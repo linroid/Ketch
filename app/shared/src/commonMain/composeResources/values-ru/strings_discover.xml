@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">Поиск</string>
+  <string name="discover_settings">Настройки поиска</string>
+  <string name="discover_hero_title">Опишите, что нужно. Ketch найдёт загрузку.</string>
+  <string name="discover_intro_body">Ketch просит %1$s поискать в интернете и прочитать найденные страницы, а затем показывает файлы, которым доверяет. Ничего не скачивается, пока вы это не добавите.</string>
+  <string name="discover_example_blender">Blender для Apple silicon</string>
+  <string name="discover_example_ubuntu">Серверный ISO Ubuntu 24.04</string>
+  <string name="discover_example_footage">Видео природы в 4K, общественное достояние</string>
+  <string name="discover_example_quoted">«%1$s»</string>
+
+  <string name="discover_setup_body">Ketch просит ИИ-модель поискать в интернете и прочитать найденные страницы, а затем показывает файлы, которым доверяет. Ваши запросы отправляются выбранному вами провайдеру.</string>
+  <string name="discover_setup_unsupported">Поиск работает в приложении Ketch на компьютере или телефоне Android.</string>
+  <string name="discover_setup_pending">Ваш запрос «%1$s» выполнится, как только поиск будет настроен.</string>
+  <string name="discover_setup_choose_model">Выберите модель</string>
+  <string name="discover_setup_local_provider">%1$s · работает локально, без ключа</string>
+  <string name="discover_setup_finish">Завершить настройку %1$s</string>
+  <string name="discover_setup_in_settings">Настроить в Настройках</string>
+  <string name="discover_provider_openai_compatible">Совместимый с OpenAI</string>
+
+  <string name="discover_query_placeholder">Опишите, что хотите скачать</string>
+  <string name="discover_find">Найти</string>
+  <string name="discover_stop">Остановить</string>
+  <string name="discover_sites_limit">Ограничить сайтами</string>
+  <plurals name="discover_sites_count">
+    <item quantity="one">%1$d сайт</item>
+    <item quantity="few">%1$d сайта</item>
+    <item quantity="many">%1$d сайтов</item>
+    <item quantity="other">%1$d сайта</item>
+  </plurals>
+  <string name="discover_sites_hint">Поиск только по этим сайтам и их поддоменам. Разделяйте их запятыми.</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="one">%1$d предыдущий шаг</item>
+    <item quantity="few">%1$d предыдущих шага</item>
+    <item quantity="many">%1$d предыдущих шагов</item>
+    <item quantity="other">%1$d предыдущего шага</item>
+  </plurals>
+  <string name="discover_step_starting">Начинаем поиск</string>
+
+  <string name="discover_select_all">Выбрать все</string>
+  <string name="discover_clear_selection">Снять выделение</string>
+  <plurals name="discover_results">
+    <item quantity="one">%1$d загрузка</item>
+    <item quantity="few">%1$d загрузки</item>
+    <item quantity="many">%1$d загрузок</item>
+    <item quantity="other">%1$d загрузки</item>
+  </plurals>
+  <string name="discover_results_for">по запросу «%1$s»</string>
+  <string name="discover_match">Совпадение %1$s</string>
+  <string name="discover_match_tooltip">Насколько результат соответствует запросу</string>
+  <string name="discover_not_encrypted">Без шифрования</string>
+  <string name="discover_error_title">Не удалось завершить этот поиск</string>
+  <string name="discover_failed">Ошибка поиска</string>
+  <string name="discover_unavailable">ИИ-поиск недоступен на этом устройстве.</string>
+  <string name="discover_none_title">Загрузки не найдены</string>
+  <string name="discover_none_body">Показываются только файлы из надёжных источников. Попробуйте указать версию, платформу или сайт, который публикует файл.</string>
+  <string name="discover_search_everywhere">Искать по всему интернету</string>
+
+  <string name="discover_select_to_add">Выберите загрузки для добавления</string>
+  <plurals name="discover_selected">
+    <item quantity="one">Выбрано: %1$d</item>
+    <item quantity="few">Выбрано: %1$d</item>
+    <item quantity="many">Выбрано: %1$d</item>
+    <item quantity="other">Выбрано: %1$d</item>
+  </plurals>
+  <string name="discover_add_now">Добавить сейчас</string>
+  <string name="discover_review_add">Проверить и добавить</string>
+  <string name="discover_review_add_count">Проверить и добавить (%1$d)</string>
+</resources>

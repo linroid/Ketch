@@ -26,8 +26,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.ByteUnit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.decimal
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_speed_chart
+import ketch.app.shared.generated.resources.speed_per_second
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /**
@@ -79,18 +90,24 @@ fun KetchSpeedChart(
   val peak = totals.maxOrNull() ?: 0L
   val top = remember(peak, limits) { speedChartCeiling(peak, limits) }
   val axisLabel = if (showAxis) {
-    remember(top, type) { measurer.measure(formatSpeedCeiling(top), type.numeralS) }
+    val ceiling = speedCeilingText(top).resolve()
+    remember(ceiling, type) { measurer.measure(ceiling, type.numeralS) }
   } else {
     null
   }
   val limitLabels = remember(limits, type) {
     limits.map { limit -> limit.label?.let { measurer.measure(it, type.numeralS) } }
   }
-  val description = remember(totals) {
-    val now = totals.lastOrNull() ?: 0L
-    "Speed ${formatBytes(now)}/s, peak ${formatBytes(peak)}/s"
-  }
+  val description = stringResource(
+    Res.string.component_speed_chart,
+    speedText(totals.lastOrNull() ?: 0L).resolve(),
+    speedText(peak).resolve(),
+  )
   var hover by remember { mutableStateOf<Int?>(null) }
+  // What the crosshair says, such as "11:42:08 · 9.8 MB/s".
+  val hoverLabel = hover?.takeIf { it < totals.size }?.let { index ->
+    timeLabel?.let { listOf(verbatim(it(index)), speedText(totals[index])).joinText().resolve() }
+  }
   val hoverable = timeLabel != null && slots > 1
   val pointer = if (hoverable) {
     Modifier.pointerInput(slots) {
@@ -157,7 +174,7 @@ fun KetchSpeedChart(
           }
           if (axisLabel != null) drawText(axisLabel, colors.textTertiary, Offset.Zero)
           val index = hover
-          if (index != null && index < totals.size && timeLabel != null) {
+          if (index != null && index < totals.size && hoverLabel != null) {
             val x = slotX(index, slots, size.width)
             drawLine(
               color = colors.textTertiary,
@@ -167,10 +184,7 @@ fun KetchSpeedChart(
             )
             val y = chartY(totals[index], top, size.height, inset)
             drawCircle(colors.accent, radius = stroke.width * 2, center = Offset(x, y))
-            val text = measurer.measure(
-              "${timeLabel(index)} · ${formatBytes(totals[index])}/s",
-              type.numeralS
-            )
+            val text = measurer.measure(hoverLabel, type.numeralS)
             val pad = labelGap * 2
             val boxWidth = text.size.width + pad * 2
             val boxLeft = (x - boxWidth / 2).coerceIn(0f, (size.width - boxWidth).coerceAtLeast(0f))
@@ -226,9 +240,23 @@ internal fun niceSpeedCeiling(bytesPerSecond: Long): Long {
   }
 }
 
-/** [bytesPerSecond] as the axis writes a round ceiling: "10 MB/s", not "10.0 MB/s". */
-internal fun formatSpeedCeiling(bytesPerSecond: Long): String =
-  formatBytes(bytesPerSecond).replace(TrailingZeros, "") + "/s"
+/**
+ * [bytesPerSecond] as the axis writes a round ceiling: "10 MB/s", not "10.0 MB/s", in the units
+ * and decimals of [speedText].
+ */
+internal fun speedCeilingText(bytesPerSecond: Long): UiText {
+  val unit = ByteUnit.of(bytesPerSecond).coerceAtMost(ByteUnit.GB)
+  val decimals = when (unit) {
+    ByteUnit.B -> 0
+    ByteUnit.KB, ByteUnit.MB -> 1
+    else -> 2
+  }
+  val value = bytesPerSecond.toDouble() / unit.bytes
+  var scale = 1L
+  repeat(decimals) { scale *= 10 }
+  val whole = (value * scale + 0.5).toLong() % scale == 0L
+  return Res.string.speed_per_second.text(unit.text(decimal(value, if (whole) 0 else decimals)))
+}
 
 /** Slot under [x] in a chart [width] wide holding [slots] samples. */
 internal fun slotAt(x: Float, width: Float, slots: Int): Int? {
@@ -279,7 +307,6 @@ private fun bandPaths(
 private const val KIB = 1024L
 private val NICE_STEPS = longArrayOf(1, 2, 5, 10, 20, 50, 100, 200, 500)
 private const val FILL_ALPHA = 0.12f
-private val TrailingZeros = Regex("""\.0+(?= )""")
 private val LineWidth = 1.5.dp
 private val LimitWidth = 1.dp
 private val DashOn = 4.dp

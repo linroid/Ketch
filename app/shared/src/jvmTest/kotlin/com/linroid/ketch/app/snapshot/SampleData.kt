@@ -19,6 +19,8 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
@@ -616,7 +618,7 @@ internal class SnapshotClipboard(private val text: String? = null) : SystemClipb
 
 /** Files that exist and, when [canTrash], can go to the Trash, without touching this machine. */
 internal class SnapshotFiles(override val canTrash: Boolean = true) : FileActions {
-  override val revealLabel: String = "Show in Finder"
+  override val revealLabel: UiText = verbatim("Show in Finder")
   override val canShare: Boolean = false
 
   override suspend fun open(path: String) {}

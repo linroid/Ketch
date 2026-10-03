@@ -5,14 +5,24 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.pulse_limit_failed
+import ketch.app.shared.generated.resources.pulse_slow_lane_off
+import ketch.app.shared.generated.resources.pulse_slow_lane_on
+import ketch.app.shared.generated.resources.pulse_speed_follows_rules
+import ketch.app.shared.generated.resources.pulse_switch_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 
@@ -67,16 +77,20 @@ internal fun AppState.switchSpeedMode(
   val previous = controller.settings.value.mode
   if (mode == previous) return null
   return launchCommand {
-    val applied = speedModeCommand("switch to ${speedModeName(mode)}") {
+    val failure = Res.string.pulse_switch_failed.text(speedModeName(mode))
+    val applied = speedModeCommand("setMode(${mode.name})", failure) {
       controller.setMode(mode)
     }
     if (!applied) return@launchCommand
     val title = when (mode) {
-      SpeedLimitMode.SlowLane -> "Slow lane on · ${formatSpeedLimit(controller.slowLaneLimit)}"
-      SpeedLimitMode.Full -> "Slow lane off"
-      SpeedLimitMode.Auto -> "Speed follows your rules"
+      SpeedLimitMode.SlowLane ->
+        Res.string.pulse_slow_lane_on.text(speedLimitText(controller.slowLaneLimit))
+      SpeedLimitMode.Full -> Res.string.pulse_slow_lane_off.text()
+      SpeedLimitMode.Auto -> Res.string.pulse_speed_follows_rules.text()
     }
-    val undo = MessageAction("Undo") { switchSpeedMode(controller, previous, undoable = false) }
+    val undo = MessageAction(Res.string.action_undo.text()) {
+      switchSpeedMode(controller, previous, undoable = false)
+    }
     messages.post(
       level = MessageLevel.Success,
       title = title,
@@ -113,7 +127,7 @@ internal fun AppState.setSpeedLimit(
     return null
   }
   return launchCommand {
-    speedModeCommand("set the speed limit") {
+    speedModeCommand("setSpeedLimit", Res.string.pulse_limit_failed.text()) {
       if (asSlowLane) {
         controller.setSlowLane(limit)
         if (controller.settings.value.mode == SpeedLimitMode.Full) {
@@ -143,20 +157,25 @@ internal val SpeedModeController.slowLaneLimit: SpeedLimit
   )
 
 // Runs a speed mode change, reads the device's limit back for the Pulse bar and posts a failure
-// with Try again. Returns whether the change applied.
-private suspend fun AppState.speedModeCommand(label: String, block: suspend () -> Unit): Boolean {
+// titled failure with Try again. command names the change in the log. Returns whether the
+// change applied.
+private suspend fun AppState.speedModeCommand(
+  command: String,
+  failure: UiText,
+  block: suspend () -> Unit,
+): Boolean {
   try {
     block()
   } catch (e: CancellationException) {
     throw e
   } catch (e: Exception) {
-    log.w { "Couldn't $label: ${e.describeCauses()}" }
+    log.w { "Speed mode command $command failed: ${e.describeCauses()}" }
     messages.post(
       level = MessageLevel.Error,
-      title = "Couldn't $label",
+      title = failure,
       actions = listOf(
-        MessageAction("Try again") {
-          launchCommand { speedModeCommand(label, block) }
+        MessageAction(Res.string.action_try_again.text()) {
+          launchCommand { speedModeCommand(command, failure, block) }
         }
       ),
       cause = e,

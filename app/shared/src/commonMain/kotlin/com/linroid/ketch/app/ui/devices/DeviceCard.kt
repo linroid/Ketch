@@ -40,20 +40,29 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.healthColor
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
+import com.linroid.ketch.app.i18n.isEmpty
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceKind
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
-import com.linroid.ketch.app.ui.pulse.healthLabel
+import com.linroid.ketch.app.ui.pulse.healthText
 import com.linroid.ketch.app.ui.pulse.sparklineSamples
-import com.linroid.ketch.app.ui.pulse.speedText
+import com.linroid.ketch.app.ui.pulse.speedParts
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_remove
+import ketch.app.shared.generated.resources.device_drop_to_download
+import ketch.app.shared.generated.resources.device_idle
+import ketch.app.shared.generated.resources.device_not_connected
+import ketch.app.shared.generated.resources.device_show_downloads
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A device on the Devices page: who it is, how fast it downloads and in which speed mode, its
@@ -79,7 +88,7 @@ internal fun DeviceCard(
   val shape = KetchTheme.shapes.card
   val problem = deviceProblem(device, LocalClock.current.now())
   DeviceDropTarget(
-    label = "Drop to download on ${device.name}",
+    label = stringResource(Res.string.device_drop_to_download, device.name.resolve()),
     enabled = problem == null,
     shape = shape,
     onDropFiles = { state.addDroppedFiles(it, device.entry) },
@@ -140,7 +149,7 @@ private fun CardHeader(
         .ketchClickable(
           interactions = interactions,
           focus = focus,
-          onClickLabel = "Show downloads",
+          onClickLabel = stringResource(Res.string.device_show_downloads),
           onClick = { state.showDeviceTab(device.entry) },
         )
         .alpha(alpha),
@@ -149,10 +158,10 @@ private fun CardHeader(
         deviceId = device.deviceId,
         name = device.entry.label,
         size = DevicePennantDefaults.Large,
-        icon = deviceIcon(device, localDeviceNoun()),
+        icon = deviceIcon(device, localDeviceKind()),
       )
       Text(
-        text = device.name,
+        text = device.name.resolve(),
         style = KetchTheme.typography.titleM,
         color = if (hovered) colors.accentText else colors.textPrimary,
         maxLines = 1,
@@ -164,9 +173,9 @@ private fun CardHeader(
     DeviceMenuButton(state, device, onRename = onRename, onRemove = onRemove)
   }
   val meta = deviceMeta(device, LocalClock.current.now())
-  if (meta.isNotEmpty()) {
+  if (!meta.isEmpty()) {
     Text(
-      text = meta,
+      text = meta.resolve(),
       style = KetchTheme.typography.caption,
       color = colors.textTertiary,
       maxLines = 1,
@@ -180,7 +189,11 @@ private fun CardHeader(
 @Composable
 private fun HealthDot(device: DevicePresence) {
   val colors = KetchTheme.colors
-  val label = if (device.connected) healthLabel(device.health) else "Not connected"
+  val label = if (device.connected) {
+    healthText(device.health).resolve()
+  } else {
+    stringResource(Res.string.device_not_connected)
+  }
   KetchTooltip(text = label) {
     KetchDot(
       color = if (device.connected) colors.healthColor(device.health) else colors.textDisabled,
@@ -226,14 +239,14 @@ private fun SpeedRow(state: AppState, device: DevicePresence) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val downloading = device.counts.downloading > 0
-  val speed = speedText(device.speed)
+  val speed = speedParts(device.speed)
   Row(verticalAlignment = Alignment.CenterVertically) {
     Row(
       horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
       modifier = Modifier.semantics(mergeDescendants = true) {},
     ) {
       Text(
-        text = if (downloading) speed.amount else "Idle",
+        text = if (downloading) speed.amount else stringResource(Res.string.device_idle),
         style = type.numeralXL,
         color = if (downloading) colors.textPrimary else colors.textTertiary,
         maxLines = 1,
@@ -289,7 +302,7 @@ private fun ProblemDetails(
         )
       }
       Text(
-        text = problem.title,
+        text = problem.title.resolve(),
         style = KetchTheme.typography.bodyStrong,
         color = colors.textPrimary,
         maxLines = 1,
@@ -298,7 +311,7 @@ private fun ProblemDetails(
     }
     problem.detail?.let { detail ->
       Text(
-        text = detail,
+        text = detail.resolve(),
         style = KetchTheme.typography.caption,
         color = colors.textSecondary,
         maxLines = 2,
@@ -310,7 +323,7 @@ private fun ProblemDetails(
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
         problemFix(device, problem)?.let { fix ->
           KetchButton(
-            text = fix.label,
+            text = fix.label.resolve(),
             onClick = {
               when (fix) {
                 ProblemFix.RetryNow -> state.retryNow(remote)
@@ -324,7 +337,7 @@ private fun ProblemDetails(
           )
         }
         KetchButton(
-          text = "Remove",
+          text = stringResource(Res.string.action_remove),
           onClick = onRemove,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,

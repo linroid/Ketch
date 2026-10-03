@@ -30,9 +30,12 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -41,8 +44,27 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.settings.NoticeTone
 import com.linroid.ketch.app.ui.settings.SettingsNotice
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connect_add_anyway
+import ketch.app.shared.generated.resources.connect_add_failed
+import ketch.app.shared.generated.resources.connect_added
+import ketch.app.shared.generated.resources.connect_added_detail
+import ketch.app.shared.generated.resources.connect_code_label
+import ketch.app.shared.generated.resources.connect_code_link_rejected
+import ketch.app.shared.generated.resources.connect_code_placeholder
+import ketch.app.shared.generated.resources.connect_code_rejected
+import ketch.app.shared.generated.resources.connect_code_requested
+import ketch.app.shared.generated.resources.connect_connected
+import ketch.app.shared.generated.resources.connect_details_manually
+import ketch.app.shared.generated.resources.connect_host
+import ketch.app.shared.generated.resources.connect_link_label
+import ketch.app.shared.generated.resources.connect_link_placeholder
+import ketch.app.shared.generated.resources.connect_port
+import ketch.app.shared.generated.resources.connect_unreachable
+import ketch.app.shared.generated.resources.connect_use_https
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("ConnectFields")
 
@@ -59,7 +81,7 @@ internal fun PairingLinkField(
   form: ConnectForm,
   onSubmit: () -> Unit,
   modifier: Modifier = Modifier,
-  placeholder: String = DefaultPlaceholder,
+  placeholder: String = stringResource(Res.string.connect_link_placeholder),
   autoFocus: Boolean = false,
 ) {
   val colors = KetchTheme.colors
@@ -78,11 +100,11 @@ internal fun PairingLinkField(
         form.link = text
         if (pasted && form.isComplete) onSubmit()
       },
-      label = "Pairing link or address",
+      label = stringResource(Res.string.connect_link_label),
       placeholder = placeholder,
       leadingIcon = KetchIcon.Link,
       mono = true,
-      error = form.linkError,
+      error = form.linkError?.resolve(),
       enabled = !form.connecting,
       onPaste = if (form.link.isEmpty()) {
         {
@@ -117,7 +139,11 @@ internal fun PairingLinkField(
           size = SummaryGlyph,
           tint = colors.status.completed.color,
         )
-        Text(summary, style = KetchTheme.typography.caption, color = colors.textSecondary)
+        Text(
+          text = summary.resolve(),
+          style = KetchTheme.typography.caption,
+          color = colors.textSecondary,
+        )
       }
     }
   }
@@ -142,15 +168,14 @@ internal fun AccessCodeField(
     KetchTextField(
       value = form.code,
       onValueChange = { form.code = it },
-      label = "Access code",
-      placeholder = "Paste or type the code",
+      label = stringResource(Res.string.connect_code_label),
+      placeholder = stringResource(Res.string.connect_code_placeholder),
       mono = true,
       enabled = !form.connecting,
       error = when {
         request?.rejected != true -> null
-        form.code.isBlank() -> "The code in the link no longer works. Enter the current one " +
-          "from Settings › Sharing on that device."
-        else -> "That code didn't work. Check it, or copy a new pairing link."
+        form.code.isBlank() -> stringResource(Res.string.connect_code_link_rejected)
+        else -> stringResource(Res.string.connect_code_rejected)
       },
       visualTransformation = PasswordVisualTransformation(),
       keyboardOptions = CodeKeyboard,
@@ -159,7 +184,7 @@ internal fun AccessCodeField(
     )
     if (request != null && !request.rejected && name != null) {
       Text(
-        text = "$name asks for its access code. It's in Settings › Sharing there.",
+        text = stringResource(Res.string.connect_code_requested, name),
         style = KetchTheme.typography.caption,
         color = KetchTheme.colors.textSecondary,
       )
@@ -175,7 +200,7 @@ internal fun ManualDetails(
   form: ConnectForm,
   onSubmit: () -> Unit,
   modifier: Modifier = Modifier,
-  label: String = "Enter details manually",
+  label: String = stringResource(Res.string.connect_details_manually),
 ) {
   val spacing = KetchTheme.spacing
   Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
@@ -193,10 +218,10 @@ internal fun ManualDetails(
       KetchTextField(
         value = form.host,
         onValueChange = { form.host = it },
-        label = "Host",
+        label = stringResource(Res.string.connect_host),
         placeholder = "192.168.1.20",
         mono = true,
-        error = form.hostError,
+        error = form.hostError?.resolve(),
         enabled = !form.connecting,
         keyboardOptions = AddressKeyboard,
         keyboardActions = KeyboardActions(onGo = { onSubmit() }),
@@ -205,10 +230,10 @@ internal fun ManualDetails(
       KetchTextField(
         value = form.port,
         onValueChange = { form.port = it },
-        label = "Port",
+        label = stringResource(Res.string.connect_port),
         mono = true,
         clearable = false,
-        error = form.portError,
+        error = form.portError?.resolve(),
         enabled = !form.connecting,
         keyboardOptions = PortKeyboard,
         keyboardActions = KeyboardActions(onGo = { onSubmit() }),
@@ -219,7 +244,7 @@ internal fun ManualDetails(
       checked = form.secure,
       onCheckedChange = { form.secure = it },
       enabled = !form.connecting,
-      label = "Use HTTPS",
+      label = stringResource(Res.string.connect_use_https),
       modifier = Modifier.fillMaxWidth(),
     )
   }
@@ -238,14 +263,13 @@ internal fun ConnectProblemNotice(
 ) {
   when (problem) {
     is ConnectProblem.Unreachable -> SettingsNotice(
-      text = "Couldn't reach ${problem.address}. Check that Ketch is sharing there and that " +
-        "both devices are on the same network.",
+      text = stringResource(Res.string.connect_unreachable, problem.address),
       tone = NoticeTone.Error,
       modifier = modifier,
       action = onAddAnyway?.let { add ->
         {
           KetchButton(
-            text = "Add anyway",
+            text = stringResource(Res.string.connect_add_anyway),
             onClick = add,
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
@@ -254,7 +278,7 @@ internal fun ConnectProblemNotice(
       },
     )
     is ConnectProblem.Failed -> SettingsNotice(
-      text = "Couldn't add the device: ${problem.message}",
+      text = Res.string.connect_add_failed.text(problem.message).resolve(),
       tone = NoticeTone.Error,
       modifier = modifier,
     )
@@ -280,12 +304,16 @@ internal fun rememberDeviceConnector(state: AppState): DeviceConnector =
 /** Tells that [device] is connected, or added when it was not tried. */
 internal fun AppState.reportConnected(device: RemoteInstance, tried: Boolean) {
   if (tried) {
-    messages.post(MessageLevel.Success, "Connected to ${device.label}", deviceId = device.deviceId)
+    messages.post(
+      level = MessageLevel.Success,
+      title = Res.string.connect_connected.text(device.displayName),
+      deviceId = device.deviceId,
+    )
   } else {
     messages.post(
       level = MessageLevel.Info,
-      title = "Added ${device.label}",
-      detail = "Ketch connects to it once it's reachable",
+      title = Res.string.connect_added.text(device.displayName),
+      detail = Res.string.connect_added_detail.text(),
       deviceId = device.deviceId,
     )
   }
@@ -307,9 +335,6 @@ private val PortKeyboard = KeyboardOptions(
   keyboardType = KeyboardType.Number,
   imeAction = ImeAction.Go,
 )
-
-/** Hint of the "Pairing link or address" field. */
-internal const val DefaultPlaceholder = "ketch://pair… or nas.local:8642"
 
 private val SummaryGlyph = 12.dp
 private val PortWidth = 96.dp

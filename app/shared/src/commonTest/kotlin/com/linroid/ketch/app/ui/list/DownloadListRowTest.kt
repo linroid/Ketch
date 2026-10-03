@@ -2,54 +2,47 @@ package com.linroid.ketch.app.ui.list
 
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.theme.lightKetchColors
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class DownloadListRowTest {
   private val colors = lightKetchColors()
 
   @Test
-  fun secondLine_downloadingOnTouch_showsSizeSpeedAndTimeLeft() {
+  fun secondLineParts_downloadingOnTouch_showsSizeSpeedAndTimeLeft() = runTest {
     val state = DownloadState.Downloading(DownloadProgress(1L shl 30, 4L shl 30, 1L shl 20))
     val row = ListFixtures.row("iso", state)
 
-    val text = secondLine(row, touch = true, colors).text
+    val parts = secondLineParts(row, touch = true)
 
-    assertEquals("1.00 of 4.00 GB · 1.0 MB/s · 51m 12s", text.replace(NO_BREAK, ' '))
+    assertEquals(listOf("1.00 of 4.00 GB", "1.0 MB/s", "51m 12s"), parts.map { it.text.load() })
+    assertEquals(listOf(true, true, true), parts.map { it.unbroken })
   }
 
   @Test
-  fun secondLine_downloadingOnTouch_wrapsOnlyBetweenParts() {
-    val state = DownloadState.Downloading(DownloadProgress(1L shl 30, 4L shl 30, 1L shl 20))
-    val row = ListFixtures.row("iso", state)
-
-    val parts = secondLine(row, touch = true, colors).text.split(" · ")
-
-    val expected = listOf("1.00 of 4.00 GB", "1.0 MB/s", "51m 12s")
-    assertEquals(expected, parts.map { it.replace(NO_BREAK, ' ') })
-    assertTrue(parts.none { ' ' in it })
-  }
-
-  @Test
-  fun secondLine_failed_leadsWithTheErrorTitle() {
-    val row = ListFixtures.row("weights", DownloadState.Failed(KetchError.Http(403, "Forbidden")))
-
-    val text = secondLine(row, touch = false, colors)
-
-    assertTrue(text.text.startsWith(row.content.error!!.title))
-    assertEquals(colors.status.failed.color, text.spanStyles.single().item.color)
-  }
-
-  @Test
-  fun secondLine_queued_isTheReason() {
+  fun secondLineParts_queued_isTheReasonThatMayWrap() = runTest {
     val row = ListFixtures.row("queued", DownloadState.Queued)
 
-    assertEquals(row.content.detail, secondLine(row, touch = false, colors).text)
+    val part = secondLineParts(row, touch = false).single()
+
+    assertEquals(row.content.detail.load(), part.text.load())
+    assertEquals(false, part.unbroken)
+  }
+
+  @Test
+  fun secondLine_failure_leadsWithTheErrorTitleInTheFailedColor() {
+    val text = secondLine(
+      "Access denied (403)",
+      "the link may have expired",
+      listOf("1 KB"),
+      colors
+    )
+
+    assertEquals("Access denied (403) · the link may have expired · 1 KB", text.text)
+    assertEquals(colors.status.failed.color, text.spanStyles.single().item.color)
   }
 }
-
-private const val NO_BREAK = '\u00A0'

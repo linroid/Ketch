@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">Téléchargements</string>
+  <string name="shell_destination_discover">Découvrir</string>
+  <string name="shell_destination_devices">Appareils</string>
+  <string name="shell_settings">Réglages</string>
+  <string name="shell_devices">Appareils</string>
+  <string name="shell_show_sidebar">Afficher la barre latérale</string>
+  <string name="shell_hide_sidebar">Masquer la barre latérale</string>
+  <string name="shell_appearance_light">Passer en mode clair</string>
+  <string name="shell_appearance_dark">Passer en mode sombre</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="one">%1$s, %2$d en cours</item>
+    <item quantity="other">%1$s, %2$d en cours</item>
+  </plurals>
+  <string name="shell_device_described">%1$s, %2$s</string>
+
+  <string name="shell_device_needs_token">Jeton requis</string>
+  <string name="shell_device_needs_a_token">Jeton requis</string>
+  <string name="shell_device_needs_new_token">Nouveau jeton d'accès requis</string>
+  <string name="shell_device_off">Désactivé</string>
+  <string name="shell_device_not_connected">Non connecté</string>
+  <string name="shell_device_offline">Hors ligne</string>
+  <string name="shell_device_last_seen">vu il y a %1$s</string>
+  <string name="shell_device_connecting">Connexion</string>
+  <string name="shell_device_connecting_now">Connexion…</string>
+  <string name="shell_device_idle">Inactif</string>
+  <string name="shell_device_slow_lane">Voie lente</string>
+  <plurals name="shell_device_active">
+    <item quantity="one">%1$d actif</item>
+    <item quantity="other">%1$d actifs</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="one">%1$d en attente</item>
+    <item quantity="other">%1$d en attente</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="one">%1$d en échec</item>
+    <item quantity="other">%1$d en échec</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%1$d sur %2$d en ligne</string>
+
+  <string name="sidebar_all_devices_tooltip">Les téléchargements de tous les appareils</string>
+  <string name="sidebar_add_device">Ajouter un appareil</string>
+  <string name="sidebar_device_menu">Menu de l'appareil</string>
+  <string name="sidebar_menu_pause_all">Tout mettre en pause ici</string>
+  <string name="sidebar_menu_resume_all">Tout reprendre ici</string>
+  <string name="sidebar_menu_retry_failed">Réessayer les échecs ici</string>
+  <string name="sidebar_menu_retry_failed_count">Réessayer les échecs ici (%1$d)</string>
+  <string name="sidebar_menu_speed">Vitesse</string>
+  <string name="sidebar_menu_settings">Réglages de cet appareil…</string>
+  <string name="sidebar_menu_full_speed">Pleine vitesse</string>
+  <string name="sidebar_menu_slow_lane">Voie lente · %1$s</string>
+  <string name="sidebar_menu_no_limit">Aucune limite</string>
+
+  <string name="switcher_overview">Vue d'ensemble</string>
+  <string name="switcher_add_device">Ajouter un appareil…</string>
+  <string name="switcher_find_on_network">Rechercher sur le réseau</string>
+  <string name="switcher_share">Partager %1$s…</string>
+
+  <string name="shell_device_button">%1$s, changer d'appareil</string>
+  <string name="shell_device_button_back">Revenir à l'appareil précédent</string>
+  <string name="shell_more">Plus</string>
+  <string name="shell_clear_finished">Effacer les terminés</string>
+  <string name="shell_search_close">Fermer la recherche</string>
+  <string name="shell_search_placeholder">Rechercher ou coller un lien</string>
+  <string name="shell_search_download_on">Télécharger sur %1$s</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="one">Télécharger %1$d lien sur %2$s</item>
+    <item quantity="other">Télécharger %1$d liens sur %2$s</item>
+  </plurals>
+  <string name="shell_discover_query">Découvrir « %1$s »</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="one">%1$d non lu</item>
+    <item quantity="other">%1$d non lus</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">Le presse-papiers ne contient aucun lien</string>
+  <string name="shell_file_picker_failed">Impossible d'ouvrir le sélecteur de fichiers</string>
+
+  <string name="banner_connecting">Connexion à %1$s…</string>
+  <string name="banner_offline">%1$s est hors ligne</string>
+  <string name="banner_retrying">nouvelle tentative</string>
+  <string name="banner_retry_now">Réessayer maintenant</string>
+  <string name="banner_switch_to">Passer à %1$s</string>
+  <string name="banner_unauthorized">%1$s a besoin d'un nouveau jeton d'accès</string>
+  <string name="banner_enter_token">Saisir le jeton</string>
+  <string name="toast_subject_reason">%1$s : %2$s</string>
+
+  <string name="drop_to_download">Déposer pour télécharger</string>
+  <string name="drop_kinds">Liens, magnets, fichiers .torrent et listes de liens</string>
+  <string name="drop_unreachable">Injoignable pour le moment</string>
+  <string name="drop_here">Déposer ici</string>
+  <string name="drop_already_here">Déjà ici</string>
+  <string name="drop_move_it">Le déplacer ici</string>
+  <string name="drop_send_it">L'envoyer ici</string>
+  <string name="drop_move_count">En déplacer %1$d ici</string>
+  <string name="drop_send_count">En envoyer %1$d ici</string>
+  <string name="drop_key_moves">%1$s pour déplacer</string>
+  <string name="berth_drop_on">Déposer sur %1$s</string>
+  <string name="berth_ready">Prêt</string>
+
+  <string name="palette_placeholder">Collez un lien, recherchez des téléchargements ou saisissez une commande</string>
+  <string name="palette_placeholder_short">Collez un lien, recherchez ou saisissez une commande</string>
+  <string name="palette_clear">Effacer</string>
+  <string name="palette_no_matches">Aucun résultat pour « %1$s »</string>
+  <string name="palette_no_matches_hint">Essayez un nom de fichier, une commande comme « pause », un lien ou /speed</string>
+  <string name="palette_hint_move">déplacer</string>
+  <string name="palette_hint_run">exécuter</string>
+  <string name="palette_hint_alternate">action secondaire</string>
+  <string name="palette_hint_discover">Découvrir</string>
+  <string name="palette_hint_close">fermer</string>
+  <string name="palette_section_recent">Récents</string>
+  <string name="palette_section_links">Télécharger</string>
+  <string name="palette_section_speed">Vitesse</string>
+  <string name="palette_section_commands">Commandes</string>
+  <string name="palette_section_downloads">Téléchargements</string>
+  <string name="palette_section_navigation">Aller à</string>
+  <string name="palette_section_devices">Appareils</string>
+  <string name="palette_section_search">Rechercher</string>
+
+  <plurals name="palette_links">
+    <item quantity="one">%1$d lien</item>
+    <item quantity="other">%1$d liens</item>
+  </plurals>
+  <string name="palette_download">Télécharger %1$s</string>
+  <string name="palette_on_device">sur %1$s</string>
+  <string name="palette_verb_download">Télécharger</string>
+  <string name="palette_add_with_options">Ajouter avec des options…</string>
+  <string name="palette_add_with_options_detail">Dossier, vitesse, priorité et heure de démarrage</string>
+  <string name="palette_limit_to">Limiter les téléchargements à %1$s</string>
+  <string name="palette_slow_lane_to">Régler la Voie lente sur %1$s</string>
+  <string name="palette_slow_lane_turns_on">Active la Voie lente</string>
+  <string name="palette_slow_lane_is_on">La Voie lente est activée</string>
+  <string name="palette_slow_lane_now">Actuellement %1$s</string>
+  <string name="palette_limit_while_off">S'applique quand la Voie lente est désactivée</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="one">Mettre en pause %1$d téléchargement</item>
+    <item quantity="other">Mettre en pause %1$d téléchargements</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">Rien à mettre en pause</string>
+  <plurals name="palette_resume_count">
+    <item quantity="one">Reprendre %1$d téléchargement en pause</item>
+    <item quantity="other">Reprendre %1$d téléchargements en pause</item>
+  </plurals>
+  <string name="palette_nothing_paused">Rien en pause</string>
+  <plurals name="palette_retry_count">
+    <item quantity="one">Réessayer %1$d téléchargement en échec</item>
+    <item quantity="other">Réessayer %1$d téléchargements en échec</item>
+  </plurals>
+  <string name="palette_nothing_failed">Aucun échec</string>
+  <string name="palette_slow_lane_off">Désactiver la Voie lente</string>
+  <string name="palette_slow_lane_on">Activer la Voie lente</string>
+  <string name="palette_nothing_to_undo">Rien à annuler</string>
+  <string name="palette_full_speed">Pleine vitesse</string>
+  <string name="palette_full_speed_slow_lane">Désactive la Voie lente</string>
+  <string name="palette_full_speed_rules">Désactive les règles de vitesse</string>
+  <string name="palette_full_speed_cap">Lève la limite de %1$s</string>
+  <string name="palette_full_speed_already">Déjà à pleine vitesse</string>
+  <string name="palette_full_speed_keywords">illimité, sans limite, vitesse max, vitesse maximale, débit maximal</string>
+  <string name="palette_speed_not_loaded">La limite de vitesse n'est pas encore chargée</string>
+
+  <string name="palette_downloads_tab">Téléchargements › %1$s</string>
+  <string name="palette_none">Aucun</string>
+  <string name="palette_settings_page">Réglages › %1$s</string>
+  <string name="palette_pause_all_on">Tout mettre en pause sur %1$s</string>
+  <string name="palette_resume_all_on">Tout reprendre sur %1$s</string>
+  <string name="palette_retry_failed_on">Réessayer les échecs sur %1$s</string>
+  <string name="palette_show_in_downloads">Afficher « %1$s » dans Téléchargements</string>
+  <plurals name="palette_matches">
+    <item quantity="one">%1$d résultat</item>
+    <item quantity="other">%1$d résultats</item>
+  </plurals>
+  <string name="palette_discover_detail">Trouver des téléchargements sur le web</string>
+</resources>

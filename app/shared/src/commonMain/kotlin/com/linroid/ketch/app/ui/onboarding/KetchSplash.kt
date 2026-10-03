@@ -16,6 +16,9 @@ import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.canvasWash
 import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ThemeMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.onboarding_loading
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What a host shows while the app gets ready, such as while the Android app binds its download
@@ -29,12 +32,13 @@ fun KetchSplash(
   val dark = appearance.theme.isDark()
   SystemAppearance(dark.takeIf { appearance.theme != ThemeMode.System })
   KetchTheme(darkTheme = dark, accent = appearance.accent.toKetchAccent()) {
+    val description = stringResource(Res.string.onboarding_loading)
     Box(
       contentAlignment = Alignment.Center,
       modifier = modifier
         .fillMaxSize()
         .canvasWash(KetchTheme.colors)
-        .semantics { contentDescription = "Loading Ketch" },
+        .semantics { contentDescription = description },
     ) {
       // The host may hold the main thread while it starts, so the lanes do not animate.
       SailLanesIllustration(animate = false, width = SailLanesIllustrationDefaults.CompactWidth)

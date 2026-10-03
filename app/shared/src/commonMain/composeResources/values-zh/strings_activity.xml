@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="notify_on_device">%1$s：%2$s</string>
+  <string name="notify_download_complete">下载完成</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="other">%1$d 个下载已完成</item>
+  </plurals>
+  <string name="notify_download_failed">下载失败</string>
+  <string name="notify_failed_body">%1$s：%2$s</string>
+  <string name="notify_all_finished">所有下载已完成</string>
+  <string name="notify_action_share">分享</string>
+
+  <string name="notify_channel_active">进行中的下载</string>
+  <string name="notify_channel_done">已完成的下载</string>
+  <string name="notify_channel_failed">失败的下载</string>
+  <string name="notify_finished_group">已完成的下载</string>
+  <string name="notify_sharing_device">正在共享这台设备</string>
+  <string name="notify_server_on_port">服务器运行于端口 %1$d</string>
+  <string name="notify_slow_lane_on">慢车道</string>
+  <string name="notify_action_pause_all">全部暂停</string>
+  <string name="notify_action_slow_lane">慢车道</string>
+  <string name="notify_action_full_speed">全速</string>
+  <plurals name="notify_more_files">
+    <item quantity="other">另有 %1$d 个</item>
+  </plurals>
+  <plurals name="notify_paused">
+    <item quantity="other">%1$d 个下载已暂停</item>
+  </plurals>
+  <string name="notify_paused_body">打开 Ketch 以继续</string>
+  <string name="notify_web_offer">通知我</string>
+  <string name="notify_web_on">已开启通知</string>
+
+  <plurals name="ongoing_downloading">
+    <item quantity="other">正在下载 %1$d 个文件</item>
+  </plurals>
+  <string name="ongoing_downloading_file">正在下载 %1$s</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="other">等待下载 %1$d 个文件</item>
+  </plurals>
+  <string name="ongoing_size_of">%1$s / %2$s</string>
+  <string name="ongoing_left_under_minute">剩余不到1分钟</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="other">剩余约%1$d分钟</item>
+  </plurals>
+  <string name="ongoing_left">剩余约%1$s</string>
+  <string name="ongoing_line_waiting">等待中</string>
+
+  <string name="feedback_background_pause">Ketch 在后台时，下载会暂停</string>
+  <string name="feedback_background_use_computer">改用电脑</string>
+  <string name="feedback_file_action_failed">无法打开文件</string>
+
+  <string name="activity_title">动态</string>
+  <string name="activity_mark_all_read">全部标为已读</string>
+  <string name="activity_clear">清除</string>
+  <string name="activity_unread">未读</string>
+  <string name="activity_empty_title">暂无动态</string>
+  <string name="activity_empty_body">已完成的下载、失败的下载和离线的设备会显示在这里。</string>
+  <string name="activity_earlier">更早</string>
+
+  <string name="feedback_open_failed">无法打开 %1$s</string>
+  <string name="feedback_drop_unsupported">只能拖入 .torrent 文件和链接列表来添加下载</string>
+  <string name="feedback_drop_no_links">拖入的内容中没有找到链接</string>
+  <string name="feedback_read_failed">无法读取 %1$s</string>
+  <string name="feedback_add_failed">无法添加 %1$s</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="other">无法添加 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_switch_failed">无法切换到 %1$s</string>
+  <string name="feedback_reconnect_failed">无法重新连接到 %1$s</string>
+  <string name="feedback_remove_device_failed">无法移除 %1$s</string>
+  <string name="feedback_discovery_failed">无法发现局域网中的服务器</string>
+
+  <plurals name="feedback_part_failed">
+    <item quantity="other">%1$d 个失败</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">没有可暂停的下载</string>
+  <plurals name="feedback_paused">
+    <item quantity="other">已暂停 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="other">已在 %2$d 台设备上暂停 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="other">%1$d 个已计划的下载仍会按时开始</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="other">%1$d 个已计划的下载仍会在 %2$s 开始</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="other">已继续 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="other">已在 %2$d 台设备上继续 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="other">正在重试 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="other">正在 %2$d 台设备上重试 %1$d 个下载</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="other">已清除 %1$d 个已完成的下载</item>
+  </plurals>
+  <string name="feedback_nothing_missing">没有文件丢失的下载需要清除</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="other">已清除 %1$d 个文件丢失的下载</item>
+  </plurals>
+  <string name="feedback_removed_one">已移除 %1$s</string>
+  <plurals name="feedback_removed">
+    <item quantity="other">已移除 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_discarded_one">已丢弃 %1$s 的进度</string>
+  <plurals name="feedback_discarded">
+    <item quantity="other">已丢弃 %1$d 个下载的进度</item>
+  </plurals>
+  <string name="feedback_restarted_one">已重新开始 %1$s</string>
+  <plurals name="feedback_restarted">
+    <item quantity="other">已重新开始 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_redownload_failed_one">无法在 %2$s 上重新下载 %1$s</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="other">无法重新下载 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_started_now_one">已立即开始 %1$s</string>
+  <plurals name="feedback_started_now">
+    <item quantity="other">已立即开始 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_started_preempted">已暂停 %1$s 以腾出位置</string>
+  <string name="feedback_start_now_failed_one">无法在 %2$s 上立即开始 %1$s</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="other">无法立即开始 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_send_failed_one">无法将 %1$s 发送到 %2$s</string>
+  <plurals name="feedback_send_failed">
+    <item quantity="other">无法将 %1$d 个下载发送到 %2$s</item>
+  </plurals>
+  <string name="feedback_moved_one">已将 %1$s 移到 %2$s</string>
+  <plurals name="feedback_moved">
+    <item quantity="other">已将 %1$d 个下载移到 %2$s</item>
+  </plurals>
+  <string name="feedback_sent_one">已将 %1$s 发送到 %2$s</string>
+  <plurals name="feedback_sent">
+    <item quantity="other">已将 %1$d 个下载发送到 %2$s</item>
+  </plurals>
+  <string name="feedback_remove_here">从这里移除</string>
+  <string name="feedback_options">选项</string>
+
+  <string name="feedback_pause_failed_one">无法在 %2$s 上暂停 %1$s</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="other">无法在 %2$s 上暂停 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">无法在 %2$s 上继续 %1$s</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="other">无法在 %2$s 上继续 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">无法在 %2$s 上重试 %1$s</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="other">无法在 %2$s 上重试 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">无法在 %2$s 上丢弃 %1$s 的进度</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="other">无法在 %2$s 上丢弃 %1$d 个下载的进度</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">无法在 %2$s 上撤销立即开始 %1$s</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="other">无法在 %2$s 上撤销立即开始 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">无法在 %2$s 上移除 %1$s</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="other">无法在 %2$s 上移除 %1$d 个下载</item>
+  </plurals>
+
+  <string name="feedback_undo_pause_all">撤销全部暂停</string>
+  <string name="feedback_undo_clear_finished">撤销清除已完成</string>
+  <string name="feedback_undo_clear_missing">撤销清除文件丢失项</string>
+  <string name="feedback_undo_remove">撤销移除</string>
+  <string name="feedback_undo_discard">撤销丢弃进度</string>
+  <string name="feedback_undo_start_now">撤销立即开始</string>
+  <string name="feedback_undo_move">撤销移动</string>
+  <string name="feedback_undo_add">撤销添加</string>
+
+  <string name="feedback_send_cookies_and_sign_in">浏览器中的 Cookie 和登录信息将发送到 %1$s。</string>
+  <string name="feedback_send_cookies">浏览器中的 Cookie 将发送到 %1$s。</string>
+  <string name="feedback_send_sign_in">登录信息将发送到 %1$s。</string>
+
+  <string name="feedback_added">已添加 %1$s</string>
+  <plurals name="feedback_recovered">
+    <item quantity="other">正在继续上次的 %1$d 个下载</item>
+  </plurals>
+  <string name="feedback_device_offline">%1$s 已离线</string>
+  <string name="feedback_device_online">已重新连接到 %1$s</string>
+</resources>

@@ -32,6 +32,10 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchLogoTile
 import com.linroid.ketch.app.components.KetchLogoTileDefaults
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.log.LogFilesAction
@@ -41,8 +45,30 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_close
+import ketch.app.shared.generated.resources.settings_about_build
+import ketch.app.shared.generated.resources.settings_about_checklist
+import ketch.app.shared.generated.resources.settings_about_checklist_done
+import ketch.app.shared.generated.resources.settings_about_checklist_hint
+import ketch.app.shared.generated.resources.settings_about_discover_elsewhere
+import ketch.app.shared.generated.resources.settings_about_getting_started
+import ketch.app.shared.generated.resources.settings_about_licenses
+import ketch.app.shared.generated.resources.settings_about_licenses_failed
+import ketch.app.shared.generated.resources.settings_about_licenses_loading
+import ketch.app.shared.generated.resources.settings_about_logs_footer
+import ketch.app.shared.generated.resources.settings_about_name_line
+import ketch.app.shared.generated.resources.settings_about_project
+import ketch.app.shared.generated.resources.settings_about_report
+import ketch.app.shared.generated.resources.settings_about_report_hint
+import ketch.app.shared.generated.resources.settings_about_source
+import ketch.app.shared.generated.resources.settings_about_troubleshooting
+import ketch.app.shared.generated.resources.settings_about_version
+import ketch.app.shared.generated.resources.settings_about_welcome
+import ketch.app.shared.generated.resources.settings_about_welcome_done
+import ketch.app.shared.generated.resources.settings_about_welcome_hint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 private const val PROJECT_URL = "https://github.com/linroid/Ketch"
 
@@ -61,39 +87,48 @@ fun AboutSettings(state: AppState) {
   val appSettings = state.appSettings
   BrandHeader()
   if (!state.aiSettings.supported) {
-    SettingsNotice(text = "Discover runs in the desktop and Android apps.", tone = NoticeTone.Info)
+    SettingsNotice(
+      text = stringResource(Res.string.settings_about_discover_elsewhere),
+      tone = NoticeTone.Info,
+    )
   }
   SettingsGroup {
-    SettingsRow(title = "Version", trailing = { MonoValue(KetchApi.VERSION) })
-    SettingsRow(title = "Build", trailing = { MonoValue(KetchApi.REVISION) })
+    SettingsRow(
+      title = stringResource(Res.string.settings_about_version),
+      trailing = { MonoValue(KetchApi.VERSION) },
+    )
+    SettingsRow(
+      title = stringResource(Res.string.settings_about_build),
+      trailing = { MonoValue(KetchApi.REVISION) },
+    )
   }
-  SettingsGroup(title = "Project") {
+  SettingsGroup(title = stringResource(Res.string.settings_about_project)) {
     LinkRow(
-      title = "Source code",
+      title = stringResource(Res.string.settings_about_source),
       description = "github.com/linroid/Ketch",
       url = PROJECT_URL,
     )
     LinkRow(
-      title = "Report a problem",
-      description = "Open an issue on GitHub",
+      title = stringResource(Res.string.settings_about_report),
+      description = stringResource(Res.string.settings_about_report_hint),
       url = "$PROJECT_URL/issues",
     )
     SettingsRow(
-      title = "Open-source licenses",
+      title = stringResource(Res.string.settings_about_licenses),
       modifier = Modifier.clickable(role = Role.Button) { showLicenses = true },
       trailing = { Chevron() },
     )
   }
-  SettingsGroup(title = "Getting started") {
+  SettingsGroup(title = stringResource(Res.string.settings_about_getting_started)) {
     // The mobile apps have welcome screens; their Downloads page shows no checklist.
     if (!isMobilePlatform) {
       var checklistShown by remember { mutableStateOf(false) }
       SettingsRow(
-        title = "Show setup checklist",
+        title = stringResource(Res.string.settings_about_checklist),
         description = if (checklistShown) {
-          "Done. It shows while the Downloads list is empty."
+          stringResource(Res.string.settings_about_checklist_done)
         } else {
-          "The setup steps on an empty Downloads page."
+          stringResource(Res.string.settings_about_checklist_hint)
         },
         modifier = Modifier.clickable(role = Role.Button) {
           appSettings.saveUi {
@@ -106,11 +141,11 @@ fun AboutSettings(state: AppState) {
     } else {
       var welcomeShown by remember { mutableStateOf(false) }
       SettingsRow(
-        title = "Show welcome again",
+        title = stringResource(Res.string.settings_about_welcome),
         description = if (welcomeShown) {
-          "Done. The welcome screens show next time you open Ketch."
+          stringResource(Res.string.settings_about_welcome_done)
         } else {
-          "Where downloads go, and how you use Ketch on this device."
+          stringResource(Res.string.settings_about_welcome_hint)
         },
         modifier = Modifier.clickable(role = Role.Button) {
           appSettings.saveUi { it.copy(onboardingVersion = 0) }
@@ -122,8 +157,8 @@ fun AboutSettings(state: AppState) {
   }
   if (logFiles != null) {
     SettingsGroup(
-      title = "Troubleshooting",
-      footer = "Logs include download names and links. Check them before posting.",
+      title = stringResource(Res.string.settings_about_troubleshooting),
+      footer = stringResource(Res.string.settings_about_logs_footer),
     ) {
       LogFilesRow(logFiles)
     }
@@ -144,6 +179,7 @@ private fun BrandHeader() {
     modifier = Modifier.fillMaxWidth().padding(vertical = spacing.s2),
   ) {
     KetchLogoTile(size = KetchLogoTileDefaults.About)
+    // The product's name, never translated.
     Text(
       text = "Ketch",
       style = KetchTheme.typography.pageTitle,
@@ -151,8 +187,7 @@ private fun BrandHeader() {
       modifier = Modifier.padding(top = spacing.s2),
     )
     Text(
-      text = "A ketch is a two-masted sailboat. Ketch splits every download into lanes, like " +
-        "its sails.",
+      text = stringResource(Res.string.settings_about_name_line),
       style = KetchTheme.typography.bodyS,
       color = colors.textSecondary,
       textAlign = TextAlign.Center,
@@ -163,29 +198,36 @@ private fun BrandHeader() {
 
 @Composable
 private fun LicenseDialog(onDismiss: () -> Unit) {
-  var licenseText by remember { mutableStateOf("Loading licenses…") }
+  // The licenses, or why they could not be read; null while they load.
+  var licenses by remember { mutableStateOf<UiText?>(null) }
   LaunchedEffect(Unit) {
-    licenseText = try {
-      listOf("LICENSE.txt", "THIRD-PARTY-NOTICES.txt").map {
-        Res.readBytes("files/licenses/$it").decodeToString()
-      }.joinToString("\n\n")
+    licenses = try {
+      verbatim(
+        listOf("LICENSE.txt", "THIRD-PARTY-NOTICES.txt").map {
+          Res.readBytes("files/licenses/$it").decodeToString()
+        }.joinToString("\n\n"),
+      )
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       log.w { "Couldn't read the licenses: ${e.describeCauses()}" }
-      "Couldn't load the licenses. They are in the LICENSE file at $PROJECT_URL."
+      Res.string.settings_about_licenses_failed.text(PROJECT_URL)
     }
   }
   AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text("Open-source licenses") },
+    title = { Text(stringResource(Res.string.settings_about_licenses)) },
     confirmButton = {
-      KetchButton(text = "Close", onClick = onDismiss, variant = KetchButtonVariant.Secondary)
+      KetchButton(
+        text = stringResource(Res.string.action_close),
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Secondary,
+      )
     },
   ) {
     SelectionContainer {
       Text(
-        text = licenseText,
+        text = licenses?.resolve() ?: stringResource(Res.string.settings_about_licenses_loading),
         style = KetchTheme.typography.mono,
         color = KetchTheme.colors.textSecondary,
         modifier = Modifier.heightIn(max = LicenseMaxHeight).verticalScroll(rememberScrollState()),
@@ -199,10 +241,10 @@ private fun LicenseDialog(onDismiss: () -> Unit) {
 private fun LogFilesRow(action: LogFilesAction) {
   val scope = rememberCoroutineScope()
   var running by remember { mutableStateOf(false) }
-  var failure by remember { mutableStateOf<String?>(null) }
+  var failure by remember { mutableStateOf<UiText?>(null) }
   SettingsRow(
-    title = action.title,
-    description = failure ?: action.description,
+    title = action.title.resolve(),
+    description = (failure ?: action.description).resolve(),
     descriptionColor = if (failure != null) {
       KetchTheme.colors.status.failed.color
     } else {
@@ -217,8 +259,8 @@ private fun LogFilesRow(action: LogFilesAction) {
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
-          log.w { "Couldn't ${action.title.lowercase()}: ${e.describeCauses()}" }
-          "Couldn't ${action.title.lowercase()}: ${e.message ?: e::class.simpleName}"
+          log.w { "Couldn't hand over the log files: ${e.describeCauses()}" }
+          action.failed.text(e.message ?: e::class.simpleName.orEmpty())
         } finally {
           running = false
         }

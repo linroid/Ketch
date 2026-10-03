@@ -4,7 +4,11 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceHealth
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,10 +24,10 @@ class BannerHostTest {
   private fun banner(
     health: DeviceHealth?,
     connectingLong: Boolean = false,
-    localName: String? = "This Mac",
+    localName: UiText? = verbatim("This Mac"),
   ) = deviceBanner(
     health = health,
-    name = "NAS-Basement",
+    name = verbatim("NAS-Basement"),
     connectingLong = connectingLong,
     localName = localName,
     onRetry = { retried++ },
@@ -37,41 +41,44 @@ class BannerHostTest {
   }
 
   @Test
-  fun deviceBanner_connectingAWhile_saysSoWithASpinner() {
+  fun deviceBanner_connectingAWhile_saysSoWithASpinner() = runTest {
     val banner = banner(DeviceHealth.Connecting, connectingLong = true)
 
-    assertEquals("Connecting to NAS-Basement…", banner?.text)
+    assertEquals("Connecting to NAS-Basement…", banner?.text?.load())
     assertEquals(BannerTone.Warning, banner?.tone)
     assertTrue(banner?.busy == true)
   }
 
   @Test
-  fun deviceBanner_offline_offersRetryAndTheLocalDevice() {
+  fun deviceBanner_offline_offersRetryAndTheLocalDevice() = runTest {
     val banner = banner(DeviceHealth.Offline("Connection refused"))
 
-    assertEquals("NAS-Basement is offline · retrying · Connection refused", banner?.text)
+    assertEquals("NAS-Basement is offline · retrying · Connection refused", banner?.text?.load())
     assertEquals(BannerTone.Danger, banner?.tone)
-    assertEquals(listOf("Retry now", "Switch to This Mac"), banner?.actions?.map { it.label })
+    assertEquals(
+      listOf("Retry now", "Switch to This Mac"),
+      banner?.actions?.map { it.label }?.load()
+    )
     banner?.actions?.forEach { it.onClick() }
     assertEquals(1, retried)
     assertEquals(1, switched)
   }
 
   @Test
-  fun deviceBanner_offlineWithoutLocalDevice_offersOnlyRetry() {
+  fun deviceBanner_offlineWithoutLocalDevice_offersOnlyRetry() = runTest {
     val banner = banner(DeviceHealth.Offline(), localName = null)
 
-    assertEquals("NAS-Basement is offline · retrying", banner?.text)
-    assertEquals(listOf("Retry now"), banner?.actions?.map { it.label })
+    assertEquals("NAS-Basement is offline · retrying", banner?.text?.load())
+    assertEquals(listOf("Retry now"), banner?.actions?.map { it.label }?.load())
   }
 
   @Test
-  fun deviceBanner_unauthorized_asksForATokenOnlyWhenClicked() {
+  fun deviceBanner_unauthorized_asksForATokenOnlyWhenClicked() = runTest {
     val banner = banner(DeviceHealth.Unauthorized)
 
-    assertEquals("NAS-Basement needs a new access token", banner?.text)
+    assertEquals("NAS-Basement needs a new access token", banner?.text?.load())
     assertEquals(0, tokenAsked)
-    banner?.actions?.single { it.label == "Enter token" }?.onClick()
+    banner?.actions?.single { it.label.load() == "Enter token" }?.onClick()
     assertEquals(1, tokenAsked)
   }
 
@@ -83,13 +90,13 @@ class BannerHostTest {
   }
 
   @Test
-  fun messageBanner_message_keepsItsActionsAndCanBeClosed() {
+  fun messageBanner_message_keepsItsActionsAndCanBeClosed() = runTest {
     var dismissed = false
     val message = AppMessage(
       id = 7,
       level = MessageLevel.Info,
-      title = "Downloads pause when Ketch is in the background",
-      actions = listOf(MessageAction("Use a computer instead") {}),
+      title = verbatim("Downloads pause when Ketch is in the background"),
+      actions = listOf(MessageAction(verbatim("Use a computer instead")) {}),
       at = Instant.fromEpochSeconds(0),
       placement = MessagePlacement.Banner,
     )
@@ -99,7 +106,7 @@ class BannerHostTest {
 
     assertEquals("message-7", banner.id)
     assertEquals(BannerTone.Info, banner.tone)
-    assertEquals(listOf("Use a computer instead"), banner.actions.map { it.label })
+    assertEquals(listOf("Use a computer instead"), banner.actions.map { it.label }.load())
     assertTrue(dismissed)
   }
 }

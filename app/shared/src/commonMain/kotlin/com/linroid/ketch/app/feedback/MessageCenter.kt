@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.feedback
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.TaskKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +41,7 @@ enum class MessagePlacement {
  * @property onClick runs when the button is clicked.
  */
 class MessageAction(
-  val label: String,
+  val label: UiText,
   val onClick: () -> Unit,
 )
 
@@ -62,8 +64,8 @@ class MessageAction(
 data class AppMessage(
   val id: Long,
   val level: MessageLevel,
-  val title: String,
-  val detail: String? = null,
+  val title: UiText,
+  val detail: UiText? = null,
   val taskKey: TaskKey? = null,
   val deviceId: String? = null,
   val actions: List<MessageAction> = emptyList(),
@@ -115,8 +117,8 @@ class MessageCenter(
    */
   fun post(
     level: MessageLevel,
-    title: String,
-    detail: String? = null,
+    title: UiText,
+    detail: UiText? = null,
     taskKey: TaskKey? = null,
     deviceId: String? = null,
     actions: List<MessageAction> = emptyList(),
@@ -148,7 +150,6 @@ class MessageCenter(
     return message
   }
 
-  /** Takes the message with [id] off the screen; it stays in the history. */
   fun dismiss(id: Long) {
     activeState.update { messages -> messages.filterNot { it.id == id } }
   }

@@ -10,7 +10,12 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.TorrentSettings
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_call_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -52,7 +57,7 @@ class InstanceSettingsController(
     private set
 
   /** Why the download settings could not be loaded or applied. */
-  var downloadError by mutableStateOf<String?>(null)
+  var downloadError by mutableStateOf<UiText?>(null)
     private set
 
   /** Network interfaces of the instance, or `null` while loading. */
@@ -60,7 +65,7 @@ class InstanceSettingsController(
     private set
 
   /** Why the network interfaces could not be loaded or changed. */
-  var networkError by mutableStateOf<String?>(null)
+  var networkError by mutableStateOf<UiText?>(null)
     private set
 
   /**
@@ -70,7 +75,7 @@ class InstanceSettingsController(
   val torrent: TorrentSettings? get() = local?.config?.torrent
 
   /** Why the torrent settings could not be applied. */
-  var torrentError by mutableStateOf<String?>(null)
+  var torrentError by mutableStateOf<UiText?>(null)
     private set
 
   /** Whether the settings live on another device. */
@@ -222,14 +227,14 @@ class InstanceSettingsController(
     }
   }
 
-  private suspend fun attempt(onError: (String) -> Unit, block: suspend () -> Unit) {
+  private suspend fun attempt(onError: (UiText) -> Unit, block: suspend () -> Unit) {
     try {
       block()
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       log.w { "Instance settings call failed: ${e.describeCauses()}" }
-      onError(e.message ?: "Something went wrong. Try again.")
+      onError(e.message?.let(::verbatim) ?: Res.string.settings_call_failed.text())
     }
   }
 }

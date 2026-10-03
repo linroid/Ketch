@@ -6,9 +6,12 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures.START
 import com.linroid.ketch.app.state.ListFixtures.downloading
 import com.linroid.ketch.app.state.ListFixtures.row
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +27,7 @@ class SortAndGroupTest {
   private val utc = TimeZone.UTC
 
   @Test
-  fun arrangeRows_smart_ordersGroupsByWhatNeedsTheUser() {
+  fun arrangeRows_smart_ordersGroupsByWhatNeedsTheUser() = runTest {
     val rows = listOf(
       row("old", completed(), createdAt = START - 30.days),
       row("week", completed(), createdAt = START - 3.days),
@@ -44,13 +47,13 @@ class SortAndGroupTest {
         "Downloading", "Waiting", "Paused", "Needs attention", "Added today", "Added yesterday",
         "Added this week", "Added earlier"
       ),
-      groups.map { it.title }
+      groups.map { it.title }.load()
     )
     assertEquals(setOf("failed", "canceled"), groups[3].ids().toSet())
   }
 
   @Test
-  fun arrangeRows_smartDownloading_ordersByPriorityThenProgress() {
+  fun arrangeRows_smartDownloading_ordersByPriorityThenProgress() = runTest {
     val rows = listOf(
       row("slow", downloading(100, total = 1000, speed = 100)),
       row("far", downloading(900, total = 1000, speed = 300)),
@@ -61,20 +64,20 @@ class SortAndGroupTest {
 
     assertEquals(listOf("urgent", "far", "slow"), group.rows.map { it.key.taskId })
     // 450 B/s in total; the urgent task takes the longest: 990 B at 50 B/s, 19 s.
-    assertEquals(listOf("3", "450 B/s", "all done ≈ 12:00"), group.details)
+    assertEquals(listOf("3", "450 B/s", "all done ≈ 12:00"), group.details.load())
   }
 
   @Test
-  fun arrangeRows_downloadingWithUnknownTimeLeft_omitsAllDone() {
+  fun arrangeRows_downloadingWithUnknownTimeLeft_omitsAllDone() = runTest {
     val rows = listOf(row("a", downloading(10, speed = 0)), row("b", downloading(10)))
 
     val details = arrangeRows(rows, ListArrangement(), START, utc).single().details
 
-    assertEquals(listOf("2", "100 B/s"), details)
+    assertEquals(listOf("2", "100 B/s"), details.load())
   }
 
   @Test
-  fun arrangeRows_smartWaiting_queuedByPriorityAndAgeThenScheduledByStart() {
+  fun arrangeRows_smartWaiting_queuedByPriorityAndAgeThenScheduledByStart() = runTest {
     val rows = listOf(
       row("later", scheduled(START + 3.hours)),
       row("queued-new", DownloadState.Queued, createdAt = START),
@@ -90,16 +93,16 @@ class SortAndGroupTest {
       listOf("high", "queued-old", "queued-new", "delayed", "soon", "later"),
       group.rows.map { it.key.taskId }
     )
-    assertEquals(listOf("6", "in start order"), group.details)
+    assertEquals(listOf("6", "in start order"), group.details.load())
   }
 
   @Test
-  fun arrangeRows_dayGroups_showCountAndSize() {
+  fun arrangeRows_dayGroups_showCountAndSize() = runTest {
     val rows = listOf(row("a", completed(1024)), row("b", completed(2048)))
 
     val details = arrangeRows(rows, ListArrangement(), START, utc).single().details
 
-    assertEquals(listOf("2", "3.0 KB"), details)
+    assertEquals(listOf("2", "3.0 KB"), details.load())
   }
 
   @Test
@@ -141,7 +144,7 @@ class SortAndGroupTest {
   }
 
   @Test
-  fun arrangeRows_sortByName_insideEachGroup() {
+  fun arrangeRows_sortByName_insideEachGroup() = runTest {
     val rows = listOf(
       row("b", downloading(10), request = named("beta.iso")),
       row("a", downloading(10), request = named("Alpha.iso")),
@@ -153,11 +156,11 @@ class SortAndGroupTest {
 
     assertEquals(listOf("a", "b"), groups[0].ids())
     assertEquals(listOf("c"), groups[1].ids())
-    assertEquals(listOf("1"), groups[1].details)
+    assertEquals(listOf("1"), groups[1].details.load())
   }
 
   @Test
-  fun arrangeRows_groupBySite_putsHostlessLinksLast() {
+  fun arrangeRows_groupBySite_putsHostlessLinksLast() = runTest {
     val rows = listOf(
       row("magnet", DownloadState.Queued, request = DownloadRequest("magnet:?xt=urn:btih:abc")),
       row("z", DownloadState.Queued, request = DownloadRequest("https://zeta.org/z.iso")),
@@ -166,16 +169,16 @@ class SortAndGroupTest {
 
     val groups = arrangeRows(rows, ListArrangement(group = GroupBy.Site), START, utc)
 
-    assertEquals(listOf("alpha.org", "zeta.org", "Other"), groups.map { it.title })
+    assertEquals(listOf("alpha.org", "zeta.org", "Other"), groups.map { it.title }.load())
   }
 
   @Test
-  fun arrangeRows_noGrouping_returnsOneUntitledGroup() {
+  fun arrangeRows_noGrouping_returnsOneUntitledGroup() = runTest {
     val rows = listOf(row("a", DownloadState.Queued), row("b", completed()))
 
     val groups = arrangeRows(rows, ListArrangement(group = GroupBy.None), START, utc)
 
-    assertEquals(listOf(""), groups.map { it.title })
+    assertEquals(listOf(""), groups.map { it.title }.load())
     assertEquals(listOf("a", "b"), groups.single().rows.map { it.key.taskId })
   }
 
@@ -254,7 +257,7 @@ class SortAndGroupTest {
     val stable = StableArrangement()
     val byDevice = ListArrangement(group = GroupBy.Device)
     stable.arrange(listOf(row("a", DownloadState.Queued)), byDevice, START, utc)
-    val renamed = DeviceInfo("Studio Mac", RowCapabilities.local())
+    val renamed = DeviceInfo(verbatim("Studio Mac"), RowCapabilities.local())
     val rows = listOf(
       row("a", DownloadState.Queued, device = renamed),
       row("b", DownloadState.Queued, device = renamed)
@@ -312,7 +315,7 @@ class SortAndGroupTest {
   }
 
   @Test
-  fun arrange_whileHeld_finishedRowStaysInItsGroup() {
+  fun arrange_whileHeld_finishedRowStaysInItsGroup() = runTest {
     val stable = StableArrangement()
     val running = listOf(row("a", downloading(10)), row("b", completed()))
     stable.arrange(running, ListArrangement(), START, utc)
@@ -321,9 +324,9 @@ class SortAndGroupTest {
     val held = stable.arrange(finished, ListArrangement(), START + 1.seconds, utc)
     val resorted = stable.arrange(finished, ListArrangement(), START + 2.seconds, utc)
 
-    assertEquals(listOf("Downloading", "Added today"), held.map { it.title })
-    assertEquals(listOf("1", "0 B/s"), held[0].details)
-    assertEquals(listOf("Added today"), resorted.map { it.title })
+    assertEquals(listOf("Downloading", "Added today"), held.map { it.title }.load())
+    assertEquals(listOf("1", "0 B/s"), held[0].details.load())
+    assertEquals(listOf("Added today"), resorted.map { it.title }.load())
   }
 
   private fun List<RowGroup>.ids(): List<String> = flatMap { it.ids() }

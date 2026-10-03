@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.pulse
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +51,12 @@ import com.linroid.ketch.app.components.healthColor
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -63,6 +68,19 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.command_activity
+import ketch.app.shared.generated.resources.pulse_activity_unread
+import ketch.app.shared.generated.resources.pulse_count_description
+import ketch.app.shared.generated.resources.pulse_disk_short
+import ketch.app.shared.generated.resources.pulse_disk_tooltip
+import ketch.app.shared.generated.resources.pulse_health_description
+import ketch.app.shared.generated.resources.pulse_idle
+import ketch.app.shared.generated.resources.pulse_speed_downloading
+import ketch.app.shared.generated.resources.pulse_speed_idle
+import ketch.app.shared.generated.resources.pulse_speed_offline
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Which of the Pulse bar's popovers are open, hoisted so a shortcut can open one: `⌘J` calls
@@ -161,7 +179,7 @@ fun PulseBar(
 internal fun PulseBarContent(
   pulse: PulseState,
   unread: Int,
-  selection: String?,
+  selection: UiText?,
   onShowTab: (StatusFilter) -> Unit,
   onSpeedClick: () -> Unit,
   onHealthClick: () -> Unit,
@@ -203,8 +221,9 @@ internal fun PulseBarContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
               Separator()
               BarLink(
-                text = part.text,
-                description = "${part.description}, show the ${part.filter.label} tab",
+                text = part.text.resolve(),
+                description = Res.string.pulse_count_description
+                  .text(part.description, part.filter.label).resolve(),
                 color = if (part.alert) colors.status.failed.color else colors.textSecondary,
                 onClick = { onShowTab(part.filter) },
               )
@@ -216,17 +235,18 @@ internal fun PulseBarContent(
           Row(verticalAlignment = Alignment.CenterVertically) {
             Separator()
             DiskReadout(
-              label = diskLabel(disk.disk),
+              label = diskLabel(disk.disk).resolve(),
               used = diskUsed(disk.disk),
               short = pulse.isDiskShort,
-              tooltip = "${diskLabel(disk.disk)} on ${disk.name} · ${disk.disk.directory}",
+              tooltip = Res.string.pulse_disk_tooltip
+                .text(diskLabel(disk.disk), disk.name, verbatim(disk.disk.directory)),
             )
           }
         }
       }
       if (selection != null) {
         Text(
-          text = selection,
+          text = selection.resolve(),
           style = KetchTheme.typography.caption,
           color = colors.textPrimary,
           maxLines = 1,
@@ -255,11 +275,12 @@ private fun SpeedReadout(
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val downloading = pulse.counts.downloading > 0
-  val speed = speedText(pulse.totalSpeed)
+  val speedLine = speedText(pulse.totalSpeed).resolve()
+  val speed = splitSpeed(speedLine)
   val description = when {
-    !online -> "Speed unknown while offline"
-    downloading -> "Downloading at $speed, show the last 5 minutes"
-    else -> "Idle, show the last 5 minutes"
+    !online -> stringResource(Res.string.pulse_speed_offline)
+    downloading -> stringResource(Res.string.pulse_speed_downloading, speedLine)
+    else -> stringResource(Res.string.pulse_speed_idle)
   }
   BarButton(onClick = onClick, description = description) {
     when {
@@ -276,7 +297,12 @@ private fun SpeedReadout(
         maxLines = 1,
         softWrap = false,
       )
-      else -> Text("Idle", style = type.caption, color = colors.textSecondary, maxLines = 1)
+      else -> Text(
+        text = stringResource(Res.string.pulse_idle),
+        style = type.caption,
+        color = colors.textSecondary,
+        maxLines = 1,
+      )
     }
     val bands = remember(pulse, colors) { sparklineBands(pulse, colors) }
     if (showSparkline && online && bands != null) {
@@ -291,10 +317,11 @@ private fun SpeedReadout(
 }
 
 @Composable
-private fun DiskReadout(label: String, used: Float, short: Boolean, tooltip: String) {
+private fun DiskReadout(label: String, used: Float, short: Boolean, tooltip: UiText) {
   val colors = KetchTheme.colors
   val ink = if (short) colors.status.paused.color else colors.textSecondary
-  KetchTooltip(text = if (short) "$tooltip · not enough for the waiting downloads" else tooltip) {
+  val tip = if (short) listOf(tooltip, Res.string.pulse_disk_short.text()).joinText() else tooltip
+  KetchTooltip(text = tip.resolve()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
@@ -328,14 +355,15 @@ internal fun DiskBar(used: Float?, short: Boolean, track: Color, modifier: Modif
 @Composable
 private fun HealthBadge(
   health: DeviceHealth,
-  name: String,
+  name: UiText,
   showLabel: Boolean,
   onClick: () -> Unit,
 ) {
   val colors = KetchTheme.colors
-  val label = healthLabel(health)
+  val label = healthText(health)
   val hollow = health is DeviceHealth.Local && health.sharingPort == null
-  BarButton(onClick = onClick, description = "$name: $label") {
+  val description = Res.string.pulse_health_description.text(name, label).resolve()
+  BarButton(onClick = onClick, description = description) {
     if (hollow) {
       Spacer(
         Modifier
@@ -352,7 +380,7 @@ private fun HealthBadge(
     if (showLabel) {
       Spacer(Modifier.width(KetchTheme.spacing.s1))
       Text(
-        text = label,
+        text = label.resolve(),
         style = KetchTheme.typography.caption,
         color = if (health.isOnline) colors.textSecondary else colors.healthColor(health),
         maxLines = 1,
@@ -364,9 +392,13 @@ private fun HealthBadge(
 @Composable
 private fun ActivityBell(unread: Int, onClick: () -> Unit) {
   val colors = KetchTheme.colors
-  val description = if (unread > 0) "Activity, $unread unread" else "Activity"
+  val description = if (unread > 0) {
+    pluralStringResource(Res.plurals.pulse_activity_unread, unread, unread)
+  } else {
+    stringResource(Res.string.command_activity)
+  }
   val command = KetchCommands.Activity
-  KetchTooltip(text = command.label, shortcut = command.shortcutLabel()) {
+  KetchTooltip(text = command.label.resolve(), shortcut = command.shortcutLabel()) {
     BarButton(onClick = onClick, description = description) {
       KetchIconImage(
         icon = KetchIcon.Bell,

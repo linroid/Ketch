@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Discover, the AI search for downloads: its setup page, the search, the agent's steps and the
+  results. What the agent writes (names, descriptions, steps) shows as it is. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- The page's title. -->
+  <string name="discover_title">Discover</string>
+  <string name="discover_settings">Discover settings</string>
+  <string name="discover_hero_title">Describe it. Ketch finds the download.</string>
+  <!-- %1$s is the model provider, such as Anthropic or Gemini. -->
+  <string name="discover_intro_body">Discover asks %1$s to search the web and read the pages it finds, then lists the files it trusts. Nothing downloads until you add it.</string>
+  <!-- Searches to try, which run as they are written. -->
+  <string name="discover_example_blender">Blender for Apple silicon</string>
+  <string name="discover_example_ubuntu">Ubuntu 24.04 server ISO</string>
+  <string name="discover_example_footage">Public-domain 4K nature footage</string>
+  <!-- An example search in quotation marks. %1$s is the search. -->
+  <string name="discover_example_quoted">“%1$s”</string>
+
+  <!-- The page before Discover is set up. -->
+  <string name="discover_setup_body">Discover asks an AI model to search the web and read the pages it finds, then lists the files it trusts. Your searches go to the provider you choose.</string>
+  <string name="discover_setup_unsupported">Discover runs in the Ketch app on a computer or an Android phone.</string>
+  <!-- %1$s is the search the user asked for before setting up. -->
+  <string name="discover_setup_pending">Your search for “%1$s” runs as soon as Discover is set up.</string>
+  <string name="discover_setup_choose_model">Choose a model</string>
+  <!-- A provider's button. %1$s is Ollama, which runs on the user's own computer. -->
+  <string name="discover_setup_local_provider">%1$s · runs locally, no key</string>
+  <!-- %1$s is the provider picked, such as OpenAI. -->
+  <string name="discover_setup_finish">Finish setting up %1$s</string>
+  <string name="discover_setup_in_settings">Set up in Settings</string>
+  <!-- A model server that speaks OpenAI's API, set up in Settings; OpenAI is a name. -->
+  <string name="discover_provider_openai_compatible">OpenAI-compatible</string>
+
+  <!-- The search. -->
+  <string name="discover_query_placeholder">Describe what you want to download</string>
+  <string name="discover_find">Find</string>
+  <string name="discover_stop">Stop</string>
+  <string name="discover_sites_limit">Limit to websites</string>
+  <!-- The website chip while two or more websites limit the search. -->
+  <plurals name="discover_sites_count">
+    <item quantity="one">%1$d website</item>
+    <item quantity="other">%1$d websites</item>
+  </plurals>
+  <!-- Under the website field, which splits the websites at commas and spaces. -->
+  <string name="discover_sites_hint">Searches only these websites and their subdomains. Separate them with commas.</string>
+
+  <!-- The agent's steps. Before them, how many earlier steps are hidden. -->
+  <plurals name="discover_steps_earlier">
+    <item quantity="one">%1$d earlier</item>
+    <item quantity="other">%1$d earlier</item>
+  </plurals>
+  <string name="discover_step_starting">Starting the search</string>
+
+  <!-- The results. -->
+  <string name="discover_select_all">Select all</string>
+  <string name="discover_clear_selection">Clear selection</string>
+  <!-- Above the results. -->
+  <plurals name="discover_results">
+    <item quantity="one">%1$d download</item>
+    <item quantity="other">%1$d downloads</item>
+  </plurals>
+  <!-- Follows discover_results after a space, in a lighter color. %1$s is the search. -->
+  <string name="discover_results_for">for “%1$s”</string>
+  <!-- How well a result matches the search. %1$s is a percentage, such as 92%. -->
+  <string name="discover_match">%1$s match</string>
+  <string name="discover_match_tooltip">How well it matches your search</string>
+  <!-- A result whose link is plain HTTP. -->
+  <string name="discover_not_encrypted">Not encrypted</string>
+  <string name="discover_error_title">Discover couldn't finish this search</string>
+  <string name="discover_failed">Discovery failed</string>
+  <string name="discover_unavailable">AI discovery is not available on this device.</string>
+  <string name="discover_none_title">No downloads found</string>
+  <string name="discover_none_body">Discover lists only files from sources it trusts. Try naming the version or platform, or the website that publishes it.</string>
+  <string name="discover_search_everywhere">Search the whole web</string>
+
+  <!-- The bar under the results. -->
+  <string name="discover_select_to_add">Select downloads to add</string>
+  <!-- Followed by the total size after " · " when every size is known. -->
+  <plurals name="discover_selected">
+    <item quantity="one">%1$d selected</item>
+    <item quantity="other">%1$d selected</item>
+  </plurals>
+  <string name="discover_add_now">Add now</string>
+  <string name="discover_review_add">Review &amp; add</string>
+  <!-- %1$d is how many downloads are selected. -->
+  <string name="discover_review_add_count">Review &amp; add %1$d</string>
+</resources>

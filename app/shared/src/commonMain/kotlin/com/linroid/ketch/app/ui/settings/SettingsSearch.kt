@@ -3,10 +3,12 @@ package com.linroid.ketch.app.ui.settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
@@ -26,8 +28,14 @@ import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.SettingsCategory
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** What this app offers beyond the rows every app has, which decides some search entries. */
 internal enum class SettingsFeature {
@@ -51,7 +59,29 @@ internal enum class SettingsFeature {
 }
 
 /**
- * One setting that search finds.
+ * One setting that search finds, as the string resources its page shows, so search reads the
+ * pages' own words in their language. [SettingsIndex] lists them; [rememberSettingsSearchIndex]
+ * and [loadSettingsSearchIndex] read them into [SettingsEntry].
+ *
+ * @property category page the setting is on.
+ * @property title what the setting is called: the title of its row or group.
+ * @property description what it does, when search should say more than the title.
+ * @property keywords other words people look for it by, separated by commas.
+ * @property anchors titles of the rows or groups to scroll to, the first one found winning.
+ * @property needs what the app must offer for the setting to show; `null` when every app has it.
+ */
+@Immutable
+internal data class SettingsIndexEntry(
+  val category: SettingsCategory,
+  val title: StringResource,
+  val description: UiText? = null,
+  val keywords: StringResource? = null,
+  val anchors: List<StringResource> = listOf(title),
+  val needs: SettingsFeature? = null,
+)
+
+/**
+ * One setting that search finds, in the language of the pages.
  *
  * @property category page the setting is on.
  * @property title what the setting is called, as results show it.
@@ -60,6 +90,7 @@ internal enum class SettingsFeature {
  * @property anchors titles of the rows or groups to scroll to, the first one found winning;
  *   empty opens the page at the top.
  * @property needs what the app must offer for the setting to show; `null` when every app has it.
+ * @property page the name of the page the setting is on; searched, and shown under the title.
  */
 @Immutable
 internal data class SettingsEntry(
@@ -69,7 +100,66 @@ internal data class SettingsEntry(
   val keywords: List<String> = emptyList(),
   val anchors: List<String> = listOf(title),
   val needs: SettingsFeature? = null,
+  val page: String = "",
 )
+
+/**
+ * What search reads, in one language.
+ *
+ * @property pages each page by its own name and description, which opens it at the top.
+ * @property entries the settings of [SettingsIndex].
+ */
+@Immutable
+internal data class SettingsSearchIndex(
+  val pages: Map<SettingsCategory, SettingsEntry>,
+  val entries: List<SettingsEntry>,
+)
+
+/** [SettingsIndex] and the pages in the language of the composition. */
+@Composable
+internal fun rememberSettingsSearchIndex(): SettingsSearchIndex {
+  val pages = SettingsCategory.entries.associateWith { category ->
+    pageEntry(category, category.titleText.resolve(), category.descriptionText.resolve())
+  }
+  val entries = SettingsIndex.map { entry ->
+    SettingsEntry(
+      category = entry.category,
+      title = stringResource(entry.title),
+      description = entry.description?.resolve().orEmpty(),
+      keywords = entry.keywords?.let { splitKeywords(stringResource(it)) }.orEmpty(),
+      anchors = entry.anchors.map { stringResource(it) },
+      needs = entry.needs,
+      page = pages.getValue(entry.category).title,
+    )
+  }
+  return remember(pages, entries) { SettingsSearchIndex(pages, entries) }
+}
+
+/** [SettingsIndex] and the pages in the language of the app's windows, as tests read them. */
+internal suspend fun loadSettingsSearchIndex(): SettingsSearchIndex {
+  val pages = SettingsCategory.entries.associateWith { category ->
+    pageEntry(category, category.titleText.load(), category.descriptionText.load())
+  }
+  val entries = SettingsIndex.map { entry ->
+    SettingsEntry(
+      category = entry.category,
+      title = entry.title.text().load(),
+      description = entry.description?.load().orEmpty(),
+      keywords = entry.keywords?.let { splitKeywords(it.text().load()) }.orEmpty(),
+      anchors = entry.anchors.map { it.text().load() },
+      needs = entry.needs,
+      page = pages.getValue(entry.category).title,
+    )
+  }
+  return SettingsSearchIndex(pages, entries)
+}
+
+/** The page [category] as search finds it by its name, opening at the top. */
+private fun pageEntry(category: SettingsCategory, title: String, description: String) =
+  SettingsEntry(category, title, description, anchors = emptyList(), page = title)
+
+private fun splitKeywords(text: String): List<String> =
+  text.split(',').map { it.trim() }.filter { it.isNotEmpty() }
 
 /**
  * A setting search found, with the parts of its [title][SettingsEntry.title] and
@@ -89,22 +179,24 @@ internal data class SettingsHit(
  * the rest, each in page order. Each page also answers by its own name and description.
  *
  * @param features what this app offers; entries that need anything else are left out.
+ * @param index the pages and settings in the language shown.
  */
 internal fun searchSettings(
   query: String,
   categories: List<SettingsCategory>,
   features: Set<SettingsFeature>,
+  index: SettingsSearchIndex,
 ): List<SettingsHit> {
   val phrase = query.trim().lowercase()
   val words = phrase.split(WHITESPACE).filter { it.isNotEmpty() }
   if (words.isEmpty()) return emptyList()
-  val pages = categories.map { SettingsEntry(it, it.title, it.description, anchors = emptyList()) }
-  val candidates = pages + SettingsIndex.filter { entry ->
+  val pages = categories.mapNotNull { index.pages[it] }
+  val candidates = pages + index.entries.filter { entry ->
     entry.category in categories && (entry.needs == null || entry.needs in features)
   }
   return candidates.mapNotNull { entry ->
     val title = entry.title.lowercase()
-    val haystack = listOf(title, entry.description.lowercase(), entry.category.title.lowercase()) +
+    val haystack = listOf(title, entry.description.lowercase(), entry.page.lowercase()) +
       entry.keywords.map { it.lowercase() }
     if (!words.all { word -> haystack.any { it.contains(word) } }) return@mapNotNull null
     val rank = when {
@@ -282,227 +374,3 @@ private const val MAX_WAIT_FRAMES = 30
 private const val FLASH_IN_MS = 150
 private const val FLASH_HOLD_MS = 900L
 private const val FLASH_OUT_MS = 600
-
-/**
- * Every setting search finds, page by page. Titles and anchors match the titles of the rows and
- * groups on the pages, so a search result can scroll to them.
- */
-internal val SettingsIndex: List<SettingsEntry> = buildList {
-  fun SettingsCategory.entry(
-    title: String,
-    description: String = "",
-    keywords: List<String> = emptyList(),
-    anchors: List<String> = listOf(title),
-    needs: SettingsFeature? = null,
-  ) {
-    add(SettingsEntry(this, title, description, keywords, anchors, needs))
-  }
-
-  with(SettingsCategory.General) {
-    entry(
-      "Device name",
-      description = "The name your other devices see",
-      keywords = listOf("hostname", "computer", "rename"),
-    )
-    entry(
-      "Theme",
-      description = "System, light or dark",
-      keywords = listOf("dark mode", "light mode", "appearance"),
-    )
-    entry(
-      "Accent color",
-      description = "Signal, Harbor, Fathom or Beacon",
-      keywords = listOf("colour", "appearance"),
-    )
-    entry(
-      "Density",
-      description = "Auto, compact or comfortable",
-      keywords = listOf("size", "spacing", "touch", "appearance"),
-    )
-    entry(
-      "Reduce motion",
-      description = "Fewer animations",
-      keywords = listOf("animation", "accessibility"),
-    )
-    entry("Language", keywords = listOf("locale", "translation"))
-    entry(
-      "When I close the window",
-      description = "Keep downloading in the background, or quit",
-      keywords = listOf("quit", "menu bar", "tray", "notification area", "exit"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "Open Ketch at login",
-      keywords = listOf("startup", "launch", "boot", "login item"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "Start hidden at login",
-      keywords = listOf("startup", "background", "menu bar", "tray"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "App icon badge",
-      description = "What the Dock or taskbar icon shows",
-      keywords = listOf("count", "dock", "taskbar"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "Keyboard shortcuts…",
-      description = "Every shortcut in Ketch",
-      keywords = listOf("keys", "hotkeys", "keybindings"),
-      needs = SettingsFeature.Keyboard,
-    )
-  }
-  with(SettingsCategory.Notifications) {
-    entry("Download finished", keywords = listOf("complete", "done", "alert"))
-    entry("Download failed", keywords = listOf("error", "alert"))
-    entry("All downloads finished", keywords = listOf("queue", "complete", "done"))
-    entry("Devices going offline", keywords = listOf("disconnected", "connection lost"))
-    entry("Only when Ketch is in the background", keywords = listOf("foreground", "toast"))
-    entry(
-      "Notify me about these devices",
-      keywords = listOf("mute", "remote", "nas", "keep connected"),
-    )
-    entry(
-      "Browser notifications",
-      description = "Let this browser show Ketch's notifications",
-      keywords = listOf("permission", "allow"),
-      needs = SettingsFeature.BrowserNotifications,
-    )
-  }
-  with(SettingsCategory.Integration) {
-    entry(
-      "Browser extension",
-      description = "Send browser downloads to Ketch",
-      keywords = listOf("chrome", "edge", "firefox", "brave", "arc", "vivaldi", "capture"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "Open magnet links with Ketch",
-      keywords = listOf("default app", "handler", "protocol"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry(
-      "Open .torrent files with Ketch",
-      keywords = listOf("default app", "file type", "handler"),
-      needs = SettingsFeature.Desktop,
-    )
-    entry("Suggest links from the clipboard", keywords = listOf("paste", "copy"))
-    entry("Add pasted links immediately", keywords = listOf("paste", "quick add", "clipboard"))
-  }
-  with(SettingsCategory.Discover) {
-    entry("AI discovery", keywords = listOf("ai", "llm", "agent", "turn on"))
-    entry(
-      "Provider",
-      description = "OpenAI, Anthropic, Gemini, Ollama or your own",
-      keywords = listOf("claude", "gpt", "google", "openrouter", "llm", "model provider"),
-    )
-    entry("API key", keywords = listOf("token", "secret", "credentials"))
-    entry("Model", keywords = listOf("llm"))
-    entry(
-      "Endpoint",
-      keywords = listOf("base url", "server", "url"),
-      anchors = listOf("Endpoint", "Endpoint (optional)"),
-    )
-    entry("Test connection", keywords = listOf("check", "verify"))
-    entry(
-      "Web search",
-      description = "Brave or Google search for the agent",
-      keywords = listOf("search provider", "search api key", "engine"),
-    )
-  }
-  with(SettingsCategory.About) {
-    entry("Version", keywords = listOf("build", "revision", "update"))
-    entry("Source code", keywords = listOf("github", "project"))
-    entry("Report a problem", keywords = listOf("bug", "issue", "feedback", "help"))
-    entry("Open-source licenses", keywords = listOf("license", "notices", "fonts", "ofl"))
-    entry(
-      "Log files",
-      description = "Open or share the logs for a bug report",
-      keywords = listOf("logs", "debug", "troubleshooting"),
-      anchors = listOf("Open log folder", "Share logs"),
-      needs = SettingsFeature.Logs,
-    )
-    entry(
-      "Show setup checklist",
-      keywords = listOf("getting started", "onboarding", "setup"),
-      needs = SettingsFeature.SetupChecklist,
-    )
-    entry(
-      "Show welcome again",
-      keywords = listOf("onboarding", "first run", "intro"),
-      needs = SettingsFeature.Mobile,
-    )
-  }
-  with(SettingsCategory.Downloads) {
-    entry(
-      "Save downloads to",
-      keywords = listOf("folder", "directory", "location", "path", "destination"),
-    )
-    entry(
-      "Folders in the add sheet",
-      description = "Pinned and recent folders",
-      keywords = listOf("favorite", "pin", "recent"),
-    )
-    entry(
-      "Run at once",
-      description = "Downloads that run together",
-      keywords = listOf("concurrent", "parallel", "simultaneous", "queue", "limit"),
-    )
-    entry(
-      "Per server",
-      description = "Downloads from one website at a time",
-      keywords = listOf("host", "website", "queue", "limit"),
-    )
-    entry("Retries", keywords = listOf("retry", "attempts", "errors"))
-  }
-  with(SettingsCategory.Speed) {
-    entry(
-      "Speed mode",
-      description = "Full speed, Slow lane or Auto",
-      keywords = listOf("limit", "bandwidth", "throttle"),
-    )
-    entry(
-      "Full speed cap",
-      description = "The speed limit all downloads share",
-      keywords = listOf("speed limit", "bandwidth", "throttle", "maximum"),
-      anchors = listOf("Full speed cap", "Speed limit"),
-    )
-    entry("Slow lane speed", keywords = listOf("limit", "bandwidth", "throttle"))
-    entry(
-      "Auto rules",
-      description = "Turn the Slow lane on at set times",
-      keywords = listOf("schedule", "work hours", "weekdays", "time"),
-    )
-    entry("Connections per download", keywords = listOf("segments", "threads", "parallel", "split"))
-  }
-  with(SettingsCategory.Network) {
-    entry(
-      "Spread downloads across",
-      description = "The networks downloads use",
-      keywords = listOf("wifi", "wi-fi", "ethernet", "interface", "vpn", "multiple networks"),
-      anchors = listOf("Networks", "Spread downloads across"),
-    )
-  }
-  with(SettingsCategory.BitTorrent) {
-    entry(
-      "Extra trackers",
-      description = "Trackers added to public torrents",
-      keywords = listOf("announce", "udp", "magnet", "add trackers"),
-    )
-  }
-  with(SettingsCategory.Sharing) {
-    entry(
-      "Pair a device",
-      description = "Control this device from a phone or browser",
-      keywords = listOf("qr code", "phone", "pairing", "remote", "web app", "connect"),
-    )
-    entry("Reachable from other devices", keywords = listOf("lan", "network", "remote access"))
-    entry("Port", keywords = listOf("server"))
-    entry("Access code", keywords = listOf("token", "password", "api token"))
-    entry("Discoverable on the local network", keywords = listOf("mdns", "bonjour", "find"))
-    entry("Websites allowed to connect", keywords = listOf("cors", "origin"))
-    entry("Start sharing when Ketch opens", keywords = listOf("server", "startup", "auto start"))
-  }
-}

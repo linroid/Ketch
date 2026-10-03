@@ -9,6 +9,9 @@ import androidx.compose.ui.Modifier
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.app.components.AddButtonMode
 import com.linroid.ketch.app.components.KetchAddButton
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
@@ -18,6 +21,9 @@ import com.linroid.ketch.app.ui.shell.deviceDropTarget
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.urlHost
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_clip_download
+import ketch.app.shared.generated.resources.downloads_clip_download_from
 
 /**
  * The Downloads header's Add button ([KetchAddButton]). It opens the add sheet; with a link on
@@ -31,13 +37,21 @@ internal fun AddButton(state: AppState, modifier: Modifier = Modifier) {
   val link = rememberClipboardLink(state, clipboard, skipOffered = true)
   val windowDrop = LocalWindowDrop.current
   var over by remember { mutableStateOf(false) }
-  val mode = addButtonMode(link, dragging = windowDrop?.active == true, over = over)
+  val description = (link as? ClipboardLink.Found)
+    ?.let { clipDescription(clipName(it.url), urlHost(it.url)).resolve() }
+    .orEmpty()
+  val mode = addButtonMode(
+    link = link,
+    dragging = windowDrop?.active == true,
+    over = over,
+    description = description,
+  )
   KetchAddButton(
     mode = mode,
     onAdd = { state.openIntake() },
     onAddClip = { (link as? ClipboardLink.Found)?.let { addClipboardLink(state, it) } },
     onOpenSheet = { state.openIntake() },
-    addTooltip = KetchCommands.Add.label,
+    addTooltip = KetchCommands.Add.label.resolve(),
     shortcut = KetchCommands.Add.shortcutLabel(),
     clipShortcut = KetchCommands.AddClipboardLink.shortcutLabel(),
     modifier = modifier
@@ -51,27 +65,35 @@ internal fun AddButton(state: AppState, modifier: Modifier = Modifier) {
  * the copied link when the clipboard was read and holds one Ketch does not have, else the plain
  * button. A link only probably on the clipboard ([ClipboardLink.Maybe]) keeps the plain button,
  * since reading it would show the platform's notice.
+ *
+ * @param description what adding the copied link does, [clipDescription] in the screen's
+ *   language.
  */
-internal fun addButtonMode(link: ClipboardLink, dragging: Boolean, over: Boolean): AddButtonMode =
-  when {
-    dragging -> AddButtonMode.Drop(over)
-    link is ClipboardLink.Found -> {
-      val name = clipName(link.url)
-      AddButtonMode.Clip(
-        name = name,
-        description = clipDescription(name, urlHost(link.url)),
-        id = link.hash,
-      )
-    }
-    else -> AddButtonMode.Plain
-  }
+internal fun addButtonMode(
+  link: ClipboardLink,
+  dragging: Boolean,
+  over: Boolean,
+  description: String = "",
+): AddButtonMode = when {
+  dragging -> AddButtonMode.Drop(over)
+  link is ClipboardLink.Found -> AddButtonMode.Clip(
+    name = clipName(link.url),
+    description = description,
+    id = link.hash,
+  )
+  else -> AddButtonMode.Plain
+}
 
 /** The file name a copied [url] downloads to, as rows name it. */
 internal fun clipName(url: String): String = displayName(DownloadRequest(url = url))
 
 /** "Download ubuntu.iso from releases.ubuntu.com", or without the site when it is the name. */
-internal fun clipDescription(name: String, host: String?): String =
-  if (host == null || host == name) "Download $name" else "Download $name from $host"
+internal fun clipDescription(name: String, host: String?): UiText =
+  if (host == null || host == name) {
+    Res.string.downloads_clip_download.text(name)
+  } else {
+    Res.string.downloads_clip_download_from.text(name, host)
+  }
 
 /**
  * Makes the button take drops for the device quick add picks, as the window does around it,

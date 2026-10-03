@@ -44,9 +44,7 @@ class InstanceFactory(
   /** Create the embedded [KetchApi] instance. */
   fun createEmbedded(): EmbeddedInstance {
     val ketch = embeddedFactory?.invoke()
-      ?: throw UnsupportedOperationException(
-        "No embedded instance available",
-      )
+      ?: throw UnsupportedOperationException("No embedded instance available")
     return EmbeddedInstance(
       instance = ketch,
       label = deviceName,
@@ -62,9 +60,7 @@ class InstanceFactory(
    */
   fun startServer(api: KetchApi) {
     val factory = localServerFactory
-      ?: throw UnsupportedOperationException(
-        "Local server not supported on this platform",
-      )
+      ?: throw UnsupportedOperationException("Local server not supported on this platform")
     localServer = factory(api)
   }
 

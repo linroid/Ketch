@@ -6,6 +6,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.DevicePulse
@@ -13,6 +15,10 @@ import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.displayName
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_pause_all_here
+import ketch.app.shared.generated.resources.device_retry_failed
+import ketch.app.shared.generated.resources.device_start_now
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -127,21 +133,21 @@ internal fun laneShares(blocks: List<LaneBlock>): List<Float> {
 /** One of the buttons at the bottom of a device card, shown only when it has work to do. */
 internal sealed interface NextAction {
   /** What the button says. */
-  val label: String
+  val label: UiText
 
   /** Retries the device's failed downloads, without switching to it. */
   data class RetryFailed(val count: Int) : NextAction {
-    override val label: String get() = "Retry $count failed"
+    override val label: UiText get() = Res.plurals.device_retry_failed.text(count)
   }
 
   /** Pauses everything the device is downloading or has queued. */
   data object PauseAll : NextAction {
-    override val label: String get() = "Pause all here"
+    override val label: UiText get() = Res.string.device_pause_all_here.text()
   }
 
   /** Starts [task], the next waiting one, at once. */
   data class StartNow(val task: DownloadTask, val name: String) : NextAction {
-    override val label: String get() = "Start ${clipName(name)} now"
+    override val label: UiText get() = Res.string.device_start_now.text(clipName(name))
   }
 }
 
@@ -169,7 +175,7 @@ internal fun fleetSentence(
   mode: SpeedMode,
   now: Instant,
   timeZone: TimeZone,
-): String {
+): UiText {
   val pulses = devices.filter { it.connected }.map { device ->
     val summary = work[device.deviceId] ?: DeviceWork()
     DevicePulse(

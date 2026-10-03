@@ -59,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommand
@@ -67,10 +69,13 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_back
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /** Builds the entries of a [KetchMenu]. */
 class KetchMenuScope internal constructor() {
@@ -86,11 +91,11 @@ class KetchMenuScope internal constructor() {
    * @param keepOpen keeps the menu open after the click, for checkable lists.
    */
   fun item(
-    label: String,
+    label: UiText,
     onClick: () -> Unit,
     icon: KetchIcon? = null,
     shortcut: String? = null,
-    caption: String? = null,
+    caption: UiText? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
     checked: Boolean? = null,
@@ -114,7 +119,7 @@ class KetchMenuScope internal constructor() {
     command: KetchCommand,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    label: String = command.label,
+    label: UiText = command.label,
     destructive: Boolean = false,
   ) {
     item(
@@ -129,7 +134,7 @@ class KetchMenuScope internal constructor() {
 
   /** Adds an item that opens the entries of [content] beside the menu, or in place on touch. */
   fun submenu(
-    label: String,
+    label: UiText,
     icon: KetchIcon? = null,
     enabled: Boolean = true,
     content: KetchMenuScope.() -> Unit,
@@ -143,7 +148,7 @@ class KetchMenuScope internal constructor() {
   }
 
   /** Adds a section label, such as "Recent". */
-  fun header(text: String) {
+  fun header(text: UiText) {
     entries += MenuEntry.Header(text)
   }
 
@@ -162,20 +167,20 @@ class KetchMenuScope internal constructor() {
 internal sealed interface MenuEntry {
   /** An entry drawn as a row that can be picked: an [Item] or a [Submenu]. */
   sealed interface Row : MenuEntry {
-    val label: String
+    val label: UiText
     val icon: KetchIcon?
     val enabled: Boolean
-    val caption: String? get() = null
+    val caption: UiText? get() = null
     val destructive: Boolean get() = false
     val checked: Boolean? get() = null
   }
 
   class Item(
-    override val label: String,
+    override val label: UiText,
     val onClick: () -> Unit,
     override val icon: KetchIcon?,
     val shortcut: String?,
-    override val caption: String?,
+    override val caption: UiText?,
     override val enabled: Boolean,
     override val destructive: Boolean,
     override val checked: Boolean?,
@@ -183,7 +188,7 @@ internal sealed interface MenuEntry {
   ) : Row
 
   class Submenu(
-    override val label: String,
+    override val label: UiText,
     override val icon: KetchIcon?,
     override val enabled: Boolean,
     val entries: List<MenuEntry>,
@@ -191,7 +196,7 @@ internal sealed interface MenuEntry {
 
   data object Divider : MenuEntry
 
-  class Header(val text: String) : MenuEntry
+  class Header(val text: UiText) : MenuEntry
 
   class Custom(val content: @Composable (dismiss: () -> Unit) -> Unit) : MenuEntry
 }
@@ -565,7 +570,7 @@ private fun MenuRow(
     }
     Column(Modifier.weight(1f)) {
       Text(
-        text = row.label,
+        text = row.label.resolve(),
         style = KetchTheme.typography.label,
         color = row.ink(colors),
         maxLines = 1,
@@ -609,7 +614,7 @@ private fun MenuSheet(
   for (index in path) {
     val submenu = current.getOrNull(index) as? MenuEntry.Submenu ?: break
     current = submenu.entries
-    heading = submenu.label
+    heading = submenu.label.resolve()
   }
   KetchBottomSheet(onDismissRequest = onDismiss, modifier = modifier, sheetState = sheetState) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.s4)) {
@@ -621,7 +626,7 @@ private fun MenuSheet(
           if (path.isNotEmpty()) {
             KetchIconButton(
               icon = KetchIcon.ChevronLeft,
-              contentDescription = "Back",
+              contentDescription = stringResource(Res.string.action_back),
               onClick = { path = path.dropLast(1) },
             )
           }
@@ -676,7 +681,7 @@ private fun SheetRow(row: MenuEntry.Row, onClick: () -> Unit) {
   ) {
     if (icon != null) KetchIconImage(icon, size = glyph, tint = row.glyphTint(colors))
     Column(Modifier.weight(1f)) {
-      Text(row.label, style = KetchTheme.typography.body, color = row.ink(colors))
+      Text(row.label.resolve(), style = KetchTheme.typography.body, color = row.ink(colors))
       MenuCaption(row)
     }
     if (row is MenuEntry.Submenu) {
@@ -709,7 +714,7 @@ private fun MenuEntry.Row.glyphTint(colors: KetchColors): Color = when {
 private fun MenuCaption(row: MenuEntry.Row) {
   val caption = row.caption ?: return
   Text(
-    text = caption,
+    text = caption.resolve(),
     style = KetchTheme.typography.caption,
     color = if (row.enabled) KetchTheme.colors.textSecondary else KetchTheme.colors.textDisabled,
   )
@@ -729,9 +734,9 @@ private fun MenuDivider(vertical: Dp) {
 
 /** A section label, such as "Recent", inset by [horizontal] on both sides and [top] above. */
 @Composable
-private fun MenuHeader(text: String, horizontal: Dp, top: Dp) {
+private fun MenuHeader(text: UiText, horizontal: Dp, top: Dp) {
   KetchEyebrow(
-    text = text,
+    text = text.resolve(),
     modifier = Modifier.padding(
       start = horizontal,
       end = horizontal,

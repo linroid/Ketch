@@ -4,15 +4,15 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.autoModeSummary
 import com.linroid.ketch.app.state.countChoices
 import com.linroid.ketch.app.state.elideMiddle
-import com.linroid.ketch.app.state.folderName
+import com.linroid.ketch.app.state.folderNameText
 import com.linroid.ketch.app.state.formatSpeedAmount
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
 import com.linroid.ketch.app.state.isSameFolder
@@ -27,8 +27,10 @@ import com.linroid.ketch.app.state.ruleDaysLabel
 import com.linroid.ketch.app.state.ruleIncludes
 import com.linroid.ketch.app.state.slowLanePresets
 import com.linroid.ketch.app.state.speedChoices
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toggleRuleDay
 import com.linroid.ketch.config.Weekday
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,11 +54,11 @@ class SettingsChoicesTest {
   }
 
   @Test
-  fun formatSpeedLimit_anyLimit_usesTheLargestSensibleUnit() {
-    assertEquals("Unlimited", formatSpeedLimit(SpeedLimit.Unlimited))
-    assertEquals("512 KB/s", formatSpeedLimit(SpeedLimit.kbps(512)))
-    assertEquals("2 MB/s", formatSpeedLimit(SpeedLimit.mbps(2)))
-    assertEquals("1.5 MB/s", formatSpeedLimit(SpeedLimit.kbps(1536)))
+  fun speedLimitText_anyLimit_usesTheLargestSensibleUnit() = runTest {
+    assertEquals("Unlimited", speedLimitText(SpeedLimit.Unlimited).load())
+    assertEquals("512 KB/s", speedLimitText(SpeedLimit.kbps(512)).load())
+    assertEquals("2 MB/s", speedLimitText(SpeedLimit.mbps(2)).load())
+    assertEquals("1.5 MB/s", speedLimitText(SpeedLimit.kbps(1536)).load())
   }
 
   @Test
@@ -137,13 +139,13 @@ class SettingsChoicesTest {
   }
 
   @Test
-  fun ruleDaysLabel_commonSets_readAsWords() {
-    assertEquals("Every day", ruleDaysLabel(emptySet()))
-    assertEquals("Weekdays", ruleDaysLabel(newSpeedRule().days))
-    assertEquals("Weekends", ruleDaysLabel(setOf(Weekday.Saturday, Weekday.Sunday)))
+  fun ruleDaysLabel_commonSets_readAsWords() = runTest {
+    assertEquals("Every day", ruleDaysLabel(emptySet()).load())
+    assertEquals("Weekdays", ruleDaysLabel(newSpeedRule().days).load())
+    assertEquals("Weekends", ruleDaysLabel(setOf(Weekday.Saturday, Weekday.Sunday)).load())
     assertEquals(
       "Mon, Wed, Fri",
-      ruleDaysLabel(setOf(Weekday.Friday, Weekday.Monday, Weekday.Wednesday)),
+      ruleDaysLabel(setOf(Weekday.Friday, Weekday.Monday, Weekday.Wednesday)).load(),
     )
   }
 
@@ -164,30 +166,37 @@ class SettingsChoicesTest {
   }
 
   @Test
-  fun autoModeSummary_slowLaneOnToday_namesTheEndTime() {
+  fun autoModeSummary_slowLaneOnToday_namesTheEndTime() = runTest {
     val now = Instant.parse("2026-10-01T10:15:00Z")
     val mode = SpeedMode.Auto(slowLane = true, until = Instant.parse("2026-10-01T18:00:00Z"))
 
-    assertEquals("Slow lane on until 18:00", autoModeSummary(mode, now, TimeZone.UTC))
+    assertEquals("Slow lane on until 18:00", autoModeSummary(mode, now, TimeZone.UTC).load())
   }
 
   @Test
-  fun autoModeSummary_fullSpeedUntilLaterInTheWeek_namesTheDay() {
+  fun autoModeSummary_fullSpeedUntilLaterInTheWeek_namesTheDay() = runTest {
     val now = Instant.parse("2026-10-01T19:00:00Z")
     val tomorrow = SpeedMode.Auto(slowLane = false, until = Instant.parse("2026-10-02T09:00:00Z"))
     val monday = SpeedMode.Auto(slowLane = false, until = Instant.parse("2026-10-05T09:00:00Z"))
 
-    assertEquals("Full speed until tomorrow 09:00", autoModeSummary(tomorrow, now, TimeZone.UTC))
-    assertEquals("Full speed until Mon 09:00", autoModeSummary(monday, now, TimeZone.UTC))
+    assertEquals(
+      "Full speed until tomorrow 09:00",
+      autoModeSummary(tomorrow, now, TimeZone.UTC).load(),
+    )
+    assertEquals("Full speed until Mon 09:00", autoModeSummary(monday, now, TimeZone.UTC).load())
   }
 
   @Test
-  fun autoModeSummary_noChange_saysSo() {
+  fun autoModeSummary_noChange_saysSo() = runTest {
     val now = Instant.parse("2026-10-01T19:00:00Z")
 
     assertEquals(
       "Slow lane on all week",
-      autoModeSummary(SpeedMode.Auto(slowLane = true), now, TimeZone.UTC),
+      autoModeSummary(SpeedMode.Auto(slowLane = true), now, TimeZone.UTC).load(),
+    )
+    assertEquals(
+      "Full speed, no rule starts this week",
+      autoModeSummary(SpeedMode.Auto(slowLane = false), now, TimeZone.UTC).load(),
     )
   }
 
@@ -200,16 +209,16 @@ class SettingsChoicesTest {
   }
 
   @Test
-  fun folderName_pathsAndDocumentTrees_nameTheFolder() {
-    assertEquals("Downloads", folderName("/Users/alex/Downloads/"))
-    assertEquals("Downloads", folderName("C:\\Users\\alex\\Downloads"))
-    assertEquals("/", folderName("/"))
+  fun folderNameText_pathsAndDocumentTrees_nameTheFolder() = runTest {
+    assertEquals("Downloads", folderNameText("/Users/alex/Downloads/").load())
+    assertEquals("Downloads", folderNameText("C:\\Users\\alex\\Downloads").load())
+    assertEquals("/", folderNameText("/").load())
     val tree = "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FKetch"
     assertTrue(isDocumentTree(tree))
-    assertEquals("Ketch", folderName(tree))
+    assertEquals("Ketch", folderNameText(tree).load())
     assertEquals(
       "Internal storage",
-      folderName("content://com.android.externalstorage.documents/tree/primary%3A"),
+      folderNameText("content://com.android.externalstorage.documents/tree/primary%3A").load(),
     )
   }
 

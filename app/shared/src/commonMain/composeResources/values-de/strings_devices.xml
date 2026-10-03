@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="device_this_mac">Dieser Mac</string>
+  <string name="device_this_pc">Dieser PC</string>
+  <string name="device_this_computer">Dieser Computer</string>
+  <string name="device_this_phone">Dieses Telefon</string>
+  <string name="device_this_tablet">Dieses Tablet</string>
+  <string name="device_this_ipad">Dieses iPad</string>
+  <string name="device_this_browser">Dieser Browser</string>
+  <string name="device_this_mac_in_sentence">diesen Mac</string>
+  <string name="device_this_pc_in_sentence">diesen PC</string>
+  <string name="device_this_computer_in_sentence">diesen Computer</string>
+  <string name="device_this_phone_in_sentence">dieses Telefon</string>
+  <string name="device_this_tablet_in_sentence">dieses Tablet</string>
+  <string name="device_this_ipad_in_sentence">dieses iPad</string>
+  <string name="device_this_browser_in_sentence">diesen Browser</string>
+  <string name="device_any_in_sentence">diesem Gerät</string>
+
+  <string name="device_free_space">%1$s frei</string>
+  <string name="device_free_of_total">%1$s von %2$s frei</string>
+  <string name="device_storage_short">nicht genug</string>
+  <string name="device_active_downloads">%1$d aktiv</string>
+
+  <string name="device_switch_to">Zu %1$s wechseln</string>
+
+  <string name="device_target_on">Ziel</string>
+  <string name="device_target_label">%1$s:</string>
+  <string name="device_target_choose">Gerät wählen</string>
+  <string name="device_target_menu_title">Herunterladen auf</string>
+  <string name="device_target_connecting">Verbindung wird hergestellt…</string>
+  <string name="device_target_offline">Offline</string>
+  <string name="device_target_unauthorized">Neues Zugriffstoken nötig</string>
+
+  <string name="device_server_start_failed">Der Server konnte nicht gestartet werden.</string>
+
+  <string name="device_duration_minutes">%1$d min</string>
+  <string name="device_duration_hours">%1$d h</string>
+  <string name="device_duration_days">%1$d Tg.</string>
+
+  <string name="device_meta_uptime">läuft seit %1$s</string>
+  <string name="device_show_downloads">Downloads anzeigen</string>
+  <string name="device_not_connected">Nicht verbunden</string>
+
+  <string name="device_problem_unauthorized">Neues Zugriffstoken nötig</string>
+  <string name="device_problem_token_rejected">Das dafür gespeicherte Zugriffstoken wurde abgelehnt.</string>
+  <string name="device_problem_over_limit">Ketch hält nur wenige Geräte gleichzeitig verbunden. Mit diesem verbindet es sich, solange es angezeigt wird.</string>
+  <string name="device_problem_not_kept">Ketch verbindet sich damit, solange es angezeigt wird oder „Verbunden bleiben“ an ist.</string>
+  <string name="device_problem_connecting">Verbindung wird hergestellt…</string>
+  <string name="device_problem_offline_for">Seit %1$s offline · neuer Versuch läuft</string>
+  <string name="device_problem_offline">Offline · neuer Versuch läuft</string>
+  <string name="device_fix_retry_now">Jetzt erneut versuchen</string>
+  <string name="device_fix_enter_token">Token eingeben</string>
+
+  <string name="device_sharing_on">Freigegeben auf :%1$d</string>
+  <string name="device_sharing_discoverable">Freigegeben auf :%1$d · sichtbar</string>
+
+  <string name="device_drop_to_download">Ablegen, um auf %1$s herunterzuladen</string>
+  <string name="device_idle">Inaktiv</string>
+  <string name="device_lane_empty">Kein Download aktiv</string>
+  <plurals name="device_lane_downloads">
+    <item quantity="one">%1$d Download, noch %2$s</item>
+    <item quantity="other">%1$d Downloads, noch %2$s</item>
+  </plurals>
+  <string name="device_count_active">Aktiv</string>
+  <string name="device_count_waiting">Wartend</string>
+  <string name="device_count_paused">Pausiert</string>
+  <string name="device_count_failed">Fehlgeschlagen</string>
+  <plurals name="device_count_downloading_on">
+    <item quantity="one">%2$s: %1$d lädt</item>
+    <item quantity="other">%2$s: %1$d laden</item>
+  </plurals>
+  <plurals name="device_count_waiting_on">
+    <item quantity="one">%2$s: %1$d wartet</item>
+    <item quantity="other">%2$s: %1$d warten</item>
+  </plurals>
+  <plurals name="device_count_paused_on">
+    <item quantity="one">%2$s: %1$d pausiert</item>
+    <item quantity="other">%2$s: %1$d pausiert</item>
+  </plurals>
+  <plurals name="device_count_failed_on">
+    <item quantity="one">%2$s: %1$d fehlgeschlagen</item>
+    <item quantity="other">%2$s: %1$d fehlgeschlagen</item>
+  </plurals>
+  <string name="device_free_space_unknown">Freier Speicher unbekannt</string>
+  <string name="device_chip_networks">Netzwerke, über die es herunterlädt</string>
+  <string name="device_chip_sharing_settings">Freigabeeinstellungen</string>
+  <string name="device_chip_share_tooltip">Anderen Geräten die Steuerung erlauben</string>
+  <string name="device_chip_not_shared">Nicht freigegeben · Freigeben…</string>
+  <plurals name="device_retry_failed">
+    <item quantity="one">%1$d fehlgeschlagenen erneut versuchen</item>
+    <item quantity="other">%1$d fehlgeschlagene erneut versuchen</item>
+  </plurals>
+  <string name="device_pause_all_here">Hier alle pausieren</string>
+  <string name="device_start_now">%1$s jetzt starten</string>
+
+  <string name="device_reconnect_failed">Erneute Verbindung mit %1$s fehlgeschlagen</string>
+
+  <string name="device_more_for">Weitere Optionen für %1$s</string>
+  <string name="device_menu_settings">Einstellungen für dieses Gerät…</string>
+  <string name="device_menu_rename">Umbenennen…</string>
+  <string name="device_menu_stay_connected">Verbunden bleiben</string>
+  <string name="device_menu_remove">Entfernen…</string>
+  <string name="device_rename_title">%1$s umbenennen</string>
+  <string name="device_rename_confirm">Umbenennen</string>
+  <string name="device_rename_remote_hint">Leer lassen, um den Namen zu verwenden, den es selbst angibt.</string>
+  <string name="device_rename_local_hint">Deine anderen Geräte sehen diesen Namen nach einem Neustart.</string>
+  <string name="device_rename_name">Name</string>
+  <string name="device_remove_title">%1$s entfernen?</string>
+  <string name="device_remove_body">Ketch zeigt seine Downloads hier nicht mehr an. Sie laufen auf %1$s weiter, und du kannst es später wieder hinzufügen.</string>
+
+  <string name="device_speed_of">Geschwindigkeit von %1$s</string>
+
+  <string name="device_page_title">Geräte</string>
+  <string name="device_add">Gerät hinzufügen</string>
+  <string name="device_add_card_title">Gerät hinzufügen</string>
+  <string name="device_add_card_body">Steuere ein NAS oder einen anderen Computer von hier aus. Führe dort %1$s aus oder aktiviere Einstellungen › Freigabe in seiner Ketch-App.</string>
+  <string name="device_pair_computer">Computer koppeln</string>
+  <string name="device_pair_phone">Telefon koppeln</string>
+
+  <string name="connect_link_label">Kopplungslink oder Adresse</string>
+  <string name="connect_link_placeholder">ketch://pair… oder nas.local:8642</string>
+  <string name="connect_link_has_code">enthält den Zugriffscode</string>
+  <string name="connect_error_link_empty">Füge einen Kopplungslink ein oder gib eine Adresse ein</string>
+  <string name="connect_error_link_invalid">Verwende einen Kopplungslink oder eine Adresse wie nas.local:8642</string>
+  <string name="connect_error_host">Gib einen Hostnamen oder eine IP-Adresse ein</string>
+  <string name="connect_error_port">Verwende einen Port von 1 bis 65535</string>
+  <string name="connect_code_label">Zugriffscode</string>
+  <string name="connect_code_placeholder">Code einfügen oder eingeben</string>
+  <string name="connect_code_link_rejected">Der Code im Link funktioniert nicht mehr. Gib den aktuellen aus Einstellungen › Freigabe auf dem Gerät ein.</string>
+  <string name="connect_code_rejected">Dieser Code hat nicht funktioniert. Prüfe ihn oder kopiere einen neuen Kopplungslink.</string>
+  <string name="connect_code_requested">%1$s fragt nach seinem Zugriffscode. Du findest ihn dort unter Einstellungen › Freigabe.</string>
+  <string name="connect_details_manually">Details manuell eingeben</string>
+  <string name="connect_address_manually">Adresse manuell eingeben</string>
+  <string name="connect_host">Host</string>
+  <string name="connect_port">Port</string>
+  <string name="connect_use_https">HTTPS verwenden</string>
+  <string name="connect_unreachable">%1$s ist nicht erreichbar. Prüfe, ob Ketch dort freigegeben ist und beide Geräte im selben Netzwerk sind.</string>
+  <string name="connect_add_anyway">Trotzdem hinzufügen</string>
+  <string name="connect_add_failed">Das Gerät konnte nicht hinzugefügt werden: %1$s</string>
+  <string name="connect_connected">Mit %1$s verbunden</string>
+  <string name="connect_added">%1$s hinzugefügt</string>
+  <string name="connect_added_detail">Ketch verbindet sich, sobald es erreichbar ist</string>
+  <string name="connect_link_incomplete">Dieser Kopplungslink ist unvollständig</string>
+  <string name="connect_link_incomplete_detail">Kopiere ihn erneut aus Einstellungen › Freigabe auf dem anderen Gerät</string>
+
+  <string name="connect_add_title">Gerät hinzufügen</string>
+  <string name="connect_new_code_title">Neuer Zugriffscode für %1$s</string>
+  <string name="connect_code_no_longer_accepted">%1$s akzeptiert den Code, den Ketch gespeichert hat, nicht mehr. Füge einen neuen Kopplungslink aus Einstellungen › Freigabe auf dem Gerät ein oder gib seinen Zugriffscode ein.</string>
+  <string name="connect_scan_hint">Scanne den Kopplungscode unter Einstellungen › Freigabe auf dem anderen Gerät mit deiner Kamera-App oder füge seinen Kopplungslink ein.</string>
+  <string name="connect_paste_hint">Füge den Kopplungslink aus Einstellungen › Freigabe auf dem anderen Gerät ein oder gib seine Adresse ein.</string>
+  <string name="connect_find_on_network">Im Netzwerk suchen</string>
+  <string name="connect_on_your_network">In deinem Netzwerk</string>
+  <string name="connect_searching">Suche läuft…</string>
+  <string name="connect_search_again">Erneut suchen</string>
+  <string name="connect_looking">Suche nach Ketch-Geräten in diesem Netzwerk…</string>
+  <string name="connect_nearby_failed">Dein Netzwerk konnte nicht durchsucht werden</string>
+  <string name="connect_nearby_failed_hint">%1$s. Füge stattdessen einen Kopplungslink ein.</string>
+  <string name="connect_none_found">Keine Geräte gefunden. Öffne auf dem anderen Gerät Einstellungen › Freigabe und lass ein weiteres Gerät zu.</string>
+  <string name="connect_asks_for_code">%1$s · fragt nach einem Code</string>
+  <string name="connect_added_badge">Hinzugefügt</string>
+  <string name="connect_share_instead">Möchtest du %1$s von einem anderen Gerät aus steuern?</string>
+  <string name="connect_show_pairing_code">Kopplungscode anzeigen</string>
+
+  <string name="connect_landing_title">Mit einem Ketch-Gerät verbinden</string>
+  <string name="connect_landing_body">Steuere die Downloads eines Computers, NAS oder Telefons, auf dem Ketch läuft.</string>
+  <string name="connect_your_devices">Deine Geräte</string>
+  <string name="connect_where_link">Wo du den Link findest</string>
+  <string name="connect_where_link_body">Öffne auf dem Computer, auf dem Ketch läuft, Einstellungen › Freigabe › Anderes Gerät zulassen und kopiere den Kopplungslink. Führe auf einem NAS oder Server %1$s aus.</string>
+  <string name="connect_enter_code">Zugriffscode eingeben</string>
+  <string name="connect_status_needs_code">Code nötig</string>
+  <string name="connect_status_online">Online</string>
+
+  <string name="connect_pairing_title">Mit %1$s verbinden?</string>
+  <string name="connect_not_now">Nicht jetzt</string>
+  <string name="connect_pairing_new">Du siehst seine Downloads hier und kannst ihm über %1$s neue hinzufügen.</string>
+  <string name="connect_pairing_known">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt.</string>
+  <string name="connect_pairing_known_code">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt und erhält den Code dieses Links.</string>
+  <string name="connect_pairing_has_code">Der Link enthält den Zugriffscode.</string>
+
+  <string name="device_pick_torrents">Torrent-Dateien öffnen</string>
+  <string name="device_pick_folder">Downloadordner wählen</string>
+  <string name="device_pick_choose">Auswählen</string>
+</resources>

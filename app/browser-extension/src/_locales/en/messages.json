@@ -1,0 +1,684 @@
+{
+  "extension_name": {
+    "message": "Ketch",
+    "description": "Name of the extension in the browser's list of extensions and in extension stores. A product name: keep it as it is."
+  },
+  "extension_description": {
+    "message": "Send downloads, links and magnet links to Ketch on this computer or a remote server.",
+    "description": "Summary of the extension in the browser's list of extensions and in extension stores. At most 132 characters."
+  },
+  "extension_action_title": {
+    "message": "Ketch",
+    "description": "Tooltip of the extension's toolbar button. A product name: keep it as it is."
+  },
+  "language_tag": {
+    "message": "en",
+    "description": "Not shown. The BCP 47 tag of this translation's language, such as zh-CN or pt-BR: the pages' lang attribute, and how numbers are written."
+  },
+  "menu_download_link": {
+    "message": "Download link with Ketch",
+    "description": "Context menu item on a link."
+  },
+  "menu_download_image": {
+    "message": "Download image with Ketch",
+    "description": "Context menu item on an image."
+  },
+  "menu_download_video": {
+    "message": "Download video with Ketch",
+    "description": "Context menu item on a video."
+  },
+  "menu_download_audio": {
+    "message": "Download audio with Ketch",
+    "description": "Context menu item on audio."
+  },
+  "notify_sent_to": {
+    "message": "Sent to $NAME$",
+    "description": "Notification title after a download was handed to a Ketch instance, when there are several. $NAME$ is the instance's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "Sent to Ketch",
+    "description": "Notification title after a download was handed to Ketch, when there is only one instance."
+  },
+  "notify_download_added": {
+    "message": "Download added",
+    "description": "Notification text after a download was handed to Ketch, when its file name isn't known."
+  },
+  "notify_fallback_browser": {
+    "message": "Downloading in the browser instead",
+    "description": "Notification title when Ketch couldn't take a download the browser started, so the browser downloads it. The text below says why."
+  },
+  "notify_fallback_magnet": {
+    "message": "Opening the magnet link in another app",
+    "description": "Notification title when Ketch couldn't take a clicked magnet link, so it opens as it would without the extension. The text below says why."
+  },
+  "notify_send_failed": {
+    "message": "Couldn't send to $NAME$",
+    "description": "Notification title when a link from the context menu couldn't be sent. $NAME$ is the instance's name. The text below says why.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch can't download this",
+    "description": "Notification title when the context menu was used on something without a link Ketch can download."
+  },
+  "notify_unsupported_stream": {
+    "message": "The page streams this media itself, so there is no link to download.",
+    "description": "Notification text below notify_unsupported, for video or audio that a page plays from data it holds itself (a blob: link)."
+  },
+  "notify_unsupported_scheme": {
+    "message": "Only http, https, ftp and magnet links can be sent to Ketch.",
+    "description": "Notification text below notify_unsupported, for other links. http, https, ftp and magnet are link types; keep them as they are."
+  },
+  "error_with_hint": {
+    "message": "$ERROR$. $HINT$",
+    "description": "An error followed by what to do about it, in notifications and on the settings page. $ERROR$ is an error without a final period, such as \"Can't reach Ketch at http://nas.local:8642\"; $HINT$ is a sentence, such as \"Open Ketch and try again.\"",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "Can't reach Ketch at http://nas.local:8642"
+      },
+      "hint": {
+        "content": "$2",
+        "example": "Open Ketch and try again."
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "Ketch at $ADDRESS$ did not respond",
+    "description": "Error when a Ketch server didn't answer in time. $ADDRESS$ is its address.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "http://192.168.1.20:8642"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "Can't reach Ketch at $ADDRESS$",
+    "description": "Error when nothing answers at a Ketch server's address. $ADDRESS$ is its address.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "http://192.168.1.20:8642"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch rejected the access token",
+    "description": "Error when a Ketch server refused the access token entered for it."
+  },
+  "error_token_required": {
+    "message": "Ketch requires an access token",
+    "description": "Error when a Ketch server needs an access token and none was entered."
+  },
+  "error_http_status": {
+    "message": "Ketch answered with HTTP $STATUS$",
+    "description": "Error when a Ketch server refused a request without saying why. $STATUS$ is the HTTP status code.",
+    "placeholders": {
+      "status": {
+        "content": "$1",
+        "example": "404"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch didn't start in time",
+    "description": "Error when the Ketch app on this computer was opened but didn't answer within 45 seconds."
+  },
+  "error_app_not_installed": {
+    "message": "The Ketch app isn't set up on this computer",
+    "description": "Error when the Ketch desktop app hasn't registered itself with this browser."
+  },
+  "error_app_unreachable": {
+    "message": "Couldn't reach the Ketch app",
+    "description": "Error when the browser couldn't talk to the Ketch app on this computer."
+  },
+  "error_app_not_running": {
+    "message": "Ketch isn't running",
+    "description": "Status in the popup and on the settings page while the Ketch app on this computer is closed. It opens by itself when a download needs it."
+  },
+  "error_app_connect_failed": {
+    "message": "The Ketch app couldn't connect",
+    "description": "Error when the Ketch app on this computer reported a problem without describing it."
+  },
+  "error_app_invalid_reply": {
+    "message": "The Ketch app sent an invalid reply",
+    "description": "Error when the Ketch app on this computer answered with something the extension can't use."
+  },
+  "error_unsupported_link": {
+    "message": "Ketch can't download this kind of link",
+    "description": "Error when a link that only exists in the browser, such as a blob: or data: link, was to be sent to Ketch."
+  },
+  "error_torrent_http": {
+    "message": "Couldn't fetch the torrent file (HTTP $STATUS$)",
+    "description": "Error when a site refused to send a .torrent file. $STATUS$ is the HTTP status code.",
+    "placeholders": {
+      "status": {
+        "content": "$1",
+        "example": "403"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "Timed out fetching the torrent file",
+    "description": "Error when a site didn't send a .torrent file in time."
+  },
+  "error_torrent_too_large": {
+    "message": "The torrent file is too large",
+    "description": "Error when a .torrent file is over 16 MB, too large to be one."
+  },
+  "error_address_required": {
+    "message": "Enter the address of a Ketch server",
+    "description": "Error when a server's address was left blank on the settings page."
+  },
+  "error_address_invalid": {
+    "message": "\"$ADDRESS$\" is not a valid address",
+    "description": "Error for a server address that can't be read. $ADDRESS$ is what was typed.",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "nas local"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "The address must start with http:// or https://",
+    "description": "Error for a server address of another kind, such as ftp://nas.local."
+  },
+  "error_address_credentials": {
+    "message": "Put the access token in the token field, not in the address",
+    "description": "Error for a server address with a user name or password in it, such as http://user:secret@nas.local."
+  },
+  "error_not_ketch": {
+    "message": "This address does not look like a Ketch server",
+    "description": "Error on the settings page when something answers at a server's address but it isn't Ketch."
+  },
+  "hint_app_not_installed": {
+    "message": "Install the Ketch desktop app and open it once, then try again. With \"ketch server\", or a browser installed as a Flatpak or Snap, add Ketch as a server instead.",
+    "description": "Hint after error_app_not_installed. \"ketch server\" is a command; Flatpak and Snap are Linux package formats. Keep them as they are."
+  },
+  "hint_app_not_running": {
+    "message": "Ketch opens by itself when you send it a download.",
+    "description": "Hint below error_app_not_running while the Ketch app on this computer is closed."
+  },
+  "hint_open_app": {
+    "message": "Open Ketch and try again.",
+    "description": "Hint when the Ketch app on this computer didn't answer."
+  },
+  "hint_local_server": {
+    "message": "Open Ketch and turn on Settings → Remote access → Server, or run \"ketch server\".",
+    "description": "Hint when a Ketch server on this computer didn't answer. Settings → Remote access → Server names a switch in the Ketch app; \"ketch server\" is a command."
+  },
+  "hint_remote_server": {
+    "message": "Check that the server is running and this address is reachable from here.",
+    "description": "Hint when a Ketch server on another device didn't answer."
+  },
+  "hint_access_token": {
+    "message": "Enter the access token shown in Ketch under Settings → Remote access.",
+    "description": "Hint when a Ketch server needs an access token or refused the one entered. Settings → Remote access names a page in the Ketch app."
+  },
+  "task_magnet_link": {
+    "message": "Magnet link",
+    "description": "Name shown for a download from a magnet link that has no name of its own."
+  },
+  "task_torrent": {
+    "message": "Torrent",
+    "description": "Name shown for a torrent download that has no name of its own."
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ of $TOTAL$ · $SPEED$",
+    "description": "State of a running download in the popup's Recent list. $DOWNLOADED$ and $TOTAL$ are sizes (size_megabytes and the like); $SPEED$ is speed_per_second.",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1",
+        "example": "1.5 MB"
+      },
+      "total": {
+        "content": "$2",
+        "example": "20 MB"
+      },
+      "speed": {
+        "content": "$3",
+        "example": "2.3 MB/s"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "description": "State of a running download of unknown size. $DOWNLOADED$ is a size (size_megabytes and the like); $SPEED$ is speed_per_second.",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1",
+        "example": "1.5 MB"
+      },
+      "speed": {
+        "content": "$2",
+        "example": "2.3 MB/s"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "Paused",
+    "description": "State of a paused download of unknown size."
+  },
+  "task_paused_percent": {
+    "message": "Paused · $PERCENT$%",
+    "description": "State of a paused download. $PERCENT$ is how much of it is downloaded, a whole number.",
+    "placeholders": {
+      "percent": {
+        "content": "$1",
+        "example": "40"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "Queued",
+    "description": "State of a download waiting for a free slot."
+  },
+  "task_scheduled": {
+    "message": "Scheduled",
+    "description": "State of a download set to start later."
+  },
+  "task_completed": {
+    "message": "Completed",
+    "description": "State of a finished download."
+  },
+  "task_failed": {
+    "message": "Failed: $REASON$",
+    "description": "State of a failed download. $REASON$ is the error from Ketch, which may be in English, or task_unknown_error.",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "HTTP error 404: Not Found"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "unknown error",
+    "description": "The reason in task_failed when Ketch gave none. Lower case because it follows \"Failed:\"."
+  },
+  "task_canceled": {
+    "message": "Canceled",
+    "description": "State of a canceled download."
+  },
+  "task_pause": {
+    "message": "Pause",
+    "description": "Tooltip of a running download's button in the popup."
+  },
+  "task_resume": {
+    "message": "Resume",
+    "description": "Tooltip of a paused or failed download's button in the popup."
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "description": "A size in bytes. $SIZE$ is a whole number.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "512"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "description": "A size in kilobytes of 1024 bytes. $SIZE$ is a number.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "1.5"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "description": "A size in megabytes of 1024 KB. $SIZE$ is a number.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "1.5"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "description": "A size in gigabytes of 1024 MB. $SIZE$ is a number.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "1.5"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "description": "A size in terabytes of 1024 GB. $SIZE$ is a number.",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "1.5"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "description": "A download speed. $SIZE$ is a size (size_megabytes and the like).",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "2.3 MB"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "Connected · Ketch $VERSION$",
+    "description": "Connection status in the popup and on an instance card on the settings page. $VERSION$ is Ketch's version.",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "1.2.0"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "Connected to $NAME$ · Ketch $VERSION$",
+    "description": "Connection status of a server that has a name of its own. $NAME$ is its name; $VERSION$ is Ketch's version.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      },
+      "version": {
+        "content": "$2",
+        "example": "1.2.0"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "Connected · Ketch $VERSION$ on $OS$",
+    "description": "Connection status on an instance card on the settings page. $VERSION$ is Ketch's version; $OS$ is the operating system it runs on.",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "1.2.0"
+      },
+      "os": {
+        "content": "$2",
+        "example": "Linux"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "Connected to $NAME$ · Ketch $VERSION$ on $OS$",
+    "description": "Connection status on the card of a server that has a name of its own. $NAME$ is its name; $VERSION$ is Ketch's version; $OS$ is the operating system it runs on.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      },
+      "version": {
+        "content": "$2",
+        "example": "1.2.0"
+      },
+      "os": {
+        "content": "$3",
+        "example": "Linux"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "Connecting…",
+    "description": "Status while checking whether a Ketch instance answers."
+  },
+  "status_opening_app": {
+    "message": "Opening Ketch…",
+    "description": "Status while the Ketch app on this computer is being opened."
+  },
+  "instance_this_computer": {
+    "message": "This computer",
+    "description": "Name of the Ketch app on this computer in the extension's list of Ketch instances, until it is renamed, and the placeholder of its name field. Saved with the settings."
+  },
+  "instance_name_default": {
+    "message": "$NAME$ (default)",
+    "description": "A Ketch instance in the context menu's submenu and the popup's picker, marked as the one captured downloads go to. $NAME$ is the instance's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "Name",
+    "description": "Placeholder and accessible label of an instance's name field on the settings page."
+  },
+  "instance_default": {
+    "message": "Default",
+    "description": "Label of the radio button that makes an instance the one captured downloads and magnet links go to."
+  },
+  "instance_app_detail": {
+    "message": "The Ketch app on this computer. The extension opens it when a download needs it.",
+    "description": "Description on the card of the Ketch app on the settings page."
+  },
+  "instance_address": {
+    "message": "Address",
+    "description": "Label of a server's address field."
+  },
+  "instance_token": {
+    "message": "Access token",
+    "description": "Label of a server's access token field."
+  },
+  "instance_token_placeholder": {
+    "message": "Not required",
+    "description": "Placeholder of the access token field, as a server may not need one."
+  },
+  "instance_insecure": {
+    "message": "This address isn't encrypted: the access token and any cookies sent with downloads travel over the network in plain text. Prefer https, or use it only on a network you trust.",
+    "description": "Warning on the card of a server whose address starts with http:// and isn't on this computer. https is a link type; keep it as it is."
+  },
+  "instance_test": {
+    "message": "Test connection",
+    "description": "Button on an instance card that checks whether it answers, opening the Ketch app if needed."
+  },
+  "instance_remove": {
+    "message": "Remove",
+    "description": "Button that removes an instance from the extension's list."
+  },
+  "instance_enter_address": {
+    "message": "Enter the address of a Ketch server.",
+    "description": "Status on a new server card until an address is entered."
+  },
+  "popup_instance_picker": {
+    "message": "Ketch instance",
+    "description": "Accessible label of the popup's menu that picks which Ketch instance to show."
+  },
+  "popup_settings": {
+    "message": "Settings",
+    "description": "Tooltip and accessible label of the popup's button that opens the settings page."
+  },
+  "popup_open_app": {
+    "message": "Open Ketch",
+    "description": "Popup button shown while the Ketch app on this computer is closed."
+  },
+  "popup_add_placeholder": {
+    "message": "Paste a link or magnet link",
+    "description": "Placeholder of the popup's field for adding a download."
+  },
+  "popup_add_label": {
+    "message": "Link to download",
+    "description": "Accessible label of the popup's field for adding a download."
+  },
+  "popup_add_button": {
+    "message": "Download",
+    "description": "Button next to that field that sends the link to Ketch. A verb."
+  },
+  "popup_added": {
+    "message": "Added $NAME$",
+    "description": "Message after a link from the popup was added. $NAME$ is the download's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "ubuntu-24.04.iso"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "Enter an http, https, ftp or magnet link.",
+    "description": "Error in the popup when what was typed isn't a link Ketch can download. http, https, ftp and magnet are link types; keep them as they are."
+  },
+  "popup_capture": {
+    "message": "Capture browser downloads",
+    "description": "Popup switch that sends downloads the browser starts to Ketch."
+  },
+  "popup_capture_target": {
+    "message": "Sent to $NAME$",
+    "description": "Below popup_capture when there are several Ketch instances: where captured downloads go. $NAME$ is the default instance's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "Recent",
+    "description": "Heading of the popup's list of recent downloads."
+  },
+  "popup_no_downloads": {
+    "message": "No downloads yet.",
+    "description": "Shown in the Recent list of the popup when the instance has no downloads."
+  },
+  "options_title": {
+    "message": "Ketch extension settings",
+    "description": "Title of the settings page, shown in its browser tab."
+  },
+  "options_intro": {
+    "message": "Send downloads from this browser to Ketch on this computer or a remote server.",
+    "description": "Introduction at the top of the settings page."
+  },
+  "options_saved": {
+    "message": "Saved",
+    "description": "Shown at the top of the settings page for a moment after a change was saved."
+  },
+  "options_permission": {
+    "message": "Ketch needs access to websites to capture their downloads, send their cookies, and reach your Ketch servers.",
+    "description": "Banner on the settings page when the browser hasn't granted access to all sites."
+  },
+  "options_allow_access": {
+    "message": "Allow access",
+    "description": "Button in that banner that asks the browser for access to all sites."
+  },
+  "options_instances": {
+    "message": "Ketch instances",
+    "description": "Heading of the settings section that lists the Ketch apps and servers downloads can go to."
+  },
+  "options_instances_detail": {
+    "message": "Captured downloads and magnet links go to the default instance. Right-click a link, image or video to send it to any of them.",
+    "description": "Description of the Ketch instances section."
+  },
+  "options_add_app": {
+    "message": "Add Ketch on this computer",
+    "description": "Button that adds the Ketch app on this computer back to the list after it was removed."
+  },
+  "options_add_server": {
+    "message": "Add server",
+    "description": "Button that adds a Ketch server, such as one on another device, to the list."
+  },
+  "options_browser_downloads": {
+    "message": "Browser downloads",
+    "description": "Heading of the settings section about downloads the browser starts."
+  },
+  "options_capture": {
+    "message": "Capture downloads",
+    "description": "Switch that sends downloads the browser starts to Ketch."
+  },
+  "options_capture_detail": {
+    "message": "Downloads you start in the browser go to Ketch instead. If Ketch can't be reached, the browser downloads them as usual.",
+    "description": "Description of options_capture."
+  },
+  "options_min_size": {
+    "message": "Leave small files to the browser",
+    "description": "Label of the field for the size below which downloads stay in the browser."
+  },
+  "options_min_size_detail": {
+    "message": "Files smaller than this stay in the browser. Files of unknown size always go to Ketch. 0 sends everything.",
+    "description": "Description of options_min_size."
+  },
+  "options_min_size_unit": {
+    "message": "MB",
+    "description": "Unit after the minimum size field: megabytes."
+  },
+  "options_excluded": {
+    "message": "Sites to leave to the browser",
+    "description": "Label of the list of sites whose downloads stay in the browser."
+  },
+  "options_excluded_detail": {
+    "message": "One per line. Includes their subdomains, so example.com also covers downloads.example.com.",
+    "description": "Description of options_excluded. example.com and downloads.example.com are example site names; keep them as they are."
+  },
+  "options_cookies": {
+    "message": "Send cookies and referrer",
+    "description": "Switch that sends the site's cookies and the page a link was on along with each download."
+  },
+  "options_cookies_detail": {
+    "message": "Lets Ketch download files that need you to be signed in. Ketch stores them with the task so it can resume it later.",
+    "description": "Description of options_cookies."
+  },
+  "options_links_notifications": {
+    "message": "Links and notifications",
+    "description": "Heading of the settings section about magnet links and notifications."
+  },
+  "options_magnet": {
+    "message": "Send clicked magnet links to Ketch",
+    "description": "Switch that sends magnet links clicked on web pages to Ketch."
+  },
+  "options_magnet_detail": {
+    "message": "Alt+click a magnet link to open it in another app instead.",
+    "description": "Description of options_magnet. Alt is the key; write the click with it as the language does."
+  },
+  "options_notify": {
+    "message": "Notify when a download is sent",
+    "description": "Switch that shows a notification each time a download was handed to Ketch."
+  },
+  "options_notify_detail": {
+    "message": "Problems are always shown.",
+    "description": "Description of options_notify."
+  },
+  "options_help": {
+    "message": "Setting up Ketch",
+    "description": "Heading of the help section at the end of the settings page."
+  },
+  "options_help_this_computer": {
+    "message": "On this computer",
+    "description": "Help topic heading."
+  },
+  "options_help_this_computer_detail": {
+    "message": "Install the Ketch desktop app and open it once, so your browsers can find it. After that, the extension opens Ketch whenever a download needs it; there is no server to turn on or token to copy.",
+    "description": "Help text under options_help_this_computer."
+  },
+  "options_help_other_device": {
+    "message": "On another device",
+    "description": "Help topic heading."
+  },
+  "options_help_other_device_detail": {
+    "message": "On that device, open Settings → Remote access, turn on <b>Server</b> and <b>Allow other devices</b>, then generate an access token. Add the device here with <b>Add server</b>, its address, such as <code>http://192.168.1.20:8642</code>, and the token. For <code>ketch server</code>, set <code>apiToken</code> in its config.toml.",
+    "description": "Help text under options_help_other_device. Settings → Remote access, Server and Allow other devices name a page and switches of the Ketch app on that device; Add server is options_add_server; config.toml is a file name. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
+  },
+  "options_help_command_line": {
+    "message": "Command line or sandboxed browsers",
+    "description": "Help topic heading."
+  },
+  "options_help_command_line_detail": {
+    "message": "To use <code>ketch server</code> on this computer, or from a browser installed as a Flatpak or Snap, which can't start other apps, add it as a server at <code>http://127.0.0.1:8642</code>.",
+    "description": "Help text under options_help_command_line. Flatpak and Snap are Linux package formats. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
+  }
+}

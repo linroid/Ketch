@@ -3,9 +3,10 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
@@ -154,7 +155,7 @@ class AppStateDroppedFileTest {
     assertFalse(state.showAddDialog)
     assertEquals(
       "Found no links in what was dropped",
-      state.messages.history.value.single().title,
+      state.messages.history.value.single().title.load(),
     )
   }
 

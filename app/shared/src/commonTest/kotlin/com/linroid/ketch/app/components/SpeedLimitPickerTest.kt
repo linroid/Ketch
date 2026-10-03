@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.components
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.SpeedUnit
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
@@ -14,6 +16,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpeedLimitPickerTest {
+  private val slowLane = verbatim("Slow lane")
 
   @Test
   fun parseSpeedInput_suffixes_readTheirUnit() {
@@ -41,6 +44,13 @@ class SpeedLimitPickerTest {
   }
 
   @Test
+  fun parseSpeedInput_translatedUnlimited_isUnlimitedToo() {
+    assertEquals(SpeedLimit.Unlimited, parseSpeedInput("sin límite", SpeedUnit.MB, "Sin límite"))
+    assertEquals(SpeedLimit.Unlimited, parseSpeedInput("unlimited", SpeedUnit.MB, "Sin límite"))
+    assertEquals(null, parseSpeedInput("illimité", SpeedUnit.MB, "Sin límite"))
+  }
+
+  @Test
   fun parseSpeedInput_zeroOrGarbage_isNull() {
     assertNull(parseSpeedInput("0", SpeedUnit.MB))
     assertNull(parseSpeedInput("", SpeedUnit.MB))
@@ -49,22 +59,22 @@ class SpeedLimitPickerTest {
   }
 
   @Test
-  fun winningLimitCaption_lowerGlobalLimit_namesIt() {
+  fun winningLimitCaption_lowerGlobalLimit_namesIt() = runTest {
     assertEquals(
       "Slow lane 1 MB/s applies to all downloads",
-      winningLimitCaption(SpeedLimit.mbps(5), SpeedLimit.mbps(1), "Slow lane"),
+      winningLimitCaption(SpeedLimit.mbps(5), SpeedLimit.mbps(1), slowLane).load(),
     )
     assertEquals(
       "Slow lane 1 MB/s applies to all downloads",
-      winningLimitCaption(SpeedLimit.Unlimited, SpeedLimit.mbps(1), "Slow lane"),
+      winningLimitCaption(SpeedLimit.Unlimited, SpeedLimit.mbps(1), slowLane).load(),
     )
   }
 
   @Test
   fun winningLimitCaption_ownLimitApplies_isNull() {
-    assertNull(winningLimitCaption(SpeedLimit.kbps(512), SpeedLimit.mbps(1), "Slow lane"))
-    assertNull(winningLimitCaption(SpeedLimit.mbps(1), SpeedLimit.mbps(1), "Slow lane"))
-    assertNull(winningLimitCaption(SpeedLimit.mbps(5), SpeedLimit.Unlimited, "Slow lane"))
+    assertNull(winningLimitCaption(SpeedLimit.kbps(512), SpeedLimit.mbps(1), slowLane))
+    assertNull(winningLimitCaption(SpeedLimit.mbps(1), SpeedLimit.mbps(1), slowLane))
+    assertNull(winningLimitCaption(SpeedLimit.mbps(5), SpeedLimit.Unlimited, slowLane))
   }
 
   @Test

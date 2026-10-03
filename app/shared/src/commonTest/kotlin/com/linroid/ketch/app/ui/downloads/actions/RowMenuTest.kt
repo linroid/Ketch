@@ -11,6 +11,8 @@ import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.MenuEntry
 import com.linroid.ketch.app.components.buildMenu
 import com.linroid.ketch.app.components.startTimeOptions
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.DeviceHealth
@@ -26,6 +28,7 @@ import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,7 +70,7 @@ class RowMenuTest {
         "Pause", "Speed limit", "Connections", "Priority", "Start later", "Copy link", "Details",
         "—", "Stop and discard progress…", "Remove from list",
       ),
-      entries.map(::labelOf),
+      entries.map { labelOf(it) },
     )
   }
 
@@ -78,11 +81,11 @@ class RowMenuTest {
         rowMenuEntries(
           listOf(rowOf(f.add(completed))),
           f.runner,
-          RowMenuContext(revealLabel = "Show in Finder"),
+          RowMenuContext(revealLabel = verbatim("Show in Finder")),
         )
       }
 
-      val labels = entries.map(::labelOf)
+      val labels = entries.map { labelOf(it) }
       assertTrue("Show in Finder" in labels)
       assertEquals("Remove and trash file…", labels.last())
     }
@@ -91,7 +94,7 @@ class RowMenuTest {
   fun rowMenuEntries_selection_countsWhatEachActionAppliesTo() = actionsTest { f ->
     val rows = listOf(f.add(downloading), f.add(downloading), f.add(completed)).map { rowOf(it) }
 
-    val labels = buildMenu { rowMenuEntries(rows, f.runner, RowMenuContext()) }.map(::labelOf)
+    val labels = buildMenu { rowMenuEntries(rows, f.runner, RowMenuContext()) }.map { labelOf(it) }
 
     assertEquals("Pause 2 downloads", labels.first())
     assertTrue("Copy 3 links" in labels)
@@ -103,28 +106,31 @@ class RowMenuTest {
     val row = rowOf(f.add(downloading))
     val laptop = SendTarget(
       EmbeddedInstance(f.api, "Laptop"),
-      DeviceOption("laptop", "Laptop", DeviceHealth.Live),
+      DeviceOption("laptop", verbatim("Laptop"), DeviceHealth.Live, "Laptop"),
     )
     val nas = SendTarget(
       EmbeddedInstance(f.api, "NAS"),
-      DeviceOption("nas", "NAS", DeviceHealth.Offline()),
+      DeviceOption("nas", verbatim("NAS"), DeviceHealth.Offline(), "NAS"),
     )
 
     val entries = buildMenu {
       rowMenuEntries(listOf(row), f.runner, RowMenuContext(devices = listOf(laptop, nas)))
     }
 
-    val send = entries.filterIsInstance<MenuEntry.Submenu>().single { it.label == "Send to" }
+    val send = entries.filterIsInstance<MenuEntry.Submenu>().single { it.label.load() == "Send to" }
     val items = send.entries.filterIsInstance<MenuEntry.Item>()
-    assertEquals(listOf("Laptop" to true, "NAS" to false), items.map { it.label to it.enabled })
-    assertEquals("Offline", items.last().caption)
+    assertEquals(
+      listOf("Laptop" to true, "NAS" to false),
+      items.map { it.label.load() to it.enabled }
+    )
+    assertEquals("Offline", items.last().caption.load())
   }
 
   @Test
   fun rowMenuEntries_noOtherDevice_leavesSendToOut() = actionsTest { f ->
     val labels = buildMenu {
       rowMenuEntries(listOf(rowOf(f.add(downloading))), f.runner, RowMenuContext())
-    }.map(::labelOf)
+    }.map { labelOf(it) }
 
     assertFalse("Send to" in labels)
   }
@@ -137,11 +143,12 @@ class RowMenuTest {
     val entries = buildMenu { speedEntries(rows, f.runner) }
 
     val checked = entries.filterIsInstance<MenuEntry.Item>().single { it.checked == true }
-    assertEquals("2 MB/s", checked.label)
+    assertEquals("2 MB/s", checked.label.load())
     val share = entries.filterIsInstance<MenuEntry.Submenu>().single()
-    assertEquals("Share across these 2", share.label)
-    val five = share.entries.filterIsInstance<MenuEntry.Item>().single { it.label == "5 MB/s" }
-    assertEquals("2.5 MB/s each", five.caption)
+    assertEquals("Share across these 2", share.label.load())
+    val five = share.entries.filterIsInstance<MenuEntry.Item>()
+      .single { it.label.load() == "5 MB/s" }
+    assertEquals("2.5 MB/s each", five.caption.load())
   }
 
   @Test
@@ -154,8 +161,10 @@ class RowMenuTest {
       rowMenuEntries(listOf(rowOf(torrent), rowOf(http)), f.runner, RowMenuContext())
     }
     val connections = entries.filterIsInstance<MenuEntry.Submenu>()
-      .single { it.label.startsWith("Connections") }
-    connections.entries.filterIsInstance<MenuEntry.Item>().single { it.label == "16" }.onClick()
+      .single { it.label.load().startsWith("Connections") }
+    connections.entries.filterIsInstance<MenuEntry.Item>()
+      .single { it.label.load() == "16" }
+      .onClick()
     runCurrent()
 
     assertEquals(emptyList(), torrent.calls)
@@ -193,7 +202,7 @@ class RowMenuTest {
     urgent.onClick()
     runCurrent()
 
-    assertEquals("Starts now · may pause debian.iso", urgent.caption)
+    assertEquals("Starts now · may pause debian.iso", urgent.caption.load())
     assertTrue("priority ${DownloadPriority.URGENT}" in queued.calls)
   }
 
@@ -219,12 +228,13 @@ class RowMenuTest {
 
     assertEquals(DeviceHealth.Live, listed.health)
     assertEquals(DeviceHealth.Unauthorized, known.health)
-    assertEquals("2 active", known.summary)
+    assertEquals("2 active", known.summary?.load())
   }
 
   @Test
   fun startLaterEntries_scheduleThatPassed_checksNothingAndOffersNoClear() = actionsTest { f ->
-    val context = RowMenuContext(now = Instant.fromEpochSeconds(1_800_000_000), zone = TimeZone.UTC)
+    val now = Instant.fromEpochSeconds(1_800_000_000)
+    val context = RowMenuContext(now = now, zone = TimeZone.UTC)
     val later = startTimeOptions(context.now, context.zone)[1].schedule
     val started = f.add(downloading, DownloadRequest("https://example.com/a.iso", schedule = later))
     val waiting = f.add(DownloadState.Scheduled(later))
@@ -233,35 +243,38 @@ class RowMenuTest {
     val pending = buildMenu { startLaterEntries(listOf(rowOf(waiting)), f.runner, context) }
 
     val items = passed.filterIsInstance<MenuEntry.Item>()
-    assertTrue(items.none { it.checked == true || it.label == "Clear" })
+    assertTrue(items.none { it.checked == true || it.label.load() == "Clear" })
     val shown = pending.filterIsInstance<MenuEntry.Item>()
     assertEquals(1, shown.count { it.checked == true })
-    assertTrue(shown.any { it.label == "Clear" })
+    assertTrue(shown.any { it.label.load() == "Clear" })
   }
 
   @Test
-  fun batchLabel_countsAndPlurals() {
-    assertEquals("Pause 1 download", batchLabel(RowAction.Pause, 1, null))
-    assertEquals("Start 2 downloads now", batchLabel(RowAction.StartNow, 2, null))
-    assertEquals("Copy 1 link", batchLabel(RowAction.CopyLink, 1, null))
-    assertEquals("Show in Finder (3)", batchLabel(RowAction.ShowInFolder, 3, "Show in Finder"))
-    assertEquals("Speed limit", batchLabel(RowAction.SpeedLimit, 3, null))
-    assertEquals("Download 2 files again", batchLabel(RowAction.DownloadAgain, 2, null))
+  fun batchLabel_countsAndPlurals() = runTest {
+    assertEquals("Pause 1 download", batchLabel(RowAction.Pause, 1, null).load())
+    assertEquals("Start 2 downloads now", batchLabel(RowAction.StartNow, 2, null).load())
+    assertEquals("Copy 1 link", batchLabel(RowAction.CopyLink, 1, null).load())
+    assertEquals(
+      "Show in Finder (3)",
+      batchLabel(RowAction.ShowInFolder, 3, verbatim("Show in Finder")).load()
+    )
+    assertEquals("Speed limit", batchLabel(RowAction.SpeedLimit, 3, null).load())
+    assertEquals("Download 2 files again", batchLabel(RowAction.DownloadAgain, 2, null).load())
     assertEquals(
       "Remove 1 download and its file…",
-      batchLabel(RowAction.RemoveAndTrash, 1, null),
+      batchLabel(RowAction.RemoveAndTrash, 1, null).load(),
     )
     assertEquals(
       "Remove 3 downloads and their files…",
-      batchLabel(RowAction.RemoveAndDelete, 3, null),
+      batchLabel(RowAction.RemoveAndDelete, 3, null).load(),
     )
   }
 
-  private fun labelOf(entry: MenuEntry): String = when (entry) {
-    is MenuEntry.Item -> entry.label
-    is MenuEntry.Submenu -> entry.label
+  private suspend fun labelOf(entry: MenuEntry): String = when (entry) {
+    is MenuEntry.Item -> entry.label.load()
+    is MenuEntry.Submenu -> entry.label.load()
     MenuEntry.Divider -> "—"
-    is MenuEntry.Header -> entry.text
+    is MenuEntry.Header -> entry.text.load()
     is MenuEntry.Custom -> "custom"
   }
 }

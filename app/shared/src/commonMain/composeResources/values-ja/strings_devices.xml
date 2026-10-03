@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="device_this_mac">このMac</string>
+  <string name="device_this_pc">このPC</string>
+  <string name="device_this_computer">このコンピュータ</string>
+  <string name="device_this_phone">このスマートフォン</string>
+  <string name="device_this_tablet">このタブレット</string>
+  <string name="device_this_ipad">このiPad</string>
+  <string name="device_this_browser">このブラウザ</string>
+  <string name="device_this_mac_in_sentence">このMac</string>
+  <string name="device_this_pc_in_sentence">このPC</string>
+  <string name="device_this_computer_in_sentence">このコンピュータ</string>
+  <string name="device_this_phone_in_sentence">このスマートフォン</string>
+  <string name="device_this_tablet_in_sentence">このタブレット</string>
+  <string name="device_this_ipad_in_sentence">このiPad</string>
+  <string name="device_this_browser_in_sentence">このブラウザ</string>
+  <string name="device_any_in_sentence">このデバイス</string>
+
+  <string name="device_free_space">空き%1$s</string>
+  <string name="device_free_of_total">空き%1$s（全%2$s）</string>
+  <string name="device_storage_short">容量不足</string>
+  <string name="device_active_downloads">%1$d件実行中</string>
+
+  <string name="device_switch_to">%1$sに切り替え</string>
+
+  <string name="device_target_on">ダウンロード先</string>
+  <string name="device_target_label">%1$s：</string>
+  <string name="device_target_choose">デバイスを選択</string>
+  <string name="device_target_menu_title">ダウンロード先</string>
+  <string name="device_target_connecting">接続中…</string>
+  <string name="device_target_offline">オフライン</string>
+  <string name="device_target_unauthorized">新しいアクセストークンが必要です</string>
+
+  <string name="device_server_start_failed">サーバーを起動できませんでした。</string>
+
+  <string name="device_duration_minutes">%1$d分</string>
+  <string name="device_duration_hours">%1$d時間</string>
+  <string name="device_duration_days">%1$d日</string>
+
+  <string name="device_meta_uptime">稼働%1$s</string>
+  <string name="device_show_downloads">ダウンロードを表示</string>
+  <string name="device_not_connected">未接続</string>
+
+  <string name="device_problem_unauthorized">新しいアクセストークンが必要です</string>
+  <string name="device_problem_token_rejected">保存されているアクセストークンが拒否されました。</string>
+  <string name="device_problem_over_limit">Ketchが同時に接続できるデバイスは数台までです。このデバイスには表示中のみ接続します。</string>
+  <string name="device_problem_not_kept">Ketchは、このデバイスを表示している間、または接続を維持している間に接続します。</string>
+  <string name="device_problem_connecting">接続中…</string>
+  <string name="device_problem_offline_for">%1$s前からオフライン · 再試行中</string>
+  <string name="device_problem_offline">オフライン · 再試行中</string>
+  <string name="device_fix_retry_now">今すぐ再試行</string>
+  <string name="device_fix_enter_token">トークンを入力</string>
+
+  <string name="device_sharing_on">共有中 :%1$d</string>
+  <string name="device_sharing_discoverable">共有中 :%1$d · 検出可能</string>
+
+  <string name="device_drop_to_download">ドロップして%1$sでダウンロード</string>
+  <string name="device_idle">アイドル</string>
+  <string name="device_lane_empty">ダウンロード中のものはありません</string>
+  <plurals name="device_lane_downloads">
+    <item quantity="other">%1$d件のダウンロード、残り%2$s</item>
+  </plurals>
+  <string name="device_count_active">実行中</string>
+  <string name="device_count_waiting">待機中</string>
+  <string name="device_count_paused">一時停止中</string>
+  <string name="device_count_failed">失敗</string>
+  <plurals name="device_count_downloading_on">
+    <item quantity="other">%2$sで%1$d件ダウンロード中</item>
+  </plurals>
+  <plurals name="device_count_waiting_on">
+    <item quantity="other">%2$sで%1$d件待機中</item>
+  </plurals>
+  <plurals name="device_count_paused_on">
+    <item quantity="other">%2$sで%1$d件一時停止中</item>
+  </plurals>
+  <plurals name="device_count_failed_on">
+    <item quantity="other">%2$sで%1$d件失敗</item>
+  </plurals>
+  <string name="device_free_space_unknown">空き容量不明</string>
+  <string name="device_chip_networks">ダウンロードに使うネットワーク</string>
+  <string name="device_chip_sharing_settings">共有の設定</string>
+  <string name="device_chip_share_tooltip">他のデバイスからの操作を許可</string>
+  <string name="device_chip_not_shared">未共有 · 共有…</string>
+  <plurals name="device_retry_failed">
+    <item quantity="other">失敗した%1$d件を再試行</item>
+  </plurals>
+  <string name="device_pause_all_here">このデバイスですべて一時停止</string>
+  <string name="device_start_now">%1$sを今すぐ開始</string>
+
+  <string name="device_reconnect_failed">%1$sに再接続できませんでした</string>
+
+  <string name="device_more_for">%1$sのその他の操作</string>
+  <string name="device_menu_settings">このデバイスの設定…</string>
+  <string name="device_menu_rename">名前を変更…</string>
+  <string name="device_menu_stay_connected">接続を維持</string>
+  <string name="device_menu_remove">削除…</string>
+  <string name="device_rename_title">%1$sの名前を変更</string>
+  <string name="device_rename_confirm">名前を変更</string>
+  <string name="device_rename_remote_hint">空欄にすると、デバイスが通知する名前を使います。</string>
+  <string name="device_rename_local_hint">他のデバイスには、再起動後にこの名前が表示されます。</string>
+  <string name="device_rename_name">名前</string>
+  <string name="device_remove_title">%1$sを削除しますか？</string>
+  <string name="device_remove_body">このデバイスのダウンロードはここに表示されなくなります。ダウンロードは%1$sで引き続き実行され、あとで再び追加できます。</string>
+
+  <string name="device_speed_of">%1$sの速度</string>
+
+  <string name="device_page_title">デバイス</string>
+  <string name="device_add">デバイスを追加</string>
+  <string name="device_add_card_title">デバイスを追加</string>
+  <string name="device_add_card_body">NASや別のコンピュータをここから操作できます。そのデバイスで%1$sを実行するか、そのKetchアプリで「設定 › 共有」をオンにしてください。</string>
+  <string name="device_pair_computer">コンピュータとペアリング</string>
+  <string name="device_pair_phone">スマートフォンとペアリング</string>
+
+  <string name="connect_link_label">ペアリングリンクまたはアドレス</string>
+  <string name="connect_link_placeholder">ketch://pair… または nas.local:8642</string>
+  <string name="connect_link_has_code">アクセスコードを含む</string>
+  <string name="connect_error_link_empty">ペアリングリンクを貼り付けるか、アドレスを入力してください</string>
+  <string name="connect_error_link_invalid">ペアリングリンク、またはnas.local:8642のようなアドレスを使用してください</string>
+  <string name="connect_error_host">ホスト名またはIPアドレスを入力してください</string>
+  <string name="connect_error_port">1〜65535のポートを使用してください</string>
+  <string name="connect_code_label">アクセスコード</string>
+  <string name="connect_code_placeholder">コードを貼り付けまたは入力</string>
+  <string name="connect_code_link_rejected">リンクに含まれるコードは使用できなくなりました。そのデバイスの「設定 › 共有」に表示されている現在のコードを入力してください。</string>
+  <string name="connect_code_rejected">そのコードは使用できませんでした。コードを確認するか、新しいペアリングリンクをコピーしてください。</string>
+  <string name="connect_code_requested">%1$sからアクセスコードを求められています。コードはそのデバイスの「設定 › 共有」にあります。</string>
+  <string name="connect_details_manually">詳細を手動で入力</string>
+  <string name="connect_address_manually">アドレスを手動で入力</string>
+  <string name="connect_host">ホスト</string>
+  <string name="connect_port">ポート</string>
+  <string name="connect_use_https">HTTPSを使用</string>
+  <string name="connect_unreachable">%1$sに接続できませんでした。そのデバイスでKetchが共有中であること、両方のデバイスが同じネットワークにあることを確認してください。</string>
+  <string name="connect_add_anyway">このまま追加</string>
+  <string name="connect_add_failed">デバイスを追加できませんでした：%1$s</string>
+  <string name="connect_connected">%1$sに接続しました</string>
+  <string name="connect_added">%1$sを追加しました</string>
+  <string name="connect_added_detail">接続できるようになると、Ketchが自動的に接続します</string>
+  <string name="connect_link_incomplete">そのペアリングリンクは不完全です</string>
+  <string name="connect_link_incomplete_detail">もう一方のデバイスの「設定 › 共有」から、もう一度コピーしてください</string>
+
+  <string name="connect_add_title">デバイスを追加</string>
+  <string name="connect_new_code_title">%1$sの新しいアクセスコード</string>
+  <string name="connect_code_no_longer_accepted">%1$sは、Ketchが保存しているコードを受け付けなくなりました。そのデバイスの「設定 › 共有」から新しいペアリングリンクを貼り付けるか、アクセスコードを入力してください。</string>
+  <string name="connect_scan_hint">もう一方のデバイスの「設定 › 共有」にあるペアリングコードをカメラアプリでスキャンするか、ペアリングリンクを貼り付けてください。</string>
+  <string name="connect_paste_hint">もう一方のデバイスの「設定 › 共有」にあるペアリングリンクを貼り付けるか、アドレスを入力してください。</string>
+  <string name="connect_find_on_network">ネットワーク上で探す</string>
+  <string name="connect_on_your_network">このネットワーク上</string>
+  <string name="connect_searching">検索中…</string>
+  <string name="connect_search_again">再検索</string>
+  <string name="connect_looking">このネットワーク上のKetchデバイスを探しています…</string>
+  <string name="connect_nearby_failed">ネットワークを検索できませんでした</string>
+  <string name="connect_nearby_failed_hint">%1$s。代わりにペアリングリンクを貼り付けてください。</string>
+  <string name="connect_none_found">デバイスが見つかりません。もう一方のデバイスで「設定 › 共有」を開き、「別のデバイスを許可」をオンにしてください。</string>
+  <string name="connect_asks_for_code">%1$s · コードが必要</string>
+  <string name="connect_added_badge">追加済み</string>
+  <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>
+  <string name="connect_show_pairing_code">ペアリングコードを表示</string>
+
+  <string name="connect_landing_title">Ketchデバイスに接続</string>
+  <string name="connect_landing_body">Ketchを実行しているコンピュータ、NAS、スマートフォンのダウンロードを操作できます。</string>
+  <string name="connect_your_devices">お使いのデバイス</string>
+  <string name="connect_where_link">リンクの場所</string>
+  <string name="connect_where_link_body">Ketchを実行しているコンピュータで「設定 › 共有 › 別のデバイスを許可」を開き、ペアリングリンクをコピーします。NASやサーバーでは%1$sを実行します。</string>
+  <string name="connect_enter_code">アクセスコードを入力</string>
+  <string name="connect_status_needs_code">コードが必要</string>
+  <string name="connect_status_online">オンライン</string>
+
+  <string name="connect_pairing_title">%1$sに接続しますか？</string>
+  <string name="connect_not_now">今はしない</string>
+  <string name="connect_pairing_new">このデバイスのダウンロードがここに表示され、%1$sから新しいダウンロードを追加できるようになります。</string>
+  <string name="connect_pairing_known">%1$sはすでに追加されています。接続すると、そのデバイスを表示します。</string>
+  <string name="connect_pairing_known_code">%1$sはすでに追加されています。接続すると、そのデバイスを表示し、このリンクのコードを設定します。</string>
+  <string name="connect_pairing_has_code">このリンクにはアクセスコードが含まれています。</string>
+
+  <string name="device_pick_torrents">トレントファイルを開く</string>
+  <string name="device_pick_folder">ダウンロードフォルダを選択</string>
+  <string name="device_pick_choose">選択</string>
+</resources>

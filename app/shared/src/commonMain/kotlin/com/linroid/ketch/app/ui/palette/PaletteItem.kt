@@ -6,38 +6,52 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.TaskKey
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.palette_pause_all_on
+import ketch.app.shared.generated.resources.palette_resume_all_on
+import ketch.app.shared.generated.resources.palette_retry_failed_on
+import ketch.app.shared.generated.resources.palette_section_commands
+import ketch.app.shared.generated.resources.palette_section_devices
+import ketch.app.shared.generated.resources.palette_section_downloads
+import ketch.app.shared.generated.resources.palette_section_links
+import ketch.app.shared.generated.resources.palette_section_navigation
+import ketch.app.shared.generated.resources.palette_section_search
+import ketch.app.shared.generated.resources.palette_section_speed
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * Where a palette row comes from. Rows that match equally well are listed in this order.
  *
  * @property title heading of the provider's rows while nothing is typed.
  */
-internal enum class PaletteProvider(val title: String) {
+internal enum class PaletteProvider(val title: UiText) {
   /** Links in the typed or pasted text, to download on a device. */
-  Links("Download"),
+  Links(Res.string.palette_section_links.text()),
 
   /** A typed speed such as "5m", for the Slow lane or the speed limit. */
-  Speed("Speed"),
+  Speed(Res.string.palette_section_speed.text()),
 
   /** Commands of the registry, with live counts. */
-  Commands("Commands"),
+  Commands(Res.string.palette_section_commands.text()),
 
   /** Downloads whose name matches. */
-  Downloads("Downloads"),
+  Downloads(Res.string.palette_section_downloads.text()),
 
   /** Tabs, destinations and Settings pages. */
-  Navigation("Go to"),
+  Navigation(Res.string.palette_section_navigation.text()),
 
   /** Other devices to switch to, and the commands that act on one device. */
-  Devices("Devices"),
+  Devices(Res.string.palette_section_devices.text()),
 
   /** Searching the Downloads list or Discover for the text. */
-  Fallback("Search"),
+  Fallback(Res.string.palette_section_search.text()),
 }
 
 /** The leading glyph of a palette row. */
@@ -101,11 +115,16 @@ internal sealed interface PaletteAction {
   data class Discover(val query: String) : PaletteAction
 }
 
-/** What a device-wide command does to the tasks of one device. */
-internal enum class BatchVerb(val label: String) {
-  Pause("Pause all"),
-  Resume("Resume all"),
-  Retry("Retry failed"),
+/**
+ * What a device-wide command does to the tasks of one device.
+ *
+ * @property title the row's title, such as "Pause all on NAS-Basement", with the device's name
+ *   as its argument.
+ */
+internal enum class BatchVerb(val title: StringResource) {
+  Pause(Res.string.palette_pause_all_on),
+  Resume(Res.string.palette_resume_all_on),
+  Retry(Res.string.palette_retry_failed_on),
 }
 
 /**

@@ -10,13 +10,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.util.RowStatus
-import kotlin.time.Duration.Companion.milliseconds
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.row_missing_file
+import ketch.app.shared.generated.resources.row_status_file_missing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * How a row plays its download's completion: the lane strip stays for its sheen while
@@ -103,8 +107,8 @@ internal fun withMissingFile(row: TaskRow, missing: Boolean): TaskRow {
   }
   val content = row.content.copy(
     status = RowStatus.FileMissing,
-    statusText = "File missing",
-    detail = "File moved or deleted",
+    statusText = Res.string.row_status_file_missing.text(),
+    detail = Res.string.row_missing_file.text(),
   )
   return row.copy(content = content)
 }

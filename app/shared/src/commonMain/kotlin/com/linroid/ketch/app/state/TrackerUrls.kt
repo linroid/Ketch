@@ -1,13 +1,24 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.intake_tracker_no_host
+import ketch.app.shared.generated.resources.intake_tracker_port
+import ketch.app.shared.generated.resources.intake_tracker_scheme
+import ketch.app.shared.generated.resources.intake_tracker_spaces
+import ketch.app.shared.generated.resources.intake_tracker_too_long
+import ketch.app.shared.generated.resources.intake_tracker_udp_port
+import ketch.app.shared.generated.resources.intake_tracker_udp_user_info
+
 /** Extra trackers the torrent engine uses at most; later ones are ignored. */
 const val MAX_EXTRA_TRACKERS = 64
 
 private val TRACKER_SCHEMES = setOf("http", "https", "udp")
 private val WHITESPACE = Regex("\\s+")
 
-/** A typed tracker URL that could not be added, and why. */
-data class RejectedTracker(val url: String, val reason: String)
+/** A typed tracker URL that could not be added, and why: [problem], such as "Too long.". */
+data class RejectedTracker(val url: String, val problem: UiText)
 
 /**
  * Outcome of [addTrackers].
@@ -41,17 +52,21 @@ fun addTrackers(current: List<String>, text: String): TrackerAddition {
  * when it is: `http`, `https` or `udp` with a host and a valid port.
  * `udp` needs an explicit port and cannot carry a user name or password.
  */
-fun trackerUrlError(url: String): String? {
-  if (url.length > 8192) return "Too long."
-  if (url.any { it.isWhitespace() }) return "Contains spaces."
-  val parts = splitTrackerUrl(url) ?: return "Start it with http://, https:// or udp://."
-  if (parts.host.isEmpty()) return "Missing the host name."
+fun trackerUrlError(url: String): UiText? {
+  if (url.length > 8192) return Res.string.intake_tracker_too_long.text()
+  if (url.any { it.isWhitespace() }) return Res.string.intake_tracker_spaces.text()
+  val parts = splitTrackerUrl(url) ?: return Res.string.intake_tracker_scheme.text()
+  if (parts.host.isEmpty()) return Res.string.intake_tracker_no_host.text()
   if (parts.scheme == "udp" && parts.hasUserInfo) {
-    return "UDP trackers can't include a user name or password."
+    return Res.string.intake_tracker_udp_user_info.text()
   }
-  val port = parts.port ?: return if (parts.scheme == "udp") "UDP trackers need a port." else null
+  val port = parts.port ?: return if (parts.scheme == "udp") {
+    Res.string.intake_tracker_udp_port.text()
+  } else {
+    null
+  }
   val valid = port.isNotEmpty() && port.all { it in '0'..'9' } && port.toIntOrNull() in 1..65535
-  return if (valid) null else "Use a port from 1 to 65535."
+  return if (valid) null else Res.string.intake_tracker_port.text()
 }
 
 /** Host of the tracker [url], or [url] itself when it has none. */

@@ -1,6 +1,38 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.intake_action_add_anyway
+import ketch.app.shared.generated.resources.intake_action_add_headers
+import ketch.app.shared.generated.resources.intake_action_find_mirror
+import ketch.app.shared.generated.resources.intake_action_keep_waiting
+import ketch.app.shared.generated.resources.intake_action_paste_curl
+import ketch.app.shared.generated.resources.intake_action_sign_in
+import ketch.app.shared.generated.resources.intake_problem_busy
+import ketch.app.shared.generated.resources.intake_problem_busy_detail
+import ketch.app.shared.generated.resources.intake_problem_check_failed
+import ketch.app.shared.generated.resources.intake_problem_file_unreadable
+import ketch.app.shared.generated.resources.intake_problem_forbidden
+import ketch.app.shared.generated.resources.intake_problem_forbidden_detail
+import ketch.app.shared.generated.resources.intake_problem_ftp
+import ketch.app.shared.generated.resources.intake_problem_http
+import ketch.app.shared.generated.resources.intake_problem_magnet_timeout
+import ketch.app.shared.generated.resources.intake_problem_no_peers
+import ketch.app.shared.generated.resources.intake_problem_no_torrents
+import ketch.app.shared.generated.resources.intake_problem_not_found
+import ketch.app.shared.generated.resources.intake_problem_not_found_detail
+import ketch.app.shared.generated.resources.intake_problem_sign_in
+import ketch.app.shared.generated.resources.intake_problem_torrent
+import ketch.app.shared.generated.resources.intake_problem_unreachable
+import ketch.app.shared.generated.resources.intake_problem_unreachable_server
+import ketch.app.shared.generated.resources.intake_problem_unsupported
+import ketch.app.shared.generated.resources.intake_problem_unsupported_detail
+import org.jetbrains.compose.resources.StringResource
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -18,18 +50,20 @@ val MAGNET_METADATA_TIMEOUT: Duration = 120.seconds
  *   busy server does not block it, because Ketch retries on its own.
  */
 data class IntakeProblem(
-  val title: String,
-  val detail: String? = null,
+  val title: UiText,
+  val detail: UiText? = null,
   val actions: List<IntakeAction> = emptyList(),
   val blocksAdd: Boolean = true,
 ) {
   /** The title and detail on one line, such as "Not found · the link may have expired". */
-  val text: String get() = if (detail == null) title else "$title · $detail"
+  val text: UiText get() = listOfNotNull(title, detail).joinText()
 
   companion object {
     /** A magnet whose peers sent no file list within [MAGNET_METADATA_TIMEOUT]. */
     val MagnetTimeout: IntakeProblem = IntakeProblem(
-      title = "No peers sent the file list in ${MAGNET_METADATA_TIMEOUT.inWholeMinutes} min",
+      title = Res.plurals.intake_problem_magnet_timeout.text(
+        MAGNET_METADATA_TIMEOUT.inWholeMinutes.toInt(),
+      ),
       actions = listOf(IntakeAction.KeepWaiting, IntakeAction.AddAnyway),
     )
   }
@@ -40,27 +74,27 @@ data class IntakeProblem(
  *
  * @property label the button text.
  */
-enum class IntakeAction(val label: String) {
+enum class IntakeAction(val label: StringResource) {
   /** Shows user name and password fields; apply them with [withCredentials]. */
-  SignIn("Sign in"),
+  SignIn(Res.string.intake_action_sign_in),
 
   /** Replaces the link with a cURL command copied from the browser, which brings its cookies. */
-  PasteCurl("Paste as cURL"),
+  PasteCurl(Res.string.intake_action_paste_curl),
 
   /** Opens the request headers under Advanced. */
-  AddHeaders("Add headers"),
+  AddHeaders(Res.string.intake_action_add_headers),
 
   /** Searches Discover for another source of the file. */
-  FindMirror("Find a working mirror"),
+  FindMirror(Res.string.intake_action_find_mirror),
 
   /** Resolves the link again. */
-  Retry("Retry"),
+  Retry(Res.string.action_retry),
 
   /** Keeps waiting for a magnet's file list. */
-  KeepWaiting("Keep waiting"),
+  KeepWaiting(Res.string.intake_action_keep_waiting),
 
   /** Adds the link without its file list or despite the problem. */
-  AddAnyway("Add anyway"),
+  AddAnyway(Res.string.intake_action_add_anyway),
 }
 
 /**
@@ -80,11 +114,11 @@ fun Throwable.toIntakeProblem(
   when {
     // No source on the device takes it: a magnet or a .torrent there means no torrents at all.
     this is KetchError.Unsupported && (file || LinkKind.of(url) == LinkKind.Magnet) -> {
-      IntakeProblem(title = "This device can't download torrents")
+      IntakeProblem(title = Res.string.intake_problem_no_torrents.text())
     }
     file && this !is KetchError -> IntakeProblem(
-      title = "Couldn't read this file",
-      detail = message?.takeIf { it.isNotBlank() },
+      title = Res.string.intake_problem_file_unreadable.text(),
+      detail = message?.takeIf { it.isNotBlank() }?.let(::verbatim),
     )
     else -> linkProblem(url, discoverAvailable)
   }
@@ -92,56 +126,56 @@ fun Throwable.toIntakeProblem(
 private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): IntakeProblem =
   when (this) {
     is KetchError.Unsupported -> IntakeProblem(
-      title = "Ketch can't download this kind of link",
-      detail = "it supports http(s), ftp(s), magnet and .torrent",
+      title = Res.string.intake_problem_unsupported.text(),
+      detail = Res.string.intake_problem_unsupported_detail.text(),
     )
     is KetchError.AuthenticationFailed -> SIGN_IN_REQUIRED
     is KetchError.Http -> when (code) {
       401 -> SIGN_IN_REQUIRED
       403 -> IntakeProblem(
-        title = "The server refused access (403)",
-        detail = "links copied from a signed-in page often need its cookies",
+        title = Res.string.intake_problem_forbidden.text(),
+        detail = Res.string.intake_problem_forbidden_detail.text(),
         actions = listOf(IntakeAction.PasteCurl, IntakeAction.AddHeaders),
       )
       404, 410 -> IntakeProblem(
-        title = "Not found",
-        detail = "the link may have expired",
+        title = Res.string.intake_problem_not_found.text(),
+        detail = Res.string.intake_problem_not_found_detail.text(),
         actions = if (discoverAvailable) listOf(IntakeAction.FindMirror) else emptyList(),
       )
       429, in 500..599 -> IntakeProblem(
-        title = "Server busy ($code)",
-        detail = "Ketch will retry automatically",
+        title = Res.string.intake_problem_busy.text(code),
+        detail = Res.string.intake_problem_busy_detail.text(),
         blocksAdd = false,
       )
       else -> IntakeProblem(
-        title = "The server answered $code",
-        detail = statusMessage?.takeIf { it.isNotBlank() },
+        title = Res.string.intake_problem_http.text(code),
+        detail = statusMessage?.takeIf { it.isNotBlank() }?.let(::verbatim),
         actions = listOf(IntakeAction.Retry),
       )
     }
     is KetchError.Network -> IntakeProblem(
-      title = if (LinkKind.of(url) == LinkKind.Magnet) {
-        "Can't reach any peers"
-      } else {
-        "Can't reach ${hostOf(url) ?: "the server"}"
+      title = when {
+        LinkKind.of(url) == LinkKind.Magnet -> Res.string.intake_problem_no_peers.text()
+        else -> hostOf(url)?.let { Res.string.intake_problem_unreachable.text(it) }
+          ?: Res.string.intake_problem_unreachable_server.text()
       },
       actions = listOf(IntakeAction.Retry),
     )
     is KetchError.SourceError -> IntakeProblem(
       title = when (sourceType) {
-        "torrent" -> "Couldn't read this torrent"
-        "ftp" -> "The FTP server reported an error"
-        else -> "Couldn't check this link"
+        "torrent" -> Res.string.intake_problem_torrent.text()
+        "ftp" -> Res.string.intake_problem_ftp.text()
+        else -> Res.string.intake_problem_check_failed.text()
       },
       actions = listOf(IntakeAction.Retry),
     )
     else -> IntakeProblem(
-      title = "Couldn't check this link",
+      title = Res.string.intake_problem_check_failed.text(),
       detail = when (this) {
         is KetchError.Unknown -> errorMessage
         is KetchError -> null
         else -> message
-      }?.takeIf { it.isNotBlank() },
+      }?.takeIf { it.isNotBlank() }?.let(::verbatim),
       actions = listOf(IntakeAction.Retry),
     )
   }
@@ -161,7 +195,7 @@ fun IntakeItem.Link.withCredentials(user: String, password: String): IntakeItem.
 private const val AUTHORIZATION = "Authorization"
 
 private val SIGN_IN_REQUIRED = IntakeProblem(
-  title = "Sign-in required",
+  title = Res.string.intake_problem_sign_in.text(),
   actions = listOf(IntakeAction.SignIn),
 )
 

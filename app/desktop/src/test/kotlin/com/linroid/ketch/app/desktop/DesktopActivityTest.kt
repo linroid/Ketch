@@ -20,7 +20,7 @@ class DesktopActivityTest {
   )
 
   @Test
-  fun addedCopy_oneDownload_namesIt() {
+  fun addedCopy_oneDownload_namesIt() = runTest {
     assertEquals(
       NotificationCopy(title = "Download added", body = "a.iso"),
       addedCopy(listOf(added("a.iso")), deviceName = null),
@@ -28,7 +28,7 @@ class DesktopActivityTest {
   }
 
   @Test
-  fun addedCopy_manyDownloads_namesTheFirstThreeAndCountsTheRest() {
+  fun addedCopy_manyDownloads_namesTheFirstThreeAndCountsTheRest() = runTest {
     val events = listOf("a.iso", "b.iso", "c.iso", "d.iso", "e.iso").map(::added)
 
     assertEquals(
@@ -38,11 +38,18 @@ class DesktopActivityTest {
   }
 
   @Test
-  fun addedCopy_anotherDevice_namesTheDevice() {
+  fun addedCopy_anotherDevice_namesTheDevice() = runTest {
     assertEquals(
       "On NAS: Download added",
       addedCopy(listOf(added("a.iso")), deviceName = "NAS").title,
     )
+  }
+
+  @Test
+  fun addedCopy_twoDownloads_namesBoth() = runTest {
+    val events = listOf("a.iso", "b.iso").map(::added)
+
+    assertEquals("a.iso, b.iso", addedCopy(events, deviceName = null).body)
   }
 
   @Test

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="device_this_mac">这台 Mac</string>
+  <string name="device_this_pc">这台电脑</string>
+  <string name="device_this_computer">这台电脑</string>
+  <string name="device_this_phone">这部手机</string>
+  <string name="device_this_tablet">这台平板电脑</string>
+  <string name="device_this_ipad">这台 iPad</string>
+  <string name="device_this_browser">此浏览器</string>
+  <string name="device_this_mac_in_sentence">这台 Mac</string>
+  <string name="device_this_pc_in_sentence">这台电脑</string>
+  <string name="device_this_computer_in_sentence">这台电脑</string>
+  <string name="device_this_phone_in_sentence">这部手机</string>
+  <string name="device_this_tablet_in_sentence">这台平板电脑</string>
+  <string name="device_this_ipad_in_sentence">这台 iPad</string>
+  <string name="device_this_browser_in_sentence">此浏览器</string>
+  <string name="device_any_in_sentence">这台设备</string>
+
+  <string name="device_free_space">可用 %1$s</string>
+  <string name="device_free_of_total">可用 %1$s，共 %2$s</string>
+  <string name="device_storage_short">空间不足</string>
+  <string name="device_active_downloads">%1$d 个进行中</string>
+
+  <string name="device_switch_to">切换到 %1$s</string>
+
+  <string name="device_target_on">设备</string>
+  <string name="device_target_label">%1$s：</string>
+  <string name="device_target_choose">选择设备</string>
+  <string name="device_target_menu_title">下载到</string>
+  <string name="device_target_connecting">正在连接…</string>
+  <string name="device_target_offline">离线</string>
+  <string name="device_target_unauthorized">需要新的访问令牌</string>
+
+  <string name="device_server_start_failed">无法启动服务器。</string>
+
+  <string name="device_duration_minutes">%1$d分钟</string>
+  <string name="device_duration_hours">%1$d小时</string>
+  <string name="device_duration_days">%1$d天</string>
+
+  <string name="device_meta_uptime">已运行%1$s</string>
+  <string name="device_show_downloads">显示下载</string>
+  <string name="device_not_connected">未连接</string>
+
+  <string name="device_problem_unauthorized">需要新的访问令牌</string>
+  <string name="device_problem_token_rejected">它拒绝了为其保存的访问令牌。</string>
+  <string name="device_problem_over_limit">Ketch 同时只与少数几台设备保持连接。显示这台设备时会连接它。</string>
+  <string name="device_problem_not_kept">显示这台设备或开启“保持连接”时，Ketch 会连接它。</string>
+  <string name="device_problem_connecting">正在连接…</string>
+  <string name="device_problem_offline_for">已离线%1$s · 正在重试</string>
+  <string name="device_problem_offline">离线 · 正在重试</string>
+  <string name="device_fix_retry_now">立即重试</string>
+  <string name="device_fix_enter_token">输入令牌</string>
+
+  <string name="device_sharing_on">共享于 :%1$d</string>
+  <string name="device_sharing_discoverable">共享于 :%1$d · 可被发现</string>
+
+  <string name="device_drop_to_download">松开以在 %1$s 上下载</string>
+  <string name="device_idle">空闲</string>
+  <string name="device_lane_empty">没有正在进行的下载</string>
+  <plurals name="device_lane_downloads">
+    <item quantity="other">%1$d 个下载，剩余 %2$s</item>
+  </plurals>
+  <string name="device_count_active">进行中</string>
+  <string name="device_count_waiting">等待中</string>
+  <string name="device_count_paused">已暂停</string>
+  <string name="device_count_failed">失败</string>
+  <plurals name="device_count_downloading_on">
+    <item quantity="other">%2$s 上有 %1$d 个正在下载</item>
+  </plurals>
+  <plurals name="device_count_waiting_on">
+    <item quantity="other">%2$s 上有 %1$d 个等待中</item>
+  </plurals>
+  <plurals name="device_count_paused_on">
+    <item quantity="other">%2$s 上有 %1$d 个已暂停</item>
+  </plurals>
+  <plurals name="device_count_failed_on">
+    <item quantity="other">%2$s 上有 %1$d 个失败</item>
+  </plurals>
+  <string name="device_free_space_unknown">可用空间未知</string>
+  <string name="device_chip_networks">用于下载的网络</string>
+  <string name="device_chip_sharing_settings">共享设置</string>
+  <string name="device_chip_share_tooltip">允许其他设备控制它</string>
+  <string name="device_chip_not_shared">未共享 · 共享…</string>
+  <plurals name="device_retry_failed">
+    <item quantity="other">重试 %1$d 个失败的下载</item>
+  </plurals>
+  <string name="device_pause_all_here">暂停这里的全部下载</string>
+  <string name="device_start_now">立即开始 %1$s</string>
+
+  <string name="device_reconnect_failed">无法重新连接到 %1$s</string>
+
+  <string name="device_more_for">%1$s 的更多操作</string>
+  <string name="device_menu_settings">这台设备的设置…</string>
+  <string name="device_menu_rename">重命名…</string>
+  <string name="device_menu_stay_connected">保持连接</string>
+  <string name="device_menu_remove">移除…</string>
+  <string name="device_rename_title">重命名 %1$s</string>
+  <string name="device_rename_confirm">重命名</string>
+  <string name="device_rename_remote_hint">留空则使用它广播的名称。</string>
+  <string name="device_rename_local_hint">其他设备会在重启后看到此名称。</string>
+  <string name="device_rename_name">名称</string>
+  <string name="device_remove_title">移除 %1$s？</string>
+  <string name="device_remove_body">Ketch 将不再在这里显示它的下载。这些下载会继续在 %1$s 上运行，之后也可以重新添加它。</string>
+
+  <string name="device_speed_of">%1$s 的速度</string>
+
+  <string name="device_page_title">设备</string>
+  <string name="device_add">添加设备</string>
+  <string name="device_add_card_title">添加设备</string>
+  <string name="device_add_card_body">在这里控制 NAS 或其他电脑。在那台设备上运行 %1$s，或在其 Ketch 应用中开启“设置 › 共享”。</string>
+  <string name="device_pair_computer">配对电脑</string>
+  <string name="device_pair_phone">配对手机</string>
+
+  <string name="connect_link_label">配对链接或地址</string>
+  <string name="connect_link_placeholder">ketch://pair… 或 nas.local:8642</string>
+  <string name="connect_link_has_code">包含访问码</string>
+  <string name="connect_error_link_empty">请粘贴配对链接或输入地址</string>
+  <string name="connect_error_link_invalid">请使用配对链接或 nas.local:8642 这样的地址</string>
+  <string name="connect_error_host">请输入主机名或 IP 地址</string>
+  <string name="connect_error_port">请使用 1 到 65535 之间的端口</string>
+  <string name="connect_code_label">访问码</string>
+  <string name="connect_code_placeholder">粘贴或输入访问码</string>
+  <string name="connect_code_link_rejected">链接中的访问码已失效。请输入那台设备“设置 › 共享”中当前的访问码。</string>
+  <string name="connect_code_rejected">访问码无效。请检查后重试，或复制新的配对链接。</string>
+  <string name="connect_code_requested">%1$s 需要访问码，可在其“设置 › 共享”中找到。</string>
+  <string name="connect_details_manually">手动输入详细信息</string>
+  <string name="connect_address_manually">手动输入地址</string>
+  <string name="connect_host">主机</string>
+  <string name="connect_port">端口</string>
+  <string name="connect_use_https">使用 HTTPS</string>
+  <string name="connect_unreachable">无法连接 %1$s。请确认那台设备上的 Ketch 已开启共享，并且两台设备位于同一网络。</string>
+  <string name="connect_add_anyway">仍然添加</string>
+  <string name="connect_add_failed">无法添加设备：%1$s</string>
+  <string name="connect_connected">已连接到 %1$s</string>
+  <string name="connect_added">已添加 %1$s</string>
+  <string name="connect_added_detail">可以访问时，Ketch 会连接它</string>
+  <string name="connect_link_incomplete">配对链接不完整</string>
+  <string name="connect_link_incomplete_detail">请从另一台设备的“设置 › 共享”中重新复制</string>
+
+  <string name="connect_add_title">添加设备</string>
+  <string name="connect_new_code_title">%1$s 的新访问码</string>
+  <string name="connect_code_no_longer_accepted">%1$s 不再接受 Ketch 保存的访问码。请粘贴那台设备“设置 › 共享”中新的配对链接，或输入它的访问码。</string>
+  <string name="connect_scan_hint">用相机应用扫描另一台设备“设置 › 共享”中的配对码，或粘贴它的配对链接。</string>
+  <string name="connect_paste_hint">粘贴另一台设备“设置 › 共享”中的配对链接，或输入它的地址。</string>
+  <string name="connect_find_on_network">在网络中查找</string>
+  <string name="connect_on_your_network">同一网络中</string>
+  <string name="connect_searching">正在搜索…</string>
+  <string name="connect_search_again">重新搜索</string>
+  <string name="connect_looking">正在此网络中查找 Ketch 设备…</string>
+  <string name="connect_nearby_failed">无法搜索你的网络</string>
+  <string name="connect_nearby_failed_hint">%1$s。请改为粘贴配对链接。</string>
+  <string name="connect_none_found">未找到设备。请在另一台设备上打开“设置 › 共享”，然后点按“允许其他设备”。</string>
+  <string name="connect_asks_for_code">%1$s · 需要访问码</string>
+  <string name="connect_added_badge">已添加</string>
+  <string name="connect_share_instead">想从其他设备控制%1$s？</string>
+  <string name="connect_show_pairing_code">显示配对码</string>
+
+  <string name="connect_landing_title">连接到 Ketch 设备</string>
+  <string name="connect_landing_body">控制运行 Ketch 的电脑、NAS 或手机上的下载。</string>
+  <string name="connect_your_devices">我的设备</string>
+  <string name="connect_where_link">在哪里找到链接</string>
+  <string name="connect_where_link_body">在运行 Ketch 的电脑上，打开“设置 › 共享 › 允许其他设备”，然后复制配对链接。在 NAS 或服务器上，运行 %1$s。</string>
+  <string name="connect_enter_code">输入访问码</string>
+  <string name="connect_status_needs_code">需要访问码</string>
+  <string name="connect_status_online">在线</string>
+
+  <string name="connect_pairing_title">连接到 %1$s？</string>
+  <string name="connect_not_now">以后再说</string>
+  <string name="connect_pairing_new">你将在这里看到它的下载，并可以从%1$s向它添加新下载。</string>
+  <string name="connect_pairing_known">你已添加过 %1$s。连接后会显示它。</string>
+  <string name="connect_pairing_known_code">你已添加过 %1$s。连接后会显示它，并为它使用此链接中的访问码。</string>
+  <string name="connect_pairing_has_code">此链接包含访问码。</string>
+
+  <string name="device_pick_torrents">打开种子文件</string>
+  <string name="device_pick_folder">选择下载文件夹</string>
+  <string name="device_pick_choose">选择</string>
+</resources>

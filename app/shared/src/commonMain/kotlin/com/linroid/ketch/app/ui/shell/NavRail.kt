@@ -55,6 +55,8 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -65,7 +67,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.sidebar.DEVICE_MENU_LABEL
 import com.linroid.ketch.app.ui.sidebar.DeviceMenu
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.allDevicesLine
@@ -76,8 +77,16 @@ import com.linroid.ketch.app.ui.sidebar.pennantHealth
 import com.linroid.ketch.app.ui.sidebar.pennantName
 import com.linroid.ketch.app.ui.sidebar.rememberAltHeld
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_device_described
+import ketch.app.shared.generated.resources.shell_rail_downloading
+import ketch.app.shared.generated.resources.shell_settings
+import ketch.app.shared.generated.resources.shell_show_sidebar
+import ketch.app.shared.generated.resources.sidebar_device_menu
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the
@@ -118,7 +127,7 @@ internal fun NavRail(
         icon = KetchIcon.Sidebar,
         onClick = { shell.toggleSidebar() },
         size = KetchButtonSize.Small,
-        contentDescription = "Show sidebar",
+        contentDescription = stringResource(Res.string.shell_show_sidebar),
         shortcut = KetchCommands.ToggleSidebar.shortcutLabel(),
         modifier = Modifier.padding(bottom = spacing.s2),
       )
@@ -130,7 +139,7 @@ internal fun NavRail(
     ) {
       for (entry in destinations) {
         RailItem(
-          label = entry.label,
+          label = entry.label.resolve(),
           icon = entry.icon,
           shortcut = entry.command.shortcutLabel(),
           selected = entry == shell.destination && !shell.settingsOpen,
@@ -168,7 +177,7 @@ internal fun NavRail(
       }
     }
     RailItem(
-      label = "Settings",
+      label = stringResource(Res.string.shell_settings),
       icon = KetchIcon.Settings,
       shortcut = KetchCommands.Settings.shortcutLabel(),
       selected = shell.settingsOpen,
@@ -207,6 +216,11 @@ private fun RailItem(
     },
     animationSpec = tween(KetchTheme.motion.micro),
   )
+  val description = if (badge > 0) {
+    pluralStringResource(Res.plurals.shell_rail_downloading, badge, label, badge)
+  } else {
+    label
+  }
   KetchTooltip(text = label, shortcut = shortcut, modifier = modifier) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,9 +235,7 @@ private fun RailItem(
           onClick = onClick,
         )
         // After selectable: a clear before it would drop its click and selected state too.
-        .clearAndSetSemantics {
-          contentDescription = if (badge > 0) "$label, $badge downloading" else label
-        }
+        .clearAndSetSemantics { contentDescription = description }
         .padding(vertical = KetchTheme.spacing.s1),
     ) {
       Box(
@@ -297,9 +309,13 @@ private fun RailDeviceCell(
   Box {
     RailCell(
       selected = selected,
-      tooltip = "${device.name} · ${line.text}",
+      tooltip = listOf(device.name, line.text).joinText().resolve(),
       shortcut = deviceShortcut(number),
-      description = "${device.name}, ${line.text}",
+      description = stringResource(
+        Res.string.shell_device_described,
+        device.name.resolve(),
+        line.text.resolve()
+      ),
       onClick = { state.switchInstance(device.entry) },
       onSecondaryClick = { menuOpen = true },
       dropping = hint != null,
@@ -345,9 +361,13 @@ private fun AllDevicesCell(
   val label = KetchCommands.AllDevices.label
   RailCell(
     selected = selected,
-    tooltip = "$label · ${line.text}",
+    tooltip = listOf(label, line.text).joinText().resolve(),
     shortcut = KetchCommands.AllDevices.shortcutLabel(),
-    description = "$label, ${line.text}",
+    description = stringResource(
+      Res.string.shell_device_described,
+      label.resolve(),
+      line.text.resolve()
+    ),
     onClick = onClick,
   ) {
     ProgressRing(progress) {
@@ -456,6 +476,7 @@ private fun RailCell(
   } else {
     Modifier
   }
+  val menuLabel = stringResource(Res.string.sidebar_device_menu)
   KetchTooltip(text = tooltip, shortcut = shortcut, enabled = !dropping, modifier = modifier) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -473,7 +494,7 @@ private fun RailCell(
           interactionSource = interactions,
           indication = null,
           role = Role.Tab,
-          onLongClickLabel = onSecondaryClick?.let { DEVICE_MENU_LABEL },
+          onLongClickLabel = onSecondaryClick?.let { menuLabel },
           // A long press opens the menu where there is no right click.
           onLongClick = onSecondaryClick,
           onClick = onClick,

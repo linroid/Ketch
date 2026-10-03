@@ -7,6 +7,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.app.ui.onboarding.WelcomeFlow
@@ -79,7 +80,7 @@ class MobileWebSnapshots {
       welcome("welcome-android-intake", Landscape, theme, WelcomePlatform.Android) {
         WelcomeState(WelcomeStep.Intake)
       }
-      welcome("welcome-ios-use", Tablet, theme, WelcomePlatform.Ios, noun = "This iPad") {
+      welcome("welcome-ios-use", Tablet, theme, WelcomePlatform.Ios, kind = LocalDeviceKind.IPad) {
         WelcomeState(WelcomeStep.Use)
       }
     }
@@ -93,7 +94,7 @@ class MobileWebSnapshots {
         size = Tablet,
         theme = theme,
         platform = WelcomePlatform.Android,
-        noun = "This tablet",
+        kind = LocalDeviceKind.Tablet,
         interact = { repeat(FOCUS_STEPS) { pressKey(Key.Tab) } },
       ) {
         WelcomeState(WelcomeStep.Use)
@@ -125,7 +126,7 @@ class MobileWebSnapshots {
     size: SnapshotSize,
     theme: SnapshotTheme,
     platform: WelcomePlatform,
-    noun: String = "This phone",
+    kind: LocalDeviceKind = LocalDeviceKind.Phone,
     interact: suspend SnapshotScene.() -> Unit = {},
     state: () -> WelcomeState,
   ): File = withSample(theme, size.density.toMode(), SampleData.empty()) { env ->
@@ -134,7 +135,7 @@ class MobileWebSnapshots {
         state = env.controller.state,
         platform = platform,
         onDone = {},
-        deviceNoun = noun,
+        deviceKind = kind,
         welcome = remember { state() },
       )
     }

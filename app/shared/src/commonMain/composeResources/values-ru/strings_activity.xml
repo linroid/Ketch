@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="notify_on_device">%1$s: %2$s</string>
+  <string name="notify_download_complete">Загрузка завершена</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="one">%1$d загрузка завершена</item>
+    <item quantity="few">%1$d загрузки завершены</item>
+    <item quantity="many">%1$d загрузок завершено</item>
+    <item quantity="other">%1$d загрузки завершено</item>
+  </plurals>
+  <string name="notify_download_failed">Ошибка загрузки</string>
+  <string name="notify_failed_body">%1$s: %2$s</string>
+  <string name="notify_all_finished">Все загрузки завершены</string>
+  <string name="notify_action_share">Поделиться</string>
+
+  <string name="notify_channel_active">Активные загрузки</string>
+  <string name="notify_channel_done">Завершённые загрузки</string>
+  <string name="notify_channel_failed">Ошибки загрузки</string>
+  <string name="notify_finished_group">Завершённые загрузки</string>
+  <string name="notify_sharing_device">Общий доступ к этому устройству</string>
+  <string name="notify_server_on_port">Сервер на порту %1$d</string>
+  <string name="notify_slow_lane_on">Медленная полоса</string>
+  <string name="notify_action_pause_all">Приостановить все</string>
+  <string name="notify_action_slow_lane">Медленная полоса</string>
+  <string name="notify_action_full_speed">Полная скорость</string>
+  <plurals name="notify_more_files">
+    <item quantity="one">и ещё %1$d</item>
+    <item quantity="few">и ещё %1$d</item>
+    <item quantity="many">и ещё %1$d</item>
+    <item quantity="other">и ещё %1$d</item>
+  </plurals>
+  <plurals name="notify_paused">
+    <item quantity="one">%1$d загрузка приостановлена</item>
+    <item quantity="few">%1$d загрузки приостановлены</item>
+    <item quantity="many">%1$d загрузок приостановлено</item>
+    <item quantity="other">%1$d загрузки приостановлено</item>
+  </plurals>
+  <string name="notify_paused_body">Откройте Ketch, чтобы продолжить</string>
+  <string name="notify_web_offer">Уведомлять</string>
+  <string name="notify_web_on">Уведомления включены</string>
+
+  <plurals name="ongoing_downloading">
+    <item quantity="one">Загружается %1$d файл</item>
+    <item quantity="few">Загружаются %1$d файла</item>
+    <item quantity="many">Загружается %1$d файлов</item>
+    <item quantity="other">Загружается %1$d файла</item>
+  </plurals>
+  <string name="ongoing_downloading_file">Загружается %1$s</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="one">%1$d файл ожидает загрузки</item>
+    <item quantity="few">%1$d файла ожидают загрузки</item>
+    <item quantity="many">%1$d файлов ожидают загрузки</item>
+    <item quantity="other">%1$d файла ожидают загрузки</item>
+  </plurals>
+  <string name="ongoing_size_of">%1$s из %2$s</string>
+  <string name="ongoing_left_under_minute">осталось меньше минуты</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="one">осталось около %1$d мин</item>
+    <item quantity="few">осталось около %1$d мин</item>
+    <item quantity="many">осталось около %1$d мин</item>
+    <item quantity="other">осталось около %1$d мин</item>
+  </plurals>
+  <string name="ongoing_left">осталось около %1$s</string>
+  <string name="ongoing_line_waiting">Ожидает</string>
+
+  <string name="feedback_background_pause">Загрузки приостанавливаются, когда Ketch работает в фоне</string>
+  <string name="feedback_background_use_computer">Скачать на компьютере</string>
+  <string name="feedback_file_action_failed">Не удалось открыть файл</string>
+
+  <string name="activity_title">Активность</string>
+  <string name="activity_mark_all_read">Прочитать все</string>
+  <string name="activity_clear">Очистить</string>
+  <string name="activity_unread">Не прочитано</string>
+  <string name="activity_empty_title">Пока ничего нет</string>
+  <string name="activity_empty_body">Здесь появятся завершённые загрузки, ошибки и отключившиеся устройства.</string>
+  <string name="activity_earlier">Ранее</string>
+
+  <string name="feedback_open_failed">Не удалось открыть %1$s</string>
+  <string name="feedback_drop_unsupported">Чтобы добавить загрузки, перетащите файлы .torrent или списки ссылок</string>
+  <string name="feedback_drop_no_links">Среди перетащенного нет ссылок</string>
+  <string name="feedback_read_failed">Не удалось прочитать %1$s</string>
+  <string name="feedback_add_failed">Не удалось добавить %1$s</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="one">Не удалось добавить %1$d загрузку</item>
+    <item quantity="few">Не удалось добавить %1$d загрузки</item>
+    <item quantity="many">Не удалось добавить %1$d загрузок</item>
+    <item quantity="other">Не удалось добавить %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_switch_failed">Не удалось переключиться на %1$s</string>
+  <string name="feedback_reconnect_failed">Не удалось переподключиться к %1$s</string>
+  <string name="feedback_remove_device_failed">Не удалось удалить %1$s</string>
+  <string name="feedback_discovery_failed">Не удалось найти серверы в локальной сети</string>
+
+  <plurals name="feedback_part_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">Нечего приостанавливать</string>
+  <plurals name="feedback_paused">
+    <item quantity="one">Приостановлена %1$d загрузка</item>
+    <item quantity="few">Приостановлены %1$d загрузки</item>
+    <item quantity="many">Приостановлено %1$d загрузок</item>
+    <item quantity="other">Приостановлено %1$d загрузки</item>
+  </plurals>
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="one">Приостановлена %1$d загрузка на устройствах: %2$d</item>
+    <item quantity="few">Приостановлены %1$d загрузки на устройствах: %2$d</item>
+    <item quantity="many">Приостановлено %1$d загрузок на устройствах: %2$d</item>
+    <item quantity="other">Приостановлено %1$d загрузки на устройствах: %2$d</item>
+  </plurals>
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="one">%1$d запланированная начнётся вовремя</item>
+    <item quantity="few">%1$d запланированные начнутся вовремя</item>
+    <item quantity="many">%1$d запланированных начнутся вовремя</item>
+    <item quantity="other">%1$d запланированной начнутся вовремя</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="one">%1$d запланированная начнётся в %2$s</item>
+    <item quantity="few">%1$d запланированные начнутся в %2$s</item>
+    <item quantity="many">%1$d запланированных начнутся в %2$s</item>
+    <item quantity="other">%1$d запланированной начнутся в %2$s</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="one">Возобновлена %1$d загрузка</item>
+    <item quantity="few">Возобновлены %1$d загрузки</item>
+    <item quantity="many">Возобновлено %1$d загрузок</item>
+    <item quantity="other">Возобновлено %1$d загрузки</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="one">Возобновлена %1$d загрузка на устройствах: %2$d</item>
+    <item quantity="few">Возобновлены %1$d загрузки на устройствах: %2$d</item>
+    <item quantity="many">Возобновлено %1$d загрузок на устройствах: %2$d</item>
+    <item quantity="other">Возобновлено %1$d загрузки на устройствах: %2$d</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="one">Повтор %1$d загрузки</item>
+    <item quantity="few">Повтор %1$d загрузок</item>
+    <item quantity="many">Повтор %1$d загрузок</item>
+    <item quantity="other">Повтор %1$d загрузки</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="one">Повтор %1$d загрузки на устройствах: %2$d</item>
+    <item quantity="few">Повтор %1$d загрузок на устройствах: %2$d</item>
+    <item quantity="many">Повтор %1$d загрузок на устройствах: %2$d</item>
+    <item quantity="other">Повтор %1$d загрузки на устройствах: %2$d</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="one">Убрана %1$d завершённая загрузка</item>
+    <item quantity="few">Убраны %1$d завершённые загрузки</item>
+    <item quantity="many">Убрано %1$d завершённых загрузок</item>
+    <item quantity="other">Убрано %1$d завершённой загрузки</item>
+  </plurals>
+  <string name="feedback_nothing_missing">Нет загрузок с отсутствующими файлами</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="one">Убрана %1$d загрузка без файла</item>
+    <item quantity="few">Убраны %1$d загрузки без файла</item>
+    <item quantity="many">Убрано %1$d загрузок без файла</item>
+    <item quantity="other">Убрано %1$d загрузки без файла</item>
+  </plurals>
+  <string name="feedback_removed_one">Удалено: %1$s</string>
+  <plurals name="feedback_removed">
+    <item quantity="one">Удалена %1$d загрузка</item>
+    <item quantity="few">Удалены %1$d загрузки</item>
+    <item quantity="many">Удалено %1$d загрузок</item>
+    <item quantity="other">Удалено %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_discarded_one">Прогресс сброшен: %1$s</string>
+  <plurals name="feedback_discarded">
+    <item quantity="one">Сброшен прогресс %1$d загрузки</item>
+    <item quantity="few">Сброшен прогресс %1$d загрузок</item>
+    <item quantity="many">Сброшен прогресс %1$d загрузок</item>
+    <item quantity="other">Сброшен прогресс %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_restarted_one">Начато заново: %1$s</string>
+  <plurals name="feedback_restarted">
+    <item quantity="one">Начата заново %1$d загрузка</item>
+    <item quantity="few">Начаты заново %1$d загрузки</item>
+    <item quantity="many">Начато заново %1$d загрузок</item>
+    <item quantity="other">Начато заново %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_redownload_failed_one">Не удалось снова скачать %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="one">Не удалось снова скачать %1$d загрузку</item>
+    <item quantity="few">Не удалось снова скачать %1$d загрузки</item>
+    <item quantity="many">Не удалось снова скачать %1$d загрузок</item>
+    <item quantity="other">Не удалось снова скачать %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_started_now_one">Запущено сейчас: %1$s</string>
+  <plurals name="feedback_started_now">
+    <item quantity="one">Запущена сейчас %1$d загрузка</item>
+    <item quantity="few">Запущены сейчас %1$d загрузки</item>
+    <item quantity="many">Запущено сейчас %1$d загрузок</item>
+    <item quantity="other">Запущено сейчас %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_started_preempted">чтобы освободить место, приостановлено: %1$s</string>
+  <string name="feedback_start_now_failed_one">Не удалось запустить %1$s сейчас на устройстве «%2$s»</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="one">Не удалось запустить сейчас %1$d загрузку</item>
+    <item quantity="few">Не удалось запустить сейчас %1$d загрузки</item>
+    <item quantity="many">Не удалось запустить сейчас %1$d загрузок</item>
+    <item quantity="other">Не удалось запустить сейчас %1$d загрузки</item>
+  </plurals>
+  <string name="feedback_send_failed_one">Не удалось отправить %1$s на %2$s</string>
+  <plurals name="feedback_send_failed">
+    <item quantity="one">Не удалось отправить %1$d загрузку на %2$s</item>
+    <item quantity="few">Не удалось отправить %1$d загрузки на %2$s</item>
+    <item quantity="many">Не удалось отправить %1$d загрузок на %2$s</item>
+    <item quantity="other">Не удалось отправить %1$d загрузки на %2$s</item>
+  </plurals>
+  <string name="feedback_moved_one">Перемещено на %2$s: %1$s</string>
+  <plurals name="feedback_moved">
+    <item quantity="one">%1$d загрузка перемещена на %2$s</item>
+    <item quantity="few">%1$d загрузки перемещены на %2$s</item>
+    <item quantity="many">%1$d загрузок перемещено на %2$s</item>
+    <item quantity="other">%1$d загрузки перемещено на %2$s</item>
+  </plurals>
+  <string name="feedback_sent_one">Отправлено на %2$s: %1$s</string>
+  <plurals name="feedback_sent">
+    <item quantity="one">%1$d загрузка отправлена на %2$s</item>
+    <item quantity="few">%1$d загрузки отправлены на %2$s</item>
+    <item quantity="many">%1$d загрузок отправлено на %2$s</item>
+    <item quantity="other">%1$d загрузки отправлено на %2$s</item>
+  </plurals>
+  <string name="feedback_remove_here">Удалить здесь</string>
+  <string name="feedback_options">Параметры</string>
+
+  <string name="feedback_pause_failed_one">Не удалось приостановить %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="one">Не удалось приостановить %1$d загрузку на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось приостановить %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось приостановить %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось приостановить %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">Не удалось возобновить %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="one">Не удалось возобновить %1$d загрузку на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось возобновить %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось возобновить %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось возобновить %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">Не удалось повторить %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="one">Не удалось повторить %1$d загрузку на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось повторить %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось повторить %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось повторить %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">Не удалось сбросить прогресс %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="one">Не удалось сбросить прогресс %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось сбросить прогресс %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось сбросить прогресс %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось сбросить прогресс %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">Не удалось отменить немедленный запуск %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="one">Не удалось отменить немедленный запуск %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось отменить немедленный запуск %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось отменить немедленный запуск %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось отменить немедленный запуск %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">Не удалось удалить %1$s на устройстве «%2$s»</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="one">Не удалось удалить %1$d загрузку на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось удалить %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось удалить %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось удалить %1$d загрузки на устройстве «%2$s»</item>
+  </plurals>
+
+  <string name="feedback_undo_pause_all">Отменить приостановку всех</string>
+  <string name="feedback_undo_clear_finished">Отменить очистку завершённых</string>
+  <string name="feedback_undo_clear_missing">Отменить очистку отсутствующих</string>
+  <string name="feedback_undo_remove">Отменить удаление</string>
+  <string name="feedback_undo_discard">Отменить сброс прогресса</string>
+  <string name="feedback_undo_start_now">Отменить немедленный запуск</string>
+  <string name="feedback_undo_move">Отменить перемещение</string>
+  <string name="feedback_undo_add">Отменить добавление</string>
+
+  <string name="feedback_send_cookies_and_sign_in">Cookie и данные для входа из вашего браузера будут отправлены на %1$s.</string>
+  <string name="feedback_send_cookies">Cookie из вашего браузера будут отправлены на %1$s.</string>
+  <string name="feedback_send_sign_in">Данные для входа будут отправлены на %1$s.</string>
+
+  <string name="feedback_added">Добавлено: %1$s</string>
+  <plurals name="feedback_recovered">
+    <item quantity="one">Возобновляется %1$d загрузка из прошлого сеанса</item>
+    <item quantity="few">Возобновляются %1$d загрузки из прошлого сеанса</item>
+    <item quantity="many">Возобновляется %1$d загрузок из прошлого сеанса</item>
+    <item quantity="other">Возобновляется %1$d загрузки из прошлого сеанса</item>
+  </plurals>
+  <string name="feedback_device_offline">%1$s не в сети</string>
+  <string name="feedback_device_online">Снова подключено к %1$s</string>
+</resources>

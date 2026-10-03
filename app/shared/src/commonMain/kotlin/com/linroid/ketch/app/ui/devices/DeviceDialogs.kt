@@ -21,12 +21,31 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.KetchTextField
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.action_remove
+import ketch.app.shared.generated.resources.device_menu_remove
+import ketch.app.shared.generated.resources.device_menu_rename
+import ketch.app.shared.generated.resources.device_menu_settings
+import ketch.app.shared.generated.resources.device_menu_stay_connected
+import ketch.app.shared.generated.resources.device_more_for
+import ketch.app.shared.generated.resources.device_remove_body
+import ketch.app.shared.generated.resources.device_remove_title
+import ketch.app.shared.generated.resources.device_rename_confirm
+import ketch.app.shared.generated.resources.device_rename_local_hint
+import ketch.app.shared.generated.resources.device_rename_name
+import ketch.app.shared.generated.resources.device_rename_remote_hint
+import ketch.app.shared.generated.resources.device_rename_title
+import ketch.app.shared.generated.resources.device_show_downloads
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The ⋯ button of a device card and its menu: show the device's downloads, open its settings,
@@ -44,12 +63,16 @@ internal fun DeviceMenuButton(
     KetchIconButton(
       icon = KetchIcon.More,
       onClick = { open = true },
-      contentDescription = "More for ${device.name}",
+      contentDescription = stringResource(Res.string.device_more_for, device.name.resolve()),
     )
-    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = device.name) {
-      item("Show downloads", onClick = { state.showDeviceTab(device.entry) }, icon = KetchIcon.All)
+    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = device.name.resolve()) {
       item(
-        label = "Settings for this device…",
+        label = Res.string.device_show_downloads.text(),
+        onClick = { state.showDeviceTab(device.entry) },
+        icon = KetchIcon.All,
+      )
+      item(
+        label = Res.string.device_menu_settings.text(),
         onClick = { state.openDeviceSettings(device.entry) },
         icon = KetchIcon.Settings,
       )
@@ -69,15 +92,20 @@ internal fun KetchMenuScope.renameAndRemoveItems(
   onRename: () -> Unit,
   onRemove: () -> Unit,
 ) {
-  item(label = "Rename…", onClick = onRename)
+  item(label = Res.string.device_menu_rename.text(), onClick = onRename)
   val remote = device.entry as? RemoteInstance ?: return
   item(
-    label = "Stay connected",
+    label = Res.string.device_menu_stay_connected.text(),
     onClick = { state.instanceManager.setWatched(remote, !device.watched) },
     checked = device.watched,
   )
   divider()
-  item(label = "Remove…", onClick = onRemove, icon = KetchIcon.Trash, destructive = true)
+  item(
+    label = Res.string.device_menu_remove.text(),
+    onClick = onRemove,
+    icon = KetchIcon.Trash,
+    destructive = true,
+  )
 }
 
 /**
@@ -97,18 +125,24 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
   }
   AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text("Rename ${device.name}") },
+    title = { Text(stringResource(Res.string.device_rename_title, device.name.resolve())) },
     dismissible = name == current,
     dismissButton = {
-      KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        variant = KetchButtonVariant.Secondary,
+        onClick = onDismiss,
+      )
     },
-    confirmButton = { KetchButton(text = "Rename", onClick = save) },
+    confirmButton = {
+      KetchButton(text = stringResource(Res.string.device_rename_confirm), onClick = save)
+    },
   ) {
     Text(
       text = if (remote != null) {
-        "Leave it empty for the name it announces."
+        stringResource(Res.string.device_rename_remote_hint)
       } else {
-        "Your other devices see this name after a restart."
+        stringResource(Res.string.device_rename_local_hint)
       },
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
@@ -117,7 +151,7 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
       value = name,
       onValueChange = { name = it },
       placeholder = remote?.let { "${it.host}:${it.port}" } ?: device.entry.label,
-      label = "Name",
+      label = stringResource(Res.string.device_rename_name),
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
       keyboardActions = KeyboardActions(onDone = { save() }),
       modifier = Modifier.fillMaxWidth().focusRequester(focus),
@@ -132,13 +166,17 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
 internal fun RemoveDeviceDialog(state: AppState, device: DevicePresence, onDismiss: () -> Unit) {
   AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text("Remove ${device.name}?") },
+    title = { Text(stringResource(Res.string.device_remove_title, device.name.resolve())) },
     dismissButton = {
-      KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        variant = KetchButtonVariant.Secondary,
+        onClick = onDismiss,
+      )
     },
     confirmButton = {
       KetchButton(
-        text = "Remove",
+        text = stringResource(Res.string.action_remove),
         variant = KetchButtonVariant.Danger,
         onClick = {
           state.removeInstance(device.entry)
@@ -148,8 +186,7 @@ internal fun RemoveDeviceDialog(state: AppState, device: DevicePresence, onDismi
     },
   ) {
     Text(
-      text = "Ketch stops showing its downloads here. They keep running on ${device.name}, " +
-        "and you can add it again later.",
+      text = stringResource(Res.string.device_remove_body, device.name.resolve()),
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
     )

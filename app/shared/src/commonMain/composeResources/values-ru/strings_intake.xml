@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="intake_space_needed">нужно %1$s</string>
+  <string name="intake_space_free_on">%1$s свободно на устройстве «%2$s»</string>
+  <string name="intake_space_warning">Нужно %1$s · свободно только %2$s на устройстве «%3$s»</string>
+  <string name="intake_added_here">Добавлено: %1$s → %2$s</string>
+  <string name="intake_added_to">Добавлено на %2$s: %1$s</string>
+  <plurals name="intake_added_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="one">пропущено: %1$d</item>
+    <item quantity="few">пропущено: %1$d</item>
+    <item quantity="many">пропущено: %1$d</item>
+    <item quantity="other">пропущено: %1$d</item>
+  </plurals>
+  <string name="intake_add_failed">Не удалось добавить: %1$s</string>
+  <string name="intake_restart_failed">Не удалось начать заново %1$s на устройстве «%2$s»</string>
+  <string name="intake_restarted">Начато заново: %1$s</string>
+  <string name="intake_retry_failed">Не удалось повторить %1$s на устройстве «%2$s»</string>
+  <string name="intake_apply_failed">Не удалось изменить параметры %1$s на устройстве «%2$s»</string>
+  <string name="intake_file_list_ready">Список файлов готов: %1$s</string>
+  <string name="intake_file_list_ready_unnamed">Список файлов торрента готов</string>
+  <string name="intake_file_list_failed">Не удалось получить список файлов: %1$s</string>
+  <string name="intake_file_list_failed_unnamed">Не удалось получить список файлов торрента</string>
+  <string name="intake_choose_files">Выбрать файлы</string>
+
+  <string name="intake_title_add">Добавить загрузки</string>
+  <string name="intake_title_retry">Повторить с параметрами</string>
+  <string name="intake_title_edit">Параметры загрузки</string>
+
+  <string name="intake_drop_to_add">Отпустите, чтобы добавить</string>
+  <string name="intake_paste_hint_short">Вставьте ссылки или magnet-ссылки</string>
+  <string name="intake_paste_hint">Вставьте ссылки или magnet-ссылки — или перетащите файл .torrent</string>
+  <string name="intake_curl_command">Команда cURL</string>
+  <string name="intake_paste_clipboard">Вставить из буфера обмена</string>
+  <string name="intake_open_torrent">Открыть файл .torrent</string>
+  <string name="intake_from_clipboard">Из буфера обмена</string>
+  <string name="intake_clear_clipboard">Очистить текст в буфере обмена</string>
+  <string name="intake_offer_paste">Вставить %1$s</string>
+  <string name="intake_offer_paste_clipboard">Вставить %1$s из буфера обмена</string>
+  <string name="intake_offer_paste_copied">Вставить скопированную ссылку</string>
+  <string name="intake_discover_offer">Здесь нет ссылок. Найти «%1$s» в Поиске?</string>
+  <string name="intake_no_links">Здесь нет ссылок. Вставьте ссылку, magnet-ссылку или команду cURL.</string>
+  <string name="intake_discover">Поиск</string>
+
+  <string name="intake_notice_no_curl">В буфере обмена нет команды cURL. На панели «Сеть» в браузере щёлкните запрос правой кнопкой мыши и выберите «Копировать как cURL».</string>
+  <string name="intake_notice_close_first">Закройте это окно, чтобы добавить другие загрузки</string>
+  <string name="intake_notice_unsupported_files">Можно добавлять только файлы .torrent и списки ссылок</string>
+  <string name="intake_notice_read_failed">Не удалось прочитать %1$s</string>
+  <string name="intake_notice_read_failed_reason">Не удалось прочитать %1$s: %2$s</string>
+  <string name="intake_notice_no_links">Среди перетащенного нет ссылок</string>
+  <plurals name="intake_notice_first_links">
+    <item quantity="one">Показана первая %1$d ссылка</item>
+    <item quantity="few">Показаны первые %1$d ссылки</item>
+    <item quantity="many">Показаны первые %1$d ссылок</item>
+    <item quantity="other">Показаны первые %1$d ссылки</item>
+  </plurals>
+  <plurals name="intake_range_truncated">
+    <item quantity="one">Раскрыто в первую %1$d ссылку</item>
+    <item quantity="few">Раскрыто в первые %1$d ссылки</item>
+    <item quantity="many">Раскрыто в первые %1$d ссылок</item>
+    <item quantity="other">Раскрыто в первые %1$d ссылки</item>
+  </plurals>
+
+  <plurals name="intake_summary_links">
+    <item quantity="one">%1$d ссылка</item>
+    <item quantity="few">%1$d ссылки</item>
+    <item quantity="many">%1$d ссылок</item>
+    <item quantity="other">%1$d ссылки</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="one">%1$d готова</item>
+    <item quantity="few">%1$d готовы</item>
+    <item quantity="many">%1$d готово</item>
+    <item quantity="other">%1$d готово</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="one">%1$d проверяется</item>
+    <item quantity="few">%1$d проверяются</item>
+    <item quantity="many">%1$d проверяется</item>
+    <item quantity="other">%1$d проверяется</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="one">%1$d требует внимания</item>
+    <item quantity="few">%1$d требуют внимания</item>
+    <item quantity="many">%1$d требуют внимания</item>
+    <item quantity="other">%1$d требуют внимания</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="one">%1$d уже в Ketch</item>
+    <item quantity="few">%1$d уже в Ketch</item>
+    <item quantity="many">%1$d уже в Ketch</item>
+    <item quantity="other">%1$d уже в Ketch</item>
+  </plurals>
+
+  <string name="intake_status_waiting">Ожидает проверки…</string>
+  <string name="intake_status_fetching">Получение списка файлов от пиров… %1$s</string>
+  <string name="intake_status_reading_torrent">Чтение торрент-файла…</string>
+  <string name="intake_status_checking">Проверка…</string>
+  <string name="intake_status_downloads_again">Скачается снова · %1$s</string>
+  <plurals name="intake_status_files_chosen">
+    <item quantity="one">%1$d из %2$d файла</item>
+    <item quantity="few">%1$d из %2$d файлов</item>
+    <item quantity="many">%1$d из %2$d файлов</item>
+    <item quantity="other">%1$d из %2$d файла</item>
+  </plurals>
+  <string name="intake_split">%1$d × %2$s</string>
+  <plurals name="intake_status_expands">
+    <item quantity="one">раскрывается в %1$d ссылку</item>
+    <item quantity="few">раскрывается в %1$d ссылки</item>
+    <item quantity="many">раскрывается в %1$d ссылок</item>
+    <item quantity="other">раскрывается в %1$d ссылки</item>
+  </plurals>
+  <plurals name="intake_status_expands_first">
+    <item quantity="one">раскрывается в %1$d ссылку (первые %1$d)</item>
+    <item quantity="few">раскрывается в %1$d ссылки (первые %1$d)</item>
+    <item quantity="many">раскрывается в %1$d ссылок (первые %1$d)</item>
+    <item quantity="other">раскрывается в %1$d ссылки (первые %1$d)</item>
+  </plurals>
+  <string name="intake_status_unknown_size">Размер неизвестен</string>
+  <string name="intake_scheme_torrent">Торрент</string>
+  <string name="intake_status_resumable">с докачкой</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="one">до %1$d подключения</item>
+    <item quantity="few">до %1$d подключений</item>
+    <item quantity="many">до %1$d подключений</item>
+    <item quantity="other">до %1$d подключения</item>
+  </plurals>
+  <string name="intake_badge_duplicate">Уже в Ketch</string>
+  <string name="intake_badge_no_resume">Без докачки</string>
+  <string name="intake_duplicate_finished">завершена %1$s</string>
+  <string name="intake_duplicate_downloading">загружается · %1$s</string>
+  <string name="intake_duplicate_paused">приостановлена на %1$s</string>
+  <string name="intake_duplicate_waiting">ожидает запуска</string>
+  <string name="intake_duplicate_failed">ошибка</string>
+  <string name="intake_duplicate_canceled">отменена</string>
+  <string name="intake_age_just_now">только что</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="one">%1$d мин назад</item>
+    <item quantity="few">%1$d мин назад</item>
+    <item quantity="many">%1$d мин назад</item>
+    <item quantity="other">%1$d мин назад</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="one">%1$d ч назад</item>
+    <item quantity="few">%1$d ч назад</item>
+    <item quantity="many">%1$d ч назад</item>
+    <item quantity="other">%1$d ч назад</item>
+  </plurals>
+  <string name="intake_age_yesterday">вчера</string>
+  <plurals name="intake_age_days">
+    <item quantity="one">%1$d день назад</item>
+    <item quantity="few">%1$d дня назад</item>
+    <item quantity="many">%1$d дней назад</item>
+    <item quantity="other">%1$d дня назад</item>
+  </plurals>
+
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="one">За %1$d мин ни один пир не прислал список файлов</item>
+    <item quantity="few">За %1$d мин ни один пир не прислал список файлов</item>
+    <item quantity="many">За %1$d мин ни один пир не прислал список файлов</item>
+    <item quantity="other">За %1$d мин ни один пир не прислал список файлов</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketch не может скачивать такие ссылки</string>
+  <string name="intake_problem_unsupported_detail">поддерживаются http(s), ftp(s), magnet и .torrent</string>
+  <string name="intake_problem_forbidden">Сервер отказал в доступе (403)</string>
+  <string name="intake_problem_forbidden_detail">ссылкам со страниц, где выполнен вход, часто нужны cookie этой страницы</string>
+  <string name="intake_problem_not_found">Не найдено</string>
+  <string name="intake_problem_not_found_detail">возможно, срок действия ссылки истёк</string>
+  <string name="intake_problem_busy">Сервер занят (%1$d)</string>
+  <string name="intake_problem_busy_detail">Ketch повторит попытку автоматически</string>
+  <string name="intake_problem_http">Сервер ответил %1$d</string>
+  <string name="intake_problem_no_peers">Не удаётся связаться ни с одним пиром</string>
+  <string name="intake_problem_unreachable">Не удаётся связаться с %1$s</string>
+  <string name="intake_problem_unreachable_server">Не удаётся связаться с сервером</string>
+  <string name="intake_problem_torrent">Не удалось прочитать этот торрент</string>
+  <string name="intake_problem_ftp">FTP-сервер сообщил об ошибке</string>
+  <string name="intake_problem_check_failed">Не удалось проверить эту ссылку</string>
+  <string name="intake_problem_no_torrents">Это устройство не может скачивать торренты</string>
+  <string name="intake_problem_file_unreadable">Не удалось прочитать этот файл</string>
+  <string name="intake_problem_sign_in">Требуется вход</string>
+  <string name="intake_action_sign_in">Войти</string>
+  <string name="intake_action_paste_curl">Вставить как cURL</string>
+  <string name="intake_action_add_headers">Добавить заголовки</string>
+  <string name="intake_action_find_mirror">Найти рабочее зеркало</string>
+  <string name="intake_action_keep_waiting">Подождать ещё</string>
+  <string name="intake_action_add_anyway">Всё равно добавить</string>
+
+  <string name="intake_download_all_now">Скачать все файлы сейчас</string>
+  <string name="intake_finish_background">Завершить в фоне</string>
+  <string name="intake_rename">Переименовать</string>
+  <string name="intake_keep_out">Не добавлять</string>
+  <string name="intake_download_again">Скачать снова</string>
+  <string name="intake_add_all">Добавить все</string>
+  <string name="intake_remove_named">Удалить %1$s</string>
+  <string name="intake_user_name">Имя пользователя</string>
+  <string name="intake_password">Пароль</string>
+  <string name="intake_connections">Подключения</string>
+
+  <string name="intake_options">Параметры</string>
+  <string name="intake_pill_label">%1$s:</string>
+  <string name="intake_reset_speed">Сбросить скорость</string>
+  <string name="intake_reset_priority">Сбросить приоритет</string>
+  <string name="intake_reset_start">Сбросить время запуска</string>
+  <string name="intake_reset_connections">Сбросить подключения</string>
+  <plurals name="intake_headers_count">
+    <item quantity="one">%1$d заголовок</item>
+    <item quantity="few">%1$d заголовка</item>
+    <item quantity="many">%1$d заголовков</item>
+    <item quantity="other">%1$d заголовка</item>
+  </plurals>
+  <string name="intake_advanced_hide">Скрыть дополнительные параметры</string>
+  <string name="intake_advanced_show">Дополнительные параметры…</string>
+  <string name="intake_advanced_caption">Имя файла, реферер, cookie и другие заголовки</string>
+  <string name="intake_speed_limit">Ограничение скорости</string>
+  <string name="intake_priority">Приоритет</string>
+  <string name="intake_start">Запуск</string>
+  <string name="intake_peer_limit">Лимит пиров</string>
+  <string name="intake_single_connection">Этот сервер разрешает 1 подключение</string>
+  <string name="intake_auto_device">«Авто» — решает устройство</string>
+  <string name="intake_auto_setting">«Авто» — по настройке устройства: %1$d</string>
+  <string name="intake_priority_low_caption">Запускается, когда больше ничего не ожидает</string>
+  <string name="intake_priority_normal_caption">Обычный порядок</string>
+  <string name="intake_priority_high_caption">Раньше обычных и низких</string>
+  <string name="intake_priority_urgent_caption">Без очереди; может приостановить загрузку с более низким приоритетом</string>
+  <string name="intake_option_unlimited">Без ограничений</string>
+  <string name="intake_option_max_speed">Макс. %1$s</string>
+  <string name="intake_option_urgent">⚡ Срочный</string>
+  <string name="intake_option_priority_low">Низкий приоритет</string>
+  <string name="intake_option_priority_high">Высокий приоритет</string>
+  <plurals name="intake_option_peers">
+    <item quantity="one">%1$d пир</item>
+    <item quantity="few">%1$d пира</item>
+    <item quantity="many">%1$d пиров</item>
+    <item quantity="other">%1$d пира</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="one">%1$d подключение</item>
+    <item quantity="few">%1$d подключения</item>
+    <item quantity="many">%1$d подключений</item>
+    <item quantity="other">%1$d подключения</item>
+  </plurals>
+  <string name="intake_option_auto">Авто</string>
+
+  <string name="intake_save_to">Сохранить в</string>
+  <string name="intake_folder_downloads">Загрузки</string>
+  <string name="intake_default_folder">Папка по умолчанию</string>
+  <string name="intake_recent">Недавние</string>
+  <string name="intake_pinned">Закреплённые</string>
+  <string name="intake_unpin">Открепить %1$s</string>
+  <string name="intake_pin">Закрепить %1$s</string>
+  <string name="intake_choose_folder">Выбрать папку…</string>
+  <string name="intake_folder_on">Папка на устройстве «%1$s»</string>
+  <string name="intake_torrents_app_folder">Торренты сохраняются в папку приложения: папки, выбранные в «Файлах», подходят только для ссылок</string>
+
+  <string name="intake_advanced">Дополнительно</string>
+  <string name="intake_hide">Скрыть</string>
+  <string name="intake_also_sent">С этой ссылкой также отправляются: %1$s</string>
+  <string name="intake_file_name">Имя файла</string>
+  <string name="intake_server_file_name">Используется имя файла с сервера</string>
+  <string name="intake_user_agent_custom">Свой</string>
+  <string name="intake_add_header">Добавить заголовок</string>
+  <string name="intake_paste_curl">Вставить cURL</string>
+  <string name="intake_headers_saved">Заголовки сохраняются вместе с задачей и видны устройствам, подключённым к этому.</string>
+  <string name="intake_header_name">Заголовок</string>
+  <string name="intake_header_value">Значение</string>
+  <string name="intake_remove_header">Удалить заголовок</string>
+
+  <string name="intake_submit_download_name">Скачать %1$s</string>
+  <string name="intake_submit_schedule_name">Запланировать %1$s</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="one">Скачать %1$d файл</item>
+    <item quantity="few">Скачать %1$d файла</item>
+    <item quantity="many">Скачать %1$d файлов</item>
+    <item quantity="other">Скачать %1$d файла</item>
+  </plurals>
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="one">Скачать %1$d файл · %2$s</item>
+    <item quantity="few">Скачать %1$d файла · %2$s</item>
+    <item quantity="many">Скачать %1$d файлов · %2$s</item>
+    <item quantity="other">Скачать %1$d файла · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_download_items">
+    <item quantity="one">Скачать %1$d элемент</item>
+    <item quantity="few">Скачать %1$d элемента</item>
+    <item quantity="many">Скачать %1$d элементов</item>
+    <item quantity="other">Скачать %1$d элемента</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="one">Скачать %1$d элемент · %2$s</item>
+    <item quantity="few">Скачать %1$d элемента · %2$s</item>
+    <item quantity="many">Скачать %1$d элементов · %2$s</item>
+    <item quantity="other">Скачать %1$d элемента · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="one">Запланировать %1$d файл</item>
+    <item quantity="few">Запланировать %1$d файла</item>
+    <item quantity="many">Запланировать %1$d файлов</item>
+    <item quantity="other">Запланировать %1$d файла</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="one">Запланировать %1$d элемент</item>
+    <item quantity="few">Запланировать %1$d элемента</item>
+    <item quantity="many">Запланировать %1$d элементов</item>
+    <item quantity="other">Запланировать %1$d элемента</item>
+  </plurals>
+  <string name="intake_submit_apply">Применить изменения</string>
+  <string name="intake_submit_start_over">Начать заново</string>
+  <string name="intake_submit_waiting_files">Ожидание списка файлов</string>
+  <string name="intake_submit_no_files">Файлы не выбраны</string>
+  <string name="intake_submit_nothing">Нечего добавлять</string>
+  <string name="intake_hint_download">%1$s — скачать</string>
+  <string name="intake_hint_schedule">%1$s — запланировать</string>
+  <string name="intake_hint_retry">%1$s — повторить</string>
+  <string name="intake_hint_start_over">%1$s — начать заново</string>
+  <string name="intake_hint_apply">%1$s — применить</string>
+  <string name="intake_download_all">Скачать все</string>
+  <string name="intake_task_gone">Этой загрузки больше нет в списке.</string>
+  <string name="intake_confirm_close">Закрыть и сбросить введённое?</string>
+  <string name="intake_keep_editing">Продолжить</string>
+  <string name="intake_discard">Сбросить</string>
+
+  <string name="intake_outcome_starts_now">Начнётся сейчас</string>
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="one">свободно %1$d из %2$d слота</item>
+    <item quantity="few">свободно %1$d из %2$d слотов</item>
+    <item quantity="many">свободно %1$d из %2$d слотов</item>
+    <item quantity="other">свободно %1$d из %2$d слота</item>
+  </plurals>
+  <string name="intake_outcome_eta">≈ %1$s при текущей скорости</string>
+  <string name="intake_outcome_eta_soon">меньше минуты при текущей скорости</string>
+  <string name="intake_outcome_urgent">⚡ Срочно: начнётся сейчас и приостановит %1$s (приоритет: %2$s)</string>
+  <string name="intake_outcome_waits_for_host">Ожидает %1$s · до %2$d на сервер</string>
+  <string name="intake_outcome_queued_next">В очереди · следующая</string>
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="one">В очереди · впереди %1$d</item>
+    <item quantity="few">В очереди · впереди %1$d</item>
+    <item quantity="many">В очереди · впереди %1$d</item>
+    <item quantity="other">В очереди · впереди %1$d</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now">
+    <item quantity="one">%1$d начнётся сейчас</item>
+    <item quantity="few">%1$d начнутся сейчас</item>
+    <item quantity="many">%1$d начнётся сейчас</item>
+    <item quantity="other">%1$d начнётся сейчас</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="one">%1$d начнётся сейчас (%2$s)</item>
+    <item quantity="few">%1$d начнутся сейчас (%2$s)</item>
+    <item quantity="many">%1$d начнётся сейчас (%2$s)</item>
+    <item quantity="other">%1$d начнётся сейчас (%2$s)</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="one">%1$d в очереди</item>
+    <item quantity="few">%1$d в очереди</item>
+    <item quantity="many">%1$d в очереди</item>
+    <item quantity="other">%1$d в очереди</item>
+  </plurals>
+  <string name="intake_time_hours">%1$d ч</string>
+  <string name="intake_time_hours_minutes">%1$d ч %2$d мин</string>
+  <string name="intake_start_over_discard">Начнётся заново · уже скачанные %1$s будут удалены.</string>
+  <string name="intake_start_over_new">Начнётся заново как новая загрузка.</string>
+
+  <string name="intake_stage_back">Назад ко всем ссылкам</string>
+  <plurals name="intake_stage_selection">
+    <item quantity="one">%1$d из %2$d файла · %3$s из %4$s</item>
+    <item quantity="few">%1$d из %2$d файлов · %3$s из %4$s</item>
+    <item quantity="many">%1$d из %2$d файлов · %3$s из %4$s</item>
+    <item quantity="other">%1$d из %2$d файла · %3$s из %4$s</item>
+  </plurals>
+  <string name="intake_filter_files">Фильтр файлов</string>
+  <string name="intake_largest_file">Самый большой файл</string>
+  <string name="intake_skip_samples">Пропустить сэмплы</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="one">Пропущен %1$d лишний файл</item>
+    <item quantity="few">Пропущены %1$d лишних файла</item>
+    <item quantity="many">Пропущено %1$d лишних файлов</item>
+    <item quantity="other">Пропущено %1$d лишнего файла</item>
+  </plurals>
+  <string name="intake_kind_subtitles">Субтитры</string>
+  <string name="intake_sort">Сортировка</string>
+  <string name="intake_sort_files">Сортировка файлов</string>
+  <string name="intake_expand">Развернуть</string>
+  <string name="intake_collapse">Свернуть</string>
+
+  <string name="intake_file_unreadable">Не удалось прочитать файл</string>
+  <string name="intake_file_empty">Файл пуст</string>
+  <string name="intake_file_too_large">Файл больше %1$d МиБ</string>
+
+  <string name="intake_tracker_too_long">Слишком длинный.</string>
+  <string name="intake_tracker_spaces">Содержит пробелы.</string>
+  <string name="intake_tracker_scheme">Начните с http://, https:// или udp://.</string>
+  <string name="intake_tracker_no_host">Не указано имя хоста.</string>
+  <string name="intake_tracker_udp_user_info">UDP-трекеры не могут содержать имя пользователя или пароль.</string>
+  <string name="intake_tracker_udp_port">Для UDP-трекеров нужен порт.</string>
+  <string name="intake_tracker_port">Укажите порт от 1 до 65535.</string>
+</resources>

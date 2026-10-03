@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Ketch",
+  "name": "__MSG_extension_name__",
   "version": "0.1.0",
-  "description": "Send downloads, links and magnet links to Ketch on this computer or a remote server.",
+  "description": "__MSG_extension_description__",
+  "default_locale": "en",
   "homepage_url": "https://github.com/linroid/Ketch",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyaDoW7JcdmymesKE5N77EnCLQuAYxLuAZdJdjk/+Hg1zw6PQxn2dLF+Siz5gPFNgrBvi9Wbw0UTFYQ6ScrgT15QGIFLD7jz5dZ75TbOt9JUgdepo2MtyaFTtk3sZPU+puc6kGA6JmtSkCXnCnMDF0BrgOuBlIDseNYQpHGitfENPKuOt335z4JtKeSMhJxJo4XHcmNhnh0QewgIl5tSKQA3rBAX7L8BXlu5UQxUUFdOBeYv3/P0pabStN2MWiaGhzGciwtEIQS2e57f536vLunfWxcac2MH7wynz80IIVJCfcAusSmOuEZBxtltK4yjSDzw+m6rzPOEd5QGi6DwvzwIDAQAB",
   "minimum_chrome_version": "116",
@@ -13,7 +14,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Ketch",
+    "default_title": "__MSG_extension_action_title__",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",

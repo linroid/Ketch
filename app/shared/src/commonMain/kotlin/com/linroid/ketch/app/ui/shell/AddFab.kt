@@ -37,12 +37,16 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.rememberPressScale
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_add
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The phone's Add button at the bottom end, which shrinks from "+ Add" to a round 56 dp button
@@ -64,6 +68,7 @@ internal fun AddFab(
   val overlay = rememberInteractionOverlay(interactions)
   val scale = rememberPressScale(interactions)
   val focus = rememberFocusVisibility()
+  val label = stringResource(Res.string.action_add)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = modifier
@@ -81,12 +86,12 @@ internal fun AddFab(
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = KetchCommands.Add.label,
-        onLongClickLabel = KetchCommands.AddClipboardLink.label,
+        onClickLabel = KetchCommands.Add.label.resolve(),
+        onLongClickLabel = KetchCommands.AddClipboardLink.label.resolve(),
         onLongClick = onLongClick,
         onClick = onClick,
       )
-      .semantics { contentDescription = "Add" }
+      .semantics { contentDescription = label }
       .padding(horizontal = spacing.s4),
   ) {
     KetchIconImage(KetchIcon.Plus, size = GlyphLarge, tint = colors.onAccent)
@@ -97,7 +102,7 @@ internal fun AddFab(
     ) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.width(spacing.s3))
-        Text(text = "Add", style = KetchTheme.typography.label, color = colors.onAccent)
+        Text(text = label, style = KetchTheme.typography.label, color = colors.onAccent)
         Spacer(Modifier.width(spacing.s1))
       }
     }

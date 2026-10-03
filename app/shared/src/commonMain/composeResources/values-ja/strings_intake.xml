@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="intake_space_needed">%1$s必要</string>
+  <string name="intake_space_free_on">%2$sの空き容量%1$s</string>
+  <string name="intake_space_warning">%1$s必要 · %3$sの空き容量は%2$sのみ</string>
+  <string name="intake_added_here">%1$sを追加しました → %2$s</string>
+  <string name="intake_added_to">%1$sを%2$sに追加しました</string>
+  <plurals name="intake_added_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="other">%1$d件を除外</item>
+  </plurals>
+  <string name="intake_add_failed">%1$sを追加できませんでした</string>
+  <string name="intake_restart_failed">%2$sで%1$sを最初からやり直せませんでした</string>
+  <string name="intake_restarted">%1$sを最初からやり直しました</string>
+  <string name="intake_retry_failed">%2$sで%1$sを再試行できませんでした</string>
+  <string name="intake_apply_failed">%2$sで%1$sのオプションを変更できませんでした</string>
+  <string name="intake_file_list_ready">%1$sのファイル一覧を取得しました</string>
+  <string name="intake_file_list_ready_unnamed">トレントのファイル一覧を取得しました</string>
+  <string name="intake_file_list_failed">%1$sのファイル一覧を取得できませんでした</string>
+  <string name="intake_file_list_failed_unnamed">トレントのファイル一覧を取得できませんでした</string>
+  <string name="intake_choose_files">ファイルを選択</string>
+
+  <string name="intake_title_add">ダウンロードを追加</string>
+  <string name="intake_title_retry">オプションを指定して再試行</string>
+  <string name="intake_title_edit">ダウンロードのオプション</string>
+
+  <string name="intake_drop_to_add">ドロップして追加</string>
+  <string name="intake_paste_hint_short">リンクまたはマグネットリンクを貼り付け</string>
+  <string name="intake_paste_hint">リンクまたはマグネットリンクを貼り付け、または.torrentファイルをドロップ</string>
+  <string name="intake_curl_command">cURLコマンド</string>
+  <string name="intake_paste_clipboard">クリップボードから貼り付け</string>
+  <string name="intake_open_torrent">.torrentファイルを開く</string>
+  <string name="intake_from_clipboard">クリップボードから</string>
+  <string name="intake_clear_clipboard">クリップボードのテキストを消去</string>
+  <string name="intake_offer_paste">%1$sを貼り付け</string>
+  <string name="intake_offer_paste_clipboard">クリップボードから%1$sを貼り付け</string>
+  <string name="intake_offer_paste_copied">コピーしたリンクを貼り付け</string>
+  <string name="intake_discover_offer">リンクがありません。ディスカバーで「%1$s」を検索しますか？</string>
+  <string name="intake_no_links">リンクがありません。リンク、マグネットリンク、またはcURLコマンドを貼り付けてください。</string>
+  <string name="intake_discover">ディスカバー</string>
+
+  <string name="intake_notice_no_curl">クリップボードにcURLコマンドがありません。ブラウザのネットワークパネルでリクエストを右クリックし、「cURLとしてコピー」を選んでください。</string>
+  <string name="intake_notice_close_first">他のダウンロードを追加するには、このシートを閉じてください</string>
+  <string name="intake_notice_unsupported_files">追加できるのは、.torrentファイルとリンクの一覧のみです</string>
+  <string name="intake_notice_read_failed">%1$sを読み込めませんでした</string>
+  <string name="intake_notice_read_failed_reason">%1$sを読み込めませんでした：%2$s</string>
+  <string name="intake_notice_no_links">ドロップされた内容にリンクが見つかりませんでした</string>
+  <plurals name="intake_notice_first_links">
+    <item quantity="other">最初の%1$d件のリンクを表示しています</item>
+  </plurals>
+  <plurals name="intake_range_truncated">
+    <item quantity="other">最初の%1$d件のリンクに展開しました</item>
+  </plurals>
+
+  <plurals name="intake_summary_links">
+    <item quantity="other">%1$d件のリンク</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="other">%1$d件準備完了</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="other">%1$d件確認中</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="other">%1$d件は対応が必要</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="other">%1$d件はKetchに追加済み</item>
+  </plurals>
+
+  <string name="intake_status_waiting">確認待ち…</string>
+  <string name="intake_status_fetching">ピアからファイル一覧を取得中… %1$s</string>
+  <string name="intake_status_reading_torrent">トレントファイルを読み込み中…</string>
+  <string name="intake_status_checking">確認中…</string>
+  <string name="intake_status_downloads_again">もう一度ダウンロード · %1$s</string>
+  <plurals name="intake_status_files_chosen">
+    <item quantity="other">%2$d個中%1$d個のファイル</item>
+  </plurals>
+  <string name="intake_split">%1$d × %2$s</string>
+  <plurals name="intake_status_expands">
+    <item quantity="other">%1$d件のリンクに展開</item>
+  </plurals>
+  <plurals name="intake_status_expands_first">
+    <item quantity="other">最初の%1$d件のリンクに展開</item>
+  </plurals>
+  <string name="intake_status_unknown_size">サイズ不明</string>
+  <string name="intake_scheme_torrent">トレント</string>
+  <string name="intake_status_resumable">再開可能</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="other">最大%1$d接続</item>
+  </plurals>
+  <string name="intake_badge_duplicate">Ketchに追加済み</string>
+  <string name="intake_badge_no_resume">再開不可</string>
+  <string name="intake_duplicate_finished">完了：%1$s</string>
+  <string name="intake_duplicate_downloading">ダウンロード中 · %1$s</string>
+  <string name="intake_duplicate_paused">%1$sで一時停止中</string>
+  <string name="intake_duplicate_waiting">開始待ち</string>
+  <string name="intake_duplicate_failed">失敗</string>
+  <string name="intake_duplicate_canceled">キャンセル済み</string>
+  <string name="intake_age_just_now">たった今</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="other">%1$d分前</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="other">%1$d時間前</item>
+  </plurals>
+  <string name="intake_age_yesterday">昨日</string>
+  <plurals name="intake_age_days">
+    <item quantity="other">%1$d日前</item>
+  </plurals>
+
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="other">%1$d分以内にファイル一覧を送信したピアはありませんでした</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketchではこの種類のリンクをダウンロードできません</string>
+  <string name="intake_problem_unsupported_detail">対応しているのはhttp(s)、ftp(s)、マグネットリンク、.torrentです</string>
+  <string name="intake_problem_forbidden">サーバーがアクセスを拒否しました（403）</string>
+  <string name="intake_problem_forbidden_detail">サインインしたページからコピーしたリンクには、そのページのCookieが必要なことがあります</string>
+  <string name="intake_problem_not_found">見つかりません</string>
+  <string name="intake_problem_not_found_detail">リンクの有効期限が切れている可能性があります</string>
+  <string name="intake_problem_busy">サーバーが混雑しています（%1$d）</string>
+  <string name="intake_problem_busy_detail">Ketchが自動的に再試行します</string>
+  <string name="intake_problem_http">サーバーの応答：%1$d</string>
+  <string name="intake_problem_no_peers">ピアに接続できません</string>
+  <string name="intake_problem_unreachable">%1$sに接続できません</string>
+  <string name="intake_problem_unreachable_server">サーバーに接続できません</string>
+  <string name="intake_problem_torrent">このトレントを読み込めませんでした</string>
+  <string name="intake_problem_ftp">FTPサーバーがエラーを返しました</string>
+  <string name="intake_problem_check_failed">このリンクを確認できませんでした</string>
+  <string name="intake_problem_no_torrents">このデバイスではトレントをダウンロードできません</string>
+  <string name="intake_problem_file_unreadable">このファイルを読み込めませんでした</string>
+  <string name="intake_problem_sign_in">サインインが必要です</string>
+  <string name="intake_action_sign_in">サインイン</string>
+  <string name="intake_action_paste_curl">cURLとして貼り付け</string>
+  <string name="intake_action_add_headers">ヘッダーを追加</string>
+  <string name="intake_action_find_mirror">使用できるミラーを探す</string>
+  <string name="intake_action_keep_waiting">待ち続ける</string>
+  <string name="intake_action_add_anyway">このまま追加</string>
+
+  <string name="intake_download_all_now">すべてのファイルを今すぐダウンロード</string>
+  <string name="intake_finish_background">バックグラウンドで続行</string>
+  <string name="intake_rename">名前を変更</string>
+  <string name="intake_keep_out">追加しない</string>
+  <string name="intake_download_again">もう一度ダウンロード</string>
+  <string name="intake_add_all">すべて追加</string>
+  <string name="intake_remove_named">%1$sを削除</string>
+  <string name="intake_user_name">ユーザー名</string>
+  <string name="intake_password">パスワード</string>
+  <string name="intake_connections">接続数</string>
+
+  <string name="intake_options">オプション</string>
+  <string name="intake_pill_label">%1$s：</string>
+  <string name="intake_reset_speed">速度をリセット</string>
+  <string name="intake_reset_priority">優先度をリセット</string>
+  <string name="intake_reset_start">開始時刻をリセット</string>
+  <string name="intake_reset_connections">接続数をリセット</string>
+  <plurals name="intake_headers_count">
+    <item quantity="other">ヘッダー%1$d件</item>
+  </plurals>
+  <string name="intake_advanced_hide">詳細オプションを隠す</string>
+  <string name="intake_advanced_show">詳細オプション…</string>
+  <string name="intake_advanced_caption">ファイル名、リファラー、Cookie、その他のヘッダー</string>
+  <string name="intake_speed_limit">速度制限</string>
+  <string name="intake_priority">優先度</string>
+  <string name="intake_start">開始</string>
+  <string name="intake_peer_limit">ピア数の上限</string>
+  <string name="intake_single_connection">このサーバーで使える接続は1つです</string>
+  <string name="intake_auto_device">「自動」ではデバイスが決定します</string>
+  <string name="intake_auto_setting">「自動」ではデバイスの設定を使用します：%1$d</string>
+  <string name="intake_priority_low_caption">ほかに待機中のものがないときに実行</string>
+  <string name="intake_priority_normal_caption">標準の順序</string>
+  <string name="intake_priority_high_caption">「標準」と「低」より先に実行</string>
+  <string name="intake_priority_urgent_caption">キューに割り込みます。優先度の低いダウンロードが一時停止される場合があります</string>
+  <string name="intake_option_unlimited">無制限</string>
+  <string name="intake_option_max_speed">最大%1$s</string>
+  <string name="intake_option_urgent">⚡ 緊急</string>
+  <string name="intake_option_priority_low">優先度：低</string>
+  <string name="intake_option_priority_high">優先度：高</string>
+  <plurals name="intake_option_peers">
+    <item quantity="other">ピア数%1$d</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="other">接続数%1$d</item>
+  </plurals>
+  <string name="intake_option_auto">自動</string>
+
+  <string name="intake_save_to">保存先</string>
+  <string name="intake_folder_downloads">ダウンロード</string>
+  <string name="intake_default_folder">デフォルトのフォルダ</string>
+  <string name="intake_recent">最近</string>
+  <string name="intake_pinned">ピン留め</string>
+  <string name="intake_unpin">%1$sのピン留めを外す</string>
+  <string name="intake_pin">%1$sをピン留め</string>
+  <string name="intake_choose_folder">フォルダを選択…</string>
+  <string name="intake_folder_on">%1$s上のフォルダ</string>
+  <string name="intake_torrents_app_folder">トレントはアプリのフォルダに保存されます。「ファイル」で選んだフォルダはリンクのダウンロードにのみ使用されます</string>
+
+  <string name="intake_advanced">詳細</string>
+  <string name="intake_hide">隠す</string>
+  <string name="intake_also_sent">このリンクと一緒に送信：%1$s</string>
+  <string name="intake_file_name">ファイル名</string>
+  <string name="intake_server_file_name">サーバーのファイル名を使用</string>
+  <string name="intake_user_agent_custom">カスタム</string>
+  <string name="intake_add_header">ヘッダーを追加</string>
+  <string name="intake_paste_curl">cURLを貼り付け</string>
+  <string name="intake_headers_saved">ヘッダーはタスクと一緒に保存され、このデバイスに接続しているデバイスから見ることができます。</string>
+  <string name="intake_header_name">ヘッダー</string>
+  <string name="intake_header_value">値</string>
+  <string name="intake_remove_header">ヘッダーを削除</string>
+
+  <string name="intake_submit_download_name">%1$sをダウンロード</string>
+  <string name="intake_submit_schedule_name">%1$sを予約</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="other">%1$d個のファイルをダウンロード</item>
+  </plurals>
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="other">%1$d個のファイルをダウンロード · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_download_items">
+    <item quantity="other">%1$d件をダウンロード</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="other">%1$d件をダウンロード · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="other">%1$d個のファイルを予約</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="other">%1$d件を予約</item>
+  </plurals>
+  <string name="intake_submit_apply">変更を適用</string>
+  <string name="intake_submit_start_over">最初からやり直す</string>
+  <string name="intake_submit_waiting_files">ファイル一覧を待機中</string>
+  <string name="intake_submit_no_files">ファイルが選択されていません</string>
+  <string name="intake_submit_nothing">追加するものはありません</string>
+  <string name="intake_hint_download">%1$sでダウンロード</string>
+  <string name="intake_hint_schedule">%1$sで予約</string>
+  <string name="intake_hint_retry">%1$sで再試行</string>
+  <string name="intake_hint_start_over">%1$sで最初からやり直す</string>
+  <string name="intake_hint_apply">%1$sで適用</string>
+  <string name="intake_download_all">すべてダウンロード</string>
+  <string name="intake_task_gone">このダウンロードはリストにありません。</string>
+  <string name="intake_confirm_close">閉じて入力内容を破棄しますか？</string>
+  <string name="intake_keep_editing">編集を続ける</string>
+  <string name="intake_discard">破棄</string>
+
+  <string name="intake_outcome_starts_now">今すぐ開始</string>
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="other">%2$d枠中%1$d枠が空き</item>
+  </plurals>
+  <string name="intake_outcome_eta">現在の速度で約%1$s</string>
+  <string name="intake_outcome_eta_soon">現在の速度で1分未満</string>
+  <string name="intake_outcome_urgent">⚡ 緊急：今すぐ開始し、%1$s（%2$s）を一時停止します</string>
+  <string name="intake_outcome_waits_for_host">%1$sを待機 · サーバーごとに%2$d件</string>
+  <string name="intake_outcome_queued_next">キュー待ち · 次に開始</string>
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="other">キュー待ち · 前に%1$d件</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now">
+    <item quantity="other">%1$d件を今すぐ開始</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="other">%1$d件を今すぐ開始（%2$s）</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="other">%1$d件がキュー待ち</item>
+  </plurals>
+  <string name="intake_time_hours">%1$d時間</string>
+  <string name="intake_time_hours_minutes">%1$d時間%2$d分</string>
+  <string name="intake_start_over_discard">最初からやり直します · これまでにダウンロードした%1$sは破棄されます。</string>
+  <string name="intake_start_over_new">新しいダウンロードとして最初からやり直します。</string>
+
+  <string name="intake_stage_back">すべてのリンクに戻る</string>
+  <plurals name="intake_stage_selection">
+    <item quantity="other">%2$d個中%1$d個のファイル · %3$s / %4$s</item>
+  </plurals>
+  <string name="intake_filter_files">ファイルを絞り込む</string>
+  <string name="intake_largest_file">最大のファイル</string>
+  <string name="intake_skip_samples">サンプルを除外</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="other">%1$d個の付属ファイルを除外しました</item>
+  </plurals>
+  <string name="intake_kind_subtitles">字幕</string>
+  <string name="intake_sort">並べ替え</string>
+  <string name="intake_sort_files">ファイルを並べ替え</string>
+  <string name="intake_expand">展開</string>
+  <string name="intake_collapse">折りたたむ</string>
+
+  <string name="intake_file_unreadable">ファイルを読み込めませんでした</string>
+  <string name="intake_file_empty">ファイルが空です</string>
+  <string name="intake_file_too_large">ファイルが%1$d MiBを超えています</string>
+
+  <string name="intake_tracker_too_long">長すぎます。</string>
+  <string name="intake_tracker_spaces">スペースが含まれています。</string>
+  <string name="intake_tracker_scheme">http://、https://、またはudp://で始めてください。</string>
+  <string name="intake_tracker_no_host">ホスト名がありません。</string>
+  <string name="intake_tracker_udp_user_info">UDPトラッカーにはユーザー名やパスワードを含められません。</string>
+  <string name="intake_tracker_udp_port">UDPトラッカーにはポートが必要です。</string>
+  <string name="intake_tracker_port">1〜65535のポートを使用してください。</string>
+</resources>

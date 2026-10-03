@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The shared controls in components/: chips, fields, pickers, steppers and charts that many
+  screens use. See docs/development/localization.md.
+-->
+<resources>
+  <!-- The ✕ of a removable chip, such as a search token, for screen readers. %1$s is the chip's
+       label. -->
+  <string name="component_chip_remove">Remove %1$s</string>
+
+  <!-- Small text button inside a text field. -->
+  <string name="component_field_paste">Paste</string>
+  <!-- The ✕ that empties a text field, for screen readers. -->
+  <string name="component_field_clear">Clear text</string>
+
+  <!-- A task's priority mark, for screen readers. Normal priority has no mark. -->
+  <string name="component_priority_low">Low priority</string>
+  <string name="component_priority_high">High priority</string>
+  <string name="component_priority_urgent">Urgent priority</string>
+
+  <!-- The failure badge of a device's pennant, for screen readers. -->
+  <plurals name="component_pennant_failures">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+
+  <!-- A speed chart, for screen readers. %1$s is the latest speed, %2$s the highest, such as
+       "1.5 MB/s". -->
+  <string name="component_speed_chart">Speed %1$s, peak %2$s</string>
+
+  <!-- The Add button of a page header while a link is on the clipboard. %1$s is the link's file
+       name, shortened in the middle when long, such as "ubuntu-24.04…amd64.iso". -->
+  <string name="component_add_clip">Add %1$s</string>
+  <!-- The same when there is no room for the file name. -->
+  <string name="component_add_link">Add link</string>
+  <!-- The Add button while something is dragged over the window. -->
+  <string name="component_add_drop">Drop to download</string>
+
+  <!-- What a download's connection strip says to screen readers, joined by ", ":
+       "8 connections, 6 active, 62 percent, 1 stalled". -->
+  <plurals name="component_lanes_connections">
+    <item quantity="one">%1$d connection</item>
+    <item quantity="other">%1$d connections</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d active</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="one">%1$d percent</item>
+    <item quantity="other">%1$d percent</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">size unknown</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="one">%1$d stalled</item>
+    <item quantity="other">%1$d stalled</item>
+  </plurals>
+
+  <!-- Under a speed limit picker when a lower limit for every download wins. %1$s is that
+       limit's name, such as "Slow lane" or "Global limit", %2$s the speed, such as "1 MB/s". -->
+  <string name="component_limit_applies">%1$s %2$s applies to all downloads</string>
+  <!-- The chip that opens a field for a speed of one's own. -->
+  <string name="component_limit_custom">Custom…</string>
+  <!-- Placeholder of that field: k is kilobytes and m megabytes per second; keep the letters. -->
+  <string name="component_limit_custom_hint">e.g. 750k or 1.5m</string>
+  <!-- Tooltip of the KB/s or MB/s button next to that field. -->
+  <string name="component_limit_unit_tooltip">Unit of a number without k or m</string>
+
+  <!-- A connection count left to the app. %1$d is the count it uses, such as 4. -->
+  <string name="component_stepper_auto">Auto</string>
+  <string name="component_stepper_auto_count">Auto (%1$d)</string>
+  <!-- The − and + of the connections stepper, for screen readers. -->
+  <string name="component_stepper_fewer_connections">Fewer connections</string>
+  <string name="component_stepper_more_connections">More connections</string>
+  <!-- The value of the connections stepper, for screen readers. -->
+  <plurals name="component_stepper_connections">
+    <item quantity="one">%1$d connection</item>
+    <item quantity="other">%1$d connections</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">Auto connections</string>
+  <string name="component_stepper_connections_auto_count">Auto (%1$d) connections</string>
+  <!-- The same for a torrent's peer limit. -->
+  <string name="component_stepper_fewer_peers">Fewer peers</string>
+  <string name="component_stepper_more_peers">More peers</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="one">%1$d peer</item>
+    <item quantity="other">%1$d peers</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">Auto peers</string>
+  <string name="component_stepper_peers_auto_count">Auto (%1$d) peers</string>
+
+  <!-- Quick choices of when a download starts. %1$s is a time of day, such as 01:00. -->
+  <string name="component_start_now">Start now</string>
+  <string name="component_start_in_hour">In 1 hour</string>
+  <string name="component_start_tonight">Tonight %1$s</string>
+  <!-- When the Slow lane ends. -->
+  <string name="component_start_off_peak">Off-peak · %1$s</string>
+  <!-- When a download starts, on the chip that changes it. -->
+  <string name="component_start_label_now">Now</string>
+  <!-- %1$s is a duration, such as "1h 5m". -->
+  <string name="component_start_after">Starts after %1$s</string>
+  <!-- %1$s is a time of day, such as 01:00. -->
+  <string name="component_start_tonight_at">Starts %1$s tonight</string>
+  <string name="component_start_today_at">Starts %1$s today</string>
+  <string name="component_start_tomorrow_at">Starts tomorrow %1$s</string>
+  <!-- Within a week. %1$s is a short weekday, such as "Fri", %2$s a time of day. -->
+  <string name="component_start_weekday_at">Starts %1$s %2$s</string>
+  <!-- Later. %1$s is a date, such as "Oct 12", %2$s a time of day. -->
+  <string name="component_start_date_at">Starts %1$s %2$s</string>
+  <!-- The same after other text, as in "Pauses now and starts 01:00 tonight", so they start in
+       lower case in English. -->
+  <string name="component_start_follow_now">now</string>
+  <string name="component_start_follow_after">starts after %1$s</string>
+  <string name="component_start_follow_tonight">starts %1$s tonight</string>
+  <string name="component_start_follow_today">starts %1$s today</string>
+  <string name="component_start_follow_tomorrow">starts tomorrow %1$s</string>
+  <string name="component_start_follow_weekday">starts %1$s %2$s</string>
+  <string name="component_start_follow_date">starts %1$s %2$s</string>
+  <!-- The start-time menu. -->
+  <string name="component_start_menu_title">Start</string>
+  <string name="component_start_pick">Pick date &amp; time…</string>
+  <string name="component_start_clear">Clear</string>
+  <!-- The dialog that asks for a time after a date. -->
+  <string name="component_start_dialog_title">Start at</string>
+  <string name="component_start_schedule">Schedule</string>
+  <string name="component_start_passed">That time has already passed</string>
+</resources>

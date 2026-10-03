@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="inspector_tab_overview">概要</string>
+  <string name="inspector_tab_connections">接続</string>
+  <string name="inspector_tab_files">ファイル</string>
+  <string name="inspector_tab_activity">アクティビティ</string>
+
+  <string name="inspector_stalled_seconds">停滞%1$d秒</string>
+  <string name="inspector_stalled_minutes">停滞%1$d分</string>
+  <string name="inspector_size_of">%1$s / %2$s</string>
+
+  <string name="inspector_metric_left">残り%1$s</string>
+  <string name="inspector_metric_done_at">%1$sごろ完了</string>
+
+  <string name="inspector_reason_reconnect">再接続</string>
+  <string name="inspector_reason_full_speed">フルスピード</string>
+  <string name="inspector_reason_remove_limit">制限を解除</string>
+  <string name="inspector_reason_speed_settings">速度の設定</string>
+  <string name="inspector_reason_paused_resumes">一時停止中 · 中断した位置から再開します</string>
+  <string name="inspector_reason_paused_restarts">一時停止中 · 再開すると最初からやり直します</string>
+  <string name="inspector_file_missing">ファイルが移動または削除されました</string>
+  <string name="inspector_reason_slow_lane">スローレーンで制限中（%1$s）</string>
+  <string name="inspector_reason_global_limit">全体の制限で制限中（%1$s）</string>
+  <string name="inspector_reason_own_limit">%1$sに制限中</string>
+
+  <string name="inspector_source_magnet">BitTorrent · マグネットリンク</string>
+  <string name="inspector_source_torrent_file">BitTorrent · トレントファイル</string>
+  <string name="inspector_source_link">リンク</string>
+
+  <string name="inspector_origin_browser">ブラウザから</string>
+  <string name="inspector_origin_discover">ディスカバーから</string>
+  <string name="inspector_origin_agent">AIエージェントから</string>
+  <string name="inspector_origin_app">Ketchで追加</string>
+  <string name="inspector_origin_cli">コマンドラインから</string>
+  <string name="inspector_with_cookies">Cookie付き</string>
+  <string name="inspector_with_referrer">リファラー付き</string>
+  <string name="inspector_with_cookies_referrer">Cookieとリファラー付き</string>
+  <string name="inspector_with_cookies_alone">Cookie付き</string>
+  <string name="inspector_with_referrer_alone">リファラー付き</string>
+  <string name="inspector_with_cookies_referrer_alone">Cookieとリファラー付き</string>
+  <string name="inspector_captured">%1$s、%2$s</string>
+
+  <string name="inspector_urgent_note">今すぐ開始します。「%1$s」（%2$s）が一時停止される場合があります</string>
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="other">%1$d件を今すぐ開始します。「%2$s」（%3$s）が一時停止される場合があります</item>
+  </plurals>
+  <string name="inspector_reschedule_note">今すぐ一時停止し、%1$s</string>
+
+  <plurals name="inspector_selected">
+    <item quantity="other">%1$d件を選択中</item>
+  </plurals>
+  <plurals name="inspector_selection_more">
+    <item quantity="other">ほか%1$d件</item>
+  </plurals>
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="other">操作は%2$d件中%1$d件に適用されます。それ以外は終了しています。</item>
+  </plurals>
+
+  <string name="inspector_close">インスペクタを閉じる</string>
+  <string name="inspector_copy_name">名前をコピー</string>
+  <string name="inspector_copied_name">名前をコピーしました</string>
+  <string name="inspector_copy_failed_name">名前をコピーできませんでした</string>
+  <string name="inspector_share">共有</string>
+  <string name="inspector_share_failed">%2$sの%1$sを共有できませんでした</string>
+  <string name="inspector_more_actions">その他の操作</string>
+
+  <string name="inspector_section_controls">操作</string>
+  <string name="inspector_control_speed">速度</string>
+  <string name="inspector_control_connections">接続数</string>
+  <string name="inspector_control_peer_limit">ピア数の上限</string>
+  <string name="inspector_control_priority">優先度</string>
+  <string name="inspector_control_start">開始</string>
+  <string name="inspector_global_slow_lane">スローレーン</string>
+  <string name="inspector_global_limit">全体の制限</string>
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">速度制限</string>
+  <string name="inspector_speed_more">別の速度制限</string>
+  <string name="inspector_mixed_limits">これらのダウンロードは制限がそれぞれ異なります</string>
+  <string name="inspector_mixed_priorities">これらのダウンロードは優先度がそれぞれ異なります</string>
+  <string name="inspector_server_one_connection">このサーバーで使える接続は1つだけです</string>
+  <string name="inspector_remote_schedule">リモートのダウンロードの予約にはまだ対応していません</string>
+  <string name="inspector_start_now">今すぐ開始</string>
+  <plurals name="inspector_start_count_now">
+    <item quantity="other">%1$d件を今すぐ開始</item>
+  </plurals>
+  <string name="inspector_reschedule">予約を変更</string>
+
+  <string name="inspector_section_details">詳細</string>
+  <string name="inspector_detail_source">ソース</string>
+  <string name="inspector_detail_link">リンク</string>
+  <string name="inspector_detail_path">保存先</string>
+  <string name="inspector_detail_size">サイズ</string>
+  <string name="inspector_detail_added">追加日時</string>
+  <string name="inspector_detail_time">所要時間</string>
+  <string name="inspector_detail_average">平均速度</string>
+  <string name="inspector_detail_connections">接続数</string>
+  <string name="inspector_detail_device">デバイス</string>
+  <string name="inspector_detail_captured">取り込み元</string>
+  <string name="inspector_section_advanced">高度な情報</string>
+  <string name="inspector_detail_task_id">タスクID</string>
+  <string name="inspector_detail_headers">ヘッダー</string>
+  <string name="inspector_detail_property">プロパティ</string>
+  <string name="inspector_copy_detail">%1$sをコピー</string>
+  <string name="inspector_copied">コピーしました</string>
+  <string name="inspector_copy_failed_source">ソースをコピーできませんでした</string>
+  <string name="inspector_copy_failed_link">リンクをコピーできませんでした</string>
+  <string name="inspector_copy_failed_path">保存先をコピーできませんでした</string>
+  <string name="inspector_copy_failed_size">サイズをコピーできませんでした</string>
+  <string name="inspector_copy_failed_added">追加日時をコピーできませんでした</string>
+  <string name="inspector_copy_failed_time">所要時間をコピーできませんでした</string>
+  <string name="inspector_copy_failed_average">平均速度をコピーできませんでした</string>
+  <string name="inspector_copy_failed_connections">接続数をコピーできませんでした</string>
+  <string name="inspector_copy_failed_device">デバイスをコピーできませんでした</string>
+  <string name="inspector_copy_failed_captured">取り込み元をコピーできませんでした</string>
+  <string name="inspector_copy_failed_task_id">タスクIDをコピーできませんでした</string>
+  <string name="inspector_copy_failed_headers">ヘッダーをコピーできませんでした</string>
+  <string name="inspector_copy_failed_property">プロパティをコピーできませんでした</string>
+  <string name="inspector_show_full_link">リンク全体を表示</string>
+  <string name="inspector_hide_full_link">リンク全体を隠す</string>
+  <string name="inspector_hide">隠す</string>
+
+  <string name="inspector_technical_details">技術的な詳細</string>
+  <string name="inspector_copy_details">詳細をコピー</string>
+  <string name="inspector_open_logs">ログを開く</string>
+  <string name="inspector_share_logs">ログを共有</string>
+  <string name="inspector_open_logs_failed">ログを開けませんでした</string>
+
+  <string name="inspector_activity_empty">ダウンロードが始まると、速度とイベントがここに表示されます。</string>
+  <string name="inspector_activity_now">現在</string>
+  <string name="inspector_activity_since">Ketchの起動以降</string>
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="other">以前の%1$d件を表示</item>
+  </plurals>
+  <string name="inspector_limit_task">タスク %1$s</string>
+  <string name="inspector_limit_global">全体</string>
+  <string name="inspector_stat_peak">ピーク</string>
+  <string name="inspector_stat_average">平均</string>
+  <string name="inspector_stat_connections">接続数</string>
+
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="other">未完了%1$d · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="other">アクティブ%1$d · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="other">アクティブ%1$d</item>
+  </plurals>
+  <plurals name="inspector_connections_finished">
+    <item quantity="other">完了%1$d · %2$s</item>
+  </plurals>
+  <string name="inspector_single_connection">単一接続</string>
+  <string name="inspector_connections_live">数を変更すると、残りのバイトがその場で再分割されます。</string>
+  <string name="inspector_connections_on_resume">数の変更は、ダウンロードの再開時に適用されます。</string>
+  <string name="inspector_lane_description">接続%1$d、%2$s、%3$s</string>
+  <string name="inspector_percent_spoken">%1$dパーセント</string>
+
+  <string name="inspector_files_waiting">ファイルの一覧は、トレントのメタデータを受信すると表示されます。</string>
+  <plurals name="inspector_files_done_of">
+    <item quantity="other">%2$d個中%1$d個のファイルが完了</item>
+  </plurals>
+  <string name="inspector_files_one_done">1個のファイルが完了</string>
+  <plurals name="inspector_files_all_done">
+    <item quantity="other">%1$d個のファイルがすべて完了</item>
+  </plurals>
+  <plurals name="inspector_files_not_selected">
+    <item quantity="other">%1$d個は未選択</item>
+  </plurals>
+  <plurals name="inspector_files_map">
+    <item quantity="other">%1$d個のファイル、%2$d個完了、%3$dパーセント</item>
+  </plurals>
+  <string name="inspector_files_filter">ファイルを絞り込む</string>
+  <string name="inspector_files_no_match">「%1$s」に一致するファイルはありません</string>
+  <string name="inspector_files_sort">ファイルを並べ替え</string>
+  <string name="inspector_sort_incomplete">未完了を先に</string>
+  <string name="inspector_sort_name">名前</string>
+  <string name="inspector_sort_size">サイズ</string>
+  <string name="inspector_file_unnamed">ファイル%1$d</string>
+  <string name="inspector_file_description">%1$s、%2$s、%3$s</string>
+  <string name="inspector_file_description_no_share">%1$s、%2$s</string>
+</resources>

@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.util.FileKind
 import com.linroid.ketch.app.util.FileType
@@ -78,6 +79,8 @@ class TaskListSource(
  * @property createdAt when the task was added.
  * @property device the device that runs the task.
  * @property content the row text, from [rowContent].
+ * @property deviceName [DeviceInfo.name] in the app's language, which searches and sorting read.
+ * @property errorTitle the title of [content]'s error in the app's language, for searches.
  * @property speedSamples speed once a second while downloading, oldest first, at most
  *   [TaskListModel.SPEED_SAMPLES]; kept while the task is paused.
  */
@@ -90,6 +93,8 @@ data class TaskRow(
   override val createdAt: Instant,
   val device: DeviceInfo,
   val content: RowContent,
+  override val deviceName: String,
+  override val errorTitle: String?,
   val speedSamples: List<Long> = emptyList(),
 ) : SearchTarget {
   override val name: String = displayName(request, state)
@@ -114,14 +119,10 @@ data class TaskRow(
 
   override val priority: DownloadPriority
     get() = request.priority
-  override val errorTitle: String?
-    get() = content.error?.title
   override val isStalled: Boolean
     get() = content.status == RowStatus.Stalled
   override val isLimited: Boolean
     get() = content.limited || !request.speedLimit.isUnlimited
-  override val deviceName: String
-    get() = device.name
 
   /** Host for the Source column: the page the link came from, else the link's own host. */
   val sourceHost: String?
@@ -342,7 +343,7 @@ class TaskListModel(
     return (MINUTE_MILLIS - millis.mod(MINUTE_MILLIS)).milliseconds
   }
 
-  private fun build(frame: Frame): Rows {
+  private suspend fun build(frame: Frame): Rows {
     val now = clock.now()
     val zone = timeZone()
     val millis = now.toEpochMilliseconds()
@@ -354,9 +355,10 @@ class TaskListModel(
     val seen = HashSet<TaskKey>()
     for (device in frame.devices) {
       val context = contextOf(device, minute, zone)
+      val deviceName = context.device.name.load()
       for (snapshot in device.tasks) {
         val key = TaskKey(device.source.deviceId, snapshot.task.taskId)
-        if (seen.add(key)) rows += rowOf(key, snapshot, context, now, sample)
+        if (seen.add(key)) rows += rowOf(key, snapshot, context, deviceName, now, sample)
       }
     }
     entries.keys.retainAll(seen)
@@ -391,10 +393,11 @@ class TaskListModel(
     return context
   }
 
-  private fun rowOf(
+  private suspend fun rowOf(
     key: TaskKey,
     snapshot: TaskSnapshot,
     context: RowContext,
+    deviceName: String,
     now: Instant,
     sample: Boolean,
   ): TaskRow {
@@ -403,6 +406,14 @@ class TaskListModel(
     val entry = entries[key]
     if (entry != null && entry.isFor(snapshot, context, samples, stalledFor)) return entry.row
     val task = snapshot.task
+    val content = rowContent(
+      request = snapshot.request,
+      state = snapshot.state,
+      createdAt = task.createdAt,
+      context = context,
+      segments = snapshot.segments,
+      stalledFor = stalledFor,
+    )
     val built = TaskRow(
       key = key,
       task = task,
@@ -411,14 +422,9 @@ class TaskListModel(
       segments = snapshot.segments,
       createdAt = task.createdAt,
       device = context.device,
-      content = rowContent(
-        request = snapshot.request,
-        state = snapshot.state,
-        createdAt = task.createdAt,
-        context = context,
-        segments = snapshot.segments,
-        stalledFor = stalledFor,
-      ),
+      content = content,
+      deviceName = deviceName,
+      errorTitle = content.error?.title?.load(),
       speedSamples = samples,
     )
     val row = if (entry != null && entry.row == built) entry.row else built

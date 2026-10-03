@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "Отправляйте загрузки, ссылки и magnet-ссылки в Ketch на этом компьютере или удалённом сервере."
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "ru"
+  },
+  "menu_download_link": {
+    "message": "Скачать по ссылке через Ketch"
+  },
+  "menu_download_image": {
+    "message": "Скачать изображение через Ketch"
+  },
+  "menu_download_video": {
+    "message": "Скачать видео через Ketch"
+  },
+  "menu_download_audio": {
+    "message": "Скачать аудио через Ketch"
+  },
+  "notify_sent_to": {
+    "message": "Отправлено на $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "Отправлено в Ketch"
+  },
+  "notify_download_added": {
+    "message": "Загрузка добавлена"
+  },
+  "notify_fallback_browser": {
+    "message": "Загрузка продолжится в браузере"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-ссылка откроется в другом приложении"
+  },
+  "notify_send_failed": {
+    "message": "Не удалось отправить на $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch не может это скачать"
+  },
+  "notify_unsupported_stream": {
+    "message": "Страница сама воспроизводит это медиа, поэтому ссылки для скачивания нет."
+  },
+  "notify_unsupported_scheme": {
+    "message": "В Ketch можно отправлять только ссылки http, https, ftp и magnet."
+  },
+  "error_with_hint": {
+    "message": "$ERROR$. $HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "Ketch по адресу $ADDRESS$ не ответил",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "Не удаётся связаться с Ketch по адресу $ADDRESS$",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch отклонил токен доступа"
+  },
+  "error_token_required": {
+    "message": "Ketch требует токен доступа"
+  },
+  "error_http_status": {
+    "message": "Ketch ответил HTTP $STATUS$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch не запустился вовремя"
+  },
+  "error_app_not_installed": {
+    "message": "Приложение Ketch не настроено на этом компьютере"
+  },
+  "error_app_unreachable": {
+    "message": "Не удалось связаться с приложением Ketch"
+  },
+  "error_app_not_running": {
+    "message": "Ketch не запущен"
+  },
+  "error_app_connect_failed": {
+    "message": "Приложению Ketch не удалось подключиться"
+  },
+  "error_app_invalid_reply": {
+    "message": "Приложение Ketch прислало неверный ответ"
+  },
+  "error_unsupported_link": {
+    "message": "Ketch не может скачивать такие ссылки"
+  },
+  "error_torrent_http": {
+    "message": "Не удалось получить торрент-файл (HTTP $STATUS$)",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "Истекло время ожидания торрент-файла"
+  },
+  "error_torrent_too_large": {
+    "message": "Торрент-файл слишком большой"
+  },
+  "error_address_required": {
+    "message": "Введите адрес сервера Ketch"
+  },
+  "error_address_invalid": {
+    "message": "«$ADDRESS$» — недопустимый адрес",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "Адрес должен начинаться с http:// или https://"
+  },
+  "error_address_credentials": {
+    "message": "Укажите токен доступа в поле токена, а не в адресе"
+  },
+  "error_not_ketch": {
+    "message": "Похоже, по этому адресу нет сервера Ketch"
+  },
+  "hint_app_not_installed": {
+    "message": "Установите настольное приложение Ketch, откройте его один раз и попробуйте снова. Если вы используете «ketch server» или браузер установлен как Flatpak или Snap, добавьте Ketch как сервер."
+  },
+  "hint_app_not_running": {
+    "message": "Ketch откроется сам, когда вы отправите в него загрузку."
+  },
+  "hint_open_app": {
+    "message": "Откройте Ketch и попробуйте снова."
+  },
+  "hint_local_server": {
+    "message": "Откройте Ketch и включите «Настройки → Удалённый доступ → Сервер» или выполните «ketch server»."
+  },
+  "hint_remote_server": {
+    "message": "Проверьте, что сервер запущен и этот адрес доступен отсюда."
+  },
+  "hint_access_token": {
+    "message": "Введите токен доступа, который показан в Ketch в разделе «Настройки → Удалённый доступ»."
+  },
+  "task_magnet_link": {
+    "message": "Magnet-ссылка"
+  },
+  "task_torrent": {
+    "message": "Торрент"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ из $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "Приостановлена"
+  },
+  "task_paused_percent": {
+    "message": "Приостановлена · $PERCENT$ %",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "В очереди"
+  },
+  "task_scheduled": {
+    "message": "Запланирована"
+  },
+  "task_completed": {
+    "message": "Готово"
+  },
+  "task_failed": {
+    "message": "Ошибка: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "неизвестная ошибка"
+  },
+  "task_canceled": {
+    "message": "Отменена"
+  },
+  "task_pause": {
+    "message": "Приостановить"
+  },
+  "task_resume": {
+    "message": "Возобновить"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ Б",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ КБ",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ МБ",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ ГБ",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ ТБ",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/с",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "Подключено · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "Подключено к $NAME$ · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "Подключено · Ketch $VERSION$ на $OS$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "Подключено к $NAME$ · Ketch $VERSION$ на $OS$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "Подключение…"
+  },
+  "status_opening_app": {
+    "message": "Открытие Ketch…"
+  },
+  "instance_this_computer": {
+    "message": "Этот компьютер"
+  },
+  "instance_name_default": {
+    "message": "$NAME$ (по умолчанию)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "Имя"
+  },
+  "instance_default": {
+    "message": "По умолчанию"
+  },
+  "instance_app_detail": {
+    "message": "Приложение Ketch на этом компьютере. Расширение открывает его, когда это нужно для загрузки."
+  },
+  "instance_address": {
+    "message": "Адрес"
+  },
+  "instance_token": {
+    "message": "Токен доступа"
+  },
+  "instance_token_placeholder": {
+    "message": "Необязательно"
+  },
+  "instance_insecure": {
+    "message": "Этот адрес не зашифрован: токен доступа и cookie, отправляемые с загрузками, передаются по сети открытым текстом. Используйте https или подключайтесь только в сети, которой вы доверяете."
+  },
+  "instance_test": {
+    "message": "Проверить подключение"
+  },
+  "instance_remove": {
+    "message": "Удалить"
+  },
+  "instance_enter_address": {
+    "message": "Введите адрес сервера Ketch."
+  },
+  "popup_instance_picker": {
+    "message": "Экземпляр Ketch"
+  },
+  "popup_settings": {
+    "message": "Настройки"
+  },
+  "popup_open_app": {
+    "message": "Открыть Ketch"
+  },
+  "popup_add_placeholder": {
+    "message": "Вставьте ссылку или magnet-ссылку"
+  },
+  "popup_add_label": {
+    "message": "Ссылка для скачивания"
+  },
+  "popup_add_button": {
+    "message": "Скачать"
+  },
+  "popup_added": {
+    "message": "Добавлено: $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "Введите ссылку http, https, ftp или magnet."
+  },
+  "popup_capture": {
+    "message": "Перехватывать загрузки браузера"
+  },
+  "popup_capture_target": {
+    "message": "Отправляются на $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "Недавние"
+  },
+  "popup_no_downloads": {
+    "message": "Загрузок пока нет."
+  },
+  "options_title": {
+    "message": "Настройки расширения Ketch"
+  },
+  "options_intro": {
+    "message": "Отправляйте загрузки из этого браузера в Ketch на этом компьютере или удалённом сервере."
+  },
+  "options_saved": {
+    "message": "Сохранено"
+  },
+  "options_permission": {
+    "message": "Ketch нужен доступ к сайтам, чтобы перехватывать их загрузки, отправлять их cookie и связываться с вашими серверами Ketch."
+  },
+  "options_allow_access": {
+    "message": "Разрешить доступ"
+  },
+  "options_instances": {
+    "message": "Экземпляры Ketch"
+  },
+  "options_instances_detail": {
+    "message": "Перехваченные загрузки и magnet-ссылки отправляются в экземпляр по умолчанию. Щёлкните правой кнопкой мыши по ссылке, изображению или видео, чтобы отправить их в любой экземпляр."
+  },
+  "options_add_app": {
+    "message": "Добавить Ketch на этом компьютере"
+  },
+  "options_add_server": {
+    "message": "Добавить сервер"
+  },
+  "options_browser_downloads": {
+    "message": "Загрузки браузера"
+  },
+  "options_capture": {
+    "message": "Перехватывать загрузки"
+  },
+  "options_capture_detail": {
+    "message": "Загрузки, начатые в браузере, будут отправляться в Ketch. Если Ketch недоступен, браузер скачает их как обычно."
+  },
+  "options_min_size": {
+    "message": "Оставлять небольшие файлы браузеру"
+  },
+  "options_min_size_detail": {
+    "message": "Файлы меньше этого размера остаются в браузере. Файлы неизвестного размера всегда отправляются в Ketch. 0 — отправлять всё."
+  },
+  "options_min_size_unit": {
+    "message": "МБ"
+  },
+  "options_excluded": {
+    "message": "Сайты, загрузки с которых остаются в браузере"
+  },
+  "options_excluded_detail": {
+    "message": "По одному на строку. Поддомены тоже учитываются, поэтому example.com охватывает и downloads.example.com."
+  },
+  "options_cookies": {
+    "message": "Отправлять cookie и реферер"
+  },
+  "options_cookies_detail": {
+    "message": "Позволяет Ketch скачивать файлы, для которых нужно войти в аккаунт. Ketch хранит их вместе с задачей, чтобы позже её возобновить."
+  },
+  "options_links_notifications": {
+    "message": "Ссылки и уведомления"
+  },
+  "options_magnet": {
+    "message": "Отправлять в Ketch magnet-ссылки при нажатии"
+  },
+  "options_magnet_detail": {
+    "message": "Чтобы открыть magnet-ссылку в другом приложении, щёлкните её с нажатой клавишей Alt."
+  },
+  "options_notify": {
+    "message": "Уведомлять об отправке загрузки"
+  },
+  "options_notify_detail": {
+    "message": "Сообщения о проблемах показываются всегда."
+  },
+  "options_help": {
+    "message": "Настройка Ketch"
+  },
+  "options_help_this_computer": {
+    "message": "На этом компьютере"
+  },
+  "options_help_this_computer_detail": {
+    "message": "Установите настольное приложение Ketch и откройте его один раз, чтобы браузеры могли его найти. После этого расширение будет открывать Ketch, когда это нужно для загрузки; включать сервер или копировать токен не требуется."
+  },
+  "options_help_other_device": {
+    "message": "На другом устройстве"
+  },
+  "options_help_other_device_detail": {
+    "message": "На том устройстве откройте «Настройки → Удалённый доступ», включите <b>Сервер</b> и <b>Разрешить другие устройства</b>, затем создайте токен доступа. Добавьте устройство здесь кнопкой <b>Добавить сервер</b>, указав его адрес, например <code>http://192.168.1.20:8642</code>, и токен. Для <code>ketch server</code> задайте <code>apiToken</code> в его config.toml."
+  },
+  "options_help_command_line": {
+    "message": "Командная строка или изолированные браузеры"
+  },
+  "options_help_command_line_detail": {
+    "message": "Чтобы использовать <code>ketch server</code> на этом компьютере или Ketch в браузере, установленном как Flatpak или Snap (такой браузер не может запускать другие приложения), добавьте его как сервер по адресу <code>http://127.0.0.1:8642</code>."
+  }
+}

@@ -161,7 +161,7 @@ Chromium build, so it can be loaded as is while developing:
   Temporary Add-on** and select `build/firefox/manifest.json`.
 
 ```shell
-npm test        # unit tests, with Node's built-in test runner (Node 22.2+)
+npm test        # unit tests, with Node's built-in test runner (Node 22.3+)
 npm run build   # build/chrome, build/firefox and a zip of each
 ```
 
@@ -197,5 +197,37 @@ including a final release after its release candidates, which the stores require
 | `src/lib/request.js` | Builds the download request and headers, tagged `ketch.origin: browser`; recognizes torrents |
 | `src/lib/intercept.js` | Which browser downloads are captured |
 | `src/lib/format.js` | Text for tasks, sizes and connection problems |
+| `src/lib/i18n.js` | Messages in the browser's language, for scripts and pages |
 | `src/lib/ext.js` | The `browser` or `chrome` API namespace |
+| `src/_locales/` | Messages of each language |
 | `test/` | Unit tests |
+
+## Translations
+
+The extension shows its text in the browser's language, in the
+[languages of the apps](../../docs/development/localization.md#languages). It falls back to
+English for other languages and for any message a translation lacks. The terms follow the
+[translation glossary](../../docs/development/translation-glossary.md) of the apps.
+
+Messages live in `src/_locales/<language>/messages.json`, in the
+[`i18n` format](https://developer.chrome.com/docs/extensions/reference/api/i18n) both browser
+families read. English, in `en`, is the source: each message has a `description` saying where it
+shows and what fills its placeholders. Translations hold only each `message` and the
+`placeholders` with their `content`.
+
+- **Scripts** call `t('key', ...values)` from `src/lib/i18n.js`. Each value fills the next
+  placeholder: a message `"Sent to $NAME$"` with `"name": { "content": "$1" }` gets its name from
+  the first value. Outside a browser, as in the tests, `t` reads the English file.
+- **Pages** mark elements with `data-i18n="key"` for their text, `data-i18n-markup="key"` for text
+  with `<b>` or `<code>`, and `data-i18n-title`, `data-i18n-placeholder` or
+  `data-i18n-aria-label` for those attributes; `localizePage()` fills them when the page loads.
+  The English text stays in the HTML.
+- **The manifest** uses `__MSG_key__`.
+
+To add a string, add it to `en/messages.json` with a description, use it as above and add it to
+the other languages; `test/locales.test.js` fails until every language has it, with the same
+placeholders. Write a whole sentence per message with placeholders for what changes, rather than
+joining pieces, and keep counts out of sentences: the `i18n` format has no plural forms. To add a
+language, copy a translation's folder under the language's
+[locale code](https://developer.chrome.com/docs/extensions/reference/api/i18n#locales), translate
+it and set `language_tag` to the language's tag, such as `pt-BR`.

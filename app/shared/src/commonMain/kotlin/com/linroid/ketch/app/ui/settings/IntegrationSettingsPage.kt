@@ -16,6 +16,9 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -29,7 +32,36 @@ import com.linroid.ketch.app.state.clipboardMode
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.IntegrationSettings
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_integration_clipboard
+import ketch.app.shared.generated.resources.settings_integration_clipboard_fill
+import ketch.app.shared.generated.resources.settings_integration_clipboard_fill_hint
+import ketch.app.shared.generated.resources.settings_integration_clipboard_off
+import ketch.app.shared.generated.resources.settings_integration_clipboard_off_hint
+import ketch.app.shared.generated.resources.settings_integration_clipboard_suggest
+import ketch.app.shared.generated.resources.settings_integration_clipboard_suggest_choice
+import ketch.app.shared.generated.resources.settings_integration_clipboard_suggest_hint
+import ketch.app.shared.generated.resources.settings_integration_connected
+import ketch.app.shared.generated.resources.settings_integration_default_apps
+import ketch.app.shared.generated.resources.settings_integration_extension
+import ketch.app.shared.generated.resources.settings_integration_extension_footer
+import ketch.app.shared.generated.resources.settings_integration_get_extension
+import ketch.app.shared.generated.resources.settings_integration_is_default
+import ketch.app.shared.generated.resources.settings_integration_magnet
+import ketch.app.shared.generated.resources.settings_integration_magnet_failed
+import ketch.app.shared.generated.resources.settings_integration_magnet_refused
+import ketch.app.shared.generated.resources.settings_integration_make_default
+import ketch.app.shared.generated.resources.settings_integration_no_browser
+import ketch.app.shared.generated.resources.settings_integration_no_browser_hint
+import ketch.app.shared.generated.resources.settings_integration_quick_add
+import ketch.app.shared.generated.resources.settings_integration_quick_add_hint
+import ketch.app.shared.generated.resources.settings_integration_quick_add_key_hint
+import ketch.app.shared.generated.resources.settings_integration_torrent
+import ketch.app.shared.generated.resources.settings_integration_torrent_failed
+import ketch.app.shared.generated.resources.settings_integration_torrent_refused
 import kotlinx.coroutines.CancellationException
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("IntegrationSettings")
 
@@ -59,7 +91,7 @@ private fun BrowserGroup() {
   val uriHandler = LocalUriHandler.current
   val getExtension = @Composable {
     KetchButton(
-      text = "Get extension",
+      text = stringResource(Res.string.settings_integration_get_extension),
       onClick = {
         try {
           uriHandler.openUri(EXTENSION_URL)
@@ -73,13 +105,13 @@ private fun BrowserGroup() {
     )
   }
   SettingsGroup(
-    title = "Browser extension",
-    footer = "Sends your browser's downloads to Ketch, with the site's cookies.",
+    title = stringResource(Res.string.settings_integration_extension),
+    footer = stringResource(Res.string.settings_integration_extension_footer),
   ) {
     if (status.browsers.isEmpty()) {
       SettingsRow(
-        title = "No browser found yet",
-        description = "For Chrome, Edge, Brave, Firefox and other Chromium browsers.",
+        title = stringResource(Res.string.settings_integration_no_browser),
+        description = stringResource(Res.string.settings_integration_no_browser_hint),
         trailing = getExtension,
       )
     }
@@ -87,7 +119,7 @@ private fun BrowserGroup() {
       SettingsRow(
         title = browser.name,
         trailing = if (browser.extensionConnected) {
-          { Confirmed("Connected") }
+          { Confirmed(stringResource(Res.string.settings_integration_connected)) }
         } else {
           getExtension
         },
@@ -96,18 +128,42 @@ private fun BrowserGroup() {
   }
 }
 
+/**
+ * A kind of link or file Ketch can open.
+ *
+ * @property logName how the log names it.
+ * @property refused what the page says when the system did not make Ketch open it.
+ * @property failed what the page says when asking the system failed; `%1$s` is why.
+ */
+private enum class Handled(
+  val logName: String,
+  val refused: StringResource,
+  val failed: StringResource,
+) {
+  MagnetLinks(
+    logName = "magnet",
+    refused = Res.string.settings_integration_magnet_refused,
+    failed = Res.string.settings_integration_magnet_failed,
+  ),
+  TorrentFiles(
+    logName = ".torrent",
+    refused = Res.string.settings_integration_torrent_refused,
+    failed = Res.string.settings_integration_torrent_failed,
+  ),
+}
+
 /** Whether Ketch opens magnet links and `.torrent` files, with buttons that make it. */
 @Composable
 private fun DefaultAppsGroup(state: AppState) {
   val hooks = LocalDesktopHooks.current
   val status = LocalIntegrationStatus.current
   val appSettings = state.appSettings
-  var registering by remember { mutableStateOf<String?>(null) }
+  var registering by remember { mutableStateOf<Handled?>(null) }
   // What this page registered, shown as done before the system's answer is read again, which
   // happens only when the window comes back to the front.
-  var registered by remember { mutableStateOf(emptySet<String>()) }
-  var failure by remember { mutableStateOf<String?>(null) }
-  val register = { what: String, hook: suspend () -> Boolean, save: IntegrationChange ->
+  var registered by remember { mutableStateOf(emptySet<Handled>()) }
+  var failure by remember { mutableStateOf<UiText?>(null) }
+  val register = { what: Handled, hook: suspend () -> Boolean, save: IntegrationChange ->
     registering = what
     failure = null
     state.launchCommand {
@@ -116,34 +172,39 @@ private fun DefaultAppsGroup(state: AppState) {
           appSettings.saveIntegration(save)
           registered = registered + what
         } else {
-          log.w { "The system didn't make Ketch open $what" }
-          failure = "Ketch couldn't make itself open $what. Choose it in your system's settings."
+          log.w { "The system didn't make Ketch open ${what.logName} links or files" }
+          failure = what.refused.text()
         }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        log.w { "Couldn't register for $what: ${e.describeCauses()}" }
-        failure = "Couldn't make Ketch open $what: ${e.message ?: e::class.simpleName}"
+        log.w { "Couldn't register for ${what.logName}: ${e.describeCauses()}" }
+        failure = what.failed.text(e.message ?: e::class.simpleName.orEmpty())
       } finally {
         registering = null
       }
     }
   }
-  SettingsGroup(title = "Default apps", footer = failure) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_integration_default_apps),
+    footer = failure?.resolve(),
+  ) {
     DefaultAppRow(
-      title = "Open magnet links with Ketch",
-      isDefault = status.magnetHandler || MAGNET_LINKS in registered,
-      registering = registering == MAGNET_LINKS,
+      title = stringResource(Res.string.settings_integration_magnet),
+      isDefault = status.magnetHandler || Handled.MagnetLinks in registered,
+      registering = registering == Handled.MagnetLinks,
       onMakeDefault = {
-        register(MAGNET_LINKS, hooks::registerMagnetHandler) { it.copy(magnetHandler = true) }
+        register(Handled.MagnetLinks, hooks::registerMagnetHandler) {
+          it.copy(magnetHandler = true)
+        }
       },
     )
     DefaultAppRow(
-      title = "Open .torrent files with Ketch",
-      isDefault = status.torrentFileHandler || TORRENT_FILES in registered,
-      registering = registering == TORRENT_FILES,
+      title = stringResource(Res.string.settings_integration_torrent),
+      isDefault = status.torrentFileHandler || Handled.TorrentFiles in registered,
+      registering = registering == Handled.TorrentFiles,
       onMakeDefault = {
-        register(TORRENT_FILES, hooks::registerTorrentFileHandler) {
+        register(Handled.TorrentFiles, hooks::registerTorrentFileHandler) {
           it.copy(torrentFileHandler = true)
         }
       },
@@ -163,10 +224,10 @@ private fun DefaultAppRow(
     title = title,
     trailing = {
       if (isDefault) {
-        Confirmed("Ketch is the default")
+        Confirmed(stringResource(Res.string.settings_integration_is_default))
       } else {
         KetchButton(
-          text = "Make default",
+          text = stringResource(Res.string.settings_integration_make_default),
           onClick = onMakeDefault,
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
@@ -183,35 +244,39 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
   val mode = appSettings.clipboardMode
   val quickAdd = appSettings.ui.quickAdd ?: !isMobilePlatform
   val paste = KetchCommands.PasteLinks.shortcutLabel(KeyboardPlatform.current)
-  SettingsGroup(title = "Clipboard") {
+  SettingsGroup(title = stringResource(Res.string.settings_integration_clipboard)) {
     SettingsRow(
-      title = "Suggest links from the clipboard",
-      description = when (mode) {
-        ClipboardMode.Fill -> "A copied link fills the add sheet."
-        ClipboardMode.Suggest -> "Reads the clipboard only when you tap."
-        ClipboardMode.Off -> "Ketch never reads the clipboard."
-      },
+      title = stringResource(Res.string.settings_integration_clipboard_suggest),
+      description = stringResource(
+        when (mode) {
+          ClipboardMode.Fill -> Res.string.settings_integration_clipboard_fill_hint
+          ClipboardMode.Suggest -> Res.string.settings_integration_clipboard_suggest_hint
+          ClipboardMode.Off -> Res.string.settings_integration_clipboard_off_hint
+        },
+      ),
       trailing = {
         KetchSegmented(
           selected = mode,
           options = ClipboardMode.entries,
           label = { option ->
-            when (option) {
-              ClipboardMode.Fill -> "Fill automatically"
-              ClipboardMode.Suggest -> "Suggest"
-              ClipboardMode.Off -> "Off"
-            }
+            stringResource(
+              when (option) {
+                ClipboardMode.Fill -> Res.string.settings_integration_clipboard_fill
+                ClipboardMode.Suggest -> Res.string.settings_integration_clipboard_suggest_choice
+                ClipboardMode.Off -> Res.string.settings_integration_clipboard_off
+              },
+            )
           },
           onSelect = { option -> appSettings.saveUi { it.copy(clipboardMode = option) } },
         )
       },
     )
     SettingsSwitchRow(
-      title = "Add pasted links immediately",
+      title = stringResource(Res.string.settings_integration_quick_add),
       description = if (paste != null) {
-        "Pasting one link with $paste adds it at once, with Undo."
+        stringResource(Res.string.settings_integration_quick_add_key_hint, paste)
       } else {
-        "Pasting one link adds it at once, with Undo."
+        stringResource(Res.string.settings_integration_quick_add_hint)
       },
       checked = quickAdd,
       onCheckedChange = { on -> appSettings.saveUi { it.copy(quickAdd = on) } },
@@ -233,6 +298,3 @@ private fun Confirmed(text: String) {
 }
 
 private typealias IntegrationChange = (IntegrationSettings) -> IntegrationSettings
-
-private const val MAGNET_LINKS = "magnet links"
-private const val TORRENT_FILES = ".torrent files"

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="process_text_label">使用 Ketch 下載</string>
+  <string name="quick_add_no_link">沒有可下載的連結</string>
+
+  <string name="notifications_offer_title">下載完成時通知我</string>
+  <string name="notifications_offer_message">你使用其他應用程式時，Ketch 可以在下載完成或失敗時通知你。</string>
+  <string name="notifications_offer_allow">允許</string>
+  <string name="notifications_offer_not_now">暫時不要</string>
+</resources>

@@ -33,14 +33,27 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.devices.storageLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.pulse_active
+import ketch.app.shared.generated.resources.pulse_idle
+import ketch.app.shared.generated.resources.pulse_last_minute
+import ketch.app.shared.generated.resources.pulse_mode_full_short
+import ketch.app.shared.generated.resources.pulse_subtitle_description
+import ketch.app.shared.generated.resources.pulse_subtitle_speed
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The phone's summary line under the "Downloads" title, such as
@@ -56,8 +69,13 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
   // The bar is narrow, so plain full speed reads "Full", as the spec's subtitle has it.
-  val mode = if (view.mode == SpeedMode.Full && !view.limited) "Full" else view.label
-  val text = pulseSubtitle(pulse, mode)
+  val mode = if (view.mode == SpeedMode.Full && !view.limited) {
+    Res.string.pulse_mode_full_short.text()
+  } else {
+    view.label
+  }
+  val text = pulseSubtitle(pulse, mode).resolve()
+  val description = stringResource(Res.string.pulse_subtitle_description, text)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
@@ -65,7 +83,7 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
       .focusRing(focus.visible, shape, colors.focusRing)
       .clip(shape)
       .background(overlay)
-      .semantics(mergeDescendants = true) { contentDescription = "$text, show the speed" }
+      .semantics(mergeDescendants = true) { contentDescription = description }
       .ketchClickable(interactions, focus, onClick = onClick),
   ) {
     Text(
@@ -81,17 +99,17 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
 }
 
 /** The phone subtitle: "↓ 4.2 MB/s · 2 active · Full", or "Idle · Slow lane · 1 MB/s". */
-internal fun pulseSubtitle(pulse: PulseState, modeLabel: String): String {
+internal fun pulseSubtitle(pulse: PulseState, modeLabel: UiText): UiText {
   val device = pulse.devices.firstOrNull()
   val parts = when {
-    device != null && !device.health.isOnline -> listOf(healthLabel(device.health))
+    device != null && !device.health.isOnline -> listOf(healthText(device.health))
     pulse.counts.downloading > 0 -> listOf(
-      "↓ ${speedText(pulse.totalSpeed)}",
-      "${pulse.counts.downloading} active"
+      Res.string.pulse_subtitle_speed.text(speedText(pulse.totalSpeed)),
+      Res.plurals.pulse_active.text(pulse.counts.downloading)
     )
-    else -> listOf("Idle")
+    else -> listOf(Res.string.pulse_idle.text())
   }
-  return (parts + modeLabel).joinToString(SEPARATOR)
+  return (parts + modeLabel).joinText()
 }
 
 /**
@@ -138,7 +156,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
   val spacing = KetchTheme.spacing
   val device = pulse.devices.firstOrNull()
   val online = device?.health?.isOnline ?: true
-  val speed = speedText(pulse.totalSpeed)
+  val speed = speedParts(pulse.totalSpeed)
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
     Row(verticalAlignment = Alignment.Bottom) {
       Text(
@@ -157,7 +175,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
       Spacer(Modifier.weight(1f))
       if (device != null) {
         Text(
-          text = "${device.name} · ${healthLabel(device.health)}",
+          text = listOf(device.name, healthText(device.health)).joinText().resolve(),
           style = KetchTheme.typography.caption,
           color = colors.textSecondary,
           maxLines = 1,
@@ -166,7 +184,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
         )
       }
     }
-    KetchEyebrow("Last minute")
+    KetchEyebrow(stringResource(Res.string.pulse_last_minute))
     KetchSpeedChart(
       bands = listOf(SpeedBand(pulse.history, colors.accent)),
       limits = listOfNotNull(limit?.let { SpeedLimitLine(it) }),
@@ -174,10 +192,9 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
       modifier = Modifier.fillMaxWidth().height(ChartHeight),
     )
     Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
-      CountTile("Downloading", pulse.counts.downloading, StatusFilter.Downloading, onShowTab)
-      CountTile("Waiting", pulse.counts.waiting, StatusFilter.Waiting, onShowTab)
+      CountTile(pulse.counts.downloading, StatusFilter.Downloading, onShowTab)
+      CountTile(pulse.counts.waiting, StatusFilter.Waiting, onShowTab)
       CountTile(
-        label = "Failed",
         count = pulse.counts.failed,
         filter = StatusFilter.Failed,
         onShowTab = onShowTab,
@@ -188,7 +205,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
     if (disk != null) {
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
         Text(
-          text = "${diskLabel(disk)} of ${formatSpace(disk.totalBytes)}",
+          text = storageLabel(disk).resolve(),
           style = KetchTheme.typography.caption,
           color = if (pulse.isDiskShort) colors.status.paused.color else colors.textSecondary,
         )
@@ -203,9 +220,9 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
   }
 }
 
+/** The count of the tab of [filter], under the tab's name; it opens the tab. */
 @Composable
 private fun RowScope.CountTile(
-  label: String,
   count: Int,
   filter: StatusFilter,
   onShowTab: (StatusFilter) -> Unit,
@@ -232,7 +249,11 @@ private fun RowScope.CountTile(
       style = KetchTheme.typography.numeralL,
       color = if (alert && count > 0) colors.status.failed.color else colors.textPrimary,
     )
-    Text(text = label, style = KetchTheme.typography.caption, color = colors.textSecondary)
+    Text(
+      text = filter.label.resolve(),
+      style = KetchTheme.typography.caption,
+      color = colors.textSecondary,
+    )
   }
 }
 

@@ -3,7 +3,12 @@
 package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AppController
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.notify_web_offer
+import ketch.app.shared.generated.resources.notify_web_on
 import kotlinx.browser.document
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -107,14 +112,14 @@ private fun offerNotifications(
 ) {
   messages.post(
     level = MessageLevel.Success,
-    title = copy.title,
-    detail = copy.body.ifEmpty { null },
+    title = verbatim(copy.title),
+    detail = copy.body.ifEmpty { null }?.let(::verbatim),
     taskKey = ActivityRouting.taskKeyOf(event),
     deviceId = ActivityRouting.deviceIdOf(event),
     actions = listOf(
-      MessageAction("Notify me") {
+      MessageAction(Res.string.notify_web_offer.text()) {
         notifier.requestPermission { granted ->
-          if (granted) messages.post(MessageLevel.Success, "Notifications on")
+          if (granted) messages.post(MessageLevel.Success, Res.string.notify_web_on.text())
         }
       }
     ),

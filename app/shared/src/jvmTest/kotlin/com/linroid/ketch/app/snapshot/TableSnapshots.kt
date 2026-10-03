@@ -14,6 +14,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenuPanel
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.DetectedBrowser
 import com.linroid.ketch.app.platform.IntegrationStatus
@@ -175,16 +176,16 @@ class TableSnapshots {
     val size = SnapshotSize(760.dp, 360.dp, KetchDensity.Compact)
     val states: Map<String, @Composable () -> Unit> = mapOf(
       "empty-waiting" to {
-        EmptyMessage(emptyCopy(StatusFilter.Waiting, "", "This Mac", slots = 3), onAction = {})
+        EmptyMessage(emptyCopy(StatusFilter.Waiting, "", Mac, slots = 3), onAction = {})
       },
       "empty-links" to {
         val links = "https://example.com/a.iso https://example.com/b.iso"
-        EmptyMessage(emptyCopy(StatusFilter.All, links, "This Mac", slots = 3), onAction = {})
+        EmptyMessage(emptyCopy(StatusFilter.All, links, Mac, slots = 3), onAction = {})
       },
       "empty-offline" to {
-        EmptyMessage(offlineCopy("nas.local:8642", unauthorized = false), onAction = {})
+        EmptyMessage(offlineCopy(Nas, unauthorized = false), onAction = {})
       },
-      "empty-remote" to { EmptyMessage(remoteEmptyCopy("nas.local:8642"), onAction = {}) },
+      "empty-remote" to { EmptyMessage(remoteEmptyCopy(Nas), onAction = {}) },
       "loading-rows" to {
         SkeletonRows(
           rowHeight = KetchTheme.density.tableRow,
@@ -282,3 +283,5 @@ private object DesktopSupport : DesktopHooks {
 private const val UBUNTU = "ubuntu-24.04-desktop-amd64.iso"
 private const val IMAGENET = "imagenet-part03.tar"
 private const val REPORT = "q3-report.pdf"
+private val Mac = verbatim("This Mac")
+private val Nas = verbatim("nas.local:8642")

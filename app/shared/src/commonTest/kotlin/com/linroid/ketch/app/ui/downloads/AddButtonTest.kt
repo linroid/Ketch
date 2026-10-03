@@ -1,6 +1,9 @@
 package com.linroid.ketch.app.ui.downloads
 
 import com.linroid.ketch.app.components.AddButtonMode
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.util.urlHost
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -12,8 +15,10 @@ class AddButtonTest {
   )
 
   @Test
-  fun addButtonMode_foundLink_offersItsFileNameAndSite() {
-    val mode = addButtonMode(found, dragging = false, over = false)
+  fun addButtonMode_foundLink_offersItsFileNameAndSite() = runTest {
+    val description = clipDescription(clipName(found.url), urlHost(found.url)).load()
+
+    val mode = addButtonMode(found, dragging = false, over = false, description = description)
 
     assertEquals(
       AddButtonMode.Clip(
@@ -38,8 +43,8 @@ class AddButtonTest {
   }
 
   @Test
-  fun clipDescription_hostIsTheName_leavesTheSiteOut() {
-    assertEquals("Download example.com", clipDescription("example.com", "example.com"))
-    assertEquals("Download a.iso", clipDescription("a.iso", null))
+  fun clipDescription_hostIsTheName_leavesTheSiteOut() = runTest {
+    assertEquals("Download example.com", clipDescription("example.com", "example.com").load())
+    assertEquals("Download a.iso", clipDescription("a.iso", null).load())
   }
 }

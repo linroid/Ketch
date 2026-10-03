@@ -100,7 +100,9 @@ skipped without `-Psnapshots`. `appSnapshot` and `appSnapshots` render the real 
 desktop, medium and phone sizes, in light and dark; `snapshot` renders any composable in
 `KetchTheme`. Add scenarios in a file of your own, such as `InspectorSnapshots.kt`, opening
 surfaces through `AppScenario` (`inspect`, `select`, `openAddSheet`, `openSettings`, `showTab`) and
-pressing keys or hovering through its `scene`.
+pressing keys or hovering through its `scene`. Tests run in English; add
+`-PsnapshotLocale=de-DE` (any BCP 47 tag) to render the snapshots in another language and check
+that its text fits.
 
 The README showcase (`art/showcase-light.png`, `art/showcase-dark.png`) is the
 `ShowcaseSnapshots` scenario: the desktop window, two phones and a terminal over brand-free
@@ -117,7 +119,7 @@ commit.
 - iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless
   `-PenableIosSimulatorTests=true` is passed to `iosSimulatorArm64Test`; JS tests run on Node.js
   with `jsNodeTest`
-- The browser extension has its own unit tests: `npm test` (`node --test`, Node 22.2+) in
+- The browser extension has its own unit tests: `npm test` (`node --test`, Node 22.3+) in
   `app/browser-extension`
 - Torrent interoperability (Transmission, libtorrent), the opt-in public swarm test
   (`-PpublicTorrentTests=true`), benchmarks and memory measurements are described in

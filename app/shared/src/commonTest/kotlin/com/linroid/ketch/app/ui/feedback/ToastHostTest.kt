@@ -4,10 +4,13 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
+import kotlinx.coroutines.test.runTest
+import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
-import okio.IOException
 
 class ToastHostTest {
 
@@ -19,38 +22,44 @@ class ToastHostTest {
   ) = AppMessage(
     id = id,
     level = level,
-    title = "Couldn't pause on NAS-Basement",
-    detail = detail,
+    title = verbatim("Couldn't pause on NAS-Basement"),
+    detail = detail?.let(::verbatim),
     at = Instant.fromEpochSeconds(0),
     cause = cause,
   )
 
   @Test
-  fun toastDetail_noCause_isTheDetail() {
-    assertEquals("6 files", toastDetail(message(detail = "6 files", level = MessageLevel.Success)))
+  fun toastDetail_noCause_isTheDetail() = runTest {
+    assertEquals(
+      "6 files",
+      toastDetail(message(detail = "6 files", level = MessageLevel.Success)).load()
+    )
   }
 
   @Test
-  fun toastDetail_lostConnection_readsAsTheCatalogCopy() {
+  fun toastDetail_lostConnection_readsAsTheCatalogCopy() = runTest {
     val cause = IOException("Socket closed")
 
-    assertEquals("Connection lost", toastDetail(message(detail = cause.message, cause = cause)))
+    assertEquals(
+      "Connection lost",
+      toastDetail(message(detail = cause.message, cause = cause)).load()
+    )
   }
 
   @Test
-  fun toastDetail_namedSubject_leadsTheCatalogCopy() {
+  fun toastDetail_namedSubject_leadsTheCatalogCopy() = runTest {
     val detail = toastDetail(message(detail = "q3-report.pdf", cause = KetchError.Http(403)))
 
-    assertEquals("q3-report.pdf: Access denied (403)", detail)
+    assertEquals("q3-report.pdf: Access denied (403)", detail.load())
   }
 
   @Test
-  fun toastDetail_unexplainedFailure_readsAsItsOwnMessage() {
+  fun toastDetail_unexplainedFailure_readsAsItsOwnMessage() = runTest {
     val cause = IllegalArgumentException("Destination must not be blank")
 
     assertEquals(
       "Destination must not be blank",
-      toastDetail(message(detail = cause.message, cause = cause))
+      toastDetail(message(detail = cause.message, cause = cause)).load()
     )
   }
 

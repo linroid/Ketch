@@ -55,6 +55,9 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.ketchClickable
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -66,7 +69,7 @@ import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.downloads.CLEAR_MISSING_CAPTION
+import com.linroid.ketch.app.ui.downloads.clearMissingCaption
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
 import com.linroid.ketch.app.ui.pulse.PulseSubtitle
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
@@ -76,6 +79,22 @@ import com.linroid.ketch.app.ui.sidebar.rememberDevices
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.links
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_any_in_sentence
+import ketch.app.shared.generated.resources.downloads_clear_missing
+import ketch.app.shared.generated.resources.shell_activity_unread
+import ketch.app.shared.generated.resources.shell_clear_finished
+import ketch.app.shared.generated.resources.shell_device_button
+import ketch.app.shared.generated.resources.shell_device_button_back
+import ketch.app.shared.generated.resources.shell_devices
+import ketch.app.shared.generated.resources.shell_discover_query
+import ketch.app.shared.generated.resources.shell_more
+import ketch.app.shared.generated.resources.shell_search_close
+import ketch.app.shared.generated.resources.shell_search_download_links_on
+import ketch.app.shared.generated.resources.shell_search_download_on
+import ketch.app.shared.generated.resources.shell_search_placeholder
+import ketch.app.shared.generated.resources.shell_settings
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /**
@@ -185,7 +204,7 @@ internal fun PhoneTopBar(shell: ShellState, showsBottomBar: Boolean) {
     DeviceButton(shell)
     Column(Modifier.weight(1f).padding(start = spacing.s1)) {
       Text(
-        text = shell.destination.label,
+        text = shell.destination.label.resolve(),
         style = KetchTheme.typography.pageTitle,
         color = KetchTheme.colors.textPrimary,
         maxLines = 1,
@@ -196,7 +215,7 @@ internal fun PhoneTopBar(shell: ShellState, showsBottomBar: Boolean) {
     KetchIconButton(
       icon = KetchIcon.Search,
       onClick = { shell.focusSearch() },
-      contentDescription = KetchCommands.Search.label,
+      contentDescription = KetchCommands.Search.label.resolve(),
     )
     Overflow(shell, showsBottomBar)
   }
@@ -219,15 +238,17 @@ private fun DeviceButton(shell: ShellState) {
   val device = devices.firstOrNull { it.deviceId == active?.deviceId }
   val target = KetchTheme.density.iconButtonTarget
   val name = if (all) KetchCommands.AllDevices.label else device?.name
+  val description = name?.let { stringResource(Res.string.shell_device_button, it.resolve()) }
+    ?: stringResource(Res.string.shell_devices)
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
       .sizeIn(minWidth = target, minHeight = target)
       .clip(KetchTheme.shapes.full)
-      .semantics { contentDescription = name?.let { "$it, switch device" } ?: "Devices" }
+      .semantics { contentDescription = description }
       .combinedClickable(
         role = Role.Button,
-        onLongClickLabel = "Back to the previous device",
+        onLongClickLabel = stringResource(Res.string.shell_device_button_back),
         onLongClick = {
           devices.firstOrNull { it.deviceId == shell.previousDeviceId }
             ?.let { state.switchInstance(it.entry) }
@@ -264,7 +285,11 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
   var open by remember { mutableStateOf(false) }
   val counts = pulse.counts
   Box {
-    KetchIconButton(icon = KetchIcon.More, onClick = { open = true }, contentDescription = "More")
+    KetchIconButton(
+      icon = KetchIcon.More,
+      onClick = { open = true },
+      contentDescription = stringResource(Res.string.shell_more),
+    )
     KetchMenu(expanded = open, onDismissRequest = { open = false }) {
       item(
         command = KetchCommands.PauseAll,
@@ -282,17 +307,17 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
         enabled = pulse.failures > 0,
       )
       item(
-        label = "Clear finished",
+        label = Res.string.shell_clear_finished.text(),
         onClick = { state.clearCompleted() },
         icon = KetchIcon.Done,
         enabled = counts.done > 0,
       )
       if (files != null) {
         item(
-          label = "Clear missing",
+          label = Res.string.downloads_clear_missing.text(),
           onClick = { state.clearMissing(files) },
           icon = KetchIcon.Warning,
-          caption = CLEAR_MISSING_CAPTION,
+          caption = clearMissingCaption,
           enabled = counts.done > 0,
         )
       }
@@ -301,7 +326,7 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
         label = KetchCommands.Activity.label,
         onClick = { shell.pulseBar.activityOpen = true },
         icon = KetchCommands.Activity.icon,
-        caption = if (unread > 0) "$unread unread" else null,
+        caption = if (unread > 0) Res.plurals.shell_activity_unread.text(unread) else null,
       )
       if (!showsBottomBar && AppDestination.Devices in shell.destinations) {
         item(
@@ -310,7 +335,11 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
           icon = AppDestination.Devices.icon,
         )
       }
-      item(label = "Settings", onClick = { state.openSettings() }, icon = KetchIcon.Settings)
+      item(
+        label = Res.string.shell_settings.text(),
+        onClick = { state.openSettings() },
+        icon = KetchIcon.Settings,
+      )
     }
     ActivityPopover(
       state = state,
@@ -374,12 +403,12 @@ private fun SearchBar(shell: ShellState) {
       KetchIconButton(
         icon = KetchIcon.ChevronLeft,
         onClick = close,
-        contentDescription = "Close search",
+        contentDescription = stringResource(Res.string.shell_search_close),
       )
       KetchTextField(
         value = query,
         onValueChange = { state.searchQuery = it },
-        placeholder = "Search or paste a link",
+        placeholder = stringResource(Res.string.shell_search_placeholder),
         leadingIcon = KetchIcon.Search,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(
@@ -393,10 +422,10 @@ private fun SearchBar(shell: ShellState) {
       )
     }
     if (suggestion != null) {
-      val deviceName = active?.displayName ?: "this device"
+      val device = active?.displayName ?: Res.string.device_any_in_sentence.text()
       SuggestionRow(
         icon = suggestion.icon,
-        text = suggestion.label(deviceName),
+        text = suggestion.label(device).resolve(),
         detail = suggestion.detail,
         onClick = { run(suggestion) },
       )
@@ -409,8 +438,8 @@ internal sealed interface SearchSuggestion {
   /** Glyph of the suggestion's row. */
   val icon: KetchIcon
 
-  /** Text of the suggestion's row, naming the device downloads go to. */
-  fun label(deviceName: String): String
+  /** Text of the suggestion's row, naming the [device] downloads go to. */
+  fun label(device: UiText): UiText
 
   /** Second line of the suggestion's row, such as the file a link downloads. */
   val detail: String?
@@ -422,9 +451,9 @@ internal sealed interface SearchSuggestion {
   data class Download(val urls: List<String>, val withOptions: Boolean) : SearchSuggestion {
     override val icon: KetchIcon get() = KetchIcon.Active
 
-    override fun label(deviceName: String): String = when (urls.size) {
-      1 -> "Download on $deviceName"
-      else -> "Download ${urls.size} links on $deviceName"
+    override fun label(device: UiText): UiText = when (urls.size) {
+      1 -> Res.string.shell_search_download_on.text(device)
+      else -> Res.plurals.shell_search_download_links_on.text(urls.size, urls.size, device)
     }
 
     override val detail: String?
@@ -435,7 +464,7 @@ internal sealed interface SearchSuggestion {
   data class Discover(val query: String) : SearchSuggestion {
     override val icon: KetchIcon get() = KetchIcon.Discover
 
-    override fun label(deviceName: String): String = "Discover “$query”"
+    override fun label(device: UiText): UiText = Res.string.shell_discover_query.text(query)
 
     override val detail: String? get() = null
   }

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Pulse bar, its sheet and popovers: what downloads across the shown devices are doing. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- The Pulse bar's sentence. Parts are joined by " · ". -->
+  <plurals name="pulse_downloading">
+    <item quantity="one">Downloading %1$d file</item>
+    <item quantity="other">Downloading %1$d files</item>
+  </plurals>
+  <!-- %1$d is how many files download, %2$d on how many devices. -->
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="one">Downloading %1$d file on %2$d devices</item>
+    <item quantity="other">Downloading %1$d files on %2$d devices</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="one">%1$d download needs attention</item>
+    <item quantity="other">%1$d downloads need attention</item>
+  </plurals>
+  <string name="pulse_all_quiet">All quiet</string>
+  <!-- %1$s is free space, such as "412 GB", %2$s a device name. -->
+  <string name="pulse_all_quiet_free">All quiet · %1$s free on %2$s</string>
+  <!-- %1$s is a device name. -->
+  <string name="pulse_connecting">Connecting to %1$s</string>
+  <string name="pulse_needs_token">%1$s needs a token</string>
+  <string name="pulse_offline">%1$s is offline · retrying</string>
+  <string name="pulse_slow_lane">Slow lane</string>
+  <!-- %1$s is a time, such as 18:00 or "Tue 09:00". -->
+  <string name="pulse_slow_lane_until">Slow lane until %1$s</string>
+  <!-- The free space readout's tooltip. %1$s is "412 GB free", %2$s the device, %3$s the folder. -->
+  <string name="pulse_disk_tooltip">%1$s on %2$s · %3$s</string>
+  <!-- The short form in a window's title, followed by " · 45%". -->
+  <string name="pulse_downloading_count">%1$d downloading</string>
+  <!-- The web app's tab title while downloads run. %1$s is the progress, such as "45%". -->
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <!-- The Pulse bar's counts, joined by " · "; each opens its status tab. -->
+  <plurals name="pulse_count_downloading">
+    <item quantity="one">%1$d downloading</item>
+    <item quantity="other">%1$d downloading</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="one">%1$d waiting</item>
+    <item quantity="other">%1$d waiting</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <!-- What a screen reader says for a count. %1$s is the count, such as "3 waiting", %2$s the
+       tab's name, such as Waiting. -->
+  <string name="pulse_count_description">%1$s, show the %2$s tab</string>
+  <!-- The bar's speed while the device is not online, as a screen reader says it. -->
+  <string name="pulse_speed_offline">Speed unknown while offline</string>
+  <!-- %1$s is a speed, such as "9.1 MB/s". The click opens the speed of the last 5 minutes. -->
+  <string name="pulse_speed_downloading">Downloading at %1$s, show the last 5 minutes</string>
+  <string name="pulse_speed_idle">Idle, show the last 5 minutes</string>
+  <!-- Nothing downloads. -->
+  <string name="pulse_idle">Idle</string>
+  <!-- Follows pulse_disk_tooltip after " · " when the waiting downloads need more space. -->
+  <string name="pulse_disk_short">not enough for the waiting downloads</string>
+  <!-- What a screen reader says for the Activity bell with unread messages. -->
+  <plurals name="pulse_activity_unread">
+    <item quantity="one">Activity, %1$d unread</item>
+    <item quantity="other">Activity, %1$d unread</item>
+  </plurals>
+  <!-- While rows are selected, in place of the connection; followed by their size and speed
+       after " · ". -->
+  <plurals name="pulse_selected">
+    <item quantity="one">%1$d selected</item>
+    <item quantity="other">%1$d selected</item>
+  </plurals>
+
+  <!-- How the bar names the shown device's connection. %1$d is the port other devices reach the
+       app on, such as 8642. -->
+  <string name="pulse_health_sharing">Sharing :%1$d</string>
+  <string name="pulse_health_not_shared">Not shared</string>
+  <string name="pulse_health_live">Live</string>
+  <string name="pulse_health_connecting">Connecting</string>
+  <string name="pulse_health_offline">Offline</string>
+  <string name="pulse_health_needs_token">Needs a token</string>
+  <!-- What a screen reader says for the connection. %1$s is the device, %2$s its connection,
+       such as Live. -->
+  <string name="pulse_health_description">%1$s: %2$s</string>
+
+  <!-- Speed modes, as the mode control and messages name them. -->
+  <string name="pulse_mode_full">Full speed</string>
+  <string name="pulse_mode_auto_name">Auto</string>
+  <!-- The speed mode pill. %1$s is a speed limit, such as "20 MB/s". -->
+  <string name="pulse_mode_capped">Capped · %1$s</string>
+  <string name="pulse_mode_slow_lane">Slow lane · %1$s</string>
+  <!-- %1$s is what the rules hold now: pulse_slow_lane, pulse_slow_lane_until, pulse_mode_full
+       or pulse_full_speed_until. -->
+  <string name="pulse_mode_auto">Auto · %1$s</string>
+  <!-- %1$s is a time, such as 18:00 or "Tue 09:00". -->
+  <string name="pulse_full_speed_until">Full speed until %1$s</string>
+  <!-- Full speed in the phone's narrow summary line. -->
+  <string name="pulse_mode_full_short">Full</string>
+
+  <!-- The phone's summary line under the Downloads title. %1$s is a speed, such as "4.2 MB/s". -->
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <!-- How many downloads run, in the phone's summary line. -->
+  <plurals name="pulse_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d active</item>
+  </plurals>
+  <!-- What a screen reader says for the summary line. %1$s is the line. -->
+  <string name="pulse_subtitle_description">%1$s, show the speed</string>
+  <!-- Over the phone's speed chart. -->
+  <string name="pulse_last_minute">Last minute</string>
+
+  <!-- The speed popover. -->
+  <string name="pulse_speed">Speed</string>
+  <string name="pulse_last_5_minutes">Last 5 minutes</string>
+  <string name="pulse_history_empty">Nothing downloaded in the last 5 minutes.</string>
+  <!-- Under a device's name: its speed limit. %1$s is a speed, such as "2 MB/s". -->
+  <string name="pulse_no_limit">No limit</string>
+  <string name="pulse_limit">Limit %1$s</string>
+
+  <!-- The speed mode pill and popover. -->
+  <string name="pulse_slow_lane_turn_on">Turn on Slow lane</string>
+  <string name="pulse_slow_lane_turn_off">Turn off Slow lane</string>
+  <string name="pulse_speed_limit">Speed limit</string>
+  <!-- Whether a limit holds downloads back, as a screen reader says the pill's state. -->
+  <string name="pulse_limited">Limited</string>
+  <string name="pulse_not_limited">Not limited</string>
+  <string name="pulse_speed_options">Speed options</string>
+  <string name="pulse_speed_mode">Speed mode</string>
+  <string name="pulse_slow_lane_speed">Slow lane speed</string>
+  <string name="pulse_use_as_slow_lane">Use as Slow lane speed</string>
+  <string name="pulse_speed_settings">Speed settings…</string>
+  <!-- %1$s is a device inside a sentence, %2$s why its settings could not be changed. -->
+  <string name="pulse_update_failed">Couldn't update %1$s · %2$s</string>
+  <!-- What the speed mode does now, under the mode control. %1$s is a speed limit. -->
+  <string name="pulse_caption_full">Downloads run as fast as the network allows.</string>
+  <string name="pulse_caption_capped">Downloads are capped at %1$s.</string>
+  <string name="pulse_caption_slow_lane">Downloads share %1$s, leaving bandwidth for everything else.</string>
+  <string name="pulse_caption_no_rules">No speed rules yet. Add them in Speed settings.</string>
+  <string name="pulse_caption_rule_slow_lane">A rule keeps the Slow lane on.</string>
+  <string name="pulse_caption_rule_full">Full speed until a rule turns on the Slow lane.</string>
+  <!-- %1$s is a time, such as 18:00 or "Tue 09:00". -->
+  <string name="pulse_caption_slow_lane_until">Slow lane until %1$s, then your rules decide.</string>
+  <string name="pulse_caption_full_until">Full speed until %1$s, then your rules decide.</string>
+  <!-- What the speed limit applies to, under it. %1$s is a device inside a sentence. -->
+  <string name="pulse_limit_for_slow_lane">Used whenever the Slow lane is on.</string>
+  <string name="pulse_limit_for_device">Applies to every download on %1$s.</string>
+  <string name="pulse_limit_after_slow_lane">Applies once the Slow lane is off.</string>
+
+  <!-- Messages after changing the speed mode. %1$s is the Slow lane's speed, such as "1 MB/s". -->
+  <string name="pulse_slow_lane_on">Slow lane on · %1$s</string>
+  <string name="pulse_slow_lane_off">Slow lane off</string>
+  <string name="pulse_speed_follows_rules">Speed follows your rules</string>
+  <!-- %1$s is a speed mode, such as Slow lane. -->
+  <string name="pulse_switch_failed">Couldn't switch to %1$s</string>
+  <string name="pulse_limit_failed">Couldn't set the speed limit</string>
+
+  <!-- What happened to a download while the app was open, in its Activity tab. -->
+  <string name="pulse_timeline_added">Added</string>
+  <string name="pulse_timeline_started">Started</string>
+  <string name="pulse_timeline_resumed">Resumed</string>
+  <!-- Started again after it failed. -->
+  <string name="pulse_timeline_retried">Retried</string>
+  <string name="pulse_timeline_paused">Paused</string>
+  <string name="pulse_timeline_queued">Queued</string>
+  <string name="pulse_timeline_scheduled">Scheduled</string>
+  <string name="pulse_timeline_completed">Completed</string>
+  <!-- Followed by the failure after " · ", such as "Access denied (403)". -->
+  <string name="pulse_timeline_failed">Failed</string>
+  <string name="pulse_timeline_canceled">Canceled</string>
+  <!-- The connections asked for changed. %1$s and %2$s are counts or pulse_timeline_auto. -->
+  <string name="pulse_timeline_connections">Connections %1$s → %2$s</string>
+  <!-- As many connections as the server allows. -->
+  <string name="pulse_timeline_auto">Auto</string>
+  <!-- %1$s is the new speed limit, such as "2 MB/s". -->
+  <string name="pulse_timeline_limit">Limit → %1$s</string>
+  <string name="pulse_timeline_limit_removed">Limit removed</string>
+  <!-- %1$s is the new priority, such as High. -->
+  <string name="pulse_timeline_priority">Priority → %1$s</string>
+</resources>

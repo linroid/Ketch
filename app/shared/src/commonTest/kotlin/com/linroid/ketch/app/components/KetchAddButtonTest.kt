@@ -1,5 +1,11 @@
 package com.linroid.ketch.app.components
 
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_add_clip
+import ketch.app.shared.generated.resources.component_add_link
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,10 +57,10 @@ class KetchAddButtonTest {
   }
 
   @Test
-  fun addLabel_eachMode_namesWhatAClickDoes() {
-    assertEquals("Add", addLabel(AddButtonMode.Plain))
-    assertEquals("Add ubuntu.iso", addLabel(clip))
-    assertEquals("Drop to download", addLabel(AddButtonMode.Drop(over = true)))
+  fun addLabel_eachMode_namesWhatAClickDoes() = runTest {
+    assertEquals("Add", addLabel(AddButtonMode.Plain).load())
+    assertEquals("Add ubuntu.iso", addLabel(clip).load())
+    assertEquals("Drop to download", addLabel(AddButtonMode.Drop(over = true)).load())
   }
 
   @Test
@@ -97,7 +103,7 @@ class KetchAddButtonTest {
   }
 
   @Test
-  fun fitClipLabel_room_takesTheLongestNameThatFits() {
+  fun fitClipLabel_room_takesTheLongestNameThatFits() = runTest {
     val name = "ubuntu-24.04.1-desktop-amd64.iso"
 
     assertEquals("Add ubuntu-24.04.1…amd64.iso", fitClipLabel(name) { true })
@@ -105,7 +111,15 @@ class KetchAddButtonTest {
   }
 
   @Test
-  fun fitClipLabel_noRoomForAShortName_saysLink() {
+  fun fitClipLabel_noRoomForAShortName_saysLink() = runTest {
     assertEquals("Add link", fitClipLabel("ubuntu-24.04.1-desktop-amd64.iso") { it.length < 14 })
   }
+
+  // The label as the button fits it, with its English text.
+  private suspend fun fitClipLabel(name: String, fits: (String) -> Boolean): String = fitClipLabel(
+    name = name,
+    template = Res.string.component_add_clip.text(CLIP_NAME_SLOT).load(),
+    fallback = Res.string.component_add_link.text().load(),
+    fits = fits,
+  )
 }

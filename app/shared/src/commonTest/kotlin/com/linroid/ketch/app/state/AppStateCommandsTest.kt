@@ -13,6 +13,11 @@ import com.linroid.ketch.app.backgroundChild
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.testController
@@ -29,6 +34,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -42,6 +48,10 @@ class AppStateCommandsTest {
   private val downloading = DownloadState.Downloading(RecordingTask.PROGRESS)
   private val paused = DownloadState.Paused(RecordingTask.PROGRESS)
 
+  // Loading a string for the first time lets virtual time run, which would end Undo windows.
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
+
   private fun TestScope.controller(api: KetchApi, configStore: ConfigStore? = null) =
     testController(api, configStore, context = backgroundChild())
 
@@ -53,19 +63,21 @@ class AppStateCommandsTest {
   private fun AppController.errors(): List<AppMessage> =
     messages.history.value.filter { it.level == MessageLevel.Error }
 
-  private fun AppController.click(label: String) {
-    messages.active.value.last().actions.first { it.label == label }.onClick()
+  private suspend fun AppController.click(label: String) {
+    messages.active.value.last().actions.first { it.label.load() == label }.onClick()
   }
 
   @Test
   fun runTaskCommand_failure_postsOneErrorNamingTheDevice() = commandsTest { api, controller ->
     val task = api.add(downloading).apply { failure = IllegalStateException("Connection lost") }
 
-    controller.state.runTaskCommand(task, "set speed limit") { setSpeedLimit(SpeedLimit.mbps(1)) }
+    controller.state.runTaskCommand(task, "set speed limit", failure("set speed limit")) {
+      setSpeedLimit(SpeedLimit.mbps(1))
+    }
     runCurrent()
 
     val error = controller.errors().single()
-    assertEquals("Couldn't set speed limit on This Mac", error.title)
+    assertEquals("Couldn't set speed limit on This Mac", error.title.load())
     assertEquals(TaskKey(LOCAL_DEVICE_ID, task.taskId), error.taskKey)
     assertIs<IllegalStateException>(error.cause)
   }
@@ -75,9 +87,9 @@ class AppStateCommandsTest {
     val failing = api.add(downloading).apply { failure = IllegalStateException("Server said no") }
     val other = api.add(downloading)
 
-    controller.state.runTaskCommand(failing, "pause") { pause() }
+    controller.state.runTaskCommand(failing, "pause", failure("pause")) { pause() }
     runCurrent()
-    controller.state.runTaskCommand(other, "pause") { pause() }
+    controller.state.runTaskCommand(other, "pause", failure("pause")) { pause() }
     runCurrent()
 
     assertEquals(listOf("pause"), other.calls)
@@ -88,7 +100,9 @@ class AppStateCommandsTest {
   fun runTaskCommand_cancelled_postsNothing() = commandsTest { api, controller ->
     val task = api.add(downloading)
 
-    val command = controller.state.runTaskCommand(task, "pause") { awaitCancellation() }
+    val command = controller.state.runTaskCommand(task, "pause", failure("pause")) {
+      awaitCancellation()
+    }
     runCurrent()
     command.cancel()
     runCurrent()
@@ -101,10 +115,10 @@ class AppStateCommandsTest {
   fun runTaskCommand_callThrowsCancellation_postsOneError() = commandsTest { api, controller ->
     val task = api.add(downloading).apply { failure = CancellationException("Client closed") }
 
-    controller.state.runTaskCommand(task, "pause") { pause() }
+    controller.state.runTaskCommand(task, "pause", failure("pause")) { pause() }
     runCurrent()
 
-    assertEquals("Couldn't pause on This Mac", controller.errors().single().title)
+    assertEquals("Couldn't pause on This Mac", controller.errors().single().title.load())
   }
 
   @Test
@@ -112,7 +126,7 @@ class AppStateCommandsTest {
     val task = api.add(downloading)
     val gate = CompletableDeferred<Unit>()
 
-    controller.state.runTaskCommand(task, "pause") {
+    controller.state.runTaskCommand(task, "pause", failure("pause")) {
       gate.await()
       pause()
     }
@@ -138,7 +152,7 @@ class AppStateCommandsTest {
       assertTrue(api.tasks.value.none { it.state.value is DownloadState.Downloading })
       assertTrue((running + queued).all { it.state.value is DownloadState.Paused })
       assertTrue(done.calls.isEmpty())
-      assertEquals("Paused 5 downloads", controller.messages.active.value.last().title)
+      assertEquals("Paused 5 downloads", controller.messages.active.value.last().title.load())
     }
 
   @Test
@@ -153,7 +167,7 @@ class AppStateCommandsTest {
     assertEquals(listOf("pause"), failing.calls)
     val toast = controller.messages.active.value.last()
     assertEquals(MessageLevel.Warning, toast.level)
-    assertEquals("Paused 2 downloads · 1 failed", toast.title)
+    assertEquals("Paused 2 downloads · 1 failed", toast.title.load())
   }
 
   @Test
@@ -165,7 +179,10 @@ class AppStateCommandsTest {
     controller.state.pauseAll()
     runCurrent()
 
-    assertEquals(listOf("Remove"), controller.state.pendingOps.ops.value.map { it.label })
+    assertEquals(
+      listOf("Undo remove"),
+      controller.state.pendingOps.ops.value.map { it.undoTitle }.load(),
+    )
     assertEquals(1, controller.errors().size)
     assertTrue(controller.state.pendingOps.undoLast())
   }
@@ -314,7 +331,7 @@ class AppStateCommandsTest {
     assertEquals(request.connections, sent.connections)
     assertEquals(Destination("ubuntu.iso"), sent.destination)
     assertTrue(task.calls.isEmpty())
-    assertEquals("Sent ubuntu.iso to NAS", controller.messages.history.value.first().title)
+    assertEquals("Sent ubuntu.iso to NAS", controller.messages.history.value.first().title.load())
   }
 
   @Test
@@ -350,7 +367,7 @@ class AppStateCommandsTest {
 
     assertTrue(task.calls.isEmpty())
     assertTrue(controller.state.pendingOps.hidden.value.isEmpty())
-    assertEquals("Couldn't send file1.bin to NAS", controller.errors().single().title)
+    assertEquals("Couldn't send file1.bin to NAS", controller.errors().single().title.load())
   }
 
   @Test
@@ -364,7 +381,7 @@ class AppStateCommandsTest {
       runCurrent()
       assertEquals(
         "Started blender.dmg now · paused debian.iso to make room",
-        controller.messages.active.value.last().title,
+        controller.messages.active.value.last().title.load(),
       )
       assertIs<DownloadState.Downloading>(waiting.state.value)
 
@@ -397,9 +414,9 @@ class AppStateCommandsTest {
     assertEquals(4, request.connections)
     assertEquals(TaskOrigin.App, TaskOrigin.of(request))
     val toast = controller.messages.active.value.last()
-    val device = checkNotNull(controller.state.activeInstance.value).displayName
-    assertEquals("Added ubuntu.iso → $device", toast.title)
-    assertEquals(listOf("Options", "Undo"), toast.actions.map { it.label })
+    val device = checkNotNull(controller.state.activeInstance.value).displayName.load()
+    assertEquals("Added ubuntu.iso → $device", toast.title.load())
+    assertEquals(listOf("Options", "Undo"), toast.actions.map { it.label }.load())
     controller.close()
   }
 
@@ -425,7 +442,11 @@ class AppStateCommandsTest {
 
     val error = controller.messages.active.value.last()
     assertEquals(MessageLevel.Error, error.level)
-    assertEquals("Couldn't remove ubuntu.iso on This Mac", error.title)
-    assertEquals("file in use", error.detail)
+    assertEquals("Couldn't remove ubuntu.iso on This Mac", error.title.load())
+    assertEquals("file in use", error.detail?.load())
   }
 }
+
+// A command's error title for the device's name: "Couldn't {what} on {device}".
+private fun failure(what: String): (UiText) -> UiText =
+  { device -> listOf(verbatim("Couldn't $what on "), device).joinText(separator = "") }

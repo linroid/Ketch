@@ -24,6 +24,7 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
@@ -60,6 +61,7 @@ import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.rememberSpeedModeView
+import com.linroid.ketch.app.ui.pulse.speedModeLabelText
 import com.linroid.ketch.app.ui.pulse.totalHistory
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedSettings
@@ -67,6 +69,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.TimeZone
 import kotlin.math.PI
 import kotlin.math.roundToLong
 import kotlin.math.sin
@@ -157,16 +160,16 @@ class PulseUiSnapshots {
         val setup: suspend AppState.() -> Unit = {
           messages.post(
             level = MessageLevel.Info,
-            title = "Downloads pause when Ketch is in the background",
-            actions = listOf(MessageAction("Use a computer instead") {}),
+            title = verbatim("Downloads pause when Ketch is in the background"),
+            actions = listOf(MessageAction(verbatim("Use a computer instead")) {}),
             toast = ToastMode.Sticky,
             placement = MessagePlacement.Banner,
           )
-          messages.post(MessageLevel.Success, "Slow lane on · 3 MB/s", actions = undo())
+          messages.post(MessageLevel.Success, verbatim("Slow lane on · 3 MB/s"), actions = undo())
           messages.post(
             level = MessageLevel.Error,
-            title = "Couldn't pause imagenet-part03.tar on MacBook Pro",
-            actions = listOf(MessageAction("Try again") {}),
+            title = verbatim("Couldn't pause imagenet-part03.tar on MacBook Pro"),
+            actions = listOf(MessageAction(verbatim("Try again")) {}),
             cause = IllegalStateException("Connection lost"),
           )
         }
@@ -292,7 +295,7 @@ class PulseUiSnapshots {
               history = ActivitySamples.history,
               active = ActivitySamples.history.take(1),
               unread = 3,
-              deviceName = { if (it == LOCAL_DEVICE_ID) "This Mac" else "NAS-Basement" },
+              deviceName = { verbatim(if (it == LOCAL_DEVICE_ID) "This Mac" else "NAS-Basement") },
               activeDeviceId = LOCAL_DEVICE_ID,
               onMarkAllRead = {},
               onClear = {},
@@ -305,7 +308,7 @@ class PulseUiSnapshots {
               history = emptyList(),
               active = emptyList(),
               unread = 0,
-              deviceName = { it },
+              deviceName = { verbatim(it) },
               activeDeviceId = LOCAL_DEVICE_ID,
               onMarkAllRead = {},
               onClear = {},
@@ -402,7 +405,7 @@ private fun BarSample(
       PulseBarContent(
         pulse = pulse,
         unread = unread,
-        selection = selection,
+        selection = selection?.let(::verbatim),
         onShowTab = {},
         onSpeedClick = {},
         onHealthClick = {},
@@ -463,7 +466,7 @@ private fun Panel(width: Dp, content: @Composable ColumnScope.() -> Unit) {
   )
 }
 
-private fun undo() = listOf(MessageAction("Undo") {})
+private fun undo() = listOf(MessageAction(verbatim("Undo")) {})
 
 /**
  * Renders an app showing [SampleData.downloads] with a speed mode on the embedded device, at
@@ -527,7 +530,7 @@ private object PulseSamples {
     id: String = LOCAL_DEVICE_ID,
   ) = DevicePulse(
     deviceId = id,
-    name = name,
+    name = verbatim(name),
     health = health,
     counts = counts,
     failures = failures,
@@ -569,13 +572,18 @@ private object PulseSamples {
     )
   )
 
-  val full = SpeedModeView(SpeedMode.Full, SpeedLimit.Unlimited, "Full speed", null)
-  val capped = SpeedModeView(SpeedMode.Full, SpeedLimit.mbps(20), "Capped · 20 MB/s", null)
-  val slowLane = SpeedModeView(SpeedMode.SlowLane, SpeedLimit.mbps(3), "Slow lane · 3 MB/s", null)
-  val auto = SpeedModeView(
-    mode = SpeedMode.Auto(slowLane = true, until = SampleData.NOW + 3.hours + 30.minutes),
-    limit = SpeedLimit.mbps(1),
-    label = "Auto · Slow lane until 18:00",
+  val full = view(SpeedMode.Full, SpeedLimit.Unlimited)
+  val capped = view(SpeedMode.Full, SpeedLimit.mbps(20))
+  val slowLane = view(SpeedMode.SlowLane, SpeedLimit.mbps(3))
+  val auto = view(
+    SpeedMode.Auto(slowLane = true, until = SampleData.NOW + 3.hours + 30.minutes),
+    SpeedLimit.mbps(1)
+  )
+
+  private fun view(mode: SpeedMode, limit: SpeedLimit) = SpeedModeView(
+    mode = mode,
+    limit = limit,
+    label = speedModeLabelText(mode, limit, SampleData.NOW, TimeZone.UTC),
     controller = null,
   )
 }
@@ -593,8 +601,8 @@ private object ActivitySamples {
   ) = AppMessage(
     id = id,
     level = level,
-    title = title,
-    detail = detail,
+    title = verbatim(title),
+    detail = detail?.let(::verbatim),
     deviceId = deviceId,
     actions = actions,
     at = now - minutesAgo.minutes,
@@ -615,7 +623,7 @@ private object ActivitySamples {
       title = "Download failed",
       detail = "model-weights.safetensors: Access denied (403)",
       minutesAgo = 12,
-      actions = listOf(MessageAction("Retry") {}),
+      actions = listOf(MessageAction(verbatim("Retry")) {}),
     ),
     message(
       id = 4,
@@ -647,7 +655,7 @@ private object BannerSamples {
   val all: List<Banner> = listOfNotNull(
     deviceBanner(
       health = DeviceHealth.Connecting,
-      name = "NAS-Basement",
+      name = verbatim("NAS-Basement"),
       connectingLong = true,
       localName = null,
       onRetry = {},
@@ -656,16 +664,16 @@ private object BannerSamples {
     ),
     deviceBanner(
       health = DeviceHealth.Offline("Connection refused"),
-      name = "NAS-Basement",
+      name = verbatim("NAS-Basement"),
       connectingLong = false,
-      localName = "This Mac",
+      localName = verbatim("This Mac"),
       onRetry = {},
       onSwitchToLocal = {},
       onEnterToken = {},
     )?.copy(id = "offline"),
     deviceBanner(
       health = DeviceHealth.Unauthorized,
-      name = "NAS-Basement",
+      name = verbatim("NAS-Basement"),
       connectingLong = false,
       localName = null,
       onRetry = {},
@@ -675,8 +683,8 @@ private object BannerSamples {
     Banner(
       id = "background",
       tone = BannerTone.Info,
-      text = "Downloads pause when Ketch is in the background",
-      actions = listOf(MessageAction("Use a computer instead") {}),
+      text = verbatim("Downloads pause when Ketch is in the background"),
+      actions = listOf(MessageAction(verbatim("Use a computer instead")) {}),
       onDismiss = {},
     )
   )

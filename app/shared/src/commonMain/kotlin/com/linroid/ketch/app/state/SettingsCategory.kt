@@ -1,92 +1,125 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_category_about
+import ketch.app.shared.generated.resources.settings_category_about_description
+import ketch.app.shared.generated.resources.settings_category_bittorrent
+import ketch.app.shared.generated.resources.settings_category_bittorrent_description
+import ketch.app.shared.generated.resources.settings_category_discover
+import ketch.app.shared.generated.resources.settings_category_discover_description
+import ketch.app.shared.generated.resources.settings_category_downloads
+import ketch.app.shared.generated.resources.settings_category_downloads_description
+import ketch.app.shared.generated.resources.settings_category_general
+import ketch.app.shared.generated.resources.settings_category_general_description
+import ketch.app.shared.generated.resources.settings_category_integration
+import ketch.app.shared.generated.resources.settings_category_integration_description
+import ketch.app.shared.generated.resources.settings_category_network
+import ketch.app.shared.generated.resources.settings_category_network_description
+import ketch.app.shared.generated.resources.settings_category_notifications
+import ketch.app.shared.generated.resources.settings_category_notifications_description
+import ketch.app.shared.generated.resources.settings_category_sharing
+import ketch.app.shared.generated.resources.settings_category_sharing_description
+import ketch.app.shared.generated.resources.settings_category_speed
+import ketch.app.shared.generated.resources.settings_category_speed_description
+import ketch.app.shared.generated.resources.settings_section_app
+import ketch.app.shared.generated.resources.settings_section_device
+import org.jetbrains.compose.resources.StringResource
 
 /** The two groups of Settings: the app's own pages, then the pages of one device. */
-enum class SettingsSection(val title: String) {
+enum class SettingsSection(private val titleResource: StringResource) {
   /** Pages about this app on this screen, whichever device it shows. */
-  App("This app"),
+  App(Res.string.settings_section_app),
 
   /** Pages about the device chosen in Settings, which may differ from the one the app shows. */
-  Device("Device"),
+  Device(Res.string.settings_section_device);
+
+  /** Name shown over the group. */
+  val title: UiText get() = titleResource.text()
 }
 
 /**
  * Pages of Settings, in the order they are listed: the app's pages, then the device's.
  *
- * @property title name shown in the list and the page header.
- * @property description what the page holds, for the phone's list and for search.
  * @property icon glyph of the page's tile.
  * @property page the page as [SettingsTarget] names it.
  */
 enum class SettingsCategory(
-  val title: String,
-  val description: String,
+  private val titleResource: StringResource,
+  private val descriptionResource: StringResource,
   val icon: KetchIcon,
   val page: SettingsTarget.Page,
 ) {
   General(
-    title = "General",
-    description = "Appearance, startup and the name of this device",
+    titleResource = Res.string.settings_category_general,
+    descriptionResource = Res.string.settings_category_general_description,
     icon = KetchIcon.Settings,
     page = SettingsTarget.Page.General,
   ),
   Notifications(
-    title = "Notifications",
-    description = "What Ketch tells you about, and how",
+    titleResource = Res.string.settings_category_notifications,
+    descriptionResource = Res.string.settings_category_notifications_description,
     icon = KetchIcon.Bell,
     page = SettingsTarget.Page.Notifications,
   ),
   Integration(
-    title = "Integration",
-    description = "Browser extension, magnet links and the clipboard",
+    titleResource = Res.string.settings_category_integration,
+    descriptionResource = Res.string.settings_category_integration_description,
     icon = KetchIcon.Browser,
     page = SettingsTarget.Page.Integration,
   ),
   Discover(
-    title = "Discover",
-    description = "The AI model and web search that find downloads",
+    titleResource = Res.string.settings_category_discover,
+    descriptionResource = Res.string.settings_category_discover_description,
     icon = KetchIcon.Discover,
     page = SettingsTarget.Page.Discover,
   ),
   About(
-    title = "About",
-    description = "Version, licenses and logs",
+    titleResource = Res.string.settings_category_about,
+    descriptionResource = Res.string.settings_category_about_description,
     icon = KetchIcon.Info,
     page = SettingsTarget.Page.About,
   ),
   Downloads(
-    title = "Downloads",
-    description = "Where downloads go, the queue and retries",
+    titleResource = Res.string.settings_category_downloads,
+    descriptionResource = Res.string.settings_category_downloads_description,
     icon = KetchIcon.Folder,
     page = SettingsTarget.Page.Downloads,
   ),
   Speed(
-    title = "Speed",
-    description = "Speed modes, Slow lane and Auto rules",
+    titleResource = Res.string.settings_category_speed,
+    descriptionResource = Res.string.settings_category_speed_description,
     icon = KetchIcon.Speed,
     page = SettingsTarget.Page.Speed,
   ),
   Network(
-    title = "Network",
-    description = "The networks downloads are spread across",
+    titleResource = Res.string.settings_category_network,
+    descriptionResource = Res.string.settings_category_network_description,
     icon = KetchIcon.Network,
     page = SettingsTarget.Page.Network,
   ),
   BitTorrent(
-    title = "BitTorrent",
-    description = "Extra trackers for public torrents",
+    titleResource = Res.string.settings_category_bittorrent,
+    descriptionResource = Res.string.settings_category_bittorrent_description,
     icon = KetchIcon.FileTorrent,
     page = SettingsTarget.Page.BitTorrent,
   ),
   Sharing(
-    title = "Sharing",
-    description = "Pair a phone or browser to control this device",
+    titleResource = Res.string.settings_category_sharing,
+    descriptionResource = Res.string.settings_category_sharing_description,
     icon = KetchIcon.Server,
     page = SettingsTarget.Page.Sharing,
   );
+
+  /** Name shown in the list and the page header. */
+  val titleText: UiText get() = titleResource.text()
+
+  /** What the page holds, for the phone's list and for search. */
+  val descriptionText: UiText get() = descriptionResource.text()
 
   /** Group the page is listed in. */
   val section: SettingsSection

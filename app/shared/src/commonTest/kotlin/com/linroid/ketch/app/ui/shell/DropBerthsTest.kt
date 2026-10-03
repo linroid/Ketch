@@ -1,9 +1,11 @@
 package com.linroid.ketch.app.ui.shell
 
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.ui.shell.FleetFixtures.nas
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -31,20 +33,20 @@ class DropBerthsTest {
   }
 
   @Test
-  fun berthCaption_online_showsFreeSpaceAndActivity() {
+  fun berthCaption_online_showsFreeSpaceAndActivity() = runTest {
     val device = nas(counts = PulseCounts(downloading = 3))
 
-    assertEquals("1.8 TB free · 3 active", berthCaption(device))
+    assertEquals("1.8 TB free · 3 active", berthCaption(device).load())
   }
 
   @Test
-  fun berthCaption_idleWithoutDisk_readsReady() {
-    assertEquals("Ready", berthCaption(nas(disk = null)))
+  fun berthCaption_idleWithoutDisk_readsReady() = runTest {
+    assertEquals("Ready", berthCaption(nas(disk = null)).load())
   }
 
   @Test
-  fun berthCaption_unreachable_saysWhy() {
-    assertEquals("Offline", berthCaption(nas(health = DeviceHealth.Offline())))
-    assertEquals("Not connected", berthCaption(nas(connected = false)))
+  fun berthCaption_unreachable_saysWhy() = runTest {
+    assertEquals("Offline", berthCaption(nas(health = DeviceHealth.Offline())).load())
+    assertEquals("Not connected", berthCaption(nas(connected = false)).load())
   }
 }

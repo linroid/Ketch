@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="onboarding_step">Schritt %1$d von %2$d</string>
+  <string name="onboarding_loading">Ketch wird geladen</string>
+
+  <string name="onboarding_files_title">Deine Downloads in der Dateien-App</string>
+  <string name="onboarding_files_body">Ketch speichert deine Downloads dort, wo die Dateien-App sie öffnen, teilen und verschieben kann.</string>
+  <string name="onboarding_files_path">Auf meinem %1$s › Ketch › Downloads</string>
+
+  <string name="onboarding_folder_title">Wohin mit deinen Downloads?</string>
+  <string name="onboarding_folder_body">Andere Apps können den eigenen Ordner von Ketch nicht öffnen. Speichere in „Download“, dann sind deine Dateien überall zu finden.</string>
+  <string name="onboarding_folder_use_download">Ordner „Download“ verwenden</string>
+  <string name="onboarding_folder_not_now">Nicht jetzt</string>
+  <string name="onboarding_folder_choose_another">Anderen Ordner wählen</string>
+  <string name="onboarding_folder_saving_to">Speichert in %1$s</string>
+  <string name="onboarding_folder_torrents">Torrents bleiben im Ordner von Ketch.</string>
+  <string name="onboarding_folder_error">Dieser Ordner kann nicht verwendet werden. Versuche einen anderen.</string>
+
+  <string name="onboarding_use_title">Wie nutzt du Ketch hier?</string>
+  <string name="onboarding_use_body">Wähle eins für den Anfang. Das andere kannst du jederzeit später einrichten.</string>
+  <string name="onboarding_use_download">Auf %1$s herunterladen</string>
+  <string name="onboarding_use_download_ios">Downloads können pausieren, während Ketch im Hintergrund ist.</string>
+  <string name="onboarding_use_download_android">Downloads laufen weiter, während du andere Apps nutzt.</string>
+  <string name="onboarding_use_control">Einen Computer steuern</string>
+  <string name="onboarding_use_control_body">Füge von hier aus Downloads zu Ketch auf deinem Computer hinzu.</string>
+  <string name="onboarding_recommended">Empfohlen</string>
+
+  <string name="onboarding_intake_title">Links an Ketch senden</string>
+  <string name="onboarding_intake_body">Starte Downloads aus den Apps, die du schon nutzt.</string>
+  <string name="onboarding_intake_start">Loslegen</string>
+  <string name="onboarding_intake_share">Aus deinem Browser teilen</string>
+  <string name="onboarding_intake_share_body">Tippe auf „Teilen“ und dann auf Ketch. Der Download startet, ohne dass du die Seite verlässt.</string>
+  <string name="onboarding_intake_select">Link auswählen</string>
+  <string name="onboarding_intake_select_body">Wähle im Menü über markiertem Text „Mit Ketch herunterladen“.</string>
+  <string name="onboarding_intake_copy">Link kopieren</string>
+  <string name="onboarding_intake_copy_body">Kehre zu Ketch zurück, und es bietet dir an, den Link herunterzuladen.</string>
+  <string name="onboarding_intake_torrents">Magnet-Links und .torrent-Dateien öffnen</string>
+  <string name="onboarding_intake_torrents_body">Sie öffnen sich in Ketch, wo du die gewünschten Dateien wählen kannst.</string>
+  <string name="onboarding_intake_notify">Erfahren, wann Downloads fertig sind</string>
+  <string name="onboarding_intake_notify_body">Ketch sagt dir Bescheid, wenn ein Download fertig ist oder fehlschlägt; was genau, wählst du in den Einstellungen.</string>
+</resources>

@@ -1,6 +1,10 @@
 package com.linroid.ketch.app.ui.palette
 
 import androidx.compose.runtime.Immutable
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.palette_section_recent
 
 /** How well a palette row matches the typed text, best first. */
 internal enum class MatchTier {
@@ -34,7 +38,7 @@ internal data class PaletteMatch(val tier: MatchTier, val span: Int = 0)
 @Immutable
 internal sealed interface PaletteEntry {
   /** A heading over the rows below it, such as "Recent". */
-  data class Header(val title: String) : PaletteEntry
+  data class Header(val title: UiText) : PaletteEntry
 
   /** The row [item], [index] among the rows of the list. */
   data class Row(val item: PaletteItem, val index: Int) : PaletteEntry
@@ -132,12 +136,12 @@ private fun browse(items: List<PaletteItem>, recent: List<String>): PaletteResul
   val shown = recentItems.mapTo(HashSet()) { it.id }
   val entries = mutableListOf<PaletteEntry>()
   var index = 0
-  fun section(title: String, rows: List<PaletteItem>) {
+  fun section(title: UiText, rows: List<PaletteItem>) {
     if (rows.isEmpty()) return
     entries += PaletteEntry.Header(title)
     for (item in rows) entries += PaletteEntry.Row(item, index++)
   }
-  section(RECENT, recentItems)
+  section(Res.string.palette_section_recent.text(), recentItems)
   val rest = items.filter { !it.searchOnly && !it.direct && it.id !in shown }
     .groupBy { it.provider }
   for (provider in PaletteProvider.entries) section(provider.title, rest[provider].orEmpty())
@@ -206,7 +210,6 @@ private fun subsequenceSpan(letters: String, candidate: String): Int? {
   return best
 }
 
-private const val RECENT = "Recent"
 private const val MAX_RESULTS = 60
 private const val SPREAD = 3
 private val WHITESPACE = Regex("""\s+""")

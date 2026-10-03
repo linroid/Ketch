@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.AppDestination
@@ -13,6 +14,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.TaskKey
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -45,7 +47,7 @@ class PaletteProvidersTest {
     platform = KeyboardPlatform.Mac,
   )
 
-  private fun results(source: PaletteSource): List<PaletteItem> =
+  private suspend fun results(source: PaletteSource): List<PaletteItem> =
     paletteResults(source.query, paletteItems(source)).items
 
   @Test
@@ -59,7 +61,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_speedWithoutModes_capsTheSpeed() {
+  fun paletteItems_speedWithoutModes_capsTheSpeed() = runTest {
     val first = results(source("2m")).first()
 
     assertEquals("Limit downloads to 2 MB/s", first.title)
@@ -67,7 +69,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_full_offersFullSpeed() {
+  fun paletteItems_full_offersFullSpeed() = runTest {
     val first = results(source("full")).first()
 
     assertEquals("Full speed", first.title)
@@ -75,7 +77,23 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_speedWhileTheSlowLaneIsOn_namesItsSpeedNow() {
+  fun paletteItems_otherWordForFullSpeed_findsIt() = runTest {
+    val first = results(source("max speed")).first()
+
+    assertEquals(PaletteAction.FullSpeed, first.action)
+  }
+
+  @Test
+  fun paletteItems_pendingUndo_namesWhatItUndoes() = runTest {
+    val undo = verbatim("Undo clear finished")
+
+    val titles = paletteItems(source("").copy(undoTitle = undo)).map { it.title }
+
+    assertTrue("Undo clear finished" in titles)
+  }
+
+  @Test
+  fun paletteItems_speedWhileTheSlowLaneIsOn_namesItsSpeedNow() = runTest {
     val speed = PaletteSpeed(modes = true, slowLane = true, slowLaneSpeed = SpeedLimit.mbps(1))
 
     val first = results(source("5m").copy(speed = speed)).first()
@@ -85,7 +103,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_fullUnderSpeedRules_saysItTurnsTheRulesOff() {
+  fun paletteItems_fullUnderSpeedRules_saysItTurnsTheRulesOff() = runTest {
     val speed = PaletteSpeed(modes = true, rules = true, cap = SpeedLimit.mbps(5))
 
     val first = results(source("full").copy(speed = speed)).first()
@@ -95,7 +113,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_link_downloadsOnTheActiveDeviceFirstThenTheOthers() {
+  fun paletteItems_link_downloadsOnTheActiveDeviceFirstThenTheOthers() = runTest {
     val url = "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"
 
     val items = results(source(url))
@@ -112,7 +130,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_linkWithAnOfflineDevice_namesItsStateAndListsItLast() {
+  fun paletteItems_linkWithAnOfflineDevice_namesItsStateAndListsItLast() = runTest {
     val url = "https://example.com/ubuntu.iso"
     val offline = nas.copy(number = 2, reachable = false)
     val phone = PaletteDevice("phone.local:8642", "Pixel", 3, active = false, "Idle")
@@ -124,7 +142,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_failedDownloadWhoseFixIsACopy_retriesInstead() {
+  fun paletteItems_failedDownloadWhoseFixIsACopy_retriesInstead() = runTest {
     val gone = ListFixtures.row("gone", DownloadState.Failed(KetchError.Http(404)))
     val source = source("gone").copy(rows = listOf(gone))
 
@@ -135,7 +153,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_magnet_opensTheSheetForTheDevice() {
+  fun paletteItems_magnet_opensTheSheetForTheDevice() = runTest {
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=arch.iso"
 
     val download = results(source(magnet)).first().action as PaletteAction.Download
@@ -144,7 +162,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_liveCounts_nameTheTasksInScope() {
+  fun paletteItems_liveCounts_nameTheTasksInScope() = runTest {
     val titles = paletteItems(source("")).map { it.title }
 
     assertTrue("Pause 1 download" in titles)
@@ -153,7 +171,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_commands_leavePastingToTheField() {
+  fun paletteItems_commands_leavePastingToTheField() = runTest {
     val commands = paletteItems(source("")).mapNotNull {
       (it.action as? PaletteAction.Command)?.command
     }
@@ -163,7 +181,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_downloadName_pausesARunningTaskAndOpensAFinishedOne() {
+  fun paletteItems_downloadName_pausesARunningTaskAndOpensAFinishedOne() = runTest {
     val running = results(source("ubuntu")).first { it.provider == PaletteProvider.Downloads }
     val finished = results(source("report")).first { it.provider == PaletteProvider.Downloads }
 
@@ -176,7 +194,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_searchToken_listsOnlyMatchingDownloads() {
+  fun paletteItems_searchToken_listsOnlyMatchingDownloads() = runTest {
     val items = results(source("is:failed"))
 
     val downloads = items.filter { it.provider == PaletteProvider.Downloads }
@@ -185,7 +203,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_tokenAndWords_matchTheWordsAmongTheFilteredTasks() {
+  fun paletteItems_tokenAndWords_matchTheWordsAmongTheFilteredTasks() = runTest {
     val downloads = results(source("is:failed blend")).filter {
       it.provider == PaletteProvider.Downloads
     }
@@ -194,7 +212,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_plainText_fallsThroughToDiscover() {
+  fun paletteItems_plainText_fallsThroughToDiscover() = runTest {
     val items = results(source("blender for mac"))
 
     assertEquals(PaletteAction.Discover("blender for mac"), items.last().action)
@@ -202,14 +220,14 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_discoverHidden_offersNoDiscoverRow() {
+  fun paletteItems_discoverHidden_offersNoDiscoverRow() = runTest {
     val items = results(source("zzz", destinations = listOf(AppDestination.Downloads)))
 
     assertTrue(items.isEmpty())
   }
 
   @Test
-  fun paletteItems_slashSpeed_jumpsToTheSpeedPage() {
+  fun paletteItems_slashSpeed_jumpsToTheSpeedPage() = runTest {
     val first = results(source("/speed")).first()
 
     assertEquals("Settings › Speed", first.title)
@@ -217,7 +235,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_tabName_showsTheTabWithItsChord() {
+  fun paletteItems_tabName_showsTheTabWithItsChord() = runTest {
     val first = results(source("failed")).first { it.provider == PaletteProvider.Navigation }
 
     assertEquals("Downloads › Failed", first.title)
@@ -225,7 +243,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_otherDevice_offersASwitchWithItsChord() {
+  fun paletteItems_otherDevice_offersASwitchWithItsChord() = runTest {
     val switch = results(source("nas")).first { it.action is PaletteAction.SwitchDevice }
 
     assertEquals("Switch to NAS-Basement", switch.title)
@@ -234,7 +252,7 @@ class PaletteProvidersTest {
   }
 
   @Test
-  fun paletteItems_oneDevice_offersNoDeviceRows() {
+  fun paletteItems_oneDevice_offersNoDeviceRows() = runTest {
     val items = paletteItems(source("nas", devices = listOf(thisMac)))
 
     assertTrue(items.none { it.provider == PaletteProvider.Devices })

@@ -45,7 +45,11 @@ import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.droppedLinkList
 import com.linroid.ketch.app.platform.rememberFileDropReader
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.drop_kinds
+import ketch.app.shared.generated.resources.drop_to_download
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Which drop targets of a window a drag from another app hovers now: the window's own
@@ -199,14 +203,14 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
         KetchIconImage(KetchIcon.Drop, size = tile / 2, tint = colors.onAccent)
       }
       Text(
-        text = "Drop to download",
+        text = stringResource(Res.string.drop_to_download),
         style = if (compact) KetchTheme.typography.bodyStrong else KetchTheme.typography.titleM,
         color = colors.textPrimary,
         textAlign = TextAlign.Center,
       )
       if (!compact) {
         Text(
-          text = DROP_KINDS,
+          text = stringResource(Res.string.drop_kinds),
           style = KetchTheme.typography.bodyS,
           color = colors.textSecondary,
           textAlign = TextAlign.Center,
@@ -228,9 +232,6 @@ internal fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = draw
     translate(width / 2, width / 2) { drawOutline(outline, color, style = stroke) }
   }
 }
-
-/** What can be dropped, under "Drop to download". */
-internal const val DROP_KINDS = "Links, magnets, .torrent files and lists of links"
 
 /** The overlay lets the app show through faintly around the berths, so the drop keeps context. */
 internal const val DROP_OVERLAY_ALPHA = 0.96f

@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
@@ -18,6 +19,9 @@ import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.SpeedPopoverWidth
 import com.linroid.ketch.app.ui.pulse.rememberPendingJob
 import com.linroid.ketch.app.ui.pulse.speedModeView
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_speed_of
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What [device]'s speed mode pill shows: its own mode and limit, whether or not it is the device
@@ -60,7 +64,7 @@ internal fun DeviceSpeedPill(
       onDismissRequest = { open = false },
       width = SpeedPopoverWidth,
       alignment = PopoverAlignment.End,
-      title = "Speed of ${device.name}",
+      title = stringResource(Res.string.device_speed_of, device.name.resolve()),
     ) {
       SpeedModeOptions(state, device.entry, view, onOpenSettings = { open = false })
     }

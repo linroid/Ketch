@@ -6,6 +6,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppSettingsController
@@ -73,8 +74,8 @@ class SpeedModeActionsTest {
     assertEquals(SpeedMode.SlowLane, f.speed?.mode?.value)
     assertEquals(SpeedLimit.mbps(1), f.engine.config.speedLimit)
     val message = f.state.messages.history.value.first()
-    assertEquals("Slow lane on · 1 MB/s", message.title)
-    assertEquals(listOf("Undo"), message.actions.map { it.label })
+    assertEquals("Slow lane on · 1 MB/s", message.title.load())
+    assertEquals(listOf("Undo"), message.actions.map { it.label }.load())
   }
 
   @Test
@@ -89,7 +90,7 @@ class SpeedModeActionsTest {
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
     assertEquals(SpeedLimit.Unlimited, f.engine.config.speedLimit)
     val message = f.state.messages.history.value.first()
-    assertEquals("Slow lane off", message.title)
+    assertEquals("Slow lane off", message.title.load())
     assertTrue(message.actions.isEmpty())
   }
 
@@ -112,8 +113,8 @@ class SpeedModeActionsTest {
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
     val message = f.state.messages.history.value.first()
     assertEquals(MessageLevel.Error, message.level)
-    assertEquals("Couldn't switch to Slow lane", message.title)
-    assertEquals(listOf("Try again"), message.actions.map { it.label })
+    assertEquals("Couldn't switch to Slow lane", message.title.load())
+    assertEquals(listOf("Try again"), message.actions.map { it.label }.load())
 
     f.engine.rejects = false
     message.actions.single().onClick()

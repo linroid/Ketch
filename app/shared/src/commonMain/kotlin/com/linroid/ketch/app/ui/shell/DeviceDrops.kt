@@ -13,6 +13,9 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.platform.LocalWindowInfo
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.platform.DragExitEffect
@@ -25,6 +28,15 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.LocalWindowDrop
 import com.linroid.ketch.app.ui.downloads.actions.draggedTaskKeys
 import com.linroid.ketch.app.ui.pulse.diskLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.drop_already_here
+import ketch.app.shared.generated.resources.drop_here
+import ketch.app.shared.generated.resources.drop_key_moves
+import ketch.app.shared.generated.resources.drop_move_count
+import ketch.app.shared.generated.resources.drop_move_it
+import ketch.app.shared.generated.resources.drop_send_count
+import ketch.app.shared.generated.resources.drop_send_it
+import ketch.app.shared.generated.resources.drop_unreachable
 import kotlinx.coroutines.launch
 
 /** What a drag over a device carries, as far as can be told before it is dropped. */
@@ -43,7 +55,7 @@ internal sealed interface DeviceDrag {
  * @property accepts whether dropping there does anything; otherwise the drop is turned down.
  */
 @Immutable
-internal data class DropHint(val text: String, val accepts: Boolean)
+internal data class DropHint(val text: UiText, val accepts: Boolean)
 
 /**
  * What [device] does with [drag]: content adds there while it is reachable, and rows are sent
@@ -58,20 +70,34 @@ internal fun dropHint(
   move: Boolean,
   moveKey: String? = null,
 ): DropHint {
-  if (!device.connected || !device.health.isOnline) return DropHint("Not reachable now", false)
+  if (!device.connected || !device.health.isOnline) {
+    return DropHint(Res.string.drop_unreachable.text(), false)
+  }
   return when (drag) {
-    DeviceDrag.Content -> {
-      val free = device.disk?.let { " · ${diskLabel(it)}" }.orEmpty()
-      DropHint("Drop here$free", true)
-    }
+    DeviceDrag.Content -> DropHint(
+      listOfNotNull(Res.string.drop_here.text(), device.disk?.let(::diskLabel)).joinText(),
+      true,
+    )
     is DeviceDrag.Rows -> {
       val outgoing = drag.keys.count { it.deviceId != device.deviceId }
-      val what = if (outgoing == 1) "it" else outgoing.toString()
+      // One download reads "it", more read their number.
+      val send = if (outgoing == 1) {
+        Res.string.drop_send_it.text()
+      } else {
+        Res.string.drop_send_count.text(outgoing)
+      }
       when {
-        outgoing == 0 -> DropHint("Already here", false)
-        move -> DropHint("Move $what here", true)
-        moveKey == null -> DropHint("Send $what here", true)
-        else -> DropHint("Send $what here · $moveKey moves", true)
+        outgoing == 0 -> DropHint(Res.string.drop_already_here.text(), false)
+        move -> DropHint(
+          if (outgoing == 1) {
+            Res.string.drop_move_it.text()
+          } else {
+            Res.string.drop_move_count.text(outgoing)
+          },
+          true,
+        )
+        moveKey == null -> DropHint(send, true)
+        else -> DropHint(listOf(send, Res.string.drop_key_moves.text(moveKey)).joinText(), true)
       }
     }
   }

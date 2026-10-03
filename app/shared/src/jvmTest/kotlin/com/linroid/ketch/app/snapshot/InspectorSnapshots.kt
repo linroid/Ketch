@@ -25,6 +25,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
@@ -337,7 +338,7 @@ private fun remoteCompletedRow() = ListFixtures.row(
   ),
   request = DownloadRequest("https://cdimage.debian.org/debian-cd/debian-12.7.0-amd64-netinst.iso"),
   deviceId = "nas.local:8642",
-  device = DeviceInfo("NAS-Basement", RowCapabilities.remote()),
+  device = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote()),
   now = SampleData.NOW,
 )
 
@@ -358,6 +359,6 @@ private fun remoteRow() = ListFixtures.row(
     ),
   ),
   deviceId = "nas.local:8642",
-  device = DeviceInfo("NAS-Basement", RowCapabilities.remote()),
+  device = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote()),
   now = SampleData.NOW,
 ).copy(segments = listOf(Segment(0, 0, 2_399_999_999, 900_000_000)))

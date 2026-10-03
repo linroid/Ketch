@@ -16,12 +16,64 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.decimal
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AiConnectionTest
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.SearchProvider
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_ai_api_key
+import ketch.app.shared.generated.resources.settings_ai_api_key_env
+import ketch.app.shared.generated.resources.settings_ai_api_key_plain
+import ketch.app.shared.generated.resources.settings_ai_connected
+import ketch.app.shared.generated.resources.settings_ai_connected_in
+import ketch.app.shared.generated.resources.settings_ai_discovery
+import ketch.app.shared.generated.resources.settings_ai_endpoint
+import ketch.app.shared.generated.resources.settings_ai_endpoint_compatible_hint
+import ketch.app.shared.generated.resources.settings_ai_endpoint_optional
+import ketch.app.shared.generated.resources.settings_ai_engine_id
+import ketch.app.shared.generated.resources.settings_ai_engine_id_hint
+import ketch.app.shared.generated.resources.settings_ai_engine_id_placeholder
+import ketch.app.shared.generated.resources.settings_ai_hint_anthropic
+import ketch.app.shared.generated.resources.settings_ai_hint_compatible
+import ketch.app.shared.generated.resources.settings_ai_hint_gemini
+import ketch.app.shared.generated.resources.settings_ai_hint_ollama
+import ketch.app.shared.generated.resources.settings_ai_hint_openai
+import ketch.app.shared.generated.resources.settings_ai_model
+import ketch.app.shared.generated.resources.settings_ai_model_any
+import ketch.app.shared.generated.resources.settings_ai_model_group
+import ketch.app.shared.generated.resources.settings_ai_model_placeholder
+import ketch.app.shared.generated.resources.settings_ai_model_required
+import ketch.app.shared.generated.resources.settings_ai_provider
+import ketch.app.shared.generated.resources.settings_ai_provider_compatible
+import ketch.app.shared.generated.resources.settings_ai_provider_compatible_name
+import ketch.app.shared.generated.resources.settings_ai_provider_ollama
+import ketch.app.shared.generated.resources.settings_ai_search_api_key
+import ketch.app.shared.generated.resources.settings_ai_search_footer
+import ketch.app.shared.generated.resources.settings_ai_search_hint_brave
+import ketch.app.shared.generated.resources.settings_ai_search_hint_google
+import ketch.app.shared.generated.resources.settings_ai_search_none
+import ketch.app.shared.generated.resources.settings_ai_search_provider
+import ketch.app.shared.generated.resources.settings_ai_status_needs_provider
+import ketch.app.shared.generated.resources.settings_ai_status_needs_search
+import ketch.app.shared.generated.resources.settings_ai_status_off
+import ketch.app.shared.generated.resources.settings_ai_status_ready
+import ketch.app.shared.generated.resources.settings_ai_status_unsupported
+import ketch.app.shared.generated.resources.settings_ai_test
+import ketch.app.shared.generated.resources.settings_ai_test_button
+import ketch.app.shared.generated.resources.settings_ai_test_failed
+import ketch.app.shared.generated.resources.settings_ai_test_idle
+import ketch.app.shared.generated.resources.settings_ai_test_running
+import ketch.app.shared.generated.resources.settings_ai_test_waiting
+import ketch.app.shared.generated.resources.settings_ai_the_model
+import ketch.app.shared.generated.resources.settings_ai_web_search
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -50,8 +102,8 @@ fun AiDiscoverySettings(state: AppState) {
   SettingsGroup {
     val (status, statusColor) = discoveryStatus(settings, effective, supported)
     SettingsSwitchRow(
-      title = "AI discovery",
-      description = status,
+      title = stringResource(Res.string.settings_ai_discovery),
+      description = status.resolve(),
       descriptionColor = statusColor,
       checked = settings.enabled,
       enabled = supported,
@@ -59,10 +111,10 @@ fun AiDiscoverySettings(state: AppState) {
     )
   }
 
-  SettingsGroup(title = "Model") {
+  SettingsGroup(title = stringResource(Res.string.settings_ai_model_group)) {
     SettingsRow(
-      title = "Provider",
-      description = providerHint(llm.provider),
+      title = stringResource(Res.string.settings_ai_provider),
+      description = providerHint(llm.provider).resolve(),
       enabled = supported,
     ) {
       FlowRow(
@@ -72,7 +124,7 @@ fun AiDiscoverySettings(state: AppState) {
       ) {
         LlmProvider.entries.forEach { provider ->
           KetchChip(
-            label = provider.buttonLabel,
+            label = provider.buttonLabel.resolve(),
             selected = provider == llm.provider,
             enabled = supported,
             // Model and endpoint are provider-specific, so switching falls back to the new
@@ -91,11 +143,11 @@ fun AiDiscoverySettings(state: AppState) {
     }
     if (llm.provider.requiresApiKey) {
       SettingsRow(
-        title = "API key",
+        title = stringResource(Res.string.settings_ai_api_key),
         description = if (tokenFromEnvironment) {
-          "Using the key from the environment. One here overrides it."
+          stringResource(Res.string.settings_ai_api_key_env)
         } else {
-          "Stored as plain text in this device's config file."
+          stringResource(Res.string.settings_ai_api_key_plain)
         },
         enabled = supported,
       ) {
@@ -110,18 +162,19 @@ fun AiDiscoverySettings(state: AppState) {
       }
     }
     SettingsRow(
-      title = "Model",
+      title = stringResource(Res.string.settings_ai_model),
       description = if (llm.provider.defaultModel.isBlank()) {
-        "Required. Use a model with tool support."
+        stringResource(Res.string.settings_ai_model_required)
       } else {
-        "Any model with tool support works."
+        stringResource(Res.string.settings_ai_model_any)
       },
       enabled = supported,
     ) {
       SettingsTextInput(
         value = llm.model,
         onCommit = { onChange(settings.copy(llm = llm.copy(model = it))) },
-        placeholder = llm.provider.defaultModel.ifBlank { "Model id" },
+        placeholder = llm.provider.defaultModel
+          .ifBlank { stringResource(Res.string.settings_ai_model_placeholder) },
         mono = true,
         enabled = supported,
       )
@@ -149,10 +202,14 @@ fun AiDiscoverySettings(state: AppState) {
       }
     }
     SettingsRow(
-      title = if (llm.provider.requiresBaseUrl) "Endpoint" else "Endpoint (optional)",
+      title = if (llm.provider.requiresBaseUrl) {
+        stringResource(Res.string.settings_ai_endpoint)
+      } else {
+        stringResource(Res.string.settings_ai_endpoint_optional)
+      },
       // The field shows the default endpoint while it is empty.
       description = if (llm.provider.requiresBaseUrl) {
-        "Any OpenAI-compatible endpoint, with or without /v1."
+        stringResource(Res.string.settings_ai_endpoint_compatible_hint)
       } else {
         null
       },
@@ -178,13 +235,17 @@ fun AiDiscoverySettings(state: AppState) {
     val model = effective.llm.effectiveModel
     val (testMessage, testColor) = testStatus(connectionTest, model, testTook)
     SettingsRow(
-      title = "Test connection",
-      description = testMessage,
+      title = stringResource(Res.string.settings_ai_test),
+      description = testMessage.resolve(),
       descriptionColor = testColor,
       enabled = supported,
       trailing = {
         KetchButton(
-          text = if (testing) "Testing…" else "Test",
+          text = if (testing) {
+            stringResource(Res.string.settings_ai_test_running)
+          } else {
+            stringResource(Res.string.settings_ai_test_button)
+          },
           onClick = {
             // Leaving the field saves what was just typed.
             focusManager.clearFocus()
@@ -201,24 +262,27 @@ fun AiDiscoverySettings(state: AppState) {
   }
 
   SettingsGroup(
-    title = "Web search",
-    footer = "Without a search provider, Discover only reads the pages you give it.",
+    title = stringResource(Res.string.settings_ai_web_search),
+    footer = stringResource(Res.string.settings_ai_search_footer),
   ) {
     SettingsSelectRow(
-      title = "Search provider",
-      description = searchProviderHint(search.provider),
+      title = stringResource(Res.string.settings_ai_search_provider),
+      description = searchProviderHint(search.provider)?.let { stringResource(it) },
       value = search.provider,
       options = SearchProvider.entries,
-      label = { it.label },
+      label = { it.displayName },
       enabled = supported,
       onSelect = { onChange(settings.copy(search = search.copy(provider = it))) },
     )
     if (search.provider.requiresApiKey) {
-      SettingsRow(title = "Search API key", enabled = supported) {
+      SettingsRow(
+        title = stringResource(Res.string.settings_ai_search_api_key),
+        enabled = supported,
+      ) {
         SettingsTextInput(
           value = search.apiKey,
           onCommit = { onChange(settings.copy(search = search.copy(apiKey = it))) },
-          placeholder = "API key",
+          placeholder = stringResource(Res.string.settings_ai_api_key),
           secret = true,
           mono = true,
           enabled = supported,
@@ -227,14 +291,14 @@ fun AiDiscoverySettings(state: AppState) {
     }
     if (search.provider.requiresCx) {
       SettingsRow(
-        title = "Search engine ID",
-        description = "The Programmable Search engine to query.",
+        title = stringResource(Res.string.settings_ai_engine_id),
+        description = stringResource(Res.string.settings_ai_engine_id_hint),
         enabled = supported,
       ) {
         SettingsTextInput(
           value = search.cx,
           onCommit = { onChange(settings.copy(search = search.copy(cx = it))) },
-          placeholder = "Engine ID",
+          placeholder = stringResource(Res.string.settings_ai_engine_id_placeholder),
           mono = true,
           enabled = supported,
         )
@@ -252,17 +316,19 @@ private fun discoveryStatus(
   settings: AiSettings,
   effective: AiSettings,
   supported: Boolean,
-): Pair<String, Color> {
+): Pair<UiText, Color> {
   val colors = KetchTheme.colors
   return when {
-    !supported -> "Runs in the desktop and Android apps." to colors.textTertiary
+    !supported -> Res.string.settings_ai_status_unsupported.text() to colors.textTertiary
     !effective.llm.isComplete ->
-      "Choose a provider and add its key below." to colors.status.paused.color
+      Res.string.settings_ai_status_needs_provider.text() to colors.status.paused.color
     !effective.search.isComplete ->
-      "Add the missing web search credentials." to colors.status.paused.color
-    !settings.enabled -> "Lets Discover find downloads for you." to colors.textSecondary
-    else -> "Ready · ${effective.llm.provider.label} · ${effective.llm.effectiveModel}" to
-      colors.status.completed.color
+      Res.string.settings_ai_status_needs_search.text() to colors.status.paused.color
+    !settings.enabled -> Res.string.settings_ai_status_off.text() to colors.textSecondary
+    else -> Res.string.settings_ai_status_ready.text(
+      effective.llm.provider.displayName,
+      effective.llm.effectiveModel,
+    ) to colors.status.completed.color
   }
 }
 
@@ -275,35 +341,49 @@ private fun testStatus(
   test: AiConnectionTest,
   model: String,
   took: Duration?,
-): Pair<String, Color> {
+): Pair<UiText, Color> {
   val colors = KetchTheme.colors
   return when (test) {
-    AiConnectionTest.Idle -> "Sends a short prompt to check the key and model." to
-      colors.textSecondary
-    AiConnectionTest.Running -> "Waiting for the model…" to colors.textSecondary
+    AiConnectionTest.Idle -> Res.string.settings_ai_test_idle.text() to colors.textSecondary
+    AiConnectionTest.Running -> Res.string.settings_ai_test_waiting.text() to colors.textSecondary
     is AiConnectionTest.Success -> connectedCopy(model, took) to colors.status.completed.color
-    is AiConnectionTest.Failure -> "Failed: ${test.message}" to colors.status.failed.color
+    is AiConnectionTest.Failure ->
+      Res.string.settings_ai_test_failed.text(test.message) to colors.status.failed.color
   }
 }
 
 /** "Connected · claude-sonnet-5 responded in 1.2 s", or without the time when it is unknown. */
-internal fun connectedCopy(model: String, took: Duration?): String {
-  val who = model.ifBlank { "the model" }
-  if (took == null) return "Connected · $who responded"
+internal fun connectedCopy(model: String, took: Duration?): UiText {
+  val who = if (model.isBlank()) Res.string.settings_ai_the_model.text() else verbatim(model)
+  if (took == null) return Res.string.settings_ai_connected.text(who)
   val tenths = took.inWholeMilliseconds / MILLIS_PER_TENTH
-  return "Connected · $who responded in ${tenths / 10}.${tenths % 10} s"
+  return Res.string.settings_ai_connected_in.text(who, decimal(tenths / 10.0, 1))
 }
 
 private const val MILLIS_PER_TENTH = 100
 
-/** How a provider reads on its button. */
-private val LlmProvider.buttonLabel: String
+/** How a provider reads in summaries and the status line: its name. */
+internal val LlmProvider.displayName: UiText
   get() = when (this) {
-    LlmProvider.OpenAi -> "OpenAI"
-    LlmProvider.Anthropic -> "Anthropic"
-    LlmProvider.Google -> "Gemini"
-    LlmProvider.Ollama -> "Ollama · runs locally, no key"
-    LlmProvider.OpenAiCompatible -> "Custom (OpenAI-compatible)"
+    LlmProvider.OpenAiCompatible -> Res.string.settings_ai_provider_compatible_name.text()
+    else -> verbatim(label)
+  }
+
+/** How a search provider reads in its menu and in summaries: its name, or "None". */
+internal val SearchProvider.displayName: UiText
+  get() = when (this) {
+    SearchProvider.None -> Res.string.settings_ai_search_none.text()
+    else -> verbatim(label)
+  }
+
+/** How a provider reads on its button. */
+private val LlmProvider.buttonLabel: UiText
+  get() = when (this) {
+    LlmProvider.OpenAi -> verbatim("OpenAI")
+    LlmProvider.Anthropic -> verbatim("Anthropic")
+    LlmProvider.Google -> verbatim("Gemini")
+    LlmProvider.Ollama -> Res.string.settings_ai_provider_ollama.text()
+    LlmProvider.OpenAiCompatible -> Res.string.settings_ai_provider_compatible.text()
   }
 
 private fun tokenPlaceholder(provider: LlmProvider): String =
@@ -314,18 +394,18 @@ private fun tokenPlaceholder(provider: LlmProvider): String =
     LlmProvider.Ollama -> ""
   }
 
-private fun providerHint(provider: LlmProvider): String = when (provider) {
-  LlmProvider.OpenAi -> "Get a key at platform.openai.com."
-  LlmProvider.Anthropic -> "Get a key at console.anthropic.com."
-  LlmProvider.Google -> "Get a key at aistudio.google.com/apikey."
-  LlmProvider.Ollama -> "Pull a model first: ollama pull ${LlmProvider.Ollama.defaultModel}"
-  LlmProvider.OpenAiCompatible -> "OpenRouter, DeepSeek, LM Studio, vLLM and similar servers."
+private fun providerHint(provider: LlmProvider): UiText = when (provider) {
+  LlmProvider.OpenAi -> Res.string.settings_ai_hint_openai.text()
+  LlmProvider.Anthropic -> Res.string.settings_ai_hint_anthropic.text()
+  LlmProvider.Google -> Res.string.settings_ai_hint_gemini.text()
+  LlmProvider.Ollama -> Res.string.settings_ai_hint_ollama.text(LlmProvider.Ollama.defaultModel)
+  LlmProvider.OpenAiCompatible -> Res.string.settings_ai_hint_compatible.text()
 }
 
-private fun searchProviderHint(provider: SearchProvider): String? = when (provider) {
+private fun searchProviderHint(provider: SearchProvider) = when (provider) {
   SearchProvider.None -> null
-  SearchProvider.Brave -> "Get a token at api-dashboard.search.brave.com."
-  SearchProvider.Google -> "Closed to new customers; it stops working on January 1, 2027."
+  SearchProvider.Brave -> Res.string.settings_ai_search_hint_brave
+  SearchProvider.Google -> Res.string.settings_ai_search_hint_google
 }
 
 /**

@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.AppMessage
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -14,7 +15,7 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
@@ -121,9 +122,9 @@ class DesktopCommandsTest {
 
       assertEquals(SpeedLimitMode.SlowLane, speedMode.settings.value.mode)
       val message = fleet.messages().last()
-      val speed = formatSpeedLimit(speedMode.slowLaneSpeed)
-      assertEquals("Slow lane on for ${localDeviceNoun()} · $speed", message.title)
-      message.actions.single { it.label == "Undo" }.onClick()
+      val speed = speedLimitText(speedMode.slowLaneSpeed).load()
+      assertEquals("Slow lane on for ${localDeviceNoun().load()} · $speed", message.title.load())
+      message.actions.single { it.label.load() == "Undo" }.onClick()
       runCurrent()
       assertEquals(SpeedLimitMode.Full, speedMode.settings.value.mode)
     }

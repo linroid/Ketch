@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">Downloads</string>
+  <string name="shell_destination_discover">Descobrir</string>
+  <string name="shell_destination_devices">Dispositivos</string>
+  <string name="shell_settings">Configurações</string>
+  <string name="shell_devices">Dispositivos</string>
+  <string name="shell_show_sidebar">Mostrar barra lateral</string>
+  <string name="shell_hide_sidebar">Ocultar barra lateral</string>
+  <string name="shell_appearance_light">Mudar para o modo claro</string>
+  <string name="shell_appearance_dark">Mudar para o modo escuro</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="one">%1$s, %2$d baixando</item>
+    <item quantity="other">%1$s, %2$d baixando</item>
+  </plurals>
+  <string name="shell_device_described">%1$s, %2$s</string>
+
+  <string name="shell_device_needs_token">Precisa de token</string>
+  <string name="shell_device_needs_a_token">Precisa de um token</string>
+  <string name="shell_device_needs_new_token">Precisa de um novo token de acesso</string>
+  <string name="shell_device_off">Inativo</string>
+  <string name="shell_device_not_connected">Não conectado</string>
+  <string name="shell_device_offline">Offline</string>
+  <string name="shell_device_last_seen">visto pela última vez há %1$s</string>
+  <string name="shell_device_connecting">Conectando</string>
+  <string name="shell_device_connecting_now">Conectando…</string>
+  <string name="shell_device_idle">Ocioso</string>
+  <string name="shell_device_slow_lane">Faixa lenta</string>
+  <plurals name="shell_device_active">
+    <item quantity="one">%1$d ativo</item>
+    <item quantity="other">%1$d ativos</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="one">%1$d aguardando</item>
+    <item quantity="other">%1$d aguardando</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="one">%1$d com falha</item>
+    <item quantity="other">%1$d com falha</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%1$d de %2$d online</string>
+
+  <string name="sidebar_all_devices_tooltip">Downloads de todos os dispositivos</string>
+  <string name="sidebar_add_device">Adicionar dispositivo</string>
+  <string name="sidebar_device_menu">Menu do dispositivo</string>
+  <string name="sidebar_menu_pause_all">Pausar tudo aqui</string>
+  <string name="sidebar_menu_resume_all">Retomar tudo aqui</string>
+  <string name="sidebar_menu_retry_failed">Tentar novamente os que falharam aqui</string>
+  <string name="sidebar_menu_retry_failed_count">Tentar novamente os que falharam aqui (%1$d)</string>
+  <string name="sidebar_menu_speed">Velocidade</string>
+  <string name="sidebar_menu_settings">Configurações deste dispositivo…</string>
+  <string name="sidebar_menu_full_speed">Velocidade máxima</string>
+  <string name="sidebar_menu_slow_lane">Faixa lenta · %1$s</string>
+  <string name="sidebar_menu_no_limit">Sem limite</string>
+
+  <string name="switcher_overview">Visão geral</string>
+  <string name="switcher_add_device">Adicionar dispositivo…</string>
+  <string name="switcher_find_on_network">Procurar na rede</string>
+  <string name="switcher_share">Compartilhar %1$s…</string>
+
+  <string name="shell_device_button">%1$s, trocar de dispositivo</string>
+  <string name="shell_device_button_back">Voltar ao dispositivo anterior</string>
+  <string name="shell_more">Mais</string>
+  <string name="shell_clear_finished">Limpar concluídos</string>
+  <string name="shell_search_close">Fechar pesquisa</string>
+  <string name="shell_search_placeholder">Pesquise ou cole um link</string>
+  <string name="shell_search_download_on">Baixar para %1$s</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="one">Baixar %1$d link para %2$s</item>
+    <item quantity="other">Baixar %1$d links para %2$s</item>
+  </plurals>
+  <string name="shell_discover_query">Descobrir “%1$s”</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="one">%1$d não lida</item>
+    <item quantity="other">%1$d não lidas</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">A área de transferência não tem nenhum link</string>
+  <string name="shell_file_picker_failed">Não foi possível abrir o seletor de arquivos</string>
+
+  <string name="banner_connecting">Conectando a %1$s…</string>
+  <string name="banner_offline">%1$s está offline</string>
+  <string name="banner_retrying">tentando novamente</string>
+  <string name="banner_retry_now">Tentar agora</string>
+  <string name="banner_switch_to">Mudar para %1$s</string>
+  <string name="banner_unauthorized">%1$s precisa de um novo token de acesso</string>
+  <string name="banner_enter_token">Inserir token</string>
+  <string name="toast_subject_reason">%1$s: %2$s</string>
+
+  <string name="drop_to_download">Solte para baixar</string>
+  <string name="drop_kinds">Links, links magnet, arquivos .torrent e listas de links</string>
+  <string name="drop_unreachable">Inacessível agora</string>
+  <string name="drop_here">Solte aqui</string>
+  <string name="drop_already_here">Já está aqui</string>
+  <string name="drop_move_it">Mover para cá</string>
+  <string name="drop_send_it">Enviar para cá</string>
+  <string name="drop_move_count">Mover %1$d para cá</string>
+  <string name="drop_send_count">Enviar %1$d para cá</string>
+  <string name="drop_key_moves">%1$s move</string>
+  <string name="berth_drop_on">Soltar em %1$s</string>
+  <string name="berth_ready">Pronto</string>
+
+  <string name="palette_placeholder">Cole um link, pesquise downloads ou digite um comando</string>
+  <string name="palette_placeholder_short">Cole um link, pesquise ou digite um comando</string>
+  <string name="palette_clear">Limpar</string>
+  <string name="palette_no_matches">Nada corresponde a “%1$s”</string>
+  <string name="palette_no_matches_hint">Tente um nome de arquivo, um comando como “pausar”, um link ou /speed</string>
+  <string name="palette_hint_move">mover</string>
+  <string name="palette_hint_run">executar</string>
+  <string name="palette_hint_alternate">alternativa</string>
+  <string name="palette_hint_discover">Descobrir</string>
+  <string name="palette_hint_close">fechar</string>
+  <string name="palette_section_recent">Recentes</string>
+  <string name="palette_section_links">Baixar</string>
+  <string name="palette_section_speed">Velocidade</string>
+  <string name="palette_section_commands">Comandos</string>
+  <string name="palette_section_downloads">Downloads</string>
+  <string name="palette_section_navigation">Ir para</string>
+  <string name="palette_section_devices">Dispositivos</string>
+  <string name="palette_section_search">Pesquisa</string>
+
+  <plurals name="palette_links">
+    <item quantity="one">%1$d link</item>
+    <item quantity="other">%1$d links</item>
+  </plurals>
+  <string name="palette_download">Baixar %1$s</string>
+  <string name="palette_on_device">para %1$s</string>
+  <string name="palette_verb_download">Baixar</string>
+  <string name="palette_add_with_options">Adicionar com opções…</string>
+  <string name="palette_add_with_options_detail">Pasta, velocidade, prioridade e horário de início</string>
+  <string name="palette_limit_to">Limitar downloads a %1$s</string>
+  <string name="palette_slow_lane_to">Definir a Faixa lenta como %1$s</string>
+  <string name="palette_slow_lane_turns_on">Ativa a Faixa lenta</string>
+  <string name="palette_slow_lane_is_on">A Faixa lenta está ativada</string>
+  <string name="palette_slow_lane_now">Agora: %1$s</string>
+  <string name="palette_limit_while_off">Vale enquanto a Faixa lenta está desativada</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="one">Pausar %1$d download</item>
+    <item quantity="other">Pausar %1$d downloads</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">Nada para pausar</string>
+  <plurals name="palette_resume_count">
+    <item quantity="one">Retomar %1$d pausado</item>
+    <item quantity="other">Retomar %1$d pausados</item>
+  </plurals>
+  <string name="palette_nothing_paused">Nada pausado</string>
+  <plurals name="palette_retry_count">
+    <item quantity="one">Tentar novamente %1$d download com falha</item>
+    <item quantity="other">Tentar novamente %1$d downloads com falha</item>
+  </plurals>
+  <string name="palette_nothing_failed">Nenhuma falha</string>
+  <string name="palette_slow_lane_off">Desativar a Faixa lenta</string>
+  <string name="palette_slow_lane_on">Ativar a Faixa lenta</string>
+  <string name="palette_nothing_to_undo">Nada para desfazer</string>
+  <string name="palette_full_speed">Velocidade máxima</string>
+  <string name="palette_full_speed_slow_lane">Desativa a Faixa lenta</string>
+  <string name="palette_full_speed_rules">Desativa as regras de velocidade</string>
+  <string name="palette_full_speed_cap">Remove o limite de %1$s</string>
+  <string name="palette_full_speed_already">Já está na velocidade máxima</string>
+  <string name="palette_full_speed_keywords">ilimitado, sem limite, velocidade máxima, máximo, turbo</string>
+  <string name="palette_speed_not_loaded">O limite de velocidade ainda não foi carregado</string>
+
+  <string name="palette_downloads_tab">Downloads › %1$s</string>
+  <string name="palette_none">Nenhum</string>
+  <string name="palette_settings_page">Configurações › %1$s</string>
+  <string name="palette_pause_all_on">Pausar tudo em %1$s</string>
+  <string name="palette_resume_all_on">Retomar tudo em %1$s</string>
+  <string name="palette_retry_failed_on">Tentar novamente os que falharam em %1$s</string>
+  <string name="palette_show_in_downloads">Mostrar “%1$s” em Downloads</string>
+  <plurals name="palette_matches">
+    <item quantity="one">%1$d resultado</item>
+    <item quantity="other">%1$d resultados</item>
+  </plurals>
+  <string name="palette_discover_detail">Encontrar downloads na web</string>
+</resources>

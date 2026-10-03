@@ -1,0 +1,14 @@
+/*
+  What iOS shows for Ketch from its Info.plist, in English. Other languages go in
+  <language>.lproj/InfoPlist.strings; see docs/development/localization.md.
+*/
+
+/* Asked before Ketch looks for the user's other devices on the local network. */
+"NSLocalNetworkUsageDescription" = "Ketch looks for your other devices running Ketch on this network, so you can add them and control their downloads.";
+
+/*
+  The kind of a .torrent file, as Files and the share sheet name it: the document type
+  (CFBundleTypeName) and the imported type (UTTypeDescription), which look it up by its English
+  name.
+*/
+"BitTorrent File" = "BitTorrent File";

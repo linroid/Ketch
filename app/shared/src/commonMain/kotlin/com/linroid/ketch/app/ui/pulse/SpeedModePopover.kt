@@ -23,6 +23,9 @@ import com.linroid.ketch.app.components.KetchCheckbox
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.displayName
@@ -31,13 +34,34 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
+import com.linroid.ketch.app.state.clockLabel
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.clockLabel
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_any_in_sentence
+import ketch.app.shared.generated.resources.pulse_caption_capped
+import ketch.app.shared.generated.resources.pulse_caption_full
+import ketch.app.shared.generated.resources.pulse_caption_full_until
+import ketch.app.shared.generated.resources.pulse_caption_no_rules
+import ketch.app.shared.generated.resources.pulse_caption_rule_full
+import ketch.app.shared.generated.resources.pulse_caption_rule_slow_lane
+import ketch.app.shared.generated.resources.pulse_caption_slow_lane
+import ketch.app.shared.generated.resources.pulse_caption_slow_lane_until
+import ketch.app.shared.generated.resources.pulse_limit_after_slow_lane
+import ketch.app.shared.generated.resources.pulse_limit_for_device
+import ketch.app.shared.generated.resources.pulse_limit_for_slow_lane
+import ketch.app.shared.generated.resources.pulse_slow_lane_speed
+import ketch.app.shared.generated.resources.pulse_speed
+import ketch.app.shared.generated.resources.pulse_speed_limit
+import ketch.app.shared.generated.resources.pulse_speed_mode
+import ketch.app.shared.generated.resources.pulse_speed_settings
+import ketch.app.shared.generated.resources.pulse_update_failed
+import ketch.app.shared.generated.resources.pulse_use_as_slow_lane
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
 /**
@@ -59,7 +83,7 @@ fun SpeedModePopover(
     onDismissRequest = onDismissRequest,
     width = SpeedPopoverWidth,
     modifier = modifier,
-    title = "Speed",
+    title = stringResource(Res.string.pulse_speed),
   ) {
     val active by state.activeInstance.collectAsState()
     SpeedModeOptions(state, active, rememberSpeedModeView(state), onDismissRequest)
@@ -86,7 +110,7 @@ internal fun ColumnScope.SpeedModeOptions(
   val spacing = KetchTheme.spacing
   val controller = view.controller
   val settings = device?.let(state::settingsFor) ?: state.instanceSettings
-  val deviceName = device?.displayName ?: "this device"
+  val deviceName = device?.displayName ?: Res.string.device_any_in_sentence.text()
   val command = rememberPendingJob()
   var asSlowLane by remember(controller) { mutableStateOf(view.mode.isSlowLane) }
 
@@ -110,15 +134,18 @@ internal fun ColumnScope.SpeedModeOptions(
     else -> settings.download?.speedLimit ?: view.limit
   }
   val error = settings.downloadError.takeIf { limitGoesToSettings(controller, asSlowLane) }
+  val caption = error?.let { Res.string.pulse_update_failed.text(deviceName, it) }
+    ?: limitCaption(view, asSlowLane, deviceName)
   KetchEyebrow(
-    text = if (asSlowLane) "Slow lane speed" else "Speed limit",
+    text = stringResource(
+      if (asSlowLane) Res.string.pulse_slow_lane_speed else Res.string.pulse_speed_limit
+    ),
     modifier = Modifier.padding(bottom = spacing.s2),
   )
   SpeedLimitPicker(
     value = limit,
     onCommit = { new -> device?.let { command.track(state.setSpeedLimit(it, new, asSlowLane)) } },
-    caption = error?.let { "Couldn't update $deviceName · $it" }
-      ?: limitCaption(view, asSlowLane, deviceName),
+    caption = caption.resolve(),
     enabled = controller != null || settings.download != null,
     pending = command.pending,
   )
@@ -127,7 +154,7 @@ internal fun ColumnScope.SpeedModeOptions(
     KetchCheckbox(
       checked = asSlowLane,
       onCheckedChange = { asSlowLane = it },
-      label = "Use as Slow lane speed",
+      label = stringResource(Res.string.pulse_use_as_slow_lane),
     )
   }
   Spacer(Modifier.height(spacing.s3))
@@ -146,17 +173,18 @@ internal fun SpeedModeControl(
 ) {
   val spacing = KetchTheme.spacing
   val settings by controller.settings.collectAsState()
-  KetchEyebrow("Speed mode", Modifier.padding(bottom = spacing.s2))
+  KetchEyebrow(stringResource(Res.string.pulse_speed_mode), Modifier.padding(bottom = spacing.s2))
   KetchSegmented(
     options = SpeedLimitMode.entries,
     selected = settings.mode,
     onSelect = onSelect,
-    label = ::speedModeName,
+    label = { speedModeName(it).resolve() },
     fill = fill,
   )
   Spacer(Modifier.height(spacing.s2))
+  val now = LocalClock.current.now()
   Text(
-    text = modeCaption(view.mode, view.limit, settings.rules.isEmpty(), LocalClock.current.now()),
+    text = modeCaptionText(view.mode, view.limit, settings.rules.isEmpty(), now).resolve(),
     style = KetchTheme.typography.caption,
     color = KetchTheme.colors.textSecondary,
   )
@@ -166,7 +194,7 @@ internal fun SpeedModeControl(
 @Composable
 internal fun SpeedSettingsButton(state: AppState, deviceId: String?, onOpenSettings: () -> Unit) {
   KetchButton(
-    text = "Speed settings…",
+    text = stringResource(Res.string.pulse_speed_settings),
     onClick = {
       onOpenSettings()
       state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, deviceId))
@@ -177,45 +205,45 @@ internal fun SpeedSettingsButton(state: AppState, deviceId: String?, onOpenSetti
   )
 }
 
-/** What the mode does now, under the mode control. */
-internal fun modeCaption(
+/** What the mode does now, under the mode control, with clock times local to [timeZone]. */
+internal fun modeCaptionText(
   mode: SpeedMode,
   limit: SpeedLimit,
   noRules: Boolean,
   now: Instant,
-): String {
-  val zone = TimeZone.currentSystemDefault()
-  return when (mode) {
-    SpeedMode.Full -> if (limit.isUnlimited) {
-      "Downloads run as fast as the network allows."
+  timeZone: TimeZone = TimeZone.currentSystemDefault(),
+): UiText = when (mode) {
+  SpeedMode.Full -> if (limit.isUnlimited) {
+    Res.string.pulse_caption_full.text()
+  } else {
+    Res.string.pulse_caption_capped.text(speedLimitText(limit))
+  }
+  SpeedMode.SlowLane -> Res.string.pulse_caption_slow_lane.text(speedLimitText(limit))
+  is SpeedMode.Auto -> when {
+    noRules -> Res.string.pulse_caption_no_rules.text()
+    mode.until == null -> if (mode.slowLane) {
+      Res.string.pulse_caption_rule_slow_lane.text()
     } else {
-      "Downloads are capped at ${formatSpeedLimit(limit)}."
+      Res.string.pulse_caption_rule_full.text()
     }
-    SpeedMode.SlowLane -> {
-      "Downloads share ${formatSpeedLimit(limit)}, leaving bandwidth for everything else."
-    }
-    is SpeedMode.Auto -> when {
-      noRules -> "No speed rules yet. Add them in Speed settings."
-      mode.until == null -> if (mode.slowLane) {
-        "A rule keeps the Slow lane on."
+    else -> {
+      val until = clockLabel(mode.until, now, timeZone)
+      if (mode.slowLane) {
+        Res.string.pulse_caption_slow_lane_until.text(until)
       } else {
-        "Full speed until a rule turns on the Slow lane."
-      }
-      else -> {
-        val phase = if (mode.slowLane) "Slow lane" else "Full speed"
-        "$phase until ${clockLabel(mode.until, now, zone)}, then your rules decide."
+        Res.string.pulse_caption_full_until.text(until)
       }
     }
   }
 }
 
-private fun limitCaption(view: SpeedModeView, asSlowLane: Boolean, deviceName: String): String =
+private fun limitCaption(view: SpeedModeView, asSlowLane: Boolean, deviceName: UiText): UiText =
   when {
-    asSlowLane -> "Used whenever the Slow lane is on."
+    asSlowLane -> Res.string.pulse_limit_for_slow_lane.text()
     view.controller == null || view.mode == SpeedMode.Full -> {
-      "Applies to every download on $deviceName."
+      Res.string.pulse_limit_for_device.text(deviceName)
     }
-    else -> "Applies once the Slow lane is off."
+    else -> Res.string.pulse_limit_after_slow_lane.text()
   }
 
 /** Width of the speed options popovers. */

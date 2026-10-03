@@ -3,8 +3,11 @@ package com.linroid.ketch.app.ui.downloads.actions
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
+import com.linroid.ketch.app.ui.list.TaskCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -24,7 +27,7 @@ class SelectionBarTest {
     val pause = bar.first()
     assertEquals(RowAction.Pause, pause.action)
     assertEquals(2, pause.count)
-    assertEquals("Pause 2 of 3 selected", pause.tooltip(rows.size))
+    assertEquals("Pause 2 of 3 selected", pause.tooltip(rows.size).load())
   }
 
   @Test
@@ -40,10 +43,10 @@ class SelectionBarTest {
 
     assertEquals(
       listOf("Pause", "Resume", "Retry", "Priority", "Speed", "Copy links", "Remove…"),
-      bar.map { it.label },
+      bar.map { it.label }.load(),
     )
     assertEquals(listOf(2, 1, 1), bar.take(3).map { it.count })
-    assertEquals("Resume 1 of 4 selected", bar[1].tooltip(rows.size))
+    assertEquals("Resume 1 of 4 selected", bar[1].tooltip(rows.size).load())
   }
 
   @Test
@@ -51,12 +54,12 @@ class SelectionBarTest {
     val rows = List(2) { rowOf(f.add(completed)) }
     val batch = f.runner.batch(rows)
 
-    val (bar, more) = barVerbs(batch, canSend = false, revealLabel = "Show in Finder")
+    val (bar, more) = barVerbs(batch, canSend = false, revealLabel = verbatim("Show in Finder"))
 
     assertFalse(bar.any { it.action == RowAction.Pause || it.action == RowAction.Priority })
-    assertEquals("Copy 2 links", bar.single { it.action == RowAction.CopyLink }.tooltip(2))
-    assertTrue(more.any { it.label == "Open" && it.count == 2 })
-    assertTrue(more.any { it.label == "Show in Finder" })
+    assertEquals("Copy 2 links", bar.single { it.action == RowAction.CopyLink }.tooltip(2).load())
+    assertTrue(more.any { it.label.load() == "Open" && it.count == 2 })
+    assertTrue(more.any { it.label.load() == "Show in Finder" })
   }
 
   @Test
@@ -77,7 +80,7 @@ class SelectionBarTest {
     val remove = barVerbs(f.runner.batch(rows), canSend = false).first.last()
 
     assertTrue(remove.asks)
-    assertEquals("Remove 3 downloads…", remove.tooltip(rows.size))
+    assertEquals("Remove 3 downloads…", remove.tooltip(rows.size).load())
   }
 
   @Test
@@ -85,16 +88,16 @@ class SelectionBarTest {
     val rows = listOf(f.add(completed), f.add(completed), f.add(DownloadState.Queued))
       .map { rowOf(it) }
 
-    assertEquals("3 selected · 2.0 MB", selectionSummary(rows))
-    assertEquals("1 selected", selectionSummary(listOf(rows.last())))
+    assertEquals("3 selected · 2.0 MB", selectionSummary(rows).load())
+    assertEquals("1 selected", selectionSummary(listOf(rows.last())).load())
   }
 
   @Test
   fun skipNote_groupsTheReasons() = actionsTest { f ->
     val rows = listOf(f.add(completed), f.add(paused), f.add(paused)).map { rowOf(it) }
 
-    assertEquals("1 already finished · 2 already paused", skipNote("pause", rows))
-    assertEquals(null, skipNote("pause", emptyList()))
+    assertEquals("1 already finished · 2 already paused", skipNote(TaskCommand.Pause, rows).load())
+    assertEquals(null, skipNote(TaskCommand.Pause, emptyList()))
   }
 
   @Test
@@ -105,6 +108,9 @@ class SelectionBarTest {
       f.add(DownloadState.Canceled),
     ).map { rowOf(it) }
 
-    assertEquals("1 already running · 1 with an error · 1 canceled", skipNote("resume", rows))
+    assertEquals(
+      "1 already running · 1 with an error · 1 canceled",
+      skipNote(TaskCommand.Resume, rows).load(),
+    )
   }
 }

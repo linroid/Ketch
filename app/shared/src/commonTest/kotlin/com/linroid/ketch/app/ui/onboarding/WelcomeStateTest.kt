@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.onboarding
 
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -9,7 +10,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -114,8 +114,7 @@ class WelcomeStateTest {
     welcome.chooseFolder(pick = { DOWNLOAD }, apply = { throw IllegalStateException("No grant") })
 
     assertNull(welcome.folder)
-    assertNotNull(welcome.folderError)
-    assertFalse(welcome.folderError.orEmpty().contains("No grant"))
+    assertEquals("Couldn't use that folder. Try another one.", welcome.folderError.load())
     assertFalse(welcome.choosingFolder)
   }
 

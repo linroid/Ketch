@@ -5,24 +5,35 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_tab_activity
+import ketch.app.shared.generated.resources.inspector_tab_connections
+import ketch.app.shared.generated.resources.inspector_tab_files
+import ketch.app.shared.generated.resources.inspector_tab_overview
+import org.jetbrains.compose.resources.StringResource
 
 /** A tab of the task inspector. */
-enum class InspectorTab(val title: String) {
+enum class InspectorTab(private val resource: StringResource) {
   /** State, controls and details. */
-  Overview("Overview"),
+  Overview(Res.string.inspector_tab_overview),
 
   /** Each connection of an HTTP or FTP download; see [ConnectionsTab]. */
-  Connections("Connections"),
+  Connections(Res.string.inspector_tab_connections),
 
   /** Each file of a torrent; see [FilesTab]. */
-  Files("Files"),
+  Files(Res.string.inspector_tab_files),
 
   /** Speed over the last five minutes and the session's events; see [ActivityTab]. */
-  Activity("Activity"),
+  Activity(Res.string.inspector_tab_activity);
+
+  /** The tab's name. */
+  val title: UiText get() = resource.text()
 }
 
 /**

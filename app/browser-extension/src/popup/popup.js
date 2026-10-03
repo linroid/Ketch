@@ -2,6 +2,7 @@ import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
 import { describeStatus, describeTaskState, failureHint, taskName } from '../lib/format.js';
 import { sendToKetch } from '../lib/handoff.js';
+import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
 import { findInstance, loadSettings, saveSettings } from '../lib/settings.js';
@@ -26,6 +27,7 @@ let refreshTimer;
 /** Bumped when the shown instance changes, so late responses for the old one are dropped. */
 let generation = 0;
 
+localizePage();
 init().catch((error) => showOffline(error));
 
 async function init() {
@@ -63,7 +65,7 @@ function showInstance(id) {
   renderPicker();
   online = false;
   $('status-dot').removeAttribute('data-state');
-  $('status-text').textContent = 'Connecting…';
+  $('status-text').textContent = t('status_connecting');
   $('status-hint').hidden = true;
   $('open-app').hidden = true;
   $('recent').hidden = true;
@@ -119,7 +121,7 @@ function showOffline(error) {
 
 async function onOpenApp() {
   $('open-app').disabled = true;
-  $('status-text').textContent = 'Opening Ketch…';
+  $('status-text').textContent = t('status_opening_app');
   $('status-hint').hidden = true;
   try {
     await withClient((client) => client.status(), { launch: true });
@@ -138,7 +140,7 @@ function renderPicker() {
   $('instance-name').hidden = multiple;
   $('instance-name').textContent = instance.name;
   picker.replaceChildren(...settings.instances.map((it) => new Option(
-    it.id === settings.defaultInstanceId ? `${it.name} (default)` : it.name,
+    it.id === settings.defaultInstanceId ? t('instance_name_default', it.name) : it.name,
     it.id,
   )));
   picker.value = instance.id;
@@ -148,7 +150,7 @@ function renderCapture() {
   $('capture').checked = settings.interceptDownloads;
   const target = $('capture-target');
   target.hidden = settings.instances.length < 2;
-  target.textContent = `Sent to ${findInstance(settings).name}`;
+  target.textContent = t('popup_capture_target', findInstance(settings).name);
 }
 
 async function onCaptureChanged(event) {
@@ -164,14 +166,14 @@ async function onAdd(event) {
   const url = input.value.trim();
   if (!url) return;
   if (!isSupportedLinkUrl(url)) {
-    showAddMessage('Enter an http, https, ftp or magnet link.', 'error');
+    showAddMessage(t('popup_unsupported_link'), 'error');
     return;
   }
   $('add-button').disabled = true;
   try {
     const task = await sendToKetch(instance, { url }, settings, { timeoutMs: REQUEST_TIMEOUT_MS });
     input.value = '';
-    showAddMessage(`Added ${taskName(task)}`, 'success');
+    showAddMessage(t('popup_added', taskName(task)), 'success');
     refresh();
   } catch (error) {
     showAddMessage(error.message, 'error');
@@ -254,7 +256,7 @@ function updateTaskItem(item, task) {
   button.hidden = action === null;
   if (action && button.dataset.action !== action) {
     button.dataset.action = action;
-    button.title = action === 'pause' ? 'Pause' : 'Resume';
+    button.title = action === 'pause' ? t('task_pause') : t('task_resume');
     button.setAttribute('aria-label', button.title);
     button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
       `stroke-width="2" stroke-linejoin="round" aria-hidden="true">${ICONS[action]}</svg>`;

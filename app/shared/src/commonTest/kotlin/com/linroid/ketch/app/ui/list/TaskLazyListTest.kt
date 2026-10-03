@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.list
 
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.RowGroup
 import kotlin.test.Test
@@ -14,8 +15,8 @@ class TaskLazyListTest {
   @Test
   fun listEntries_titledGroups_putAHeaderBeforeTheirRows() {
     val groups = listOf(
-      RowGroup("smart:waiting", "Waiting", listOf(queued)),
-      RowGroup("smart:attention", "Needs attention", listOf(canceled))
+      RowGroup("smart:waiting", verbatim("Waiting"), listOf(queued)),
+      RowGroup("smart:attention", verbatim("Needs attention"), listOf(canceled))
     )
 
     val entries = listEntries(groups, GroupCollapse())
@@ -31,14 +32,17 @@ class TaskLazyListTest {
 
   @Test
   fun listEntries_untitledGroup_hasNoHeader() {
-    val entries = listEntries(listOf(RowGroup("all", "", listOf(queued))), GroupCollapse())
+    val entries = listEntries(
+      listOf(RowGroup("all", verbatim(""), listOf(queued))),
+      GroupCollapse()
+    )
 
     assertEquals(listOf(queued.key.encode()), entries.map { it.key })
   }
 
   @Test
   fun listEntries_collapsedGroup_keepsOnlyItsHeader() {
-    val group = RowGroup("smart:waiting", "Waiting", listOf(queued))
+    val group = RowGroup("smart:waiting", verbatim("Waiting"), listOf(queued))
     val collapse = GroupCollapse()
     collapse.toggle(group)
 
@@ -52,7 +56,7 @@ class TaskLazyListTest {
   fun isCollapsed_largeEarlierGroup_startsCollapsedUntilOpened() {
     val group = RowGroup(
       id = "smart:earlier",
-      title = "Added earlier",
+      title = verbatim("Added earlier"),
       rows = listOf(queued),
       collapsedByDefault = true,
     )

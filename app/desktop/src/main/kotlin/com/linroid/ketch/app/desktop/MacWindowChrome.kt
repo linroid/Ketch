@@ -19,9 +19,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.WindowChrome
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.app_title_status
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,8 +76,8 @@ internal fun windowAppearance(darkTheme: Boolean): String =
   if (darkTheme) "NSAppearanceNameDarkAqua" else "NSAppearanceNameAqua"
 
 /** The main window's title: "Ketch — 3 downloading · 45%" while downloading, else "Ketch". */
-internal fun windowTitle(pulse: PulseState): String =
-  pulse.shortSentence()?.let { "Ketch — $it" } ?: "Ketch"
+internal fun windowTitle(pulse: PulseState): UiText =
+  pulse.shortSentence()?.let { Res.string.app_title_status.text(it) } ?: verbatim("Ketch")
 
 /**
  * Sets up this window's macOS title bar: with [fullWindowContent] the content fills the window

@@ -60,12 +60,21 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchMotion
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_add
+import ketch.app.shared.generated.resources.component_add_clip
+import ketch.app.shared.generated.resources.component_add_drop
+import ketch.app.shared.generated.resources.component_add_link
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
 /** What a [KetchAddButton] offers. */
 @Immutable
@@ -153,7 +162,7 @@ internal fun KetchAddButton(
   onAddClip: () -> Unit,
   onOpenSheet: () -> Unit,
   modifier: Modifier = Modifier,
-  addTooltip: String = "Add",
+  addTooltip: String = stringResource(Res.string.action_add),
   shortcut: String? = null,
   clipShortcut: String? = null,
 ) {
@@ -295,7 +304,7 @@ internal fun KetchAddButton(
           ClipLabel(label.clipName, ink)
         } else {
           Text(
-            text = label.text,
+            text = label.text.resolve(),
             style = KetchTheme.typography.label,
             color = ink,
             maxLines = 1,
@@ -336,13 +345,13 @@ internal fun KetchAddButton(
 }
 
 /** What the label shows: [text], or a copied link's [clipName], which fits itself to its room. */
-private data class LabelKey(val text: String, val clipName: String?)
+private data class LabelKey(val text: UiText, val clipName: String?)
 
 /** The label of a button in [mode]. */
-internal fun addLabel(mode: AddButtonMode): String = when (mode) {
-  AddButtonMode.Plain -> "Add"
-  is AddButtonMode.Clip -> "Add ${mode.name}"
-  is AddButtonMode.Drop -> "Drop to download"
+internal fun addLabel(mode: AddButtonMode): UiText = when (mode) {
+  AddButtonMode.Plain -> Res.string.action_add.text()
+  is AddButtonMode.Clip -> Res.string.component_add_clip.text(mode.name)
+  is AddButtonMode.Drop -> Res.string.component_add_drop.text()
 }
 
 /**
@@ -373,16 +382,24 @@ internal fun shortFileName(name: String, max: Int): String {
 }
 
 /**
- * The label of a copied link's button that [fits]: "Add" and the file [name], shortened in the
- * middle as far as needed (see [shortFileName]), or "Add link" where even a short name has no
- * room.
+ * The label of a copied link's button that [fits]: [template] with the file [name], as "Add
+ * ubuntu.iso", the name shortened in the middle as far as needed (see [shortFileName]), or
+ * [fallback], "Add link", where even a short name has no room.
+ *
+ * @param template the label with [CLIP_NAME_SLOT] where the name goes, as
+ *   `component_add_clip` formatted with it.
  */
-internal fun fitClipLabel(name: String, fits: (String) -> Boolean): String {
+internal fun fitClipLabel(
+  name: String,
+  template: String,
+  fallback: String,
+  fits: (String) -> Boolean,
+): String {
   for (length in CLIP_NAME_MAX downTo CLIP_NAME_MIN) {
-    val label = "Add ${shortFileName(name, length)}"
+    val label = template.replace(CLIP_NAME_SLOT, shortFileName(name, length))
     if (fits(label)) return label
   }
-  return CLIP_FALLBACK
+  return fallback
 }
 
 /** A copied link's label, as long as the room the button leaves it allows. */
@@ -390,10 +407,14 @@ internal fun fitClipLabel(name: String, fits: (String) -> Boolean): String {
 private fun ClipLabel(name: String, color: Color) {
   val style = KetchTheme.typography.label
   val measurer = rememberTextMeasurer()
+  val template = stringResource(Res.string.component_add_clip, CLIP_NAME_SLOT)
+  val fallback = stringResource(Res.string.component_add_link)
   BoxWithConstraints(contentAlignment = Alignment.CenterStart) {
     val room = constraints.maxWidth
-    val label = remember(name, room, style) {
-      fitClipLabel(name) { measurer.measure(it, style, maxLines = 1).size.width <= room }
+    val label = remember(name, room, style, template, fallback) {
+      fitClipLabel(name, template, fallback) {
+        measurer.measure(it, style, maxLines = 1).size.width <= room
+      }
     }
     Text(
       text = label,
@@ -611,10 +632,11 @@ private const val SPLIT_ALPHA = 0.32f
 /** Longest copied file name the button shows. */
 private const val CLIP_NAME_MAX = 24
 
-/** Shortest copied file name worth showing; with less room the button says [CLIP_FALLBACK]. */
+/** Shortest copied file name worth showing; with less room the button says "Add link". */
 private const val CLIP_NAME_MIN = 10
 
-private const val CLIP_FALLBACK = "Add link"
+/** Stands for the file name in a formatted clip label until [fitClipLabel] fills it in. */
+internal const val CLIP_NAME_SLOT = "⁣"
 
 /** Longest ending after the last dot that counts as a file extension. */
 private const val MAX_EXTENSION = 5

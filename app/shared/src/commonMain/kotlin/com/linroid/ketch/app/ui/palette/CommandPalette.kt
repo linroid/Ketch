@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -86,6 +87,11 @@ import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.ketchClickable
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.CommandScope
@@ -114,10 +120,29 @@ import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.app.ui.shell.KeyCap
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.shellShortcuts
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.command_palette
+import ketch.app.shared.generated.resources.palette_clear
+import ketch.app.shared.generated.resources.palette_hint_alternate
+import ketch.app.shared.generated.resources.palette_hint_close
+import ketch.app.shared.generated.resources.palette_hint_discover
+import ketch.app.shared.generated.resources.palette_hint_move
+import ketch.app.shared.generated.resources.palette_hint_run
+import ketch.app.shared.generated.resources.palette_no_matches
+import ketch.app.shared.generated.resources.palette_no_matches_hint
+import ketch.app.shared.generated.resources.palette_placeholder
+import ketch.app.shared.generated.resources.palette_placeholder_short
+import ketch.app.shared.generated.resources.shell_device_active
+import ketch.app.shared.generated.resources.shell_device_connecting
+import ketch.app.shared.generated.resources.shell_device_idle
+import ketch.app.shared.generated.resources.shell_device_needs_a_token
+import ketch.app.shared.generated.resources.shell_device_not_connected
+import ketch.app.shared.generated.resources.shell_device_offline
+import ketch.app.shared.generated.resources.shell_device_waiting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 
 /** Sizes of the command palette. */
 internal object PaletteDefaults {
@@ -264,8 +289,9 @@ private fun PalettePanel(
   var keyMoves by remember { mutableIntStateOf(0) }
   val rowCommands = rememberRowCommands(state)
   val source = rememberPaletteSource(state, query.text, canRun, destinations, rowCommands)
-  val results = remember(source, history.recent) {
-    paletteResults(source.query, paletteItems(source), history.recent)
+  // Rows are worded in the language of the window, which loading reads off the main thread.
+  val results by produceState(PaletteResults(emptyList()), source, history.recent) {
+    value = paletteResults(source.query, paletteItems(source), history.recent)
   }
   val items = results.items
   val current = highlighted.coerceIn(0, (items.size - 1).coerceAtLeast(0))
@@ -344,7 +370,9 @@ private fun PalettePanel(
         if (value.text != query.text) highlighted = 0
         query = value
       },
-      placeholder = if (wide) PLACEHOLDER else SHORT_PLACEHOLDER,
+      placeholder = stringResource(
+        if (wide) Res.string.palette_placeholder else Res.string.palette_placeholder_short
+      ),
       link = items.firstOrNull()?.provider == PaletteProvider.Links,
       focus = focus,
       onKey = ::handleKey,
@@ -401,10 +429,10 @@ private fun rememberPaletteSource(
     val device = presence.firstOrNull { it.deviceId == entry.deviceId }
     PaletteDevice(
       deviceId = entry.deviceId,
-      name = device?.name ?: entry.displayName,
+      name = (device?.name ?: entry.displayName).resolve(),
       number = index + 1,
       active = entry == active,
-      line = device?.let(::deviceLine).orEmpty(),
+      line = device?.let { deviceLine(it).resolve() }.orEmpty(),
       reachable = device == null || device.reachable,
     )
   }
@@ -426,7 +454,7 @@ private fun rememberPaletteSource(
       slowLaneSpeed = controller?.slowLaneLimit,
       cap = state.instanceSettings.download?.speedLimit ?: SpeedLimit.Unlimited,
     ),
-    undoLabel = ops.lastOrNull()?.label,
+    undoTitle = ops.lastOrNull()?.undoTitle,
     canRun = canRunTask,
     now = now,
     timeZone = TimeZone.currentSystemDefault(),
@@ -435,15 +463,17 @@ private fun rememberPaletteSource(
 }
 
 /** What a device is doing, after its name: "2 active · 6.4 MB/s", "Idle", "Offline"… */
-private fun deviceLine(device: DevicePresence): String = when {
-  device.health == DeviceHealth.Unauthorized -> "Needs a token"
-  !device.connected -> "Not connected"
-  device.health is DeviceHealth.Offline -> "Offline"
-  device.health == DeviceHealth.Connecting -> "Connecting"
-  device.counts.downloading > 0 ->
-    "${device.counts.downloading} active · ${formatBytes(device.speed)}/s"
-  device.counts.waiting > 0 -> "${device.counts.waiting} waiting"
-  else -> "Idle"
+private fun deviceLine(device: DevicePresence): UiText = when {
+  device.health == DeviceHealth.Unauthorized -> Res.string.shell_device_needs_a_token.text()
+  !device.connected -> Res.string.shell_device_not_connected.text()
+  device.health is DeviceHealth.Offline -> Res.string.shell_device_offline.text()
+  device.health == DeviceHealth.Connecting -> Res.string.shell_device_connecting.text()
+  device.counts.downloading > 0 -> listOf(
+    Res.plurals.shell_device_active.text(device.counts.downloading),
+    speedText(device.speed)
+  ).joinText()
+  device.counts.waiting > 0 -> Res.plurals.shell_device_waiting.text(device.counts.waiting)
+  else -> Res.string.shell_device_idle.text()
 }
 
 // Offline or refused for want of a token, as [deviceLine] reads it; a device the app does not
@@ -467,6 +497,7 @@ private fun PaletteInput(
     fontWeight = FontWeight.Normal,
     color = colors.textPrimary,
   )
+  val description = stringResource(Res.string.command_palette)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
@@ -492,7 +523,7 @@ private fun PaletteInput(
         .weight(1f)
         .focusRequester(focus)
         .onPreviewKeyEvent(onKey)
-        .semantics { contentDescription = "Command palette" },
+        .semantics { contentDescription = description },
       decorationBox = { field ->
         Box(contentAlignment = Alignment.CenterStart) {
           if (value.text.isEmpty()) {
@@ -513,7 +544,7 @@ private fun PaletteInput(
         icon = KetchIcon.Close,
         onClick = { onValueChange(TextFieldValue()) },
         size = KetchButtonSize.Small,
-        contentDescription = "Clear",
+        contentDescription = stringResource(Res.string.palette_clear),
         modifier = Modifier.focusProperties { canFocus = false },
       )
     }
@@ -542,7 +573,7 @@ private fun PaletteList(
   ) {
     itemsIndexed(results.entries, contentType = { _, entry -> entry::class }) { _, entry ->
       when (entry) {
-        is PaletteEntry.Header -> SectionHeader(entry.title)
+        is PaletteEntry.Header -> SectionHeader(entry.title.resolve())
         is PaletteEntry.Row -> PaletteRow(
           item = entry.item,
           highlighted = entry.index == highlighted,
@@ -798,14 +829,14 @@ private fun NoMatches(query: String, modifier: Modifier = Modifier) {
       .padding(horizontal = spacing.s6, vertical = spacing.s8),
   ) {
     Text(
-      text = "Nothing matches “$query”",
+      text = stringResource(Res.string.palette_no_matches, query),
       style = KetchTheme.typography.bodyStrong,
       color = colors.textPrimary,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
     Text(
-      text = "Try a file name, a command such as “pause”, a link or /speed",
+      text = stringResource(Res.string.palette_no_matches_hint),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
     )
@@ -821,11 +852,16 @@ private fun KeyHints(discover: Boolean) {
       KetchCommands.PaletteUp.shortcutLabel(),
       KetchCommands.PaletteDown.shortcutLabel()
     ).joinToString("")
-    add(move to "move")
-    KetchCommands.PaletteRun.shortcutLabel()?.let { add(it to "run") }
-    KetchCommands.PaletteAlternate.shortcutLabel()?.let { add(it to "alternate") }
-    if (discover) KetchCommands.PaletteDiscover.shortcutLabel()?.let { add(it to "Discover") }
-    KetchCommands.PaletteClose.shortcutLabel()?.let { add(it.lowercase() to "close") }
+    add(move to Res.string.palette_hint_move)
+    KetchCommands.PaletteRun.shortcutLabel()?.let { add(it to Res.string.palette_hint_run) }
+    KetchCommands.PaletteAlternate.shortcutLabel()
+      ?.let { add(it to Res.string.palette_hint_alternate) }
+    if (discover) {
+      KetchCommands.PaletteDiscover.shortcutLabel()
+        ?.let { add(it to Res.string.palette_hint_discover) }
+    }
+    KetchCommands.PaletteClose.shortcutLabel()
+      ?.let { add(it.lowercase() to Res.string.palette_hint_close) }
   }
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -841,7 +877,11 @@ private fun KeyHints(discover: Boolean) {
         Text(text = "·", style = KetchTheme.typography.caption, color = colors.textTertiary)
       }
       Text(text = key, style = KetchTheme.typography.labelS, color = colors.textSecondary)
-      Text(text = label, style = KetchTheme.typography.caption, color = colors.textTertiary)
+      Text(
+        text = stringResource(label),
+        style = KetchTheme.typography.caption,
+        color = colors.textTertiary,
+      )
     }
   }
 }
@@ -869,6 +909,3 @@ private object WindowOrigin : PopupPositionProvider {
     popupContentSize: IntSize,
   ): IntOffset = IntOffset.Zero
 }
-
-private const val PLACEHOLDER = "Paste a link, search downloads, or type a command"
-private const val SHORT_PLACEHOLDER = "Paste a link, search, or type a command"

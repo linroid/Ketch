@@ -1,10 +1,13 @@
 package com.linroid.ketch.app.ui.pulse
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseState
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -18,7 +21,7 @@ class PulseSheetTest {
     devices = listOf(
       DevicePulse(
         deviceId = "local",
-        name = "This Mac",
+        name = verbatim("This Mac"),
         health = health,
         counts = PulseCounts(downloading = downloading),
         failures = 0,
@@ -35,23 +38,25 @@ class PulseSheetTest {
   )
 
   @Test
-  fun pulseSubtitle_downloading_readsSpeedActiveAndMode() {
+  fun pulseSubtitle_downloading_readsSpeedActiveAndMode() = runTest {
     assertEquals(
       "↓ 4.2 MB/s · 2 active · Full speed",
-      pulseSubtitle(pulse(downloading = 2, speed = 4_404_019), "Full speed")
+      pulseSubtitle(pulse(downloading = 2, speed = 4_404_019), verbatim("Full speed")).load()
     )
   }
 
   @Test
-  fun pulseSubtitle_idle_readsIdle() {
-    assertEquals("Idle · Slow lane · 1 MB/s", pulseSubtitle(pulse(), "Slow lane · 1 MB/s"))
-  }
-
-  @Test
-  fun pulseSubtitle_offline_namesTheConnection() {
+  fun pulseSubtitle_idle_readsIdle() = runTest {
     assertEquals(
-      "Offline · Full speed",
-      pulseSubtitle(pulse(health = DeviceHealth.Offline(), downloading = 1), "Full speed")
+      "Idle · Slow lane · 1 MB/s",
+      pulseSubtitle(pulse(), verbatim("Slow lane · 1 MB/s")).load()
     )
+  }
+
+  @Test
+  fun pulseSubtitle_offline_namesTheConnection() = runTest {
+    val offline = pulse(health = DeviceHealth.Offline(), downloading = 1)
+
+    assertEquals("Offline · Full speed", pulseSubtitle(offline, verbatim("Full speed")).load())
   }
 }

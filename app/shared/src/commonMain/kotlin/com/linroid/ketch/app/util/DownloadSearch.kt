@@ -3,11 +3,28 @@ package com.linroid.ketch.app.util
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.StatusFilter
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.file_type_app
+import ketch.app.shared.generated.resources.file_type_archive
+import ketch.app.shared.generated.resources.file_type_audio
+import ketch.app.shared.generated.resources.file_type_doc
+import ketch.app.shared.generated.resources.file_type_image
+import ketch.app.shared.generated.resources.file_type_other
+import ketch.app.shared.generated.resources.file_type_torrent
+import ketch.app.shared.generated.resources.file_type_video
+import ketch.app.shared.generated.resources.origin_agent
+import ketch.app.shared.generated.resources.origin_app
+import ketch.app.shared.generated.resources.origin_browser
+import ketch.app.shared.generated.resources.origin_cli
+import ketch.app.shared.generated.resources.origin_discover
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -17,14 +34,16 @@ import kotlin.time.Instant
  * Where a task was added from, recorded in its request property [TaskOrigin.PROPERTY].
  *
  * @property id value of the property and of the `origin:` search token.
- * @property label name shown in the Origin column.
  */
-enum class TaskOrigin(val id: String, val label: String) {
-  Browser("browser", "Browser"),
-  Discover("discover", "Discover"),
-  Agent("agent", "Agent"),
-  App("app", "App"),
-  Cli("cli", "CLI");
+enum class TaskOrigin(val id: String, private val resource: StringResource) {
+  Browser("browser", Res.string.origin_browser),
+  Discover("discover", Res.string.origin_discover),
+  Agent("agent", Res.string.origin_agent),
+  App("app", Res.string.origin_app),
+  Cli("cli", Res.string.origin_cli);
+
+  /** Name shown in the Origin column. */
+  val label: UiText get() = resource.text()
 
   companion object {
     /**
@@ -49,17 +68,19 @@ enum class TaskOrigin(val id: String, val label: String) {
  * [FileKind]s.
  *
  * @property id value of the `type:` search token.
- * @property label group title.
  */
-enum class FileType(val id: String, val label: String) {
-  Video("video", "Video"),
-  Audio("audio", "Audio"),
-  Image("image", "Images"),
-  Doc("doc", "Documents"),
-  Archive("archive", "Archives"),
-  App("app", "Apps"),
-  Torrent("torrent", "Torrents"),
-  Other("other", "Other");
+enum class FileType(val id: String, private val resource: StringResource) {
+  Video("video", Res.string.file_type_video),
+  Audio("audio", Res.string.file_type_audio),
+  Image("image", Res.string.file_type_image),
+  Doc("doc", Res.string.file_type_doc),
+  Archive("archive", Res.string.file_type_archive),
+  App("app", Res.string.file_type_app),
+  Torrent("torrent", Res.string.file_type_torrent),
+  Other("other", Res.string.file_type_other);
+
+  /** Group title. */
+  val label: UiText get() = resource.text()
 
   companion object {
     /** The type [kind] belongs to. */

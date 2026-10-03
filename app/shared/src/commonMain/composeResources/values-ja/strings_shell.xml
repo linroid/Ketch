@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">ダウンロード</string>
+  <string name="shell_destination_discover">ディスカバー</string>
+  <string name="shell_destination_devices">デバイス</string>
+  <string name="shell_settings">設定</string>
+  <string name="shell_devices">デバイス</string>
+  <string name="shell_show_sidebar">サイドバーを表示</string>
+  <string name="shell_hide_sidebar">サイドバーを非表示</string>
+  <string name="shell_appearance_light">ライトに切り替え</string>
+  <string name="shell_appearance_dark">ダークに切り替え</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="other">%1$s、%2$d件ダウンロード中</item>
+  </plurals>
+  <string name="shell_device_described">%1$s、%2$s</string>
+
+  <string name="shell_device_needs_token">トークンが必要</string>
+  <string name="shell_device_needs_a_token">トークンが必要です</string>
+  <string name="shell_device_needs_new_token">新しいアクセストークンが必要です</string>
+  <string name="shell_device_off">オフ</string>
+  <string name="shell_device_not_connected">未接続</string>
+  <string name="shell_device_offline">オフライン</string>
+  <string name="shell_device_last_seen">最終接続は%1$s前</string>
+  <string name="shell_device_connecting">接続中</string>
+  <string name="shell_device_connecting_now">接続中…</string>
+  <string name="shell_device_idle">アイドル</string>
+  <string name="shell_device_slow_lane">スローレーン</string>
+  <plurals name="shell_device_active">
+    <item quantity="other">%1$d件実行中</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="other">%1$d件待機中</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%2$d台中%1$d台がオンライン</string>
+
+  <string name="sidebar_all_devices_tooltip">すべてのデバイスのダウンロード</string>
+  <string name="sidebar_add_device">デバイスを追加</string>
+  <string name="sidebar_device_menu">デバイスメニュー</string>
+  <string name="sidebar_menu_pause_all">このデバイスですべて一時停止</string>
+  <string name="sidebar_menu_resume_all">このデバイスですべて再開</string>
+  <string name="sidebar_menu_retry_failed">このデバイスで失敗したものを再試行</string>
+  <string name="sidebar_menu_retry_failed_count">このデバイスで失敗したものを再試行（%1$d）</string>
+  <string name="sidebar_menu_speed">速度</string>
+  <string name="sidebar_menu_settings">このデバイスの設定…</string>
+  <string name="sidebar_menu_full_speed">フルスピード</string>
+  <string name="sidebar_menu_slow_lane">スローレーン · %1$s</string>
+  <string name="sidebar_menu_no_limit">制限なし</string>
+
+  <string name="switcher_overview">概要</string>
+  <string name="switcher_add_device">デバイスを追加…</string>
+  <string name="switcher_find_on_network">ネットワーク上で探す</string>
+  <string name="switcher_share">%1$sを共有…</string>
+
+  <string name="shell_device_button">%1$s、デバイスを切り替え</string>
+  <string name="shell_device_button_back">前のデバイスに戻る</string>
+  <string name="shell_more">その他</string>
+  <string name="shell_clear_finished">完了したものをクリア</string>
+  <string name="shell_search_close">検索を閉じる</string>
+  <string name="shell_search_placeholder">検索・リンク貼り付け</string>
+  <string name="shell_search_download_on">%1$sでダウンロード</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="other">%2$sで%1$d件のリンクをダウンロード</item>
+  </plurals>
+  <string name="shell_discover_query">「%1$s」をディスカバーで検索</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="other">未読%1$d件</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">クリップボードにリンクがありません</string>
+  <string name="shell_file_picker_failed">ファイルの選択画面を開けませんでした</string>
+
+  <string name="banner_connecting">%1$sに接続中…</string>
+  <string name="banner_offline">%1$sはオフラインです</string>
+  <string name="banner_retrying">再試行中</string>
+  <string name="banner_retry_now">今すぐ再試行</string>
+  <string name="banner_switch_to">%1$sに切り替え</string>
+  <string name="banner_unauthorized">%1$sには新しいアクセストークンが必要です</string>
+  <string name="banner_enter_token">トークンを入力</string>
+  <string name="toast_subject_reason">%1$s：%2$s</string>
+
+  <string name="drop_to_download">ドロップしてダウンロード</string>
+  <string name="drop_kinds">リンク、マグネットリンク、.torrentファイル、リンクの一覧</string>
+  <string name="drop_unreachable">現在接続できません</string>
+  <string name="drop_here">ここにドロップ</string>
+  <string name="drop_already_here">すでにこのデバイスにあります</string>
+  <string name="drop_move_it">ここに移動</string>
+  <string name="drop_send_it">ここに送信</string>
+  <string name="drop_move_count">%1$d件をここに移動</string>
+  <string name="drop_send_count">%1$d件をここに送信</string>
+  <string name="drop_key_moves">%1$sで移動</string>
+  <string name="berth_drop_on">%1$sにドロップ</string>
+  <string name="berth_ready">準備完了</string>
+
+  <string name="palette_placeholder">リンクを貼り付け、ダウンロードを検索、またはコマンドを入力</string>
+  <string name="palette_placeholder_short">リンクを貼り付け、検索、またはコマンドを入力</string>
+  <string name="palette_clear">クリア</string>
+  <string name="palette_no_matches">「%1$s」に一致するものはありません</string>
+  <string name="palette_no_matches_hint">ファイル名、「一時停止」などのコマンド、リンク、/speedを入力してみてください</string>
+  <string name="palette_hint_move">移動</string>
+  <string name="palette_hint_run">実行</string>
+  <string name="palette_hint_alternate">別の操作</string>
+  <string name="palette_hint_discover">ディスカバー</string>
+  <string name="palette_hint_close">閉じる</string>
+  <string name="palette_section_recent">最近</string>
+  <string name="palette_section_links">ダウンロード</string>
+  <string name="palette_section_speed">速度</string>
+  <string name="palette_section_commands">コマンド</string>
+  <string name="palette_section_downloads">ダウンロード一覧</string>
+  <string name="palette_section_navigation">移動</string>
+  <string name="palette_section_devices">デバイス</string>
+  <string name="palette_section_search">検索</string>
+
+  <plurals name="palette_links">
+    <item quantity="other">%1$d件のリンク</item>
+  </plurals>
+  <string name="palette_download">%1$sをダウンロード</string>
+  <string name="palette_on_device">%1$sで</string>
+  <string name="palette_verb_download">ダウンロード</string>
+  <string name="palette_add_with_options">オプションを指定して追加…</string>
+  <string name="palette_add_with_options_detail">フォルダ、速度、優先度、開始時刻</string>
+  <string name="palette_limit_to">ダウンロード速度を%1$sに制限</string>
+  <string name="palette_slow_lane_to">スローレーンを%1$sに設定</string>
+  <string name="palette_slow_lane_turns_on">スローレーンをオンにします</string>
+  <string name="palette_slow_lane_is_on">スローレーンはオンです</string>
+  <string name="palette_slow_lane_now">現在%1$s</string>
+  <string name="palette_limit_while_off">スローレーンがオフのときに適用されます</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="other">%1$d件のダウンロードを一時停止</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">一時停止するものはありません</string>
+  <plurals name="palette_resume_count">
+    <item quantity="other">一時停止中の%1$d件を再開</item>
+  </plurals>
+  <string name="palette_nothing_paused">一時停止中のものはありません</string>
+  <plurals name="palette_retry_count">
+    <item quantity="other">失敗した%1$d件のダウンロードを再試行</item>
+  </plurals>
+  <string name="palette_nothing_failed">失敗したものはありません</string>
+  <string name="palette_slow_lane_off">スローレーンをオフにする</string>
+  <string name="palette_slow_lane_on">スローレーンをオンにする</string>
+  <string name="palette_nothing_to_undo">取り消すものはありません</string>
+  <string name="palette_full_speed">フルスピード</string>
+  <string name="palette_full_speed_slow_lane">スローレーンをオフにします</string>
+  <string name="palette_full_speed_rules">速度ルールをオフにします</string>
+  <string name="palette_full_speed_cap">%1$sの制限を解除します</string>
+  <string name="palette_full_speed_already">すでにフルスピードです</string>
+  <string name="palette_full_speed_keywords">無制限、制限なし、制限解除、最高速度、最大速度、全速</string>
+  <string name="palette_speed_not_loaded">速度制限をまだ読み込んでいません</string>
+
+  <string name="palette_downloads_tab">ダウンロード › %1$s</string>
+  <string name="palette_none">なし</string>
+  <string name="palette_settings_page">設定 › %1$s</string>
+  <string name="palette_pause_all_on">%1$sですべて一時停止</string>
+  <string name="palette_resume_all_on">%1$sですべて再開</string>
+  <string name="palette_retry_failed_on">%1$sで失敗したものを再試行</string>
+  <string name="palette_show_in_downloads">「%1$s」をダウンロード一覧で表示</string>
+  <plurals name="palette_matches">
+    <item quantity="other">%1$d件一致</item>
+  </plurals>
+  <string name="palette_discover_detail">Webでダウンロードを探す</string>
+</resources>

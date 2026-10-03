@@ -3,9 +3,11 @@ package com.linroid.ketch.app.ui.devices
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SettingsTarget
@@ -18,6 +20,8 @@ import com.linroid.ketch.app.ui.pulse.speedModeFor
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_reconnect_failed
 import kotlinx.coroutines.Job
 
 private val log = KetchLogger("DevicesPage")
@@ -57,7 +61,7 @@ internal fun AppState.retryNow(device: RemoteInstance): Job = launchCommand {
     log.w { "Couldn't reconnect to ${device.deviceId}: ${e.describeCauses()}" }
     messages.post(
       level = MessageLevel.Error,
-      title = "Couldn't reconnect to ${device.label}",
+      title = Res.string.device_reconnect_failed.text(device.displayName),
       cause = e,
       deviceId = device.deviceId,
     )

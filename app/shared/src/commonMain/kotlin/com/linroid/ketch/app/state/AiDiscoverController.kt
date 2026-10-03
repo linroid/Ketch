@@ -10,7 +10,12 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.TaskOrigin
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.discover_failed
+import ketch.app.shared.generated.resources.discover_unavailable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -74,7 +79,7 @@ class AiDiscoverController(
         pending = DiscoverRequest(query, siteList).takeIf { query.isNotBlank() }
         state = AiDiscoverState.Idle
       } else {
-        state = AiDiscoverState.Error("AI discovery is not available on this device.")
+        state = AiDiscoverState.Error(Res.string.discover_unavailable.text())
       }
       return
     }
@@ -98,7 +103,9 @@ class AiDiscoverController(
         state = AiDiscoverState.Results(candidates = response.candidates)
       }.onFailure { e ->
         log.w { "Discovery failed: ${e.describeCauses()}" }
-        state = AiDiscoverState.Error(e.message ?: "Discovery failed")
+        // The engine's message, such as the provider rejecting the token, says what to fix.
+        val message = e.message?.let(::verbatim) ?: Res.string.discover_failed.text()
+        state = AiDiscoverState.Error(message)
       }
     }
   }

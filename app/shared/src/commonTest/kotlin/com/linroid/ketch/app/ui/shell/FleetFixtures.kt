@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.backgroundChild
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
@@ -95,7 +96,7 @@ internal object FleetFixtures {
     speedMode: SpeedMode = SpeedMode.Full,
   ) = DevicePresence(
     entry = entry,
-    name = name,
+    name = verbatim(name),
     detail = detail,
     health = health,
     connected = connected,

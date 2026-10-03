@@ -22,6 +22,8 @@ dependencies {
   implementation(projects.library.server)
   implementation(projects.library.sqlite)
   implementation(compose.desktop.currentOs)
+  // The menu bar, tray and dialog strings in src/main/composeResources.
+  implementation(libs.compose.components.resources)
   implementation(libs.kotlinx.coroutinesSwing)
   implementation(libs.kotlinx.serialization.json)
   // SLF4J backend for Ktor server and Koog; much smaller than Logback.
@@ -29,6 +31,58 @@ dependencies {
 
   testImplementation(libs.kotlin.test)
   testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// Chinese is written once per script and copied for the systems that name it by script or by
+// another region, as app/shared/build.gradle.kts does for the shared strings.
+val composeResourcesWithAliases = layout.buildDirectory.dir("generated/composeResourcesWithAliases")
+val aliasComposeResources = tasks.register<Sync>("aliasComposeResources") {
+  val source = layout.projectDirectory.dir("src/main/composeResources")
+  from(source)
+  for (alias in listOf("values-b+zh+Hant", "values-zh-rHK", "values-zh-rMO")) {
+    from(source.dir("values-zh-rTW")) { into(alias) }
+  }
+  from(source.dir("values-zh")) { into("values-b+zh+Hans") }
+  into(composeResourcesWithAliases)
+}
+
+compose.resources {
+  customDirectory(
+    sourceSetName = "main",
+    directoryProvider = aliasComposeResources.map { composeResourcesWithAliases.get() },
+  )
+}
+
+// The languages of the desktop's strings, as macOS names them: English and one per values-*
+// folder. macOS shows its own parts of an app, such as the app menu's Services, Hide and Quit and
+// the Open and Save dialogs, only in the languages the app's bundle lists; see
+// docs/development/localization.md.
+val macLocalizations = listOf("en") +
+  layout.projectDirectory.dir("src/main/composeResources").asFile.list().orEmpty()
+    .filter { it.startsWith("values-") }
+    .sorted()
+    .map { macLocalization(it.removePrefix("values-")) }
+
+// A resource folder's qualifier as macOS names its language: "ja" for ja, "pt-BR" for pt-rBR,
+// and Chinese by script: "zh-Hant" for Taiwan, Hong Kong and Macau, else "zh-Hans".
+fun macLocalization(qualifier: String): String {
+  val language = qualifier.substringBefore("-r")
+  val region = qualifier.substringAfter("-r", "")
+  return when {
+    language == "zh" -> if (region in setOf("TW", "HK", "MO")) "zh-Hant" else "zh-Hans"
+    region.isEmpty() -> language
+    else -> "$language-$region"
+  }
+}
+
+tasks.test {
+  // Tests read the English strings and format numbers the English way, whatever the machine's
+  // language and region.
+  for (category in listOf("", ".display", ".format")) {
+    systemProperty("user.language$category", "en")
+    systemProperty("user.country$category", "US")
+    systemProperty("user.script$category", "")
+  }
 }
 
 // sqlite-jdbc bundles its native library for ~30 OS/arch pairs (~25 MB). A desktop package only
@@ -136,9 +190,16 @@ compose.desktop {
         // permission and other per-app macOS state.
         bundleID = "com.linroid.ketch.app.desktop"
         // Lists Ketch as an app for magnet: links, and for ketch: pairing links; macOS delivers
-        // them through Desktop.setOpenURIHandler (MagnetHandler.kt).
+        // them through Desktop.setOpenURIHandler (MagnetHandler.kt). CFBundleLocalizations names
+        // the languages macOS may show the app in. The Compose plugin already sets
+        // CFBundleAllowMixedLocalizations to true; repeating it here would duplicate the key.
+        val localizations = macLocalizations.joinToString("\n") { "|    <string>$it</string>" }
         infoPlist {
           extraKeysRawXml = """
+            |  <key>CFBundleLocalizations</key>
+            |  <array>
+            $localizations
+            |  </array>
             |  <key>CFBundleURLTypes</key>
             |  <array>
             |    <dict>

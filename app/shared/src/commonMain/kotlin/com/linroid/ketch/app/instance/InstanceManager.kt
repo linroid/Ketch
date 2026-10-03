@@ -8,6 +8,8 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
@@ -16,6 +18,8 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_server_start_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -198,9 +202,7 @@ class InstanceManager(
   suspend fun switchTo(instance: InstanceEntry) {
     connectionLock.withLock {
       val deviceId = instance.deviceId
-      val target = requireNotNull(entryOf(deviceId)) {
-        "Instance not found: ${instance.label}"
-      }
+      val target = requireNotNull(entryOf(deviceId)) { "Instance not found: ${instance.label}" }
       _deviceScope.value = DeviceScope.Single(deviceId)
       if (deviceId == _activeInstance.value?.deviceId) return
       _activeInstance.value = target
@@ -240,9 +242,7 @@ class InstanceManager(
    */
   fun startServer() {
     val api = embeddedInstance?.instance
-      ?: throw UnsupportedOperationException(
-        "No embedded instance for local server",
-      )
+      ?: throw UnsupportedOperationException("No embedded instance for local server")
     val config = configStore?.load()?.server ?: ServerConfig()
     factory.stopServer()
     _serverState.value = try {
@@ -250,7 +250,9 @@ class InstanceManager(
       ServerState.Running(config)
     } catch (e: Exception) {
       // Typically the port is taken; report it instead of crashing.
-      ServerState.Failed(e.message ?: "Could not start the server.")
+      ServerState.Failed(
+        e.message?.let(::verbatim) ?: Res.string.device_server_start_failed.text(),
+      )
     }
   }
 
@@ -328,9 +330,7 @@ class InstanceManager(
    * Its client is closed.
    */
   suspend fun removeInstance(instance: InstanceEntry) {
-    require(instance !is EmbeddedInstance) {
-      "Cannot remove the embedded instance"
-    }
+    require(instance !is EmbeddedInstance) { "Cannot remove the embedded instance" }
     val deviceId = instance.deviceId
     if (_activeInstance.value?.deviceId == deviceId) {
       if (embeddedInstance != null) {

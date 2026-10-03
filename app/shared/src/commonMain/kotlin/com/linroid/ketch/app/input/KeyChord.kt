@@ -87,7 +87,7 @@ data class KeyChord(
     }
     return listOfNotNull(
       "Ctrl".takeIf { primary || ctrl },
-      "Alt".takeIf { alt },
+      ALT.takeIf { alt },
       "Shift".takeIf { shift },
       name,
     ).joinToString("+")
@@ -100,6 +100,12 @@ data class KeyChord(
   internal fun typesText(platform: KeyboardPlatform): Boolean =
     !primary && !ctrl && (!alt || platform.isApple) && key in printableKeys
 }
+
+/**
+ * How [platform] names the ⌥ (Alt) key on its own, as its key cap does: "⌥" on Apple keyboards,
+ * "Alt" elsewhere.
+ */
+internal fun altKeyName(platform: KeyboardPlatform): String = if (platform.isApple) "⌥" else ALT
 
 /**
  * A key and the physical modifiers held with it, as an event reports them.
@@ -127,6 +133,9 @@ fun KeyEvent.toKeyPress(): KeyPress = KeyPress(
   alt = isAltPressed,
   shift = isShiftPressed,
 )
+
+// Key names stay English on every language: they match the legends printed on keyboards.
+private const val ALT = "Alt"
 
 private val letterKeys = listOf(
   Key.A, Key.B, Key.C, Key.D, Key.E, Key.F, Key.G, Key.H, Key.I, Key.J, Key.K, Key.L, Key.M,

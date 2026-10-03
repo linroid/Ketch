@@ -1,8 +1,10 @@
 package com.linroid.ketch.app.util
 
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.util.IntakeItem.Discover
 import com.linroid.ketch.app.util.IntakeItem.Link
 import com.linroid.ketch.app.util.IntakeItem.Range
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -156,13 +158,13 @@ class LinkParserTest {
   }
 
   @Test
-  fun parseIntake_rangePastTheCap_isCutWithAWarning() {
+  fun parseIntake_rangePastTheCap_isCutWithAWarning() = runTest {
     val range = assertIs<Range>(parse("https://x.org/f[1-500].bin").single())
 
     assertEquals(MAX_EXPANDED_LINKS, range.urls.size)
     assertEquals("https://x.org/f200.bin", range.urls.last())
     assertTrue(range.truncated)
-    assertEquals("Expanded to the first 200 links", range.warning)
+    assertEquals("Expanded to the first 200 links", range.warning.load())
   }
 
   @Test

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">찾기</string>
+  <string name="discover_settings">찾기 설정</string>
+  <string name="discover_hero_title">원하는 것을 설명하세요. 다운로드는 Ketch가 찾아 드립니다.</string>
+  <string name="discover_intro_body">찾기는 %1$s에 웹 검색과 찾은 페이지 읽기를 맡긴 다음 신뢰할 수 있는 파일만 보여 줍니다. 직접 추가하기 전에는 아무것도 다운로드되지 않습니다.</string>
+  <string name="discover_example_blender">Apple 실리콘용 Blender</string>
+  <string name="discover_example_ubuntu">Ubuntu 24.04 서버 ISO</string>
+  <string name="discover_example_footage">퍼블릭 도메인 4K 자연 영상</string>
+  <string name="discover_example_quoted">“%1$s”</string>
+
+  <string name="discover_setup_body">찾기는 AI 모델에 웹 검색과 찾은 페이지 읽기를 맡긴 다음 신뢰할 수 있는 파일만 보여 줍니다. 검색 내용은 선택한 제공업체로 전송됩니다.</string>
+  <string name="discover_setup_unsupported">찾기는 컴퓨터나 Android 휴대폰의 Ketch 앱에서 사용할 수 있습니다.</string>
+  <string name="discover_setup_pending">찾기 설정이 끝나면 “%1$s” 검색이 바로 실행됩니다.</string>
+  <string name="discover_setup_choose_model">모델 선택</string>
+  <string name="discover_setup_local_provider">%1$s · 로컬에서 실행, 키 불필요</string>
+  <string name="discover_setup_finish">%1$s 설정 마치기</string>
+  <string name="discover_setup_in_settings">설정에서 구성하기</string>
+  <string name="discover_provider_openai_compatible">OpenAI 호환</string>
+
+  <string name="discover_query_placeholder">다운로드할 항목을 설명하세요</string>
+  <string name="discover_find">검색</string>
+  <string name="discover_stop">중지</string>
+  <string name="discover_sites_limit">특정 웹사이트로 제한</string>
+  <plurals name="discover_sites_count">
+    <item quantity="other">웹사이트 %1$d개</item>
+  </plurals>
+  <string name="discover_sites_hint">이 웹사이트와 하위 도메인에서만 검색합니다. 쉼표로 구분하세요.</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="other">이전 단계 %1$d개</item>
+  </plurals>
+  <string name="discover_step_starting">검색 시작 중</string>
+
+  <string name="discover_select_all">모두 선택</string>
+  <string name="discover_clear_selection">선택 해제</string>
+  <plurals name="discover_results">
+    <item quantity="other">다운로드 %1$d개</item>
+  </plurals>
+  <string name="discover_results_for">“%1$s” 검색 결과</string>
+  <string name="discover_match">%1$s 일치</string>
+  <string name="discover_match_tooltip">검색어와 일치하는 정도</string>
+  <string name="discover_not_encrypted">암호화되지 않음</string>
+  <string name="discover_error_title">찾기에서 이 검색을 완료하지 못했습니다</string>
+  <string name="discover_failed">찾기 실패</string>
+  <string name="discover_unavailable">이 기기에서는 AI 찾기를 사용할 수 없습니다.</string>
+  <string name="discover_none_title">다운로드를 찾지 못했습니다</string>
+  <string name="discover_none_body">찾기는 신뢰할 수 있는 출처의 파일만 보여 줍니다. 버전이나 플랫폼, 또는 배포하는 웹사이트를 함께 입력해 보세요.</string>
+  <string name="discover_search_everywhere">웹 전체 검색</string>
+
+  <string name="discover_select_to_add">추가할 다운로드 선택</string>
+  <plurals name="discover_selected">
+    <item quantity="other">%1$d개 선택됨</item>
+  </plurals>
+  <string name="discover_add_now">지금 추가</string>
+  <string name="discover_review_add">검토 후 추가</string>
+  <string name="discover_review_add_count">%1$d개 검토 후 추가</string>
+</resources>

@@ -31,6 +31,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LocalAppState
@@ -51,6 +53,9 @@ import com.linroid.ketch.app.ui.inspector.tabs.count
 import com.linroid.ketch.app.ui.inspector.tabs.rememberInspectorTabs
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_copied_name
+import ketch.app.shared.generated.resources.inspector_copy_failed_name
 
 /** Where the task inspector shows. */
 enum class InspectorPlacement {
@@ -226,7 +231,9 @@ private fun TaskView(
     stalled = stalled,
     onReason = { action -> runReason(state, row, runner, action) },
     onCopyName = {
-      copier.copy(row.name, "name") { state.messages.post(MessageLevel.Success, "Copied the name") }
+      copier.copy(row.name, Res.string.inspector_copy_failed_name.text()) {
+        state.messages.post(MessageLevel.Success, Res.string.inspector_copied_name.text())
+      }
     },
     onClose = onClose,
   )
@@ -238,7 +245,7 @@ private fun TaskView(
       options = tabs,
       selected = shown,
       onSelect = onTab,
-      label = { it.title },
+      label = { it.title.resolve() },
       count = { it.count(row) },
     )
   }

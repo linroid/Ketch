@@ -1,8 +1,15 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.intake_file_empty
+import ketch.app.shared.generated.resources.intake_file_too_large
+import ketch.app.shared.generated.resources.intake_file_unreadable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,8 +75,11 @@ sealed interface IncomingDownload {
     override fun toString(): String = "Pairing($label)"
   }
 
-  /** The input could not be read; [message] explains why. */
-  data class Failed(override val label: String, val message: String) : IncomingDownload
+  /** The input could not be read; [reason] explains why. */
+  data class Failed(override val label: String, val reason: UiText) : IncomingDownload {
+    /** A failure explained by [message] from elsewhere, such as an exception's. */
+    constructor(label: String, message: String) : this(label, verbatim(message))
+  }
 }
 
 /** How [IncomingDownload.Links] reached the app. */
@@ -196,16 +206,17 @@ class IncomingDownloads {
 
   /** Reports that the file named [name] could not be read. */
   fun offerUnreadable(name: String, cause: Throwable) {
-    offer(IncomingDownload.Failed(name, cause.message ?: "The file could not be read"))
+    val reason = cause.message?.let(::verbatim) ?: Res.string.intake_file_unreadable.text()
+    offer(IncomingDownload.Failed(name, reason))
   }
 }
 
 /** Checks `.torrent` file contents read by a platform entry point. */
 fun torrentFileDownload(name: String, bytes: ByteArray): IncomingDownload = when {
-  bytes.isEmpty() -> IncomingDownload.Failed(name, "The file is empty")
+  bytes.isEmpty() -> IncomingDownload.Failed(name, Res.string.intake_file_empty.text())
   bytes.size > MAX_TORRENT_FILE_BYTES -> IncomingDownload.Failed(
     name,
-    "The file is larger than ${MAX_TORRENT_FILE_BYTES / 1024 / 1024} MiB",
+    Res.string.intake_file_too_large.text(MAX_TORRENT_FILE_BYTES / 1024 / 1024),
   )
   else -> IncomingDownload.Ready(name, bytes)
 }

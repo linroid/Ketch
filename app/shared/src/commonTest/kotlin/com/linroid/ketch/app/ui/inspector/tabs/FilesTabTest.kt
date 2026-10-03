@@ -6,6 +6,9 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures.START
 import com.linroid.ketch.app.state.ListFixtures.downloading
 import com.linroid.ketch.app.state.ListFixtures.row
@@ -13,13 +16,14 @@ import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.TimelineKind
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class FilesTabTest {
   @Test
-  fun torrentFiles_segments_namedByIdFromTheResolvedList() {
+  fun torrentFiles_segments_namedByIdFromTheResolvedList() = runTest {
     val row = torrent(
       files = listOf(SourceFile("0", "Show/S01E01.mkv", 100), SourceFile("1", "S01E02.mkv", 200)),
       segments = listOf(seg(0, 0, 99, 100), seg(1, 100, 299, 50), seg(4, 300, 349, 0)),
@@ -27,8 +31,9 @@ class FilesTabTest {
 
     val files = torrentFiles(row)
 
-    assertEquals(listOf("Show/S01E01.mkv", "S01E02.mkv", "File 5"), files.map { it.path })
-    assertEquals("S01E01.mkv", files[0].name)
+    assertEquals(listOf("Show/S01E01.mkv", "S01E02.mkv", null), files.map { it.path })
+    assertEquals(listOf("S01E01.mkv", "S01E02.mkv", "File 5"), files.map { it.label }.load())
+    assertEquals("File 5", files[2].pathText.load())
     assertEquals(listOf(100, 25, 0), files.map { it.percent })
     assertEquals(listOf(true, false, false), files.map { it.isDone })
   }
@@ -58,25 +63,25 @@ class FilesTabTest {
   }
 
   @Test
-  fun filesSummary_partlyDone_countsFilesAndBytes() {
+  fun filesSummary_partlyDone_countsFilesAndBytes() = runTest {
     val files = listOf(
       file("0", size = GIB, downloaded = GIB),
       file("1", size = GIB * 3, downloaded = GIB / 2)
     )
 
-    assertEquals("1 of 2 files done" to "1.5 of 4.0 GB", filesSummary(files, listed = 2))
+    assertEquals("1 of 2 files done" to "1.5 of 4.0 GB", filesSummary(files, listed = 2).load())
     assertEquals(
       "1 of 2 files done" to "1.5 of 4.0 GB · 3 not selected",
-      filesSummary(files, listed = 5)
+      filesSummary(files, listed = 5).load()
     )
   }
 
   @Test
-  fun filesSummary_allDone_showsTheTotalSize() {
+  fun filesSummary_allDone_showsTheTotalSize() = runTest {
     val files = listOf(file("0", size = 1024, downloaded = 1024))
 
-    assertEquals("1 file done" to "1.0 KB", filesSummary(files, listed = 0))
-    assertEquals("All 2 files done", filesSummary(files + files, listed = 0).first)
+    assertEquals("1 file done" to "1.0 KB", filesSummary(files, listed = 0).load())
+    assertEquals("All 2 files done", filesSummary(files + files, listed = 0).first.load())
   }
 
   @Test
@@ -170,7 +175,7 @@ class FilesTabTest {
   @Test
   fun inspectorTabs_timelineOnly_showsActivity() {
     val row = row("a", DownloadState.Queued)
-    val timeline = listOf(TimelineEntry(START, TimelineKind.Added, "Added"))
+    val timeline = listOf(TimelineEntry(START, TimelineKind.Added, verbatim("Added")))
 
     assertEquals(
       listOf(InspectorTab.Overview, InspectorTab.Activity),
@@ -199,6 +204,9 @@ class FilesTabTest {
     )
     return row("t", state, request = request).copy(segments = segments)
   }
+
+  private suspend fun Pair<UiText, UiText>.load(): Pair<String, String> =
+    first.load() to second.load()
 
   private fun file(
     id: String,

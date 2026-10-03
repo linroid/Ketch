@@ -8,6 +8,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -157,8 +158,8 @@ class DeviceActionsTest {
 
     assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
     val message = f.state.messages.history.value.first()
-    assertEquals("Slow lane on · 1 MB/s", message.title)
-    message.actions.single { it.label == "Undo" }.onClick()
+    assertEquals("Slow lane on · 1 MB/s", message.title.load())
+    message.actions.single { it.label.load() == "Undo" }.onClick()
     runCurrent()
     assertEquals(SpeedMode.Full, f.speed.mode.value)
   }

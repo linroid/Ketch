@@ -15,6 +15,10 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
@@ -23,6 +27,26 @@ import com.linroid.ketch.app.state.RejectedTracker
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.trackerHost
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_add
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.settings_torrent_add
+import ketch.app.shared.generated.resources.settings_torrent_add_hint
+import ketch.app.shared.generated.resources.settings_torrent_footer
+import ketch.app.shared.generated.resources.settings_torrent_footer_first_only
+import ketch.app.shared.generated.resources.settings_torrent_no_trackers
+import ketch.app.shared.generated.resources.settings_torrent_rejected
+import ketch.app.shared.generated.resources.settings_torrent_rejected_line
+import ketch.app.shared.generated.resources.settings_torrent_rejected_many
+import ketch.app.shared.generated.resources.settings_torrent_rejected_more
+import ketch.app.shared.generated.resources.settings_torrent_remote
+import ketch.app.shared.generated.resources.settings_torrent_remove
+import ketch.app.shared.generated.resources.settings_torrent_remove_all
+import ketch.app.shared.generated.resources.settings_torrent_removed
+import ketch.app.shared.generated.resources.settings_torrent_trackers
+import ketch.app.shared.generated.resources.settings_torrent_unused
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** Rejected URLs listed under the add field; the rest are only counted. */
 private const val MAX_LISTED_REJECTIONS = 3
@@ -39,7 +63,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   var removed by remember { mutableStateOf(emptyList<String>()) }
   if (torrent == null) {
     SettingsNotice(
-      text = "Change the extra trackers on ${device.label} itself, or in its config.toml.",
+      text = stringResource(Res.string.settings_torrent_remote, device.label),
       tone = NoticeTone.Info,
     )
     return
@@ -47,15 +71,19 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val trackers = torrent.trackers
   val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
   controller.torrentError?.let {
-    SettingsNotice(text = it, tone = NoticeTone.Error)
+    SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
   }
   if (removed.isNotEmpty()) {
     SettingsNotice(
-      text = if (removed.size == 1) "Removed 1 tracker." else "Removed ${removed.size} trackers.",
+      text = pluralStringResource(
+        Res.plurals.settings_torrent_removed,
+        removed.size,
+        removed.size,
+      ),
       tone = NoticeTone.Info,
       action = {
         KetchButton(
-          text = "Undo",
+          text = stringResource(Res.string.action_undo),
           onClick = {
             save((removed + trackers).distinct())
             removed = emptyList()
@@ -68,17 +96,16 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     )
   }
   SettingsGroup(
-    title = "Extra trackers",
-    footer = "Public torrents also announce to these as they start; private ones never do." +
-      if (trackers.size > MAX_EXTRA_TRACKERS) {
-        " Only the first $MAX_EXTRA_TRACKERS are used."
-      } else {
-        ""
-      },
+    title = stringResource(Res.string.settings_torrent_trackers),
+    footer = if (trackers.size > MAX_EXTRA_TRACKERS) {
+      stringResource(Res.string.settings_torrent_footer_first_only, MAX_EXTRA_TRACKERS)
+    } else {
+      stringResource(Res.string.settings_torrent_footer)
+    },
     action = if (trackers.isNotEmpty()) {
       {
         KetchButton(
-          text = "Remove all",
+          text = stringResource(Res.string.settings_torrent_remove_all),
           onClick = {
             removed = trackers
             save(emptyList())
@@ -99,7 +126,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
       },
     )
     if (trackers.isEmpty()) {
-      SettingsRow(title = "No extra trackers")
+      SettingsRow(title = stringResource(Res.string.settings_torrent_no_trackers))
     }
     trackers.forEachIndexed { index, url ->
       val host = trackerHost(url)
@@ -112,13 +139,16 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
             horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
           ) {
             if (index >= MAX_EXTRA_TRACKERS) {
-              KetchBadge("Unused", KetchBadgeTone.Warning)
+              KetchBadge(
+                text = stringResource(Res.string.settings_torrent_unused),
+                tone = KetchBadgeTone.Warning,
+              )
             }
             KetchIconButton(
               icon = KetchIcon.Close,
               onClick = { save(trackers - url) },
               size = KetchButtonSize.Small,
-              contentDescription = "Remove $host",
+              contentDescription = stringResource(Res.string.settings_torrent_remove, host),
             )
           }
         },
@@ -142,8 +172,8 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
     }
   }
   SettingsRow(
-    title = "Add trackers",
-    description = "One or more http, https or udp announce URLs.",
+    title = stringResource(Res.string.settings_torrent_add),
+    description = stringResource(Res.string.settings_torrent_add_hint),
   ) {
     Row(
       verticalAlignment = Alignment.Top,
@@ -157,12 +187,12 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
         },
         modifier = Modifier.weight(1f),
         placeholder = "udp://tracker.example.org:1337/announce",
-        error = rejectionMessage(rejected),
+        error = rejectionMessage(rejected)?.resolve(),
         onDone = add,
         mono = true,
       )
       KetchButton(
-        text = "Add",
+        text = stringResource(Res.string.action_add),
         onClick = add,
         variant = KetchButtonVariant.Secondary,
         enabled = text.isNotBlank(),
@@ -172,10 +202,16 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
 }
 
 /** Explains why the URLs in [rejected] were not added, or `null` when none were. */
-private fun rejectionMessage(rejected: List<RejectedTracker>): String? {
+private fun rejectionMessage(rejected: List<RejectedTracker>): UiText? {
   if (rejected.isEmpty()) return null
-  if (rejected.size == 1) return "Couldn't add ${rejected[0].url}: ${rejected[0].reason}"
-  val listed = rejected.take(MAX_LISTED_REJECTIONS).joinToString("\n") { "${it.url}: ${it.reason}" }
+  if (rejected.size == 1) {
+    return Res.string.settings_torrent_rejected.text(rejected[0].url, rejected[0].problem)
+  }
+  val listed = rejected.take(MAX_LISTED_REJECTIONS).map {
+    Res.string.settings_torrent_rejected_line.text(it.url, it.problem)
+  }
   val more = rejected.size - MAX_LISTED_REJECTIONS
-  return "Couldn't add ${rejected.size} URLs:\n$listed" + if (more > 0) "\nand $more more." else ""
+  val lines = listOf(Res.plurals.settings_torrent_rejected_many.text(rejected.size)) + listed +
+    listOfNotNull(Res.plurals.settings_torrent_rejected_more.text(more).takeIf { more > 0 })
+  return lines.joinText("\n")
 }

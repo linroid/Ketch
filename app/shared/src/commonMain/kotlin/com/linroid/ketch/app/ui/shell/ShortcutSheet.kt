@@ -24,12 +24,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchEyebrow
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_done
+import ketch.app.shared.generated.resources.shortcut_add_to_devices
+import ketch.app.shared.generated.resources.shortcut_group_general
+import ketch.app.shared.generated.resources.shortcut_group_intake
+import ketch.app.shared.generated.resources.shortcut_group_list
+import ketch.app.shared.generated.resources.shortcut_sheet_title
+import ketch.app.shared.generated.resources.shortcut_switch_to_devices
+import ketch.app.shared.generated.resources.shortcut_tab
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * One line of the shortcut sheet.
@@ -37,10 +50,10 @@ import com.linroid.ketch.app.ui.common.AdaptiveModal
  * @property label what the keys do.
  * @property keys the chords, as the platform prints them; a range of devices reads "⌥⌘1–9".
  */
-internal data class ShortcutLine(val label: String, val keys: List<String>)
+internal data class ShortcutLine(val label: UiText, val keys: List<String>)
 
 /** A titled group of the shortcut sheet. */
-internal data class ShortcutGroup(val title: String, val lines: List<ShortcutLine>)
+internal data class ShortcutGroup(val title: UiText, val lines: List<ShortcutLine>)
 
 /**
  * The shortcut sheet's groups on [platform], from [KetchCommands]: the global commands the
@@ -53,7 +66,7 @@ internal fun shortcutGroups(
   platform: KeyboardPlatform,
   runs: (KetchCommand) -> Boolean,
 ): List<ShortcutGroup> {
-  fun lines(commands: List<KetchCommand>, devices: List<KetchCommand>, label: String) =
+  fun lines(commands: List<KetchCommand>, devices: List<KetchCommand>, label: UiText?) =
     buildList {
       for (command in commands) {
         if (command in devices.drop(1)) continue
@@ -61,7 +74,7 @@ internal fun shortcutGroups(
         if (chords.isEmpty()) continue
         if (command == devices.firstOrNull()) {
           val first = chords.first().label(platform)
-          add(ShortcutLine(label, listOf("$first–${devices.size}")))
+          add(ShortcutLine(checkNotNull(label), listOf("$first–${devices.size}")))
         } else {
           add(ShortcutLine(lineLabel(command), chords.map { it.label(platform) }))
         }
@@ -70,19 +83,26 @@ internal fun shortcutGroups(
   val global = KetchCommands.all.filter { it.scope == CommandScope.Global && runs(it) }
   val list = KetchCommands.all.filter { it.scope == CommandScope.List }
   val intake = KetchCommands.all.filter { it.scope == CommandScope.Intake }
-  val deviceCommands = (1..KetchCommands.NUMBERED_DEVICES).map(KetchCommands::device)
-  val targetCommands = (1..KetchCommands.NUMBERED_DEVICES).map(KetchCommands::intakeTarget)
+  val numbered = KetchCommands.NUMBERED_DEVICES
+  val deviceCommands = (1..numbered).map(KetchCommands::device)
+  val targetCommands = (1..numbered).map(KetchCommands::intakeTarget)
   return listOf(
-    ShortcutGroup("General", lines(global, deviceCommands, "Switch to device 1–9")),
-    ShortcutGroup("Downloads list", lines(list, emptyList(), "")),
-    ShortcutGroup("Add sheet", lines(intake, targetCommands, "Add to device 1–9")),
+    ShortcutGroup(
+      Res.string.shortcut_group_general.text(),
+      lines(global, deviceCommands, Res.string.shortcut_switch_to_devices.text(numbered)),
+    ),
+    ShortcutGroup(Res.string.shortcut_group_list.text(), lines(list, emptyList(), null)),
+    ShortcutGroup(
+      Res.string.shortcut_group_intake.text(),
+      lines(intake, targetCommands, Res.string.shortcut_add_to_devices.text(numbered)),
+    ),
   ).filter { it.lines.isNotEmpty() }
 }
 
 // A tab command is named after its tab alone, such as "Failed".
-private fun lineLabel(command: KetchCommand): String =
+private fun lineLabel(command: KetchCommand): UiText =
   if (KetchCommands.tabFilter(command) != null) {
-    "${command.label} tab"
+    Res.string.shortcut_tab.text(command.label)
   } else {
     command.label
   }
@@ -96,8 +116,10 @@ internal fun ShortcutSheet(groups: List<ShortcutGroup>, onDismissRequest: () -> 
   val typography = KetchTheme.typography
   AdaptiveModal(
     onDismissRequest = onDismissRequest,
-    title = { Text("Keyboard shortcuts", style = typography.titleL) },
-    confirmButton = { KetchButton(text = "Done", onClick = onDismissRequest) },
+    title = { Text(stringResource(Res.string.shortcut_sheet_title), style = typography.titleL) },
+    confirmButton = {
+      KetchButton(text = stringResource(Res.string.action_done), onClick = onDismissRequest)
+    },
     maxWidth = SheetMaxWidth,
   ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -119,7 +141,7 @@ private fun ShortcutGroupView(group: ShortcutGroup, columns: Int) {
   val spacing = KetchTheme.spacing
   val rows = remember(group, columns) { group.lines.chunked(columns) }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-    KetchEyebrow(group.title, Modifier.padding(bottom = spacing.s1))
+    KetchEyebrow(group.title.resolve(), Modifier.padding(bottom = spacing.s1))
     for (row in rows) {
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s6)) {
         for (line in row) ShortcutLineView(line, Modifier.weight(1f))
@@ -132,16 +154,17 @@ private fun ShortcutGroupView(group: ShortcutGroup, columns: Int) {
 @Composable
 private fun ShortcutLineView(line: ShortcutLine, modifier: Modifier) {
   val spacing = KetchTheme.spacing
+  val label = line.label.resolve()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = modifier
       // Lines are read, not tapped, so they keep their height on touch screens too.
       .heightIn(min = KeyCapHeight + spacing.s2)
-      .clearAndSetSemantics { contentDescription = "${line.label}, ${line.keys.joinToString()}" },
+      .clearAndSetSemantics { contentDescription = "$label, ${line.keys.joinToString()}" },
   ) {
     Text(
-      text = line.label,
+      text = label,
       style = KetchTheme.typography.bodyS,
       color = KetchTheme.colors.textPrimary,
       maxLines = 1,

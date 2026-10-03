@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.ListFixtures.downloading
@@ -126,31 +127,32 @@ class ConnectionsTabTest {
   }
 
   @Test
-  fun connectionsSummary_eachState_countsLanesWithSpeedOrProgress() {
+  fun connectionsSummary_eachState_countsLanesWithSpeedOrProgress() = runTest {
     val model = connectionsModel(
       segments = listOf(seg(0, 0, 999, 1000), seg(1, 1000, 1999, 10), seg(2, 2000, 2999, 10)),
       rates = emptyList(),
       downloading = true,
     )
 
-    assertEquals("2 active · 6.4 MB/s", connectionsSummary(model, true, 6_710_886))
-    assertEquals("2 unfinished · 34%", connectionsSummary(model, false, null))
+    assertEquals("2 active · 6.4 MB/s", connectionsSummary(model, true, 6_710_886).load())
+    assertEquals("2 unfinished · 34%", connectionsSummary(model, false, null).load())
+    assertEquals("2 active", connectionsSummary(model, true, null).load())
   }
 
   @Test
-  fun connectionsCaption_eachCase_explainsTheLanes() {
-    assertEquals("Single connection", connectionsCaption(1, false, true, true))
+  fun connectionsCaption_eachCase_explainsTheLanes() = runTest {
+    assertEquals("Single connection", connectionsCaption(1, false, true, true).load())
     assertEquals(
       "This server allows only 1 connection",
-      connectionsCaption(1, serverLimited = true, editable = true, downloading = true)
+      connectionsCaption(1, serverLimited = true, editable = true, downloading = true).load()
     )
     assertEquals(
       "A new count re-splits the remaining bytes live.",
-      connectionsCaption(4, serverLimited = false, editable = true, downloading = true)
+      connectionsCaption(4, serverLimited = false, editable = true, downloading = true).load()
     )
     assertEquals(
       "A new count applies when the download resumes.",
-      connectionsCaption(4, serverLimited = false, editable = true, downloading = false)
+      connectionsCaption(4, serverLimited = false, editable = true, downloading = false).load()
     )
     assertNull(connectionsCaption(4, serverLimited = false, editable = false, downloading = false))
   }

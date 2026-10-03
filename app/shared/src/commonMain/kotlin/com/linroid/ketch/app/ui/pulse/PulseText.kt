@@ -1,6 +1,14 @@
 package com.linroid.ketch.app.ui.pulse
 
+import androidx.compose.runtime.Composable
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
 import com.linroid.ketch.app.state.PulseCounts
@@ -8,12 +16,31 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.clockLabel
 import com.linroid.ketch.app.state.formatSpace
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
-import com.linroid.ketch.app.util.clockLabel
-import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_free_space
+import ketch.app.shared.generated.resources.pulse_count_downloading
+import ketch.app.shared.generated.resources.pulse_count_failed
+import ketch.app.shared.generated.resources.pulse_count_waiting
+import ketch.app.shared.generated.resources.pulse_full_speed_until
+import ketch.app.shared.generated.resources.pulse_health_connecting
+import ketch.app.shared.generated.resources.pulse_health_live
+import ketch.app.shared.generated.resources.pulse_health_needs_token
+import ketch.app.shared.generated.resources.pulse_health_not_shared
+import ketch.app.shared.generated.resources.pulse_health_offline
+import ketch.app.shared.generated.resources.pulse_health_sharing
+import ketch.app.shared.generated.resources.pulse_mode_auto
+import ketch.app.shared.generated.resources.pulse_mode_auto_name
+import ketch.app.shared.generated.resources.pulse_mode_capped
+import ketch.app.shared.generated.resources.pulse_mode_full
+import ketch.app.shared.generated.resources.pulse_mode_slow_lane
+import ketch.app.shared.generated.resources.pulse_selected
+import ketch.app.shared.generated.resources.pulse_slow_lane
+import ketch.app.shared.generated.resources.pulse_slow_lane_until
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 
@@ -24,10 +51,10 @@ import kotlin.time.Instant
  * @property description what a screen reader says, such as "2 downloading" for "2↓".
  */
 internal data class CountPart(
-  val text: String,
+  val text: UiText,
   val filter: StatusFilter,
   val alert: Boolean = false,
-  val description: String = text,
+  val description: UiText = text,
 )
 
 /**
@@ -39,15 +66,18 @@ internal fun countParts(counts: PulseCounts, failures: Int): List<CountPart> = b
   if (counts.downloading > 0) {
     add(
       CountPart(
-        text = "${counts.downloading}↓",
+        text = verbatim("${counts.downloading}↓"),
         filter = StatusFilter.Downloading,
-        description = "${counts.downloading} downloading",
+        description = Res.plurals.pulse_count_downloading.text(counts.downloading),
       )
     )
   }
-  if (counts.waiting > 0) add(CountPart("${counts.waiting} waiting", StatusFilter.Waiting))
+  if (counts.waiting > 0) {
+    add(CountPart(Res.plurals.pulse_count_waiting.text(counts.waiting), StatusFilter.Waiting))
+  }
   if (counts.failed > 0) {
-    add(CountPart("${counts.failed} failed", StatusFilter.Failed, alert = failures > 0))
+    val text = Res.plurals.pulse_count_failed.text(counts.failed)
+    add(CountPart(text, StatusFilter.Failed, alert = failures > 0))
   }
 }
 
@@ -56,14 +86,24 @@ internal data class SpeedText(val amount: String, val unit: String) {
   override fun toString(): String = "$amount $unit"
 }
 
-/** [bytesPerSecond] as "9.1 MB/s". */
-internal fun speedText(bytesPerSecond: Long): SpeedText {
-  val bytes = formatBytes(bytesPerSecond.coerceAtLeast(0))
-  return SpeedText(bytes.substringBefore(' '), "${bytes.substringAfter(' ')}/s")
+/** [bytesPerSecond] as "9.1 MB/s" in the language of the composition, split by [splitSpeed]. */
+@Composable
+internal fun speedParts(bytesPerSecond: Long): SpeedText =
+  splitSpeed(speedText(bytesPerSecond).resolve())
+
+/**
+ * [speed], such as "9.1 MB/s", split at its first space into "9.1" and "MB/s"; a speed written
+ * without a space is all amount.
+ */
+internal fun splitSpeed(speed: String): SpeedText {
+  val space = speed.indexOfFirst { it.isWhitespace() }
+  if (space < 0) return SpeedText(speed, "")
+  return SpeedText(speed.substring(0, space), speed.substring(space + 1).trim())
 }
 
 /** Free space as the Pulse bar shows it: "412 GB free". */
-internal fun diskLabel(disk: DiskSpace): String = "${formatSpace(disk.usableBytes)} free"
+internal fun diskLabel(disk: DiskSpace): UiText =
+  Res.string.device_free_space.text(formatSpace(disk.usableBytes))
 
 /** Share of the disk in use, from 0 to 1. */
 internal fun diskUsed(disk: DiskSpace): Float {
@@ -75,29 +115,30 @@ internal fun diskUsed(disk: DiskSpace): Float {
  * How the Pulse bar names a device's connection: "Sharing :8642", "Not shared", "Live",
  * "Connecting", "Offline" or "Needs a token".
  */
-internal fun healthLabel(health: DeviceHealth): String = when (health) {
-  is DeviceHealth.Local -> health.sharingPort?.let { "Sharing :$it" } ?: "Not shared"
-  DeviceHealth.Live -> "Live"
-  DeviceHealth.Connecting -> "Connecting"
-  is DeviceHealth.Offline -> "Offline"
-  DeviceHealth.Unauthorized -> "Needs a token"
+internal fun healthText(health: DeviceHealth): UiText = when (health) {
+  is DeviceHealth.Local -> health.sharingPort?.let { Res.string.pulse_health_sharing.text(it) }
+    ?: Res.string.pulse_health_not_shared.text()
+  DeviceHealth.Live -> Res.string.pulse_health_live.text()
+  DeviceHealth.Connecting -> Res.string.pulse_health_connecting.text()
+  is DeviceHealth.Offline -> Res.string.pulse_health_offline.text()
+  DeviceHealth.Unauthorized -> Res.string.pulse_health_needs_token.text()
 }
 
 /**
  * Summary of the selected rows for the Pulse bar, "3 selected · 2.4 GB · 9.1 MB/s"; sizes and
  * speeds that are unknown or zero are left out. `null` when nothing listed is selected.
  */
-internal fun selectionSummary(rows: List<TaskRow>, selected: Set<TaskKey>): String? {
+internal fun selectionSummary(rows: List<TaskRow>, selected: Set<TaskKey>): UiText? {
   if (selected.isEmpty()) return null
   val chosen = rows.filter { it.key in selected }
   if (chosen.isEmpty()) return null
   val size = chosen.sumOf { it.sizeBytes ?: 0L }
   val speed = chosen.sumOf { it.speed ?: 0L }
   return listOfNotNull(
-    "${chosen.size} selected",
-    formatBytes(size).takeIf { size > 0 },
-    speedText(speed).toString().takeIf { speed > 0 }
-  ).joinToString(SEPARATOR)
+    Res.plurals.pulse_selected.text(chosen.size),
+    sizeText(size).takeIf { size > 0 },
+    speedText(speed).takeIf { speed > 0 }
+  ).joinText()
 }
 
 /**
@@ -122,26 +163,33 @@ internal fun effectiveCap(
  *
  * @param limit the limit in effect, from [effectiveCap].
  */
-internal fun speedModeLabel(
+internal fun speedModeLabelText(
   mode: SpeedMode,
   limit: SpeedLimit,
   now: Instant,
   timeZone: TimeZone,
-): String = when (mode) {
-  SpeedMode.Full -> if (limit.isUnlimited) "Full speed" else "Capped · ${formatSpeedLimit(limit)}"
-  SpeedMode.SlowLane -> "Slow lane · ${formatSpeedLimit(limit)}"
+): UiText = when (mode) {
+  SpeedMode.Full -> if (limit.isUnlimited) {
+    Res.string.pulse_mode_full.text()
+  } else {
+    Res.string.pulse_mode_capped.text(speedLimitText(limit))
+  }
+  SpeedMode.SlowLane -> Res.string.pulse_mode_slow_lane.text(speedLimitText(limit))
   is SpeedMode.Auto -> {
-    val phase = if (mode.slowLane) "Slow lane" else "Full speed"
-    val until = mode.until?.let { " until ${clockLabel(it, now, timeZone)}" }.orEmpty()
-    "Auto · $phase$until"
+    val until = mode.until?.let { clockLabel(it, now, timeZone) }
+    val phase = when {
+      mode.slowLane && until != null -> Res.string.pulse_slow_lane_until.text(until)
+      mode.slowLane -> Res.string.pulse_slow_lane.text()
+      until != null -> Res.string.pulse_full_speed_until.text(until)
+      else -> Res.string.pulse_mode_full.text()
+    }
+    Res.string.pulse_mode_auto.text(phase)
   }
 }
 
 /** Name of [mode] in sentence case, as the popover, menus and messages show it. */
-fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
-  SpeedLimitMode.Full -> "Full speed"
-  SpeedLimitMode.SlowLane -> "Slow lane"
-  SpeedLimitMode.Auto -> "Auto"
+fun speedModeName(mode: SpeedLimitMode): UiText = when (mode) {
+  SpeedLimitMode.Full -> Res.string.pulse_mode_full.text()
+  SpeedLimitMode.SlowLane -> Res.string.pulse_slow_lane.text()
+  SpeedLimitMode.Auto -> Res.string.pulse_mode_auto_name.text()
 }
-
-internal const val SEPARATOR = " · "

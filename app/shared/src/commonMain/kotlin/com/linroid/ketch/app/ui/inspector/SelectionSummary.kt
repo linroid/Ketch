@@ -13,12 +13,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.LaneStrip
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_close
+import ketch.app.shared.generated.resources.inspector_controls_apply_to
+import ketch.app.shared.generated.resources.inspector_selection_more
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What the inspector shows for several selected [rows]: "3 selected · 2.4 GB · 9.1 MB/s", a
@@ -41,7 +48,7 @@ internal fun SelectionSummary(
       horizontalArrangement = Arrangement.spacedBy(spacing.s3),
     ) {
       Text(
-        text = selectionLine(rows),
+        text = selectionLine(rows).resolve(),
         style = type.titleM,
         color = colors.textPrimary,
         maxLines = 2,
@@ -50,7 +57,7 @@ internal fun SelectionSummary(
       )
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Close inspector",
+        contentDescription = stringResource(Res.string.inspector_close),
         onClick = onClose,
         size = KetchButtonSize.Small,
       )
@@ -79,7 +86,11 @@ internal fun SelectionSummary(
       }
       val more = rows.size - MAX_MAPS
       if (more > 0) {
-        Text(text = "and $more more", style = type.caption, color = colors.textTertiary)
+        Text(
+          text = pluralStringResource(Res.plurals.inspector_selection_more, more, more),
+          style = type.caption,
+          color = colors.textTertiary,
+        )
       }
     }
     val controllable = rows.filter { it.state.hasControls }
@@ -87,7 +98,12 @@ internal fun SelectionSummary(
       InspectorControls(state, controllable, runner, pending)
       if (controllable.size < rows.size) {
         Text(
-          text = "Controls apply to ${controllable.size} of ${rows.size}; the others have ended.",
+          text = pluralStringResource(
+            Res.plurals.inspector_controls_apply_to,
+            rows.size,
+            controllable.size,
+            rows.size,
+          ),
           style = type.caption,
           color = colors.textTertiary,
         )

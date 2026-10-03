@@ -33,8 +33,8 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Duration.Companion.milliseconds
 
 /** What a list key does, before it is applied to rows. */
 internal sealed interface ListKey {

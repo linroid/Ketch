@@ -16,6 +16,8 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.feedback.reportWebActivity
+import com.linroid.ketch.app.i18n.appLanguageTag
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -82,8 +84,9 @@ fun main() {
   val activityEvents = reportWebActivity(controller)
   // Removals and other undoable operations still pending commit when the tab closes.
   window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
+  controller.scope.launch { setPageLanguage() }
   controller.scope.launch {
-    controller.pulse.state.collect { document.title = it.tabTitle() }
+    controller.pulse.state.collect { document.title = it.tabTitle().load() }
   }
   ComposeViewport(body) {
     // The installed app's title bar takes the canvas color of the theme the app shows.
@@ -115,6 +118,20 @@ fun main() {
 }
 
 private val FONT_WAIT_LIMIT = 5.seconds
+
+/**
+ * Sets the page's `lang` to the language of the strings the app shows: the browser's when the app
+ * is translated to it, else English. Screen readers then read the page in that language, and the
+ * browser offers to translate it only when it is not in the browser's language.
+ *
+ * The bundled fonts only cover Latin, Greek and Cyrillic. For Chinese, Japanese, Korean and
+ * other scripts, Compose (1.12 and later) downloads Noto fonts from Google Fonts as text needs
+ * them, choosing the Simplified Chinese, Traditional Chinese, Hong Kong, Japanese or Korean
+ * variant by the browser's language, so the app ships no font for them.
+ */
+private suspend fun setPageLanguage() {
+  document.documentElement?.setAttribute("lang", appLanguageTag())
+}
 
 /** [this] as `#RRGGBB`. */
 private fun Color.toHex(): String = "#" + (toArgb() and RGB_MASK).toString(HEX).padStart(6, '0')

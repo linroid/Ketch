@@ -3,6 +3,10 @@ package com.linroid.ketch.app.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.uikit.LocalUIViewController
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.reveal_in_files
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -37,9 +41,9 @@ actual fun rememberFileActions(): FileActions? {
  * in the Files app, where iOS lets Ketch open it.
  */
 private class IosFileActions(private val viewController: UIViewController) : FileActions {
-  override val revealLabel: String? =
+  override val revealLabel: UiText? =
     if (UIApplication.sharedApplication.canOpenURL(NSURL(string = FILES_SCHEME))) {
-      "Show in Files"
+      Res.string.reveal_in_files.text()
     } else {
       null
     }

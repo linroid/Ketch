@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="status_tab_all">全部</string>
+  <string name="status_tab_downloading">下载中</string>
+  <string name="status_tab_waiting">等待中</string>
+  <string name="status_tab_paused">已暂停</string>
+  <string name="status_tab_done">已完成</string>
+  <string name="status_tab_failed">失败</string>
+
+  <string name="row_status_downloading">下载中</string>
+  <string name="row_status_stalled">停滞</string>
+  <string name="row_status_paused">已暂停</string>
+  <string name="row_status_queued">排队中</string>
+  <string name="row_status_scheduled">已计划</string>
+  <string name="row_status_done">已完成</string>
+  <string name="row_status_file_missing">文件丢失</string>
+  <string name="row_status_failed">失败</string>
+  <string name="row_status_canceled">已取消</string>
+
+  <string name="row_stalled_for">停滞 · 已%1$s没有数据</string>
+  <string name="row_paused">已暂停</string>
+  <string name="row_canceled">已取消</string>
+  <string name="row_saved_on">保存在 %1$s 上</string>
+  <string name="row_missing_file">文件已移动或删除</string>
+  <string name="row_completed">已完成</string>
+  <string name="row_took">用时%1$s</string>
+  <plurals name="row_files">
+    <item quantity="other">%1$d 个文件</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <string name="row_speed_limit">限速 %1$s</string>
+  <string name="row_limited_by_slow_lane">受慢车道限制</string>
+  <string name="row_starts_today">今天 %1$s 开始</string>
+  <string name="row_starts_tomorrow">明天 %1$s 开始</string>
+  <string name="row_starts_on">%1$s %2$s 开始</string>
+  <string name="row_starts_in">%1$s后</string>
+  <string name="row_starts_after">%1$s后开始</string>
+  <string name="row_waiting_for_conditions">等待条件满足</string>
+
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <string name="summary_average_speed">平均 %1$s</string>
+
+  <string name="sort_smart">智能</string>
+  <string name="sort_name">名称</string>
+  <string name="sort_size">大小</string>
+  <string name="sort_progress">进度</string>
+  <string name="sort_speed">速度</string>
+  <string name="sort_time_left">剩余时间</string>
+  <string name="sort_added">添加时间</string>
+  <string name="sort_status">状态</string>
+  <string name="sort_connections">连接数</string>
+  <string name="sort_source">来源</string>
+  <string name="sort_origin">添加方式</string>
+  <string name="sort_priority">优先级</string>
+  <string name="sort_device">设备</string>
+  <string name="group_smart">智能</string>
+  <string name="group_status">状态</string>
+  <string name="group_day">日期</string>
+  <string name="group_device">设备</string>
+  <string name="group_site">网站</string>
+  <string name="group_type">类型</string>
+  <string name="group_none">不分组</string>
+  <string name="group_title_downloading">下载中</string>
+  <string name="group_title_waiting">等待中</string>
+  <string name="group_title_paused">已暂停</string>
+  <string name="group_title_attention">需要处理</string>
+  <string name="group_title_other_site">其他</string>
+  <string name="group_title_today">今天添加</string>
+  <string name="group_title_yesterday">昨天添加</string>
+  <string name="group_title_week">本周添加</string>
+  <string name="group_title_earlier">更早添加</string>
+  <string name="group_all_done_at">预计 %1$s 全部完成</string>
+  <string name="group_in_start_order">按开始顺序</string>
+
+  <string name="origin_browser">浏览器</string>
+  <string name="origin_discover">发现</string>
+  <string name="origin_agent">智能体</string>
+  <string name="origin_app">应用</string>
+  <string name="origin_cli">命令行</string>
+  <string name="file_type_video">视频</string>
+  <string name="file_type_audio">音频</string>
+  <string name="file_type_image">图片</string>
+  <string name="file_type_doc">文档</string>
+  <string name="file_type_archive">压缩包</string>
+  <string name="file_type_app">应用</string>
+  <string name="file_type_torrent">种子</string>
+  <string name="file_type_other">其他</string>
+
+  <string name="queue_waiting_slot">等待空闲名额（已用 %1$d/%2$d）</string>
+  <string name="queue_waiting_host">等待 %1$s（每个网站 %2$d 个）</string>
+  <string name="queue_waiting_start">等待开始</string>
+
+  <string name="action_row_pause">暂停</string>
+  <string name="action_row_resume">继续</string>
+  <string name="action_row_reconnect">重新连接</string>
+  <string name="action_row_start_now">立即开始</string>
+  <string name="action_row_speed_limit">限速</string>
+  <string name="action_row_connections">连接数</string>
+  <string name="action_row_priority">优先级</string>
+  <string name="action_row_start_later">稍后开始</string>
+  <string name="action_row_send_to">发送到</string>
+  <string name="action_row_copy_link">复制链接</string>
+  <string name="action_row_details">详细信息</string>
+  <string name="action_row_open">打开</string>
+  <string name="action_row_show_in_folder">在文件夹中显示</string>
+  <string name="action_row_copy_path">复制文件路径</string>
+  <string name="action_row_download_again">重新下载</string>
+  <string name="action_row_retry">重试</string>
+  <string name="action_row_retry_with_options">使用选项重试…</string>
+  <string name="action_row_edit_link">编辑链接…</string>
+  <string name="action_row_enter_credentials">输入登录信息…</string>
+  <string name="action_row_find_another_source">查找其他来源</string>
+  <string name="action_row_open_source_page">打开来源页面</string>
+  <string name="action_row_copy_error">复制错误信息</string>
+  <string name="action_row_copy_details">复制详细信息</string>
+  <string name="action_row_stop_and_discard">停止并丢弃进度…</string>
+  <string name="action_row_remove">从列表中移除</string>
+  <string name="action_row_remove_and_trash">移除并将文件移到回收站…</string>
+  <string name="action_row_remove_and_delete">移除并删除文件…</string>
+  <plurals name="batch_pause">
+    <item quantity="other">暂停 %1$d 个下载</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="other">继续 %1$d 个下载</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="other">立即开始 %1$d 个下载</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="other">重试 %1$d 个下载</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="other">打开 %1$d 个文件</item>
+  </plurals>
+  <string name="batch_show_in_folder">%1$s（%2$d）</string>
+  <plurals name="batch_copy_link">
+    <item quantity="other">复制 %1$d 个链接</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="other">复制 %1$d 个文件路径</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="other">重新下载 %1$d 个文件</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="other">丢弃 %1$d 个下载的进度…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="other">从列表中移除 %1$d 个下载</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="other">移除 %1$d 个下载及其文件…</item>
+  </plurals>
+  <string name="bar_speed">速度</string>
+  <string name="bar_copy_links">复制链接</string>
+  <string name="bar_remove">移除…</string>
+  <string name="bar_copy_paths">复制文件路径</string>
+  <string name="bar_discard">丢弃进度…</string>
+  <string name="bar_label_count">%1$s（%2$d）</string>
+  <string name="bar_label_number">%1$s %2$d</string>
+  <string name="bar_tooltip_counted">%1$s已选 %3$d 个中的 %2$d 个</string>
+  <string name="bar_tooltip_partial">%1$s · 已选 %3$d 个中的 %2$d 个</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="other">移除 %1$d 个下载…</item>
+  </plurals>
+  <string name="row_menu_peer_limit">节点上限</string>
+  <string name="send_move_to">移到 %1$s</string>
+  <string name="reveal_in_finder">在访达中显示</string>
+  <string name="reveal_in_explorer">在文件资源管理器中显示</string>
+  <string name="reveal_in_folder">在文件夹中显示</string>
+  <string name="reveal_in_files">在“文件”中显示</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="other">使用 %1$d 个连接重试</item>
+  </plurals>
+</resources>

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The window around the pages: sidebar, rail, top and bottom bars, device switcher, drop berths
+  and the command palette. See docs/development/localization.md.
+-->
+<resources>
+  <!-- The pages of the navigation: the sidebar, the rail and the phone's bottom bar. -->
+  <string name="shell_destination_downloads">Downloads</string>
+  <string name="shell_destination_discover">Discover</string>
+  <string name="shell_destination_devices">Devices</string>
+  <!-- Settings at the bottom of the sidebar and the rail, and in the phone's menus. -->
+  <string name="shell_settings">Settings</string>
+  <!-- The heading over the sidebar's devices, and the title of the phone's device sheet. -->
+  <string name="shell_devices">Devices</string>
+  <!-- The sidebar toggle's description, in the rail and in the sidebar. -->
+  <string name="shell_show_sidebar">Show sidebar</string>
+  <string name="shell_hide_sidebar">Hide sidebar</string>
+  <!-- The sun or moon button, named after the appearance it switches to. -->
+  <string name="shell_appearance_light">Switch to light</string>
+  <string name="shell_appearance_dark">Switch to dark</string>
+  <!-- A destination of the rail for screen readers while downloads run. %1$s is the destination,
+       such as "Downloads", %2$d how many files download. -->
+  <plurals name="shell_rail_downloading">
+    <item quantity="one">%1$s, %2$d downloading</item>
+    <item quantity="other">%1$s, %2$d downloading</item>
+  </plurals>
+  <!-- A device for screen readers. %1$s is its name, %2$s what it is doing, such as "Idle". -->
+  <string name="shell_device_described">%1$s, %2$s</string>
+
+  <!-- What a device is doing, after or under its name in the sidebar, the rail, the device
+       switcher and the command palette. Several are joined by " · ". -->
+  <string name="shell_device_needs_token">Needs token</string>
+  <string name="shell_device_needs_a_token">Needs a token</string>
+  <string name="shell_device_needs_new_token">Needs a new access token</string>
+  <!-- A device the app does not keep connected, which is not a problem. -->
+  <string name="shell_device_off">Off</string>
+  <string name="shell_device_not_connected">Not connected</string>
+  <string name="shell_device_offline">Offline</string>
+  <!-- Follows shell_device_offline after " · ". %1$s is a duration, such as "2 h". -->
+  <string name="shell_device_last_seen">last seen %1$s ago</string>
+  <string name="shell_device_connecting">Connecting</string>
+  <string name="shell_device_connecting_now">Connecting…</string>
+  <string name="shell_device_idle">Idle</string>
+  <string name="shell_device_slow_lane">Slow lane</string>
+  <!-- How many downloads of a device run, wait or failed. -->
+  <plurals name="shell_device_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d active</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="one">%1$d waiting</item>
+    <item quantity="other">%1$d waiting</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <!-- The speed of every device together, under All devices. %1$s is a speed, such as "9.1 MB/s". -->
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <!-- Under All devices while some cannot be reached. %1$d devices of all %2$d are online. -->
+  <string name="shell_devices_online">%1$d of %2$d online</string>
+
+  <!-- The sidebar's device rows. -->
+  <string name="sidebar_all_devices_tooltip">Every device's downloads</string>
+  <string name="sidebar_add_device">Add device</string>
+  <!-- What a long press on a device opens, for screen readers. -->
+  <string name="sidebar_device_menu">Device menu</string>
+  <!-- The menu of a device in the sidebar and the rail. -->
+  <string name="sidebar_menu_pause_all">Pause all here</string>
+  <string name="sidebar_menu_resume_all">Resume all here</string>
+  <string name="sidebar_menu_retry_failed">Retry failed here</string>
+  <!-- %1$d is how many downloads failed on the device. -->
+  <string name="sidebar_menu_retry_failed_count">Retry failed here (%1$d)</string>
+  <string name="sidebar_menu_speed">Speed</string>
+  <string name="sidebar_menu_settings">Settings for this device…</string>
+  <!-- The Speed submenu. -->
+  <string name="sidebar_menu_full_speed">Full speed</string>
+  <!-- %1$s is the Slow lane's speed, such as "1 MB/s". -->
+  <string name="sidebar_menu_slow_lane">Slow lane · %1$s</string>
+  <string name="sidebar_menu_no_limit">No limit</string>
+
+  <!-- The device switcher and the phone's device sheet, after the devices. -->
+  <string name="switcher_overview">Overview</string>
+  <string name="switcher_add_device">Add device…</string>
+  <string name="switcher_find_on_network">Find on network</string>
+  <!-- %1$s is how the app names the device it runs on inside a sentence, such as "this Mac". -->
+  <string name="switcher_share">Share %1$s…</string>
+
+  <!-- The phone's top bar. -->
+  <!-- The device button for screen readers. %1$s is the device shown, or All devices. -->
+  <string name="shell_device_button">%1$s, switch device</string>
+  <!-- What a long press on the device button does. -->
+  <string name="shell_device_button_back">Back to the previous device</string>
+  <string name="shell_more">More</string>
+  <string name="shell_clear_finished">Clear finished</string>
+  <string name="shell_search_close">Close search</string>
+  <string name="shell_search_placeholder">Search or paste a link</string>
+  <!-- Offered under the search for a typed link. %1$s is a device name, or "this device". -->
+  <string name="shell_search_download_on">Download on %1$s</string>
+  <!-- The same for two links or more. %1$d is how many, %2$s a device name. -->
+  <plurals name="shell_search_download_links_on">
+    <item quantity="one">Download %1$d link on %2$s</item>
+    <item quantity="other">Download %1$d links on %2$s</item>
+  </plurals>
+  <!-- Searches Discover for typed text, in the phone's search and the command palette. %1$s is
+       the text. -->
+  <string name="shell_discover_query">Discover “%1$s”</string>
+
+  <!-- Under Activity in the phone's overflow menu. -->
+  <plurals name="shell_activity_unread">
+    <item quantity="one">%1$d unread</item>
+    <item quantity="other">%1$d unread</item>
+  </plurals>
+
+  <!-- Messages after a command of the window. -->
+  <string name="shell_clipboard_no_link">The clipboard holds no link</string>
+  <string name="shell_file_picker_failed">Couldn't open the file picker</string>
+
+  <!-- Banners about the shown device's connection. %1$s is a device name. -->
+  <string name="banner_connecting">Connecting to %1$s…</string>
+  <string name="banner_offline">%1$s is offline</string>
+  <!-- Follows banner_offline after " · ". -->
+  <string name="banner_retrying">retrying</string>
+  <string name="banner_retry_now">Retry now</string>
+  <string name="banner_switch_to">Switch to %1$s</string>
+  <string name="banner_unauthorized">%1$s needs a new access token</string>
+  <string name="banner_enter_token">Enter token</string>
+  <!-- A failure's second line: what failed and why. %1$s is a file or device, %2$s the reason. -->
+  <string name="toast_subject_reason">%1$s: %2$s</string>
+
+  <!-- The overlay while links or files from another app are dragged over the window. -->
+  <string name="drop_to_download">Drop to download</string>
+  <string name="drop_kinds">Links, magnets, .torrent files and lists of links</string>
+  <!-- What a device row or berth says while something is dragged over it. -->
+  <string name="drop_unreachable">Not reachable now</string>
+  <string name="drop_here">Drop here</string>
+  <string name="drop_already_here">Already here</string>
+  <!-- One dragged download goes to the device. -->
+  <string name="drop_move_it">Move it here</string>
+  <string name="drop_send_it">Send it here</string>
+  <!-- %1$d dragged downloads, two or more, go to the device. -->
+  <string name="drop_move_count">Move %1$d here</string>
+  <string name="drop_send_count">Send %1$d here</string>
+  <!-- Follows drop_send_it or drop_send_count after " · ". %1$s is a key, such as Alt or ⌥. -->
+  <string name="drop_key_moves">%1$s moves</string>
+  <!-- A drop berth's title. %1$s is a device name. -->
+  <string name="berth_drop_on">Drop on %1$s</string>
+  <!-- Under a drop berth's name while the device can take a drop. -->
+  <string name="berth_ready">Ready</string>
+
+  <!-- The command palette's field. -->
+  <string name="palette_placeholder">Paste a link, search downloads, or type a command</string>
+  <!-- The same where the palette is narrow, as on a phone. -->
+  <string name="palette_placeholder_short">Paste a link, search, or type a command</string>
+  <string name="palette_clear">Clear</string>
+  <!-- When no row matches. %1$s is what was typed. -->
+  <string name="palette_no_matches">Nothing matches “%1$s”</string>
+  <string name="palette_no_matches_hint">Try a file name, a command such as “pause”, a link or /speed</string>
+  <!-- Key hints at the bottom of the palette, each after its key, such as "↩ run". -->
+  <string name="palette_hint_move">move</string>
+  <string name="palette_hint_run">run</string>
+  <string name="palette_hint_alternate">alternate</string>
+  <string name="palette_hint_discover">Discover</string>
+  <string name="palette_hint_close">close</string>
+  <!-- Headings over the palette's rows while nothing is typed. -->
+  <string name="palette_section_recent">Recent</string>
+  <string name="palette_section_links">Download</string>
+  <string name="palette_section_speed">Speed</string>
+  <string name="palette_section_commands">Commands</string>
+  <string name="palette_section_downloads">Downloads</string>
+  <string name="palette_section_navigation">Go to</string>
+  <string name="palette_section_devices">Devices</string>
+  <string name="palette_section_search">Search</string>
+
+  <!-- Rows for typed or pasted links. %1$d is how many links, two or more. -->
+  <plurals name="palette_links">
+    <item quantity="one">%1$d link</item>
+    <item quantity="other">%1$d links</item>
+  </plurals>
+  <!-- %1$s is a file name, or palette_links. -->
+  <string name="palette_download">Download %1$s</string>
+  <!-- After a link row's title. %1$s is the device it downloads on. -->
+  <string name="palette_on_device">on %1$s</string>
+  <!-- What ↩ does on the highlighted row. -->
+  <string name="palette_verb_download">Download</string>
+  <string name="palette_add_with_options">Add with options…</string>
+  <string name="palette_add_with_options_detail">Folder, speed, priority and start time</string>
+  <!-- Rows for a typed speed. %1$s is a speed, such as "5 MB/s". -->
+  <string name="palette_limit_to">Limit downloads to %1$s</string>
+  <string name="palette_slow_lane_to">Set Slow lane to %1$s</string>
+  <string name="palette_slow_lane_turns_on">Turns the Slow lane on</string>
+  <string name="palette_slow_lane_is_on">Slow lane is on</string>
+  <!-- %1$s is the Slow lane's speed now, such as "1 MB/s". -->
+  <string name="palette_slow_lane_now">Now %1$s</string>
+  <string name="palette_limit_while_off">Applies while the Slow lane is off</string>
+
+  <!-- Commands with how many downloads they apply to. %1$d is how many. -->
+  <plurals name="palette_pause_count">
+    <item quantity="one">Pause %1$d download</item>
+    <item quantity="other">Pause %1$d downloads</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">Nothing to pause</string>
+  <plurals name="palette_resume_count">
+    <item quantity="one">Resume %1$d paused</item>
+    <item quantity="other">Resume %1$d paused</item>
+  </plurals>
+  <string name="palette_nothing_paused">Nothing paused</string>
+  <plurals name="palette_retry_count">
+    <item quantity="one">Retry %1$d failed download</item>
+    <item quantity="other">Retry %1$d failed downloads</item>
+  </plurals>
+  <string name="palette_nothing_failed">Nothing failed</string>
+  <string name="palette_slow_lane_off">Turn Slow lane off</string>
+  <string name="palette_slow_lane_on">Turn Slow lane on</string>
+  <string name="palette_nothing_to_undo">Nothing to undo</string>
+  <string name="palette_full_speed">Full speed</string>
+  <!-- Under Full speed: what running it changes. -->
+  <string name="palette_full_speed_slow_lane">Turns the Slow lane off</string>
+  <string name="palette_full_speed_rules">Turns speed rules off</string>
+  <!-- %1$s is the device's speed limit, such as "5 MB/s". -->
+  <string name="palette_full_speed_cap">Lifts the %1$s limit</string>
+  <!-- Under Full speed, and the message when running it changes nothing. -->
+  <string name="palette_full_speed_already">Already at full speed</string>
+  <!-- Other words that find Full speed when typed, separated by commas. -->
+  <string name="palette_full_speed_keywords">unlimited, no limit, max speed</string>
+  <string name="palette_speed_not_loaded">The speed limit isn't loaded yet</string>
+
+  <!-- Rows that go to a page. %1$s is a tab of the Downloads page, such as "Failed". -->
+  <string name="palette_downloads_tab">Downloads › %1$s</string>
+  <!-- After a tab with no downloads. -->
+  <string name="palette_none">None</string>
+  <!-- %1$s is a page of Settings, such as "Speed". -->
+  <string name="palette_settings_page">Settings › %1$s</string>
+  <!-- Commands on one device. %1$s is the device's name. -->
+  <string name="palette_pause_all_on">Pause all on %1$s</string>
+  <string name="palette_resume_all_on">Resume all on %1$s</string>
+  <string name="palette_retry_failed_on">Retry failed on %1$s</string>
+  <!-- Searching for what was typed. %1$s is the text. -->
+  <string name="palette_show_in_downloads">Show “%1$s” in Downloads</string>
+  <!-- How many downloads match the text. -->
+  <plurals name="palette_matches">
+    <item quantity="one">%1$d match</item>
+    <item quantity="other">%1$d matches</item>
+  </plurals>
+  <string name="palette_discover_detail">Find downloads on the web</string>
+</resources>

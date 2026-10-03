@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.theme.KetchTheme
@@ -59,7 +60,7 @@ internal fun PhoneBottomBar(
               tint = if (isSelected) colors.accentText else colors.textSecondary,
             )
           },
-          label = { Text(entry.label, style = KetchTheme.typography.labelS) },
+          label = { Text(entry.label.resolve(), style = KetchTheme.typography.labelS) },
           colors = itemColors,
         )
       }

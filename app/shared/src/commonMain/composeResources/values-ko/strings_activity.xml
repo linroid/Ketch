@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="notify_on_device">%1$s: %2$s</string>
+  <string name="notify_download_complete">다운로드 완료</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="other">다운로드 %1$d개 완료</item>
+  </plurals>
+  <string name="notify_download_failed">다운로드 실패</string>
+  <string name="notify_failed_body">%1$s: %2$s</string>
+  <string name="notify_all_finished">모든 다운로드 완료</string>
+  <string name="notify_action_share">공유</string>
+
+  <string name="notify_channel_active">진행 중인 다운로드</string>
+  <string name="notify_channel_done">완료된 다운로드</string>
+  <string name="notify_channel_failed">실패한 다운로드</string>
+  <string name="notify_finished_group">완료된 다운로드</string>
+  <string name="notify_sharing_device">이 기기 공유 중</string>
+  <string name="notify_server_on_port">서버 실행 중(포트 %1$d)</string>
+  <string name="notify_slow_lane_on">저속 차로</string>
+  <string name="notify_action_pause_all">모두 일시정지</string>
+  <string name="notify_action_slow_lane">저속 차로</string>
+  <string name="notify_action_full_speed">최대 속도</string>
+  <plurals name="notify_more_files">
+    <item quantity="other">+%1$d개 더</item>
+  </plurals>
+  <plurals name="notify_paused">
+    <item quantity="other">다운로드 %1$d개 일시정지됨</item>
+  </plurals>
+  <string name="notify_paused_body">계속하려면 Ketch를 여세요</string>
+  <string name="notify_web_offer">알림 받기</string>
+  <string name="notify_web_on">알림 켜짐</string>
+
+  <plurals name="ongoing_downloading">
+    <item quantity="other">파일 %1$d개 다운로드 중</item>
+  </plurals>
+  <string name="ongoing_downloading_file">%1$s 다운로드 중</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="other">파일 %1$d개 다운로드 대기 중</item>
+  </plurals>
+  <string name="ongoing_size_of">%1$s / %2$s</string>
+  <string name="ongoing_left_under_minute">1분 미만 남음</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="other">약 %1$d분 남음</item>
+  </plurals>
+  <string name="ongoing_left">약 %1$s 남음</string>
+  <string name="ongoing_line_waiting">대기 중</string>
+
+  <string name="feedback_background_pause">Ketch가 백그라운드에 있으면 다운로드가 일시정지됩니다</string>
+  <string name="feedback_background_use_computer">대신 컴퓨터 사용</string>
+  <string name="feedback_file_action_failed">파일을 열 수 없음</string>
+
+  <string name="activity_title">활동</string>
+  <string name="activity_mark_all_read">모두 읽음으로 표시</string>
+  <string name="activity_clear">지우기</string>
+  <string name="activity_unread">읽지 않음</string>
+  <string name="activity_empty_title">아직 활동이 없습니다</string>
+  <string name="activity_empty_body">완료된 다운로드, 실패한 다운로드, 오프라인이 된 기기가 여기에 표시됩니다.</string>
+  <string name="activity_earlier">이전</string>
+
+  <string name="feedback_open_failed">%1$s을(를) 열 수 없음</string>
+  <string name="feedback_drop_unsupported">.torrent 파일과 링크 목록만 놓아서 다운로드를 추가할 수 있습니다</string>
+  <string name="feedback_drop_no_links">놓은 항목에서 링크를 찾지 못했습니다</string>
+  <string name="feedback_read_failed">%1$s을(를) 읽을 수 없음</string>
+  <string name="feedback_add_failed">%1$s을(를) 추가할 수 없음</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="other">다운로드 %1$d개를 추가할 수 없음</item>
+  </plurals>
+  <string name="feedback_switch_failed">%1$s(으)로 전환할 수 없음</string>
+  <string name="feedback_reconnect_failed">%1$s에 다시 연결할 수 없음</string>
+  <string name="feedback_remove_device_failed">%1$s을(를) 제거할 수 없음</string>
+  <string name="feedback_discovery_failed">LAN 서버를 찾지 못했습니다</string>
+
+  <plurals name="feedback_part_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">일시정지할 항목 없음</string>
+  <plurals name="feedback_paused">
+    <item quantity="other">다운로드 %1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="other">기기 %2$d대에서 다운로드 %1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="other">예약된 %1$d개는 예정대로 시작</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="other">예약된 %1$d개는 %2$s에 시작</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="other">다운로드 %1$d개 재개됨</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="other">기기 %2$d대에서 다운로드 %1$d개 재개됨</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="other">다운로드 %1$d개 재시도 중</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="other">기기 %2$d대에서 다운로드 %1$d개 재시도 중</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="other">완료된 다운로드 %1$d개를 지움</item>
+  </plurals>
+  <string name="feedback_nothing_missing">지울 파일 없는 항목 없음</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="other">파일이 없는 다운로드 %1$d개를 지움</item>
+  </plurals>
+  <string name="feedback_removed_one">%1$s 제거됨</string>
+  <plurals name="feedback_removed">
+    <item quantity="other">다운로드 %1$d개 제거됨</item>
+  </plurals>
+  <string name="feedback_discarded_one">%1$s의 진행 상황 삭제됨</string>
+  <plurals name="feedback_discarded">
+    <item quantity="other">다운로드 %1$d개의 진행 상황 삭제됨</item>
+  </plurals>
+  <string name="feedback_restarted_one">%1$s 다시 시작됨</string>
+  <plurals name="feedback_restarted">
+    <item quantity="other">다운로드 %1$d개 다시 시작됨</item>
+  </plurals>
+  <string name="feedback_redownload_failed_one">%2$s에서 %1$s을(를) 다시 다운로드할 수 없음</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="other">다운로드 %1$d개를 다시 다운로드할 수 없음</item>
+  </plurals>
+  <string name="feedback_started_now_one">%1$s 지금 시작됨</string>
+  <plurals name="feedback_started_now">
+    <item quantity="other">다운로드 %1$d개 지금 시작됨</item>
+  </plurals>
+  <string name="feedback_started_preempted">자리를 만들기 위해 %1$s 일시정지함</string>
+  <string name="feedback_start_now_failed_one">%2$s에서 %1$s을(를) 지금 시작할 수 없음</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="other">다운로드 %1$d개를 지금 시작할 수 없음</item>
+  </plurals>
+  <string name="feedback_send_failed_one">%1$s을(를) %2$s에 보낼 수 없음</string>
+  <plurals name="feedback_send_failed">
+    <item quantity="other">다운로드 %1$d개를 %2$s에 보낼 수 없음</item>
+  </plurals>
+  <string name="feedback_moved_one">%1$s을(를) %2$s(으)로 이동함</string>
+  <plurals name="feedback_moved">
+    <item quantity="other">다운로드 %1$d개를 %2$s(으)로 이동함</item>
+  </plurals>
+  <string name="feedback_sent_one">%1$s을(를) %2$s에 보냄</string>
+  <plurals name="feedback_sent">
+    <item quantity="other">다운로드 %1$d개를 %2$s에 보냄</item>
+  </plurals>
+  <string name="feedback_remove_here">여기서 제거</string>
+  <string name="feedback_options">옵션</string>
+
+  <string name="feedback_pause_failed_one">%2$s에서 %1$s을(를) 일시정지할 수 없음</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개를 일시정지할 수 없음</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">%2$s에서 %1$s을(를) 재개할 수 없음</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개를 재개할 수 없음</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">%2$s에서 %1$s을(를) 재시도할 수 없음</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개를 재시도할 수 없음</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">%2$s에서 %1$s의 진행 상황을 삭제할 수 없음</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개의 진행 상황을 삭제할 수 없음</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">%2$s에서 %1$s의 지금 시작을 실행 취소할 수 없음</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개의 지금 시작을 실행 취소할 수 없음</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">%2$s에서 %1$s을(를) 제거할 수 없음</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="other">%2$s에서 다운로드 %1$d개를 제거할 수 없음</item>
+  </plurals>
+
+  <string name="feedback_undo_pause_all">모두 일시정지 실행 취소</string>
+  <string name="feedback_undo_clear_finished">완료 항목 지우기 실행 취소</string>
+  <string name="feedback_undo_clear_missing">파일 없는 항목 지우기 실행 취소</string>
+  <string name="feedback_undo_remove">제거 실행 취소</string>
+  <string name="feedback_undo_discard">진행 상황 삭제 실행 취소</string>
+  <string name="feedback_undo_start_now">지금 시작 실행 취소</string>
+  <string name="feedback_undo_move">이동 실행 취소</string>
+  <string name="feedback_undo_add">추가 실행 취소</string>
+
+  <string name="feedback_send_cookies_and_sign_in">브라우저의 쿠키와 로그인 정보가 %1$s에 전송됩니다.</string>
+  <string name="feedback_send_cookies">브라우저의 쿠키가 %1$s에 전송됩니다.</string>
+  <string name="feedback_send_sign_in">로그인 정보가 %1$s에 전송됩니다.</string>
+
+  <string name="feedback_added">%1$s 추가됨</string>
+  <plurals name="feedback_recovered">
+    <item quantity="other">지난 세션의 다운로드 %1$d개를 재개하는 중</item>
+  </plurals>
+  <string name="feedback_device_offline">%1$s 연결 끊김</string>
+  <string name="feedback_device_online">%1$s에 다시 연결됨</string>
+</resources>
