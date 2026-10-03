@@ -12,12 +12,19 @@ import com.linroid.ketch.app.components.MenuEntry
 import com.linroid.ketch.app.components.buildMenu
 import com.linroid.ketch.app.components.startTimeOptions
 import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.PulseCounts
+import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
 import com.linroid.ketch.app.ui.inspector.urgentVictim
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
@@ -195,6 +202,24 @@ class RowMenuTest {
     // Urgent starts nothing here, so nothing makes room, however full the device is.
     assertNull(urgentVictim(f.state, listOf(rowOf(f.add(downloading)))))
     assertNull(urgentVictim(f.state, emptyList()))
+  }
+
+  @Test
+  fun sendTargets_withPresence_takeItsHealthAndSummary() = actionsTest { f ->
+    val nas = RemoteInstance(
+      RecordingKetchApi("NAS"),
+      RemoteConfig(host = "nas.local", name = "NAS"),
+      MutableStateFlow(ConnectionState.Connected),
+    )
+    val row = rowOf(f.add(downloading))
+    val presence = presence(nas, "NAS", health = DeviceHealth.Unauthorized, counts = PulseCounts(2))
+
+    val listed = sendTargets(listOf(nas), listOf(row)).single().option
+    val known = sendTargets(listOf(nas), listOf(row), listOf(presence)).single().option
+
+    assertEquals(DeviceHealth.Live, listed.health)
+    assertEquals(DeviceHealth.Unauthorized, known.health)
+    assertEquals("2 active", known.summary)
   }
 
   @Test

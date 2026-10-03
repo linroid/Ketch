@@ -38,6 +38,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
@@ -147,9 +148,7 @@ internal fun RowMenu(
   if (rows.isEmpty()) return
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
-  val instances by runner.state.instances.collectAsState()
-  val presence by runner.state.instanceManager.presence.collectAsState()
-  val context = rowMenuContext(rows, runner, sendTargets(instances, rows, presence))
+  val context = rowMenuContext(rows, runner, rememberSendTargets(runner.state, rows))
   val title = single?.name ?: downloads(rows.size)
   KetchMenu(
     expanded = true,
@@ -448,8 +447,20 @@ internal fun KetchMenuScope.sendEntries(
 }
 
 /**
+ * The devices [rows] can be sent to, [sendTargets], kept current as devices come, go and change
+ * health; the row menu, the selection bar and the inspector all list them this way.
+ */
+@Composable
+internal fun rememberSendTargets(state: AppState, rows: List<TaskRow>): List<SendTarget> {
+  val instances by state.instances.collectAsState()
+  val presence by state.instanceManager.presence.collectAsState()
+  return remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
+}
+
+/**
  * The devices other than those of [rows], with their health and, from [presence], what each
- * is doing, such as "1.8 TB free · 2 active".
+ * is doing, such as "1.8 TB free · 2 active". A device [presence] does not list yet takes its
+ * health from its connection.
  */
 internal fun sendTargets(
   instances: List<InstanceEntry>,
@@ -458,13 +469,13 @@ internal fun sendTargets(
 ): List<SendTarget> {
   val here = rows.mapTo(mutableSetOf()) { it.key.deviceId }
   return instances.filter { it.deviceId !in here }.map { entry ->
-    val health = when (entry) {
+    val device = presence.firstOrNull { it.deviceId == entry.deviceId }
+    val health = device?.health ?: when (entry) {
       is RemoteInstance -> entry.connectionState.value.toDeviceHealth()
       else -> DeviceHealth.Local()
     }
-    val name = entry.displayName
-    val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
-    SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
+    val summary = targetSummary(device)
+    SendTarget(entry, DeviceOption(entry.deviceId, entry.displayName, health, summary = summary))
   }
 }
 

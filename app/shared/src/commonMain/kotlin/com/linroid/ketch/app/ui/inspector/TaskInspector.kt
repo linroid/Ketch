@@ -206,7 +206,6 @@ private fun TaskView(
 ) {
   val pulse by state.pulse.state.collectAsState()
   val rates by state.speedHistory.rates.collectAsState()
-  val instances by state.instances.collectAsState()
   val device = rememberDeviceLabel(state, row)
   val copier = rememberCopier(state)
   val cap = pulse.devices.firstOrNull { it.deviceId == row.key.deviceId }?.cap
@@ -231,7 +230,7 @@ private fun TaskView(
     },
     onClose = onClose,
   )
-  ActionBar(state, row, runner, instances)
+  ActionBar(state, row, runner)
   val tabs = rememberInspectorTabs(state, row)
   val shown = if (tab in tabs) tab else InspectorTab.Overview
   if (tabs.size > 1) {
