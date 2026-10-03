@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <plurals name="pulse_downloading">
+    <item quantity="other">%1$d個のファイルをダウンロード中</item>
+  </plurals>
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="other">%2$d台のデバイスで%1$d個のファイルをダウンロード中</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="other">%1$d件のダウンロードに対応が必要です</item>
+  </plurals>
+  <string name="pulse_all_quiet">実行中のダウンロードなし</string>
+  <string name="pulse_all_quiet_free">実行中のダウンロードなし · %2$sの空き容量%1$s</string>
+  <string name="pulse_connecting">%1$sに接続中</string>
+  <string name="pulse_needs_token">%1$sにはトークンが必要です</string>
+  <string name="pulse_offline">%1$sはオフラインです · 再試行中</string>
+  <string name="pulse_slow_lane">スローレーン</string>
+  <string name="pulse_slow_lane_until">%1$sまでスローレーン</string>
+  <string name="pulse_disk_tooltip">%2$s：%1$s · %3$s</string>
+  <string name="pulse_downloading_count">%1$d件ダウンロード中</string>
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <plurals name="pulse_count_downloading">
+    <item quantity="other">%1$d件ダウンロード中</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="other">%1$d件待機中</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <string name="pulse_count_description">%1$s、%2$sタブを表示</string>
+  <string name="pulse_speed_offline">オフライン中は速度不明</string>
+  <string name="pulse_speed_downloading">%1$sでダウンロード中、過去5分間を表示</string>
+  <string name="pulse_speed_idle">アイドル、過去5分間を表示</string>
+  <string name="pulse_idle">アイドル</string>
+  <string name="pulse_disk_short">待機中のダウンロードには容量が足りません</string>
+  <plurals name="pulse_activity_unread">
+    <item quantity="other">アクティビティ、未読%1$d件</item>
+  </plurals>
+  <plurals name="pulse_selected">
+    <item quantity="other">%1$d件を選択中</item>
+  </plurals>
+
+  <string name="pulse_health_sharing">共有中 :%1$d</string>
+  <string name="pulse_health_not_shared">未共有</string>
+  <string name="pulse_health_live">オンライン</string>
+  <string name="pulse_health_connecting">接続中</string>
+  <string name="pulse_health_offline">オフライン</string>
+  <string name="pulse_health_needs_token">トークンが必要</string>
+  <string name="pulse_health_description">%1$s：%2$s</string>
+
+  <string name="pulse_mode_full">フルスピード</string>
+  <string name="pulse_mode_auto_name">自動</string>
+  <string name="pulse_mode_capped">制限 · %1$s</string>
+  <string name="pulse_mode_slow_lane">スローレーン · %1$s</string>
+  <string name="pulse_mode_auto">自動 · %1$s</string>
+  <string name="pulse_full_speed_until">%1$sまでフルスピード</string>
+  <string name="pulse_mode_full_short">フル</string>
+
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <plurals name="pulse_active">
+    <item quantity="other">%1$d件実行中</item>
+  </plurals>
+  <string name="pulse_subtitle_description">%1$s、速度を表示</string>
+  <string name="pulse_last_minute">直近1分間</string>
+
+  <string name="pulse_speed">速度</string>
+  <string name="pulse_last_5_minutes">過去5分間</string>
+  <string name="pulse_history_empty">過去5分間にダウンロードしたものはありません。</string>
+  <string name="pulse_no_limit">制限なし</string>
+  <string name="pulse_limit">制限：%1$s</string>
+
+  <string name="pulse_slow_lane_turn_on">スローレーンをオンにする</string>
+  <string name="pulse_slow_lane_turn_off">スローレーンをオフにする</string>
+  <string name="pulse_speed_limit">速度制限</string>
+  <string name="pulse_limited">制限中</string>
+  <string name="pulse_not_limited">制限なし</string>
+  <string name="pulse_speed_options">速度オプション</string>
+  <string name="pulse_speed_mode">速度モード</string>
+  <string name="pulse_slow_lane_speed">スローレーンの速度</string>
+  <string name="pulse_use_as_slow_lane">スローレーンの速度として使用</string>
+  <string name="pulse_speed_settings">速度の設定…</string>
+  <string name="pulse_update_failed">%1$sを更新できませんでした · %2$s</string>
+  <string name="pulse_caption_full">ネットワークが許す限りの速度でダウンロードします。</string>
+  <string name="pulse_caption_capped">ダウンロード速度は%1$sに制限されています。</string>
+  <string name="pulse_caption_slow_lane">ダウンロードは%1$sの範囲で行い、ほかの通信のために帯域を残します。</string>
+  <string name="pulse_caption_no_rules">速度ルールはまだありません。速度の設定で追加してください。</string>
+  <string name="pulse_caption_rule_slow_lane">ルールによりスローレーンがオンになっています。</string>
+  <string name="pulse_caption_rule_full">ルールでスローレーンがオンになるまでフルスピードです。</string>
+  <string name="pulse_caption_slow_lane_until">%1$sまでスローレーン、その後はルールに従います。</string>
+  <string name="pulse_caption_full_until">%1$sまでフルスピード、その後はルールに従います。</string>
+  <string name="pulse_limit_for_slow_lane">スローレーンがオンのときに使用されます。</string>
+  <string name="pulse_limit_for_device">%1$sのすべてのダウンロードに適用されます。</string>
+  <string name="pulse_limit_after_slow_lane">スローレーンがオフになると適用されます。</string>
+
+  <string name="pulse_slow_lane_on">スローレーン：オン · %1$s</string>
+  <string name="pulse_slow_lane_off">スローレーン：オフ</string>
+  <string name="pulse_speed_follows_rules">速度はルールに従います</string>
+  <string name="pulse_switch_failed">%1$sに切り替えられませんでした</string>
+  <string name="pulse_limit_failed">速度制限を設定できませんでした</string>
+
+  <string name="pulse_timeline_added">追加</string>
+  <string name="pulse_timeline_started">開始</string>
+  <string name="pulse_timeline_resumed">再開</string>
+  <string name="pulse_timeline_retried">再試行</string>
+  <string name="pulse_timeline_paused">一時停止</string>
+  <string name="pulse_timeline_queued">キュー待ち</string>
+  <string name="pulse_timeline_scheduled">予約</string>
+  <string name="pulse_timeline_completed">完了</string>
+  <string name="pulse_timeline_failed">失敗</string>
+  <string name="pulse_timeline_canceled">キャンセル</string>
+  <string name="pulse_timeline_connections">接続数 %1$s → %2$s</string>
+  <string name="pulse_timeline_auto">自動</string>
+  <string name="pulse_timeline_limit">制限 → %1$s</string>
+  <string name="pulse_timeline_limit_removed">制限を解除</string>
+  <string name="pulse_timeline_priority">優先度 → %1$s</string>
+</resources>

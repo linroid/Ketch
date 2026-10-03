@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="downloads_title">ダウンロード</string>
+  <plurals name="downloads_count_downloading">
+    <item quantity="other">%2$d件中%1$d件ダウンロード中</item>
+  </plurals>
+  <string name="downloads_view_list">リスト</string>
+  <string name="downloads_view_table">テーブル</string>
+  <string name="downloads_close_search">検索を閉じる</string>
+  <string name="downloads_switch_device">デバイスを切り替え</string>
+  <string name="downloads_all_devices">すべてのデバイス</string>
+  <string name="downloads_search_placeholder">検索・リンク貼り付け</string>
+  <string name="downloads_more">その他</string>
+  <string name="downloads_more_actions">その他の操作</string>
+  <string name="downloads_copy_all_links">すべてのリンクをコピー</string>
+  <string name="downloads_columns">列</string>
+  <string name="downloads_row_density">行の表示密度</string>
+  <string name="downloads_density_default">標準</string>
+  <string name="downloads_density_compact">コンパクト</string>
+  <string name="downloads_resolving">%1$d件を取得中</string>
+  <string name="downloads_resolving_tooltip">ピアからファイル一覧を取得中 · クリックしてファイルを選択</string>
+  <string name="downloads_show_add_sheet">追加シートを表示</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="other">完了した%1$d件をクリア</item>
+  </plurals>
+  <string name="downloads_clear_finished">完了したものをクリア</string>
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="other">ファイルなしの%1$d件をクリア</item>
+  </plurals>
+  <string name="downloads_clear_missing">ファイルなしをクリア</string>
+  <string name="downloads_clear_missing_caption">ファイルが移動または削除されました</string>
+  <string name="downloads_clear_missing_tooltip">ファイルが移動または削除された完了済みのダウンロードを削除</string>
+  <string name="downloads_select_all">すべて選択</string>
+  <string name="downloads_clear_selection">選択を解除</string>
+  <string name="downloads_retry_all_count">すべて再試行（%1$d）</string>
+
+  <plurals name="downloads_tab_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">すべて再試行</string>
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="other">%1$d件は新しいリンクが必要</item>
+  </plurals>
+  <string name="downloads_sort">並べ替え</string>
+  <string name="downloads_group">グループ</string>
+  <string name="downloads_label_value">%1$s：%2$s</string>
+  <string name="downloads_sort_by">並べ替えの基準</string>
+  <string name="downloads_group_by">グループ化の基準</string>
+
+  <string name="downloads_facet_type">種類</string>
+  <string name="downloads_facet_site">サイト</string>
+  <string name="downloads_facet_device">デバイス</string>
+  <string name="downloads_facet_origin">追加元</string>
+  <string name="downloads_facet_matched">%2$d件中%1$d件</string>
+
+  <string name="downloads_table_connections_short">接続</string>
+  <string name="downloads_table_column_auto">「すべてのデバイス」で表示</string>
+  <string name="downloads_table_reset_columns">列をリセット</string>
+  <string name="downloads_table_sort_by">%1$sで並べ替え</string>
+  <string name="downloads_table_sorted_ascending">%1$s、昇順</string>
+  <string name="downloads_table_sorted_descending">%1$s、降順</string>
+  <string name="downloads_table_capped_at">%1$sに制限</string>
+  <string name="downloads_table_source_magnet">マグネット</string>
+  <string name="downloads_table_origin_unknown">不明</string>
+  <string name="downloads_table_speed_limited">このダウンロードには速度制限がかかっています</string>
+
+  <string name="downloads_group_show">%1$sを表示</string>
+  <string name="downloads_group_hide">%1$sを隠す</string>
+  <string name="downloads_group_collapsed">折りたたみ</string>
+  <string name="downloads_group_expanded">展開</string>
+  <string name="downloads_row_select">選択</string>
+  <string name="downloads_row_show_actions">操作を表示</string>
+  <string name="downloads_inspector_resize">インスペクタのサイズを変更</string>
+
+  <string name="downloads_empty_clear_search">検索をクリア</string>
+  <string name="downloads_empty_add_link">このリンクを追加</string>
+  <string name="downloads_empty_add_links">これらのリンクを追加</string>
+  <string name="downloads_empty_show_all">すべてのダウンロードを表示</string>
+  <string name="downloads_empty_add">リンクを追加</string>
+  <string name="downloads_empty_link_missing">このリンクはダウンロードにありません</string>
+  <string name="downloads_empty_links_missing">これらのリンクはダウンロードにありません</string>
+  <string name="downloads_empty_add_it_to">代わりに%1$sに追加してください。</string>
+  <string name="downloads_empty_add_them_to">代わりに%1$sに追加してください。</string>
+  <string name="downloads_empty_no_match">「%1$s」に一致するダウンロードはありません</string>
+  <string name="downloads_empty_no_match_hint">名前、サイト、フォルダ、エラーを対象に検索します。</string>
+  <string name="downloads_empty_all">ダウンロードはまだありません</string>
+  <string name="downloads_empty_downloading">ダウンロード中のものはありません</string>
+  <string name="downloads_empty_downloading_hint">実行中のダウンロードがここに表示されます。</string>
+  <string name="downloads_empty_waiting">待機中のものはありません</string>
+  <string name="downloads_empty_waiting_hint_one">%1$sは一度に1件ずつダウンロードします。</string>
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="other">%1$sは一度に%2$d件までダウンロードします。</item>
+  </plurals>
+  <string name="downloads_empty_paused">一時停止中のダウンロードはありません</string>
+  <string name="downloads_empty_paused_hint">一時停止したダウンロードがここに表示されます。</string>
+  <string name="downloads_empty_done">完了したダウンロードはありません</string>
+  <string name="downloads_empty_done_hint">ダウンロードが完了するとここに表示されます。</string>
+  <string name="downloads_empty_failed">対応が必要なものはありません</string>
+  <string name="downloads_empty_failed_hint">失敗またはキャンセルしたダウンロードがここに表示されます。</string>
+  <string name="downloads_empty_fleet">どのデバイスにもダウンロードはありません</string>
+  <string name="downloads_empty_fleet_hint">すべてのデバイスのダウンロードがここに表示されます。</string>
+  <string name="downloads_empty_add_to">%1$sにリンクを追加</string>
+  <string name="downloads_empty_remote">%1$sのダウンロードがここに表示されます</string>
+  <string name="downloads_empty_unauthorized">%1$sには新しいアクセストークンが必要です</string>
+  <string name="downloads_empty_offline">%1$sに接続できません</string>
+  <string name="downloads_empty_offline_hint">接続されると、そのデバイスのダウンロードがここに表示されます。</string>
+  <string name="downloads_empty_loading">ダウンロードを読み込み中</string>
+
+  <string name="launchpad_title">ダウンロードはまだありません</string>
+  <string name="launchpad_subtitle">リンクを貼り付けるか、ファイルをドロップするか、ブラウザから送信してください。</string>
+  <string name="launchpad_subtitle_phone">リンクを貼り付けるか、.torrentファイルを開くか、コンピュータからダウンロードを追加してください。</string>
+  <string name="launchpad_paste_title">リンクを貼り付け</string>
+  <string name="launchpad_paste_download">ダウンロード</string>
+  <string name="launchpad_paste_maybe">クリップボードにリンクがあります。</string>
+  <string name="launchpad_paste">貼り付け</string>
+  <string name="launchpad_paste_hint_phone">任意のアプリでリンクをコピーして、ここに貼り付けてください。</string>
+  <string name="launchpad_paste_hint">リンクをコピーして、Ketch内のどこでも%1$sを押してください。</string>
+  <string name="launchpad_paste_hint_plain">リンクをコピーして、Ketch内のどこでも貼り付けてください。</string>
+  <string name="launchpad_torrent_title">リンク、マグネットリンク、.torrentをドロップ</string>
+  <string name="launchpad_torrent_title_phone">.torrentファイルを開く</string>
+  <string name="launchpad_torrent_hint">このウィンドウ内のどこにでもドロップするか、.torrentファイルを選択してください。</string>
+  <string name="launchpad_torrent_hint_phone">または、ブラウザからマグネットリンクを開いてください。</string>
+  <string name="launchpad_browser_title">ブラウザから取り込む</string>
+  <string name="launchpad_browser_none">Chrome、Edge、FirefoxからKetchにダウンロードを送信できます。</string>
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s：入手</string>
+  <string name="launchpad_pair_title">コンピュータのダウンロードを操作</string>
+  <string name="launchpad_pair_hint">コンピュータのKetchに接続して、ここからダウンロードを追加できます。</string>
+  <string name="launchpad_discover">または、欲しいものを説明 · ディスカバー</string>
+  <string name="launchpad_checklist_title">Ketchのセットアップ</string>
+  <string name="launchpad_checklist_close">セットアップのチェックリストを閉じる</string>
+  <string name="launchpad_checklist_folder">ダウンロード先：%1$s</string>
+  <string name="launchpad_checklist_folder_choose">ダウンロード先を選択</string>
+  <string name="launchpad_checklist_change">変更…</string>
+  <string name="launchpad_checklist_extension">ブラウザ拡張機能</string>
+  <string name="launchpad_checklist_detected">%1$sを検出</string>
+  <string name="launchpad_checklist_connected">接続済み</string>
+  <string name="launchpad_checklist_get_it">入手</string>
+  <string name="launchpad_checklist_phone">スマートフォンから%1$sを操作</string>
+  <string name="launchpad_checklist_show_qr">QRコードを表示</string>
+
+  <string name="downloads_clip_download">%1$sをダウンロード</string>
+  <string name="downloads_clip_download_from">%2$sから%1$sをダウンロード</string>
+  <string name="downloads_clip_copied">コピーしたリンクをダウンロード</string>
+  <string name="downloads_clip_dismiss">このリンクを提案しない</string>
+
+  <plurals name="downloads_selected">
+    <item quantity="other">%1$d件を選択中</item>
+  </plurals>
+
+  <string name="downloads_menu_file_missing">ファイルが移動または削除されました</string>
+  <string name="downloads_menu_hold_to_move">%1$sを押したままにすると移動します</string>
+  <string name="downloads_menu_moving">送信後、元のデバイスから削除されます</string>
+  <string name="downloads_menu_speed_custom">カスタム…</string>
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="other">これら%1$d件で分け合う</item>
+  </plurals>
+  <string name="downloads_menu_speed_each">それぞれ%1$s</string>
+  <string name="downloads_menu_urgent_may_pause">今すぐ開始 · %1$sが一時停止される場合があります</string>
+  <string name="downloads_menu_urgent_starts_now">今すぐ開始</string>
+  <string name="downloads_menu_pick_start">日時を選択…</string>
+  <string name="downloads_menu_clear_schedule">クリア</string>
+
+  <string name="downloads_discard_title">停止して進捗を破棄しますか？</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="other">%1$d件のダウンロードの進捗を破棄しますか？</item>
+  </plurals>
+  <string name="downloads_discard_body">この操作のあとは%1$sを再開できません。</string>
+  <string name="downloads_discard_body_many">この操作のあとは再開できません。</string>
+  <string name="downloads_discard_keep">残す</string>
+  <string name="downloads_discard_confirm">進捗を破棄</string>
+  <string name="downloads_speed_title">速度制限</string>
+  <string name="downloads_speed_invalid">2mや500kのように速度を入力してください</string>
+  <string name="downloads_speed_placeholder">2m、500k、または無制限</string>
+  <string name="downloads_speed_set">制限を設定</string>
+  <string name="downloads_speed_caps">%1$sの速度を制限します。全体の制限も引き続き適用されます。</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="other">%1$d件のダウンロードの速度をそれぞれ制限します。全体の制限も引き続き適用されます。</item>
+  </plurals>
+  <string name="downloads_speed_limit">制限</string>
+  <string name="downloads_speed_limit_each">それぞれの制限</string>
+  <string name="downloads_send_title">%1$sを%2$sに送信しますか？</string>
+  <string name="downloads_move_title">%1$sを%2$sに移動しますか？</string>
+  <string name="downloads_send_confirm">送信</string>
+  <string name="downloads_move_confirm">移動</string>
+  <string name="downloads_send_note">これらはダウンロードとともに送信先に保存され、そのデバイスを操作できる人なら誰でも見ることができます。</string>
+
+  <string name="downloads_remove_title">「%1$s」を削除しますか？</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="other">%1$d件のダウンロードを削除しますか？</item>
+  </plurals>
+  <string name="downloads_remove_subtitle">%1$sのリストから削除します。</string>
+  <string name="downloads_remove_trash_files">ファイルもゴミ箱に入れる</string>
+  <string name="downloads_remove_trash_file">ファイルもゴミ箱に入れる</string>
+  <string name="downloads_remove_trash_partial">途中までのファイルもゴミ箱に入れる</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="other">%1$d個のファイルもすべてゴミ箱に入れる</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">ファイルも完全に削除する</string>
+  <string name="downloads_remove_delete_file">ファイルも完全に削除する</string>
+  <string name="downloads_remove_delete_partial">途中までのファイルも完全に削除する</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="other">%1$d個のファイルもすべて完全に削除する</item>
+  </plurals>
+  <string name="downloads_remove_size_of">%1$s / %2$s</string>
+  <string name="downloads_remove_and_trash">削除してゴミ箱へ</string>
+  <string name="downloads_remove_and_delete">削除して完全に消去</string>
+  <string name="downloads_remove_and_trash_size">削除して%1$sをゴミ箱へ</string>
+  <string name="downloads_remove_and_delete_size">削除して%1$sを完全に消去</string>
+  <string name="downloads_remove_note_partial">途中までのファイルは完全に削除されます</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="other">途中までの%1$d個のファイルは完全に削除されます</item>
+  </plurals>
+  <string name="downloads_remove_note_frees">%1$sが解放されます</string>
+  <string name="downloads_remove_note_frees_after">%1$sが解放されます</string>
+  <string name="downloads_remove_note_free_on">%2$sの空き容量%1$s</string>
+
+  <string name="downloads_failed_pause">%2$sで%1$sを一時停止できませんでした</string>
+  <string name="downloads_failed_resume">%2$sで%1$sを再開できませんでした</string>
+  <string name="downloads_failed_retry">%2$sで%1$sを再試行できませんでした</string>
+  <string name="downloads_failed_reconnect">%2$sで%1$sを再接続できませんでした</string>
+  <string name="downloads_failed_open">%2$sで%1$sを開けませんでした</string>
+  <string name="downloads_failed_reveal">%2$sで%1$sをフォルダに表示できませんでした</string>
+  <string name="downloads_failed_speed_limit">%2$sで%1$sの速度制限を設定できませんでした</string>
+  <string name="downloads_failed_priority">%2$sで%1$sの優先度を設定できませんでした</string>
+  <string name="downloads_failed_connections">%2$sで%1$sの接続数を設定できませんでした</string>
+  <string name="downloads_failed_reschedule">%2$sで%1$sの予約を変更できませんでした</string>
+
+  <plurals name="downloads_batch_paused">
+    <item quantity="other">%1$d件のダウンロードを一時停止しました</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="other">%1$d件のダウンロードを再開しました</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="other">%1$d件のダウンロードを再試行しています</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="other">%1$d件のダウンロードの予約を変更しました</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="other">%1$d件のダウンロードの速度制限を解除しました</item>
+  </plurals>
+  <plurals name="downloads_batch_limited">
+    <item quantity="other">%1$d件のダウンロードを%2$sに制限しました</item>
+  </plurals>
+  <plurals name="downloads_batch_shared">
+    <item quantity="other">%1$d件のダウンロードで%2$sを分け合っています</item>
+  </plurals>
+  <plurals name="downloads_batch_priority">
+    <item quantity="other">%1$d件のダウンロードの優先度を%2$sに設定しました</item>
+  </plurals>
+  <plurals name="downloads_batch_connections">
+    <item quantity="other">%1$d件のダウンロードの接続数を%2$dに設定しました</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <plurals name="downloads_skipped_finished">
+    <item quantity="other">%1$d件は完了済み</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="other">%1$d件はすでに実行中</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="other">%1$d件はすでに一時停止中</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="other">%1$d件は一時停止中</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="other">%1$d件は予約済み</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="other">%1$d件はエラーあり</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="other">%1$d件はキャンセル済み</item>
+  </plurals>
+
+  <string name="downloads_trash_removed">%1$sを削除しました</string>
+  <string name="downloads_trash_its_file">ファイルはゴミ箱に移動されます</string>
+  <string name="downloads_trash_their_files">ファイルはゴミ箱に移動されます</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="other">%1$d個のファイルをゴミ箱に移動しました</item>
+  </plurals>
+  <string name="downloads_trash_failed">%1$sをゴミ箱に移動できませんでした</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="other">%1$d個のファイルをゴミ箱に移動できませんでした</item>
+  </plurals>
+  <string name="downloads_trash_stays">ダウンロードはリストに残ります</string>
+  <string name="downloads_trash_stay">ダウンロードはリストに残ります</string>
+  <string name="downloads_remove_failed">%1$sを削除できませんでした</string>
+
+  <string name="downloads_copied_link">リンクをコピーしました</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="other">%1$d件のリンクをコピーしました</item>
+  </plurals>
+  <string name="downloads_copied_path">ファイルパスをコピーしました</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="other">%1$d件のファイルパスをコピーしました</item>
+  </plurals>
+  <string name="downloads_copied_error">エラーをコピーしました</string>
+  <string name="downloads_copied_details">詳細をコピーしました</string>
+  <string name="downloads_copy_failed_link">リンクをコピーできませんでした</string>
+  <string name="downloads_copy_failed_links">リンクをコピーできませんでした</string>
+  <string name="downloads_copy_failed_path">ファイルパスをコピーできませんでした</string>
+  <string name="downloads_copy_failed_paths">ファイルパスをコピーできませんでした</string>
+  <string name="downloads_copy_failed_error">エラーをコピーできませんでした</string>
+  <string name="downloads_copy_failed_details">詳細をコピーできませんでした</string>
+  <string name="downloads_open_source_failed">ソースページを開けませんでした</string>
+</resources>
