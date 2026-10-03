@@ -204,10 +204,14 @@ uses it instead of defining its own:
 | Error bodies (F10a), constant-time compare and server `coerceInputValues` (F10b, PR1 item 8) | Whichever stack lands first | — |
 
 A task frozen for a transfer is paused (task-transfer.md K4): its lanes stop as in §8.6, and
-`setHelpers` and `stopHelp` persist like speed and priority changes. A transfer never carries
-`DownloadRequest.helpers`, which names this device's pairings: like `forDevice()` it resets them to
-`Auto()`, and relayed bytes travel only per §9.6. The data planes stay separate: transfer chunks run
-on the admin plane under access tokens, relays between paired instances with no app involved.
+`setHelpers` and `stopHelp` persist like speed and priority changes. `DownloadRequest.helpers` names
+this device's pairings, so neither a transfer nor `forDevice()` carries it as is: both pass it
+through `HelperPolicy.forOtherDevice()`, which never widens it. `Off` stays `Off`; `Auto` keeps
+`signIns` and drops `added` and `excluded`; `Only` becomes `Off`, since its helpers are pairings of
+the source device. A task the user kept from helpers, or whose sign-ins it withheld, keeps that
+choice on the destination. Relayed bytes travel only per §9.6. The data planes stay separate:
+transfer chunks run on the admin plane under access tokens, relays between paired instances with no
+app involved.
 
 ## 6 Range scheduler and lanes
 
@@ -1287,6 +1291,7 @@ sealed class HelperPolicy {
   data class Only(val instanceIds: Set<String>, val signIns: Boolean = true) : HelperPolicy()
 }
 // DownloadRequest.helpers: HelperPolicy = HelperPolicy.Auto()
+// HelperPolicy.forOtherDevice(): Off stays Off, Auto keeps only signIns, Only becomes Off (§5.1)
 // KetchStatus.instanceId: String? = null (task transfer's F7)
 // KetchFeatures.TASK_LANES = "task.lanes": DownloadTask.lanes reports and ?lanes=1 is honoured
 // KetchFeatures.HELPERS = "helpers": KetchApi.helpers works and /api/helpers* answer
@@ -1456,7 +1461,8 @@ daemon and the apps write.
   3 MB/s" in the sidebar, switcher and Pulse bar; All devices counts speed once, at the owner.
 - `KetchCommands` gains "Get help from ▸ device" and "Stop help". Send to and Move to stay the
   whole-task tools, carrying data once task transfer's keyed `AppState.sendTo` lands
-  (task-transfer.md §12.1); `forDevice()` and the transfer manifest reset `helpers` (§5.1). While
+  (task-transfer.md §12.1); `forDevice()` and the transfer manifest map `helpers` through
+  `HelperPolicy.forOtherDevice()` (§5.1). While
   a transfer runs, the row and inspector show its progress overlay instead of lanes: a frozen task
   has none.
 - Copy: glossary rows for "helper", "help (with a download)" and "helper link"; strings in
@@ -1487,7 +1493,7 @@ app or a daemon holds it, exits with "Helpers are in use by Ketch here; add the 
 
 | Module | Changes |
 | --- | --- |
-| `library:api` | `HelperPolicy` with `HelperPolicySerializer`, `LaneInfo`, `TaskLanes`, `api.helper.*`; `DownloadRequest.helpers`; `KetchFeatures.TASK_LANES`/`HELPERS`; `HelpersUnavailableReason.UNKNOWN_SIZE`; `DownloadTask.lanes`/`setHelpers`/`stopHelp`; `KetchApi.helpers`; `@KetchInternalApi`; signed-URL keys in task transfer's sign-in classifier (`KetchStatus.instanceId` is its F7); `redactUrl` fragment masking |
+| `library:api` | `HelperPolicy` with `HelperPolicySerializer` and `forOtherDevice()`, `LaneInfo`, `TaskLanes`, `api.helper.*`; `DownloadRequest.helpers`; `KetchFeatures.TASK_LANES`/`HELPERS`; `HelpersUnavailableReason.UNKNOWN_SIZE`; `DownloadTask.lanes`/`setHelpers`/`stopHelp`; `KetchApi.helpers`; `@KetchInternalApi`; signed-URL keys in task transfer's sign-in classifier (`KetchStatus.instanceId` is its F7); `redactUrl` fragment masking |
 | `library:core` | `core.lane`: `RangeLedger`, `LaneScheduler`, `LaneTuning`, `EgressGroup`, `LaneFailure`, SPI, `HttpRangeFetcher`, `RepresentationPin`, `RangeResponseValidator`, `PinAdjudicator`, `AuditSampler`; `core.hash.Sha256` (moved, public opt-in); `HttpEngine.fetch`; core `FileReader` in task-transfer.md §7.4's shape unless its M1 added it; durable Apple flush; `ServerInfo.date`/`contentEncoding`; network engines' `fetch`; `HttpDownloadSource` pin + scheduler; `DownloadExecution` checkpoints and narrowed retry; `DownloadContext.lanes`/`executionNonce`; `Ketch(laneMode, laneTuning)`, `Ketch.instanceId` from the store, `Ketch.features`, `laneProvider`, `helperController`, `helperRuntime`, `shutdown` joining executions (the `DownloadCoordinator.closing` flag exists since #353); later delete `SegmentedDownloadHelper`, `SegmentDownloader`, `resegment`, `pendingResegment` |
 | `library:ktor` | `KtorHttpEngine.fetch` with metadata, preconditions, identity encoding and stop |
 | `library:ftp` | `FtpRangeFetcher`; leaves `SegmentedDownloadHelper`; 421 → Throttled |
@@ -1644,9 +1650,10 @@ only through the CLI and `[helping] enabled`.
     device with per-task Add help and Stop, exclusion copy, colour amendment, presence line,
     remote-device rules, glossary and strings. `HelperPolicy.Auto` becomes reachable in the apps
     here. Exit: `RemoteKetch` MockEngine tests (lanes decode, an unknown enum value decodes to
-    `UNKNOWN`, a status without the `helpers` feature gives `supported == false`, a command
-    response never overwrites lanes from a newer `lanes_changed`); snapshot scenarios under
-    `-Psnapshots`.
+    `UNKNOWN`, a status without the `helpers` feature gives `supported == false`, a command response
+    never overwrites lanes from a newer `lanes_changed`); `HelperPolicyTest` (`forOtherDevice()`
+    keeps `Off` and `signIns = false` and turns `Only` into `Off`) and a `forDevice()` test that
+    Send to and Move to use it; snapshot scenarios under `-Psnapshots`.
 11. **PR11 Android helper (second WAN)**, gated on the PR9 harness and one real VPS measurement:
     `RelayServer` in `KetchService`, cellular-bound relay engine, "Help over mobile data",
     `WifiLock`, `ForegroundPolicy`, metered and battery gates, drain on `onTimeout`. Exit:
@@ -1763,8 +1770,9 @@ this document (not made here):
    path and user, a non-exportable Keystore or Keychain key whose absence marks a restored store.
 2. **Store lock.** `<db>.transfer-lock` becomes the lock every instance-to-instance feature takes
    (§14.5); a holder with transfers disabled leaves transfer rows alone.
-3. **Manifest.** `DownloadRequest.helpers` is reset to `Auto()`; the HTTP portable state gains a
-   defaulted `aliases`; exports follow §9.6 for relayed bytes with pending audits.
+3. **Manifest.** `DownloadRequest.helpers` goes through `HelperPolicy.forOtherDevice()` (§5.1),
+   never reset to `Auto()`; the HTTP portable state gains a defaulted `aliases`; exports follow
+   §9.6 for relayed bytes with pending audits.
 4. **Origin preflight.** After PR3, HTTP `probeOrigin` is the conditional ranged probe through
    `PinAdjudicator`, not HEAD: a different strong validator with the same length answers `weak`,
    not `origin_changed` (§9.4).
