@@ -1574,7 +1574,6 @@ class AppState(
     offerOptions: Boolean = false,
     retry: (() -> Unit)? = null,
   ) {
-    val deviceName = entry.label
     if (added.isEmpty()) {
       val (name, e) = failures.firstOrNull() ?: return
       postError(
@@ -1585,16 +1584,12 @@ class AppState(
       )
       return
     }
-    val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-      reportFailures("remove", runEach(added) { it.remove(deleteFiles = true) })
-    })
     val single = added.singleOrNull()?.takeIf { failures.isEmpty() }
-    val title = if (single != null) {
-      "Added ${single.displayName()} → $deviceName"
-    } else {
-      "Added ${downloads(added.size)} → $deviceName" +
-        if (failures.isEmpty()) "" else " · ${failures.size} failed"
-    }
+    val title = addedTitle(
+      what = single?.displayName() ?: downloads(added.size),
+      target = entry,
+      failed = failures.size,
+    )
     val actions = buildList {
       if (single != null && offerOptions) {
         add(
@@ -1603,7 +1598,7 @@ class AppState(
           },
         )
       }
-      add(undoAction(op))
+      add(undoAddAction(added))
     }
     messages.post(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
@@ -1715,19 +1710,30 @@ class AppState(
     MessageAction("Undo") { pendingOps.undo(op.id) }
 
   /**
-   * Registers the Undo of adding [tasks], which removes them with their files, and returns its
-   * button; [logger] notes each task that could not be removed.
+   * Registers the Undo of adding [tasks], which removes them with their files, all at once, and
+   * returns its button; one Error message names the tasks that could not be removed.
    */
-  internal fun undoAddAction(tasks: List<DownloadTask>, logger: KetchLogger): MessageAction {
+  internal fun undoAddAction(tasks: List<DownloadTask>): MessageAction {
     val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-      tasks.forEach { task ->
-        catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-          logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-        }
-      }
+      reportFailures("remove", runEach(tasks) { it.remove(deleteFiles = true) })
     })
     return undoAction(op)
   }
+
+  /**
+   * The title of a message about adding [what] to [target]: "Added ubuntu.iso → This Mac" when
+   * the list shows [target], "… to NAS" when it does not, and how many [failed] or were [left]
+   * out.
+   */
+  internal fun addedTitle(what: String, target: InstanceEntry, failed: Int = 0, left: Int = 0) =
+    buildString {
+      // Under All devices the target may show already; "to" says it is not on screen.
+      val device = target.displayName
+      val shown = target in shownInstances.value
+      append(if (shown) "Added $what → $device" else "Added $what to $device")
+      if (failed > 0) append(" · $failed failed")
+      if (left > 0) append(" · $left left out")
+    }
 
   private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: "this device"
 

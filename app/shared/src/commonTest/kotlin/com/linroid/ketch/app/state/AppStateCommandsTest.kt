@@ -14,6 +14,7 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.testController
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.config.ConfigStore
@@ -396,7 +397,8 @@ class AppStateCommandsTest {
     assertEquals(4, request.connections)
     assertEquals(TaskOrigin.App, TaskOrigin.of(request))
     val toast = controller.messages.active.value.last()
-    assertEquals("Added ubuntu.iso → This Mac", toast.title)
+    val device = checkNotNull(controller.state.activeInstance.value).displayName
+    assertEquals("Added ubuntu.iso → $device", toast.title)
     assertEquals(listOf("Options", "Undo"), toast.actions.map { it.label })
     controller.close()
   }
@@ -410,5 +412,20 @@ class AppStateCommandsTest {
     runCurrent()
 
     assertEquals(listOf("remove deleteFiles=true"), task.calls)
+  }
+
+  @Test
+  fun quickAdd_undoThatFails_saysSo() = commandsTest { api, controller ->
+    controller.state.quickAdd(listOf("https://example.com/ubuntu.iso"))
+    runCurrent()
+    val task = api.tasks.value.single() as RecordingTask
+    task.failure = IllegalStateException("file in use")
+    controller.click("Undo")
+    runCurrent()
+
+    val error = controller.messages.active.value.last()
+    assertEquals(MessageLevel.Error, error.level)
+    assertEquals("Couldn't remove ubuntu.iso on This Mac", error.title)
+    assertEquals("file in use", error.detail)
   }
 }

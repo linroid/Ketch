@@ -1,20 +1,15 @@
 package com.linroid.ketch.app.ui.discover
 
-import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.CandidateAddResult
-import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.downloads
 import kotlinx.coroutines.Job
-
-private val log = KetchLogger("DiscoverScreen")
 
 /** The device Discover adds to: the one picked with the On: chip, else the active one. */
 internal fun AppState.discoverTarget(): InstanceEntry? {
@@ -76,26 +71,15 @@ private fun AppState.reportDiscovered(
     )
     return
   }
-  val undo = undoAddAction(tasks, log)
-  // Under All devices the target may show already; switching to it would hide the others.
-  val shown = target in shownInstances.value
+  val undo = undoAddAction(tasks)
   val single = tasks.singleOrNull()?.takeIf { failed.isEmpty() }
   val key = single?.let { TaskKey(target.deviceId, it.taskId) }
-  val show = MessageAction("Show") {
-    if (!shown) switchInstance(target)
-    showDownloads(StatusFilter.All)
-    key?.let(::inspect)
-  }
+  val show = MessageAction("Show") { showOn(target, single) }
   val what = added.singleOrNull()?.takeIf { single != null }?.let(::candidateName)
     ?: downloads(tasks.size)
-  val device = target.displayName
-  val title = buildString {
-    append(if (shown) "Added $what → $device" else "Added $what to $device")
-    if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-  }
   messages.post(
     level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-    title = title,
+    title = addedTitle(what, target, failed.size),
     detail = firstError?.message,
     taskKey = key,
     deviceId = target.deviceId,

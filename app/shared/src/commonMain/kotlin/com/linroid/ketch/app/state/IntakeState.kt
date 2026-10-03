@@ -1303,9 +1303,6 @@ class IntakeSession internal constructor(
   ) {
     val added = results.mapNotNull { it.third.getOrNull() }
     val failed = results.filter { it.third.isFailure }
-    val deviceName = targetName()
-    // Under All devices the target may show already; switching to it would hide the others.
-    val shown = target in state.shownInstances.value
     val review = (failed.map { it.first } + skipped).distinct()
     val failedUrls = failed.mapTo(HashSet()) { it.second.url }
     val reviewAction = if (review.isEmpty()) {
@@ -1326,19 +1323,14 @@ class IntakeSession internal constructor(
       )
       return
     }
-    if (shown) showNewRows()
+    if (target in state.shownInstances.value) showNewRows()
     state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
-    val undo = state.undoAddAction(added, log)
+    val undo = state.undoAddAction(added)
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
     val show = MessageAction("Show") { state.showOn(target, single) }
     val what = if (single != null) displayName(single.request) else downloads(added.size)
-    val title = buildString {
-      append(if (shown) "Added $what → $deviceName" else "Added $what to $deviceName")
-      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-      val left = skipped.sumOf { it.linkCount }
-      if (left > 0) append(" · $left left out")
-    }
+    val title = state.addedTitle(what, target, failed.size, left = skipped.sumOf { it.linkCount })
     state.messages.post(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
