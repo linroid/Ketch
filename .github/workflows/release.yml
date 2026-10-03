@@ -147,10 +147,21 @@ jobs:
           APK=$(find app/android/build/outputs/apk/release -name '*.apk' | head -1)
           cp "$APK" app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}.apk
 
+      # R8 renames classes and methods, so stack traces from this APK can only be read with the
+      # mapping of this exact build. The text file is >100 MB; zipped it is a few MB.
+      - name: Package R8 mapping
+        run: >
+          zip -j -9
+          app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}-mapping.zip
+          app/android/build/outputs/mapping/release/mapping.txt
+
       - uses: actions/upload-artifact@v7
         with:
           name: ketch-android
-          path: app/android/build/outputs/apk/release/ketch-android-*.apk
+          path: |
+            app/android/build/outputs/apk/release/ketch-android-*.apk
+            app/android/build/outputs/apk/release/ketch-android-*-mapping.zip
+          if-no-files-found: error
 
   build-desktop:
     name: Desktop (${{ matrix.name }})
