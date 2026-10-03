@@ -11,6 +11,7 @@
   <string name="menu_resume">繼續</string>
   <string name="menu_add_device">新增裝置…</string>
   <string name="menu_pair_device">配對裝置…</string>
+  <string name="menu_check_updates">檢查更新…</string>
   <string name="menu_item_keys">%1$s（%2$s）</string>
 
 
@@ -53,6 +54,15 @@
   <string name="message_switch_speed_failed">無法將 %1$s 切換至「%2$s」</string>
   <string name="message_try_again">再試一次</string>
   <string name="message_undo">復原</string>
+  <string name="message_update_available">Ketch %1$s 現已推出</string>
+  <string name="message_update_ready">Ketch %1$s 已可安裝</string>
+  <string name="message_update_installed">已更新到 Ketch %1$s</string>
+  <string name="message_update_failed">無法更新到 Ketch %1$s</string>
+  <string name="message_update_failed_hint">記錄檔資料夾中的 update.log 記錄了出錯原因。</string>
+  <string name="message_update">更新</string>
+  <string name="message_restart">重新啟動</string>
+  <string name="message_open_installer">開啟安裝程式</string>
+  <string name="message_whats_new">新功能</string>
   <string name="message_slow_lane_on">已為 %1$s 開啟慢車道 · %2$s</string>
   <string name="message_slow_lane_off">已為 %1$s 關閉慢車道</string>
   <string name="message_speed_follows_rules">%1$s 的速度將依照你的規則調整</string>

@@ -11,6 +11,7 @@
   <string name="menu_resume">Reanudar</string>
   <string name="menu_add_device">Añadir dispositivo…</string>
   <string name="menu_pair_device">Vincular un dispositivo…</string>
+  <string name="menu_check_updates">Buscar actualizaciones…</string>
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
 
@@ -59,6 +60,15 @@
   <string name="message_switch_speed_failed">No se pudo cambiar %1$s a %2$s</string>
   <string name="message_try_again">Volver a intentarlo</string>
   <string name="message_undo">Deshacer</string>
+  <string name="message_update_available">Ketch %1$s está disponible</string>
+  <string name="message_update_ready">Ketch %1$s está listo para instalarse</string>
+  <string name="message_update_installed">Ketch se actualizó a %1$s</string>
+  <string name="message_update_failed">No se pudo actualizar a Ketch %1$s</string>
+  <string name="message_update_failed_hint">update.log, en la carpeta de registros, explica qué falló.</string>
+  <string name="message_update">Actualizar</string>
+  <string name="message_restart">Reiniciar</string>
+  <string name="message_open_installer">Abrir instalador</string>
+  <string name="message_whats_new">Novedades</string>
   <string name="message_slow_lane_on">Carril lento activado en %1$s · %2$s</string>
   <string name="message_slow_lane_off">Carril lento desactivado en %1$s</string>
   <string name="message_speed_follows_rules">La velocidad de %1$s sigue tus reglas</string>

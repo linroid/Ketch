@@ -128,6 +128,7 @@ internal val populatedAppSections = KetchConfig(
     openAtLogin = true,
     startHidden = false,
     dockBadge = DockBadgeMode.FailuresOnly,
+    checkForUpdates = false,
   ),
   notifications = NotificationSettings(
     finished = NotificationMode.InApp,

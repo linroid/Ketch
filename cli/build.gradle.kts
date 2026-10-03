@@ -120,6 +120,7 @@ dependencies {
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
   implementation(projects.library.torrent)
+  implementation(projects.updater)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktor.client.cio)

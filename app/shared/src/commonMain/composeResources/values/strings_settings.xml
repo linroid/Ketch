@@ -331,6 +331,41 @@
   <string name="settings_about_welcome_done">Done. The welcome screens show next time you open Ketch.</string>
   <string name="settings_about_troubleshooting">Troubleshooting</string>
   <string name="settings_about_logs_footer">Logs include download names and links. Check them before posting.</string>
+  <!-- Updates of the desktop app itself, on the About page. -->
+  <string name="settings_about_updates">Updates</string>
+  <string name="settings_about_update_idle">Check for updates</string>
+  <string name="settings_about_update_idle_hint">See whether a newer version of Ketch is out.</string>
+  <string name="settings_about_update_checking">Checking for updates…</string>
+  <string name="settings_about_update_current">Ketch is up to date</string>
+  <!-- %1$s is the running version. -->
+  <string name="settings_about_update_current_hint">%1$s is the latest release.</string>
+  <!-- %1$s is the newer version, such as 0.0.2. -->
+  <string name="settings_about_update_available">Ketch %1$s is available</string>
+  <!-- %1$s is the running version. -->
+  <string name="settings_about_update_available_hint">You have %1$s.</string>
+  <!-- When the app runs from source code and cannot install the update itself. -->
+  <string name="settings_about_update_source_hint">This copy runs from source. The release page has the installers.</string>
+  <string name="settings_about_update_downloading">Downloading Ketch %1$s…</string>
+  <!-- Downloaded and total size of the update, such as "12.4 MB of 70.1 MB". -->
+  <string name="settings_about_update_progress">%1$s of %2$s</string>
+  <string name="settings_about_update_ready">Ketch %1$s is ready to install</string>
+  <!-- Installing quits the app, installs the update and opens the app again. -->
+  <string name="settings_about_update_ready_hint">Ketch restarts to install it. Downloads continue where they left off.</string>
+  <!-- When the app hands the installer over instead, as on Linux without a password prompt. -->
+  <string name="settings_about_update_ready_open_hint">Open the installer and follow its steps.</string>
+  <string name="settings_about_update_check_failed">Couldn't check for updates</string>
+  <string name="settings_about_update_download_failed">Couldn't download the update</string>
+  <string name="settings_about_update_install_failed">Couldn't install the update</string>
+  <string name="settings_about_update_auto">Check for updates automatically</string>
+  <string name="settings_about_update_auto_hint">Once a day, from Ketch's releases on GitHub.</string>
+  <!-- Opens the release notes. %1$s is the version. -->
+  <string name="settings_about_update_notes">What's new in %1$s</string>
+  <string name="settings_about_update_check">Check now</string>
+  <!-- Button: downloads the update. -->
+  <string name="settings_about_update_install">Update</string>
+  <string name="settings_about_update_restart">Restart to update</string>
+  <string name="settings_about_update_open_installer">Open installer</string>
+  <string name="settings_about_update_release_page">Release page</string>
   <!-- How the desktop app hands over its log files. -->
   <string name="settings_logs_open">Open log folder</string>
   <!-- When the folder could not be opened. %1$s is why. -->

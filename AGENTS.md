@@ -42,6 +42,7 @@ library/
   server/     # Ktor-based daemon server with REST API, SSE events and mDNS (JVM only)
   mcp/        # MCP server exposing KetchApi as tools for AI agents (JVM only)
 config/       # Multiplatform TOML-based configuration (server, download, remotes, AI, ...)
+updater/      # Self-update from GitHub releases for the desktop app and the CLI (JVM only)
 ai/
   discover/   # LLM agent-driven resource discovery (JVM only, Koog framework)
 app/
@@ -102,6 +103,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
   `PriorityRequest`, `ConnectionsRequest`
+
+### `updater` (JVM only)
+- `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
+  `ReleasePlatform`, `ReleaseFeed`, `GitHubReleases`, `ReleaseDownloader`, `UpdateException`
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
@@ -272,8 +277,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults
-  and onboarding; `DesktopSettings`: close action, open at login, Dock badge;
-  `NotificationSettings` and `IntegrationSettings` (magnet and `.torrent` handlers)
+  and onboarding; `DesktopSettings`: close action, open at login, Dock badge, daily update
+  checks; `NotificationSettings` and `IntegrationSettings` (magnet and `.torrent` handlers)
 - Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
   Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
   BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
@@ -329,6 +334,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   is no tray). The tray lists every device with its own actions, and the macOS menu bar, the
   tray and the Dock menu are generated from `KetchCommands` (`DesktopMenuBar`, `DesktopTray`,
   `TaskbarFeedback` for the Dock and taskbar badge and progress)
+- Self-update (desktop): `DesktopUpdater` implements the shared `AppUpdates`
+  (`LocalAppUpdates`, shown in Settings → About and the macOS Help menu); it checks GitHub daily
+  while `[desktop] checkForUpdates` is on, downloads this system's installer with the `updater`
+  module, and `UpdateInstaller` replaces the app once it quits (macOS bundle swap, `msiexec`,
+  `pkexec dpkg -i`) and opens it again. The installers carry a monotonic numeric version
+  (`installerVersion()` in `app/desktop/build.gradle.kts`) so Windows Installer upgrades; see
+  [updates](docs/updates.md)
 - Phones: a welcome flow on first launch (`ui/onboarding`); Android shows a splash while its
   service binds, and iOS 26 keeps user-started downloads running in the background with
   `BGContinuedProcessingTaskRequest`
@@ -367,6 +379,17 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
   content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
   and `ketch ai-discover` with each LLM provider to verify changes
+
+### Self-update (`updater`)
+- Shared by the desktop app and the CLI: `GitHubReleases` reads the latest (or a tagged) release
+  from the GitHub API, `Release.asset` picks the file by the release workflow's names, and
+  `ReleaseDownloader` downloads it with a private Ketch engine and checks the SHA-256 digest
+  GitHub publishes per asset (files without one are refused). Pass it the process's logger:
+  every `Ketch` installs its logger globally
+- `ReleaseVersion` orders `rc9` before `rc15` and pre-releases before their release
+- `ketch update [--check] [--version <v>]` replaces the native binary (`CliInstallation`): renamed
+  over the old one on macOS/Linux, the old one set aside as `ketch.exe.old` on Windows; refuses
+  on a JVM. See [updates](docs/updates.md)
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
@@ -490,7 +513,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
   "TorrentTracker", "RemoteKetch", "RemoteTask", "TokenBucket", "SqliteStore", "SqliteDriver",
-  "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "McpStdio"; `ai:discover`, mDNS
+  "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "McpStdio", "GitHubReleases";
+  `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
