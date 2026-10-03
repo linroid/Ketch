@@ -3,14 +3,18 @@ package com.linroid.ketch.updater
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import java.util.Collections
 
 /** Serves [bodies] by URL, with range support; any other URL answers [missingCode]. */
 internal class FakeHttpEngine(
   private val bodies: Map<String, ByteArray>,
   private val missingCode: Int = 404,
 ) : HttpEngine {
-  /** URLs and headers of every GET, in order. */
-  val requests = mutableListOf<Pair<String, Map<String, String>>>()
+  /** URLs and headers of every GET, in order; segments request them from several threads. */
+  val requests: MutableList<Pair<String, Map<String, String>>> =
+    Collections.synchronizedList(mutableListOf())
+
+  @Volatile
   var closed = false
     private set
 
