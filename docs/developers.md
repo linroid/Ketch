@@ -178,7 +178,7 @@ To give AI agents control of a `KetchApi`, run `ketch mcp`
 6. **Persist** — Segment progress is saved to the `TaskStore`, so pause and resume work across
    restarts.
 7. **Resume** — Check that the file on the server is unchanged and the local file is intact, then
-   continue. A server without range support starts over.
+   continue. A server without range support, or content of unknown size, starts over.
 
 The [architecture](architecture.md#download-pipeline) describes each step.
 

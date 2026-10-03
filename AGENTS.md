@@ -155,6 +155,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   JS (Node.js) and WasmWasi for the engine; the browser (WasmJs) uses `RemoteKetch`
 - Segmented downloads with concurrent HTTP Range requests
 - Servers without Range support use a single connection; resuming them restarts from zero
+- Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
+  connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - `DownloadState.Completed` reports the size and the download time, summed over every run and

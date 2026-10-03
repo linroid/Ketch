@@ -10,9 +10,13 @@ import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentDownloader
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * HTTP/HTTPS download source using the existing [HttpEngine] pipeline.
@@ -23,7 +27,8 @@ import kotlinx.serialization.json.Json
  * from [DownloadContext.config], so global configuration changes apply
  * to downloads started or resumed afterwards. Servers without byte-range
  * support use a single connection, and a retry or resume restarts it
- * from byte zero.
+ * from byte zero. Content whose size the server does not report, such as
+ * an archive generated on request, is streamed to its end the same way.
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
@@ -80,7 +85,10 @@ internal class HttpDownloadSource(
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
-    if (totalBytes < 0) throw KetchError.Unsupported()
+    if (totalBytes < 0) {
+      downloadUnknownSize(context)
+      return
+    }
 
     val remaining = resolved.metadata[META_RATE_LIMIT_REMAINING]
       ?.toLongOrNull()
@@ -141,6 +149,11 @@ internal class HttpDownloadSource(
     }
 
     log.i { "Resuming download for taskId=${context.taskId}" }
+    if (state.totalBytes < 0) {
+      // Bytes written without a known size cannot be continued, so a changed file is no concern.
+      downloadUnknownSize(context)
+      return
+    }
 
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(context.url, context.headers)
@@ -276,6 +289,45 @@ internal class HttpDownloadSource(
         context.url, segment, context.headers, onProgress,
       )
     }
+  }
+
+  /**
+   * Streams content whose size the server does not report over one connection, from byte zero
+   * to the end of the response. Such a transfer can neither be split nor continued, so every
+   * attempt empties the file first and [DownloadContext.segments] stays empty.
+   */
+  private suspend fun downloadUnknownSize(context: DownloadContext) {
+    log.i { "Unknown size, streaming taskId=${context.taskId} over one connection" }
+    context.segments.value = emptyList()
+    try {
+      context.fileAccessor.preallocate(0)
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      if (e is KetchError) throw e
+      throw KetchError.Disk(e)
+    }
+    val progressInterval = context.config.progressIntervalMs.milliseconds
+    var lastProgress = TimeSource.Monotonic.markNow()
+    var downloaded = 0L
+    context.onProgress(0, 0)
+    httpEngine.download(context.url, null, context.headers) { data ->
+      currentCoroutineContext().ensureActive()
+      context.throttle(data.size)
+      try {
+        context.fileAccessor.writeAt(downloaded, data)
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KetchError) throw e
+        throw KetchError.Disk(e)
+      }
+      downloaded += data.size
+      if (lastProgress.elapsedNow() >= progressInterval) {
+        context.onProgress(downloaded, 0)
+        lastProgress = TimeSource.Monotonic.markNow()
+      }
+    }
+    log.i { "Streamed $downloaded bytes for taskId=${context.taskId}" }
+    context.onProgress(downloaded, downloaded)
   }
 
   /**

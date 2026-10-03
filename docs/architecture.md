@@ -131,6 +131,8 @@ DownloadRequest
   v
 [4. Plan]  SegmentCalculator splits the file into N segments, N being the task's
   |        effective connection count. Single segment if no range support.
+  |        Content of unknown size gets no segments: it streams to the end of
+  |        the response on one connection, and every attempt starts over.
   |
   v
 [5. Download]  DownloadCoordinator starts a DownloadExecution, which calls the
@@ -156,7 +158,8 @@ DownloadRequest
 
 - **Pause**: Cancels the execution. The source stops its segments and the execution saves
   their final progress to TaskStore. A queued task can be paused too; it leaves the queue.
-- **Resume**: Probes the server again. An ETag or Last-Modified mismatch fails the task with
+- **Resume**: A download of unknown size restarts from byte zero without a probe. Otherwise
+  probes the server again. An ETag or Last-Modified mismatch fails the task with
   `KetchError.FileChanged`. A server that no longer supports ranges restarts the download from
   byte zero on one connection. Otherwise the remaining bytes are resegmented to the current
   connection count and the local file is checked (file size vs. claimed progress); if the
