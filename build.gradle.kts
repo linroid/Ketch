@@ -41,3 +41,19 @@ subprojects {
     }
   }
 }
+
+// Multiplatform modules run their JVM tests with `jvmTest`, but JVM-only modules (the kotlinJvm
+// plugin) with `test`, which `./gradlew jvmTest` never selects. CI runs this task to cover both.
+val allJvmTests = tasks.register("allJvmTests") {
+  group = LifecycleBasePlugin.VERIFICATION_GROUP
+  description = "Runs the JVM tests of every module: jvmTest, and test in JVM-only modules."
+}
+
+subprojects {
+  val jvmTests = tasks.named { it == "jvmTest" }
+  allJvmTests.configure { dependsOn(jvmTests) }
+  pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+    val tests = tasks.named("test")
+    allJvmTests.configure { dependsOn(tests) }
+  }
+}
