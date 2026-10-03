@@ -636,8 +636,9 @@ Planned features not yet implemented:
     every client, the server and the browser extension get them
 12. **Torrent file selection after adding** - A magnet added without a selection can wait, with
     its metadata, until files are chosen, and a running torrent's selection can change, through
-    `KetchApi`, the REST API and MCP. Today magnets from the extension, CLI, REST or MCP download
-    every file
+    `KetchApi`, the REST API and MCP. Today a selection can only be given up front
+    (`DownloadRequest.selectedFileIds`, after a resolve), and a magnet added without one, as the
+    extension, CLI and MCP always do, downloads every file
 13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
     on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
     `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
