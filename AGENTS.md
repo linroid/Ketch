@@ -24,7 +24,8 @@ Multiplatform download manager library.
 The library is **substantially complete** with all core features implemented and working across
 Android, JVM/Desktop, iOS, and WebAssembly platforms.
 
-**Note:** The library has not been published yet, so public API breaking changes are allowed.
+**Note:** The library is published on Maven Central (`com.linroid.ketch`), but it is still pre-1.0,
+so public API breaking changes are allowed.
 
 ## Module Structure
 
