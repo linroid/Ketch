@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "將下載項目、連結和磁力連結傳送到這台電腦或遠端伺服器上的 Ketch。"
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "zh-TW"
+  },
+  "menu_download_link": {
+    "message": "使用 Ketch 下載連結"
+  },
+  "menu_download_image": {
+    "message": "使用 Ketch 下載圖片"
+  },
+  "menu_download_video": {
+    "message": "使用 Ketch 下載影片"
+  },
+  "menu_download_audio": {
+    "message": "使用 Ketch 下載音訊"
+  },
+  "notify_sent_to": {
+    "message": "已傳送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "已傳送到 Ketch"
+  },
+  "notify_download_added": {
+    "message": "已新增下載項目"
+  },
+  "notify_fallback_browser": {
+    "message": "改用瀏覽器下載"
+  },
+  "notify_fallback_magnet": {
+    "message": "改用其他應用程式開啟磁力連結"
+  },
+  "notify_send_failed": {
+    "message": "無法傳送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch 無法下載此內容"
+  },
+  "notify_unsupported_stream": {
+    "message": "此媒體由網頁自行串流播放，沒有可下載的連結。"
+  },
+  "notify_unsupported_scheme": {
+    "message": "只能將 http、https、ftp 和磁力連結傳送到 Ketch。"
+  },
+  "error_with_hint": {
+    "message": "$ERROR$。$HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "$ADDRESS$ 上的 Ketch 沒有回應",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "無法連線到 $ADDRESS$ 上的 Ketch",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch 拒絕了存取權杖"
+  },
+  "error_token_required": {
+    "message": "Ketch 需要存取權杖"
+  },
+  "error_http_status": {
+    "message": "Ketch 回應了 HTTP $STATUS$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch 未能及時啟動"
+  },
+  "error_app_not_installed": {
+    "message": "這台電腦上尚未設定 Ketch 應用程式"
+  },
+  "error_app_unreachable": {
+    "message": "無法連線到 Ketch 應用程式"
+  },
+  "error_app_not_running": {
+    "message": "Ketch 未在執行"
+  },
+  "error_app_connect_failed": {
+    "message": "Ketch 應用程式無法連線"
+  },
+  "error_app_invalid_reply": {
+    "message": "Ketch 應用程式傳回了無效的回應"
+  },
+  "error_unsupported_link": {
+    "message": "Ketch 無法下載這類連結"
+  },
+  "error_torrent_http": {
+    "message": "無法取得種子檔案（HTTP $STATUS$）",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "取得種子檔案逾時"
+  },
+  "error_torrent_too_large": {
+    "message": "種子檔案太大"
+  },
+  "error_address_required": {
+    "message": "請輸入 Ketch 伺服器的位址"
+  },
+  "error_address_invalid": {
+    "message": "「$ADDRESS$」不是有效的位址",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "位址必須以 http:// 或 https:// 開頭"
+  },
+  "error_address_credentials": {
+    "message": "請將存取權杖填入權杖欄位，而不是位址中"
+  },
+  "error_not_ketch": {
+    "message": "此位址看起來不是 Ketch 伺服器"
+  },
+  "hint_app_not_installed": {
+    "message": "請安裝 Ketch 桌面應用程式並開啟一次，然後再試一次。若使用「ketch server」，或瀏覽器是以 Flatpak 或 Snap 安裝的，請改為將 Ketch 新增為伺服器。"
+  },
+  "hint_app_not_running": {
+    "message": "傳送下載項目給 Ketch 時，它會自動開啟。"
+  },
+  "hint_open_app": {
+    "message": "請開啟 Ketch 後再試一次。"
+  },
+  "hint_local_server": {
+    "message": "請開啟 Ketch 並啟用「設定 → 遠端存取 → 伺服器」，或執行「ketch server」。"
+  },
+  "hint_remote_server": {
+    "message": "請確認伺服器正在執行，且從這裡可以連到此位址。"
+  },
+  "hint_access_token": {
+    "message": "請輸入 Ketch 中「設定 → 遠端存取」下顯示的存取權杖。"
+  },
+  "task_magnet_link": {
+    "message": "磁力連結"
+  },
+  "task_torrent": {
+    "message": "種子"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ / $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "已暫停"
+  },
+  "task_paused_percent": {
+    "message": "已暫停 · $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "佇列中"
+  },
+  "task_scheduled": {
+    "message": "已排程"
+  },
+  "task_completed": {
+    "message": "已完成"
+  },
+  "task_failed": {
+    "message": "失敗：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "未知錯誤"
+  },
+  "task_canceled": {
+    "message": "已取消"
+  },
+  "task_pause": {
+    "message": "暫停"
+  },
+  "task_resume": {
+    "message": "繼續"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "已連線 · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "已連線到 $NAME$ · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "已連線 · $OS$ 上的 Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "已連線到 $NAME$ · $OS$ 上的 Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "正在連線…"
+  },
+  "status_opening_app": {
+    "message": "正在開啟 Ketch…"
+  },
+  "instance_this_computer": {
+    "message": "這台電腦"
+  },
+  "instance_name_default": {
+    "message": "$NAME$（預設）",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "名稱"
+  },
+  "instance_default": {
+    "message": "預設"
+  },
+  "instance_app_detail": {
+    "message": "這台電腦上的 Ketch 應用程式。需要下載時，擴充功能會自動開啟它。"
+  },
+  "instance_address": {
+    "message": "位址"
+  },
+  "instance_token": {
+    "message": "存取權杖"
+  },
+  "instance_token_placeholder": {
+    "message": "非必填"
+  },
+  "instance_insecure": {
+    "message": "此位址未加密：存取權杖和隨下載項目傳送的 Cookie 會以明文在網路上傳輸。建議使用 https，或只在信任的網路上使用。"
+  },
+  "instance_test": {
+    "message": "測試連線"
+  },
+  "instance_remove": {
+    "message": "移除"
+  },
+  "instance_enter_address": {
+    "message": "請輸入 Ketch 伺服器的位址。"
+  },
+  "popup_instance_picker": {
+    "message": "Ketch 實例"
+  },
+  "popup_settings": {
+    "message": "設定"
+  },
+  "popup_open_app": {
+    "message": "開啟 Ketch"
+  },
+  "popup_add_placeholder": {
+    "message": "貼上連結或磁力連結"
+  },
+  "popup_add_label": {
+    "message": "要下載的連結"
+  },
+  "popup_add_button": {
+    "message": "下載"
+  },
+  "popup_added": {
+    "message": "已新增 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "請輸入 http、https、ftp 或磁力連結。"
+  },
+  "popup_capture": {
+    "message": "擷取瀏覽器下載項目"
+  },
+  "popup_capture_target": {
+    "message": "傳送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "最近"
+  },
+  "popup_no_downloads": {
+    "message": "還沒有下載項目。"
+  },
+  "options_title": {
+    "message": "Ketch 擴充功能設定"
+  },
+  "options_intro": {
+    "message": "將這個瀏覽器的下載項目傳送到這台電腦或遠端伺服器上的 Ketch。"
+  },
+  "options_saved": {
+    "message": "已儲存"
+  },
+  "options_permission": {
+    "message": "Ketch 需要網站存取權，才能擷取網站的下載項目、傳送其 Cookie 並連線到 Ketch 伺服器。"
+  },
+  "options_allow_access": {
+    "message": "允許存取"
+  },
+  "options_instances": {
+    "message": "Ketch 實例"
+  },
+  "options_instances_detail": {
+    "message": "擷取的下載項目和磁力連結會傳送到預設實例。在連結、圖片或影片上按右鍵，即可傳送到任一實例。"
+  },
+  "options_add_app": {
+    "message": "新增這台電腦上的 Ketch"
+  },
+  "options_add_server": {
+    "message": "新增伺服器"
+  },
+  "options_browser_downloads": {
+    "message": "瀏覽器下載項目"
+  },
+  "options_capture": {
+    "message": "擷取下載項目"
+  },
+  "options_capture_detail": {
+    "message": "在瀏覽器中開始的下載會改由 Ketch 處理。若無法連線到 Ketch，瀏覽器會照常下載。"
+  },
+  "options_min_size": {
+    "message": "小檔案交給瀏覽器"
+  },
+  "options_min_size_detail": {
+    "message": "小於此大小的檔案會留在瀏覽器下載。大小不明的檔案一律交給 Ketch。設為 0 則全部傳送。"
+  },
+  "options_min_size_unit": {
+    "message": "MB"
+  },
+  "options_excluded": {
+    "message": "交給瀏覽器的網站"
+  },
+  "options_excluded_detail": {
+    "message": "每行一個。包含其子網域，因此 example.com 也涵蓋 downloads.example.com。"
+  },
+  "options_cookies": {
+    "message": "傳送 Cookie 和參照網址"
+  },
+  "options_cookies_detail": {
+    "message": "讓 Ketch 能下載需要登入的檔案。Ketch 會將它們與任務一起儲存，以便日後繼續下載。"
+  },
+  "options_links_notifications": {
+    "message": "連結和通知"
+  },
+  "options_magnet": {
+    "message": "將點擊的磁力連結傳送到 Ketch"
+  },
+  "options_magnet_detail": {
+    "message": "按住 Alt 鍵點擊磁力連結，即可改用其他應用程式開啟。"
+  },
+  "options_notify": {
+    "message": "傳送下載項目時通知"
+  },
+  "options_notify_detail": {
+    "message": "發生問題時一律會通知。"
+  },
+  "options_help": {
+    "message": "設定 Ketch"
+  },
+  "options_help_this_computer": {
+    "message": "在這台電腦上"
+  },
+  "options_help_this_computer_detail": {
+    "message": "安裝 Ketch 桌面應用程式並開啟一次，讓瀏覽器能找到它。之後，擴充功能會在需要下載時自動開啟 Ketch，不必啟用伺服器或複製權杖。"
+  },
+  "options_help_other_device": {
+    "message": "在其他裝置上"
+  },
+  "options_help_other_device_detail": {
+    "message": "在該裝置上開啟「設定 → 遠端存取」，啟用<b>伺服器</b>和<b>允許其他裝置</b>，然後產生存取權杖。接著在這裡使用<b>新增伺服器</b>新增該裝置，輸入其位址（例如 <code>http://192.168.1.20:8642</code>）和權杖。若使用 <code>ketch server</code>，請在其 config.toml 中設定 <code>apiToken</code>。"
+  },
+  "options_help_command_line": {
+    "message": "命令列或沙盒瀏覽器"
+  },
+  "options_help_command_line_detail": {
+    "message": "若要在這台電腦上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安裝的瀏覽器（無法啟動其他應用程式）中使用 Ketch，請將其新增為伺服器，位址為 <code>http://127.0.0.1:8642</code>。"
+  }
+}
