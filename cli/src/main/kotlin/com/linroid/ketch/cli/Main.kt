@@ -43,6 +43,9 @@ import kotlin.system.exitProcess
 private var ketchLogLevel = LogLevel.INFO
 
 fun main(args: Array<String>) {
+  // Windows cannot replace a running program, so `ketch update` renamed the old binary aside.
+  if (File.separatorChar == '\\') CliInstallation.current()?.removeReplaced()
+
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
 
@@ -58,6 +61,12 @@ fun main(args: Array<String>) {
     null -> printUsage()
     "server" -> runServer(remaining.drop(1).toTypedArray())
     "ai-discover" -> runAiDiscover(remaining.drop(1))
+    "update" -> {
+      // The engine that downloads the release only logs warnings unless -v or --debug asks for
+      // more, so the progress line stays readable.
+      val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
+      exitProcess(runUpdate(remaining.drop(1), Logger.console(level)))
+    }
     else -> when (val parsed = parseDownloadArgs(remaining)) {
       DownloadArgs.Help -> printUsage()
       is DownloadArgs.Invalid -> {
@@ -698,6 +707,7 @@ private fun printUsage() {
   println("       ketch server [options]")
   println("       ketch mcp [options]")
   println("       ketch ai-discover <query> [options]")
+  println("       ketch update [options]")
   println()
   println("Global Options:")
   println("  -v, --verbose            Enable verbose logging (DEBUG)")
@@ -740,6 +750,11 @@ private fun printUsage() {
   println("    BRAVE_SEARCH_API_KEY   Use Brave Search API")
   println("    GOOGLE_SEARCH_API_KEY  Use Google Custom Search")
   println("    GOOGLE_SEARCH_CX      Google Search Engine ID")
+  println()
+  println("Update:")
+  println("  update [options]         Replace this binary with the latest")
+  println("                           release; run `ketch update --help`")
+  println("                           for options")
   println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")
@@ -785,7 +800,7 @@ private fun printServerUsage() {
   println("  ketch server --generate-config")
 }
 
-private fun formatBytes(bytes: Long): String {
+internal fun formatBytes(bytes: Long): String {
   return when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 ->

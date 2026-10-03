@@ -46,6 +46,8 @@ enum class DockBadgeMode {
  * @property startHidden whether a launch at login starts hidden in the menu bar
  *   or notification area.
  * @property dockBadge what the Dock or taskbar badge shows.
+ * @property checkForUpdates whether the app looks for a newer release once a day and offers to
+ *   install it.
  */
 @Serializable
 data class DesktopSettings(
@@ -53,4 +55,5 @@ data class DesktopSettings(
   val openAtLogin: Boolean = false,
   val startHidden: Boolean = true,
   val dockBadge: DockBadgeMode = DockBadgeMode.ActiveCount,
+  val checkForUpdates: Boolean = true,
 )

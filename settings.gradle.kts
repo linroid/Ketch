@@ -53,6 +53,9 @@ include(":ai:discover")
 // Config module
 include(":config")
 
+// Self-update of the apps and the CLI
+include(":updater")
+
 // App modules
 include(":app:shared")
 include(":app:android")

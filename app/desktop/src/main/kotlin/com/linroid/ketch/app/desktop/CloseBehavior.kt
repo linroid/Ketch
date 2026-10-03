@@ -303,6 +303,14 @@ internal class CloseBehavior(
     dialog = LifecycleDialog.ConfirmQuit(downloads)
   }
 
+  /**
+   * Quits without asking, for an update the user chose to install now. Downloads pause and pick
+   * up where they left off when the updated app opens.
+   */
+  fun quitWithoutAsking() {
+    quitNow(quitResponse)
+  }
+
   /** Answers the dialog's main button. */
   fun confirm(dontAskAgain: Boolean = false) {
     when (dialog) {

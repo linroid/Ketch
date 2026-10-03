@@ -11,6 +11,7 @@
   <string name="menu_resume">Reprendre</string>
   <string name="menu_add_device">Ajouter un appareil…</string>
   <string name="menu_pair_device">Appairer un appareil…</string>
+  <string name="menu_check_updates">Rechercher des mises à jour…</string>
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
 
@@ -59,6 +60,15 @@
   <string name="message_switch_speed_failed">Impossible de passer %1$s au mode %2$s</string>
   <string name="message_try_again">Réessayer</string>
   <string name="message_undo">Annuler</string>
+  <string name="message_update_available">Ketch %1$s est disponible</string>
+  <string name="message_update_ready">Ketch %1$s est prêt à être installé</string>
+  <string name="message_update_installed">Ketch a été mis à jour vers la %1$s</string>
+  <string name="message_update_failed">Impossible de passer à Ketch %1$s</string>
+  <string name="message_update_failed_hint">Le fichier update.log du dossier des journaux indique ce qui n'a pas fonctionné.</string>
+  <string name="message_update">Mettre à jour</string>
+  <string name="message_restart">Redémarrer</string>
+  <string name="message_open_installer">Ouvrir le programme d'installation</string>
+  <string name="message_whats_new">Nouveautés</string>
   <string name="message_slow_lane_on">Voie lente activée pour %1$s · %2$s</string>
   <string name="message_slow_lane_off">Voie lente désactivée pour %1$s</string>
   <string name="message_speed_follows_rules">La vitesse de %1$s suit vos règles</string>
