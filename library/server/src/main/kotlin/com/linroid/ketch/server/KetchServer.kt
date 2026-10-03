@@ -155,7 +155,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param allowedHosts extra `Host` names or IP addresses accepted when there is no
  *   [apiToken], for example a DNS name or a Docker host's address
  * @param mdnsEnabled whether to advertise the server over mDNS
- * @param mdnsRegistrar mDNS service registrar for LAN discovery
+ * @param mdnsRegistrar mDNS service registrar for LAN discovery; Android callers must supply
+ *   an Android implementation, since the default registrar is compiled for the JVM
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
  */
