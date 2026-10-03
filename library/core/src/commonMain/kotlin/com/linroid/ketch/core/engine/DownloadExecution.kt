@@ -161,13 +161,13 @@ internal class DownloadExecution(
         sum + file.size
       }
     } else resolvedUrl.totalBytes
-    if (total < 0) {
+    // A source streams content of unknown size (-1) or fails, and the engine then measures the
+    // file it wrote. A source that writes its own files leaves the engine nothing to measure.
+    if (total < 0 && source.managesOwnFileIo) {
       log.e { "Unknown file size for taskId=$taskId: url=${redactUrl(request.url)}" }
       throw KetchError.SourceError(
         sourceType = source.type,
-        cause = Exception(
-          "Unknown file size for ${redactUrl(request.url)}"
-        ),
+        cause = Exception("Unknown file size for ${redactUrl(request.url)}"),
       )
     }
     totalBytes = total
@@ -326,21 +326,26 @@ internal class DownloadExecution(
         }
       }
 
+      var finalTotal = total
       if (!selfManagedIo) {
         try {
           fa.flush()
+          // Content of unknown size was streamed to its end, so the file holds all of it.
+          if (total < 0) finalTotal = fa.size()
         } catch (e: Exception) {
           if (e is CancellationException) throw e
           if (e is KetchError) throw e
           throw KetchError.Disk(e)
         }
       }
+      totalBytes = finalTotal
 
       val finalTime = downloadTime()
       val finishedAt = finishTime()
       handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
+          totalBytes = finalTotal,
           segments = null,
           downloadTime = finalTime,
           completedAt = finishedAt,
@@ -352,7 +357,7 @@ internal class DownloadExecution(
       log.i { "Download completed for taskId=$taskId" }
       handle.mutableState.value = DownloadState.Completed(
         outputPath = outputPath,
-        totalBytes = total.takeIf { it >= 0 },
+        totalBytes = finalTotal.takeIf { it >= 0 },
         downloadTime = finalTime,
         completedAt = finishedAt,
       )

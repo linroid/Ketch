@@ -156,6 +156,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   JS (Node.js) and WasmWasi for the engine; the browser (WasmJs) uses `RemoteKetch`
 - Segmented downloads with concurrent HTTP Range requests
 - Servers without Range support use a single connection; resuming them restarts from zero
+- Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
+  connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
@@ -446,6 +448,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   waits for the transport). The SDK's `StdioServerTransport` drops those replies. `ketch mcp`
   then calls `exitProcess`, so a non-daemon thread cannot keep it alive; its shutdown hook closes
   `Ketch`
+- Stdio builds its SDK `Server` itself (adding tools with Koog's `addTool`) without
+  `tools.listChanged`. With Koog's `configureMcpServer`, which announces it, the SDK sent
+  `notifications/tools/list_changed` for the tools it registered to a session starting in the same
+  millisecond, at times after the session closed, and threw "Not connected". SSE still uses Koog's
+  `startMcpServer`, whose sessions start later
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
@@ -596,6 +603,9 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+6. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+   bytes, segment progress, resume state, finished files) between instances, so the destination
+   continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
+7. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
    own network and IP, joining or leaving mid-download without pausing it; see the
    [proposal](docs/design/multi-instance-downloads.md)
