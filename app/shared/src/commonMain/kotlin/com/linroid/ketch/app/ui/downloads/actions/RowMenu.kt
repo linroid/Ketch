@@ -48,6 +48,8 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.startSchedule
+import com.linroid.ketch.app.ui.inspector.urgentVictim
 import com.linroid.ketch.app.ui.intake.targetSummary
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.plural
@@ -198,7 +200,7 @@ internal fun rowMenuContext(
   devices = devices,
   now = LocalClock.current.now(),
   zone = TimeZone.currentSystemDefault(),
-  urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+  urgentVictim = urgentVictim(runner.state, rows)?.name,
   send = rememberSendMode(),
 )
 
@@ -398,7 +400,7 @@ internal fun KetchMenuScope.startLaterEntries(
   runner: RowActionRunner,
   context: RowMenuContext,
 ) {
-  val current = rows.map { it.request.schedule }.distinct().singleOrNull()
+  val current = rows.map { it.startSchedule }.distinct().singleOrNull()
   // Start now is an action of its own; the submenu only holds later times.
   for (option in startTimeOptions(context.now, context.zone).drop(1)) {
     item(
@@ -464,23 +466,6 @@ internal fun sendTargets(
     val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
     SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
   }
-}
-
-/**
- * The download Urgent would pause to start [rows]: the lowest-priority one running on their
- * device, when every slot is taken; `null` when a slot is free or nothing could be paused.
- */
-internal fun urgentVictim(rows: List<TaskRow>, runner: RowActionRunner): String? {
-  if (rows.all { it.state is DownloadState.Downloading }) return null
-  val deviceId = rows.first().key.deviceId
-  val keys = rows.mapTo(mutableSetOf()) { it.key }
-  val running = runner.state.taskList.rows.value.filter {
-    it.key.deviceId == deviceId && it.state is DownloadState.Downloading
-  }
-  val slots = runner.state.settingsOf(deviceId)?.download?.maxConcurrentDownloads
-  if (slots != null && running.size < slots) return null
-  return running.filter { it.key !in keys && it.request.priority < DownloadPriority.URGENT }
-    .minByOrNull { it.request.priority.ordinal }?.name
 }
 
 /** Menu label of [action] on one row; Show in folder takes the platform's [revealLabel]. */

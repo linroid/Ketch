@@ -10,17 +10,22 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.MenuEntry
 import com.linroid.ketch.app.components.buildMenu
+import com.linroid.ketch.app.components.startTimeOptions
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.urgentVictim
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RowMenuTest {
@@ -183,6 +188,30 @@ class RowMenuTest {
 
     assertEquals("Starts now · may pause debian.iso", urgent.caption)
     assertTrue("priority ${DownloadPriority.URGENT}" in queued.calls)
+  }
+
+  @Test
+  fun urgentVictim_rowsThatAllRun_namesNone() = actionsTest { f ->
+    // Urgent starts nothing here, so nothing makes room, however full the device is.
+    assertNull(urgentVictim(f.state, listOf(rowOf(f.add(downloading)))))
+    assertNull(urgentVictim(f.state, emptyList()))
+  }
+
+  @Test
+  fun startLaterEntries_scheduleThatPassed_checksNothingAndOffersNoClear() = actionsTest { f ->
+    val context = RowMenuContext(now = Instant.fromEpochSeconds(1_800_000_000), zone = TimeZone.UTC)
+    val later = startTimeOptions(context.now, context.zone)[1].schedule
+    val started = f.add(downloading, DownloadRequest("https://example.com/a.iso", schedule = later))
+    val waiting = f.add(DownloadState.Scheduled(later))
+
+    val passed = buildMenu { startLaterEntries(listOf(rowOf(started)), f.runner, context) }
+    val pending = buildMenu { startLaterEntries(listOf(rowOf(waiting)), f.runner, context) }
+
+    val items = passed.filterIsInstance<MenuEntry.Item>()
+    assertTrue(items.none { it.checked == true || it.label == "Clear" })
+    val shown = pending.filterIsInstance<MenuEntry.Item>()
+    assertEquals(1, shown.count { it.checked == true })
+    assertTrue(shown.any { it.label == "Clear" })
   }
 
   @Test

@@ -212,7 +212,7 @@ private fun PriorityRow(
             when {
               priority == null || priority == shown -> Unit
               priority == DownloadPriority.URGENT && waiting.isNotEmpty() -> {
-                val victim = victimFor(state, rows)
+                val victim = urgentVictim(state, rows)
                 if (victim != null) asking = victim else urgent()
               }
               priority == DownloadPriority.URGENT -> urgent()
@@ -243,10 +243,12 @@ private fun PriorityRow(
 }
 
 /**
- * The download starting [rows] now would pause: the lowest-priority one running on their
- * device when every slot is taken.
+ * The download Urgent would pause to start [rows] now: the lowest-priority one running on their
+ * device when every slot is taken (see [preemptionVictim]); `null` when they all run already, a
+ * slot is free or the device's slots are unknown.
  */
-private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
+internal fun urgentVictim(state: AppState, rows: List<TaskRow>): TaskRow? {
+  if (rows.all { it.state is DownloadState.Downloading }) return null
   val deviceId = rows.first().key.deviceId
   val running = state.taskList.rows.value.filter {
     it.key.deviceId == deviceId && it.state is DownloadState.Downloading
