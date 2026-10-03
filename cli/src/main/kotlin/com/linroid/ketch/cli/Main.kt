@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -202,8 +203,10 @@ private fun runServer(args: Array<String>) {
   var cliHost: String? = null
   var cliPort: Int? = null
   var cliToken: String? = null
+  var noToken = false
   var cliCorsOrigins: List<String>? = null
   var cliAllowedHosts: List<String>? = null
+  var cliAllowedDirectories: List<String>? = null
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
   var configPath: String? = null
@@ -265,6 +268,7 @@ private fun runServer(args: Array<String>) {
         }
         cliToken = args[++i]
       }
+      "--no-token" -> noToken = true
       "--cors" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --cors requires a value")
@@ -280,6 +284,14 @@ private fun runServer(args: Array<String>) {
           return
         }
         cliAllowedHosts = args[++i].split(",").map { it.trim() }
+      }
+      "--allowed-dirs" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --allowed-dirs requires a value")
+          printServerUsage()
+          return
+        }
+        cliAllowedDirectories = args[++i].split(",").map { it.trim() }.filter { it.isNotEmpty() }
       }
       "--dir" -> {
         if (i + 1 >= args.size) {
@@ -308,6 +320,10 @@ private fun runServer(args: Array<String>) {
       }
     }
     i++
+  }
+  if (noToken && cliToken != null) {
+    System.err.println("Error: --token and --no-token cannot be used together")
+    return
   }
 
   // Load config: explicit --config path, or default path if exists,
@@ -343,11 +359,12 @@ private fun runServer(args: Array<String>) {
     server = fileConfig.server.copy(
       host = cliHost ?: fileConfig.server.host,
       port = cliPort ?: fileConfig.server.port,
-      apiToken = cliToken ?: fileConfig.server.apiToken,
       corsAllowedHosts = cliCorsOrigins
         ?: fileConfig.server.corsAllowedHosts,
       allowedHosts = cliAllowedHosts
         ?: fileConfig.server.allowedHosts,
+      allowedDirectories = cliAllowedDirectories
+        ?: fileConfig.server.allowedDirectories,
     ),
     download = fileConfig.download.copy(
       defaultDirectory = cliDownloadDir
@@ -359,8 +376,28 @@ private fun runServer(args: Array<String>) {
   )
 
   val downloadConfig = mergedConfig.download
-  val serverConfig = mergedConfig.server
   val instanceName = mergedConfig.name ?: "Ketch"
+  val token = try {
+    resolveServerToken(
+      cliToken = cliToken,
+      noToken = noToken,
+      environmentToken = System.getenv(TOKEN_ENV),
+      configToken = fileConfig.server.apiToken,
+      loopbackOnly = mergedConfig.server.isLoopbackOnly,
+      tokenFile = File(defaultConfigDir(), TOKEN_FILE_NAME),
+    )
+  } catch (e: IOException) {
+    System.err.println("Error: could not keep the access token: ${e.message}")
+    return
+  }
+  val serverConfig = mergedConfig.server.copy(
+    apiToken = token.value,
+    // With a token, pages on any site, such as the web app, may call the API, as they still
+    // need the token; the apps do the same. Without one, KetchServer refuses them.
+    corsAllowedHosts = mergedConfig.server.corsAllowedHosts.ifEmpty {
+      if (token.value == null) emptyList() else listOf("*")
+    },
+  )
 
   File(downloadConfig.defaultDirectory).mkdirs()
 
@@ -383,6 +420,7 @@ private fun runServer(args: Array<String>) {
     name = instanceName,
     corsAllowedHosts = serverConfig.corsAllowedHosts,
     allowedHosts = serverConfig.allowedHosts,
+    allowedDirectories = serverConfig.allowedDirectories,
     mdnsEnabled = serverConfig.mdnsEnabled,
   )
 
@@ -400,16 +438,29 @@ private fun runServer(args: Array<String>) {
   if (configPath != null) {
     println("  Config:        $configPath")
   }
-  if (serverConfig.apiToken != null) {
-    println("  Auth:          enabled")
-  } else if (serverConfig.allowedHosts.isNotEmpty()) {
+  when (token) {
+    is ServerToken.Given -> println("  Auth:          token from ${token.source}")
+    is ServerToken.Saved -> println("  Auth:          token from ${token.file}")
+    is ServerToken.Created -> {
+      println("  Auth:          new token, saved to ${token.file}")
+      println("  Token:         ${token.value}")
+    }
+    ServerToken.None -> println(
+      "  Auth:          none" + if (serverConfig.isLoopbackOnly) " (this machine only)" else ""
+    )
+  }
+  if (token.value == null && serverConfig.allowedHosts.isNotEmpty()) {
     println("  Allowed hosts: " + serverConfig.allowedHosts.joinToString(", "))
+  }
+  if (token.value == null || serverConfig.allowedDirectories.isNotEmpty()) {
+    val folders = listOf(downloadConfig.defaultDirectory) + serverConfig.allowedDirectories
+    println("  Save folders:  " + folders.joinToString(", "))
   }
   if (serverConfig.corsAllowedHosts.isNotEmpty()) {
     println(
       "  CORS origins:  " +
         serverConfig.corsAllowedHosts.joinToString(", ") +
-        if (serverConfig.apiToken == null) " (ignored: needs --token)" else ""
+        if (serverConfig.apiToken == null) " (ignored: needs a token)" else ""
     )
   }
   if (!downloadConfig.speedLimit.isUnlimited) {
@@ -419,6 +470,15 @@ private fun runServer(args: Array<String>) {
     )
   }
   println()
+  if (token.value == null && !serverConfig.isLoopbackOnly) {
+    System.err.println(
+      """
+      |WARNING: --no-token: anyone who can reach port ${serverConfig.port} of this machine can use
+      |this server: add downloads to the save folders above, list, pause and remove tasks, and
+      |delete their files. Leave out --no-token to require a token.
+      |""".trimMargin()
+    )
+  }
 
   serveDaemon(server, ketch)
 }
@@ -797,13 +857,24 @@ private fun printServerUsage() {
   println("  --generate-config      Generate default config and exit")
   println("  --host <address>       Bind address (default: 0.0.0.0)")
   println("  --port <number>        Port number (default: 8642)")
-  println("  --token <string>       API bearer token (optional)")
+  println("  --token <string>       API bearer token; also read from")
+  println("                         $TOKEN_ENV. Without one, a server")
+  println("                         listening beyond loopback creates")
+  println("                         one and saves it to")
+  println("                         ${File(defaultConfigDir(), TOKEN_FILE_NAME)}")
+  println("  --no-token             Require no token, even beyond")
+  println("                         loopback (anyone on the network")
+  println("                         can use the server)")
   println("  --cors <origins>       Origins whose web pages may call")
-  println("                         the API, comma-separated or '*';")
-  println("                         needs --token (optional)")
+  println("                         the API, comma-separated or '*'")
+  println("                         (default with a token: '*')")
   println("  --allowed-hosts <names>")
   println("                         Extra Host names accepted without")
   println("                         a token, comma-separated (optional)")
+  println("  --allowed-dirs <paths> Folders besides --dir that clients")
+  println("                         may save to and delete from,")
+  println("                         comma-separated; with a token,")
+  println("                         setting it also keeps clients to them")
   println("  --dir <path>           Download directory")
   println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
@@ -818,7 +889,9 @@ private fun printServerUsage() {
   println("Examples:")
   println("  ketch server")
   println("  ketch server --port 9000 --dir /tmp/downloads")
-  println("  ketch server --token my-secret --cors '*'")
+  println("  ketch server --token my-secret --cors 'localhost:3000'")
+  println("  ketch server --host 127.0.0.1 --no-token")
+  println("  ketch server --allowed-dirs /srv/media,/srv/iso")
   println("  ketch server --speed-limit 10m")
   println("  ketch server --config /path/to/config.toml")
   println("  ketch server --generate-config")

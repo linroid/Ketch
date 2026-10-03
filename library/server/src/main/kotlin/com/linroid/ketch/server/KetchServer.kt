@@ -2,7 +2,10 @@ package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.file.PathRejectedException
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.server.api.PayloadTooLargeException
+import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.pairingRoutes
@@ -25,9 +28,11 @@ import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.plugins.UnsupportedMediaTypeException
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.CORSConfig
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
@@ -43,7 +48,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.concurrent.CountDownLatch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -54,7 +60,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * Usage:
  * ```kotlin
  * val ketch = Ketch(httpEngine = KtorHttpEngine())
- * val server = KetchServer(ketch)
+ * val server = KetchServer(ketch, host = "0.0.0.0", apiToken = token)
  * server.start()          // blocking
  * // or server.start(wait = false) for non-blocking
  * server.stop()
@@ -92,6 +98,30 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `POST   /api/pairing`      — ask the owner for the access token
  * - `GET    /api/pairing/{id}` — whether the owner answered, with the token once allowed
  * - `DELETE /api/pairing/{id}` — withdraw the request
+ *
+ * ## Access token
+ *
+ * With an [apiToken], every API request must carry it as `Authorization: Bearer <token>`. An
+ * address that sends ten wrong tokens within a minute gets `429 Too Many Requests` for any
+ * token until that minute ends. Without one, anyone who can reach [host] and [port] can use the
+ * API, so the server binds to loopback by default and logs a warning when it listens on another
+ * address without a token.
+ *
+ * ## Folders
+ *
+ * Callers choose where downloads are saved, and removing a task with `deleteFiles=true` deletes
+ * its files. Without an [apiToken], and with one when [allowedDirectories] is not empty, the
+ * server keeps them to the instance's download directory and [allowedDirectories]: a new task's
+ * destination (relative paths are taken from the download directory, an existing file is never
+ * overwritten), a resume's `destination`, the `defaultDirectory` of `PUT /api/config` and the
+ * files `deleteFiles` removes. Anything else gets `403 Forbidden` with a `path_rejected`
+ * `ErrorResponse`. Symbolic links count as the place they point to.
+ *
+ * ## Request bodies
+ *
+ * JSON bodies must be `application/json` (`415` otherwise) and are read up to 1 MiB, or 32 MiB
+ * for a new task, which can carry a resolved torrent; uploaded content up to 16 MiB. Longer
+ * bodies get `413 Payload Too Large`.
  *
  * ## Pairing
  *
@@ -144,16 +174,20 @@ import kotlin.coroutines.cancellation.CancellationException
  * API; the host check does.
  *
  * @param ketch the KetchApi instance to expose
- * @param host bind address
+ * @param host bind address; loopback by default, so only this machine can connect
  * @param port listen port
  * @param apiToken bearer token every API request must carry, or `null` for no
- *   authentication, a `Host` header check, and refusing web pages on other origins instead
+ *   authentication, a `Host` header check, refusing web pages on other origins, and keeping
+ *   callers to the download folders instead
  * @param name instance name advertised over mDNS
  * @param corsAllowedHosts origins whose web pages may call the API when there is an
  *   [apiToken]: `"*"` for any, a host such as `"localhost:3000"` for both `http` and
  *   `https`, or an origin such as `"http://localhost:3000"`. Ignored without a token.
  * @param allowedHosts extra `Host` names or IP addresses accepted when there is no
  *   [apiToken], for example a DNS name or a Docker host's address
+ * @param allowedDirectories folders, besides the download directory, that callers may save
+ *   downloads to and delete files from. Without an [apiToken] callers are always kept to the
+ *   download directory and these folders; with one, only when this list is not empty.
  * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
@@ -161,12 +195,13 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class KetchServer(
   private val ketch: KetchApi,
-  private val host: String = "0.0.0.0",
+  private val host: String = "127.0.0.1",
   private val port: Int = 8642,
   private val apiToken: String? = null,
   private val name: String = "Ketch",
   private val corsAllowedHosts: List<String> = emptyList(),
   private val allowedHosts: List<String> = emptyList(),
+  allowedDirectories: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
   pairingApprover: PairingApprover? = null,
@@ -178,6 +213,12 @@ class KetchServer(
   } else {
     PairingSessions(pairingApprover, apiToken, scope)
   }
+  private val destinations = DestinationGuard(
+    ketch,
+    allowedDirectories,
+    enabled = apiToken == null || allowedDirectories.isNotEmpty(),
+  )
+  private val throttle = AuthThrottle()
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -196,6 +237,12 @@ class KetchServer(
   fun start(wait: Boolean = true) {
     check(scope.isActive) { "Server has been stopped" }
     log.i { "Starting server on ${host}:${port}" }
+    if (apiToken == null && !isLoopback(host)) {
+      log.w {
+        "Listening on $host:$port without an API token: anyone who can reach it can add" +
+          " downloads, list, pause and remove tasks, and delete files in the download folders"
+      }
+    }
     engine.start(wait = false)
     startMdnsRegistration()
     if (wait) awaitStop()
@@ -268,12 +315,7 @@ class KetchServer(
 
   internal fun Application.configureServer() {
     install(ContentNegotiation) {
-      json(
-        Json {
-          encodeDefaults = true
-          ignoreUnknownKeys = true
-        },
-      )
+      json(ServerJson)
     }
 
     install(Resources)
@@ -302,7 +344,34 @@ class KetchServer(
       }
     }
 
+    if (apiToken != null) {
+      // Before authentication, so an address guessing tokens is turned away unchecked.
+      install(authThrottling(throttle))
+    }
+
     install(StatusPages) {
+      exception<PathRejectedException> { call, cause ->
+        log.w { "Refused path ${cause.path}: ${cause.message}" }
+        call.respond(
+          HttpStatusCode.Forbidden,
+          ErrorResponse("path_rejected", cause.message ?: "Path is not allowed"),
+        )
+      }
+      exception<PayloadTooLargeException> { call, cause ->
+        call.respond(
+          HttpStatusCode.PayloadTooLarge,
+          ErrorResponse("payload_too_large", cause.message ?: "Request body is too large"),
+        )
+      }
+      exception<UnsupportedMediaTypeException> { call, cause ->
+        call.respond(
+          HttpStatusCode.UnsupportedMediaType,
+          ErrorResponse(
+            "unsupported_media_type",
+            cause.message ?: "Request body must be application/json",
+          ),
+        )
+      }
       exception<IllegalArgumentException> { call, cause ->
         call.respond(
           HttpStatusCode.BadRequest,
@@ -332,12 +401,16 @@ class KetchServer(
     }
 
     apiToken?.let { expectedToken ->
+      val tokenCheck = TokenCheck(expectedToken)
       install(Authentication) {
         bearer(AUTH_API) {
           authenticate { credential ->
-            if (credential.token == expectedToken) {
+            if (tokenCheck.matches(credential.token)) {
               UserIdPrincipal("api")
             } else {
+              val address = request.origin.remoteAddress
+              log.w { "Rejected a wrong API token from $address" }
+              throttle.recordFailure(address)
               null
             }
           }
@@ -348,10 +421,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch)
+          apiRoutes(ketch, destinations)
         }
       } else {
-        apiRoutes(ketch)
+        apiRoutes(ketch, destinations)
       }
       pairing?.let { pairingRoutes(it) }
       webResources()
@@ -379,10 +452,20 @@ private fun CORSConfig.allowCorsEntry(entry: String) {
   }
 }
 
-private fun Route.apiRoutes(ketch: KetchApi) {
-  serverRoutes(ketch)
-  downloadRoutes(ketch)
+private fun Route.apiRoutes(ketch: KetchApi, destinations: DestinationGuard) {
+  serverRoutes(ketch, destinations)
+  downloadRoutes(ketch, destinations)
   eventRoutes(ketch)
+}
+
+/** Whether [host], a bind address, only accepts connections from this machine. */
+private fun isLoopback(host: String): Boolean {
+  if (host.equals("localhost", ignoreCase = true)) return true
+  return try {
+    InetAddress.getByName(host).isLoopbackAddress
+  } catch (_: UnknownHostException) {
+    false
+  }
 }
 
 /**

@@ -36,6 +36,13 @@ internal object OutputPathReservations {
     }
   }
 
+  /**
+   * [candidate], or when it exists or is reserved, the first free `name (n).ext` beside it,
+   * without reserving it.
+   */
+  fun freePath(candidate: String): String =
+    firstFree(candidate.toPath(), reserved.load()).toString()
+
   /** Releases one reservation of [path]. */
   fun release(path: String) {
     val key = key(path.toPath())

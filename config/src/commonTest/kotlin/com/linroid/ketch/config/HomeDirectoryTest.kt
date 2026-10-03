@@ -37,6 +37,16 @@ class HomeDirectoryTest {
   }
 
   @Test
+  fun `config expands the server's allowed directories`() {
+    val config = KetchConfig(
+      server = ServerConfig(allowedDirectories = listOf("~/Media", "/srv/media")),
+    )
+    val expanded = config.expandHome("/home/me")
+    assertEquals(listOf("/home/me/Media", "/srv/media"), expanded.server.allowedDirectories)
+    assertEquals(config.copy(server = expanded.server), expanded)
+  }
+
+  @Test
   fun `config without a tilde path is returned as is`() {
     val config = KetchConfig()
     assertSame(config, config.expandHome("/home/me"))

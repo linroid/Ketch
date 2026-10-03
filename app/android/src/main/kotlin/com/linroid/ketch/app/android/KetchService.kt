@@ -182,6 +182,7 @@ class KetchService : Service() {
               if (serverConfig.apiToken == null) emptyList() else listOf("*")
             },
             allowedHosts = serverConfig.allowedHosts,
+            allowedDirectories = serverConfig.allowedDirectories,
             mdnsEnabled = serverConfig.mdnsEnabled,
             pairingApprover = { request, address ->
               pairingRequests.ask(request.name, request.code, request.os, address)

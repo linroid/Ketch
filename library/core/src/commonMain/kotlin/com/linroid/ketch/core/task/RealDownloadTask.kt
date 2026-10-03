@@ -47,6 +47,8 @@ internal class RealDownloadTask(
     mutableRequest.value = it.request
   }
 
+  override val outputPath: String? get() = record.value.outputPath
+
   private val log = KetchLogger("DownloadTask")
 
   override suspend fun pause() {

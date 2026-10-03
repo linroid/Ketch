@@ -9,14 +9,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.origin
-import io.ktor.server.request.contentLength
-import io.ktor.server.request.receiveChannel
 import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.utils.io.readAvailable
 import kotlinx.serialization.json.Json
 
 /**
@@ -83,25 +80,6 @@ private suspend fun refuseWebPage(call: ApplicationCall): Boolean {
     ErrorResponse("origin_not_allowed", "Web pages cannot pair with this server"),
   )
   return true
-}
-
-/**
- * The body of [call] when it has at most [limit] bytes, or `null` when it has more. Chunked
- * bodies, which declare no length, are read only up to the limit.
- */
-private suspend fun readBounded(call: ApplicationCall, limit: Int): ByteArray? {
-  val declared = call.request.contentLength()
-  if (declared != null && declared > limit) return null
-  val channel = call.receiveChannel()
-  // readRemaining(max) can return more than max, so the cap is kept by hand.
-  val buffer = ByteArray(limit + 1)
-  var read = 0
-  while (read < buffer.size) {
-    val count = channel.readAvailable(buffer, read, buffer.size - read)
-    if (count < 0) break
-    read += count
-  }
-  return if (read > limit) null else buffer.copyOf(read)
 }
 
 /**

@@ -81,7 +81,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
   `PathFileAccessor`, `ContentUriFileAccessor` (Android), `NoOpFileAccessor`,
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
-  `sanitizeFileName()`, `OutputPathReservations`
+  `sanitizeFileName()`, `OutputPathReservations`, `DestinationPathPolicy`,
+  `PathRejectedException`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`
 
@@ -137,8 +138,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `ConnectionState`, `RemotePairing`, `PairingResult`, `RemoteApiException`
 
 ### `library:server`, `library:mcp` (JVM only)
-- `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`; `server.api`
-  holds the routes and `server.mdns` the `MdnsRegistrar` implementations
+- `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`,
+  `DestinationGuard`, `AuthThrottle`; `server.api` holds the routes and `receiveJson`, and
+  `server.mdns` the `MdnsRegistrar` implementations
 - `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `asDeclaredTools()`
 
 ### `ai:discover` (JVM/Android only)
@@ -186,6 +188,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   the folder (`KetchError.Disk` otherwise). A file `Destination` is used as it is.
   `OutputPathReservations` holds every running download's path for the process, so `name (n)`
   deduplication also avoids files other downloads have not created yet
+- `DownloadTask.outputPath` reports where a task saves once the download chose it (core tasks;
+  `null` from remote ones)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
@@ -345,8 +349,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `KetchApi.updateConfig` / `updateNetworkInterfaces`. Downloads settings are saved to
   `config.toml` only for the embedded instance; the network selection is runtime-only and
   never saved
-- `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
-  (apps start the server on launch)
+- `ServerConfig`: host, port, API token, CORS, `allowedHosts`, `allowedDirectories`, mDNS,
+  `autoStart` (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
   reported, which picks its `DeviceType` glyph in the apps' pennants
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
@@ -435,7 +439,26 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - SSE event stream for real-time state updates; `TaskSnapshot` and `state_changed` carry the
   task's `queuePosition` (a queue change sends `state_changed` for every waiting task whose
   position moved), `progress` carries none
-- Optional bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`)
+- Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
+  `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
+  without a token. Tokens are compared in constant time (SHA-256 digests,
+  `MessageDigest.isEqual`); an address that sends ten wrong tokens within a minute gets 429
+  `too_many_attempts` for any token until the minute ends (`AuthThrottle`)
+- `ketch server` listening beyond loopback always has a token: `--token`, `KETCH_API_TOKEN`,
+  `apiToken`, or one it creates in the owner-only `api-token` file of the config directory
+  (`ServerToken`) and prints once; `--no-token` opts out with a loud warning. With a token and
+  no `corsAllowedHosts` it allows any origin, like the apps
+- Folders (`DestinationGuard` over core's `DestinationPathPolicy`): without a token, and with
+  one when `allowedDirectories` is set, callers are kept to the download directory and
+  `ServerConfig.allowedDirectories` for a new task's destination (relative paths rebased on the
+  download directory, file names through `sanitizeFileName()`, existing or reserved paths never
+  reused), a resume's `destination`, `PUT /api/config`'s `defaultDirectory` and
+  `deleteFiles=true` (checked against `DownloadTask.outputPath`); anything else is 403
+  `path_rejected`. With a token and no list, callers may save anywhere, as the apps let owners
+  type any folder on a remote device
+- JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
+  `POST /api/tasks`, 16 MiB for uploaded content, 4 KiB for pairing; longer is 413
+  `payload_too_large`
 - Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
   name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`
   (DNS rebinding protection); with a token any `Host` is accepted

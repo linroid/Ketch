@@ -43,6 +43,16 @@ interface DownloadTask {
   val queuePosition: StateFlow<Int?> get() = NoQueuePosition
 
   /**
+   * Where this task saves its download, once the download has chosen it: the file, or the
+   * folder of a source that writes several files, such as a torrent. It can change when the task
+   * [resumes][resume] with a destination.
+   *
+   * `null` before the download has chosen it, and from implementations that do not report it,
+   * such as tasks of a remote instance.
+   */
+  val outputPath: String? get() = null
+
+  /**
    * Pauses the download, preserving segment progress for later resume.
    * Works while downloading, queued, or paused for [PauseReason.Preempted]; the task
    * then leaves the queue until [resume] is called.

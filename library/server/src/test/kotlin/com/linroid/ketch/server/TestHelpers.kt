@@ -60,10 +60,15 @@ internal fun createTestKetch(
   return Ketch(httpEngine = NoOpHttpEngine(), config = config)
 }
 
+/**
+ * A server without a token for [ketch]. Callers may save downloads to `/tmp`, where the tests
+ * point their destinations, besides the download directory.
+ */
 internal fun createTestServer(
   ketch: KetchApi = createTestKetch(),
+  allowedDirectories: List<String> = listOf("/tmp"),
 ): KetchServer {
-  return KetchServer(ketch)
+  return KetchServer(ketch, allowedDirectories = allowedDirectories)
 }
 
 /**
