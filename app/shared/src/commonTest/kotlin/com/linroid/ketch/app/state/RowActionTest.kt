@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.toCopy
@@ -156,6 +157,17 @@ class RowActionTest {
 
     assertEquals(RowAction.StartNow, actions.primary)
     assertEquals(listOf(RowAction.Pause, RowAction.StartNow), actions.menu.take(2))
+  }
+
+  @Test
+  fun taskActions_preempted_primaryIsStartNow() {
+    val preempted = DownloadState.Paused(progress, PauseReason.Preempted("urgent"))
+
+    val actions = taskActions(request, preempted, local)
+
+    assertEquals(RowAction.StartNow, actions.primary)
+    assertTrue(RowAction.Pause in actions.menu)
+    assertFalse(RowAction.Resume in actions.menu)
   }
 
   @Test

@@ -325,6 +325,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   must run from outside it, such as the macOS menu bar's, go through `AppState.runInShell`
 - Toasts and banners go through `MessageCenter`; removals and other undoable operations wait in
   `PendingOps` for their Undo window
+- Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
+  everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
+  now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
+  waits ("next in line", "2 ahead") and when a finished one finished (Finished column and sort,
+  Smart "Finished today" groups). Auto connections and queue positions only show for devices
+  whose `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
 - Design tokens: feature code reads colors, type, spacing, shapes and motion from `KetchTheme`
   and uses the controls in `components/` and `KetchIcon`. `DesignTokenUsageTest` fails when
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,

@@ -64,6 +64,8 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
 import com.linroid.ketch.app.ui.inspector.hasControls
 import com.linroid.ketch.app.ui.inspector.rememberServerLimited
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -106,6 +108,9 @@ fun ConnectionsTab(
 ) {
   val rates by state.speedHistory.rates.collectAsState()
   val pending by state.pending.collectAsState()
+  // Collected so the stepper offers Auto once a remote device has reported what it supports.
+  val presence by state.instanceManager.presence.collectAsState()
+  val allowAuto = remember(presence, row.key) { autoConnectionsSupported(state, listOf(row)) }
   // The same key as the Controls' stepper, which shows the change pending too.
   val label = RowCommands.connectionsLabel(row)
   // Lanes, highlight and animations never carry over from another task.
@@ -115,6 +120,8 @@ fun ConnectionsTab(
       rates = rates[row.key].orEmpty(),
       modifier = modifier,
       connectionsPending = (row.key to label) in pending,
+      autoValue = autoConnectionsOf(state, listOf(row)),
+      allowAuto = allowAuto,
       onConnectionsChange = { connections ->
         state.runTaskCommand(
           task = row.task,
@@ -131,6 +138,9 @@ fun ConnectionsTab(
  * [ConnectionsTab] for [row] with the [rates] of its connections, without the app state. A
  * place that shows different tasks in turn keys it by task.
  *
+ * @param autoValue the count Auto stands for on the task's device; the task's segments when
+ *   `null`.
+ * @param allowAuto whether the task's device takes Auto, which the stepper then offers.
  * @param onConnectionsChange asks for a new number of connections; `null` hides the stepper.
  */
 @Composable
@@ -139,6 +149,8 @@ internal fun ConnectionsTabContent(
   rates: List<SegmentRate>,
   modifier: Modifier = Modifier,
   connectionsPending: Boolean = false,
+  autoValue: Int? = null,
+  allowAuto: Boolean = false,
   onConnectionsChange: ((Int) -> Unit)? = null,
   onHighlight: (Long?) -> Unit = {},
 ) {
@@ -181,7 +193,7 @@ internal fun ConnectionsTabContent(
         ConnectionStepper(
           value = requested,
           onCommit = onConnectionsChange,
-          autoValue = row.segments.size.takeIf { it > 0 },
+          autoValue = autoValue ?: row.segments.size.takeIf { it > 0 },
           enabled = !serverLimited,
           pending = connectionsPending,
           disabledReason = if (serverLimited) {
@@ -189,6 +201,7 @@ internal fun ConnectionsTabContent(
           } else {
             null
           },
+          allowAuto = allowAuto,
         )
       }
     }

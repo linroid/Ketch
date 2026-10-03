@@ -231,8 +231,16 @@ fun taskActions(
       val primary = if (stalled) RowAction.Reconnect else RowAction.Pause
       waitingOrRunning(primary, listOf(primary, RowAction.Pause).distinct(), capabilities)
     }
-    is DownloadState.Paused ->
+    // Paused for an urgent download, it still waits in the queue: Resume would do nothing.
+    is DownloadState.Paused -> if (state.waitsInQueue) {
+      waitingOrRunning(
+        RowAction.StartNow,
+        listOf(RowAction.Pause, RowAction.StartNow),
+        capabilities
+      )
+    } else {
       waitingOrRunning(RowAction.Resume, listOf(RowAction.Resume), capabilities)
+    }
     is DownloadState.Queued -> waitingOrRunning(
       RowAction.StartNow,
       listOf(RowAction.Pause, RowAction.StartNow),

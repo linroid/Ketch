@@ -29,7 +29,7 @@ suspend fun pauseActiveTasks(
   val attempted = HashSet<String>()
   repeat(rounds) {
     val pending = tasks().filter { it.taskId !in attempted }
-    val queued = pending.filter { it.state.value is DownloadState.Queued }
+    val queued = pending.filter { it.state.value.waitsInQueue }
     val running = pending.filter { it.state.value is DownloadState.Downloading }
     if (queued.isEmpty() && running.isEmpty()) return PausedTasks(paused, failures)
     for (group in listOf(queued, running)) {

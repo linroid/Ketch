@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.backgroundChild
@@ -383,6 +384,10 @@ class AppStateCommandsTest {
         controller.messages.active.value.last().title.load(),
       )
       assertIs<DownloadState.Downloading>(waiting.state.value)
+      assertEquals(
+        DownloadState.Paused(RecordingTask.PROGRESS, PauseReason.Preempted(waiting.taskId)),
+        running.state.value,
+      )
 
       controller.click("Undo")
       runCurrent()
@@ -390,6 +395,40 @@ class AppStateCommandsTest {
       assertIs<DownloadState.Downloading>(running.state.value)
       assertIs<DownloadState.Queued>(waiting.state.value)
     }
+
+  @Test
+  fun startNow_noFreeSlotOnOlderDevice_namesThePreemptedTaskAndUndoRestoresIt() =
+    commandsTest(RecordingKetchApi(maxActive = 1, preemptsToPaused = false)) { api, controller ->
+      val running = api.add(downloading, DownloadRequest("https://example.com/debian.iso"))
+      val waiting =
+        api.add(DownloadState.Queued, DownloadRequest("https://example.com/blender.dmg"))
+
+      controller.state.startNow(waiting)
+      runCurrent()
+      assertEquals(
+        "Started blender.dmg now · paused debian.iso to make room",
+        controller.messages.active.value.last().title.load(),
+      )
+      assertIs<DownloadState.Queued>(running.state.value)
+
+      controller.click("Undo")
+      runCurrent()
+      assertIs<DownloadState.Downloading>(running.state.value)
+      assertIs<DownloadState.Queued>(waiting.state.value)
+    }
+
+  @Test
+  fun resumeAll_skipsPreemptedTasks() = commandsTest { api, controller ->
+    val reason = PauseReason.Preempted("urgent")
+    val preempted = api.add(DownloadState.Paused(RecordingTask.PROGRESS, reason))
+    val byUser = api.add(paused)
+
+    controller.state.resumeAll().join()
+    runCurrent()
+
+    assertEquals(emptyList(), preempted.calls)
+    assertEquals(listOf("resume"), byUser.calls)
+  }
 
   @Test
   fun quickAdd_link_usesTheOptionsLastUsedOnTheDevice() = runTest {

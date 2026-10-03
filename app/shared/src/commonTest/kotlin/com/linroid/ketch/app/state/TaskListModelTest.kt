@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.warmStrings
@@ -114,6 +115,29 @@ class TaskListModelTest {
       "Waiting for a free slot (1 of 1 in use)",
       model.rows.value[1].content.detail.load()
     )
+  }
+
+  @Test
+  fun rows_queuePositionChanges_rebuildsRow() = runTest {
+    val waiting = task("waiting", DownloadState.Queued)
+    waiting.queuePosition.value = 2
+    val source = TaskListSource(
+      deviceId = LOCAL_DEVICE_ID,
+      device = ListFixtures.device,
+      tasks = flowOf(listOf(waiting)),
+      features = flowOf(KetchFeatures.ALL),
+    )
+    val model = model(listOf(source))
+    advanceTimeBy(300)
+    val before = model.rows.value.single()
+
+    waiting.queuePosition.value = 1
+    advanceTimeBy(300)
+    val after = model.rows.value.single()
+
+    assertEquals("Waiting to start · 1 ahead", before.content.detail.load())
+    assertEquals("Waiting to start · next in line", after.content.detail.load())
+    assertEquals(1, after.queuePosition)
   }
 
   @Test

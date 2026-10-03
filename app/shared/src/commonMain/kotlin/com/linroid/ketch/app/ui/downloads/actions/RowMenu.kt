@@ -28,6 +28,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
+import com.linroid.ketch.app.components.connectionText
 import com.linroid.ketch.app.components.deviceOptionCaption
 import com.linroid.ketch.app.components.startTimeOptions
 import com.linroid.ketch.app.i18n.UiText
@@ -53,6 +54,8 @@ import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
 import com.linroid.ketch.app.ui.intake.targetSummary
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.batch_copy_link
@@ -298,7 +301,15 @@ internal fun KetchMenuScope.rowMenuEntries(
         val name = if (single != null && peers) Res.string.row_menu_peer_limit.text() else label
         // A connection count is no peer limit, so a mixed selection leaves its torrents alone.
         val counted = if (peers) targets else targets.filterNot { it.isTorrent }
-        submenu(name, action.icon) { connectionEntries(counted, runner, peers) }
+        submenu(name, action.icon) {
+          connectionEntries(
+            rows = counted,
+            runner = runner,
+            peers = peers,
+            auto = if (peers) null else autoConnectionsOf(runner.state, counted),
+            allowAuto = autoConnectionsSupported(runner.state, counted),
+          )
+        }
       }
       RowAction.Priority -> submenu(label, action.icon) {
         priorityEntries(targets, runner, context.urgentVictim)
@@ -377,13 +388,26 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
   }
 }
 
-/** Adds the connection counts, or the peer limits when [peers], for [rows]. */
+/**
+ * Adds the connection counts, or the peer limits when [peers], for [rows]. When their devices
+ * take Auto ([allowAuto]), it comes first: "Auto ([auto])", or "Auto" when [auto] is unknown.
+ */
 internal fun KetchMenuScope.connectionEntries(
   rows: List<TaskRow>,
   runner: RowActionRunner,
   peers: Boolean,
+  auto: Int?,
+  allowAuto: Boolean,
 ) {
   val current = rows.map { it.request.connections }.distinct().singleOrNull()
+  if (allowAuto) {
+    item(
+      label = connectionText(0, auto),
+      onClick = { runner.setConnections(rows, 0) },
+      checked = current == 0,
+    )
+    divider()
+  }
   for (count in if (peers) PeerLimits else ConnectionCounts) {
     item(
       label = verbatim(count.toString()),

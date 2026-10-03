@@ -347,6 +347,10 @@
     <item quantity="one">Set %1$d download to %2$d connections</item>
     <item quantity="other">Set %1$d downloads to %2$d connections</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">Set %1$d download to Auto connections</item>
+    <item quantity="other">Set %1$d downloads to Auto connections</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d failed</item>
     <item quantity="other">%1$d failed</item>

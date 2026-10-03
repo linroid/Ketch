@@ -16,6 +16,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
@@ -1577,13 +1578,15 @@ class IntakeSession internal constructor(
   }
 
   /**
-   * Connections to set on the task downloading [current], or `null` to leave them. A task cannot
-   * go back to Auto, so Auto gives a task with its own count the target's default count; a
-   * torrent's peer limit, or a default not known yet, is left as it is.
+   * Connections to set on the task downloading [current], or `null` to leave them. A device that
+   * supports Auto gets 0. An older one cannot set a task back to Auto, so Auto gives a task with
+   * its own count that device's default count; a torrent's peer limit, or a default not known
+   * yet, is then left as it is.
    */
   private fun connectionsFor(current: DownloadRequest): Int? = when {
     connections == current.connections -> null
     connections > 0 -> connections
+    KetchFeatures.AUTO_CONNECTIONS in targetStatus?.features.orEmpty() -> 0
     torrentsOnly -> null
     else -> autoConnections?.takeIf { it != current.connections }
   }
@@ -2053,7 +2056,7 @@ internal fun intakeOutcome(
       return listOfNotNull(Res.string.intake_outcome_starts_now.text(), slotsText, eta).joinText()
     }
     val ahead = tasks.count {
-      it.state.value is DownloadState.Queued && it.requestState.value.priority >= priority
+      it.state.value.waitsInQueue && it.requestState.value.priority >= priority
     }
     return if (ahead == 0) {
       Res.string.intake_outcome_queued_next.text()

@@ -20,6 +20,10 @@ import ketch.app.shared.generated.resources.group_status
 import ketch.app.shared.generated.resources.group_title_attention
 import ketch.app.shared.generated.resources.group_title_downloading
 import ketch.app.shared.generated.resources.group_title_earlier
+import ketch.app.shared.generated.resources.group_title_finished_earlier
+import ketch.app.shared.generated.resources.group_title_finished_today
+import ketch.app.shared.generated.resources.group_title_finished_week
+import ketch.app.shared.generated.resources.group_title_finished_yesterday
 import ketch.app.shared.generated.resources.group_title_other_site
 import ketch.app.shared.generated.resources.group_title_paused
 import ketch.app.shared.generated.resources.group_title_today
@@ -30,6 +34,7 @@ import ketch.app.shared.generated.resources.group_type
 import ketch.app.shared.generated.resources.sort_added
 import ketch.app.shared.generated.resources.sort_connections
 import ketch.app.shared.generated.resources.sort_device
+import ketch.app.shared.generated.resources.sort_finished
 import ketch.app.shared.generated.resources.sort_name
 import ketch.app.shared.generated.resources.sort_origin
 import ketch.app.shared.generated.resources.sort_priority
@@ -62,7 +67,7 @@ enum class SortKey(
 ) {
   /**
    * Downloading first by priority then progress, then waiting tasks in start order, paused,
-   * failed and canceled, and finished tasks, the newest first.
+   * failed and canceled, and finished tasks, the most recently finished first.
    */
   Smart("smart", Res.string.sort_smart, descendingFirst = false),
   Name("name", Res.string.sort_name, descendingFirst = false),
@@ -73,6 +78,9 @@ enum class SortKey(
   Speed("speed", Res.string.sort_speed, descendingFirst = true),
   TimeLeft("left", Res.string.sort_time_left, descendingFirst = false),
   Added("added", Res.string.sort_added, descendingFirst = true),
+
+  /** When completed tasks finished; other tasks, and those whose finish time is unknown, last. */
+  Finished("finished", Res.string.sort_finished, descendingFirst = true),
   Status("status", Res.string.sort_status, descendingFirst = false),
   Connections("connections", Res.string.sort_connections, descendingFirst = true),
   Source("source", Res.string.sort_source, descendingFirst = false),
@@ -91,8 +99,9 @@ enum class SortKey(
  */
 enum class GroupBy(val id: String, private val resource: StringResource) {
   /**
-   * Downloading, waiting, paused, needing attention, then finished tasks by the day they were
-   * added: today, yesterday, this week and earlier.
+   * Downloading, waiting, paused, needing attention, then finished tasks by the day they
+   * finished, or by the day they were added when that is unknown: today, yesterday, this week
+   * and earlier.
    */
   Smart("smart", Res.string.group_smart),
   Status("status", Res.string.group_status),
@@ -347,9 +356,12 @@ private fun slotOf(row: TaskRow, group: GroupBy, now: Instant, timeZone: TimeZon
     GroupBy.Smart -> when (row.state) {
       is DownloadState.Downloading -> DOWNLOADING
       is DownloadState.Queued, is DownloadState.Scheduled -> WAITING
-      is DownloadState.Paused -> PAUSED
+      is DownloadState.Paused -> if (row.state.waitsInQueue) WAITING else PAUSED
       is DownloadState.Failed, is DownloadState.Canceled -> ATTENTION
-      is DownloadState.Completed -> daySlot("smart", row.createdAt, now, timeZone)
+      // A finish time the task does not report is never guessed: those rows keep the day added.
+      is DownloadState.Completed -> row.finishedAt
+        ?.let { daySlot("smart:finished", it, now, timeZone, finished = true) }
+        ?: daySlot("smart", row.createdAt, now, timeZone)
     }
     GroupBy.Status -> {
       val filter = StatusFilter.entries.first { it != StatusFilter.All && it.matches(row.state) }
@@ -368,18 +380,66 @@ private fun slotOf(row: TaskRow, group: GroupBy, now: Instant, timeZone: TimeZon
     GroupBy.None -> ALL
   }
 
-/** Today, yesterday, the rest of the last 7 days, and earlier, after the smart groups. */
-private fun daySlot(prefix: String, createdAt: Instant, now: Instant, timeZone: TimeZone): Slot {
+/**
+ * Today, yesterday, the rest of the last 7 days, and earlier, after the smart groups. A group of
+ * the day tasks [finished] follows the group of tasks added that day.
+ */
+private fun daySlot(
+  prefix: String,
+  at: Instant,
+  now: Instant,
+  timeZone: TimeZone,
+  finished: Boolean = false,
+): Slot {
   val today = now.toLocalDateTime(timeZone).date
-  val date = createdAt.toLocalDateTime(timeZone).date
+  val date = at.toLocalDateTime(timeZone).date
+  // Same order for both kinds of a day; the name puts "Added" before "Finished".
+  val name = if (finished) "finished" else "added"
   return when {
-    date >= today ->
-      Slot("$prefix:today", Res.string.group_title_today.text(), 4, kind = SlotKind.Day)
-    date == today.minus(1, DateTimeUnit.DAY) ->
-      Slot("$prefix:yesterday", Res.string.group_title_yesterday.text(), 5, kind = SlotKind.Day)
-    date > today.minus(7, DateTimeUnit.DAY) ->
-      Slot("$prefix:week", Res.string.group_title_week.text(), 6, kind = SlotKind.Day)
-    else -> Slot("$prefix:earlier", Res.string.group_title_earlier.text(), 7, collapsible = true)
+    date >= today -> Slot(
+      "$prefix:today",
+      if (finished) {
+        Res.string.group_title_finished_today.text()
+      } else {
+        Res.string.group_title_today.text()
+      },
+      4,
+      name = name,
+      kind = SlotKind.Day,
+    )
+    date == today.minus(1, DateTimeUnit.DAY) -> Slot(
+      "$prefix:yesterday",
+      if (finished) {
+        Res.string.group_title_finished_yesterday.text()
+      } else {
+        Res.string.group_title_yesterday.text()
+      },
+      5,
+      name = name,
+      kind = SlotKind.Day,
+    )
+    date > today.minus(7, DateTimeUnit.DAY) -> Slot(
+      "$prefix:week",
+      if (finished) {
+        Res.string.group_title_finished_week.text()
+      } else {
+        Res.string.group_title_week.text()
+      },
+      6,
+      name = name,
+      kind = SlotKind.Day,
+    )
+    else -> Slot(
+      "$prefix:earlier",
+      if (finished) {
+        Res.string.group_title_finished_earlier.text()
+      } else {
+        Res.string.group_title_earlier.text()
+      },
+      7,
+      name = name,
+      collapsible = true,
+    )
   }
 }
 
@@ -433,6 +493,7 @@ private fun rowOrder(arrangement: ListArrangement): Comparator<TaskRow> {
     SortKey.Speed -> valueOrder(descending) { it.speed }
     SortKey.TimeLeft -> valueOrder(descending) { it.timeLeft }
     SortKey.Added -> valueOrder(descending) { it.createdAt }
+    SortKey.Finished -> valueOrder(descending) { it.finishedAt }
     SortKey.Status -> valueOrder(descending) { smartRank(it.state) }
     SortKey.Connections -> valueOrder(descending) { it.connections }
     SortKey.Source -> textOrder(descending) { it.sourceHost }
@@ -447,7 +508,7 @@ private fun rowOrder(arrangement: ListArrangement): Comparator<TaskRow> {
 private fun smartRank(state: DownloadState): Int = when (state) {
   is DownloadState.Downloading -> 0
   is DownloadState.Queued, is DownloadState.Scheduled -> 1
-  is DownloadState.Paused -> 2
+  is DownloadState.Paused -> if (state.waitsInQueue) 1 else 2
   is DownloadState.Failed, is DownloadState.Canceled -> 3
   is DownloadState.Completed -> 4
 }
@@ -462,16 +523,27 @@ private fun startTime(row: TaskRow): Instant? =
 
 private val NEWEST_FIRST: Comparator<TaskRow> = compareByDescending { it.createdAt }
 
+/** Finished tasks, the most recently finished first; the day added stands in when unknown. */
+private val RECENTLY_DONE_FIRST: Comparator<TaskRow> =
+  compareByDescending { it.finishedAt ?: it.createdAt }
+
 private val TIEBREAK: Comparator<TaskRow> =
   NEWEST_FIRST.thenBy { it.key.deviceId }.thenBy { it.key.taskId }
 
-/** Queued tasks by priority then age, as the engine starts them, then scheduled ones by time. */
+/**
+ * Queued tasks in the order their device starts them: by the positions it reports, otherwise by
+ * priority then age, as the engine orders its queue; then scheduled ones by time.
+ */
 private val WAITING_ORDER: Comparator<TaskRow> = Comparator { a, b ->
   val aScheduled = a.state is DownloadState.Scheduled
   val bScheduled = b.state is DownloadState.Scheduled
+  val aPosition = a.queuePosition
+  val bPosition = b.queuePosition
   when {
     aScheduled != bScheduled -> if (aScheduled) 1 else -1
     aScheduled -> nullsLast(startTime(a), startTime(b), descending = false)
+    aPosition != null && bPosition != null && a.key.deviceId == b.key.deviceId ->
+      aPosition.compareTo(bPosition)
     else -> compareValuesBy(a, b, { -it.request.priority.ordinal }, { it.createdAt })
   }
 }
@@ -485,6 +557,7 @@ private val SMART_ORDER: Comparator<TaskRow> = Comparator { a, b ->
     rank != 0 -> rank
     a.state is DownloadState.Downloading -> DOWNLOADING_ORDER.compare(a, b)
     smartRank(a.state) == 1 -> WAITING_ORDER.compare(a, b)
+    a.state is DownloadState.Completed -> RECENTLY_DONE_FIRST.compare(a, b)
     else -> NEWEST_FIRST.compare(a, b)
   }
 }

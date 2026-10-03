@@ -64,6 +64,8 @@ import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.isPausedUntilResumed
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
@@ -396,7 +398,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
       item(
         command = KetchCommands.ResumeAll,
         onClick = { state.resumeAll() },
-        enabled = rows.any { it.state is DownloadState.Paused },
+        enabled = rows.any { it.state.isPausedUntilResumed },
       )
       item(
         command = KetchCommands.RetryFailed,
@@ -503,7 +505,7 @@ private fun ResolvingChip(state: AppState) {
 }
 
 private val DownloadState.isPausable: Boolean
-  get() = this is DownloadState.Downloading || this is DownloadState.Queued
+  get() = this is DownloadState.Downloading || waitsInQueue
 
 /** "Clear 4 finished", or "Clear finished" when there are none. */
 internal fun clearFinishedLabel(count: Int): UiText = if (count > 0) {

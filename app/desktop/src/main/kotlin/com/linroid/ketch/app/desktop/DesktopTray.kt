@@ -568,8 +568,9 @@ private fun traySpeed(speedMode: SpeedModeController): TraySpeed {
   return TraySpeed(settings.mode, slowLane, settings.rules.isNotEmpty())
 }
 
-// Completed downloads of the embedded device, newest first, without the ones a pending removal
-// hides. Only a change of phase re-reads the list, not every progress update.
+// Completed downloads of the embedded device, the most recently finished first (by when they
+// were added when that is unknown), without the ones a pending removal hides. Only a change of
+// phase re-reads the list, not every progress update.
 @OptIn(ExperimentalCoroutinesApi::class)
 private fun recentDownloads(controller: AppController): Flow<List<RecentDownload>> {
   val embedded = controller.instanceManager.embedded ?: return flowOf(emptyList())
@@ -583,7 +584,7 @@ private fun recentDownloads(controller: AppController): Flow<List<RecentDownload
   return combine(finished, controller.state.pendingOps.hidden) { pairs, hidden ->
     pairs
       .filter { (task, done) -> done != null && TaskKey(LOCAL_DEVICE_ID, task.taskId) !in hidden }
-      .sortedByDescending { (task, _) -> task.createdAt }
+      .sortedByDescending { (task, done) -> done?.completedAt ?: task.createdAt }
       .take(RECENT_LIMIT)
       .map { (task, done) ->
         val completed = checkNotNull(done)

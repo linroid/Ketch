@@ -86,6 +86,7 @@ import com.linroid.ketch.app.state.SortKey
 import com.linroid.ketch.app.state.TaskListView
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.speedLimitText
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
@@ -585,7 +586,10 @@ private fun columnLead(columns: List<ColumnSetting>, index: Int): Modifier {
 
 /** Whether [row] shows its reason across Progress, Speed and Left instead of numbers. */
 private fun spansReason(row: TaskRow, lanes: Boolean): Boolean = when (row.state) {
-  is DownloadState.Downloading, is DownloadState.Paused -> false
+  is DownloadState.Downloading -> false
+  // A task paused for an urgent download explains itself like a queued one; other pauses keep
+  // their numbers.
+  is DownloadState.Paused -> row.state.waitsInQueue
   is DownloadState.Completed -> !lanes
   else -> true
 }
@@ -703,6 +707,8 @@ private fun Cell(
     TableColumn.Speed -> SpeedCell(row, cell)
     TableColumn.Left -> NumberCell(content.time.resolve(), cell, color = colors.textSecondary)
     TableColumn.Added -> TextCell(content.added.resolve(), cell, color = colors.textSecondary)
+    TableColumn.Finished ->
+      TextCell(content.finished.resolve(), cell, color = colors.textSecondary)
     TableColumn.Status -> TextCell(
       text = content.statusText.resolve(),
       modifier = cell,

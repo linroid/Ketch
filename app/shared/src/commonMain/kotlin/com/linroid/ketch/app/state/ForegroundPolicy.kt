@@ -48,7 +48,7 @@ object ForegroundPolicy {
   fun evaluate(states: List<DownloadState>, serverState: ServerState): ForegroundStatus =
     ForegroundStatus(
       downloading = states.count { it is DownloadState.Downloading },
-      queued = states.count { it is DownloadState.Queued },
+      queued = states.count { it.waitsInQueue },
       serverPort = (serverState as? ServerState.Running)?.port,
     )
 

@@ -2,9 +2,11 @@ package com.linroid.ketch.app.desktop
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.window.Notification
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.NotificationCopy
@@ -408,6 +410,17 @@ class DesktopTrayModelTest {
     assertEquals("Undo pause all (⌘Z)", pending.item(KetchCommands.Undo).label.load())
     assertTrue(pending.item(KetchCommands.Undo).enabled)
     assertFalse(none.item(KetchCommands.Undo).enabled)
+  }
+
+  @Test
+  fun taskPhase_preemptedTask_isRunningLikeAQueuedOne() {
+    val progress = DownloadProgress(10, 100)
+
+    assertEquals(
+      TaskPhase.Running,
+      TaskPhase.of(DownloadState.Paused(progress, PauseReason.Preempted("urgent")))
+    )
+    assertEquals(TaskPhase.Paused, TaskPhase.of(DownloadState.Paused(progress)))
   }
 
   @Test

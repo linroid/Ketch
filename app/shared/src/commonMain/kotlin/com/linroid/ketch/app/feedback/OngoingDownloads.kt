@@ -13,6 +13,7 @@ import com.linroid.ketch.app.i18n.speedText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.util.displayName
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.ongoing_downloading
@@ -73,10 +74,10 @@ internal data class OngoingDownloads(
       val downloading = ArrayList<Pair<DownloadTask, DownloadProgress>>()
       val queued = ArrayList<DownloadTask>()
       for (task in tasks) {
-        when (val state = task.state.value) {
-          is DownloadState.Downloading -> downloading += task to state.progress
-          is DownloadState.Queued -> queued += task
-          else -> Unit
+        val state = task.state.value
+        when {
+          state is DownloadState.Downloading -> downloading += task to state.progress
+          state.waitsInQueue -> queued += task
         }
       }
       if (downloading.isEmpty() && queued.isEmpty()) return null

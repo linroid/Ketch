@@ -135,6 +135,17 @@ class RowActionRunnerTest {
   }
 
   @Test
+  fun setConnections_autoBatch_saysAuto() = actionsTest { f ->
+    val tasks = List(2) { f.add(downloading) }
+
+    f.runner.setConnections(tasks.map { rowOf(it) }, 0)
+    runCurrent()
+
+    tasks.forEach { assertEquals(listOf("connections 0"), it.calls) }
+    assertEquals("Set 2 downloads to Auto connections", f.messages().last().title.load())
+  }
+
+  @Test
   fun run_stopAndDiscard_asksFirst() = actionsTest { f ->
     val row = rowOf(f.add(downloading))
 

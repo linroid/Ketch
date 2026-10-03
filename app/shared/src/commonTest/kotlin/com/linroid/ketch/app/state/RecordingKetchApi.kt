@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
@@ -19,7 +20,8 @@ import kotlin.time.Instant
 
 /**
  * A task that records its commands and changes state roughly like the engine: pausing a
- * download frees its slot for the next queued task, and an urgent queued task preempts one.
+ * download frees its slot for the next queued task, and an urgent waiting task preempts one,
+ * which then waits paused for it (or queued, like an older daemon's).
  */
 internal class RecordingTask(
   override val taskId: String,
@@ -32,6 +34,9 @@ internal class RecordingTask(
   override val createdAt: Instant = Instant.fromEpochSeconds(taskId.hashCode().toLong())
   override val state = MutableStateFlow(initial)
   override val segments = MutableStateFlow(emptyList<Segment>())
+
+  // The fake keeps no queue order of its own, so it reports no positions.
+  override val queuePosition = MutableStateFlow<Int?>(null)
 
   /** Commands received, in order, such as "pause" or "remove deleteFiles=false". */
   val calls = mutableListOf<String>()
@@ -53,6 +58,8 @@ internal class RecordingTask(
 
   override suspend fun resume(destination: Destination?) {
     record("resume")
+    // Paused for an urgent download, it already waits in the queue.
+    if (state.value.waitsInQueue) return
     state.value = DownloadState.Queued
     api.promoteNext()
   }
@@ -71,7 +78,7 @@ internal class RecordingTask(
   override suspend fun setPriority(priority: DownloadPriority) {
     record("priority $priority")
     requestState.update { it.copy(priority = priority) }
-    if (priority == DownloadPriority.URGENT && state.value is DownloadState.Queued) {
+    if (priority == DownloadPriority.URGENT && state.value.waitsInQueue) {
       api.preemptFor(this)
     }
   }
@@ -102,10 +109,15 @@ internal class RecordingTask(
 /**
  * A device whose tasks are [RecordingTask]s. At most [maxActive] tasks download at once; the
  * rest of the added ones wait in the queue.
+ *
+ * @param preemptsToPaused whether a task an urgent one pushes out of its slot waits paused for
+ *   it, as this version of the engine does; `false` sends it back to the queue as an older
+ *   daemon does.
  */
 internal class RecordingKetchApi(
   label: String = "Recording",
   private val maxActive: Int = Int.MAX_VALUE,
+  private val preemptsToPaused: Boolean = true,
 ) : KetchApi by FakeKetchApi(label) {
   private val taskList = MutableStateFlow<List<DownloadTask>>(emptyList())
   private var nextId = 1
@@ -134,22 +146,26 @@ internal class RecordingKetchApi(
     return add(DownloadState.Queued, request).also { promoteNext() }
   }
 
-  /** Starts queued tasks while a slot is free. */
+  /** Starts waiting tasks, queued or preempted, in list order while a slot is free. */
   fun promoteNext() {
     for (task in taskList.value.filterIsInstance<RecordingTask>()) {
       if (activeCount() >= maxActive) return
-      if (task.state.value is DownloadState.Queued) {
+      if (task.state.value.waitsInQueue) {
         task.state.value = DownloadState.Downloading(RecordingTask.PROGRESS)
       }
     }
   }
 
-  /** Starts [task] at once, sending a running task back to the queue when no slot is free. */
+  /** Starts [task] at once, making a running task wait for it when no slot is free. */
   fun preemptFor(task: RecordingTask) {
     if (activeCount() >= maxActive) {
       val victim = taskList.value.filterIsInstance<RecordingTask>()
         .firstOrNull { it !== task && it.state.value is DownloadState.Downloading }
-      victim?.state?.value = DownloadState.Queued
+      victim?.state?.value = if (preemptsToPaused) {
+        DownloadState.Paused(RecordingTask.PROGRESS, PauseReason.Preempted(task.taskId))
+      } else {
+        DownloadState.Queued
+      }
     }
     task.state.value = DownloadState.Downloading(RecordingTask.PROGRESS)
   }

@@ -53,6 +53,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.speedLimitText
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
@@ -210,7 +211,9 @@ private fun Metric(row: TaskRow) {
       maxLines = 1,
     )
     row.state is DownloadState.Completed && content.status == RowStatus.Completed -> Text(
-      text = content.added.resolve(),
+      // When it finished, or when it was added if that is unknown.
+      text = (content.finished.takeIf { !it.isEmpty() && it != UNKNOWN } ?: content.added)
+        .resolve(),
       style = KetchTheme.typography.numeral,
       color = colors.textTertiary,
       maxLines = 1,
@@ -263,7 +266,7 @@ internal fun secondLineParts(row: TaskRow, touch: Boolean): List<LinePart> {
       val detail = content.detail
       // A queue reason is a sentence and may wrap; the other details are short facts.
       when {
-        state is DownloadState.Queued -> add(LinePart(detail, unbroken = false))
+        state.waitsInQueue -> add(LinePart(detail, unbroken = false))
         detail is UiText.Joined && detail.separator == SEPARATOR ->
           detail.parts.forEach { add(LinePart(it)) }
         else -> add(LinePart(detail))

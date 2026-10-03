@@ -68,6 +68,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.toDeviceHealth
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.command
@@ -442,7 +443,9 @@ private fun barActions(row: TaskRow, runner: RowActionRunner, missing: Boolean):
   val canRun = { action: RowAction -> runner.commands.canRun(action, row) }
   val actions = when (row.state) {
     is DownloadState.Downloading -> listOf(RowAction.Pause)
-    is DownloadState.Paused -> listOf(RowAction.Resume)
+    // Paused for an urgent download, it waits in the queue and resumes on its own.
+    is DownloadState.Paused ->
+      listOf(if (row.state.waitsInQueue) RowAction.StartNow else RowAction.Resume)
     is DownloadState.Queued -> listOf(RowAction.StartNow)
     is DownloadState.Scheduled -> {
       listOfNotNull(RowAction.StartNow.takeIf { row.device.capabilities.canReschedule })

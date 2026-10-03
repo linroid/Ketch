@@ -47,6 +47,7 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
@@ -284,7 +285,8 @@ internal enum class TaskPhase {
     /** The phase of a task in [state]. */
     fun of(state: DownloadState): TaskPhase = when (state) {
       is DownloadState.Downloading, DownloadState.Queued, is DownloadState.Scheduled -> Running
-      is DownloadState.Paused -> Paused
+      // Paused for an urgent download, it waits in the queue like a queued task.
+      is DownloadState.Paused -> if (state.waitsInQueue) Running else Paused
       is DownloadState.Failed -> Failed
       DownloadState.Canceled -> Canceled
       is DownloadState.Completed -> Completed

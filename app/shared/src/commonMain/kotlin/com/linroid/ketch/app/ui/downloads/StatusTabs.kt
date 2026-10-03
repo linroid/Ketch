@@ -394,6 +394,7 @@ private val ListSortKeys = listOf(
   SortKey.Smart,
   SortKey.Name,
   SortKey.Added,
+  SortKey.Finished,
   SortKey.Size,
   SortKey.Progress,
   SortKey.Speed,

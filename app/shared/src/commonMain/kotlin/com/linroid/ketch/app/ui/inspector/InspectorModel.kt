@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.startTimeFollowOnText
 import com.linroid.ketch.app.i18n.UiText
@@ -100,7 +101,8 @@ internal data class InspectorReason(
  * The reason line of [row], or `null` when nothing needs explaining. A stall comes first; then
  * the limit that caps a running download: the Slow lane when [slowLane] is on and [globalCap]
  * is the lower one, the download's own limit, or the device's [globalCap]. Waiting tasks say why
- * they wait, and paused ones whether resuming keeps their progress; a completed download whose
+ * they wait, tasks the engine paused say why and when they go on, and paused ones whether
+ * resuming keeps their progress; a completed download whose
  * file is gone ([fileMissing]) says so. The action bar already offers Resume, Start now and
  * Download again, so these reasons carry no chip of their own.
  */
@@ -118,7 +120,10 @@ internal fun inspectorReason(
       else -> limitReason(row.request.speedLimit, slowLane, globalCap)
     }
     is DownloadState.Queued, is DownloadState.Scheduled -> InspectorReason(content.detail)
-    is DownloadState.Paused -> {
+    // The row explains a pause the engine made, and when the task goes on by itself.
+    is DownloadState.Paused -> if (row.state.reason != PauseReason.User) {
+      InspectorReason(content.detail)
+    } else {
       val resumable = row.request.resolvedSource?.supportsResume != false
       InspectorReason(
         if (resumable) {
@@ -228,6 +233,17 @@ internal fun addedDetail(row: TaskRow, now: Instant, zone: TimeZone): UiText {
   val today = now.toLocalDateTime(zone).date
   if (row.createdAt.toLocalDateTime(zone).date == today) return row.content.added
   return Res.string.date_at_time.text(row.content.added, clockTime(row.createdAt, zone))
+}
+
+/**
+ * When [row] finished, for the Finished detail, in the form of [addedDetail]; `null` while it
+ * has not completed or its finish time is unknown.
+ */
+internal fun finishedDetail(row: TaskRow, now: Instant, zone: TimeZone): UiText? {
+  val finishedAt = row.finishedAt ?: return null
+  val today = now.toLocalDateTime(zone).date
+  if (finishedAt.toLocalDateTime(zone).date == today) return row.content.finished
+  return Res.string.date_at_time.text(row.content.finished, clockTime(finishedAt, zone))
 }
 
 /**

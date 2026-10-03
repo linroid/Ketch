@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.ConnectionStepper
 import com.linroid.ketch.app.components.KetchButton
@@ -161,11 +162,21 @@ private fun ConnectionsRow(
   }
   val connections = stringResource(Res.string.inspector_control_connections)
   val label = if (torrent) stringResource(Res.string.inspector_control_peer_limit) else connections
+  // Collected so the row offers Auto once a remote device has reported what it supports.
+  val presence by state.instanceManager.presence.collectAsState()
+  val autoSupported = remember(presence, targets) { autoConnectionsSupported(state, targets) }
   ControlRow(label, inline) {
     when {
       value == null -> MixedChip(title = connections) {
-        connectionEntries(targets, runner, peers = torrent)
+        connectionEntries(
+          rows = targets,
+          runner = runner,
+          peers = torrent,
+          auto = if (torrent) null else autoConnectionsOf(state, targets),
+          allowAuto = autoSupported,
+        )
       }
+      // The app does not know a torrent's default peer limit, so its Auto shows no number.
       torrent -> ConnectionStepper(
         value = value,
         onCommit = { runner.setConnections(rows, it) },
@@ -173,6 +184,7 @@ private fun ConnectionsRow(
         step = PEER_LIMIT_STEP,
         pending = pending,
         counts = StepperCount.Peers,
+        allowAuto = autoSupported,
       )
       else -> {
         val single = rows.singleOrNull()
@@ -190,6 +202,7 @@ private fun ConnectionsRow(
           } else {
             null
           },
+          allowAuto = autoSupported,
         )
       }
     }
@@ -302,6 +315,13 @@ internal fun autoConnectionsOf(state: AppState, rows: List<TaskRow>): Int? {
   val deviceId = rows.map { it.key.deviceId }.distinct().singleOrNull() ?: return null
   return state.settingsOf(deviceId)?.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
 }
+
+/**
+ * Whether the devices of every one of [rows] take 0 (Auto) connections; older devices only take
+ * a count.
+ */
+internal fun autoConnectionsSupported(state: AppState, rows: List<TaskRow>): Boolean =
+  rows.all { KetchFeatures.AUTO_CONNECTIONS in state.featuresOf(it.key.deviceId) }
 
 @Composable
 private fun StartRow(

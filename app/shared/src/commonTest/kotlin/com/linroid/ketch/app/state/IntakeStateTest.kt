@@ -10,6 +10,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
@@ -605,7 +606,7 @@ class IntakeStateTest {
   }
 
   @Test
-  fun retry_autoConnectionsOnATaskWithItsOwnCount_setsTheDeviceDefault() = runTest {
+  fun retry_autoConnectionsOnOlderDevice_setsTheDeviceDefault() = runTest {
     val api = IntakeTestApi()
     val failed = api.base.add(
       DownloadState.Failed(KetchError.Network()),
@@ -624,6 +625,43 @@ class IntakeStateTest {
     runCurrent()
 
     assertEquals(listOf("connections 4", "resume"), failed.calls)
+  }
+
+  @Test
+  fun retry_autoConnectionsOnCapableDevice_setsAuto() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.Network()),
+      DownloadRequest(links.first(), connections = 8),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(links.first())),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+    session.connections = 0
+
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("connections 0", "resume"), failed.calls)
+  }
+
+  @Test
+  fun apply_autoPeerLimitOnCapableDevice_setsAuto() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val task = api.base.add(DownloadState.Queued, DownloadRequest(magnet, connections = 40))
+    val session = session(api, IntakeRequest(editTask = TaskKey(LOCAL_DEVICE_ID, task.taskId)))
+    runCurrent()
+    session.connections = 0
+
+    assertTrue(session.torrentsOnly)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("connections 0"), task.calls)
   }
 
   @Test
@@ -865,6 +903,7 @@ private class IntakeTestApi(
   private val check: suspend (String, Map<String, String>) -> ResolvedSource = { url, _ ->
     ready(url)
   },
+  private val features: Set<String> = emptySet(),
 ) : KetchApi by base {
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
     check(url, properties)
@@ -884,6 +923,7 @@ private class IntakeTestApi(
       freeSpace = 1L shl 39,
       usableSpace = 1L shl 39,
     ),
+    features = features,
   )
 }
 

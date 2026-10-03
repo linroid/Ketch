@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures.START
@@ -94,6 +95,115 @@ class SortAndGroupTest {
       group.rows.map { it.key.taskId }
     )
     assertEquals(listOf("6", "in start order"), group.details.load())
+  }
+
+  @Test
+  fun waitingOrder_sameDevicePositions_followQueuePosition() {
+    // Positions win over priority and age, as the device's queue order is the truth.
+    val high = urgent("high", DownloadPriority.HIGH)
+    val rows = listOf(
+      row("high", DownloadState.Queued, request = high, queuePosition = 2),
+      row("old", DownloadState.Queued, createdAt = START - 1.hours, queuePosition = 3),
+      row("normal", DownloadState.Queued, queuePosition = 1)
+    )
+
+    val group = arrangeRows(rows, ListArrangement(), START, utc).single()
+
+    assertEquals(listOf("normal", "high", "old"), group.ids())
+  }
+
+  @Test
+  fun smart_preemptedTask_inWaitingGroup() = runTest {
+    val rows = listOf(
+      row("paused", DownloadState.Paused(DownloadProgress(5, 10))),
+      row("preempted", preempted()),
+      row("queued", DownloadState.Queued, createdAt = START + 1.minutes)
+    )
+
+    val groups = arrangeRows(rows, ListArrangement(), START, utc)
+
+    assertEquals(listOf("Waiting", "Paused"), groups.map { it.title }.load())
+    assertEquals(listOf("preempted", "queued"), groups[0].ids())
+    assertEquals(listOf("paused"), groups[1].ids())
+  }
+
+  @Test
+  fun statusFilter_preempted_isWaitingNotPaused() {
+    val shutdown = DownloadState.Paused(DownloadProgress(5, 10), PauseReason.Shutdown)
+
+    assertTrue(StatusFilter.Waiting.matches(preempted()))
+    assertFalse(StatusFilter.Paused.matches(preempted()))
+    assertTrue(StatusFilter.Paused.matches(shutdown))
+    assertFalse(StatusFilter.Waiting.matches(shutdown))
+  }
+
+  @Test
+  fun smart_completedRows_sortByFinishTimeNewestFirst() = runTest {
+    val rows = listOf(
+      row("added-later", completed(finishedAt = START - 50.minutes), createdAt = START - 1.hours),
+      row("added-earlier", completed(finishedAt = START - 5.minutes), createdAt = START - 2.hours)
+    )
+
+    val group = arrangeRows(rows, ListArrangement(), START, utc).single()
+
+    assertEquals("Finished today", group.title.load())
+    assertEquals(listOf("added-earlier", "added-later"), group.ids())
+  }
+
+  @Test
+  fun smart_completedRows_groupByFinishDayWithFinishedTitles() = runTest {
+    val added = START - 60.days
+    val rows = listOf(
+      row("earlier", completed(finishedAt = START - 30.days), createdAt = added),
+      row("week", completed(finishedAt = START - 3.days), createdAt = added),
+      row("yesterday", completed(finishedAt = START - 1.days), createdAt = added),
+      row("today", completed(finishedAt = START - 1.hours), createdAt = added)
+    )
+
+    val groups = arrangeRows(rows, ListArrangement(), START, utc)
+
+    assertEquals(
+      listOf("Finished today", "Finished yesterday", "Finished this week", "Finished earlier"),
+      groups.map { it.title }.load()
+    )
+    assertEquals(listOf("today", "yesterday", "week", "earlier"), groups.ids())
+  }
+
+  @Test
+  fun smart_completedWithoutCompletedAt_keepsAddedTitles() = runTest {
+    val rows = listOf(
+      row("finished", completed(finishedAt = START - 1.days), createdAt = START - 3.days),
+      row("unknown", completed(), createdAt = START - 1.days),
+      row("week", completed(), createdAt = START - 3.days)
+    )
+
+    val groups = arrangeRows(rows, ListArrangement(), START, utc)
+
+    assertEquals(
+      listOf("Added yesterday", "Finished yesterday", "Added this week"),
+      groups.map { it.title }.load()
+    )
+    assertEquals(listOf("unknown", "finished", "week"), groups.ids())
+  }
+
+  @Test
+  fun sortFinished_rowsWithoutFinishTime_last() {
+    val rows = listOf(
+      row("unknown", completed()),
+      row("running", downloading(10)),
+      row("older", completed(finishedAt = START - 2.hours)),
+      row("newer", completed(finishedAt = START - 1.hours))
+    )
+    val byFinished = ListArrangement(SortKey.Finished, descending = true, group = GroupBy.None)
+
+    val descending = arrangeRows(rows, byFinished, START, utc).single().ids()
+    val ascending = arrangeRows(rows, byFinished.copy(descending = false), START, utc)
+      .single().ids()
+
+    assertEquals(listOf("newer", "older"), descending.take(2))
+    assertEquals(listOf("older", "newer"), ascending.take(2))
+    assertEquals(setOf("unknown", "running"), descending.drop(2).toSet())
+    assertEquals(setOf("unknown", "running"), ascending.drop(2).toSet())
   }
 
   @Test
@@ -335,7 +445,11 @@ class SortAndGroupTest {
 
   private fun speedRow(id: String, speed: Long) = row(id, downloading(10, speed = speed))
 
-  private fun completed(size: Long = 100) = DownloadState.Completed("/downloads/file", size)
+  private fun completed(size: Long = 100, finishedAt: Instant? = null) =
+    DownloadState.Completed("/downloads/file", size, completedAt = finishedAt)
+
+  private fun preempted() =
+    DownloadState.Paused(DownloadProgress(5, 10), PauseReason.Preempted("urgent"))
 
   private fun scheduled(at: Instant) = DownloadState.Scheduled(DownloadSchedule.AtTime(at))
 
