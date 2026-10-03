@@ -151,6 +151,14 @@
   <string name="connect_nearby_failed_hint">%1$s。請改為貼上配對連結。</string>
   <string name="connect_none_found">找不到裝置。請在另一台裝置上開啟「設定 › 共享」，然後允許其他裝置。</string>
   <string name="connect_asks_for_code">%1$s · 需要存取碼</string>
+  <string name="connect_asks_for_approval">%1$s · 需要核准</string>
+  <string name="connect_approval_waiting">正在等待 %1$s…</string>
+  <string name="connect_approval_check">請在 %1$s 上確認顯示的是這組代碼，然後允許此裝置。</string>
+  <string name="connect_approval_enter_code">改為輸入存取碼</string>
+  <string name="connect_approval_denied">%1$s 未允許此裝置。請再次要求，或輸入其存取碼。</string>
+  <string name="connect_approval_expired">%1$s 上沒有人回應。請再次要求，或輸入其存取碼。</string>
+  <string name="connect_approval_busy">%1$s 仍在處理此裝置的另一個要求。請稍後再次要求，或輸入其存取碼。</string>
+  <string name="connect_approval_ask_again">再次要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s嗎？</string>
   <string name="connect_show_pairing_code">顯示它的配對碼</string>
@@ -170,6 +178,11 @@
   <string name="connect_pairing_known">你已新增過 %1$s，連線後就會顯示它。</string>
   <string name="connect_pairing_known_code">你已新增過 %1$s，連線後就會顯示它，並為它套用此連結的存取碼。</string>
   <string name="connect_pairing_has_code">此連結包含它的存取碼。</string>
+  <string name="pairing_request_title">要允許 %1$s 控制%2$s嗎？</string>
+  <string name="pairing_request_check">只有在 %1$s 顯示這組代碼時才允許：</string>
+  <string name="pairing_request_note">允許後，它可以在這裡新增、暫停和移除下載。之後若要撤銷，請在「設定 › 共享」中選擇「新存取碼」。</string>
+  <string name="pairing_request_allow">允許</string>
+  <string name="pairing_request_deny">不允許</string>
 
   <string name="device_pick_torrents">開啟種子檔案</string>
   <string name="device_pick_folder">選擇下載資料夾</string>

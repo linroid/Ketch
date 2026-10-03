@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
@@ -35,9 +36,11 @@ internal class RealDownloadTask(
 
   override val mutableState = MutableStateFlow(initialState)
   override val mutableSegments = MutableStateFlow(initialSegments)
+  override val mutableQueuePosition = MutableStateFlow<Int?>(null)
 
   override val state: StateFlow<DownloadState> = mutableState.asStateFlow()
   override val segments: StateFlow<List<Segment>> = mutableSegments.asStateFlow()
+  override val queuePosition: StateFlow<Int?> = mutableQueuePosition.asStateFlow()
 
   override val record = AtomicSaver(record) {
     taskStore.save(it)
@@ -48,7 +51,8 @@ internal class RealDownloadTask(
 
   override suspend fun pause() {
     val s = mutableState.value
-    if (s.isActive || s is DownloadState.Queued) {
+    val preempted = s is DownloadState.Paused && s.reason is PauseReason.Preempted
+    if (s.isActive || s is DownloadState.Queued || preempted) {
       controller.pause(this)
     } else {
       log.w { "Ignoring pause for taskId=$taskId in state ${mutableState.value}" }
@@ -89,7 +93,7 @@ internal class RealDownloadTask(
   }
 
   override suspend fun setConnections(connections: Int) {
-    require(connections > 0) { "Connections must be greater than 0" }
+    require(connections >= 0) { "Connections must not be negative" }
     settingsMutex.withLock {
       record.update {
         it.copy(

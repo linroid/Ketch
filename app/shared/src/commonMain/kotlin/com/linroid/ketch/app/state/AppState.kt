@@ -13,6 +13,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
@@ -1024,11 +1025,14 @@ class AppState(
       )
     }
 
-  /** Resumes every paused task on each of [targets], the shown devices by default. */
+  /**
+   * Resumes every paused task on each of [targets], the shown devices by default. Tasks paused
+   * for an urgent download already wait to resume on their own and are left alone.
+   */
   fun resumeAll(targets: List<InstanceEntry> = shownInstances.value): Job =
     runOnAll(
       targets = targets,
-      matches = { it is DownloadState.Paused },
+      matches = { it.isPausedUntilResumed },
       verb = BatchVerb.Resumed,
       command = FailedCommand.Resume,
     ) { _, task ->
@@ -1131,7 +1135,7 @@ class AppState(
     if (tasks.isEmpty()) return@launch
     val running = tasks.filter {
       val state = it.state.value
-      state is DownloadState.Downloading || state is DownloadState.Queued
+      state is DownloadState.Downloading || state.waitsInQueue
     }
     val paused = runEach(running) { it.pause() }.filter { it.second == null }.map { it.first }
     val op = pendingOps.register(
@@ -1208,7 +1212,7 @@ class AppState(
     when {
       current is DownloadState.Canceled -> redownload(task)
       current is DownloadState.Failed && current.error.needsFreshStart() -> redownload(task)
-      current is DownloadState.Failed || current is DownloadState.Paused -> {
+      current is DownloadState.Failed || current.isPausedUntilResumed -> {
         val failed = current is DownloadState.Failed
         val name = task.displayName()
         val command = if (failed) FailedCommand.Retry else FailedCommand.Resume
@@ -1277,7 +1281,7 @@ class AppState(
       )
       return@launch
     }
-    val preempted = running.filter { it.state.value is DownloadState.Queued }
+    val preempted = running.filter { it.state.value.waitsInQueue }
     val op = pendingOps.register(Res.string.feedback_undo_start_now.text(), undo = {
       val results = runEach(started) { it.undo() }.map { (start, e) -> start.task to e }
       reportFailures(FailedCommand.UndoStartNow, results)
@@ -1519,6 +1523,30 @@ class AppState(
     TaskKey(deviceOf(task)?.deviceId ?: LOCAL_DEVICE_ID, task.taskId)
 
   /**
+   * What the device [deviceId] reports in [com.linroid.ketch.api.KetchStatus.features]:
+   * everything for the engine inside this app, nothing until a remote device's status has been
+   * read.
+   */
+  fun featuresOf(deviceId: String): Set<String> {
+    val entry = instances.value.firstOrNull { it.deviceId == deviceId } ?: return emptySet()
+    if (entry !is RemoteInstance) return KetchFeatures.ALL
+    return instanceManager.presence.value.firstOrNull { it.deviceId == deviceId }
+      ?.status?.features.orEmpty()
+  }
+
+  /** [featuresOf] the device of [entry], as it changes. */
+  internal fun featuresFlow(entry: InstanceEntry): Flow<Set<String>> {
+    // The embedded engine is this build of Ketch, which supports everything it lists.
+    if (entry !is RemoteInstance) return flowOf(KetchFeatures.ALL)
+    val deviceId = entry.deviceId
+    return instanceManager.presence
+      .map { devices ->
+        devices.firstOrNull { it.deviceId == deviceId }?.status?.features.orEmpty()
+      }
+      .distinctUntilChanged()
+  }
+
+  /**
    * The tasks of [keys] on the devices that hold them, in that order, such as rows dragged onto
    * a device to [sendTo] it; keys of tasks no device lists are skipped.
    */
@@ -1556,6 +1584,7 @@ class AppState(
       tasks = visibleTasksOf(entry),
       config = snapshotFlow { settings.download },
       slowLane = if (remote) flowOf(false) else localMode.map { it.isSlowLane },
+      features = featuresFlow(entry),
     )
   }
 
@@ -1648,20 +1677,21 @@ class AppState(
     suspend fun run() {
       if (before is DownloadState.Scheduled) task.reschedule(DownloadSchedule.Immediate)
       task.setPriority(DownloadPriority.URGENT)
-      if (before is DownloadState.Paused || before is DownloadState.Failed) task.resume()
+      if (before is DownloadState.Failed || before.isPausedUntilResumed) task.resume()
       withTimeoutOrNull(START_TIMEOUT) { task.state.first { it is DownloadState.Downloading } }
     }
 
     suspend fun undo() {
       task.setPriority(priority)
-      when (before) {
-        is DownloadState.Scheduled -> task.reschedule(before.schedule)
-        is DownloadState.Queued -> {
+      when {
+        before is DownloadState.Scheduled -> task.reschedule(before.schedule)
+        // A task paused for an urgent download waited in the queue just like a queued one.
+        before.waitsInQueue -> {
           // Pausing frees the slot for the task the start preempted; resuming queues this again.
           task.pause()
           task.resume()
         }
-        is DownloadState.Paused -> task.pause()
+        before.isPausedUntilResumed -> task.pause()
         else -> Unit
       }
     }

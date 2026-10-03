@@ -58,6 +58,8 @@ import com.linroid.ketch.app.util.isTorrent as isTorrentRequest
  * @property config the device's download configuration, which explains why queued tasks wait;
  *   `null` while unknown.
  * @property slowLane whether Slow lane caps the device.
+ * @property features what the device reports in [com.linroid.ketch.api.KetchStatus.features];
+ *   empty while unknown.
  */
 class TaskListSource(
   val deviceId: String,
@@ -65,6 +67,7 @@ class TaskListSource(
   val tasks: Flow<List<DownloadTask>>,
   val config: Flow<DownloadConfig?> = flowOf(null),
   val slowLane: Flow<Boolean> = flowOf(false),
+  val features: Flow<Set<String>> = flowOf(emptySet()),
 )
 
 /**
@@ -83,6 +86,7 @@ class TaskListSource(
  * @property errorTitle the title of [content]'s error in the app's language, for searches.
  * @property speedSamples speed once a second while downloading, oldest first, at most
  *   [TaskListModel.SPEED_SAMPLES]; kept while the task is paused.
+ * @property queuePosition [DownloadTask.queuePosition].
  */
 data class TaskRow(
   val key: TaskKey,
@@ -96,6 +100,7 @@ data class TaskRow(
   override val deviceName: String,
   override val errorTitle: String?,
   val speedSamples: List<Long> = emptyList(),
+  val queuePosition: Int? = null,
 ) : SearchTarget {
   override val name: String = displayName(request, state)
 
@@ -123,6 +128,10 @@ data class TaskRow(
     get() = content.status == RowStatus.Stalled
   override val isLimited: Boolean
     get() = content.limited || !request.speedLimit.isUnlimited
+
+  /** When a completed task finished; `null` for other states or when unknown. */
+  val finishedAt: Instant?
+    get() = (state as? DownloadState.Completed)?.completedAt
 
   /** Host for the Source column: the page the link came from, else the link's own host. */
   val sourceHost: String?
@@ -304,8 +313,13 @@ class TaskListModel(
 
   private fun device(source: TaskListSource): Flow<DeviceSnapshot> {
     val tasks = source.tasks.flatMapLatest(::tasks)
-    return combine(tasks, source.config, source.slowLane) { snapshots, config, slowLane ->
-      DeviceSnapshot(source, snapshots, config, slowLane)
+    return combine(
+      tasks,
+      source.config,
+      source.slowLane,
+      source.features,
+    ) { snapshots, config, slowLane, features ->
+      DeviceSnapshot(source, snapshots, config, slowLane, features)
     }
   }
 
@@ -313,8 +327,13 @@ class TaskListModel(
     if (tasks.isEmpty()) return flowOf(emptyList())
     return combine(
       tasks.map { task ->
-        combine(task.requestState, task.state, task.segments) { request, state, segments ->
-          TaskSnapshot(task, request, state, segments)
+        combine(
+          task.requestState,
+          task.state,
+          task.segments,
+          task.queuePosition,
+        ) { request, state, segments, position ->
+          TaskSnapshot(task, request, state, segments, position)
         }
       }
     ) { it.toList() }
@@ -386,6 +405,7 @@ class TaskListModel(
       config = device.config,
       running = running,
       slowLane = device.slowLane,
+      features = device.features,
     )
     val cached = contexts[device.source.deviceId]
     if (cached == context) return cached
@@ -413,6 +433,7 @@ class TaskListModel(
       context = context,
       segments = snapshot.segments,
       stalledFor = stalledFor,
+      queuePosition = snapshot.queuePosition,
     )
     val built = TaskRow(
       key = key,
@@ -426,6 +447,7 @@ class TaskListModel(
       deviceName = deviceName,
       errorTitle = content.error?.title?.load(),
       speedSamples = samples,
+      queuePosition = snapshot.queuePosition,
     )
     val row = if (entry != null && entry.row == built) entry.row else built
     entries[key] = Entry(snapshot, context, samples, stalledFor, row)
@@ -463,6 +485,7 @@ class TaskListModel(
     val request: DownloadRequest,
     val state: DownloadState,
     val segments: List<Segment>,
+    val queuePosition: Int?,
   )
 
   private class DeviceSnapshot(
@@ -470,6 +493,7 @@ class TaskListModel(
     val tasks: List<TaskSnapshot>,
     val config: DownloadConfig?,
     val slowLane: Boolean,
+    val features: Set<String>,
   )
 
   private class Frame(val devices: List<DeviceSnapshot>, val tick: Long, val shown: DeviceScope)
@@ -493,6 +517,7 @@ class TaskListModel(
       stalledFor: Duration?,
     ): Boolean = snapshot.task === other.task && snapshot.request === other.request &&
       snapshot.state === other.state && snapshot.segments === other.segments &&
+      snapshot.queuePosition == other.queuePosition &&
       this.context === context && this.samples === samples && this.stalledFor == stalledFor
   }
 

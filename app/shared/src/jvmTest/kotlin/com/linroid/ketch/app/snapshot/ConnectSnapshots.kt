@@ -9,6 +9,7 @@ import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.MdnsDiscoverer
+import com.linroid.ketch.app.instance.PairingAsk
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LinkSource
@@ -17,12 +18,15 @@ import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
 import com.linroid.ketch.app.ui.connect.DeviceConnector
 import com.linroid.ketch.app.ui.connect.NearbySearch
+import com.linroid.ketch.app.ui.connect.PairingApprovalDialog
+import com.linroid.ketch.app.ui.connect.PairingClient
 import com.linroid.ketch.app.ui.connect.PairingDialog
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.PairingResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
@@ -122,6 +126,44 @@ class ConnectSnapshots {
         }
         AddDeviceSample(form)
       }
+    }
+  }
+
+  @Test
+  fun addDevice_ownerDecides_showsTheCodeTheyCheck() {
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )) {
+      snapshot("add-device-approval", size, theme) {
+        val scope = rememberCoroutineScope()
+        val form = remember {
+          val connector = pairingConnector { awaitCancellation() }
+          ConnectForm().apply { pair(PairableDevice, scope, connector, "4821") {} }
+        }
+        AddDeviceSample(form)
+      }
+    }
+  }
+
+  @Test
+  fun addDevice_ownerSaysNo_offersToAskAgain() {
+    for (theme in SnapshotTheme.entries) {
+      snapshot("add-device-approval-denied", SnapshotSize.Desktop, theme) {
+        AddDeviceSample(remember { formAfterPairing(PairingResult.Denied) })
+      }
+    }
+  }
+
+  @Test
+  fun pairingRequest_asksTheOwnerWithTheCode() {
+    val ask = PairingAsk(1, "Pixel 9", "4821", "Android 16", "192.168.1.30")
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Desktop to SnapshotTheme.Dark,
+      SnapshotSize.Phone to SnapshotTheme.Light,
+    )) {
+      snapshot("pairing-request", size, theme) { PairingApprovalDialog(ask, onAnswer = {}) }
     }
   }
 
@@ -260,6 +302,29 @@ private class SampleNearbyDiscoverer(
     if (rounds++ > 0 && searching) awaitCancellation()
     return servers
   }
+}
+
+/** A device on the network whose owner can let this one in. */
+private val PairableDevice = DiscoveredServer(
+  "Lins-MacBook-Pro", "192.168.1.20", 8642, tokenRequired = true, pairable = true,
+)
+
+/** A [DeviceConnector] whose pairing requests [client] answers. */
+private fun pairingConnector(client: suspend () -> PairingResult): DeviceConnector =
+  DeviceConnector(
+    InstanceManager(InstanceFactory()),
+    {},
+    { ProbeResult(ConnectionState.Unauthorized) },
+    PairingClient { _, _ -> client() },
+  )
+
+/** A form that asked the owner of [PairableDevice] and got [answer]. */
+private fun formAfterPairing(answer: PairingResult): ConnectForm {
+  val form = ConnectForm()
+  runBlocking {
+    coroutineScope { form.pair(PairableDevice, this, pairingConnector { answer }, "4821") {} }
+  }
+  return form
 }
 
 /** A form that tried [link] and got [answer]. */

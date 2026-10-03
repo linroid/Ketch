@@ -14,6 +14,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.IntakeEntry
 import com.linroid.ketch.app.state.IntakeSource
 import com.linroid.ketch.app.state.IntakeStatus
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.util.LinkKind
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_month_day
@@ -166,12 +167,16 @@ internal fun schemeLabel(url: String?, source: ResolvedSource?): UiText {
 internal fun duplicateState(task: DownloadTask, now: Instant): UiText =
   when (val state = task.state.value) {
     is DownloadState.Completed -> {
-      val finished = task.createdAt + (state.downloadTime ?: Duration.ZERO)
+      val finished = state.completedAt ?: (task.createdAt + (state.downloadTime ?: Duration.ZERO))
       Res.string.intake_duplicate_finished.text(relativeAge(finished, now))
     }
     is DownloadState.Downloading ->
       Res.string.intake_duplicate_downloading.text(percent(state.progress))
-    is DownloadState.Paused -> Res.string.intake_duplicate_paused.text(percent(state.progress))
+    is DownloadState.Paused -> if (state.waitsInQueue) {
+      Res.string.intake_duplicate_waiting.text()
+    } else {
+      Res.string.intake_duplicate_paused.text(percent(state.progress))
+    }
     is DownloadState.Queued, is DownloadState.Scheduled ->
       Res.string.intake_duplicate_waiting.text()
     is DownloadState.Failed -> Res.string.intake_duplicate_failed.text()

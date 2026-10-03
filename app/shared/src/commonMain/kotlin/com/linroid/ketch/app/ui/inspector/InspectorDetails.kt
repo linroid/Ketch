@@ -78,6 +78,7 @@ import ketch.app.shared.generated.resources.inspector_copy_failed_average
 import ketch.app.shared.generated.resources.inspector_copy_failed_captured
 import ketch.app.shared.generated.resources.inspector_copy_failed_connections
 import ketch.app.shared.generated.resources.inspector_copy_failed_device
+import ketch.app.shared.generated.resources.inspector_copy_failed_finished
 import ketch.app.shared.generated.resources.inspector_copy_failed_headers
 import ketch.app.shared.generated.resources.inspector_copy_failed_link
 import ketch.app.shared.generated.resources.inspector_copy_failed_path
@@ -91,6 +92,7 @@ import ketch.app.shared.generated.resources.inspector_detail_average
 import ketch.app.shared.generated.resources.inspector_detail_captured
 import ketch.app.shared.generated.resources.inspector_detail_connections
 import ketch.app.shared.generated.resources.inspector_detail_device
+import ketch.app.shared.generated.resources.inspector_detail_finished
 import ketch.app.shared.generated.resources.inspector_detail_headers
 import ketch.app.shared.generated.resources.inspector_detail_link
 import ketch.app.shared.generated.resources.inspector_detail_path
@@ -149,8 +151,8 @@ internal fun rememberCopier(state: AppState): Copier {
 /**
  * The DETAILS of [row], each row copying its value when clicked (long-pressed on touch), which
  * then reads "Copied" for a moment: Source, Link (the query behind "Show full link"), Saved to,
- * Size, Added, Time spent and Avg speed once completed, Connections, Device, Captured, and
- * under Advanced the task id, the names of its headers and its properties.
+ * Size, Added, Finished, Time spent and Avg speed once completed, Connections, Device, Captured,
+ * and under Advanced the task id, the names of its headers and its properties.
  */
 @Composable
 internal fun TaskDetails(
@@ -194,6 +196,9 @@ internal fun TaskDetails(
     val zone = remember { TimeZone.currentSystemDefault() }
     val added = addedDetail(row, LocalClock.current.now(), zone).resolve()
     DetailRow(Detail.Added, copier, added)
+    finishedDetail(row, LocalClock.current.now(), zone)?.let { finished ->
+      DetailRow(Detail.Finished, copier, finished.resolve())
+    }
     val time = completed?.downloadTime
     if (completed != null && time != null) {
       DetailRow(Detail.TimeSpent, copier, durationText(time).resolve())
@@ -298,6 +303,7 @@ private enum class Detail(val label: StringResource, val copyFailed: StringResou
   SavedTo(Res.string.inspector_detail_path, Res.string.inspector_copy_failed_path),
   Size(Res.string.inspector_detail_size, Res.string.inspector_copy_failed_size),
   Added(Res.string.inspector_detail_added, Res.string.inspector_copy_failed_added),
+  Finished(Res.string.inspector_detail_finished, Res.string.inspector_copy_failed_finished),
   TimeSpent(Res.string.inspector_detail_time, Res.string.inspector_copy_failed_time),
   AverageSpeed(Res.string.inspector_detail_average, Res.string.inspector_copy_failed_average),
   Connections(

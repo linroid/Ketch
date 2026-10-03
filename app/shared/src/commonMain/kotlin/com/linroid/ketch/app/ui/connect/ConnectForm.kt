@@ -15,6 +15,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.app.util.toCopy
+import com.linroid.ketch.remote.PairingResult
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.connect_error_host
 import ketch.app.shared.generated.resources.connect_error_link_empty
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 /** Why the last attempt of a [ConnectForm] did not connect. */
 internal sealed interface ConnectProblem {
@@ -40,7 +42,23 @@ internal sealed interface ConnectProblem {
 
   /** The device could not be added, for the reason in [message]. */
   data class Failed(val message: UiText) : ConnectProblem
+
+  /**
+   * The owner of [server], which goes by [name], did not let this device in: they turned it
+   * away, did not answer, or are still answering another request from it ([reason]).
+   */
+  data class NotPaired(
+    val server: DiscoveredServer,
+    val name: String,
+    val reason: PairingResult,
+  ) : ConnectProblem
 }
+
+/**
+ * A request for the access code of [name], found on the network, waiting for its owner, who
+ * checks that it shows [code] too.
+ */
+internal data class PairingWait(val name: String, val code: String)
 
 /**
  * What the Add device sheet, the pairing confirmation and the connect page hold: the pairing
@@ -124,6 +142,10 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
 
   /** Whether a connection is being tried. */
   var connecting by mutableStateOf(false)
+    private set
+
+  /** The request waiting for the owner of a device found on the network, or `null`. */
+  var pairing by mutableStateOf<PairingWait?>(null)
     private set
 
   /** Why the last attempt did not connect; cleared by the next edit. */
@@ -228,6 +250,75 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
   }
 
   /**
+   * Asks the owner of [server], found on the network, to let this device in, and connects with
+   * the access code once they do. [pairing] shows the code they check meanwhile. When they turn
+   * it away, do not answer or the device takes no requests, the form asks for the code instead.
+   *
+   * @param code the four digits both devices show; random unless given.
+   */
+  fun pair(
+    server: DiscoveredServer,
+    scope: CoroutineScope,
+    connector: DeviceConnector,
+    code: String = newPairingCode(),
+    onConnected: (RemoteInstance) -> Unit,
+  ) {
+    if (connecting || pairing != null) return
+    val address = PairingLink(server.host, server.port).address
+    if (address != linkState) codeState = ""
+    linkState = address
+    nameState = deviceNameOrNull(server.name)
+    manual = false
+    attempted = false
+    codeShown = false
+    problem = null
+    val target = checkNotNull(target)
+    val wait = PairingWait(name = target.name ?: server.host, code = code)
+    pairing = wait
+    job = scope.launch {
+      try {
+        when (val result = connector.pair(target, wait.code)) {
+          is PairingResult.Allowed -> {
+            pairing = null
+            connecting = true
+            when (val outcome = connector.connect(target.copy(token = result.token))) {
+              is ConnectOutcome.Connected -> onConnected(outcome.device)
+              is ConnectOutcome.NeedsCode -> askForCode(address, rejected = true)
+              ConnectOutcome.Unreachable -> problem = ConnectProblem.Unreachable(address)
+            }
+          }
+          PairingResult.Unsupported -> askForCode(address, rejected = false)
+          else -> {
+            codeShown = true
+            problem = ConnectProblem.NotPaired(server, wait.name, result)
+          }
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Couldn't ask $address to pair: ${e.describeCauses()}" }
+        problem = ConnectProblem.Unreachable(address)
+      } finally {
+        pairing = null
+        connecting = false
+      }
+    }
+  }
+
+  /** Stops waiting for the owner of a device and asks for its access code instead. */
+  fun enterCodeInstead() {
+    if (pairing == null) return
+    job?.cancel()
+    pairing = null
+    askForCode(linkState, rejected = false)
+  }
+
+  private fun askForCode(address: String, rejected: Boolean) {
+    codeShown = true
+    problem = ConnectProblem.NeedsCode(address, rejected)
+  }
+
+  /**
    * Fills the form with [device], added before, whose access code no longer works, and asks
    * for the current one.
    */
@@ -310,6 +401,13 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     const val PORT_DIGITS = 5
   }
 }
+
+// Four digits, which both devices show while the owner of one decides.
+private fun newPairingCode(): String =
+  Random.nextInt(PAIRING_CODES).toString().padStart(PAIRING_CODE_DIGITS, '0')
+
+private const val PAIRING_CODES = 10_000
+private const val PAIRING_CODE_DIGITS = 4
 
 /** A [ConnectForm] to give [device], which rejected its access code, a new one. */
 internal fun codeForm(device: RemoteInstance): ConnectForm =

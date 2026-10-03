@@ -276,6 +276,10 @@
     <item quantity="one">Conexões de %1$d download definidas como %2$d</item>
     <item quantity="other">Conexões de %1$d downloads definidas como %2$d</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">Conexões de %1$d download definidas como automáticas</item>
+    <item quantity="other">Conexões de %1$d downloads definidas como automáticas</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d com falha</item>
     <item quantity="other">%1$d com falha</item>

@@ -322,6 +322,12 @@
     <item quantity="many">Число подключений %2$d задано для %1$d загрузок</item>
     <item quantity="other">Число подключений %2$d задано для %1$d загрузки</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">Число подключений «Авто» задано для %1$d загрузки</item>
+    <item quantity="few">Число подключений «Авто» задано для %1$d загрузок</item>
+    <item quantity="many">Число подключений «Авто» задано для %1$d загрузок</item>
+    <item quantity="other">Число подключений «Авто» задано для %1$d загрузки</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d с ошибкой</item>
     <item quantity="few">%1$d с ошибкой</item>

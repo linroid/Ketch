@@ -38,6 +38,8 @@
   <string name="row_starts_in">%1$s 후</string>
   <string name="row_starts_after">%1$s 후 시작</string>
   <string name="row_waiting_for_conditions">조건 대기 중</string>
+  <string name="row_paused_preempted">긴급 다운로드를 위해 일시정지됨 · 자동으로 재개</string>
+  <string name="row_paused_shutdown">Ketch가 종료되어 일시정지됨 · Ketch가 다시 실행되면 재개</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">평균 %1$s</string>
@@ -49,6 +51,7 @@
   <string name="sort_speed">속도</string>
   <string name="sort_time_left">남은 시간</string>
   <string name="sort_added">추가일</string>
+  <string name="sort_finished">완료일</string>
   <string name="sort_status">상태</string>
   <string name="sort_connections">연결</string>
   <string name="sort_source">소스</string>
@@ -71,6 +74,10 @@
   <string name="group_title_yesterday">어제 추가됨</string>
   <string name="group_title_week">이번 주에 추가됨</string>
   <string name="group_title_earlier">이전에 추가됨</string>
+  <string name="group_title_finished_today">오늘 완료됨</string>
+  <string name="group_title_finished_yesterday">어제 완료됨</string>
+  <string name="group_title_finished_week">이번 주에 완료됨</string>
+  <string name="group_title_finished_earlier">이전에 완료됨</string>
   <string name="group_all_done_at">≈ %1$s에 모두 완료</string>
   <string name="group_in_start_order">시작 순서대로</string>
 
@@ -91,6 +98,11 @@
   <string name="queue_waiting_slot">빈 슬롯 대기 중(%2$d개 중 %1$d개 사용 중)</string>
   <string name="queue_waiting_host">%1$s 대기 중(사이트당 %2$d개)</string>
   <string name="queue_waiting_start">시작 대기 중</string>
+  <string name="queue_position_next">다음 순서</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="other">앞에 %1$d개</item>
+  </plurals>
+  <string name="queue_starting">시작 중</string>
 
   <string name="action_row_pause">일시정지</string>
   <string name="action_row_resume">재개</string>

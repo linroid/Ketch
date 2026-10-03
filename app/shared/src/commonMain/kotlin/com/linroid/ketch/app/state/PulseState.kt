@@ -505,8 +505,8 @@ class PulseModel(
     var sizesKnown = true
     var pending = 0L
     for ((request, state) in samples) {
-      when (state) {
-        is DownloadState.Downloading -> {
+      when {
+        state is DownloadState.Downloading -> {
           val progress = state.progress
           speed += progress.bytesPerSecond
           if (progress.totalBytes > 0) {
@@ -517,11 +517,10 @@ class PulseModel(
             sizesKnown = false
           }
         }
-        is DownloadState.Queued, is DownloadState.Scheduled -> {
+        state.waitsInQueue || state is DownloadState.Scheduled -> {
           pending += request.resolvedSource?.totalBytes?.coerceAtLeast(0) ?: 0
         }
-        is DownloadState.Failed -> failures++
-        else -> {}
+        state is DownloadState.Failed -> failures++
       }
     }
     return TaskTotals(

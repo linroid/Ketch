@@ -25,6 +25,7 @@ internal class DnsSdDiscoverer : MdnsDiscoverer {
               port = service.port,
               tokenRequired = service.txt["token"]
                 ?.decodeToString() == "required",
+              pairable = service.txt["pairing"]?.decodeToString() == "1",
             )
           }
           is DiscoveryEvent.Removed -> {

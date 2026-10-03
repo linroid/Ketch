@@ -126,6 +126,9 @@ class InstanceManager(
   val isLocalServerSupported: Boolean =
     factory.isLocalServerSupported
 
+  /** Devices that asked the shared embedded device for its access code; see [startServer]. */
+  val pairingRequests: PairingRequests get() = factory.pairingRequests
+
   private val _serverState =
     MutableStateFlow<ServerState>(ServerState.Stopped)
 

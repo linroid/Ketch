@@ -276,6 +276,10 @@
     <item quantity="one">%1$d téléchargement réglé sur %2$d connexions</item>
     <item quantity="other">%1$d téléchargements réglés sur %2$d connexions</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">%1$d téléchargement réglé sur des connexions automatiques</item>
+    <item quantity="other">%1$d téléchargements réglés sur des connexions automatiques</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d en échec</item>
     <item quantity="other">%1$d en échec</item>

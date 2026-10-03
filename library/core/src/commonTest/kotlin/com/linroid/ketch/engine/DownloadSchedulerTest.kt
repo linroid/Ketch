@@ -72,6 +72,7 @@ class DownloadSchedulerTest {
         MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
       override val record = AtomicSaver(record) {}
     }
   }

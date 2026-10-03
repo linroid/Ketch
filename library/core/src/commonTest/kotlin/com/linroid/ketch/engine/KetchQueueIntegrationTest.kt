@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -33,8 +34,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class KetchQueueIntegrationTest {
   @Test
@@ -178,13 +182,114 @@ class KetchQueueIntegrationTest {
       runCurrent()
       val urgent = ketch.download(request("urgent").copy(priority = DownloadPriority.URGENT))
       runCurrent()
-      assertEquals(DownloadState.Queued, first.state.value)
+      val paused = assertIs<DownloadState.Paused>(first.state.value)
+      assertEquals(PauseReason.Preempted(urgent.taskId), paused.reason)
       assertEquals(TaskState.QUEUED, store.load(first.taskId)?.state)
+      assertEquals(1, first.queuePosition.value)
       assertIs<DownloadState.Downloading>(urgent.state.value)
       source.complete("urgent")
       runCurrent()
       assertIs<DownloadState.Downloading>(first.state.value)
+      assertNull(first.queuePosition.value)
       assertEquals(1, source.maximumActive)
+    }
+  }
+
+  @Test
+  fun pause_preemptedTask_staysPausedWhenSlotFrees() = runTest {
+    withKetch { ketch, source, store ->
+      val first = ketch.download(request("first"))
+      runCurrent()
+      ketch.download(request("urgent").copy(priority = DownloadPriority.URGENT))
+      runCurrent()
+
+      first.pause()
+
+      assertEquals(PauseReason.User, assertIs<DownloadState.Paused>(first.state.value).reason)
+      assertEquals(TaskState.PAUSED, store.load(first.taskId)?.state)
+      assertNull(first.queuePosition.value)
+      source.complete("urgent")
+      runCurrent()
+      assertEquals(PauseReason.User, assertIs<DownloadState.Paused>(first.state.value).reason)
+      assertTrue(source.resumed.isEmpty())
+    }
+  }
+
+  @Test
+  fun resume_preemptedTask_keepsItWaitingOnce() = runTest {
+    withKetch { ketch, source, _ ->
+      val first = ketch.download(request("first"))
+      runCurrent()
+      val urgent = ketch.download(request("urgent").copy(priority = DownloadPriority.URGENT))
+      runCurrent()
+
+      first.resume()
+      runCurrent()
+
+      val paused = assertIs<DownloadState.Paused>(first.state.value)
+      assertEquals(PauseReason.Preempted(urgent.taskId), paused.reason)
+      assertEquals(1, first.queuePosition.value)
+      source.complete("urgent")
+      runCurrent()
+      assertIs<DownloadState.Downloading>(first.state.value)
+      source.complete("first")
+      runCurrent()
+      // Queued once: it ran once more and was not started again after it completed.
+      assertIs<DownloadState.Completed>(first.state.value)
+      assertEquals(listOf("first"), source.resumed)
+      assertEquals(1, source.maximumActive)
+    }
+  }
+
+  @Test
+  fun download_completes_recordsCompletedAtOnceAndRestoresIt() = runTest {
+    withKetch { ketch, source, store ->
+      val before = Clock.System.now().truncatedToMillis()
+      val task = ketch.download(request("first"))
+      runCurrent()
+      source.complete("first")
+      runCurrent()
+      val after = Clock.System.now()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      val completedAt = assertNotNull(completed.completedAt)
+      assertTrue(completedAt in before..after, "$completedAt not in $before..$after")
+      assertEquals(completedAt, store.load(task.taskId)?.completedAt)
+      // Later changes to the record keep the finish time.
+      task.setSpeedLimit(SpeedLimit.of(1024))
+      assertEquals(completedAt, store.load(task.taskId)?.completedAt)
+
+      val dispatcher = StandardTestDispatcher(testScheduler)
+      val restored = Ketch(
+        httpEngine = FakeHttpEngine(),
+        taskStore = store,
+        config = DownloadConfig(maxConcurrentDownloads = 1, retryCount = 0),
+        additionalSources = listOf(GatedSource()),
+        dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+      )
+      try {
+        restored.start()
+        runCurrent()
+        val state = restored.tasks.value.single().state.value
+        assertEquals(completedAt, assertIs<DownloadState.Completed>(state).completedAt)
+      } finally {
+        restored.close()
+        runCurrent()
+      }
+    }
+  }
+
+  @Test
+  fun setConnections_zeroWhileRunning_persistsAuto() = runTest {
+    withKetch { ketch, source, store ->
+      val task = ketch.download(request("first").copy(connections = 3))
+      runCurrent()
+
+      task.setConnections(0)
+
+      assertEquals(0, task.requestState.value.connections)
+      assertEquals(0, store.load(task.taskId)?.request?.connections)
+      assertEquals(0, source.contexts.getValue("first").maxConnections.value)
     }
   }
 
@@ -346,6 +451,9 @@ class KetchQueueIntegrationTest {
       runCurrent()
     }
   }
+
+  private fun Instant.truncatedToMillis(): Instant =
+    Instant.fromEpochMilliseconds(toEpochMilliseconds())
 
   private fun request(name: String): DownloadRequest = DownloadRequest(
     url = "fixture://host/$name",

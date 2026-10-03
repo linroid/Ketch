@@ -43,6 +43,24 @@ class TaskEventsTest {
     assertEquals(DownloadState.Queued, event.state)
   }
 
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun taskEvents_queuePositionChange_emitsStateChangedWithPosition() = runTest {
+    val task = ObservableTask()
+    task.queuePosition.value = 2
+    val events = mutableListOf<TaskEvent>()
+    backgroundScope.launch { taskEvents(task).collect { events.add(it) } }
+    runCurrent()
+    assertEquals(2, assertIs<TaskEvent.StateChanged>(events.single()).queuePosition)
+
+    task.queuePosition.value = 1
+    runCurrent()
+    assertEquals(2, events.size)
+    val event = assertIs<TaskEvent.StateChanged>(events.last())
+    assertEquals(1, event.queuePosition)
+    assertEquals(DownloadState.Queued, event.state)
+  }
+
   private class ObservableTask : DownloadTask {
     override val taskId = "task"
     override val requestState = MutableStateFlow(DownloadRequest("https://example.com/file"))
@@ -50,6 +68,7 @@ class TaskEventsTest {
     override val createdAt = Instant.fromEpochMilliseconds(0)
     override val state = MutableStateFlow<DownloadState>(DownloadState.Queued)
     override val segments = MutableStateFlow<List<Segment>>(emptyList())
+    override val queuePosition = MutableStateFlow<Int?>(null)
     override suspend fun pause() = error("Unexpected call")
     override suspend fun resume(destination: Destination?) = error("Unexpected call")
     override suspend fun cancel() = error("Unexpected call")

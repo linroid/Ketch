@@ -28,6 +28,7 @@ internal class ListTestTask(
   request: DownloadRequest = DownloadRequest("https://example.com/$taskId.bin"),
   override val createdAt: Instant = ListFixtures.START,
   segments: List<Segment> = emptyList(),
+  override val queuePosition: MutableStateFlow<Int?> = MutableStateFlow(null),
 ) : DownloadTask {
   override val requestState = MutableStateFlow(request)
   override val request: DownloadRequest
@@ -74,8 +75,13 @@ internal object ListFixtures {
     device: DeviceInfo = this.device,
     speedSamples: List<Long> = emptyList(),
     now: Instant = START,
-  ): TaskRow =
-    rowOf(ListTestTask(id, state, request, createdAt), device, deviceId, speedSamples, now)
+    queuePosition: Int? = null,
+    features: Set<String> = emptySet(),
+  ): TaskRow {
+    val position = MutableStateFlow(queuePosition)
+    val task = ListTestTask(id, state, request, createdAt, queuePosition = position)
+    return rowOf(task, device, deviceId, speedSamples, now, features)
+  }
 
   /** A clock that reads the virtual time of [scope], starting at [START]. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -85,16 +91,22 @@ internal object ListFixtures {
   }
 }
 
-/** The row of [task] on [device], built like [TaskListModel] builds one. */
+/**
+ * The row of [task] on [device], built like [TaskListModel] builds one, for a device that reports
+ * [features].
+ */
 internal fun rowOf(
   task: DownloadTask,
   device: DeviceInfo = ListFixtures.device,
   deviceId: String = LOCAL_DEVICE_ID,
   speedSamples: List<Long> = emptyList(),
   now: Instant = ListFixtures.START,
+  features: Set<String> = emptySet(),
 ): TaskRow {
   val request = task.requestState.value
   val state = task.state.value
+  val position = task.queuePosition.value
+  val context = RowContext(device, now, TimeZone.UTC, features = features)
   return TaskRow(
     key = TaskKey(deviceId, task.taskId),
     task = task,
@@ -103,9 +115,10 @@ internal fun rowOf(
     segments = task.segments.value,
     createdAt = task.createdAt,
     device = device,
-    content = rowContent(request, state, task.createdAt, RowContext(device, now, TimeZone.UTC)),
+    content = rowContent(request, state, task.createdAt, context, queuePosition = position),
     deviceName = device.name.plain,
     errorTitle = null,
     speedSamples = speedSamples,
+    queuePosition = position,
   )
 }

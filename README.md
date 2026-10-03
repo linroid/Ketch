@@ -91,7 +91,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 ### All your devices in one app
 
 - **Pair by QR code** — On the device to share, open **Settings → Sharing** and choose
-  **Allow another device**; scan the code with your phone, or copy the pairing link.
+  **Allow another device**; scan the code with your phone, or copy the pairing link. Or pick
+  the device under **Find on network** and allow it there, once both show the same four digits.
 - **Every device in the sidebar** with its live speed and health. Switch between them with a
   keystroke, or open **All devices** to list every download in one table.
 - **Send downloads where they belong** — Add a link to any device, drop it on a device in the

@@ -3,16 +3,17 @@ package com.linroid.ketch.core
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
@@ -41,6 +42,7 @@ import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -218,6 +220,7 @@ class Ketch(
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = config,
       system = currentSystemInfo(config.defaultDirectory),
+      features = KetchFeatures.ALL,
     )
   }
 
@@ -239,9 +242,10 @@ class Ketch(
         }
       }
       if (state is DownloadState.Queued) {
-        handle.mutableState.value = DownloadState.Paused(
-          DownloadProgress(record.segments?.sumOf { it.downloadedBytes } ?: 0L, record.totalBytes),
-        )
+        handle.mutableState.value = DownloadState.Paused(record.savedProgress())
+      } else if (state is DownloadState.Paused && state.reason is PauseReason.Preempted) {
+        // It waited in the queue; dequeue above took it out, so it now stays paused.
+        handle.mutableState.value = state.copy(reason = PauseReason.User)
       }
     }
 
@@ -335,9 +339,10 @@ class Ketch(
    * State restoration:
    * - `SCHEDULED` -> re-scheduled (schedule is preserved, conditions
    *   default to met after deserialization)
-   * - `QUEUED` / `DOWNLOADING` -> enqueued for immediate download
-   * - `PAUSED` -> stays [DownloadState.Paused]
-   * - `COMPLETED` -> [DownloadState.Completed]
+   * - `QUEUED` / `DOWNLOADING` -> enqueued for immediate download; this includes tasks
+   *   that were paused for [PauseReason.Preempted] or [PauseReason.Shutdown]
+   * - `PAUSED` -> stays [DownloadState.Paused] for [PauseReason.User]
+   * - `COMPLETED` -> [DownloadState.Completed], with the saved finish time
    * - `FAILED` -> [DownloadState.Failed]
    * - `CANCELED` -> [DownloadState.Canceled]
    */
@@ -403,17 +408,13 @@ class Ketch(
       TaskState.QUEUED,
       TaskState.DOWNLOADING -> DownloadState.Queued
 
-      TaskState.PAUSED -> DownloadState.Paused(
-        DownloadProgress(
-          record.segments?.sumOf { it.downloadedBytes } ?: 0L,
-          record.totalBytes,
-        ),
-      )
+      TaskState.PAUSED -> DownloadState.Paused(record.savedProgress())
 
       TaskState.COMPLETED -> DownloadState.Completed(
         outputPath = record.outputPath ?: "",
         totalBytes = record.totalBytes.takeIf { it >= 0 },
         downloadTime = record.downloadTime,
+        completedAt = record.completedAt,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -454,7 +455,15 @@ class Ketch(
     is DownloadState.Failed -> "Failed(${error.describeCauses()})"
     is DownloadState.Completed ->
       "Completed($outputPath, totalBytes=$totalBytes, downloadTime=$downloadTime)"
+    is DownloadState.Paused -> "Paused(${reason.logName()})"
     else -> this::class.simpleName ?: toString()
+  }
+
+  private fun PauseReason.logName(): String = when (this) {
+    PauseReason.User -> "user"
+    is PauseReason.Preempted -> "preempted by taskId=$byTaskId"
+    PauseReason.WaitingForCondition -> "waiting for conditions"
+    PauseReason.Shutdown -> "shutdown"
   }
 
   /**

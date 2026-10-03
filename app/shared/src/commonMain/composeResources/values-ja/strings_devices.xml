@@ -151,6 +151,14 @@
   <string name="connect_nearby_failed_hint">%1$s。代わりにペアリングリンクを貼り付けてください。</string>
   <string name="connect_none_found">デバイスが見つかりません。もう一方のデバイスで「設定 › 共有」を開き、「別のデバイスを許可」をオンにしてください。</string>
   <string name="connect_asks_for_code">%1$s · コードが必要</string>
+  <string name="connect_asks_for_approval">%1$s · 許可が必要</string>
+  <string name="connect_approval_waiting">%1$sの応答を待っています…</string>
+  <string name="connect_approval_check">%1$sにこのコードが表示されていることを確認してから、このデバイスを許可してください。</string>
+  <string name="connect_approval_enter_code">代わりにアクセスコードを入力</string>
+  <string name="connect_approval_denied">%1$sでこのデバイスは許可されませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_expired">%1$sで応答がありませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_busy">%1$sではこのデバイスからの別のリクエストをまだ確認中です。少し待ってからもう一度依頼するか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_ask_again">もう一度依頼</string>
   <string name="connect_added_badge">追加済み</string>
   <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>
   <string name="connect_show_pairing_code">ペアリングコードを表示</string>
@@ -170,6 +178,11 @@
   <string name="connect_pairing_known">%1$sはすでに追加されています。接続すると、そのデバイスを表示します。</string>
   <string name="connect_pairing_known_code">%1$sはすでに追加されています。接続すると、そのデバイスを表示し、このリンクのコードを設定します。</string>
   <string name="connect_pairing_has_code">このリンクにはアクセスコードが含まれています。</string>
+  <string name="pairing_request_title">%1$sに%2$sの操作を許可しますか？</string>
+  <string name="pairing_request_check">%1$sにこのコードが表示されている場合のみ許可してください：</string>
+  <string name="pairing_request_note">許可すると、ここでダウンロードの追加、一時停止、削除ができるようになります。後で取り消すには、「設定 › 共有」で「新しいコード」を選んでください。</string>
+  <string name="pairing_request_allow">許可</string>
+  <string name="pairing_request_deny">許可しない</string>
 
   <string name="device_pick_torrents">トレントファイルを開く</string>
   <string name="device_pick_folder">ダウンロードフォルダを選択</string>

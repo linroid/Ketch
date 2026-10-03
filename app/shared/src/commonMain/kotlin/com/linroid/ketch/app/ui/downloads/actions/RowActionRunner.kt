@@ -35,6 +35,7 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.taskActions
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.CopiedText
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -45,6 +46,7 @@ import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.downloads_batch_connections
+import ketch.app.shared.generated.resources.downloads_batch_connections_auto
 import ketch.app.shared.generated.resources.downloads_batch_failed
 import ketch.app.shared.generated.resources.downloads_batch_limited
 import ketch.app.shared.generated.resources.downloads_batch_paused
@@ -284,11 +286,18 @@ internal class RowActionRunner(
     }) { setPriority(priority) }
   }
 
-  /** Lets each of [rows] open [connections] connections, or peers for a torrent. */
+  /**
+   * Lets each of [rows] open [connections] connections, or peers for a torrent; 0 gives each
+   * its device's default (Auto).
+   */
   fun setConnections(rows: List<TaskRow>, connections: Int): Job {
     rows.singleOrNull()?.let { return commands.setConnections(it, connections) }
     return launchBatch(rows, TaskCommand.Connections, { n ->
-      Res.plurals.downloads_batch_connections.text(n, n, connections)
+      if (connections == 0) {
+        Res.plurals.downloads_batch_connections_auto.text(n)
+      } else {
+        Res.plurals.downloads_batch_connections.text(n, n, connections)
+      }
     }) { setConnections(connections) }
   }
 
@@ -595,7 +604,9 @@ internal fun skipNote(command: TaskCommand, skipped: List<TaskRow>): UiText? {
     when (row.state) {
       is DownloadState.Completed -> Res.plurals.downloads_skipped_finished
       is DownloadState.Downloading, DownloadState.Queued -> Res.plurals.downloads_skipped_running
-      is DownloadState.Paused -> if (command == TaskCommand.Pause) {
+      is DownloadState.Paused -> if (row.state.waitsInQueue) {
+        Res.plurals.downloads_skipped_running
+      } else if (command == TaskCommand.Pause) {
         Res.plurals.downloads_skipped_already_paused
       } else {
         Res.plurals.downloads_skipped_paused

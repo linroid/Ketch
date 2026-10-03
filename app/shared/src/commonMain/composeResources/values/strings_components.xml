@@ -69,6 +69,8 @@
   <!-- A connection count left to the app. %1$d is the count it uses, such as 4. -->
   <string name="component_stepper_auto">Auto</string>
   <string name="component_stepper_auto_count">Auto (%1$d)</string>
+  <!-- The Auto button after the stepper, for screen readers: it returns to the default count. -->
+  <string name="component_stepper_use_auto">Use the device's default</string>
   <!-- The − and + of the connections stepper, for screen readers. -->
   <string name="component_stepper_fewer_connections">Fewer connections</string>
   <string name="component_stepper_more_connections">More connections</string>

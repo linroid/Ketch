@@ -34,6 +34,11 @@ import kotlinx.serialization.Serializable
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
+ *
+ * ### Pairing (without the access token)
+ * - `POST   /api/pairing`      — ask the server's owner for its access token
+ * - `GET    /api/pairing/{id}` — whether the owner answered
+ * - `DELETE /api/pairing/{id}` — withdraw the request
  */
 @Serializable
 @Resource("/api")
@@ -109,6 +114,19 @@ class Api {
     @Resource("{id}")
     data class ById(
       val parent: Events = Events(),
+      val id: String,
+    )
+  }
+
+  /** Pairing requests, which servers that can ask their owner take without the token. */
+  @Serializable
+  @Resource("pairing")
+  data class Pairing(val parent: Api = Api()) {
+
+    @Serializable
+    @Resource("{id}")
+    data class ById(
+      val parent: Pairing = Pairing(),
       val id: String,
     )
   }

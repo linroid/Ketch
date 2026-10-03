@@ -27,13 +27,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   Used by HTTP sources for custom headers; other sources may ignore.
  * @property preResolved pre-resolved URL metadata, allowing the
  *   download source to skip its own probe/HEAD request
- * @property maxConnections observable override for the number of
- *   concurrent segment connections. When positive, takes precedence
- *   over [DownloadRequest.connections]. Emitting a new value triggers
- *   live resegmentation in sources that support it. Reduced
- *   automatically on HTTP 429 (Too Many Requests) responses.
- *   Sources that do not split files into byte ranges may interpret it
- *   differently; BitTorrent uses it as the peer connection limit.
+ * @property maxConnections the task's requested connection count for this run, 0 for Auto.
+ *   Starts at [DownloadRequest.connections];
+ *   [com.linroid.ketch.api.DownloadTask.setConnections] and HTTP 429
+ *   handling change it while the task runs, which triggers live resegmentation in sources that
+ *   support it. BitTorrent uses it as the peer connection limit, 0 meaning its own default.
  * @property pendingResegment target connection count for a pending
  *   resegmentation. Set by the connection-change watcher before
  *   canceling the download batch scope. Read by sources to
@@ -60,7 +58,8 @@ class DownloadContext(
   val throttle: suspend (bytes: Int) -> Unit,
   val headers: Map<String, String>,
   val preResolved: ResolvedSource? = null,
-  val maxConnections: MutableStateFlow<Int> = MutableStateFlow(0),
+  val maxConnections: MutableStateFlow<Int> =
+    MutableStateFlow(request.connections.coerceAtLeast(0)),
   var pendingResegment: Int = 0,
   /** Final destination resolved by Ketch, including default directory and deduplication. */
   val outputPath: String? = null,
@@ -69,15 +68,13 @@ class DownloadContext(
   val config: DownloadConfig = DownloadConfig.Default,
 ) {
   /**
-   * Number of connections a segmented source should use now: a positive
-   * [maxConnections] override wins, then a positive
-   * [DownloadRequest.connections], then [DownloadConfig.maxConnectionsPerDownload]
-   * from [config]. Sources must still use a single connection when the
-   * server cannot transfer from arbitrary byte offsets.
+   * Number of connections a segmented source should use now: [maxConnections] when positive,
+   * otherwise (Auto) [DownloadConfig.maxConnectionsPerDownload] from [config]. Sources must
+   * still use a single connection when the server cannot transfer from arbitrary byte offsets.
    */
-  fun effectiveConnections(): Int = when {
-    maxConnections.value > 0 -> maxConnections.value
-    request.connections > 0 -> request.connections
-    else -> config.maxConnectionsPerDownload
-  }
+  fun effectiveConnections(): Int = effectiveConnections(maxConnections.value)
+
+  /** What [effectiveConnections] would be with [requested] connections; 0 means Auto. */
+  fun effectiveConnections(requested: Int): Int =
+    if (requested > 0) requested else config.maxConnectionsPerDownload
 }

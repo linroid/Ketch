@@ -47,6 +47,7 @@ import ketch.app.shared.generated.resources.component_stepper_more_peers
 import ketch.app.shared.generated.resources.component_stepper_peers
 import ketch.app.shared.generated.resources.component_stepper_peers_auto
 import ketch.app.shared.generated.resources.component_stepper_peers_auto_count
+import ketch.app.shared.generated.resources.component_stepper_use_auto
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration.Companion.milliseconds
@@ -135,6 +136,8 @@ enum class StepperCount(
  * @param counts what is counted, which names the value and the buttons for screen readers.
  * @param disabledReason why it is disabled, shown as its tooltip, such as "This server allows
  *   1 connection".
+ * @param allowAuto whether the task's device takes 0 (Auto); an Auto button then follows the
+ *   stepper while the value is not Auto.
  */
 @Composable
 fun ConnectionStepper(
@@ -148,6 +151,7 @@ fun ConnectionStepper(
   pending: Boolean = false,
   counts: StepperCount = StepperCount.Connections,
   disabledReason: String? = null,
+  allowAuto: Boolean = false,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -197,6 +201,21 @@ fun ConnectionStepper(
         enabled = enabled && (shown == 0 || effective < range.last),
         onClick = { press(1) },
       )
+      if (allowAuto && shown != 0) {
+        val useAuto = Res.string.component_stepper_use_auto.text().resolve()
+        KetchButton(
+          text = Res.string.component_stepper_auto.text().resolve(),
+          onClick = {
+            requested = 0
+            debounce.update(0)
+          },
+          modifier = Modifier.semantics { contentDescription = useAuto },
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+          enabled = enabled,
+          tooltip = useAuto,
+        )
+      }
       if (pending) KetchSpinner()
     }
   }

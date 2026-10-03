@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.waitsInQueue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
@@ -145,7 +146,7 @@ class ActivityMonitor(
         }
         isBaseline || task.createdAt < startedAt -> {
           preexisting = true
-          if (state is DownloadState.Queued || state is DownloadState.Downloading) recovered++
+          if (state.waitsInQueue || state is DownloadState.Downloading) recovered++
         }
         else -> events += ActivityEvent.Added(key, task.request)
       }
@@ -169,7 +170,7 @@ class ActivityMonitor(
       tracker.held += completion
     }
     val busy = tasks.any {
-      it.state is DownloadState.Queued || it.state is DownloadState.Downloading
+      it.state.waitsInQueue || it.state is DownloadState.Downloading
     }
     when {
       !busy -> {

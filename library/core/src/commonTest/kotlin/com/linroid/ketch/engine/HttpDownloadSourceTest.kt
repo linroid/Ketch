@@ -31,6 +31,25 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun download_connectionChangeWhilePreparing_isApplied() = runTest {
+    val engine = FakeHttpEngine()
+    val connections = MutableStateFlow(4)
+    // The change lands after the segments are sized and before the first batch starts.
+    val accessor = object : FileAccessor by NoOpFileAccessor {
+      override suspend fun preallocate(size: Long) {
+        connections.value = 6
+      }
+    }
+    val context = context(connections = connections, fileAccessor = accessor)
+
+    HttpDownloadSource(engine).download(context)
+
+    assertEquals(6, engine.downloadCallCount)
+    assertEquals(6, context.segments.value.size)
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
   fun download_noRangeSupport_ignoresLiveConnectionChange() = runTest {
     val engine = FakeHttpEngine(serverInfo = NO_RANGES)
     val connections = MutableStateFlow(0)
@@ -69,7 +88,7 @@ class HttpDownloadSourceTest {
     val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE)
     val file = MemoryFile()
     val progress = mutableListOf<Pair<Long, Long>>()
-    val context = context(file = file, onProgress = { downloaded, total ->
+    val context = context(fileAccessor = file, onProgress = { downloaded, total ->
       progress += downloaded to total
     })
 
@@ -85,7 +104,7 @@ class HttpDownloadSourceTest {
   fun download_unknownSizeRetry_restartsInEmptiedFile() = runTest {
     val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE, failAfterBytes = 300)
     val file = MemoryFile()
-    val context = context(file = file)
+    val context = context(fileAccessor = file)
     val source = HttpDownloadSource(engine)
     assertFailsWith<KetchError.Network> { source.download(context) }
 
@@ -105,7 +124,7 @@ class HttpDownloadSourceTest {
       etag = "\"old\"", lastModified = null, totalBytes = -1,
     )
 
-    HttpDownloadSource(engine).resume(context(file = file), state)
+    HttpDownloadSource(engine).resume(context(fileAccessor = file), state)
 
     assertContentEquals(engine.content, file.bytes)
     assertEquals(0, engine.headCallCount)
@@ -126,13 +145,13 @@ class HttpDownloadSourceTest {
     config: DownloadConfig = DownloadConfig.Default,
     connections: MutableStateFlow<Int> = MutableStateFlow(0),
     throttle: suspend (Int) -> Unit = {},
-    file: FileAccessor = NoOpFileAccessor,
+    fileAccessor: FileAccessor = NoOpFileAccessor,
     onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ): DownloadContext = DownloadContext(
     taskId = "http-source",
     url = "https://example.com/file",
     request = DownloadRequest("https://example.com/file"),
-    fileAccessor = file,
+    fileAccessor = fileAccessor,
     segments = MutableStateFlow(emptyList()),
     onProgress = onProgress,
     throttle = throttle,

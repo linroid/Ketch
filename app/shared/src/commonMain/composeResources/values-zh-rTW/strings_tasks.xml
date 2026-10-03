@@ -38,6 +38,8 @@
   <string name="row_starts_in">%1$s後</string>
   <string name="row_starts_after">%1$s後開始</string>
   <string name="row_waiting_for_conditions">等待條件符合</string>
+  <string name="row_paused_preempted">因緊急下載而暫停 · 會自動繼續</string>
+  <string name="row_paused_shutdown">Ketch 關閉時已暫停 · 重新啟動後會繼續</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">平均 %1$s</string>
@@ -49,6 +51,7 @@
   <string name="sort_speed">速度</string>
   <string name="sort_time_left">剩餘時間</string>
   <string name="sort_added">新增時間</string>
+  <string name="sort_finished">完成時間</string>
   <string name="sort_status">狀態</string>
   <string name="sort_connections">連線數</string>
   <string name="sort_source">來源</string>
@@ -71,6 +74,10 @@
   <string name="group_title_yesterday">昨天新增</string>
   <string name="group_title_week">本週新增</string>
   <string name="group_title_earlier">更早新增</string>
+  <string name="group_title_finished_today">今天完成</string>
+  <string name="group_title_finished_yesterday">昨天完成</string>
+  <string name="group_title_finished_week">本週完成</string>
+  <string name="group_title_finished_earlier">更早完成</string>
   <string name="group_all_done_at">約 %1$s 全部完成</string>
   <string name="group_in_start_order">依開始順序</string>
 
@@ -91,6 +98,11 @@
   <string name="queue_waiting_slot">等待空位（已使用 %1$d / %2$d）</string>
   <string name="queue_waiting_host">等待 %1$s（每個網站 %2$d 個）</string>
   <string name="queue_waiting_start">等待開始</string>
+  <string name="queue_position_next">下一個</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="other">前面還有 %1$d 個</item>
+  </plurals>
+  <string name="queue_starting">即將開始</string>
 
   <string name="action_row_pause">暫停</string>
   <string name="action_row_resume">繼續</string>

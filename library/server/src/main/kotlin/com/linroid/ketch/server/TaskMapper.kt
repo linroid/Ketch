@@ -12,6 +12,7 @@ internal object TaskMapper {
       state = task.state.value,
       segments = task.segments.value,
       createdAt = task.createdAt,
+      queuePosition = task.queuePosition.value,
     )
   }
 }

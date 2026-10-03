@@ -1,16 +1,22 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.endpoints.model.ConnectionsRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
+import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -23,9 +29,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DownloadRoutesTest {
@@ -560,5 +568,114 @@ class DownloadRoutesTest {
     assertEquals(
       "custom.zip", task.request.destination?.value
     )
+  }
+
+  @Test
+  fun putConnections_zero_setsAuto() = testApplication {
+    val ketch = createKetch()
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val created = createTask(client, connections = 4)
+
+    val response = client.put("/api/tasks/${created.taskId}/connections") {
+      contentType(ContentType.Application.Json)
+      setBody(ConnectionsRequest(connections = 0))
+    }
+    assertEquals(HttpStatusCode.OK, response.status)
+    val updated = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(0, updated.request.connections)
+    assertEquals(0, ketch.tasks.value.single().request.connections)
+  }
+
+  @Test
+  fun putConnections_negative_rejected() = testApplication {
+    val ketch = createKetch()
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val created = createTask(client, connections = 4)
+
+    val response = client.put("/api/tasks/${created.taskId}/connections") {
+      contentType(ContentType.Application.Json)
+      setBody(ConnectionsRequest(connections = -1))
+    }
+    assertEquals(HttpStatusCode.BadRequest, response.status)
+    val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    assertEquals("invalid_connections", error.error)
+    assertEquals(4, ketch.tasks.value.single().request.connections)
+  }
+
+  @Test
+  fun getTask_queuedBehindAnother_includesQueuePosition() = testApplication {
+    // The first download holds the only slot: its HEAD request never answers.
+    val ketch = Ketch(
+      httpEngine = HangingHttpEngine(),
+      config = DownloadConfig(maxConcurrentDownloads = 1),
+    )
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    try {
+      val running = createTask(client, url = "https://example.com/first.zip")
+      val waiting = createTask(client, url = "https://example.com/second.zip")
+
+      val runningSnapshot = json.decodeFromString<TaskSnapshot>(
+        client.get("/api/tasks/${running.taskId}").bodyAsText(),
+      )
+      assertNull(runningSnapshot.queuePosition)
+      val response = client.get("/api/tasks/${waiting.taskId}")
+      assertEquals(HttpStatusCode.OK, response.status)
+      val snapshot = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(DownloadState.Queued, snapshot.state)
+      assertEquals(1, snapshot.queuePosition)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  private suspend fun createTask(
+    client: HttpClient,
+    url: String = "https://example.com/file.zip",
+    connections: Int = 0,
+  ): TaskSnapshot {
+    val response = client.post("/api/tasks") {
+      contentType(ContentType.Application.Json)
+      setBody(
+        DownloadRequest(
+          url = url,
+          destination = Destination("/tmp/"),
+          connections = connections,
+        ),
+      )
+    }
+    assertEquals(HttpStatusCode.Created, response.status)
+    return json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+  }
+
+  private class HangingHttpEngine : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      awaitCancellation()
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ): Unit = awaitCancellation()
+
+    override fun close() {}
   }
 }

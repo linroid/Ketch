@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
  * @property uptime seconds since the instance started
  * @property config current download configuration (with runtime speed limit)
  * @property system host system and storage information
+ * @property features optional API behaviors this instance supports, from [KetchFeatures];
+ *   empty for older instances and servers, which support none of them
  */
 @Serializable
 data class KetchStatus(
@@ -21,6 +23,7 @@ data class KetchStatus(
   val uptime: Long,
   val config: DownloadConfig,
   val system: SystemInfo,
+  val features: Set<String> = emptySet(),
 )
 
 /**

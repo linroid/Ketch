@@ -214,6 +214,19 @@
   <string name="connect_none_found">No devices found. On the other device, open Settings › Sharing and allow another device.</string>
   <!-- Under a device found on the network. %1$s is its address, such as "192.168.1.7:8642". -->
   <string name="connect_asks_for_code">%1$s · asks for a code</string>
+  <!-- Under a device found on the network whose owner can allow this one instead of giving its
+       code. %1$s is its address, such as "192.168.1.7:8642". -->
+  <string name="connect_asks_for_approval">%1$s · asks for approval</string>
+  <!-- While the owner of a device found on the network decides whether to let this one in.
+       %1$s is that device's name. The code shows under connect_approval_check. -->
+  <string name="connect_approval_waiting">Waiting for %1$s…</string>
+  <string name="connect_approval_check">On %1$s, check that it shows this code, then allow this device.</string>
+  <string name="connect_approval_enter_code">Enter its access code instead</string>
+  <!-- %1$s is the name of the device that was asked. -->
+  <string name="connect_approval_denied">%1$s didn't allow this device. Ask again, or enter its access code.</string>
+  <string name="connect_approval_expired">No one answered on %1$s. Ask again, or enter its access code.</string>
+  <string name="connect_approval_busy">%1$s is still deciding about another request from this device. Ask again in a moment, or enter its access code.</string>
+  <string name="connect_approval_ask_again">Ask again</string>
   <!-- At the end of a device found on the network that is added already. -->
   <string name="connect_added_badge">Added</string>
   <!-- %1$s names this device inside a sentence, such as "this Mac". -->
@@ -241,6 +254,16 @@
   <string name="connect_pairing_known">You've added %1$s already. Connecting shows it.</string>
   <string name="connect_pairing_known_code">You've added %1$s already. Connecting shows it and gives it this link's code.</string>
   <string name="connect_pairing_has_code">The link includes its access code.</string>
+
+  <!-- Asked on this device, while it is shared, when another device found it on the network and
+       wants its access code. %1$s is that device's name, such as "Pixel 9"; %2$s names this
+       device inside a sentence, such as "this Mac". -->
+  <string name="pairing_request_title">Allow %1$s to control %2$s?</string>
+  <!-- %1$s is the other device's name; four digits show under it. -->
+  <string name="pairing_request_check">Allow it only if %1$s shows this code:</string>
+  <string name="pairing_request_note">It can then add, pause and remove downloads here. To turn it away later, choose New code in Settings › Sharing.</string>
+  <string name="pairing_request_allow">Allow</string>
+  <string name="pairing_request_deny">Don't allow</string>
 
   <!-- The desktop's file dialogs. -->
   <string name="device_pick_torrents">Open torrent files</string>

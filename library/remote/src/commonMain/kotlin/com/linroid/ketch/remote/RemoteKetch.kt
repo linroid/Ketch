@@ -348,7 +348,7 @@ class RemoteKetch internal constructor(
       is TaskEvent.StateChanged -> {
         taskMutex.withLock {
           val task = taskMap[event.taskId] ?: return
-          task.updateState(event.state, event.request, event.segments)
+          task.applyEvent(event.state, event.request, event.segments, event.queuePosition)
           taskRevision++
         }
       }
@@ -356,7 +356,8 @@ class RemoteKetch internal constructor(
       is TaskEvent.Progress -> {
         taskMutex.withLock {
           val task = taskMap[event.taskId] ?: return
-          task.updateState(event.state, event.request, event.segments)
+          // A downloading task no longer waits in the queue.
+          task.applyEvent(event.state, event.request, event.segments, queuePosition = null)
           taskRevision++
         }
       }
@@ -374,10 +375,12 @@ class RemoteKetch internal constructor(
       createdAt = wire.createdAt,
       initialState = wire.state,
       initialSegments = wire.segments,
+      initialQueuePosition = wire.queuePosition,
       httpClient = httpClient,
       onRemoved = { id ->
         taskMutex.withLock { removeTask(id) }
       },
+      updateLock = taskMutex,
     )
   }
 
@@ -388,7 +391,12 @@ class RemoteKetch internal constructor(
     // Preserve the instance already returned to callers so its StateFlows keep receiving SSE.
     val current = taskMap[task.taskId]
     if (current != null) {
-      current.updateState(task.state.value, task.request, task.segments.value)
+      current.updateState(
+        task.state.value,
+        task.request,
+        task.segments.value,
+        task.queuePosition.value,
+      )
     } else {
       taskMap[task.taskId] = task
     }

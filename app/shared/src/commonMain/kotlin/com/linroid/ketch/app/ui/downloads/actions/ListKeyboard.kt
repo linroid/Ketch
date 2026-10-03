@@ -32,6 +32,7 @@ import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration.Companion.milliseconds
@@ -112,7 +113,9 @@ internal fun keyAction(command: KetchCommand, row: TaskRow, menu: List<RowAction
   return when (command) {
     KetchCommands.TogglePause -> when (row.state) {
       is DownloadState.Downloading, DownloadState.Queued -> offered(RowAction.Pause)
-      is DownloadState.Paused -> offered(RowAction.Resume)
+      // Paused for an urgent download, it still waits, so Space takes it out of the queue.
+      is DownloadState.Paused ->
+        offered(if (row.state.waitsInQueue) RowAction.Pause else RowAction.Resume)
       is DownloadState.Failed, DownloadState.Canceled -> restart
       else -> null
     }
@@ -123,7 +126,7 @@ internal fun keyAction(command: KetchCommand, row: TaskRow, menu: List<RowAction
     KetchCommands.CopyLink -> offered(RowAction.CopyLink)
     KetchCommands.CopyPath -> offered(RowAction.CopyPath)
     KetchCommands.Retry -> when (row.state) {
-      is DownloadState.Paused -> offered(RowAction.Resume)
+      is DownloadState.Paused -> if (row.state.waitsInQueue) null else offered(RowAction.Resume)
       is DownloadState.Failed, DownloadState.Canceled -> restart
       else -> null
     }

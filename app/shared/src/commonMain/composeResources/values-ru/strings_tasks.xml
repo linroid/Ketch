@@ -44,6 +44,8 @@
   <string name="row_starts_in">через %1$s</string>
   <string name="row_starts_after">Начнётся через %1$s</string>
   <string name="row_waiting_for_conditions">Ожидание условий</string>
+  <string name="row_paused_preempted">Приостановлена из-за срочной загрузки · возобновится автоматически</string>
+  <string name="row_paused_shutdown">Приостановлена при закрытии Ketch · возобновится при его запуске</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">сред. %1$s</string>
@@ -55,6 +57,7 @@
   <string name="sort_speed">Скорость</string>
   <string name="sort_time_left">Осталось</string>
   <string name="sort_added">Добавлено</string>
+  <string name="sort_finished">Завершено</string>
   <string name="sort_status">Статус</string>
   <string name="sort_connections">Подключения</string>
   <string name="sort_source">Источник</string>
@@ -77,6 +80,10 @@
   <string name="group_title_yesterday">Добавлены вчера</string>
   <string name="group_title_week">Добавлены на этой неделе</string>
   <string name="group_title_earlier">Добавлены ранее</string>
+  <string name="group_title_finished_today">Завершены сегодня</string>
+  <string name="group_title_finished_yesterday">Завершены вчера</string>
+  <string name="group_title_finished_week">Завершены на этой неделе</string>
+  <string name="group_title_finished_earlier">Завершены ранее</string>
   <string name="group_all_done_at">всё будет готово ≈ %1$s</string>
   <string name="group_in_start_order">в порядке запуска</string>
 
@@ -97,6 +104,14 @@
   <string name="queue_waiting_slot">Ожидает свободного слота (занято %1$d из %2$d)</string>
   <string name="queue_waiting_host">Ожидает %1$s (до %2$d на сайт)</string>
   <string name="queue_waiting_start">Ожидает запуска</string>
+  <string name="queue_position_next">следующая</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="one">впереди %1$d</item>
+    <item quantity="few">впереди %1$d</item>
+    <item quantity="many">впереди %1$d</item>
+    <item quantity="other">впереди %1$d</item>
+  </plurals>
+  <string name="queue_starting">Запускается</string>
 
   <string name="action_row_pause">Приостановить</string>
   <string name="action_row_resume">Возобновить</string>

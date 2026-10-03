@@ -5,6 +5,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
+import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
@@ -87,6 +88,20 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
+ * ### Pairing
+ * - `POST   /api/pairing`      — ask the owner for the access token
+ * - `GET    /api/pairing/{id}` — whether the owner answered, with the token once allowed
+ * - `DELETE /api/pairing/{id}` — withdraw the request
+ *
+ * ## Pairing
+ *
+ * With an [apiToken] and a [pairingApprover], a device can ask for the token instead of having
+ * someone type it: the pairing endpoints take no token, [pairingApprover] decides, and the
+ * device polls until it has the answer or the request expires after two minutes. One request
+ * per address, and four in all, wait at a time. Web pages are refused, since with a token
+ * [corsAllowedHosts] may let them call the API. The server advertises `pairing=1` over mDNS
+ * when it takes requests.
+ *
  * ## Host check
  *
  * Without an [apiToken], the server answers `403 Forbidden` with an `ErrorResponse` to any
@@ -141,6 +156,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *   [apiToken], for example a DNS name or a Docker host's address
  * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
+ * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
+ *   [apiToken]
  */
 class KetchServer(
   private val ketch: KetchApi,
@@ -152,9 +169,15 @@ class KetchServer(
   private val allowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
+  pairingApprover: PairingApprover? = null,
 ) {
   private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+  private val pairing = if (apiToken.isNullOrBlank() || pairingApprover == null) {
+    null
+  } else {
+    PairingSessions(pairingApprover, apiToken, scope)
+  }
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -209,19 +232,23 @@ class KetchServer(
       val tokenValue =
         if (apiToken.isNullOrBlank()) "none"
         else "required"
+      val metadata = buildMap {
+        put("token", tokenValue)
+        if (pairing != null) put("pairing", "1")
+      }
       log.d {
         "Registering mDNS service:" +
           " name=$name," +
           " type=${MDNS_SERVICE_TYPE}," +
           " port=${port}," +
-          " token=$tokenValue"
+          " metadata=$metadata"
       }
       try {
         mdnsRegistrar.register(
           serviceType = MDNS_SERVICE_TYPE,
           serviceName = name,
           port = port,
-          metadata = mapOf("token" to tokenValue),
+          metadata = metadata,
         )
         log.i { "mDNS registered: $name (${MDNS_SERVICE_TYPE})" }
         awaitCancellation()
@@ -326,6 +353,7 @@ class KetchServer(
       } else {
         apiRoutes(ketch)
       }
+      pairing?.let { pairingRoutes(it) }
       webResources()
     }
   }

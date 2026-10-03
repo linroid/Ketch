@@ -2,16 +2,22 @@ package com.linroid.ketch.app.ui.connect
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
+import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.endpoints.model.PairingRequest
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.PairingResult
 import com.linroid.ketch.remote.RemoteKetch
+import com.linroid.ketch.remote.RemotePairing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -63,6 +69,18 @@ internal object RemoteProbe : ConnectionProbe {
   private const val NO_ANSWER = "No answer"
 }
 
+/** Asks the owner of a device for its access code, instead of having someone type it. */
+internal fun interface PairingClient {
+  /** Sends [request] to the device [link] names and waits for its owner's answer. */
+  suspend fun request(link: PairingLink, request: PairingRequest): PairingResult
+}
+
+/** A [PairingClient] that asks over the network with a [RemotePairing] of its own. */
+internal object RemotePairingClient : PairingClient {
+  override suspend fun request(link: PairingLink, request: PairingRequest): PairingResult =
+    RemotePairing(link.host, link.port, link.secure).use { it.request(request) }
+}
+
 /** What [DeviceConnector.connect] did. */
 internal sealed interface ConnectOutcome {
   /** The device is added, or was already, and has the code it was given. */
@@ -88,8 +106,30 @@ internal class DeviceConnector(
   private val manager: InstanceManager,
   private val switchTo: (InstanceEntry) -> Unit,
   private val probe: ConnectionProbe = RemoteProbe,
+  private val pairing: PairingClient = RemotePairingClient,
 ) {
   private val log = KetchLogger("DeviceConnector")
+
+  /**
+   * Asks the owner of the device [link] names to let this one in, and waits for the answer.
+   * The request names this device as its embedded instance is named, with the system it runs.
+   *
+   * @param code four digits this device shows, which the owner sees too.
+   */
+  suspend fun pair(link: PairingLink, code: String): PairingResult {
+    val local = manager.instances.value.firstOrNull { it is EmbeddedInstance }
+    val os = try {
+      manager.embedded?.status()?.system?.os?.trim()?.ifEmpty { null }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.d { "Couldn't read this device's system: ${e.describeCauses()}" }
+      null
+    }
+    val name = local?.label?.trim()?.ifEmpty { null } ?: localDeviceNoun().load()
+    log.i { "Asking ${link.address} to pair" }
+    return pairing.request(link, PairingRequest(name = name, code = code, os = os))
+  }
 
   /**
    * Connects to [link]. A device added before is tried with the code it has unless [link]

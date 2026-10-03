@@ -96,14 +96,42 @@ class RealDownloadTaskTest {
   }
 
   @Test
-  fun setConnections_zero_throwsWithoutPersisting() = runTest {
+  fun setConnections_negative_throwsWithoutPersisting() = runTest {
     val store = InMemoryTaskStore()
     val task = pausedTask(store, UnusedController)
 
-    assertFailsWith<IllegalArgumentException> { task.setConnections(0) }
+    assertFailsWith<IllegalArgumentException> { task.setConnections(-1) }
 
     assertNull(store.load(task.taskId))
     assertEquals(0, task.request.connections)
+  }
+
+  @Test
+  fun setConnections_zero_persistsAuto() = runTest {
+    val store = InMemoryTaskStore()
+    var applied: Int? = null
+    val request = DownloadRequest(url = "https://example.com/file", connections = 6)
+    val now = Instant.fromEpochMilliseconds(0)
+    val task = RealDownloadTask(
+      taskId = "task",
+      request = request,
+      createdAt = now,
+      initialState = DownloadState.Paused(DownloadProgress(0, 100)),
+      initialSegments = emptyList(),
+      controller = object : TaskController by UnusedController {
+        override suspend fun setConnections(taskId: String, connections: Int) {
+          applied = connections
+        }
+      },
+      taskStore = store,
+      record = TaskRecord(taskId = "task", request = request, createdAt = now, updatedAt = now),
+    )
+
+    task.setConnections(0)
+
+    assertEquals(0, store.load(task.taskId)?.request?.connections)
+    assertEquals(0, task.requestState.value.connections)
+    assertEquals(0, applied)
   }
 
   @Test

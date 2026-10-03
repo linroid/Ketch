@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
@@ -82,6 +83,22 @@ class InspectorModelTest {
   }
 
   @Test
+  fun reason_preempted_showsRowDetail() = runTest {
+    val preempted = row(
+      id = "p",
+      state = DownloadState.Paused(DownloadProgress(40, 100), PauseReason.Preempted("urgent")),
+    )
+
+    val reason = inspectorReason(preempted, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals(
+      "Paused for an urgent download · resumes automatically",
+      reason?.text?.load()
+    )
+    assertNull(reason?.action)
+  }
+
+  @Test
   fun inspectorReason_pausedWithoutResumeSupport_saysItStartsOver() = runTest {
     val source = ResolvedSource("https://example.com/a.bin", "http", 100, false, "a.bin", 1)
     val paused = row(
@@ -155,6 +172,20 @@ class InspectorModelTest {
 
     assertEquals("Today 10:00", addedDetail(today, start, TimeZone.UTC).load())
     assertEquals("Yesterday 18:00", addedDetail(yesterday, start, TimeZone.UTC).load())
+  }
+
+  @Test
+  fun finishedDetail_completedEarlierDay_addsTheTime() = runTest {
+    val today = DownloadState.Completed("/d/t.iso", 10, completedAt = start - 2.hours)
+    val yesterday = DownloadState.Completed("/d/y.iso", 10, completedAt = start - 18.hours)
+    val unknown = DownloadState.Completed("/d/u.iso", 10)
+
+    assertEquals("Today 10:00", finishedDetail(row("t", today), start, TimeZone.UTC)?.load())
+    assertEquals(
+      "Yesterday 18:00",
+      finishedDetail(row("y", yesterday), start, TimeZone.UTC)?.load()
+    )
+    assertNull(finishedDetail(row("u", unknown), start, TimeZone.UTC))
   }
 
   @Test

@@ -151,6 +151,14 @@
   <string name="connect_nearby_failed_hint">%1$s。请改为粘贴配对链接。</string>
   <string name="connect_none_found">未找到设备。请在另一台设备上打开“设置 › 共享”，然后点按“允许其他设备”。</string>
   <string name="connect_asks_for_code">%1$s · 需要访问码</string>
+  <string name="connect_asks_for_approval">%1$s · 需要批准</string>
+  <string name="connect_approval_waiting">正在等待 %1$s…</string>
+  <string name="connect_approval_check">请在 %1$s 上确认显示的是这个代码，然后允许此设备。</string>
+  <string name="connect_approval_enter_code">改为输入访问码</string>
+  <string name="connect_approval_denied">%1$s 未允许此设备。请再次请求，或输入其访问码。</string>
+  <string name="connect_approval_expired">%1$s 上无人响应。请再次请求，或输入其访问码。</string>
+  <string name="connect_approval_busy">%1$s 仍在处理此设备的另一个请求。请稍后再次请求，或输入其访问码。</string>
+  <string name="connect_approval_ask_again">再次请求</string>
   <string name="connect_added_badge">已添加</string>
   <string name="connect_share_instead">想从其他设备控制%1$s？</string>
   <string name="connect_show_pairing_code">显示配对码</string>
@@ -170,6 +178,11 @@
   <string name="connect_pairing_known">你已添加过 %1$s。连接后会显示它。</string>
   <string name="connect_pairing_known_code">你已添加过 %1$s。连接后会显示它，并为它使用此链接中的访问码。</string>
   <string name="connect_pairing_has_code">此链接包含访问码。</string>
+  <string name="pairing_request_title">允许 %1$s 控制%2$s？</string>
+  <string name="pairing_request_check">仅当 %1$s 显示此代码时才允许：</string>
+  <string name="pairing_request_note">允许后，它可以在这里添加、暂停和删除下载。之后要撤销，请在“设置 › 共享”中选择“新访问码”。</string>
+  <string name="pairing_request_allow">允许</string>
+  <string name="pairing_request_deny">不允许</string>
 
   <string name="device_pick_torrents">打开种子文件</string>
   <string name="device_pick_folder">选择下载文件夹</string>

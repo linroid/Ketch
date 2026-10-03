@@ -133,6 +133,7 @@
   <string name="inspector_detail_path">Saved to</string>
   <string name="inspector_detail_size">Size</string>
   <string name="inspector_detail_added">Added</string>
+  <string name="inspector_detail_finished">Finished</string>
   <string name="inspector_detail_time">Time spent</string>
   <string name="inspector_detail_average">Avg speed</string>
   <string name="inspector_detail_connections">Connections</string>
@@ -152,6 +153,7 @@
   <string name="inspector_copy_failed_path">Couldn't copy the saved to</string>
   <string name="inspector_copy_failed_size">Couldn't copy the size</string>
   <string name="inspector_copy_failed_added">Couldn't copy the added</string>
+  <string name="inspector_copy_failed_finished">Couldn't copy the finish time</string>
   <string name="inspector_copy_failed_time">Couldn't copy the time spent</string>
   <string name="inspector_copy_failed_average">Couldn't copy the avg speed</string>
   <string name="inspector_copy_failed_connections">Couldn't copy the connections</string>

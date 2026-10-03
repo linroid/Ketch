@@ -40,6 +40,7 @@
 
   <string name="component_stepper_auto">自动</string>
   <string name="component_stepper_auto_count">自动（%1$d）</string>
+  <string name="component_stepper_use_auto">使用设备默认值</string>
   <string name="component_stepper_fewer_connections">减少连接数</string>
   <string name="component_stepper_more_connections">增加连接数</string>
   <plurals name="component_stepper_connections">

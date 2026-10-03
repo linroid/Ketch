@@ -119,7 +119,8 @@ DownloadRequest
 [2. Queue]  DownloadQueue orders tasks by priority, then creation time, and starts
   |         them while maxConcurrentDownloads and the per-host limit allow; the
   |         rest stay Queued. URGENT can preempt a lower-priority active download,
-  |         which is paused and requeued.
+  |         which is Paused(Preempted), keeps its place in the queue and resumes
+  |         on its own. Each waiting task reports its queuePosition.
   |
   v
 [3. Resolve]  SourceResolver finds the right DownloadSource for the URL, unless
@@ -158,6 +159,11 @@ DownloadRequest
 
 - **Pause**: Cancels the execution. The source stops its segments and the execution saves
   their final progress to TaskStore. A queued task can be paused too; it leaves the queue.
+  `Paused.reason` says who paused it: `User`, `Preempted` for an URGENT task's victim (still
+  queued; resuming it changes nothing, pausing it makes it a `User` pause) or `Shutdown`.
+- **Close**: `Ketch.close()` pauses every downloading task for `Shutdown` instead of
+  canceling it. Its partial file and `DOWNLOADING` record are kept, so the next `start()`
+  resumes it.
 - **Resume**: A download of unknown size restarts from byte zero without a probe. Otherwise
   probes the server again. An ETag or Last-Modified mismatch fails the task with
   `KetchError.FileChanged`. A server that no longer supports ranges restarts the download from
@@ -173,6 +179,12 @@ DownloadRequest
   guards progress aggregation and queue and coordinator bookkeeping.
 - Structured concurrency ensures cleanup on cancel/pause.
 - `DownloadQueue` enforces the concurrent-download limit and the per-host download limit.
+  Its mutex also guards the queue positions: every queue change republishes them before it
+  releases the lock, so two changes never interleave. Each task's position is a separate flow
+  set one at a time, though, so a reader that does not hold the lock (a task list snapshot, a
+  UI collector, a stream of SSE frames) can briefly see positions from two queue states, such
+  as two tasks at the same position. `RemoteKetch` takes positions from the event stream over
+  a command's response when an event arrived while the command was in flight.
 
 ## Error Classification
 
@@ -225,17 +237,23 @@ resources in `library:endpoints` (`Api`) and shared with the client:
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events
 - **Auth**: Optional bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
-  `config.toml`) required on every API route
+  `config.toml`) required on every API route except pairing
+- **Pairing**: With a token and a `PairingApprover`, a device can ask for the token instead
+  (`POST /api/pairing`, then poll `GET /api/pairing/{id}`): the approver decides, within two
+  minutes, one request per address and four in all. Web pages are refused. The apps' servers
+  pass one that asks their owner; `ketch server` takes no requests
 - **Host check**: Without a token, requests must name this machine in `Host` (loopback, an
   interface IP, the host name or `<host>.local`, or `allowedHosts`), which blocks DNS rebinding
 - **Browsers**: Without a token, requests from web pages on other origins are refused
   (`CrossOriginGuard`); with one, `corsAllowedHosts` lists the origins that get CORS
-- **Discovery**: Advertised on the LAN over mDNS as `_ketch._tcp` unless disabled
+- **Discovery**: Advertised on the LAN over mDNS as `_ketch._tcp` unless disabled, with TXT
+  `token=none|required` and `pairing=1` when it takes pairing requests
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
 
 `RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`
 by calling the REST API and subscribing to SSE events. Auto-reconnects with exponential
-backoff on disconnection, and stops retrying when the server rejects the API token. The
+backoff on disconnection, and stops retrying when the server rejects the API token.
+`RemotePairing` asks a server's owner for the token and waits for the answer. The
 [browser extension](../app/browser-extension/README.md) is another REST client: it sends
 downloads to `POST /api/tasks` and `.torrent` content to `POST /api/resolve/content`.
 
@@ -259,6 +277,9 @@ through `KetchApi`:
 - **Devices are places, not settings.** Every device is listed in the sidebar with its live
   presence, and watched devices stay connected, so switching to one is instant. Users add
   devices with a pairing link or QR code, an address, or from those found on the LAN over mDNS.
+  A found device that asks for a code but takes pairing requests asks its owner instead: both
+  show the same four digits, and the shared device's app asks in a dialog (`PairingRequests`,
+  `PairingApprovalHost`), or from a notification while it is not in front.
 
 ### Architecture
 

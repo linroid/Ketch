@@ -51,6 +51,8 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
 import com.linroid.ketch.app.ui.list.rowDivider
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.bar_copy_links
@@ -411,7 +413,14 @@ private fun KetchMenuScope.verbChoices(
     RowAction.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
     RowAction.Connections -> {
       val peers = verb.rows.all { it.isTorrent }
-      connectionEntries(connectionTargets(verb.rows), runner, peers)
+      val targets = connectionTargets(verb.rows)
+      connectionEntries(
+        rows = targets,
+        runner = runner,
+        peers = peers,
+        auto = if (peers) null else autoConnectionsOf(runner.state, targets),
+        allowAuto = autoConnectionsSupported(runner.state, targets),
+      )
     }
     RowAction.StartLater -> startLaterEntries(verb.rows, runner, context)
     else -> Unit

@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.task
 
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
@@ -17,6 +18,8 @@ import kotlin.time.Instant
  *
  * @property downloadTime time spent downloading over every run of the task; `null` for records
  *   created before it was tracked, which keep it unknown rather than undercount it
+ * @property completedAt when the task completed; set once, `null` before completion and for
+ *   records completed before it was tracked
  */
 @Serializable
 data class TaskRecord(
@@ -32,4 +35,9 @@ data class TaskRecord(
   val downloadTime: Duration? = null,
   val createdAt: Instant,
   val updatedAt: Instant,
+  val completedAt: Instant? = null,
 )
+
+/** Progress saved in this record, as a paused task reports it. */
+internal fun TaskRecord.savedProgress(): DownloadProgress =
+  DownloadProgress(segments?.sumOf { it.downloadedBytes } ?: 0L, totalBytes)

@@ -74,7 +74,8 @@ interface KetchApi {
 
   /**
    * Returns a point-in-time status snapshot including
-   * configuration, system information, and storage details.
+   * configuration, system information, and storage details, and the optional
+   * behaviors the instance supports in [KetchStatus.features].
    */
   suspend fun status(): KetchStatus
 

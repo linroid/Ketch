@@ -54,6 +54,10 @@
   <string name="row_starts_in">in %1$s</string>
   <string name="row_starts_after">Starts after %1$s</string>
   <string name="row_waiting_for_conditions">Waiting for conditions</string>
+  <!-- A paused task's detail when the engine paused it for an urgent download. -->
+  <string name="row_paused_preempted">Paused for an urgent download · resumes automatically</string>
+  <!-- A paused task's detail when its device's Ketch closed while it downloaded. -->
+  <string name="row_paused_shutdown">Paused when Ketch closed · resumes when it starts</string>
 
   <!-- Bytes so far of the total. %1$s and %2$s are sizes, such as "1.0 KB". -->
   <string name="summary_size_of_total">%1$s / %2$s</string>
@@ -68,6 +72,7 @@
   <string name="sort_speed">Speed</string>
   <string name="sort_time_left">Left</string>
   <string name="sort_added">Added</string>
+  <string name="sort_finished">Finished</string>
   <string name="sort_status">Status</string>
   <string name="sort_connections">Connections</string>
   <string name="sort_source">Source</string>
@@ -92,6 +97,10 @@
   <string name="group_title_yesterday">Added yesterday</string>
   <string name="group_title_week">Added this week</string>
   <string name="group_title_earlier">Added earlier</string>
+  <string name="group_title_finished_today">Finished today</string>
+  <string name="group_title_finished_yesterday">Finished yesterday</string>
+  <string name="group_title_finished_week">Finished this week</string>
+  <string name="group_title_finished_earlier">Finished earlier</string>
   <!-- Details after a group's header, joined by " · ". %1$s is a time of day, such as 14:32. -->
   <string name="group_all_done_at">all done ≈ %1$s</string>
   <string name="group_in_start_order">in start order</string>
@@ -117,6 +126,15 @@
   <!-- %1$s is a host name, %2$d how many downloads a site may run at once. -->
   <string name="queue_waiting_host">Waiting for %1$s (%2$d per site)</string>
   <string name="queue_waiting_start">Waiting to start</string>
+  <!-- Follows a queue_waiting_* reason after " · ": the queued task starts next. -->
+  <string name="queue_position_next">next in line</string>
+  <!-- Follows a queue_waiting_* reason after " · ". %1$d is how many queued downloads start first. -->
+  <plurals name="queue_position_ahead">
+    <item quantity="one">%1$d ahead</item>
+    <item quantity="other">%1$d ahead</item>
+  </plurals>
+  <!-- A queued task that has a download slot and is about to download. -->
+  <string name="queue_starting">Starting</string>
 
   <!-- Actions on a task, in menus, buttons and the command palette. -->
   <string name="action_row_pause">Pause</string>

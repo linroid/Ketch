@@ -7,8 +7,12 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.endpoints.model.PairingRequest
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.PairingResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -25,6 +29,23 @@ class ConnectFormTest {
 
   private val pairingLink =
     "ketch://pair?host=192.168.1.20&port=8642&name=Lins-MacBook-Pro#token=secret"
+
+  private val den = DiscoveredServer(
+    "Den-PC", "192.168.1.7", 8642, tokenRequired = true, pairable = true,
+  )
+
+  // Lets in only the code the owner gave through pairing.
+  private fun TestScope.pairingConnector(pairing: PairingClient): DeviceConnector {
+    val manager = InstanceManager(
+      factory = FakeInstanceFactory().factory,
+      context = backgroundScope.coroutineContext,
+    )
+    val probe = ConnectionProbe { config ->
+      val allowed = config.apiToken == "granted"
+      ProbeResult(if (allowed) ConnectionState.Connected else ConnectionState.Unauthorized)
+    }
+    return DeviceConnector(manager, {}, probe, pairing)
+  }
 
   private fun TestScope.connector(answer: ConnectionState): DeviceConnector {
     val manager = InstanceManager(
@@ -263,6 +284,90 @@ class ConnectFormTest {
       (form.problem as ConnectProblem.Failed).message.load(),
     )
     assertFalse(form.connecting)
+  }
+
+  @Test
+  fun pair_whileTheOwnerDecides_showsTheCodeTheRequestCarries() = runTest {
+    val sent = CompletableDeferred<PairingRequest>()
+    val form = ConnectForm()
+
+    form.pair(den, this, pairingConnector { link, request ->
+      assertEquals("192.168.1.7:8642", link.address)
+      sent.complete(request)
+      awaitCancellation()
+    }) {}
+    runCurrent()
+
+    val pairing = assertNotNull(form.pairing)
+    assertEquals("Den-PC", pairing.name)
+    assertTrue(pairing.code.length == 4 && pairing.code.all { it.isDigit() }, pairing.code)
+    assertEquals(pairing.code, sent.await().code)
+    assertTrue(sent.await().name.isNotBlank())
+    assertFalse(form.codeShown)
+    form.cancel()
+  }
+
+  @Test
+  fun pair_ownerAllows_connectsWithTheCodeTheyGave() = runTest {
+    val form = ConnectForm()
+    var connected: RemoteInstance? = null
+
+    form.pair(den, this, pairingConnector { _, _ -> PairingResult.Allowed("granted") }) {
+      connected = it
+    }
+    runCurrent()
+
+    assertEquals("granted", connected?.remoteConfig?.apiToken)
+    assertEquals("Den-PC", connected?.remoteConfig?.name)
+    assertNull(form.pairing)
+    assertFalse(form.connecting)
+  }
+
+  @Test
+  fun pair_ownerSaysNo_asksForTheCodeAndOffersToAskAgain() = runTest {
+    for (answer in listOf(PairingResult.Denied, PairingResult.Expired, PairingResult.Busy)) {
+      val form = ConnectForm()
+
+      form.pair(den, this, pairingConnector { _, _ -> answer }) {}
+      runCurrent()
+
+      assertTrue(form.codeShown)
+      assertEquals(ConnectProblem.NotPaired(den, "Den-PC", answer), form.problem)
+      assertNull(form.pairing)
+    }
+  }
+
+  @Test
+  fun pair_deviceTakesNoRequests_asksForTheCode() = runTest {
+    val form = ConnectForm()
+
+    form.pair(den, this, pairingConnector { _, _ -> PairingResult.Unsupported }) {}
+    runCurrent()
+
+    assertTrue(form.codeShown)
+    assertEquals(ConnectProblem.NeedsCode("192.168.1.7:8642", rejected = false), form.problem)
+  }
+
+  @Test
+  fun enterCodeInstead_withdrawsTheRequest() = runTest {
+    val withdrawn = CompletableDeferred<Unit>()
+    val form = ConnectForm()
+    form.pair(den, this, pairingConnector { _, _ ->
+      try {
+        awaitCancellation()
+      } finally {
+        withdrawn.complete(Unit)
+      }
+    }) {}
+    runCurrent()
+
+    form.enterCodeInstead()
+    runCurrent()
+
+    assertTrue(withdrawn.isCompleted)
+    assertNull(form.pairing)
+    assertTrue(form.codeShown)
+    assertEquals(ConnectProblem.NeedsCode("192.168.1.7:8642", rejected = false), form.problem)
   }
 
   @Test

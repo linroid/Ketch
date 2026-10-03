@@ -14,6 +14,7 @@ import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.util.displayName
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_pause_all_here
@@ -60,16 +61,24 @@ internal data class DeviceWork(
   val pendingBytes: Long = 0,
 )
 
-/** Sums up [tasks] in the states they are in. */
-internal fun deviceWork(tasks: List<Pair<DownloadTask, DownloadState>>): DeviceWork {
+/**
+ * Sums up [tasks] in the states they are in.
+ *
+ * @param positions the [DownloadTask.queuePosition] of each waiting task, by task id, as far as
+ *   the device reports them.
+ */
+internal fun deviceWork(
+  tasks: List<Pair<DownloadTask, DownloadState>>,
+  positions: Map<String, Int> = emptyMap(),
+): DeviceWork {
   val blocks = ArrayList<LaneBlock>()
   var downloaded = 0L
   var size = 0L
   var sizesKnown = true
   var pending = 0L
   for ((task, state) in tasks.sortedBy { it.first.createdAt }) {
-    when (state) {
-      is DownloadState.Downloading -> {
+    when {
+      state is DownloadState.Downloading -> {
         val progress = state.progress
         if (progress.totalBytes > 0) {
           val remaining = (progress.totalBytes - progress.downloadedBytes).coerceAtLeast(0)
@@ -82,15 +91,14 @@ internal fun deviceWork(tasks: List<Pair<DownloadTask, DownloadState>>): DeviceW
           blocks += LaneBlock(task.taskId, null)
         }
       }
-      is DownloadState.Queued, is DownloadState.Scheduled -> {
+      state.waitsInQueue || state is DownloadState.Scheduled -> {
         pending += task.request.resolvedSource?.totalBytes?.coerceAtLeast(0) ?: 0
       }
-      else -> Unit
     }
   }
   return DeviceWork(
     blocks = blocks,
-    next = nextWaiting(tasks),
+    next = nextWaiting(tasks, positions),
     downloadedBytes = downloaded,
     sizeBytes = size,
     sizesKnown = sizesKnown,
@@ -99,20 +107,29 @@ internal fun deviceWork(tasks: List<Pair<DownloadTask, DownloadState>>): DeviceW
 }
 
 /**
- * The waiting task that would start first: a queued one before a scheduled one, then the
- * highest priority, then the oldest.
+ * The waiting task that would start first: the one the device puts first in its queue when it
+ * reports [positions], otherwise a queued one before a scheduled one, then the highest priority,
+ * then the oldest.
  */
-internal fun nextWaiting(tasks: List<Pair<DownloadTask, DownloadState>>): DownloadTask? =
-  tasks
-    .filter { (_, state) -> state is DownloadState.Queued || state is DownloadState.Scheduled }
+internal fun nextWaiting(
+  tasks: List<Pair<DownloadTask, DownloadState>>,
+  positions: Map<String, Int> = emptyMap(),
+): DownloadTask? {
+  val waiting = tasks.filter { (_, state) ->
+    state.waitsInQueue || state is DownloadState.Scheduled
+  }
+  waiting.firstOrNull { (task, state) -> state.waitsInQueue && positions[task.taskId] == 1 }
+    ?.let { return it.first }
+  return waiting
     .sortedWith(
       compareBy<Pair<DownloadTask, DownloadState>> { (_, state) ->
-        if (state is DownloadState.Queued) 0 else 1
+        if (state.waitsInQueue) 0 else 1
       }
         .thenByDescending { (task, _) -> task.request.priority.ordinal }
         .thenBy { (task, _) -> task.createdAt }
     )
     .firstOrNull()?.first
+}
 
 /**
  * Shares of the lane each of [blocks] takes, adding up to 1: its remaining bytes, with blocks
@@ -222,7 +239,15 @@ private fun workOf(entry: InstanceEntry): Flow<DeviceWork> =
     if (tasks.isEmpty()) {
       flowOf(DeviceWork())
     } else {
-      combine(tasks.map { task -> task.state.map { task to it } }) { deviceWork(it.toList()) }
+      val states = tasks.map { task ->
+        combine(task.state, task.queuePosition) { state, position -> Triple(task, state, position) }
+      }
+      combine(states) { snapshots ->
+        val positions = snapshots.mapNotNull { (task, _, position) ->
+          position?.let { task.taskId to it }
+        }.toMap()
+        deviceWork(snapshots.map { (task, state, _) -> task to state }, positions)
+      }
     }
   }
 

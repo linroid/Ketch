@@ -18,6 +18,7 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PendingOps
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.util.displayName
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.feedback_background_pause
@@ -515,7 +516,7 @@ internal class BackgroundPauser(
     val attempted = mutableSetOf<String>()
     repeat(MAX_PAUSE_ROUNDS) {
       val tasks = api.tasks.value.filter { it.taskId !in attempted }
-      val waiting = tasks.filter { it.state.value is DownloadState.Queued }
+      val waiting = tasks.filter { it.state.value.waitsInQueue }
       val running = tasks.filter { it.state.value is DownloadState.Downloading }
       if (waiting.isEmpty() && running.isEmpty()) return downloading + queued
       for ((group, paused) in listOf(waiting to queued, running to downloading)) {
@@ -533,7 +534,7 @@ internal class BackgroundPauser(
 
   private fun hasActiveTasks(): Boolean = api.tasks.value.any {
     val state = it.state.value
-    state is DownloadState.Queued || state is DownloadState.Downloading
+    state.waitsInQueue || state is DownloadState.Downloading
   }
 
   private suspend fun attempt(

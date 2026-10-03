@@ -27,10 +27,13 @@ class TrayNotifier(
   private val linux = System.getProperty("os.name").startsWith("Linux")
 
   override fun notify(event: ActivityEvent, copy: NotificationCopy) {
+    post(copy, notificationType(event))
+  }
+
+  /** Posts [copy], which is about no [ActivityEvent], such as a pairing request. */
+  fun post(copy: NotificationCopy, type: Notification.Type = Notification.Type.Info) {
     when {
-      traySupported -> trayState.sendNotification(
-        Notification(copy.title, copy.body, notificationType(event)),
-      )
+      traySupported -> trayState.sendNotification(Notification(copy.title, copy.body, type))
       linux -> notifySend(notifySendCommand(copy))
       else -> log.d { "No tray to post \"${copy.title}\" from" }
     }

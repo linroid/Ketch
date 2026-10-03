@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,6 +73,19 @@ class PauseActiveTasksTest {
     assertEquals(listOf("queued", "running"), pauses)
     assertTrue(tasks.active().isEmpty())
     assertTrue(failures.isEmpty())
+  }
+
+  @Test
+  fun pauseActiveTasks_preemptedTask_isPausedWithQueuedOnes() = runTest {
+    val waiting = DownloadState.Paused(DownloadProgress(10, 1000), PauseReason.Preempted("urgent"))
+    val preempted = QueueTask("preempted", waiting)
+    val tasks = listOf(QueueTask("running", downloading()), preempted)
+
+    pauseActiveTasks({ tasks })
+
+    // Left waiting, it would take the slot the paused download frees.
+    assertEquals(listOf("preempted", "running"), pauses)
+    assertEquals(DownloadState.Paused(DownloadProgress(0, 1000)), preempted.state.value)
   }
 
   @Test

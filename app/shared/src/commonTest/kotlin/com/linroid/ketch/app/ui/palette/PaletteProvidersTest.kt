@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.palette
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommands
@@ -191,6 +192,19 @@ class PaletteProvidersTest {
     assertEquals("Pause", running.verb)
     assertEquals(PaletteAction.Task(report, RowAction.Open), finished.action)
     assertEquals(PaletteAction.Task(report, RowAction.ShowInFolder), finished.alternate)
+  }
+
+  @Test
+  fun paletteItems_preemptedDownload_pausesIt() = runTest {
+    // Paused for an urgent download, it still waits in the queue: ↩ takes it out as Space does.
+    val state = DownloadState.Paused(DownloadProgress(10, 100), PauseReason.Preempted("urgent"))
+    val preempted = ListFixtures.row("waiting", state)
+    val source = source("waiting").copy(rows = listOf(preempted))
+
+    val item = results(source).first { it.provider == PaletteProvider.Downloads }
+
+    assertEquals(PaletteAction.Task(preempted.key, RowAction.Pause), item.action)
+    assertEquals("Pause", item.verb)
   }
 
   @Test

@@ -7,12 +7,16 @@ import com.linroid.ketch.config.ServerConfig
  *
  * @property name the name it announces, which the app adopts as the device's name unless it is
  *   the generic one (see [deviceNameOrNull]).
+ * @property tokenRequired whether it asks for an access code.
+ * @property pairable whether its owner can allow this device instead, through
+ *   [com.linroid.ketch.remote.RemotePairing].
  */
 data class DiscoveredServer(
   val name: String,
   val host: String,
   val port: Int,
   val tokenRequired: Boolean,
+  val pairable: Boolean = false,
 )
 
 class LanServerDiscovery(

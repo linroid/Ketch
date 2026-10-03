@@ -106,6 +106,7 @@
   <string name="inspector_detail_path">Сохранено в</string>
   <string name="inspector_detail_size">Размер</string>
   <string name="inspector_detail_added">Добавлено</string>
+  <string name="inspector_detail_finished">Завершено</string>
   <string name="inspector_detail_time">Время загрузки</string>
   <string name="inspector_detail_average">Средняя скорость</string>
   <string name="inspector_detail_connections">Подключения</string>
@@ -122,6 +123,7 @@
   <string name="inspector_copy_failed_path">Не удалось скопировать поле «Сохранено в»</string>
   <string name="inspector_copy_failed_size">Не удалось скопировать поле «Размер»</string>
   <string name="inspector_copy_failed_added">Не удалось скопировать поле «Добавлено»</string>
+  <string name="inspector_copy_failed_finished">Не удалось скопировать поле «Завершено»</string>
   <string name="inspector_copy_failed_time">Не удалось скопировать поле «Время загрузки»</string>
   <string name="inspector_copy_failed_average">Не удалось скопировать поле «Средняя скорость»</string>
   <string name="inspector_copy_failed_connections">Не удалось скопировать поле «Подключения»</string>

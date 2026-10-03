@@ -68,6 +68,34 @@ describe('describeTaskState', () => {
     assert.equal(view.progress, null);
   });
 
+  test('a task paused for an urgent download shows as queued', () => {
+    const view = describeTaskState({
+      state: {
+        type: 'paused',
+        progress: { downloadedBytes: 512, totalBytes: 2048 },
+        reason: { type: 'preempted', byTaskId: 'b' },
+      },
+    });
+    assert.equal(view.text, 'Queued');
+    assert.equal(view.progress, null);
+    assert.equal(view.canPause, true);
+    assert.equal(view.canResume, false);
+  });
+
+  test('user pauses and pauses without a reason keep the paused view', () => {
+    const progress = { downloadedBytes: 512, totalBytes: 2048 };
+    for (const state of [
+      { type: 'paused', progress, reason: { type: 'user' } },
+      { type: 'paused', progress },
+    ]) {
+      const view = describeTaskState({ state });
+      assert.equal(view.text, 'Paused · 25%');
+      assert.equal(view.progress, 0.25);
+      assert.equal(view.canPause, false);
+      assert.equal(view.canResume, true);
+    }
+  });
+
   test('failed tasks show the error and can be retried', () => {
     const view = describeTaskState({
       state: { type: 'failed', error: { type: 'http', message: 'HTTP error 404: Not Found' } },

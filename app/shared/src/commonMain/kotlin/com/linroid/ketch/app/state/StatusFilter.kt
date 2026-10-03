@@ -21,7 +21,7 @@ enum class StatusFilter(private val resource: StringResource) {
   All(Res.string.status_tab_all),
   Downloading(Res.string.status_tab_downloading),
 
-  /** Queued for a free slot, or scheduled to start later. */
+  /** Queued for a free slot, paused for an urgent download, or scheduled to start later. */
   Waiting(Res.string.status_tab_waiting),
   Paused(Res.string.status_tab_paused),
   Done(Res.string.status_tab_done),
@@ -36,8 +36,8 @@ enum class StatusFilter(private val resource: StringResource) {
   fun matches(state: DownloadState): Boolean = when (this) {
     All -> true
     Downloading -> state is DownloadState.Downloading
-    Waiting -> state is DownloadState.Queued || state is DownloadState.Scheduled
-    Paused -> state is DownloadState.Paused
+    Waiting -> state.waitsInQueue || state is DownloadState.Scheduled
+    Paused -> state.isPausedUntilResumed
     Done -> state is DownloadState.Completed
     Failed -> state is DownloadState.Failed || state is DownloadState.Canceled
   }

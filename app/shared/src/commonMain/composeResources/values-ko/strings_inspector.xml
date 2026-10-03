@@ -91,6 +91,7 @@
   <string name="inspector_detail_path">저장 위치</string>
   <string name="inspector_detail_size">크기</string>
   <string name="inspector_detail_added">추가일</string>
+  <string name="inspector_detail_finished">완료일</string>
   <string name="inspector_detail_time">소요 시간</string>
   <string name="inspector_detail_average">평균 속도</string>
   <string name="inspector_detail_connections">연결</string>
@@ -107,6 +108,7 @@
   <string name="inspector_copy_failed_path">저장 위치를 복사할 수 없음</string>
   <string name="inspector_copy_failed_size">크기를 복사할 수 없음</string>
   <string name="inspector_copy_failed_added">추가일을 복사할 수 없음</string>
+  <string name="inspector_copy_failed_finished">완료일을 복사할 수 없음</string>
   <string name="inspector_copy_failed_time">소요 시간을 복사할 수 없음</string>
   <string name="inspector_copy_failed_average">평균 속도를 복사할 수 없음</string>
   <string name="inspector_copy_failed_connections">연결을 복사할 수 없음</string>

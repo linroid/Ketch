@@ -68,6 +68,7 @@ class MdnsRegistrationTest {
     mdnsEnabled: Boolean = true,
     name: String = "Ketch",
     registrar: FakeMdnsRegistrar = FakeMdnsRegistrar(),
+    pairingApprover: PairingApprover? = null,
   ): Pair<KetchServer, FakeMdnsRegistrar> {
     val server = KetchServer(
       ketch = createTestKetch(),
@@ -76,6 +77,7 @@ class MdnsRegistrationTest {
       name = name,
       mdnsEnabled = mdnsEnabled,
       mdnsRegistrar = registrar,
+      pairingApprover = pairingApprover,
     )
     return server to registrar
   }
@@ -234,6 +236,41 @@ class MdnsRegistrationTest {
         mapOf("token" to "required"),
         registrar.lastMetadata,
       )
+    } finally {
+      server.stop()
+    }
+  }
+
+  @Test
+  fun `pairing metadata is advertised with a token and an approver`() {
+    val registrar = FakeMdnsRegistrar()
+    val (server, _) = createServer(
+      port = findFreePort(),
+      apiToken = "my-secret",
+      registrar = registrar,
+      pairingApprover = { _, _ -> false },
+    )
+    server.start(wait = false)
+    try {
+      registrar.awaitRegister()
+      assertEquals(mapOf("token" to "required", "pairing" to "1"), registrar.lastMetadata)
+    } finally {
+      server.stop()
+    }
+  }
+
+  @Test
+  fun `pairing metadata is left out without a token`() {
+    val registrar = FakeMdnsRegistrar()
+    val (server, _) = createServer(
+      port = findFreePort(),
+      registrar = registrar,
+      pairingApprover = { _, _ -> true },
+    )
+    server.start(wait = false)
+    try {
+      registrar.awaitRegister()
+      assertEquals(mapOf("token" to "none"), registrar.lastMetadata)
     } finally {
       server.stop()
     }

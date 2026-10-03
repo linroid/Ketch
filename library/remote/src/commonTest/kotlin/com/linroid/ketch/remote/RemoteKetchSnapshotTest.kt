@@ -1,7 +1,9 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
@@ -21,7 +23,10 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class RemoteKetchSnapshotTest {
@@ -121,6 +126,73 @@ class RemoteKetchSnapshotTest {
           }
         }
       }
+    }
+  }
+
+  @Test
+  fun fetchAllTasks_olderServerJson_loadsTasksWithDefaults() = runTest {
+    // Written by hand as a server without queue positions, pause reasons or finish times
+    // sends it.
+    val body = """
+      {"tasks":[
+        {"taskId":"paused","request":{"url":"https://example.com/a"},
+         "state":{"type":"paused","progress":{"downloadedBytes":10,"totalBytes":100}},
+         "segments":[],"createdAt":"2026-10-03T08:00:00Z"},
+        {"taskId":"done","request":{"url":"https://example.com/b"},
+         "state":{"type":"completed","outputPath":"/d/b.iso","totalBytes":100,
+                  "downloadTime":"PT3S"},
+         "segments":[],"createdAt":"2026-10-03T08:00:00Z"}
+      ]}
+    """.trimIndent()
+    val engine = MockEngine {
+      respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+    }
+    val remote = RemoteKetch("localhost", 8642, null, false, engine)
+    try {
+      remote.fetchAllTasks()
+
+      val tasks = remote.tasks.value.associateBy { it.taskId }
+      val paused = tasks.getValue("paused")
+      assertEquals(
+        DownloadState.Paused(DownloadProgress(10, 100), PauseReason.User),
+        paused.state.value,
+      )
+      assertNull(paused.queuePosition.value)
+      val done = assertIs<DownloadState.Completed>(tasks.getValue("done").state.value)
+      assertEquals(3.seconds, done.downloadTime)
+      assertNull(done.completedAt)
+    } finally {
+      remote.close()
+      engine.close()
+    }
+  }
+
+  @Test
+  fun handleEvent_stateChangedThenProgress_updatesAndClearsPosition() = runTest {
+    val waiting = snapshot("task").copy(queuePosition = 2)
+    val engine = MockEngine {
+      respond(
+        Json.encodeToString(waiting),
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    val remote = RemoteKetch("localhost", 8642, null, false, engine)
+    try {
+      val task = remote.download(waiting.request)
+      assertEquals(2, task.queuePosition.value)
+
+      remote.handleEvent(
+        TaskEvent.StateChanged(task.taskId, DownloadState.Queued, queuePosition = 1),
+      )
+      assertEquals(1, task.queuePosition.value)
+
+      val downloading = DownloadState.Downloading(DownloadProgress(0, 100))
+      remote.handleEvent(TaskEvent.Progress(task.taskId, downloading))
+      assertEquals(downloading, task.state.value)
+      assertNull(task.queuePosition.value)
+    } finally {
+      remote.close()
+      engine.close()
     }
   }
 }

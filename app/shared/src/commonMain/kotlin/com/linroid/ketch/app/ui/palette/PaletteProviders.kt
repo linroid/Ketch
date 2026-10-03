@@ -21,9 +21,11 @@ import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.isPausedUntilResumed
 import com.linroid.ketch.app.state.parseSpeedLimit
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.taskActions
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.util.IntakeItem
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
@@ -293,7 +295,7 @@ private suspend fun commandItem(
       }
     }
     KetchCommands.ResumeAll -> {
-      val count = rows.count { it.state is DownloadState.Paused }
+      val count = rows.count { it.state.isPausedUntilResumed }
       if (count > 0) {
         title = Res.plurals.palette_resume_count.text(count)
       } else {
@@ -409,7 +411,8 @@ private fun primaryAction(source: PaletteSource, row: TaskRow): RowAction {
   val action = when (row.state) {
     is DownloadState.Completed -> offered(RowAction.Open)
     is DownloadState.Downloading, DownloadState.Queued -> offered(RowAction.Pause)
-    is DownloadState.Paused -> offered(RowAction.Resume)
+    is DownloadState.Paused ->
+      offered(if (row.state.waitsInQueue) RowAction.Pause else RowAction.Resume)
     // The row's own fix comes first, such as Edit link for a link the server turned away; a
     // copy is no fix, so a gone file retries as Space does.
     is DownloadState.Failed, DownloadState.Canceled ->
@@ -566,7 +569,7 @@ private fun KetchCommand.isTabOrDevice(): Boolean =
   KetchCommands.tabFilter(this) != null || KetchCommands.deviceNumber(this) != null
 
 private val DownloadState.isQueued: Boolean
-  get() = this is DownloadState.Queued
+  get() = waitsInQueue
 
 private val BatchVerb.icon: KetchIcon
   get() = when (this) {

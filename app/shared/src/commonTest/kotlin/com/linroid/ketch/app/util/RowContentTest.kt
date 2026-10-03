@@ -6,6 +6,8 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
@@ -133,6 +135,66 @@ class RowContentTest {
   }
 
   @Test
+  fun rowContent_queuedWithPositionOne_saysNextInLine() = runTest {
+    val capable = context.copy(features = KetchFeatures.ALL)
+
+    val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = 1)
+
+    assertEquals("Waiting to start · next in line", content.detail.load())
+  }
+
+  @Test
+  fun rowContent_queuedWithPositionThree_saysTwoAhead() = runTest {
+    val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
+    val capable = context.copy(running = running, features = KetchFeatures.ALL)
+
+    val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = 3)
+
+    assertEquals("Waiting for a free slot (2 of 2 in use) · 2 ahead", content.detail.load())
+  }
+
+  @Test
+  fun rowContent_queuedWithoutPositionOnCapableDevice_saysStarting() = runTest {
+    val capable = context.copy(features = KetchFeatures.ALL)
+
+    val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = null)
+
+    assertEquals("Starting", content.detail.load())
+  }
+
+  @Test
+  fun rowContent_queuedOnOlderDevice_keepsQueueReason() = runTest {
+    val content = rowContent(request, DownloadState.Queued, now, context, queuePosition = 2)
+
+    assertEquals("Waiting to start", content.detail.load())
+  }
+
+  @Test
+  fun rowContent_preempted_explainsAndOffersStartNow() = runTest {
+    val state = DownloadState.Paused(DownloadProgress(29, 100), PauseReason.Preempted("urgent"))
+
+    val content = rowContent(request, state, now, context)
+
+    assertEquals(RowStatus.Paused, content.status)
+    assertEquals("Paused", content.statusText.load())
+    assertEquals(
+      "Paused for an urgent download · resumes automatically",
+      content.detail.load()
+    )
+    assertEquals(RowAction.StartNow, content.primary)
+  }
+
+  @Test
+  fun rowContent_pausedForShutdown_saysItResumesWithKetch() = runTest {
+    val state = DownloadState.Paused(DownloadProgress(29, 100), PauseReason.Shutdown)
+
+    val content = rowContent(request, state, now, context)
+
+    assertEquals("Paused when Ketch closed · resumes when it starts", content.detail.load())
+    assertEquals(RowAction.Resume, content.primary)
+  }
+
+  @Test
   fun rowContent_scheduledAtTime_countsDown() = runTest {
     val state = DownloadState.Scheduled(
       DownloadSchedule.AtTime(Instant.parse("2026-10-01T23:00:00Z"))
@@ -202,6 +264,23 @@ class RowContentTest {
     assertEquals("10.0 MB", content.size.load())
     assertEquals("took 4s", content.time.load())
     assertEquals(RowAction.Open, content.primary)
+  }
+
+  @Test
+  fun rowContent_completedWithCompletedAt_showsFinishedTime() = runTest {
+    val state = DownloadState.Completed(
+      outputPath = "/tmp/ubuntu.iso",
+      totalBytes = 1024,
+      completedAt = Instant.parse("2026-10-01T18:05:00Z"),
+    )
+    val unknown = DownloadState.Completed("/tmp/ubuntu.iso", totalBytes = 1024)
+
+    val content = rowContent(request, state, now - 2.days, context)
+
+    assertEquals("Today 18:05", content.finished.load())
+    assertEquals("Sep 29", content.added.load())
+    assertEquals("–", rowContent(request, unknown, now, context).finished.load())
+    assertEquals("", rowContent(request, DownloadState.Queued, now, context).finished.load())
   }
 
   @Test

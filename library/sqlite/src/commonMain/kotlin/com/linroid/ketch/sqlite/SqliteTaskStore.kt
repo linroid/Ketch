@@ -62,6 +62,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         segments_json = segmentsJson,
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
+        completed_at = record.completedAt?.toEpochMilliseconds(),
       )
       queries.update(
         task_id = record.taskId,
@@ -74,6 +75,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         segments_json = segmentsJson,
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
+        completed_at = record.completedAt?.toEpochMilliseconds(),
       )
     }
   }
@@ -143,6 +145,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       downloadTime = download_time_ms?.milliseconds,
       createdAt = Instant.fromEpochMilliseconds(created_at),
       updatedAt = Instant.fromEpochMilliseconds(updated_at),
+      completedAt = completed_at?.let(Instant::fromEpochMilliseconds),
     )
   }
 }
