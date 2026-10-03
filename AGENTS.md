@@ -562,3 +562,6 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
+6. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+   own network and IP, joining or leaving mid-download without pausing it; see the
+   [proposal](docs/design/multi-instance-downloads.md)
