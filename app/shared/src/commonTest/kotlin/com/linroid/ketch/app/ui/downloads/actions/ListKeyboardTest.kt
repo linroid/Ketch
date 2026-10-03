@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
@@ -33,6 +34,10 @@ import kotlin.time.Duration.Companion.milliseconds
 class ListKeyboardTest {
   private val downloading = ListFixtures.downloading(400)
   private val paused = DownloadState.Paused(DownloadProgress(400, 1000))
+
+  // Paused for an urgent download, it still waits in the queue and resumes by itself.
+  private val preempted =
+    DownloadState.Paused(DownloadProgress(400, 1000), PauseReason.Preempted("urgent"))
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 1000)
 
   @Test
@@ -46,6 +51,7 @@ class ListKeyboardTest {
       KeyCase(space, downloading, RowAction.Pause),
       KeyCase(space, DownloadState.Queued, RowAction.Pause),
       KeyCase(space, paused, RowAction.Resume),
+      KeyCase(space, preempted, RowAction.Pause),
       KeyCase(space, DownloadState.Failed(KetchError.Http(503)), RowAction.Retry),
       // A failure that cannot resume starts over.
       KeyCase(space, DownloadState.Failed(KetchError.Http(416)), RowAction.DownloadAgain),
@@ -63,6 +69,7 @@ class ListKeyboardTest {
       KeyCase(copyPath, completed, RowAction.CopyPath),
       KeyCase(copyPath, downloading, null),
       KeyCase(retry, paused, RowAction.Resume),
+      KeyCase(retry, preempted, null),
       KeyCase(retry, DownloadState.Failed(KetchError.Network()), RowAction.Retry),
       KeyCase(retry, downloading, null),
     )
