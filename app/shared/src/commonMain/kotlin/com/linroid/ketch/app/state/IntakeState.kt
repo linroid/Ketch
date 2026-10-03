@@ -25,17 +25,23 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import com.linroid.ketch.app.components.startTimeLabel
+import com.linroid.ketch.app.components.startTimeText
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.isMobilePlatform
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.CurlParser
 import com.linroid.ketch.app.util.DuplicateDetector
 import com.linroid.ketch.app.util.IntakeItem
@@ -46,15 +52,91 @@ import com.linroid.ketch.app.util.MAGNET_METADATA_TIMEOUT
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.app.util.percentDecode
-import com.linroid.ketch.app.util.priorityLabel
 import com.linroid.ketch.app.util.toIntakeProblem
 import com.linroid.ketch.app.util.urlHost
 import com.linroid.ketch.app.util.withCredentials
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.IntakePreferences
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_review
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.device_any_in_sentence
+import ketch.app.shared.generated.resources.duration_minutes
+import ketch.app.shared.generated.resources.feedback_undo_add
+import ketch.app.shared.generated.resources.intake_add_failed
+import ketch.app.shared.generated.resources.intake_added_failed
+import ketch.app.shared.generated.resources.intake_added_here
+import ketch.app.shared.generated.resources.intake_added_left_out
+import ketch.app.shared.generated.resources.intake_added_to
+import ketch.app.shared.generated.resources.intake_apply_failed
+import ketch.app.shared.generated.resources.intake_choose_files
+import ketch.app.shared.generated.resources.intake_file_list_failed
+import ketch.app.shared.generated.resources.intake_file_list_failed_unnamed
+import ketch.app.shared.generated.resources.intake_file_list_ready
+import ketch.app.shared.generated.resources.intake_file_list_ready_unnamed
+import ketch.app.shared.generated.resources.intake_hint_apply
+import ketch.app.shared.generated.resources.intake_hint_download
+import ketch.app.shared.generated.resources.intake_hint_retry
+import ketch.app.shared.generated.resources.intake_hint_schedule
+import ketch.app.shared.generated.resources.intake_hint_start_over
+import ketch.app.shared.generated.resources.intake_notice_close_first
+import ketch.app.shared.generated.resources.intake_notice_first_links
+import ketch.app.shared.generated.resources.intake_notice_no_curl
+import ketch.app.shared.generated.resources.intake_notice_no_links
+import ketch.app.shared.generated.resources.intake_notice_read_failed
+import ketch.app.shared.generated.resources.intake_notice_read_failed_reason
+import ketch.app.shared.generated.resources.intake_notice_unsupported_files
+import ketch.app.shared.generated.resources.intake_option_auto
+import ketch.app.shared.generated.resources.intake_option_connections
+import ketch.app.shared.generated.resources.intake_option_max_speed
+import ketch.app.shared.generated.resources.intake_option_peers
+import ketch.app.shared.generated.resources.intake_option_priority_high
+import ketch.app.shared.generated.resources.intake_option_priority_low
+import ketch.app.shared.generated.resources.intake_option_unlimited
+import ketch.app.shared.generated.resources.intake_option_urgent
+import ketch.app.shared.generated.resources.intake_outcome_eta
+import ketch.app.shared.generated.resources.intake_outcome_eta_soon
+import ketch.app.shared.generated.resources.intake_outcome_queued_behind
+import ketch.app.shared.generated.resources.intake_outcome_queued_next
+import ketch.app.shared.generated.resources.intake_outcome_queued_count
+import ketch.app.shared.generated.resources.intake_outcome_slots_free
+import ketch.app.shared.generated.resources.intake_outcome_start_now
+import ketch.app.shared.generated.resources.intake_outcome_start_now_slots
+import ketch.app.shared.generated.resources.intake_outcome_starts_now
+import ketch.app.shared.generated.resources.intake_outcome_urgent
+import ketch.app.shared.generated.resources.intake_outcome_waits_for_host
+import ketch.app.shared.generated.resources.intake_restart_failed
+import ketch.app.shared.generated.resources.intake_restarted
+import ketch.app.shared.generated.resources.intake_retry_failed
+import ketch.app.shared.generated.resources.intake_space_warning
+import ketch.app.shared.generated.resources.intake_start_over_discard
+import ketch.app.shared.generated.resources.intake_start_over_new
+import ketch.app.shared.generated.resources.intake_submit_apply
+import ketch.app.shared.generated.resources.intake_submit_download_files
+import ketch.app.shared.generated.resources.intake_submit_download_files_size
+import ketch.app.shared.generated.resources.intake_submit_download_items
+import ketch.app.shared.generated.resources.intake_submit_download_items_size
+import ketch.app.shared.generated.resources.intake_submit_download_name
+import ketch.app.shared.generated.resources.intake_submit_no_files
+import ketch.app.shared.generated.resources.intake_submit_nothing
+import ketch.app.shared.generated.resources.intake_submit_schedule_files
+import ketch.app.shared.generated.resources.intake_submit_schedule_items
+import ketch.app.shared.generated.resources.intake_submit_schedule_name
+import ketch.app.shared.generated.resources.intake_submit_start_over
+import ketch.app.shared.generated.resources.intake_submit_waiting_files
+import ketch.app.shared.generated.resources.intake_summary_attention
+import ketch.app.shared.generated.resources.intake_summary_checking
+import ketch.app.shared.generated.resources.intake_summary_duplicates
+import ketch.app.shared.generated.resources.intake_summary_links
+import ketch.app.shared.generated.resources.intake_summary_ready
+import ketch.app.shared.generated.resources.intake_time_hours
+import ketch.app.shared.generated.resources.intake_time_hours_minutes
+import ketch.app.shared.generated.resources.intake_user_agent_custom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -71,6 +153,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -279,16 +362,15 @@ data class IntakeSummary(
   val bytes: Long,
 ) {
   /** "7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB". */
-  val text: String
+  val text: UiText
     get() = buildList {
-      add(if (links == 1) "1 link" else "$links links")
-      add("$ready ready")
-      if (checking > 0) add("$checking checking")
-      if (attention == 1) add("1 needs attention")
-      if (attention > 1) add("$attention need attention")
-      if (duplicates > 0) add("$duplicates already in Ketch")
-      if (bytes > 0) add(formatBytes(bytes))
-    }.joinToString(SEPARATOR)
+      add(Res.plurals.intake_summary_links.text(links))
+      add(Res.plurals.intake_summary_ready.text(ready))
+      if (checking > 0) add(Res.plurals.intake_summary_checking.text(checking))
+      if (attention > 0) add(Res.plurals.intake_summary_attention.text(attention))
+      if (duplicates > 0) add(Res.plurals.intake_summary_duplicates.text(duplicates))
+      if (bytes > 0) add(sizeText(bytes))
+    }.joinText()
 }
 
 /** Counts [entries] for the summary line. */
@@ -315,23 +397,23 @@ internal fun intakeSummary(entries: List<IntakeEntry>): IntakeSummary {
 }
 
 /** A user agent the Advanced section offers; `null` [value] sends Ketch's own. */
-enum class UserAgentChoice(val label: String, val value: String?) {
-  Ketch("Ketch", null),
+enum class UserAgentChoice(val label: UiText, val value: String?) {
+  Ketch(verbatim("Ketch"), null),
   Chrome(
-    "Chrome",
+    verbatim("Chrome"),
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
       "Chrome/140.0.0.0 Safari/537.36",
   ),
   Firefox(
-    "Firefox",
+    verbatim("Firefox"),
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
   ),
   Safari(
-    "Safari",
+    verbatim("Safari"),
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) " +
       "Version/26.0 Safari/605.1.15",
   ),
-  Custom("Custom", null),
+  Custom(Res.string.intake_user_agent_custom.text(), null),
 }
 
 /** One extra header row of the Advanced section. */
@@ -400,7 +482,8 @@ class IntakeHeaders {
     }
   }
 
-  private companion object {
+  internal companion object {
+    /** Names of the headers the section has a field for, which also label the fields. */
     const val REFERER = "Referer"
     const val USER_AGENT = "User-Agent"
     const val COOKIE = "Cookie"
@@ -464,7 +547,7 @@ enum class IntakeOption {
  * 2 MB/s", "⚡ Urgent", "Starts 23:00 tonight" and "8 connections" once [changed], which also
  * shows it as a chip that puts the default back.
  */
-data class IntakeOptionValue(val option: IntakeOption, val text: String, val changed: Boolean)
+data class IntakeOptionValue(val option: IntakeOption, val text: UiText, val changed: Boolean)
 
 /**
  * The values the Options pill sums up, in order: speed, priority, start (left out when
@@ -481,32 +564,45 @@ internal fun intakeOptionValues(
   now: Instant,
   zone: TimeZone,
 ): List<IntakeOptionValue> = buildList {
-  add(
-    IntakeOptionValue(
-      option = IntakeOption.Speed,
-      text = if (speedLimit.isUnlimited) "Unlimited" else "Max ${formatSpeedLimit(speedLimit)}",
-      changed = !speedLimit.isUnlimited,
-    ),
-  )
-  val priorityText = when (priority) {
-    DownloadPriority.NORMAL -> "Normal"
-    DownloadPriority.URGENT -> "⚡ Urgent"
-    else -> "${priorityLabel(priority)} priority"
+  val speedText = if (speedLimit.isUnlimited) {
+    Res.string.intake_option_unlimited.text()
+  } else {
+    Res.string.intake_option_max_speed.text(speedLimitText(speedLimit))
   }
-  add(IntakeOptionValue(IntakeOption.Priority, priorityText, priority != DownloadPriority.NORMAL))
+  add(IntakeOptionValue(IntakeOption.Speed, speedText, changed = !speedLimit.isUnlimited))
+  val priorityValue = when (priority) {
+    DownloadPriority.LOW -> Res.string.intake_option_priority_low.text()
+    DownloadPriority.NORMAL -> priorityText(priority)
+    DownloadPriority.HIGH -> Res.string.intake_option_priority_high.text()
+    DownloadPriority.URGENT -> Res.string.intake_option_urgent.text()
+  }
+  add(IntakeOptionValue(IntakeOption.Priority, priorityValue, priority != DownloadPriority.NORMAL))
   if (schedule != null) {
     // A time that has passed starts at once, like no time.
-    val startText = startTimeLabel(schedule, now, zone)
-    add(IntakeOptionValue(IntakeOption.Start, startText, startText != NOW_LABEL))
+    val later = when (schedule) {
+      DownloadSchedule.Immediate -> false
+      is DownloadSchedule.AfterDelay -> true
+      is DownloadSchedule.AtTime -> schedule.startAt > now
+    }
+    add(IntakeOptionValue(IntakeOption.Start, startTimeText(schedule, now, zone), later))
   }
   val connectionText = when {
-    torrents && connections > 0 -> if (connections == 1) "1 peer" else "$connections peers"
-    singleConnection || connections == 1 -> "1 connection"
-    connections > 0 -> "$connections connections"
-    else -> "Auto"
+    torrents && connections > 0 -> Res.plurals.intake_option_peers.text(connections)
+    singleConnection || connections == 1 -> Res.plurals.intake_option_connections.text(1)
+    connections > 0 -> Res.plurals.intake_option_connections.text(connections)
+    else -> Res.string.intake_option_auto.text()
   }
   val connectionsChanged = connections > 0 && (torrents || !singleConnection)
   add(IntakeOptionValue(IntakeOption.Connections, connectionText, connectionsChanged))
+}
+
+/** What the add sheet's main button does: its [verb] and the [hint] that names its key. */
+private enum class SubmitAction(val verb: String, val hint: StringResource) {
+  Download("download", Res.string.intake_hint_download),
+  Schedule("schedule", Res.string.intake_hint_schedule),
+  Retry("retry", Res.string.intake_hint_retry),
+  StartOver("start over", Res.string.intake_hint_start_over),
+  Apply("apply", Res.string.intake_hint_apply),
 }
 
 /** Whether a line of [text] starts a cURL command. */
@@ -577,7 +673,7 @@ class IntakeSession internal constructor(
     private set
 
   /** A note under the input, such as rows left out; `null` when there is none. */
-  var notice: String? by mutableStateOf(null)
+  var notice: UiText? by mutableStateOf(null)
 
   /** Device the downloads go to. */
   var target: InstanceEntry? by mutableStateOf(null)
@@ -722,29 +818,29 @@ class IntakeSession internal constructor(
   val autoConnections: Int? get() = targetStatus?.config?.maxConnectionsPerDownload
 
   /** Bytes the selection needs beyond the target's free space, as a warning; else `null`. */
-  val spaceWarning: String?
+  val spaceWarning: UiText?
     get() {
       val free = targetStatus?.system?.usableSpace?.takeIf { it > 0 } ?: return null
       val needed = summary.bytes
       if (needed <= free) return null
-      return "Needs ${formatBytes(needed)} · only ${formatBytes(free)} free on ${targetName()}"
+      return Res.string.intake_space_warning.text(sizeText(needed), sizeText(free), targetName())
     }
 
   /**
    * A warning that cookies or credentials go to another device, which keeps them with the
    * task; `null` when the downloads stay on this device or send none.
    */
-  val cookieWarning: String?
+  val cookieWarning: UiText?
     get() {
       val remote = target as? RemoteInstance ?: return null
-      return credentialWarning(entries.map(::effectiveHeaders), remote.label)
+      return credentialWarningText(entries.map(::effectiveHeaders), remote.displayName)
     }
 
   /**
    * What happens once the rows are added, such as "Starts now · 1 of 2 slots free"; a scheduled
    * start is left to the Start chip.
    */
-  val outcome: String?
+  val outcome: UiText?
     get() {
       if (mode == IntakeMode.Retry && startsOver) return startOverWarning()
       if (mode != IntakeMode.Add || schedule != DownloadSchedule.Immediate) return null
@@ -783,61 +879,75 @@ class IntakeSession internal constructor(
    * files · 1.2 GB", "Schedule 2 files", "Download 16 files · 9.3 GB" for a torrent's chosen
    * files, "Retry", "Start over" or "Apply changes".
    */
-  val primaryLabel: String
+  val primaryLabel: UiText
     get() {
       val stage = activeStage?.takeIf { entries.size == 1 }
       return when {
-        mode == IntakeMode.Edit -> "Apply changes"
-        mode == IntakeMode.Retry -> if (startsOver) "Start over" else "Retry"
-        allFailed -> "Retry"
+        mode == IntakeMode.Edit -> Res.string.intake_submit_apply.text()
+        mode == IntakeMode.Retry && startsOver -> Res.string.intake_submit_start_over.text()
+        mode == IntakeMode.Retry || allFailed -> Res.string.action_retry.text()
         stage != null -> filesLabel(stage)
-        single?.waitsForFiles == true && single?.addAnyway == false -> "Waiting for file list"
+        single?.waitsForFiles == true && single?.addAnyway == false ->
+          Res.string.intake_submit_waiting_files.text()
         else -> batchLabel()
       }
     }
 
   /** What ↩ does, after "↩ to": "download", "schedule", "retry", "start over" or "apply". */
-  val submitVerb: String
+  val submitVerb: String get() = submitAction.verb
+
+  /** "↩ to download": what pressing [chord] does. */
+  fun submitHint(chord: String): UiText = submitAction.hint.text(chord)
+
+  private val submitAction: SubmitAction
     get() = when {
-      mode == IntakeMode.Edit -> "apply"
-      mode == IntakeMode.Retry -> if (startsOver) "start over" else "retry"
-      allFailed -> "retry"
-      schedule != DownloadSchedule.Immediate -> "schedule"
-      else -> "download"
+      mode == IntakeMode.Edit -> SubmitAction.Apply
+      mode == IntakeMode.Retry -> if (startsOver) SubmitAction.StartOver else SubmitAction.Retry
+      allFailed -> SubmitAction.Retry
+      schedule != DownloadSchedule.Immediate -> SubmitAction.Schedule
+      else -> SubmitAction.Download
     }
 
-  private val verb: String
-    get() = if (schedule == DownloadSchedule.Immediate) "Download" else "Schedule"
+  private val scheduled: Boolean get() = schedule != DownloadSchedule.Immediate
 
-  private fun filesLabel(stage: IntakeEntry): String {
+  private fun filesLabel(stage: IntakeEntry): UiText {
     val count = stage.selectedFiles?.size ?: 0
-    if (count == 0) return "No files chosen"
-    val files = if (count == 1) "1 file" else "$count files"
-    return withSize("$verb $files", stage.bytes)
+    if (count == 0) return Res.string.intake_submit_no_files.text()
+    return countLabel(count, items = false, stage.bytes)
   }
 
-  private fun batchLabel(): String {
+  private fun batchLabel(): UiText {
     val adding = entries.filter { it.addable }
     val count = adding.sumOf { it.linkCount }
     val only = adding.singleOrNull()?.takeIf { it.linkCount == 1 }
     return when {
-      count == 0 -> "Nothing to add"
-      only != null -> "$verb ${middleEllipsis(only.name, MAX_LABEL_NAME)}"
-      else -> {
-        // A torrent holds files of its own, so a batch with one counts items.
-        val noun = if (adding.any { it.isTorrent }) "items" else "files"
-        withSize("$verb $count $noun", adding.sumOf { it.bytes ?: 0 })
+      count == 0 -> Res.string.intake_submit_nothing.text()
+      only != null -> {
+        val name = middleEllipsis(only.name, MAX_LABEL_NAME)
+        if (scheduled) {
+          Res.string.intake_submit_schedule_name.text(name)
+        } else {
+          Res.string.intake_submit_download_name.text(name)
+        }
       }
+      // A torrent holds files of its own, so a batch with one counts items.
+      else -> countLabel(count, items = adding.any { it.isTorrent }, adding.sumOf { it.bytes ?: 0 })
     }
   }
 
   // Scheduling says when, not how much; adding now says how much.
-  private fun withSize(label: String, bytes: Long?): String =
-    if (schedule == DownloadSchedule.Immediate && bytes != null && bytes > 0) {
-      "$label · ${formatBytes(bytes)}"
-    } else {
-      label
+  private fun countLabel(count: Int, items: Boolean, bytes: Long?): UiText {
+    val size = bytes?.takeIf { it > 0 && !scheduled }?.let(::sizeText)
+    return when {
+      scheduled && items -> Res.plurals.intake_submit_schedule_items.text(count)
+      scheduled -> Res.plurals.intake_submit_schedule_files.text(count)
+      size != null && items ->
+        Res.plurals.intake_submit_download_items_size.text(count, count, size)
+      size != null -> Res.plurals.intake_submit_download_files_size.text(count, count, size)
+      items -> Res.plurals.intake_submit_download_items.text(count)
+      else -> Res.plurals.intake_submit_download_files.text(count)
     }
+  }
 
   /**
    * Speed, priority, start and connections as the Options pill sums them up; a retry offers no
@@ -1060,8 +1170,7 @@ class IntakeSession internal constructor(
   fun pasteCurl(clip: String?, entry: IntakeEntry? = null): Boolean {
     val command = clip?.trim()
     if (command == null || !CurlParser.isCurl(command) || CurlParser.parse(command) == null) {
-      notice = "The clipboard holds no cURL command. In the browser's network panel, " +
-        "right-click the request and choose Copy as cURL."
+      notice = Res.string.intake_notice_no_curl.text()
       return false
     }
     notice = null
@@ -1082,14 +1191,14 @@ class IntakeSession internal constructor(
    */
   fun addFiles(files: List<DroppedFile>) {
     if (mode != IntakeMode.Add) {
-      notice = "Close this sheet to add other downloads"
+      notice = Res.string.intake_notice_close_first.text()
       return
     }
     val torrents = files.filter { it.name.endsWith(".torrent", ignoreCase = true) }
     torrents.forEach(::addFile)
     val lists = files.filter { LinkParser.isLinkList(it.name) }
     if (torrents.isEmpty() && lists.isEmpty() && files.isNotEmpty()) {
-      notice = "Only .torrent files and lists of links can be added"
+      notice = Res.string.intake_notice_unsupported_files.text()
       return
     }
     if (lists.isEmpty()) return
@@ -1097,13 +1206,15 @@ class IntakeSession internal constructor(
       val links = lists.flatMap { file ->
         val content = catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES) }
           .onFailure { e ->
-            notice = listOfNotNull("Couldn't read ${file.name}", e.message).joinToString(": ")
+            notice = e.message
+              ?.let { Res.string.intake_notice_read_failed_reason.text(file.name, it) }
+              ?: Res.string.intake_notice_read_failed.text(file.name)
           }
           .getOrNull() ?: return@flatMap emptyList()
         LinkParser.parseIntake(content.decodeToString(), file.name).links().map { it.url }
       }
       if (links.isEmpty()) {
-        if (notice == null) notice = "Found no links in what was dropped"
+        if (notice == null) notice = Res.string.intake_notice_no_links.text()
         return@launch
       }
       val updated = (listOf(text.text.trimEnd()) + links).filter { it.isNotEmpty() }
@@ -1216,10 +1327,7 @@ class IntakeSession internal constructor(
   }
 
   /** The device name downloads go to, as messages say it. */
-  fun targetName(): String {
-    val target = target ?: return "this device"
-    return if (target is EmbeddedInstance) localDeviceNoun() else target.label
-  }
+  fun targetName(): UiText = target?.displayName ?: Res.string.device_any_in_sentence.text()
 
   private fun add(onDone: () -> Unit) {
     val target = target ?: return
@@ -1320,15 +1428,19 @@ class IntakeSession internal constructor(
     val reviewAction = if (review.isEmpty()) {
       null
     } else {
-      MessageAction("Review") { reopen(review, failedUrls) }
+      MessageAction(Res.string.action_review.text()) { reopen(review, failedUrls) }
     }
     if (added.isEmpty()) {
       val error = failed.firstOrNull()?.third?.exceptionOrNull()
+      val what = if (failed.size == 1) {
+        verbatim(failed.single().first.name)
+      } else {
+        Res.plurals.count_downloads.text(failed.size)
+      }
       state.messages.post(
         level = MessageLevel.Error,
-        title = if (failed.size == 1) "Couldn't add ${failed.single().first.name}"
-        else "Couldn't add ${failed.size} downloads",
-        detail = error?.message,
+        title = Res.string.intake_add_failed.text(what),
+        detail = error?.message?.let(::verbatim),
         deviceId = target.deviceId,
         actions = listOfNotNull(reviewAction),
         cause = error,
@@ -1337,32 +1449,41 @@ class IntakeSession internal constructor(
     }
     if (shown) showNewRows()
     state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
-    val op = state.pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
+    val undoTitle = Res.string.feedback_undo_add.text()
+    val op = state.pendingOps.register(undoTitle, timeout = ADD_UNDO_WINDOW, undo = {
       added.forEach { task ->
         catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
           log.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
         }
       }
     })
-    val undo = MessageAction("Undo") { state.pendingOps.undo(op.id) }
+    val undo = MessageAction(Res.string.action_undo.text()) { state.pendingOps.undo(op.id) }
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
-    val show = MessageAction("Show") {
+    val show = MessageAction(Res.string.action_show.text()) {
       if (target !in state.shownInstances.value) state.switchInstance(target)
       state.showDownloads(StatusFilter.All)
       key?.let(state::inspect)
     }
-    val what = if (single != null) displayName(single.request) else downloads(added.size)
-    val title = buildString {
-      append(if (shown) "Added $what → $deviceName" else "Added $what to $deviceName")
-      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-      val left = skipped.sumOf { it.linkCount }
-      if (left > 0) append(" · $left left out")
+    val what = if (single != null) {
+      verbatim(displayName(single.request))
+    } else {
+      Res.plurals.count_downloads.text(added.size)
     }
+    val left = skipped.sumOf { it.linkCount }
+    val title = listOfNotNull(
+      if (shown) {
+        Res.string.intake_added_here.text(what, deviceName)
+      } else {
+        Res.string.intake_added_to.text(what, deviceName)
+      },
+      Res.plurals.intake_added_failed.text(failed.size).takeIf { failed.isNotEmpty() },
+      Res.plurals.intake_added_left_out.text(left).takeIf { left > 0 },
+    ).joinText()
     state.messages.post(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failed.firstOrNull()?.third?.exceptionOrNull()?.message,
+      detail = failed.firstOrNull()?.third?.exceptionOrNull()?.message?.let(::verbatim),
       taskKey = key,
       deviceId = target.deviceId,
       actions = listOfNotNull(reviewAction ?: show, undo),
@@ -1415,7 +1536,8 @@ class IntakeSession internal constructor(
     val name = displayName(current, task.state.value)
     if (!startsOver) {
       val newConnections = connectionsFor(current)
-      state.runTaskCommand(task, "retry $name") {
+      val failure = { device: UiText -> Res.string.intake_retry_failed.text(name, device) }
+      state.runTaskCommand(task, "retry $name", failure) {
         if (speedLimit != current.speedLimit) setSpeedLimit(speedLimit)
         if (priority != current.priority) setPriority(priority)
         newConnections?.let { setConnections(it) }
@@ -1437,15 +1559,15 @@ class IntakeSession internal constructor(
         state.claimAdds(listOf(TaskKey(target.deviceId, copy.taskId)))
         state.messages.post(
           MessageLevel.Success,
-          "Started ${displayName(request)} over",
+          Res.string.intake_restarted.text(displayName(request)),
           deviceId = target.deviceId,
         )
       }.onFailure { e ->
         log.w { "Couldn't start taskId=${task.taskId} over: ${e.describeCauses()}" }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "Couldn't start $name over on ${targetName()}",
-          detail = e.message,
+          title = Res.string.intake_restart_failed.text(name, targetName()),
+          detail = e.message?.let(::verbatim),
           deviceId = target.deviceId,
           cause = e,
         )
@@ -1462,7 +1584,8 @@ class IntakeSession internal constructor(
     val newConnections = connectionsFor(current)
     val newSchedule = schedule
     val wasScheduled = task.state.value as? DownloadState.Scheduled
-    state.runTaskCommand(task, "change the options of $name") {
+    val failure = { device: UiText -> Res.string.intake_apply_failed.text(name, device) }
+    state.runTaskCommand(task, "options $name", failure) {
       if (speed != current.speedLimit) setSpeedLimit(speed)
       if (newPriority != current.priority) setPriority(newPriority)
       newConnections?.let { setConnections(it) }
@@ -1541,7 +1664,7 @@ class IntakeSession internal constructor(
     }
     val room = (MAX_INTAKE_ROWS - fileEntries.size).coerceAtLeast(0)
     val kept = sources.take(room)
-    notice = if (kept.size < sources.size) "Showing the first $room links" else null
+    notice = Res.plurals.intake_notice_first_links.text(room).takeIf { kept.size < sources.size }
     val previous = textEntries.associateBy { it.key }
     val next = kept.map { source ->
       val existing = previous[source.key]
@@ -1643,7 +1766,7 @@ class IntakeSession internal constructor(
         when (resolveState) {
           is ResolveState.Resolved -> return resolveState.result
           is ResolveState.Error -> throw resolveState.cause ?: IllegalStateException(
-            resolveState.message,
+            resolveState.text.load(),
           )
           else -> Unit
         }
@@ -1715,12 +1838,12 @@ class IntakeSession internal constructor(
     }
   }
 
-  private fun startOverWarning(): String {
+  private fun startOverWarning(): UiText {
     val done = task?.segments?.value?.sumOf { it.downloadedBytes } ?: 0
     return if (done > 0) {
-      "Starts over · ${formatBytes(done)} downloaded so far will be discarded."
+      Res.string.intake_start_over_discard.text(sizeText(done))
     } else {
-      "Starts over as a new download."
+      Res.string.intake_start_over_new.text()
     }
   }
 
@@ -1814,14 +1937,18 @@ class IntakeController(
         .first { rows -> rows.none { it.waitsForFiles || it.isTimedOut } }
       if (background !== session || !session.inBackground) return@launch
       val ready = torrents.firstOrNull { it.status is IntakeStatus.Ready }
-      val name = (ready ?: torrents.firstOrNull())?.name ?: "the torrent"
+      val name = (ready ?: torrents.firstOrNull())?.name
+      val title = when {
+        ready != null && name != null -> Res.string.intake_file_list_ready.text(name)
+        ready != null -> Res.string.intake_file_list_ready_unnamed.text()
+        name != null -> Res.string.intake_file_list_failed.text(name)
+        else -> Res.string.intake_file_list_failed_unnamed.text()
+      }
+      val action = if (ready != null) Res.string.intake_choose_files else Res.string.action_review
       state.messages.post(
         level = if (ready != null) MessageLevel.Info else MessageLevel.Warning,
-        title = if (ready != null) "File list of $name is ready"
-        else "Couldn't get the file list of $name",
-        actions = listOf(MessageAction(if (ready != null) "Choose files" else "Review") {
-          resume(session)
-        }),
+        title = title,
+        actions = listOf(MessageAction(action.text()) { resume(session) }),
       )
     }
   }
@@ -1902,7 +2029,7 @@ internal fun defaultTorrentSelection(files: List<SourceFile>): Set<String> {
 
 /**
  * What happens once the links are added on a device with [config] that runs [tasks]: "Starts
- * now · 1 of 2 slots free · ≈ 4 min at current speed", "Queued · 3rd in line", "⚡ Urgent:
+ * now · 1 of 2 slots free · ≈ 4 min at current speed", "Queued · 2 ahead", "⚡ Urgent:
  * starts now and pauses debian-12.iso (Low)", "Waits for github.com · 8 per server" or "Starts
  * 01:00 tonight". Returns `null` when nothing is added or the device's queue is unknown.
  *
@@ -1918,10 +2045,10 @@ internal fun intakeOutcome(
   bytes: Long?,
   now: Instant,
   zone: TimeZone,
-): String? {
+): UiText? {
   val count = hosts.size
   if (count == 0) return null
-  if (schedule != DownloadSchedule.Immediate) return startTimeLabel(schedule, now, zone)
+  if (schedule != DownloadSchedule.Immediate) return startTimeText(schedule, now, zone)
   if (config == null) return null
   val running = tasks.filter { it.state.value is DownloadState.Downloading }
   val slots = config.maxConcurrentDownloads
@@ -1931,40 +2058,58 @@ internal fun intakeOutcome(
   }
   val eta = if (bytes != null && speed > 0) {
     val seconds = bytes / speed
-    val time = approximateTime(seconds).let { if (seconds < 60) it else "≈ $it" }
-    " · $time at current speed"
+    if (seconds < 60) {
+      Res.string.intake_outcome_eta_soon.text()
+    } else {
+      Res.string.intake_outcome_eta.text(approximateTime(seconds))
+    }
   } else {
-    ""
+    null
   }
   if (priority == DownloadPriority.URGENT && free == 0 && running.isNotEmpty()) {
     val paused = running.minWith(
       compareBy<DownloadTask> { it.requestState.value.priority }.thenByDescending { it.createdAt },
     )
     val request = paused.requestState.value
-    return "⚡ Urgent: starts now and pauses ${displayName(request, paused.state.value)} " +
-      "(${priorityLabel(request.priority)})"
+    val name = displayName(request, paused.state.value)
+    return Res.string.intake_outcome_urgent.text(name, priorityText(request.priority))
   }
-  val slotsText = if (slots > 0) "$free of $slots slots free" else null
+  val slotsText = Res.plurals.intake_outcome_slots_free.text(slots, free, slots)
+    .takeIf { slots > 0 }
   if (count == 1) {
     val host = hosts.single()
     val perHost = config.maxConnectionsPerHost
     if (host != null && perHost > 0 && free > 0) {
       val onHost = running.count { urlHost(it.requestState.value.url) == host }
-      if (onHost >= perHost) return "Waits for $host · $perHost per server"
+      if (onHost >= perHost) return Res.string.intake_outcome_waits_for_host.text(host, perHost)
     }
-    if (free > 0) return listOfNotNull("Starts now", slotsText).joinToString(SEPARATOR) + eta
+    if (free > 0) {
+      return listOfNotNull(Res.string.intake_outcome_starts_now.text(), slotsText, eta).joinText()
+    }
     val ahead = tasks.count {
       it.state.value is DownloadState.Queued && it.requestState.value.priority >= priority
     }
-    return "Queued · ${ordinal(ahead + 1)} in line"
+    return if (ahead == 0) {
+      Res.string.intake_outcome_queued_next.text()
+    } else {
+      Res.plurals.intake_outcome_queued_behind.text(ahead)
+    }
   }
   val startNow = minOf(free, count)
   val queued = count - startNow
-  val parts = buildList {
-    if (startNow > 0) add("$startNow start now" + (slotsText?.let { " ($it)" } ?: ""))
-    if (queued > 0) add("$queued queued")
-  }
-  return parts.joinToString(SEPARATOR) + eta
+  return buildList {
+    if (startNow > 0) {
+      add(
+        if (slotsText != null) {
+          Res.plurals.intake_outcome_start_now_slots.text(startNow, startNow, slotsText)
+        } else {
+          Res.plurals.intake_outcome_start_now.text(startNow)
+        },
+      )
+    }
+    if (queued > 0) add(Res.plurals.intake_outcome_queued_count.text(queued))
+    eta?.let(::add)
+  }.joinText()
 }
 
 /**
@@ -2028,25 +2173,13 @@ private fun keysIn(segment: String): List<String> =
     }
   }
 
-/** "1st", "2nd", "3rd", "4th", "11th". */
-internal fun ordinal(number: Int): String {
-  val suffix = when {
-    number % 100 in 11..13 -> "th"
-    number % 10 == 1 -> "st"
-    number % 10 == 2 -> "nd"
-    number % 10 == 3 -> "rd"
-    else -> "th"
-  }
-  return "$number$suffix"
-}
-
-/** "under a minute", "4 min" or "2 h 10 min" for [seconds]. */
-internal fun approximateTime(seconds: Long): String = when {
-  seconds < 60 -> "under a minute"
-  seconds < 3600 -> "${(seconds + 59) / 60} min"
-  else -> {
-    val minutes = (seconds + 59) / 60
-    if (minutes % 60 == 0L) "${minutes / 60} h" else "${minutes / 60} h ${minutes % 60} min"
+/** "4 min" or "2 h 10 min" for [seconds], rounded up to the minute. */
+internal fun approximateTime(seconds: Long): UiText {
+  val minutes = (seconds + 59) / 60
+  return when {
+    minutes < 60 -> Res.string.duration_minutes.text(minutes)
+    minutes % 60 == 0L -> Res.string.intake_time_hours.text(minutes / 60)
+    else -> Res.string.intake_time_hours_minutes.text(minutes / 60, minutes % 60)
   }
 }
 
@@ -2063,11 +2196,8 @@ private fun separatorIn(path: String, fallback: String = "/"): String = when {
   else -> fallback
 }
 
-private fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
-
 private val WORD = Regex("\\S+")
 private val SPACES = Regex("[ \\t]{2,}")
-private const val SEPARATOR = " · "
 private const val CONTENT_SCHEME = "content://"
 private const val TORRENT_SOURCE = "torrent"
 private const val MAX_RECENT_FOLDERS = 5
@@ -2076,9 +2206,6 @@ private const val HASH_RADIX = 36
 
 /** Longest file name the main button shows before shortening it in the middle. */
 private const val MAX_LABEL_NAME = 36
-
-/** How [startTimeLabel] reads a start that is not later. */
-private const val NOW_LABEL = "Now"
 
 /**
  * What to do with a link on the clipboard: the setting, else fill on desktop, else suggest, as

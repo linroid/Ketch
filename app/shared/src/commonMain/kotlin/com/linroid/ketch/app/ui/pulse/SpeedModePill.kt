@@ -41,6 +41,9 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -51,15 +54,23 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.pulse_limited
+import ketch.app.shared.generated.resources.pulse_not_limited
+import ketch.app.shared.generated.resources.pulse_slow_lane_turn_off
+import ketch.app.shared.generated.resources.pulse_slow_lane_turn_on
+import ketch.app.shared.generated.resources.pulse_speed_limit
+import ketch.app.shared.generated.resources.pulse_speed_options
 import kotlinx.coroutines.Job
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What the speed mode pill and popover show for the active device.
  *
  * @property mode mode in effect.
  * @property limit limit downloads run at, from [effectiveCap].
- * @property label text of the pill, from [speedModeLabel].
+ * @property label text of the pill, from [speedModeLabelText].
  * @property controller the device's speed mode; `null` when it has none, which leaves only the
  *   speed limit to change.
  */
@@ -67,7 +78,7 @@ import kotlinx.datetime.TimeZone
 internal data class SpeedModeView(
   val mode: SpeedMode,
   val limit: SpeedLimit,
-  val label: String,
+  val label: UiText,
   val controller: SpeedModeController?,
 ) {
   /** Whether any limit holds downloads back, which tints the pill amber. */
@@ -97,7 +108,8 @@ internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   } else {
     effectiveCap(mode, pulse.cap, controller.slowLaneSpeed, settings.standard)
   }
-  val label = speedModeLabel(mode, limit, LocalClock.current.now(), TimeZone.currentSystemDefault())
+  val now = LocalClock.current.now()
+  val label = speedModeLabelText(mode, limit, now, TimeZone.currentSystemDefault())
   return SpeedModeView(mode, limit, label, controller)
 }
 
@@ -176,11 +188,15 @@ internal fun SpeedModePillContent(
   val ink = if (view.limited) limitedInk else colors.textSecondary
   val border = if (view.limited) limitedInk.copy(alpha = LIMITED_BORDER_ALPHA) else colors.hairline
   val toggles = view.controller != null
-  val toggleTip = if (toggles) {
-    if (view.mode.isSlowLane) "Turn off Slow lane" else "Turn on Slow lane"
-  } else {
-    "Speed limit"
-  }
+  val toggleTip = stringResource(
+    when {
+      !toggles -> Res.string.pulse_speed_limit
+      view.mode.isSlowLane -> Res.string.pulse_slow_lane_turn_off
+      else -> Res.string.pulse_slow_lane_turn_on
+    }
+  )
+  val label = view.label.resolve()
+  val options = stringResource(Res.string.pulse_speed_options)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = modifier
@@ -196,8 +212,10 @@ internal fun SpeedModePillContent(
     ) {
       PillPart(
         onClick = onToggle,
-        description = view.label,
-        stateLabel = if (view.limited) "Limited" else "Not limited",
+        description = label,
+        stateLabel = stringResource(
+          if (view.limited) Res.string.pulse_limited else Res.string.pulse_not_limited
+        ),
         startPadding = spacing.s2,
         endPadding = spacing.s1,
       ) {
@@ -207,7 +225,7 @@ internal fun SpeedModePillContent(
           KetchIconImage(icon = view.icon, size = GlyphSize, tint = ink)
         }
         Text(
-          text = view.label,
+          text = label,
           style = KetchTheme.typography.labelS,
           color = if (view.limited) limitedInk else colors.textPrimary,
           maxLines = 1,
@@ -216,10 +234,10 @@ internal fun SpeedModePillContent(
         )
       }
     }
-    KetchTooltip(text = "Speed options") {
+    KetchTooltip(text = options) {
       PillPart(
         onClick = onOptions,
-        description = "Speed options",
+        description = options,
         stateLabel = null,
         startPadding = spacing.s0_5,
         endPadding = spacing.s2,

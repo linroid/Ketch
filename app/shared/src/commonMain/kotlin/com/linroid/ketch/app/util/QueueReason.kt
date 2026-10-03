@@ -2,11 +2,17 @@ package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.queue_waiting_host
+import ketch.app.shared.generated.resources.queue_waiting_slot
+import ketch.app.shared.generated.resources.queue_waiting_start
 
 /** Why a queued task has not started, judged like the engine's download queue. */
 sealed class QueueReason {
   /** What a row says, such as "Waiting for a free slot (2 of 2 in use)". */
-  abstract val text: String
+  abstract val text: UiText
 
   /**
    * Every download slot is taken.
@@ -15,8 +21,8 @@ sealed class QueueReason {
    * @property limit [DownloadConfig.maxConcurrentDownloads].
    */
   data class SlotsFull(val running: Int, val limit: Int) : QueueReason() {
-    override val text: String
-      get() = "Waiting for a free slot ($running of $limit in use)"
+    override val text: UiText
+      get() = Res.string.queue_waiting_slot.text(running, limit)
   }
 
   /**
@@ -26,13 +32,14 @@ sealed class QueueReason {
    * @property limit [DownloadConfig.maxConnectionsPerHost].
    */
   data class HostFull(val host: String, val limit: Int) : QueueReason() {
-    override val text: String
-      get() = "Waiting for $host ($limit per site)"
+    override val text: UiText
+      get() = Res.string.queue_waiting_host.text(host, limit)
   }
 
   /** No limit holds the task back; it starts when the queue reaches it. */
   data object Next : QueueReason() {
-    override val text: String = "Waiting to start"
+    override val text: UiText
+      get() = Res.string.queue_waiting_start.text()
   }
 
   companion object {

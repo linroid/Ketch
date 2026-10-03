@@ -6,11 +6,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.app.util.toCopy
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connect_error_host
+import ketch.app.shared.generated.resources.connect_error_link_empty
+import ketch.app.shared.generated.resources.connect_error_link_invalid
+import ketch.app.shared.generated.resources.connect_error_port
+import ketch.app.shared.generated.resources.connect_link_has_code
+import ketch.app.shared.generated.resources.error_title_hint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -28,7 +39,7 @@ internal sealed interface ConnectProblem {
   data class Unreachable(val address: String) : ConnectProblem
 
   /** The device could not be added, for the reason in [message]. */
-  data class Failed(val message: String) : ConnectProblem
+  data class Failed(val message: UiText) : ConnectProblem
 }
 
 /**
@@ -146,40 +157,40 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     }
 
   /** What the form read from a pairing link, to confirm it; `null` for a plain address. */
-  val linkSummary: String?
+  val linkSummary: UiText?
     get() {
       val link = parsed?.takeIf { !usesManual } ?: return null
       val name = deviceNameOrNull(link.name ?: nameState)
       if (name == null && link.token == null) return null
       return listOfNotNull(
-        name,
-        link.address,
-        "includes its access code".takeIf { link.token != null },
-      ).joinToString(" · ")
+        name?.let(::verbatim),
+        verbatim(link.address),
+        Res.string.connect_link_has_code.text().takeIf { link.token != null },
+      ).joinText()
     }
 
   /** What is wrong with [link], once an attempt pointed it out. */
-  val linkError: String?
+  val linkError: UiText?
     get() = when {
       !attempted || manual -> null
-      linkState.isBlank() -> "Paste a pairing link or type an address"
-      parsed == null -> "Use a pairing link or an address such as nas.local:8642"
+      linkState.isBlank() -> Res.string.connect_error_link_empty.text()
+      parsed == null -> Res.string.connect_error_link_invalid.text()
       else -> null
     }
 
   /** What is wrong with [host], once an attempt pointed it out. */
-  val hostError: String?
+  val hostError: UiText?
     get() = when {
       !manual || !attempted || hostState.isBlank() && parsed != null -> null
-      !isHost(hostState.trim()) -> "Type a host name or an IP address"
+      !isHost(hostState.trim()) -> Res.string.connect_error_host.text()
       else -> null
     }
 
   /** What is wrong with [port], as soon as it is typed. */
-  val portError: String?
+  val portError: UiText?
     get() = when {
       !manual || portState.isEmpty() && !attempted -> null
-      portState.toIntOrNull() !in PORTS -> "Use a port from 1 to 65535"
+      portState.toIntOrNull() !in PORTS -> Res.string.connect_error_port.text()
       else -> null
     }
 
@@ -262,7 +273,10 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
       } catch (e: Exception) {
         log.w { "Couldn't add ${target.address}: ${e.describeCauses()}" }
         val copy = e.toCopy()
-        problem = ConnectProblem.Failed(listOfNotNull(copy.title, copy.hint).joinToString(". "))
+        val hint = copy.hint
+        problem = ConnectProblem.Failed(
+          if (hint == null) copy.title else Res.string.error_title_hint.text(copy.title, hint),
+        )
       } finally {
         connecting = false
       }

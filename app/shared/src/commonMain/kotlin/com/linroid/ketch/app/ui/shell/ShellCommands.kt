@@ -3,6 +3,8 @@ package com.linroid.ketch.app.ui.shell
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -16,6 +18,9 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_clipboard_no_link
+import ketch.app.shared.generated.resources.shell_file_picker_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -175,7 +180,7 @@ internal class ShellCommands(
       }
       is ClipboardAdd.Sheet -> state.openIntake(IntakeRequest(text = add.text))
       ClipboardAdd.Empty -> if (warnEmpty) {
-        state.messages.post(MessageLevel.Warning, "The clipboard holds no link")
+        state.messages.post(MessageLevel.Warning, Res.string.shell_clipboard_no_link.text())
       }
     }
   }
@@ -188,7 +193,11 @@ internal class ShellCommands(
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't pick torrent files: ${e.describeCauses()}" }
-        state.messages.post(MessageLevel.Error, "Couldn't open the file picker", e.message)
+        state.messages.post(
+          MessageLevel.Error,
+          Res.string.shell_file_picker_failed.text(),
+          e.message?.let(::verbatim),
+        )
         emptyList()
       }
       if (picked.isNotEmpty()) {

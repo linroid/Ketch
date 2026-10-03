@@ -10,6 +10,7 @@ import android.webkit.MimeTypeMap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import com.linroid.ketch.app.i18n.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -22,7 +23,7 @@ actual fun rememberFileActions(): FileActions? {
 
 /** Hands downloads to other apps. Android has no file manager to reveal them in. */
 private class AndroidFileActions(private val context: Context) : FileActions {
-  override val revealLabel: String? = null
+  override val revealLabel: UiText? = null
 
   override val canShare: Boolean = true
 

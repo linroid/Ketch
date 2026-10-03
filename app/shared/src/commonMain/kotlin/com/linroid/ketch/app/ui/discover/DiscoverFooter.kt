@@ -26,13 +26,25 @@ import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.DeviceTargetChip
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AiDiscoverState
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_free_space
+import ketch.app.shared.generated.resources.discover_add_now
+import ketch.app.shared.generated.resources.discover_review_add
+import ketch.app.shared.generated.resources.discover_review_add_count
+import ketch.app.shared.generated.resources.discover_select_to_add
+import ketch.app.shared.generated.resources.discover_selected
 import kotlinx.coroutines.Job
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The bar under the results: how much is selected, the device it goes to (with two devices or
@@ -58,7 +70,9 @@ internal fun DiscoverFooter(
     adding = null
   }
   val busy = adding != null
-  val summary = selectionSummary(selected.size, selected.map { it.fileSize })
+  val summary = selectionSummary(selected.size, selected.map { it.fileSize }).resolve()
+  val addNowLabel = stringResource(Res.string.discover_add_now)
+  val reviewLabel = reviewLabel(selected.size)
   val addNow = {
     adding = state.addDiscovered(selected)
   }
@@ -87,14 +101,14 @@ internal fun DiscoverFooter(
       TargetChip(state)
       if (!stacked) {
         KetchButton(
-          text = "Add now",
+          text = addNowLabel,
           onClick = addNow,
           variant = KetchButtonVariant.Secondary,
           enabled = selected.isNotEmpty(),
           loading = busy,
         )
         KetchButton(
-          text = reviewLabel(selected.size),
+          text = reviewLabel,
           onClick = review,
           enabled = selected.isNotEmpty() && !busy,
         )
@@ -103,7 +117,7 @@ internal fun DiscoverFooter(
     if (stacked) {
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
         KetchButton(
-          text = "Add now",
+          text = addNowLabel,
           onClick = addNow,
           variant = KetchButtonVariant.Secondary,
           enabled = selected.isNotEmpty(),
@@ -111,7 +125,7 @@ internal fun DiscoverFooter(
           modifier = Modifier.weight(1f),
         )
         KetchButton(
-          text = reviewLabel(selected.size),
+          text = reviewLabel,
           onClick = review,
           enabled = selected.isNotEmpty() && !busy,
           modifier = Modifier.weight(1f),
@@ -144,21 +158,27 @@ private fun targetOption(device: DevicePresence): DeviceOption = DeviceOption(
   name = device.name,
   health = device.health,
   pennantName = device.entry.label,
-  summary = device.disk?.usableBytes?.takeIf { it > 0 }?.let { "${formatBytes(it)} free" },
+  summary = device.disk?.usableBytes?.takeIf { it > 0 }
+    ?.let { Res.string.device_free_space.text(sizeText(it)) },
 )
 
 /** "Select downloads to add", or "2 selected · 1.2 GB" when every size is known. */
-internal fun selectionSummary(count: Int, sizes: List<Long?>): String {
-  if (count == 0) return "Select downloads to add"
+internal fun selectionSummary(count: Int, sizes: List<Long?>): UiText {
+  if (count == 0) return Res.string.discover_select_to_add.text()
   val known = sizes.filterNotNull().filter { it > 0 }
+  val selected = Res.plurals.discover_selected.text(count)
   return if (known.size == sizes.size) {
-    "$count selected · ${formatBytes(known.sum())}"
+    listOf(selected, sizeText(known.sum())).joinText()
   } else {
-    "$count selected"
+    selected
   }
 }
 
-private fun reviewLabel(count: Int): String =
-  if (count > 0) "Review & add $count" else "Review & add"
+@Composable
+private fun reviewLabel(count: Int): String = if (count > 0) {
+  stringResource(Res.string.discover_review_add_count, count)
+} else {
+  stringResource(Res.string.discover_review_add)
+}
 
 private val HairlineWidth: Dp = 1.dp

@@ -58,6 +58,13 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.SEPARATOR
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AiCandidate
@@ -67,8 +74,23 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.FileNameText
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.urlHost
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.discover_clear_selection
+import ketch.app.shared.generated.resources.discover_error_title
+import ketch.app.shared.generated.resources.discover_match
+import ketch.app.shared.generated.resources.discover_match_tooltip
+import ketch.app.shared.generated.resources.discover_none_body
+import ketch.app.shared.generated.resources.discover_none_title
+import ketch.app.shared.generated.resources.discover_not_encrypted
+import ketch.app.shared.generated.resources.discover_results
+import ketch.app.shared.generated.resources.discover_results_for
+import ketch.app.shared.generated.resources.discover_search_everywhere
+import ketch.app.shared.generated.resources.discover_select_all
+import ketch.app.shared.generated.resources.discover_settings
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What a search shows under the search field: the agent's steps, then placeholder rows while it
@@ -165,10 +187,11 @@ private fun ResultsHeader(
     modifier = modifier.fillMaxWidth().heightIn(min = KetchTheme.density.tableRow),
   ) {
     val everything = selected == candidates.size
+    val toggleAll = stringResource(
+      if (everything) Res.string.discover_clear_selection else Res.string.discover_select_all
+    )
     KetchTriStateCheckbox(
-      modifier = Modifier.checkboxSlot().semantics {
-        contentDescription = if (everything) "Clear selection" else "Select all"
-      },
+      modifier = Modifier.checkboxSlot().semantics { contentDescription = toggleAll },
       state = when (selected) {
         0 -> ToggleableState.Off
         candidates.size -> ToggleableState.On
@@ -178,15 +201,14 @@ private fun ResultsHeader(
         draft.selected = if (everything) draft.selected - all else draft.selected + all
       },
     )
+    val count = pluralStringResource(Res.plurals.discover_results, candidates.size, candidates.size)
+    val query = draft.submittedQuery.takeIf { it.isNotBlank() }
+      ?.let { stringResource(Res.string.discover_results_for, it) }
     Text(
       text = buildAnnotatedString {
-        withStyle(SpanStyle(color = colors.textPrimary)) {
-          append(if (candidates.size == 1) "1 download" else "${candidates.size} downloads")
-        }
-        if (draft.submittedQuery.isNotBlank()) {
-          withStyle(SpanStyle(color = colors.textSecondary)) {
-            append(" for “${draft.submittedQuery}”")
-          }
+        withStyle(SpanStyle(color = colors.textPrimary)) { append(count) }
+        if (query != null) {
+          withStyle(SpanStyle(color = colors.textSecondary)) { append(" $query") }
         }
       },
       style = KetchTheme.typography.bodyStrong,
@@ -218,6 +240,12 @@ private fun ResultRow(
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
   val name = candidateName(candidate)
+  val match = stringResource(
+    Res.string.discover_match,
+    percentText(percentOf(candidate.confidence)).resolve(),
+  )
+  val notEncrypted = stringResource(Res.string.discover_not_encrypted)
+  val meta = candidateMeta(candidate).resolve()
   // Tertiary text is too faint on the selected fill.
   val quiet = if (selected) colors.textSecondary else colors.textTertiary
   Row(
@@ -252,17 +280,15 @@ private fun ResultRow(
       Text(
         text = buildAnnotatedString {
           if (narrow) {
-            withStyle(SpanStyle(color = confidenceColor(candidate.confidence))) {
-              append("${percentOf(candidate.confidence)}% match")
-            }
-            append(" · ")
+            withStyle(SpanStyle(color = confidenceColor(candidate.confidence))) { append(match) }
+            append(SEPARATOR)
           }
           // Ahead of the host, so a phone never cuts the warning off.
           if (candidate.url.startsWith("http://", ignoreCase = true)) {
-            withStyle(SpanStyle(color = colors.status.paused.color)) { append("Not encrypted") }
-            append(" · ")
+            withStyle(SpanStyle(color = colors.status.paused.color)) { append(notEncrypted) }
+            append(SEPARATOR)
           }
-          append(candidateMeta(candidate))
+          append(meta)
         },
         style = type.caption,
         color = colors.textSecondary,
@@ -287,9 +313,9 @@ private fun ResultRow(
 /** "92%", green when the agent is sure, amber when it is not. */
 @Composable
 private fun ConfidenceBadge(confidence: Float) {
-  KetchTooltip(text = "How well it matches your search") {
+  KetchTooltip(text = stringResource(Res.string.discover_match_tooltip)) {
     KetchBadge(
-      text = "${percentOf(confidence)}%",
+      text = percentText(percentOf(confidence)).resolve(),
       tone = when {
         confidence >= SURE -> KetchBadgeTone.Success
         confidence >= UNSURE -> KetchBadgeTone.Neutral
@@ -329,11 +355,11 @@ private fun Modifier.checkboxSlot(): Modifier =
 private fun checkboxSize(): Dp = KetchTheme.density.controlGlyph
 
 /** "412 MB · download.blender.org", leaving out what is not known. */
-internal fun candidateMeta(candidate: AiCandidate): String =
+internal fun candidateMeta(candidate: AiCandidate): UiText =
   listOfNotNull(
-    candidate.fileSize?.takeIf { it > 0 }?.let(::formatBytes),
-    urlHost(candidate.url),
-  ).joinToString(" · ")
+    candidate.fileSize?.takeIf { it > 0 }?.let(::sizeText),
+    urlHost(candidate.url)?.let(::verbatim),
+  ).joinText()
 
 /** A row's shape while a search runs; it breathes unless motion is reduced. */
 @Composable
@@ -384,7 +410,7 @@ private fun SkeletonRow(index: Int, narrow: Boolean, modifier: Modifier) {
 /** What went wrong, with Try again and the settings that may fix it. */
 @Composable
 private fun ProblemCard(
-  message: String,
+  message: UiText,
   onRetry: () -> Unit,
   onSettings: () -> Unit,
   modifier: Modifier,
@@ -405,12 +431,12 @@ private fun ProblemCard(
     )
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
       Text(
-        text = "Discover couldn't finish this search",
+        text = stringResource(Res.string.discover_error_title),
         style = KetchTheme.typography.bodyStrong,
         color = colors.textPrimary,
       )
       Text(
-        text = message,
+        text = message.resolve(),
         style = KetchTheme.typography.bodyS,
         color = colors.textSecondary,
         maxLines = 4,
@@ -421,14 +447,14 @@ private fun ProblemCard(
         modifier = Modifier.padding(top = spacing.s2),
       ) {
         KetchButton(
-          text = "Try again",
+          text = stringResource(Res.string.action_try_again),
           onClick = onRetry,
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
           leadingIcon = KetchIcon.Retry,
         )
         KetchButton(
-          text = "Discover settings",
+          text = stringResource(Res.string.discover_settings),
           onClick = onSettings,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -455,13 +481,12 @@ private fun NoResults(
   ) {
     KetchIconImage(KetchIcon.Search, size = KetchTheme.density.navGlyph, tint = colors.textTertiary)
     Text(
-      text = "No downloads found",
+      text = stringResource(Res.string.discover_none_title),
       style = KetchTheme.typography.titleM,
       color = colors.textPrimary,
     )
     Text(
-      text = "Discover lists only files from sources it trusts. Try naming the version or " +
-        "platform, or the website that publishes it.",
+      text = stringResource(Res.string.discover_none_body),
       style = KetchTheme.typography.bodyS,
       color = colors.textSecondary,
       textAlign = TextAlign.Center,
@@ -469,7 +494,7 @@ private fun NoResults(
     )
     if (limited) {
       KetchButton(
-        text = "Search the whole web",
+        text = stringResource(Res.string.discover_search_everywhere),
         onClick = onSearchEverywhere,
         variant = KetchButtonVariant.Secondary,
         size = KetchButtonSize.Small,

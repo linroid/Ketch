@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommand
@@ -73,10 +76,13 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_back
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /** Builds the entries of a [KetchMenu]. */
 class KetchMenuScope internal constructor() {
@@ -92,11 +98,11 @@ class KetchMenuScope internal constructor() {
    * @param keepOpen keeps the menu open after the click, for checkable lists.
    */
   fun item(
-    label: String,
+    label: UiText,
     onClick: () -> Unit,
     icon: KetchIcon? = null,
     shortcut: String? = null,
-    caption: String? = null,
+    caption: UiText? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
     checked: Boolean? = null,
@@ -120,7 +126,7 @@ class KetchMenuScope internal constructor() {
     command: KetchCommand,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    label: String = command.label,
+    label: UiText = command.label,
     destructive: Boolean = false,
   ) {
     item(
@@ -135,7 +141,7 @@ class KetchMenuScope internal constructor() {
 
   /** Adds an item that opens the entries of [content] beside the menu, or in place on touch. */
   fun submenu(
-    label: String,
+    label: UiText,
     icon: KetchIcon? = null,
     enabled: Boolean = true,
     content: KetchMenuScope.() -> Unit,
@@ -149,7 +155,7 @@ class KetchMenuScope internal constructor() {
   }
 
   /** Adds a section label, such as "Recent". */
-  fun header(text: String) {
+  fun header(text: UiText) {
     entries += MenuEntry.Header(text)
   }
 
@@ -167,11 +173,11 @@ class KetchMenuScope internal constructor() {
 /** One entry of a [KetchMenu]. */
 internal sealed interface MenuEntry {
   class Item(
-    val label: String,
+    val label: UiText,
     val onClick: () -> Unit,
     val icon: KetchIcon?,
     val shortcut: String?,
-    val caption: String?,
+    val caption: UiText?,
     val enabled: Boolean,
     val destructive: Boolean,
     val checked: Boolean?,
@@ -179,7 +185,7 @@ internal sealed interface MenuEntry {
   ) : MenuEntry
 
   class Submenu(
-    val label: String,
+    val label: UiText,
     val icon: KetchIcon?,
     val enabled: Boolean,
     val entries: List<MenuEntry>,
@@ -187,7 +193,7 @@ internal sealed interface MenuEntry {
 
   data object Divider : MenuEntry
 
-  class Header(val text: String) : MenuEntry
+  class Header(val text: UiText) : MenuEntry
 
   class Custom(val content: @Composable (dismiss: () -> Unit) -> Unit) : MenuEntry
 }
@@ -488,11 +494,11 @@ private fun MenuPanel(
     entries.forEachIndexed { index, entry ->
       when (entry) {
         is MenuEntry.Item -> MenuRow(
-          label = entry.label,
+          label = entry.label.resolve(),
           icon = if (entry.checked == true) KetchIcon.Check else entry.icon,
           leading = leading,
           shortcut = entry.shortcut,
-          caption = entry.caption,
+          caption = entry.caption?.resolve(),
           enabled = entry.enabled,
           destructive = entry.destructive,
           checked = entry.checked,
@@ -503,7 +509,7 @@ private fun MenuPanel(
         )
         is MenuEntry.Submenu -> Box {
           MenuRow(
-            label = entry.label,
+            label = entry.label.resolve(),
             icon = entry.icon,
             leading = leading,
             shortcut = null,
@@ -529,7 +535,7 @@ private fun MenuPanel(
             .background(colors.divider),
         )
         is MenuEntry.Header -> Text(
-          text = eyebrowText(entry.text),
+          text = eyebrowText(entry.text.resolve()),
           style = KetchTheme.typography.eyebrow,
           color = colors.textTertiary,
           modifier = Modifier.padding(
@@ -685,7 +691,7 @@ private fun MenuSheet(
   for (index in path) {
     val submenu = current.getOrNull(index) as? MenuEntry.Submenu ?: break
     current = submenu.entries
-    heading = submenu.label
+    heading = submenu.label.resolve()
   }
   ModalBottomSheet(
     onDismissRequest = onDismiss,
@@ -706,7 +712,7 @@ private fun MenuSheet(
           if (path.isNotEmpty()) {
             KetchIconButton(
               icon = KetchIcon.ChevronLeft,
-              contentDescription = "Back",
+              contentDescription = stringResource(Res.string.action_back),
               onClick = { path = path.dropLast(1) },
             )
           }
@@ -723,9 +729,9 @@ private fun MenuSheet(
       current.forEachIndexed { index, entry ->
         when (entry) {
           is MenuEntry.Item -> SheetRow(
-            label = entry.label,
+            label = entry.label.resolve(),
             icon = if (entry.checked == true) KetchIcon.Check else entry.icon,
-            caption = entry.caption,
+            caption = entry.caption?.resolve(),
             enabled = entry.enabled,
             destructive = entry.destructive,
             checked = entry.checked,
@@ -736,7 +742,7 @@ private fun MenuSheet(
             },
           )
           is MenuEntry.Submenu -> SheetRow(
-            label = entry.label,
+            label = entry.label.resolve(),
             icon = entry.icon,
             caption = null,
             enabled = entry.enabled,
@@ -753,7 +759,7 @@ private fun MenuSheet(
               .background(colors.divider),
           )
           is MenuEntry.Header -> Text(
-            text = eyebrowText(entry.text),
+            text = eyebrowText(entry.text.resolve()),
             style = KetchTheme.typography.eyebrow,
             color = colors.textTertiary,
             modifier = Modifier.padding(

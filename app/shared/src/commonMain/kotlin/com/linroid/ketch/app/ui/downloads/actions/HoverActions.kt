@@ -20,12 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchSpinner
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.RowCommands
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_more_actions
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The buttons that fade in at the end of a row while the pointer is over it: Open and Show for a
@@ -99,7 +103,7 @@ private fun HoverButtons(
       }
       KetchIconButton(
         icon = action.icon,
-        contentDescription = rowActionLabel(action, revealLabel),
+        contentDescription = rowActionLabel(action, revealLabel).resolve(),
         shortcut = action.command?.shortcutLabel(platform),
         onClick = { runner.run(action, listOf(row)) },
       )
@@ -108,7 +112,7 @@ private fun HoverButtons(
       Box {
         KetchIconButton(
           icon = KetchIcon.More,
-          contentDescription = "More actions",
+          contentDescription = stringResource(Res.string.downloads_more_actions),
           onClick = { setMenuOpen(true) },
           selected = menuOpen,
         )

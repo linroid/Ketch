@@ -226,11 +226,11 @@ class SpeedModeController(
               throw e
             } catch (e: Exception) {
               // An offline device fails every minute; only the first failure is a warning.
-              val message = "Could not apply the speed mode on deviceId=$deviceId"
+              val cause = e.describeCauses()
               if (failing) {
-                log.d { "$message: ${e.describeCauses()}" }
+                log.d { "Could not apply the speed mode on deviceId=$deviceId: $cause" }
               } else {
-                log.w { "$message: ${e.describeCauses()}" }
+                log.w { "Could not apply the speed mode on deviceId=$deviceId: $cause" }
               }
               failing = true
             }

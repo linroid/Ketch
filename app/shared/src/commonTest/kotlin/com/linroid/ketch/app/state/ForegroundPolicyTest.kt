@@ -11,6 +11,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.config.ServerConfig
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -65,7 +66,7 @@ class ForegroundPolicyTest {
 
   @Test
   fun evaluate_serverFailedWithoutTasks_isNotRequired() {
-    val failed = ServerState.Failed("Port in use")
+    val failed = ServerState.Failed(verbatim("Port in use"))
     assertFalse(ForegroundPolicy.evaluate(emptyList(), failed).isRequired)
   }
 

@@ -36,10 +36,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_field_clear
+import ketch.app.shared.generated.resources.component_field_paste
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Text input on a sunken fill, 32 dp tall with a pointer and 48 dp on touch.
@@ -297,14 +302,22 @@ private fun FieldDecoration(
         .weight(1f)
         .padding(vertical = if (multiline) spacing.s2 else spacing.s1),
     ) {
-      if (isEmpty) Text(placeholder, style = textStyle, color = colors.textTertiary, maxLines = 1)
+      if (isEmpty) {
+        Text(
+          placeholder,
+          style = textStyle,
+          color = colors.textTertiary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
       inner()
     }
-    if (onPaste != null) FieldAction("Paste", onPaste)
+    if (onPaste != null) FieldAction(stringResource(Res.string.component_field_paste), onPaste)
     if (onClear != null) {
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Clear text",
+        contentDescription = stringResource(Res.string.component_field_clear),
         size = KetchButtonSize.Small,
         onClick = onClear,
       )

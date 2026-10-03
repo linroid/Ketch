@@ -58,6 +58,10 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -72,8 +76,23 @@ import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.util.IntakeAction
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_open
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.intake_action_sign_in
+import ketch.app.shared.generated.resources.intake_add_all
+import ketch.app.shared.generated.resources.intake_choose_files
+import ketch.app.shared.generated.resources.intake_connections
+import ketch.app.shared.generated.resources.intake_download_again
+import ketch.app.shared.generated.resources.intake_download_all_now
+import ketch.app.shared.generated.resources.intake_finish_background
+import ketch.app.shared.generated.resources.intake_keep_out
+import ketch.app.shared.generated.resources.intake_password
+import ketch.app.shared.generated.resources.intake_remove_named
+import ketch.app.shared.generated.resources.intake_rename
+import ketch.app.shared.generated.resources.intake_user_name
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -215,13 +234,17 @@ private fun LanesPreview(actions: IntakeActions, entry: IntakeEntry) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        text = eyebrowText("Connections"),
+        text = eyebrowText(stringResource(Res.string.intake_connections)),
         style = KetchTheme.typography.eyebrow,
         color = KetchTheme.colors.textTertiary,
         modifier = Modifier.weight(1f),
       )
       splitLabel(resolved.totalBytes, connections)?.let {
-        Text(it, style = KetchTheme.typography.numeralS, color = KetchTheme.colors.textSecondary)
+        Text(
+          text = it.resolve(),
+          style = KetchTheme.typography.numeralS,
+          color = KetchTheme.colors.textSecondary,
+        )
       }
     }
     // Write heads at each segment's start show where every connection begins.
@@ -270,7 +293,7 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
     )
     Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
       KetchButton(
-        text = "Download all files now",
+        text = stringResource(Res.string.intake_download_all_now),
         onClick = {
           entry.addAnyway = true
           actions.submit()
@@ -280,7 +303,7 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
       )
       if (actions.canFinishInBackground) {
         KetchButton(
-          text = "Finish in background",
+          text = stringResource(Res.string.intake_finish_background),
           onClick = actions::finishInBackground,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -328,7 +351,7 @@ internal fun TaskPreview(task: DownloadTask) {
       )
       size.takeIf { it > 0 }?.let {
         Text(
-          text = formatBytes(it),
+          text = sizeText(it).resolve(),
           style = KetchTheme.typography.caption,
           color = colors.textSecondary,
         )
@@ -443,7 +466,8 @@ private fun EntryName(entry: IntakeEntry, style: TextStyle) {
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
     modifier = if (renamable) {
-      Modifier.clickable(onClickLabel = "Rename", role = Role.Button) { editing = true }
+      val rename = stringResource(Res.string.intake_rename)
+      Modifier.clickable(onClickLabel = rename, role = Role.Button) { editing = true }
     } else {
       Modifier
     },
@@ -454,19 +478,20 @@ private fun EntryName(entry: IntakeEntry, style: TextStyle) {
 private fun EntryStatus(entry: IntakeEntry, now: Instant) {
   val colors = KetchTheme.colors
   val line = statusLine(entry, now)
+  val text = line.text.resolve()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
   ) {
     if (line.tone == LineTone.Checking) KetchSpinner()
     line.badge?.let {
-      KetchBadge(it, tone = KetchBadgeTone.Warning)
+      KetchBadge(it.resolve(), tone = KetchBadgeTone.Warning)
     }
-    if (line.text.isNotEmpty()) {
+    if (text.isNotEmpty()) {
       // A problem's advice is often longer than the row; hovering shows all of it.
-      KetchTooltip(text = line.text, enabled = line.tone != LineTone.Neutral) {
+      KetchTooltip(text = text, enabled = line.tone != LineTone.Neutral) {
         Text(
-          text = line.text,
+          text = text,
           style = KetchTheme.typography.caption,
           color = when (line.tone) {
             LineTone.Danger -> colors.status.failed.color
@@ -481,8 +506,13 @@ private fun EntryStatus(entry: IntakeEntry, now: Instant) {
   }
 }
 
-/** One button a row offers. */
-private class RowButton(val label: String, val primary: Boolean = false, val onClick: () -> Unit)
+/** One button a row offers; a [sparkle] marks one that asks Discover. */
+private class RowButton(
+  val label: UiText,
+  val primary: Boolean = false,
+  val sparkle: Boolean = false,
+  val onClick: () -> Unit,
+)
 
 /** The buttons [entry] offers for its problem, its duplicate, or its torrent files. */
 private fun entryActions(
@@ -493,41 +523,50 @@ private fun entryActions(
   val session = actions.session
   val duplicate = entry.duplicate
   if (duplicate != null) {
-    if (entry.downloadAgain) return listOf(RowButton("Keep out") { entry.downloadAgain = false })
+    if (entry.downloadAgain) {
+      return listOf(RowButton(Res.string.intake_keep_out.text()) { entry.downloadAgain = false })
+    }
     val completed = duplicate.state.value as? DownloadState.Completed
     val files = actions.fileActions.takeIf { session.target is EmbeddedInstance }
     return buildList {
       if (completed != null && files != null) {
-        add(RowButton("Open") { actions.openFile(completed.outputPath, reveal = false) })
+        add(RowButton(Res.string.action_open.text()) {
+          actions.openFile(completed.outputPath, reveal = false)
+        })
         if (files.revealLabel != null) {
-          add(RowButton("Show") { actions.openFile(completed.outputPath, reveal = true) })
+          add(RowButton(Res.string.action_show.text()) {
+            actions.openFile(completed.outputPath, reveal = true)
+          })
         }
       }
-      add(RowButton("Download again") { entry.downloadAgain = true })
+      add(RowButton(Res.string.intake_download_again.text()) { entry.downloadAgain = true })
     }
   }
   val problem = (entry.status as? IntakeStatus.Problem)?.problem
   if (problem != null && !entry.addAnyway) {
     return problem.actions.mapNotNull { action ->
+      val label = action.label.text()
       when (action) {
-        IntakeAction.SignIn -> RowButton(action.label, primary = true, onClick = onSignIn)
-        IntakeAction.PasteCurl -> RowButton(action.label, primary = true) {
-          actions.pasteCurl(entry)
+        IntakeAction.SignIn -> RowButton(label, primary = true, onClick = onSignIn)
+        IntakeAction.PasteCurl -> RowButton(label, primary = true) { actions.pasteCurl(entry) }
+        IntakeAction.AddHeaders -> RowButton(label) { session.updateAdvancedOpen(true) }
+        IntakeAction.FindMirror -> RowButton(label, sparkle = true) {
+          session.discover(entry.name)
         }
-        IntakeAction.AddHeaders -> RowButton(action.label) { session.updateAdvancedOpen(true) }
-        IntakeAction.FindMirror -> RowButton("✦ ${action.label}") { session.discover(entry.name) }
-        IntakeAction.Retry -> RowButton(action.label) { session.retry(entry) }
-        IntakeAction.KeepWaiting -> RowButton(action.label) { session.keepWaiting(entry) }
-        IntakeAction.AddAnyway -> RowButton(action.label) { entry.addAnyway = true }
+        IntakeAction.Retry -> RowButton(label) { session.retry(entry) }
+        IntakeAction.KeepWaiting -> RowButton(label) { session.keepWaiting(entry) }
+        IntakeAction.AddAnyway -> RowButton(label) { entry.addAnyway = true }
       }
     }
   }
   if (entry.isTorrent) {
     if (entry.files.isNotEmpty()) {
-      return listOf(RowButton("Choose files") { session.torrentStage = entry })
+      return listOf(
+        RowButton(Res.string.intake_choose_files.text()) { session.torrentStage = entry },
+      )
     }
     if (session.entries.size > 1 && entry.waitsForFiles && !entry.addAnyway) {
-      return listOf(RowButton("Add all") { entry.addAnyway = true })
+      return listOf(RowButton(Res.string.intake_add_all.text()) { entry.addAnyway = true })
     }
   }
   return emptyList()
@@ -549,8 +588,9 @@ private fun EntryActions(
     modifier = modifier,
   ) {
     for (button in buttons) {
+      val label = button.label.resolve()
       KetchButton(
-        text = button.label,
+        text = if (button.sparkle) "✦ $label" else label,
         onClick = button.onClick,
         variant = if (button.primary) KetchButtonVariant.Tonal else KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -563,7 +603,7 @@ private fun EntryActions(
 private fun RemoveButton(actions: IntakeActions, entry: IntakeEntry) {
   KetchIconButton(
     icon = KetchIcon.Close,
-    contentDescription = "Remove ${entry.name}",
+    contentDescription = stringResource(Res.string.intake_remove_named, entry.name),
     size = KetchButtonSize.Small,
     onClick = { actions.session.remove(entry) },
   )
@@ -583,13 +623,13 @@ private fun SignInFields(onSignIn: (user: String, password: String) -> Unit) {
     KetchTextField(
       value = user,
       onValueChange = { user = it },
-      label = "User name",
+      label = stringResource(Res.string.intake_user_name),
       modifier = Modifier.weight(1f),
     )
     KetchTextField(
       value = password,
       onValueChange = { password = it },
-      label = "Password",
+      label = stringResource(Res.string.intake_password),
       clearable = false,
       visualTransformation = PasswordVisualTransformation(),
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -599,7 +639,7 @@ private fun SignInFields(onSignIn: (user: String, password: String) -> Unit) {
       modifier = Modifier.weight(1f),
     )
     KetchButton(
-      text = "Sign in",
+      text = stringResource(Res.string.intake_action_sign_in),
       onClick = { onSignIn(user, password) },
       enabled = user.isNotBlank(),
       variant = KetchButtonVariant.Tonal,

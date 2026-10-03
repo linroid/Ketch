@@ -27,6 +27,10 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.row_files
+import org.jetbrains.compose.resources.pluralStringResource
 
 /**
  * What dragging rows out of the Downloads list carries.
@@ -85,17 +89,38 @@ internal expect fun draggedTaskKeys(event: DragAndDropEvent): List<TaskKey>
  *
  * @param rows the rows a drag that starts here carries: the selection when this row is in it,
  *   otherwise this row.
+ * @param count what the drag shows after the first row's name when it carries several rows,
+ *   [dragCount] of them.
  */
 @Composable
-internal fun Modifier.taskDragSource(rows: () -> List<TaskRow>): Modifier {
+internal fun Modifier.taskDragSource(
+  rows: () -> List<TaskRow>,
+  count: () -> String?,
+): Modifier {
   val measurer = rememberTextMeasurer()
   val style = rememberDragPreviewStyle()
   val currentRows by rememberUpdatedState(rows)
+  val currentCount by rememberUpdatedState(count)
   return dragAndDropSource(
-    drawDragDecoration = { drawDragPreview(currentRows(), measurer, style) },
+    drawDragDecoration = { drawDragPreview(currentRows(), measurer, style, currentCount()) },
   ) { _ ->
     val dragged = currentRows()
     if (dragged.isEmpty()) null else dragTransferData(DragPayload.of(dragged))
+  }
+}
+
+/**
+ * What a drag of [rows] shows after the first row's name: "3 files" when every row brings its
+ * file, otherwise "3 downloads"; `null` for one row.
+ */
+@Composable
+internal fun dragCount(rows: List<TaskRow>): String? {
+  if (rows.size < 2) return null
+  val files = remember(rows) { DragPayload.of(rows).files.size }
+  return if (files == rows.size) {
+    pluralStringResource(Res.plurals.row_files, rows.size, rows.size)
+  } else {
+    pluralStringResource(Res.plurals.count_downloads, rows.size, rows.size)
   }
 }
 
@@ -148,24 +173,20 @@ internal fun rememberDragPreviewStyle(): DragPreviewStyle {
 
 /**
  * Draws what a drag of [rows] shows under the pointer: a pill with the first row's name and,
- * for several rows, how many files or downloads come along, at the start of the drawing area.
+ * for several rows, [count], how many files or downloads come along, at the start of the
+ * drawing area.
  */
 internal fun DrawScope.drawDragPreview(
   rows: List<TaskRow>,
   measurer: TextMeasurer,
   style: DragPreviewStyle,
+  count: String?,
 ) {
   val first = rows.firstOrNull() ?: return
   val padding = style.padding.toPx()
   val gap = style.gap.toPx()
   val height = style.height.toPx().coerceAtMost(size.height)
-  val badge = if (rows.size > 1) {
-    val files = DragPayload.of(rows).files.size
-    val noun = if (files == rows.size) "files" else "downloads"
-    measurer.measure("${rows.size} $noun", style.badge)
-  } else {
-    null
-  }
+  val badge = count?.takeIf { rows.size > 1 }?.let { measurer.measure(it, style.badge) }
   val badgeWidth = badge?.let { it.size.width + gap * 2 } ?: 0f
   val nameMax = (size.width - padding * 2 - badgeWidth - gap).coerceAtLeast(0f)
   val name = measurer.measure(

@@ -30,13 +30,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
@@ -50,6 +48,7 @@ import com.linroid.ketch.app.components.healthColor
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -60,8 +59,27 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.devices.SERVER_COMMAND
+import com.linroid.ketch.app.ui.devices.styledPart
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.shell.canvasWash
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_connect
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.connect_address_manually
+import ketch.app.shared.generated.resources.connect_enter_code
+import ketch.app.shared.generated.resources.connect_landing_body
+import ketch.app.shared.generated.resources.connect_landing_title
+import ketch.app.shared.generated.resources.connect_link_placeholder
+import ketch.app.shared.generated.resources.connect_status_needs_code
+import ketch.app.shared.generated.resources.connect_status_online
+import ketch.app.shared.generated.resources.connect_where_link
+import ketch.app.shared.generated.resources.connect_where_link_body
+import ketch.app.shared.generated.resources.connect_your_devices
+import ketch.app.shared.generated.resources.device_not_connected
+import ketch.app.shared.generated.resources.device_target_connecting
+import ketch.app.shared.generated.resources.device_target_offline
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The page shown in place of the app while no device is shown, as in the web app before one is
@@ -159,13 +177,13 @@ internal fun ConnectLandingContent(
         ) {
           SailLanesIllustration(width = SailLanesIllustrationDefaults.CompactWidth)
           Text(
-            text = "Connect to a Ketch device",
+            text = stringResource(Res.string.connect_landing_title),
             style = type.titleL,
             color = colors.textPrimary,
             textAlign = TextAlign.Center,
           )
           Text(
-            text = "Control the downloads of a computer, NAS or phone that runs Ketch.",
+            text = stringResource(Res.string.connect_landing_body),
             style = type.bodyS,
             color = colors.textSecondary,
             textAlign = TextAlign.Center,
@@ -175,21 +193,29 @@ internal fun ConnectLandingContent(
           form = form,
           onSubmit = submit,
           // The whole hint does not fit a phone's card.
-          placeholder = if (narrow) NarrowPlaceholder else DefaultPlaceholder,
+          placeholder = if (narrow) {
+            NarrowPlaceholder
+          } else {
+            stringResource(Res.string.connect_link_placeholder)
+          },
           autoFocus = true,
         )
         AccessCodeField(form, onSubmit = submit)
-        ManualDetails(form, onSubmit = submit, label = "Enter address manually")
+        ManualDetails(
+          form = form,
+          onSubmit = submit,
+          label = stringResource(Res.string.connect_address_manually),
+        )
         ConnectProblemNotice(form.problem, onAddAnyway = { onSubmit(false) })
         KetchButton(
-          text = "Connect",
+          text = stringResource(Res.string.action_connect),
           onClick = submit,
           loading = form.connecting,
           modifier = Modifier.align(Alignment.End),
         )
         if (devices.isNotEmpty()) {
           Divider(colors)
-          LandingSection("Your devices") {
+          LandingSection(stringResource(Res.string.connect_your_devices)) {
             // The rows' hover reaches past the text, which lines up with the rest of the card.
             Column(Modifier.fillMaxWidth().bleed(spacing.s2)) {
               devices.forEach { device -> LandingDeviceRow(device, onClick = { onPick(device) }) }
@@ -197,16 +223,13 @@ internal fun ConnectLandingContent(
           }
         }
         Divider(colors)
-        LandingSection("Where to find the link") {
+        LandingSection(stringResource(Res.string.connect_where_link)) {
           Text(
-            text = buildAnnotatedString {
-              append("On the computer that runs Ketch, open Settings › Sharing › Allow another ")
-              append("device, then copy the pairing link. On a NAS or server, run ")
-              withStyle(SpanStyle(fontFamily = type.mono.fontFamily, color = colors.textPrimary)) {
-                append("ketch\u00A0server")
-              }
-              append(".")
-            },
+            text = styledPart(
+              text = stringResource(Res.string.connect_where_link_body, SERVER_COMMAND),
+              part = SERVER_COMMAND,
+              style = SpanStyle(fontFamily = type.mono.fontFamily, color = colors.textPrimary),
+            ),
             style = type.bodyS,
             color = colors.textSecondary,
           )
@@ -260,7 +283,9 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = if (device.needsCode) "Enter its access code" else "Show",
+        onClickLabel = stringResource(
+          if (device.needsCode) Res.string.connect_enter_code else Res.string.action_show,
+        ),
         onClick = onClick,
       )
       .padding(horizontal = spacing.s2),
@@ -269,7 +294,7 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
     Box(Modifier.size(DevicePennantDefaults.Large), contentAlignment = Alignment.Center) {
       DevicePennant(
         deviceId = device.deviceId,
-        name = device.name,
+        name = device.name.resolve(),
         health = device.health.takeIf { device.connected },
         failures = device.unseenFailures,
         icon = KetchIcon.Server.takeIf { unnamed },
@@ -277,7 +302,7 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
     }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       Text(
-        text = device.name,
+        text = device.name.resolve(),
         style = type.label,
         color = colors.textPrimary,
         maxLines = 1,
@@ -293,17 +318,19 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
         )
       }
     }
-    Text(text = label, style = type.labelS, color = tone, maxLines = 1)
+    Text(text = stringResource(label), style = type.labelS, color = tone, maxLines = 1)
   }
 }
 
 /** What a device row says about how [device] is reached, and in which color. */
 private fun landingStatus(device: DevicePresence, colors: KetchColors) = when {
-  !device.connected -> "Not connected" to colors.textTertiary
-  device.needsCode -> "Needs a code" to colors.status.failed.color
-  device.health is DeviceHealth.Offline -> "Offline" to colors.status.failed.color
-  device.health == DeviceHealth.Connecting -> "Connecting…" to colors.textSecondary
-  else -> "Online" to colors.healthColor(device.health)
+  !device.connected -> Res.string.device_not_connected to colors.textTertiary
+  device.needsCode -> Res.string.connect_status_needs_code to colors.status.failed.color
+  device.health is DeviceHealth.Offline ->
+    Res.string.device_target_offline to colors.status.failed.color
+  device.health == DeviceHealth.Connecting ->
+    Res.string.device_target_connecting to colors.textSecondary
+  else -> Res.string.connect_status_online to colors.healthColor(device.health)
 }
 
 // Whether the device turned down the access code it was given.

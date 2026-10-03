@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommand
@@ -260,7 +261,7 @@ fun KetchIconButton(
     size = size,
     enabled = enabled,
     tint = tint,
-    contentDescription = command.label,
+    contentDescription = command.label.resolve(),
     shortcut = command.shortcutLabel(),
     selected = selected,
   )

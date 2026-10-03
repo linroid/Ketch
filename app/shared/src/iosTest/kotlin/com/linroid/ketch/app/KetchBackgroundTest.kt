@@ -1,6 +1,7 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.PendingOps
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
@@ -87,7 +88,7 @@ class KetchBackgroundTest {
     val api = RecordingKetchApi()
     val ops = PendingOps(backgroundScope)
     val removal = CompletableDeferred<Unit>()
-    ops.register("Remove", commit = { removal.await() })
+    ops.register(verbatim("Undo remove"), commit = { removal.await() })
 
     val work = assertNotNull(pauser(api, this, commitPending = ops::flush).enterBackground())
     runCurrent()
@@ -104,7 +105,7 @@ class KetchBackgroundTest {
     val running = api.add(downloading)
     val ops = PendingOps(backgroundScope)
     val removal = CompletableDeferred<Unit>()
-    ops.register("Remove", commit = { removal.await() })
+    ops.register(verbatim("Undo remove"), commit = { removal.await() })
     val pauser = pauser(api, this, commitPending = ops::flush)
 
     val work = assertNotNull(pauser.keepRunningInBackground())

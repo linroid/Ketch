@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -475,7 +476,7 @@ private fun PhoneShell(
     topBar = {
       PhoneTopBar(
         shell = shell,
-        title = shell.destination.label,
+        title = shell.destination.label.resolve(),
         showsBottomBar = showsBottomBar,
         onShow = { shell.show(it) },
         onOpenSettings = { appState.openSettings() },

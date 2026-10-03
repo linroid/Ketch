@@ -23,6 +23,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
@@ -416,11 +417,11 @@ private fun history(row: TaskRow): SpeedHistory {
 }
 
 private val TIMELINE = listOf(
-  TimelineEntry(SampleData.NOW - 7.minutes, TimelineKind.Added, "Added"),
-  TimelineEntry(SampleData.NOW - 7.minutes + 1.seconds, TimelineKind.Started, "Started"),
-  TimelineEntry(SampleData.NOW - 5.minutes, TimelineKind.Changed, "Connections 4 → 8"),
-  TimelineEntry(SampleData.NOW - 4.minutes, TimelineKind.Paused, "Paused"),
-  TimelineEntry(SampleData.NOW - 3.minutes - 30.seconds, TimelineKind.Resumed, "Resumed"),
-  TimelineEntry(SampleData.NOW - 2.minutes, TimelineKind.Changed, "Limit → 8 MB/s"),
-  TimelineEntry(SampleData.NOW - 1.minutes, TimelineKind.Changed, "Priority → High")
+  TimelineEntry(SampleData.NOW - 7.minutes, TimelineKind.Added, verbatim("Added")),
+  TimelineEntry(SampleData.NOW - 7.minutes + 1.seconds, TimelineKind.Started, verbatim("Started")),
+  TimelineEntry(SampleData.NOW - 5.minutes, TimelineKind.Changed, verbatim("Connections 4 → 8")),
+  TimelineEntry(SampleData.NOW - 4.minutes, TimelineKind.Paused, verbatim("Paused")),
+  TimelineEntry(SampleData.NOW - 3.minutes - 30.seconds, TimelineKind.Resumed, verbatim("Resumed")),
+  TimelineEntry(SampleData.NOW - 2.minutes, TimelineKind.Changed, verbatim("Limit → 8 MB/s")),
+  TimelineEntry(SampleData.NOW - 1.minutes, TimelineKind.Changed, verbatim("Priority → High"))
 )

@@ -18,11 +18,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.app.util.SearchToken
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_facet_device
+import ketch.app.shared.generated.resources.downloads_facet_matched
+import ketch.app.shared.generated.resources.downloads_facet_origin
+import ketch.app.shared.generated.resources.downloads_facet_site
+import ketch.app.shared.generated.resources.downloads_facet_type
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The 32 dp row under the tabs while searching: the search's tokens as removable chips, the
@@ -66,7 +75,7 @@ internal fun FacetRow(
         )
       }
       Facet(
-        label = "Type",
+        label = stringResource(Res.string.downloads_facet_type),
         options = rows.groupingBy { it.fileType }.eachCount().entries
           .sortedBy { it.key.ordinal }
           .map { (type, count) -> FacetOption(SearchToken.Type(type), type.label, count) },
@@ -74,27 +83,27 @@ internal fun FacetRow(
         onQueryChange = onQueryChange,
       )
       Facet(
-        label = "Site",
+        label = stringResource(Res.string.downloads_facet_site),
         options = rows.mapNotNull { it.sourceHost }.groupingBy { it }.eachCount().entries
           .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
           .take(MAX_SITES)
-          .map { (host, count) -> FacetOption(SearchToken.Host(host), host, count) },
+          .map { (host, count) -> FacetOption(SearchToken.Host(host), verbatim(host), count) },
         query = query,
         onQueryChange = onQueryChange,
       )
-      val devices = rows.groupingBy { it.device.name }.eachCount()
+      val devices = rows.groupingBy { it.deviceName }.eachCount()
       if (devices.size > 1) {
         Facet(
-          label = "Device",
+          label = stringResource(Res.string.downloads_facet_device),
           options = devices.entries.map { (name, count) ->
-            FacetOption(SearchToken.Device(name), name, count)
+            FacetOption(SearchToken.Device(name), verbatim(name), count)
           },
           query = query,
           onQueryChange = onQueryChange,
         )
       }
       Facet(
-        label = "Origin",
+        label = stringResource(Res.string.downloads_facet_origin),
         options = rows.mapNotNull { it.origin }.groupingBy { it }.eachCount().entries
           .sortedBy { it.key.ordinal }
           .map { (origin, count) -> FacetOption(SearchToken.Origin(origin), origin.label, count) },
@@ -103,7 +112,7 @@ internal fun FacetRow(
       )
     }
     Text(
-      text = "$matched of $total",
+      text = stringResource(Res.string.downloads_facet_matched, matched, total),
       style = KetchTheme.typography.numeralS,
       color = colors.textTertiary,
       maxLines = 1,
@@ -116,7 +125,7 @@ internal fun FacetRow(
  *
  * @property count downloads on the tab with this value.
  */
-private class FacetOption(val token: SearchToken, val label: String, val count: Int)
+private class FacetOption(val token: SearchToken, val label: UiText, val count: Int)
 
 /**
  * A chip that opens a menu of [options]; picking one adds its token or removes it again. A facet

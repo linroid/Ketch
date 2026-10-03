@@ -58,6 +58,9 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.InspectorPlacement
 import com.linroid.ketch.app.ui.inspector.TaskInspector
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_inspector_resize
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The inspector docked beside the table: a 1 dp divider whose 6 dp handle drags the width
@@ -130,6 +133,7 @@ private fun ResizeHandle(
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   var start by remember { mutableStateOf(width) }
   var moved by remember { mutableStateOf(0f) }
+  val description = stringResource(Res.string.downloads_inspector_resize)
   Box(
     modifier = modifier
       .width(InspectorHandleWidth)
@@ -150,7 +154,7 @@ private fun ResizeHandle(
         },
         onDragStopped = { onResizeEnd() },
       )
-      .semantics { contentDescription = "Resize the inspector" },
+      .semantics { contentDescription = description },
   )
 }
 

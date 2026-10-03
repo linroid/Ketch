@@ -27,6 +27,10 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchHueTile
 import com.linroid.ketch.app.components.KetchHueTileDefaults
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
@@ -34,6 +38,21 @@ import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.LlmProvider
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.discover_example_blender
+import ketch.app.shared.generated.resources.discover_example_footage
+import ketch.app.shared.generated.resources.discover_example_quoted
+import ketch.app.shared.generated.resources.discover_example_ubuntu
+import ketch.app.shared.generated.resources.discover_hero_title
+import ketch.app.shared.generated.resources.discover_provider_openai_compatible
+import ketch.app.shared.generated.resources.discover_setup_body
+import ketch.app.shared.generated.resources.discover_setup_choose_model
+import ketch.app.shared.generated.resources.discover_setup_finish
+import ketch.app.shared.generated.resources.discover_setup_in_settings
+import ketch.app.shared.generated.resources.discover_setup_local_provider
+import ketch.app.shared.generated.resources.discover_setup_pending
+import ketch.app.shared.generated.resources.discover_setup_unsupported
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Discover before it is set up: what it does, searches it could run, and a button per model
@@ -50,18 +69,17 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
   val spacing = KetchTheme.spacing
   val colors = KetchTheme.colors
   DiscoverHero(
-    title = "Describe it. Ketch finds the download.",
+    title = stringResource(Res.string.discover_hero_title),
     body = if (supported) {
-      "Discover asks an AI model to search the web and read the pages it finds, then lists " +
-        "the files it trusts. Your searches go to the provider you choose."
+      stringResource(Res.string.discover_setup_body)
     } else {
-      "Discover runs in the Ketch app on a computer or an Android phone."
+      stringResource(Res.string.discover_setup_unsupported)
     },
     modifier = modifier,
   ) {
     if (pending != null) {
       Text(
-        text = "Your search for “${pending.query}” runs as soon as Discover is set up.",
+        text = stringResource(Res.string.discover_setup_pending, pending.query),
         style = KetchTheme.typography.labelS,
         color = colors.accentText,
         textAlign = TextAlign.Center,
@@ -75,7 +93,7 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
     if (!supported) return@DiscoverHero
     Spacer(Modifier.height(spacing.s8))
     Text(
-      text = eyebrowText("Choose a model"),
+      text = eyebrowText(stringResource(Res.string.discover_setup_choose_model)),
       style = KetchTheme.typography.eyebrow,
       color = colors.textTertiary,
     )
@@ -87,7 +105,7 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
     ) {
       for (provider in SetupProviders) {
         KetchButton(
-          text = provider.setupLabel,
+          text = provider.setupLabel.resolve(),
           onClick = {
             state.aiSettings.chooseProvider(provider)
             state.openSettings(SettingsTarget(SettingsTarget.Page.Discover))
@@ -103,7 +121,11 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
     }
     Spacer(Modifier.height(spacing.s2))
     KetchButton(
-      text = chosen?.let { "Finish setting up ${it.shortLabel}" } ?: "Set up in Settings",
+      text = if (chosen != null) {
+        stringResource(Res.string.discover_setup_finish, chosen.shortLabel.resolve())
+      } else {
+        stringResource(Res.string.discover_setup_in_settings)
+      },
       onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
       variant = KetchButtonVariant.Ghost,
       leadingIcon = KetchIcon.Settings,
@@ -179,7 +201,8 @@ internal fun DiscoverExamples(onClick: ((String) -> Unit)?) {
     verticalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier.fillMaxWidth(),
   ) {
-    for (example in Examples) {
+    for (resource in Examples) {
+      val example = stringResource(resource)
       if (onClick != null) {
         KetchChip(
           label = example,
@@ -206,7 +229,7 @@ private fun ExampleQuote(text: String) {
       .padding(horizontal = KetchTheme.spacing.s3),
   ) {
     Text(
-      text = "“$text”",
+      text = stringResource(Res.string.discover_example_quoted, text),
       style = KetchTheme.typography.labelS,
       color = colors.textSecondary,
       maxLines = 1,
@@ -215,16 +238,17 @@ private fun ExampleQuote(text: String) {
 }
 
 /** The provider's name as Discover shows it: "Gemini" rather than "Google Gemini". */
-internal val LlmProvider.shortLabel: String
+internal val LlmProvider.shortLabel: UiText
   get() = when (this) {
-    LlmProvider.Google -> "Gemini"
-    else -> label
+    LlmProvider.Google -> verbatim("Gemini")
+    LlmProvider.OpenAiCompatible -> Res.string.discover_provider_openai_compatible.text()
+    else -> verbatim(label)
   }
 
 /** What the provider's setup button says. */
-private val LlmProvider.setupLabel: String
+private val LlmProvider.setupLabel: UiText
   get() = when (this) {
-    LlmProvider.Ollama -> "$shortLabel · runs locally, no key"
+    LlmProvider.Ollama -> Res.string.discover_setup_local_provider.text(shortLabel)
     else -> shortLabel
   }
 
@@ -237,9 +261,9 @@ private val SetupProviders = listOf(
 )
 
 private val Examples = listOf(
-  "Blender for Apple silicon",
-  "Ubuntu 24.04 server ISO",
-  "Public-domain 4K nature footage",
+  Res.string.discover_example_blender,
+  Res.string.discover_example_ubuntu,
+  Res.string.discover_example_footage,
 )
 
 private val HeroWidth: Dp = 640.dp

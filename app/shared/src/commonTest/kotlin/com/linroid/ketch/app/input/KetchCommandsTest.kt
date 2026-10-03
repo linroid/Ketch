@@ -1,7 +1,9 @@
 package com.linroid.ketch.app.input
 
 import androidx.compose.ui.input.key.Key
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.StatusFilter
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,9 +54,9 @@ class KetchCommandsTest {
   }
 
   @Test
-  fun all_everyCommand_hasLabel() {
+  fun all_everyCommand_hasLabel() = runTest {
     KetchCommands.all.forEach { command ->
-      assertTrue(command.label.isNotBlank(), "${command.id} has no label")
+      assertTrue(command.label.load().isNotBlank(), "${command.id} has no label")
     }
   }
 

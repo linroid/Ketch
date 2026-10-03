@@ -32,6 +32,9 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -49,7 +52,51 @@ import com.linroid.ketch.config.CloseAction
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.DockBadgeMode
 import com.linroid.ketch.config.ThemeMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_choice_auto
+import ketch.app.shared.generated.resources.settings_choice_on
+import ketch.app.shared.generated.resources.settings_density_auto
+import ketch.app.shared.generated.resources.settings_density_comfortable
+import ketch.app.shared.generated.resources.settings_density_compact
+import ketch.app.shared.generated.resources.settings_general_accent
+import ketch.app.shared.generated.resources.settings_general_appearance
+import ketch.app.shared.generated.resources.settings_general_badge
+import ketch.app.shared.generated.resources.settings_general_badge_active
+import ketch.app.shared.generated.resources.settings_general_badge_failures
+import ketch.app.shared.generated.resources.settings_general_badge_off
+import ketch.app.shared.generated.resources.settings_general_close
+import ketch.app.shared.generated.resources.settings_general_close_ask
+import ketch.app.shared.generated.resources.settings_general_close_ask_hint
+import ketch.app.shared.generated.resources.settings_general_close_menu_bar
+import ketch.app.shared.generated.resources.settings_general_close_menu_bar_hint
+import ketch.app.shared.generated.resources.settings_general_close_quit
+import ketch.app.shared.generated.resources.settings_general_close_quit_hint
+import ketch.app.shared.generated.resources.settings_general_close_tray
+import ketch.app.shared.generated.resources.settings_general_close_tray_hint
+import ketch.app.shared.generated.resources.settings_general_density
+import ketch.app.shared.generated.resources.settings_general_density_hint
+import ketch.app.shared.generated.resources.settings_general_device_name
+import ketch.app.shared.generated.resources.settings_general_device_name_hint
+import ketch.app.shared.generated.resources.settings_general_language
+import ketch.app.shared.generated.resources.settings_general_language_current
+import ketch.app.shared.generated.resources.settings_general_login_add_failed
+import ketch.app.shared.generated.resources.settings_general_login_remove_failed
+import ketch.app.shared.generated.resources.settings_general_login_update_failed
+import ketch.app.shared.generated.resources.settings_general_open_at_login
+import ketch.app.shared.generated.resources.settings_general_reduce_motion
+import ketch.app.shared.generated.resources.settings_general_reduce_motion_auto
+import ketch.app.shared.generated.resources.settings_general_reduce_motion_on
+import ketch.app.shared.generated.resources.settings_general_reduce_motion_system
+import ketch.app.shared.generated.resources.settings_general_shortcuts
+import ketch.app.shared.generated.resources.settings_general_start_hidden
+import ketch.app.shared.generated.resources.settings_general_start_hidden_menu_bar_hint
+import ketch.app.shared.generated.resources.settings_general_start_hidden_tray_hint
+import ketch.app.shared.generated.resources.settings_general_startup
+import ketch.app.shared.generated.resources.settings_general_theme
+import ketch.app.shared.generated.resources.settings_general_this_device
 import kotlinx.coroutines.CancellationException
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("GeneralSettings")
 
@@ -68,10 +115,10 @@ fun GeneralSettings(
 ) {
   val ui = appSettings.ui
   if (systemDeviceName != null) {
-    SettingsGroup(title = "This device") {
+    SettingsGroup(title = stringResource(Res.string.settings_general_this_device)) {
       SettingsRow(
-        title = "Device name",
-        description = "Your other devices see this name after a restart.",
+        title = stringResource(Res.string.settings_general_device_name),
+        description = stringResource(Res.string.settings_general_device_name_hint),
       ) {
         SettingsTextInput(
           value = appSettings.config.name.orEmpty(),
@@ -82,54 +129,63 @@ fun GeneralSettings(
     }
   }
 
-  SettingsGroup(title = "Appearance") {
+  SettingsGroup(title = stringResource(Res.string.settings_general_appearance)) {
     SettingsRow(
-      title = "Theme",
+      title = stringResource(Res.string.settings_general_theme),
       trailing = {
         SettingsSegmented(
           value = appSettings.themeMode,
           options = ThemeMode.entries,
-          label = { it.label },
+          label = { it.label.resolve() },
           onSelect = { appSettings.saveThemeMode(it) },
         )
       },
     )
     SettingsRow(
-      title = "Accent color",
+      title = stringResource(Res.string.settings_general_accent),
       trailing = {
         AccentPicker(selected = appSettings.accent, onSelect = { appSettings.saveAccent(it) })
       },
     )
     SettingsRow(
-      title = "Density",
-      description = "Auto: compact with a mouse, roomier with touch.",
+      title = stringResource(Res.string.settings_general_density),
+      description = stringResource(Res.string.settings_general_density_hint),
       trailing = {
         SettingsSegmented(
           value = ui.density,
           options = DensityMode.entries,
-          label = { it.label },
+          label = { stringResource(it.label) },
           onSelect = { mode -> appSettings.saveUi { it.copy(density = mode) } },
         )
       },
     )
     val systemReduces = rememberReduceMotion()
     SettingsRow(
-      title = "Reduce motion",
-      description = when {
-        ui.reduceMotion -> "Lanes and panels change without animating."
-        systemReduces -> "Your system reduces motion, so Ketch does too."
-        else -> "Auto follows your system's setting."
-      },
+      title = stringResource(Res.string.settings_general_reduce_motion),
+      description = stringResource(
+        when {
+          ui.reduceMotion -> Res.string.settings_general_reduce_motion_on
+          systemReduces -> Res.string.settings_general_reduce_motion_system
+          else -> Res.string.settings_general_reduce_motion_auto
+        },
+      ),
       trailing = {
         SettingsSegmented(
           value = ui.reduceMotion,
           options = listOf(false, true),
-          label = { if (it) "On" else "Auto" },
+          label = { on ->
+            stringResource(
+              if (on) Res.string.settings_choice_on else Res.string.settings_choice_auto,
+            )
+          },
           onSelect = { on -> appSettings.saveUi { it.copy(reduceMotion = on) } },
         )
       },
     )
-    SettingsRow(title = "Language", trailing = { SettingsValue("English") })
+    SettingsRow(
+      title = stringResource(Res.string.settings_general_language),
+      trailing = { SettingsValue(stringResource(Res.string.settings_general_language_current)) },
+    )
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
@@ -138,7 +194,7 @@ fun GeneralSettings(
     val chord = KetchCommands.Shortcuts.shortcutLabel(KeyboardPlatform.current)
     SettingsGroup {
       SettingsRow(
-        title = "Keyboard shortcuts…",
+        title = stringResource(Res.string.settings_general_shortcuts),
         modifier = Modifier.clickable(role = Role.Button) { state.showShortcuts() },
         trailing = {
           Row(
@@ -159,12 +215,17 @@ fun GeneralSettings(
 private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   val hooks = LocalDesktopHooks.current
   val desktop = appSettings.config.desktop
-  val apple = KeyboardPlatform.current.isApple
-  val trayName = if (apple) "menu bar" else "notification area"
-  var failure by remember { mutableStateOf<String?>(null) }
+  // The menu bar on macOS, the notification area elsewhere.
+  val menuBar = KeyboardPlatform.current.isApple
+  var failure by remember { mutableStateOf<UiText?>(null) }
   // Saves a change, then asks the operating system to follow it; when it refuses, the saved
-  // setting goes back, so the switch keeps saying what the system does.
-  val apply = { what: String, change: (Boolean) -> Unit, on: Boolean, hook: suspend () -> Unit ->
+  // setting goes back, so the switch keeps saying what the system does; `failed` says so.
+  fun apply(
+    failed: StringResource,
+    change: (Boolean) -> Unit,
+    on: Boolean,
+    hook: suspend () -> Unit,
+  ) {
     failure = null
     change(on)
     state.launchCommand {
@@ -173,31 +234,41 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        log.w { "Couldn't $what: ${e.describeCauses()}" }
-        failure = "Couldn't $what: ${e.message ?: e::class.simpleName}"
+        log.w { "Couldn't change the login item to on=$on: ${e.describeCauses()}" }
+        failure = failed.text(e.message ?: e::class.simpleName.orEmpty())
         change(!on)
       }
     }
   }
   SettingsGroup(
-    title = "Startup and window",
-    footer = failure,
+    title = stringResource(Res.string.settings_general_startup),
+    footer = failure?.resolve(),
   ) {
     SettingsSelectRow(
-      title = "When I close the window",
-      description = when (desktop.closeAction) {
-        CloseAction.Ask -> "Asks only while downloads are running."
-        CloseAction.Background -> "Quit from the $trayName icon."
-        CloseAction.Quit -> "Downloads pause until you open Ketch again."
-      },
+      title = stringResource(Res.string.settings_general_close),
+      description = stringResource(
+        when (desktop.closeAction) {
+          CloseAction.Ask -> Res.string.settings_general_close_ask_hint
+          CloseAction.Background -> if (menuBar) {
+            Res.string.settings_general_close_menu_bar_hint
+          } else {
+            Res.string.settings_general_close_tray_hint
+          }
+          CloseAction.Quit -> Res.string.settings_general_close_quit_hint
+        },
+      ),
       value = desktop.closeAction,
       options = CloseAction.entries,
       label = { action ->
         when (action) {
-          CloseAction.Ask -> "Ask each time"
-          CloseAction.Background -> "Keep downloading in the $trayName"
-          CloseAction.Quit -> "Quit Ketch"
-        }
+          CloseAction.Ask -> Res.string.settings_general_close_ask
+          CloseAction.Background -> if (menuBar) {
+            Res.string.settings_general_close_menu_bar
+          } else {
+            Res.string.settings_general_close_tray
+          }
+          CloseAction.Quit -> Res.string.settings_general_close_quit
+        }.text()
       },
       onSelect = { action ->
         appSettings.saveDesktop { it.copy(closeAction = action) }
@@ -205,34 +276,46 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
       },
     )
     SettingsSwitchRow(
-      title = "Open Ketch at login",
+      title = stringResource(Res.string.settings_general_open_at_login),
       checked = desktop.openAtLogin,
       onCheckedChange = { on ->
         val save = { value: Boolean -> appSettings.saveDesktop { it.copy(openAtLogin = value) } }
-        val what = if (on) "add the login item" else "remove the login item"
-        apply(what, save, on) { hooks.setOpenAtLogin(on) }
+        val failed = if (on) {
+          Res.string.settings_general_login_add_failed
+        } else {
+          Res.string.settings_general_login_remove_failed
+        }
+        apply(failed, save, on) { hooks.setOpenAtLogin(on) }
       },
     )
     SettingsSwitchRow(
-      title = "Start hidden at login",
-      description = "Opens in the $trayName, without a window.",
+      title = stringResource(Res.string.settings_general_start_hidden),
+      description = stringResource(
+        if (menuBar) {
+          Res.string.settings_general_start_hidden_menu_bar_hint
+        } else {
+          Res.string.settings_general_start_hidden_tray_hint
+        },
+      ),
       checked = desktop.startHidden,
       enabled = desktop.openAtLogin,
       onCheckedChange = { on ->
         val save = { value: Boolean -> appSettings.saveDesktop { it.copy(startHidden = value) } }
-        apply("update the login item", save, on) { hooks.setStartHidden(on) }
+        apply(Res.string.settings_general_login_update_failed, save, on) {
+          hooks.setStartHidden(on)
+        }
       },
     )
     SettingsSelectRow(
-      title = "App icon badge",
+      title = stringResource(Res.string.settings_general_badge),
       value = desktop.dockBadge,
       options = DockBadgeMode.entries,
       label = { mode ->
         when (mode) {
-          DockBadgeMode.ActiveCount -> "Active downloads"
-          DockBadgeMode.FailuresOnly -> "Failures only"
-          DockBadgeMode.Off -> "Nothing"
-        }
+          DockBadgeMode.ActiveCount -> Res.string.settings_general_badge_active
+          DockBadgeMode.FailuresOnly -> Res.string.settings_general_badge_failures
+          DockBadgeMode.Off -> Res.string.settings_general_badge_off
+        }.text()
       },
       onSelect = { mode ->
         appSettings.saveDesktop { it.copy(dockBadge = mode) }
@@ -242,11 +325,11 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   }
 }
 
-private val DensityMode.label: String
+private val DensityMode.label: StringResource
   get() = when (this) {
-    DensityMode.Auto -> "Auto"
-    DensityMode.Compact -> "Compact"
-    DensityMode.Comfortable -> "Comfortable"
+    DensityMode.Auto -> Res.string.settings_density_auto
+    DensityMode.Compact -> Res.string.settings_density_compact
+    DensityMode.Comfortable -> Res.string.settings_density_comfortable
   }
 
 /** The four accents as swatches, each named under it, the selected one ringed and checked. */
@@ -294,7 +377,7 @@ private fun AccentPicker(selected: KetchAccent, onSelect: (KetchAccent) -> Unit)
           }
         }
         Text(
-          text = accent.displayName,
+          text = accent.displayName.resolve(),
           style = KetchTheme.typography.labelS,
           fontWeight = if (isSelected) FontWeight.SemiBold else null,
           color = if (isSelected) colors.textPrimary else colors.textSecondary,

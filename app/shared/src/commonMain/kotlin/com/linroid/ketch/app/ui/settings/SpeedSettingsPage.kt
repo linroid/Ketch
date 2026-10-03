@@ -44,6 +44,10 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
@@ -53,22 +57,81 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.autoModeSummary
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.newSpeedRule
 import com.linroid.ketch.app.state.normalizeRuleTime
 import com.linroid.ketch.app.state.ruleDaysLabel
 import com.linroid.ketch.app.state.ruleIncludes
 import com.linroid.ketch.app.state.slowLanePresets
 import com.linroid.ketch.app.state.speedChoices
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toggleRuleDay
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.Weekday
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_loading_from
+import ketch.app.shared.generated.resources.settings_speed_auto_no_rules
+import ketch.app.shared.generated.resources.settings_speed_auto_summary
+import ketch.app.shared.generated.resources.settings_speed_cap_failed
+import ketch.app.shared.generated.resources.settings_speed_connections
+import ketch.app.shared.generated.resources.settings_speed_connections_hint
+import ketch.app.shared.generated.resources.settings_speed_full_cap
+import ketch.app.shared.generated.resources.settings_speed_full_cap_hint
+import ketch.app.shared.generated.resources.settings_speed_full_capped
+import ketch.app.shared.generated.resources.settings_speed_full_unlimited
+import ketch.app.shared.generated.resources.settings_speed_limit
+import ketch.app.shared.generated.resources.settings_speed_limit_group
+import ketch.app.shared.generated.resources.settings_speed_limit_hint
+import ketch.app.shared.generated.resources.settings_speed_limits_group
+import ketch.app.shared.generated.resources.settings_speed_mode
+import ketch.app.shared.generated.resources.settings_speed_mode_auto
+import ketch.app.shared.generated.resources.settings_speed_mode_full
+import ketch.app.shared.generated.resources.settings_speed_mode_group
+import ketch.app.shared.generated.resources.settings_speed_mode_slow_lane
+import ketch.app.shared.generated.resources.settings_speed_per_download
+import ketch.app.shared.generated.resources.settings_speed_remote
+import ketch.app.shared.generated.resources.settings_speed_rule_add
+import ketch.app.shared.generated.resources.settings_speed_rule_end
+import ketch.app.shared.generated.resources.settings_speed_rule_remove
+import ketch.app.shared.generated.resources.settings_speed_rule_slow_lane_on
+import ketch.app.shared.generated.resources.settings_speed_rule_start
+import ketch.app.shared.generated.resources.settings_speed_rule_time_invalid
+import ketch.app.shared.generated.resources.settings_speed_rules
+import ketch.app.shared.generated.resources.settings_speed_rules_empty
+import ketch.app.shared.generated.resources.settings_speed_rules_empty_hint
+import ketch.app.shared.generated.resources.settings_speed_rules_failed
+import ketch.app.shared.generated.resources.settings_speed_rules_footer
+import ketch.app.shared.generated.resources.settings_speed_rules_footer_auto
+import ketch.app.shared.generated.resources.settings_speed_rules_max
+import ketch.app.shared.generated.resources.settings_speed_slow_lane
+import ketch.app.shared.generated.resources.settings_speed_slow_lane_capped
+import ketch.app.shared.generated.resources.settings_speed_slow_lane_failed
+import ketch.app.shared.generated.resources.settings_speed_slow_lane_suggested
+import ketch.app.shared.generated.resources.settings_speed_slow_lane_summary
+import ketch.app.shared.generated.resources.settings_speed_slow_lane_unknown
+import ketch.app.shared.generated.resources.settings_speed_switch_failed
+import ketch.app.shared.generated.resources.settings_weekday_friday
+import ketch.app.shared.generated.resources.settings_weekday_friday_initial
+import ketch.app.shared.generated.resources.settings_weekday_monday
+import ketch.app.shared.generated.resources.settings_weekday_monday_initial
+import ketch.app.shared.generated.resources.settings_weekday_saturday
+import ketch.app.shared.generated.resources.settings_weekday_saturday_initial
+import ketch.app.shared.generated.resources.settings_weekday_sunday
+import ketch.app.shared.generated.resources.settings_weekday_sunday_initial
+import ketch.app.shared.generated.resources.settings_weekday_thursday
+import ketch.app.shared.generated.resources.settings_weekday_thursday_initial
+import ketch.app.shared.generated.resources.settings_weekday_tuesday
+import ketch.app.shared.generated.resources.settings_weekday_tuesday_initial
+import ketch.app.shared.generated.resources.settings_weekday_wednesday
+import ketch.app.shared.generated.resources.settings_weekday_wednesday_initial
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Speed settings of [device]: the speed mode with its Slow lane and Auto rules, the full speed
@@ -86,7 +149,7 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     if (controller.isRemote) {
       SettingsNotice(
-        text = "Saved on ${device.label} until it restarts. No Slow lane or Auto for it yet.",
+        text = stringResource(Res.string.settings_speed_remote, device.label),
         tone = NoticeTone.Info,
       )
     }
@@ -95,16 +158,16 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
     }
     if (config == null) {
       if (controller.downloadError == null) {
-        SettingsLoading("Loading settings from ${device.label}…")
+        SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
       }
       return@Column
     }
     val speedMode = model.speedMode
     if (speedMode == null) {
-      SettingsGroup(title = "Limit") {
+      SettingsGroup(title = stringResource(Res.string.settings_speed_limit_group)) {
         SettingsRow(
-          title = "Speed limit",
-          description = "All downloads share it; a download's own limit can go lower.",
+          title = stringResource(Res.string.settings_speed_limit),
+          description = stringResource(Res.string.settings_speed_limit_hint),
         ) {
           SpeedLimitPicker(
             value = config.speedLimit,
@@ -138,25 +201,30 @@ private fun ModeGroup(
   val slowLane = model.slowLaneSpeed(settings)
   val summary = when (mode) {
     SpeedMode.Full -> if (cap.isUnlimited) {
-      "Downloads use all the speed they can get."
+      Res.string.settings_speed_full_unlimited.text()
     } else {
-      "Downloads share up to ${formatSpeedLimit(cap)}."
+      Res.string.settings_speed_full_capped.text(speedLimitText(cap))
     }
-    SpeedMode.SlowLane ->
-      "Downloads share at most ${formatSpeedLimit(slowLane)}, leaving room for calls."
+    SpeedMode.SlowLane -> Res.string.settings_speed_slow_lane_summary.text(speedLimitText(slowLane))
     is SpeedMode.Auto -> if (settings.rules.isEmpty()) {
-      "Add a rule below to turn the Slow lane on by itself."
+      Res.string.settings_speed_auto_no_rules.text()
     } else {
-      "${autoModeSummary(mode, LocalClock.current.now(), TimeZone.currentSystemDefault())}."
+      val now = LocalClock.current.now()
+      Res.string.settings_speed_auto_summary.text(
+        autoModeSummary(mode, now, TimeZone.currentSystemDefault()),
+      )
     }
   }
-  SettingsGroup(title = "Mode") {
-    SettingsRow(title = "Speed mode", description = summary) {
+  SettingsGroup(title = stringResource(Res.string.settings_speed_mode_group)) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_speed_mode),
+      description = summary.resolve(),
+    ) {
       KetchSegmented(
         options = SpeedLimitMode.entries,
         selected = settings.mode,
         onSelect = model::setMode,
-        label = { it.label },
+        label = { stringResource(it.label) },
         icon = { it.icon },
       )
     }
@@ -173,10 +241,10 @@ private fun LimitsGroup(
   model: SpeedSettingsModel,
 ) {
   val slowLane = model.slowLaneSpeed(settings)
-  SettingsGroup(title = "Limits") {
+  SettingsGroup(title = stringResource(Res.string.settings_speed_limits_group)) {
     SettingsRow(
-      title = "Full speed cap",
-      description = "The most downloads share outside the Slow lane.",
+      title = stringResource(Res.string.settings_speed_full_cap),
+      description = stringResource(Res.string.settings_speed_full_cap_hint),
     ) {
       SpeedLimitPicker(
         value = cap,
@@ -184,13 +252,17 @@ private fun LimitsGroup(
         presets = speedChoices(SpeedLimitPickerPresets, cap),
       )
     }
+    val suggestion = speedLimitText(suggested).resolve()
     SettingsRow(
-      title = "Slow lane speed",
+      title = stringResource(Res.string.settings_speed_slow_lane),
       description = if (hasPeak) {
-        "≈ ${formatSpeedLimit(suggested)} suggested, ${SpeedModeController.SLOW_LANE_PERCENT}% " +
-          "of the top speed seen this week."
+        stringResource(
+          Res.string.settings_speed_slow_lane_suggested,
+          suggestion,
+          SpeedModeController.SLOW_LANE_PERCENT,
+        )
       } else {
-        "${formatSpeedLimit(suggested)} until Ketch has seen how fast this connection goes."
+        stringResource(Res.string.settings_speed_slow_lane_unknown, suggestion)
       },
     ) {
       SpeedLimitPicker(
@@ -198,7 +270,7 @@ private fun LimitsGroup(
         presets = speedChoices(slowLanePresets(suggested), slowLane),
         onCommit = { limit -> model.setSlowLane(limit.takeUnless { it == suggested }) },
         caption = if (!cap.isUnlimited && cap.bytesPerSecond < slowLane.bytesPerSecond) {
-          "The full speed cap of ${formatSpeedLimit(cap)} is lower and applies instead."
+          stringResource(Res.string.settings_speed_slow_lane_capped, speedLimitText(cap).resolve())
         } else {
           null
         },
@@ -213,28 +285,36 @@ private fun RulesGroup(settings: SpeedSettings, model: SpeedSettingsModel) {
   val rules = settings.rules
   val canAdd = rules.size < SpeedSettings.MAX_RULES
   SettingsGroup(
-    title = "Auto rules",
+    title = stringResource(Res.string.settings_speed_rules),
     footer = if (settings.mode == SpeedLimitMode.Auto) {
-      "Rules follow this device's clock."
+      stringResource(Res.string.settings_speed_rules_footer_auto)
     } else {
-      "Rules apply in Auto mode, by this device's clock."
+      stringResource(Res.string.settings_speed_rules_footer)
     },
     action = {
       KetchButton(
-        text = "Add rule",
+        text = stringResource(Res.string.settings_speed_rule_add),
         onClick = { model.setRules(rules + newSpeedRule()) },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
         leadingIcon = KetchIcon.Plus,
         enabled = canAdd,
-        tooltip = if (canAdd) null else "Up to ${SpeedSettings.MAX_RULES} rules",
+        tooltip = if (canAdd) {
+          null
+        } else {
+          pluralStringResource(
+            Res.plurals.settings_speed_rules_max,
+            SpeedSettings.MAX_RULES,
+            SpeedSettings.MAX_RULES,
+          )
+        },
       )
     },
   ) {
     if (rules.isEmpty()) {
       SettingsRow(
-        title = "No rules yet",
-        description = "For example, slow downloads down during work hours.",
+        title = stringResource(Res.string.settings_speed_rules_empty),
+        description = stringResource(Res.string.settings_speed_rules_empty_hint),
       )
     }
     rules.forEachIndexed { index, rule ->
@@ -269,10 +349,15 @@ private fun RuleRow(rule: SpeedRule, onChange: (SpeedRule) -> Unit, onRemove: ()
       verticalArrangement = Arrangement.spacedBy(spacing.s2),
       itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-      Text("Slow lane on", style = KetchTheme.typography.body, color = colors.textPrimary)
+      Text(
+        text = stringResource(Res.string.settings_speed_rule_slow_lane_on),
+        style = KetchTheme.typography.body,
+        color = colors.textPrimary,
+      )
+      val days = ruleDaysLabel(rule.days).resolve()
       Row(
         horizontalArrangement = Arrangement.spacedBy(spacing.s1),
-        modifier = Modifier.semantics { contentDescription = ruleDaysLabel(rule.days) },
+        modifier = Modifier.semantics { contentDescription = days },
       ) {
         Weekday.entries.forEach { day ->
           DayToggle(
@@ -286,16 +371,24 @@ private fun RuleRow(rule: SpeedRule, onChange: (SpeedRule) -> Unit, onRemove: ()
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       ) {
-        TimeField(rule.start, label = "Start", onCommit = { onChange(rule.copy(start = it)) })
+        TimeField(
+          value = rule.start,
+          label = stringResource(Res.string.settings_speed_rule_start),
+          onCommit = { onChange(rule.copy(start = it)) },
+        )
         Text("–", style = KetchTheme.typography.body, color = colors.textSecondary)
-        TimeField(rule.end, label = "End", onCommit = { onChange(rule.copy(end = it)) })
+        TimeField(
+          value = rule.end,
+          label = stringResource(Res.string.settings_speed_rule_end),
+          onCommit = { onChange(rule.copy(end = it)) },
+        )
       }
     }
     KetchIconButton(
       icon = KetchIcon.Close,
       onClick = onRemove,
       size = KetchButtonSize.Small,
-      contentDescription = "Remove rule",
+      contentDescription = stringResource(Res.string.settings_speed_rule_remove),
     )
   }
 }
@@ -308,6 +401,8 @@ private fun DayToggle(day: Weekday, on: Boolean, onToggle: () -> Unit) {
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
+  val (name, initial) = day.names
+  val description = stringResource(name)
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
@@ -316,7 +411,7 @@ private fun DayToggle(day: Weekday, on: Boolean, onToggle: () -> Unit) {
       .background(if (on) colors.accentSoft else colors.surface, shape)
       .background(overlay, shape)
       .border(HairlineWidth, if (on) colors.accentSoft else colors.borderStrong, shape)
-      .semantics { contentDescription = day.name }
+      .semantics { contentDescription = description }
       .trackFocusVisibility(focus)
       .toggleable(
         value = on,
@@ -327,12 +422,31 @@ private fun DayToggle(day: Weekday, on: Boolean, onToggle: () -> Unit) {
       ),
   ) {
     Text(
-      text = day.name.take(1),
+      text = stringResource(initial),
       style = KetchTheme.typography.labelS,
       color = if (on) colors.accentText else colors.textSecondary,
     )
   }
 }
+
+/** The day's full name, for screen readers, and its initial, as the toggle shows it. */
+private val Weekday.names: Pair<StringResource, StringResource>
+  get() = when (this) {
+    Weekday.Monday ->
+      Res.string.settings_weekday_monday to Res.string.settings_weekday_monday_initial
+    Weekday.Tuesday ->
+      Res.string.settings_weekday_tuesday to Res.string.settings_weekday_tuesday_initial
+    Weekday.Wednesday ->
+      Res.string.settings_weekday_wednesday to Res.string.settings_weekday_wednesday_initial
+    Weekday.Thursday ->
+      Res.string.settings_weekday_thursday to Res.string.settings_weekday_thursday_initial
+    Weekday.Friday ->
+      Res.string.settings_weekday_friday to Res.string.settings_weekday_friday_initial
+    Weekday.Saturday ->
+      Res.string.settings_weekday_saturday to Res.string.settings_weekday_saturday_initial
+    Weekday.Sunday ->
+      Res.string.settings_weekday_sunday to Res.string.settings_weekday_sunday_initial
+  }
 
 /** An `HH:MM` field that saves a valid time as it is typed. */
 @Composable
@@ -341,7 +455,9 @@ private fun TimeField(value: String, label: String, onCommit: (String) -> Unit) 
     value = value,
     onCommit = onCommit,
     normalize = { normalizeRuleTime(it) ?: it.trim() },
-    validate = { if (normalizeRuleTime(it) == null) "Use HH:MM" else null },
+    validate = { typed ->
+      if (normalizeRuleTime(typed) == null) TimeInvalid else null
+    },
     placeholder = label,
     mono = true,
     width = TimeFieldWidth,
@@ -351,10 +467,10 @@ private fun TimeField(value: String, label: String, onCommit: (String) -> Unit) 
 /** Settings each download starts with. */
 @Composable
 private fun PerDownloadGroup(config: DownloadConfig, model: SpeedSettingsModel) {
-  SettingsGroup(title = "Per download") {
+  SettingsGroup(title = stringResource(Res.string.settings_speed_per_download)) {
     SettingsRow(
-      title = "Connections per download",
-      description = "For HTTP and FTP; applies as downloads start or resume.",
+      title = stringResource(Res.string.settings_speed_connections),
+      description = stringResource(Res.string.settings_speed_connections_hint),
       trailing = {
         ConnectionStepper(
           value = config.maxConnectionsPerDownload.coerceIn(ConnectionRange),
@@ -365,11 +481,12 @@ private fun PerDownloadGroup(config: DownloadConfig, model: SpeedSettingsModel) 
   }
 }
 
-private val SpeedLimitMode.label: String
+/** The mode's name, as the Speed page's switch shows it. */
+private val SpeedLimitMode.label: StringResource
   get() = when (this) {
-    SpeedLimitMode.Full -> "Full speed"
-    SpeedLimitMode.SlowLane -> "Slow lane"
-    SpeedLimitMode.Auto -> "Auto"
+    SpeedLimitMode.Full -> Res.string.settings_speed_mode_full
+    SpeedLimitMode.SlowLane -> Res.string.settings_speed_mode_slow_lane
+    SpeedLimitMode.Auto -> Res.string.settings_speed_mode_auto
   }
 
 private val SpeedLimitMode.icon: KetchIcon
@@ -380,6 +497,9 @@ private val SpeedLimitMode.icon: KetchIcon
   }
 
 private val TimeFieldWidth = 72.dp
+
+/** Under a rule's time field that holds no time. */
+private val TimeInvalid = Res.string.settings_speed_rule_time_invalid.text()
 
 /**
  * What the Speed page changes on [device], kept out of the composable so it can be tested.
@@ -412,28 +532,34 @@ internal class SpeedSettingsModel(
     settings.slowLane ?: speedMode?.suggestedSlowLane ?: SpeedModeController.DEFAULT_SLOW_LANE
 
   /** Switches to [mode]. */
-  fun setMode(mode: SpeedLimitMode): Job? = change("switch to ${mode.label}") { it.setMode(mode) }
+  fun setMode(mode: SpeedLimitMode): Job? =
+    change("setMode($mode)", Res.string.settings_speed_switch_failed.text(mode.label.text())) {
+      it.setMode(mode)
+    }
 
   /** Sets the speed downloads share outside the Slow lane; [SpeedLimit.Unlimited] for none. */
   fun setFullSpeedCap(limit: SpeedLimit): Job? {
     val modes = speedMode
+    val failed = Res.string.settings_speed_cap_failed.text()
     if (modes == null || modes.settings.value.mode == SpeedLimitMode.Full) {
       // At full speed the cap is the device's own limit, saved with its download settings.
       val config = settings.download ?: return null
       settings.updateDownload(config.copy(speedLimit = limit))
       if (modes == null) return null
-      return change("change the full speed cap", syncCap = false) { it.setStandard(limit) }
+      return change("setStandard", failed, syncCap = false) { it.setStandard(limit) }
     }
-    return change("change the full speed cap") { it.setStandard(limit) }
+    return change("setStandard", failed) { it.setStandard(limit) }
   }
 
   /** Sets the Slow lane speed; `null` follows the suggestion. */
   fun setSlowLane(limit: SpeedLimit?): Job? =
-    change("change the Slow lane speed") { it.setSlowLane(limit) }
+    change("setSlowLane", Res.string.settings_speed_slow_lane_failed.text()) {
+      it.setSlowLane(limit)
+    }
 
   /** Replaces the Auto rules. */
   fun setRules(rules: List<SpeedRule>): Job? =
-    change("change the Auto rules") { it.setRules(rules) }
+    change("setRules", Res.string.settings_speed_rules_failed.text()) { it.setRules(rules) }
 
   /** Sets the connections a download opens unless it asks for its own number. */
   fun setConnections(count: Int) {
@@ -443,9 +569,11 @@ internal class SpeedSettingsModel(
     }
   }
 
-  // syncCap: whether to hand the controller the device's limit first; see the class KDoc.
+  // action names the change in the log, failed tells the user it failed. syncCap: whether to
+  // hand the controller the device's limit first; see the class KDoc.
   private fun change(
     action: String,
+    failed: UiText,
     syncCap: Boolean = true,
     block: suspend (SpeedModeController) -> Unit,
   ): Job? {
@@ -463,8 +591,8 @@ internal class SpeedSettingsModel(
         log.w { "Couldn't $action on deviceId=${device.deviceId}: ${e.describeCauses()}" }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "Couldn't $action",
-          detail = e.message,
+          title = failed,
+          detail = e.message?.let(::verbatim),
           deviceId = device.deviceId,
           cause = e,
         )

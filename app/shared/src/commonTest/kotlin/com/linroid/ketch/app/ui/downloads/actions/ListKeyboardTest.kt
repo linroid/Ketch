@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyPress
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -210,7 +211,7 @@ class ListKeyboardTest {
     assertEquals(listOf("pause"), one.calls)
     assertEquals(listOf("pause"), two.calls)
     assertTrue(three.calls.isEmpty())
-    assertEquals("Paused 2 downloads · 1 already paused", f.messages().last().title)
+    assertEquals("Paused 2 downloads · 1 already paused", f.messages().last().title.load())
     f.close()
   }
 

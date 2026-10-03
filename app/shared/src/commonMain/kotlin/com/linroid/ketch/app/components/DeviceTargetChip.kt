@@ -24,10 +24,22 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_target_choose
+import ketch.app.shared.generated.resources.device_target_connecting
+import ketch.app.shared.generated.resources.device_target_label
+import ketch.app.shared.generated.resources.device_target_menu_title
+import ketch.app.shared.generated.resources.device_target_offline
+import ketch.app.shared.generated.resources.device_target_on
+import ketch.app.shared.generated.resources.device_target_unauthorized
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A device downloads can be sent to, as a [DeviceTargetChip] lists it.
@@ -44,10 +56,10 @@ import com.linroid.ketch.app.theme.KetchTheme
 @Immutable
 data class DeviceOption(
   val id: String,
-  val name: String,
+  val name: UiText,
   val health: DeviceHealth,
-  val pennantName: String = name,
-  val summary: String? = null,
+  val pennantName: String,
+  val summary: UiText? = null,
   val shortcut: String? = null,
 )
 
@@ -58,7 +70,7 @@ data class DeviceOption(
  * two or more devices.
  *
  * @param selectedId id of the device downloads go to now.
- * @param label what the pill calls the choice.
+ * @param label what the pill calls the choice; "On" unless given.
  */
 @Composable
 fun DeviceTargetChip(
@@ -66,7 +78,7 @@ fun DeviceTargetChip(
   options: List<DeviceOption>,
   onSelect: (DeviceOption) -> Unit,
   modifier: Modifier = Modifier,
-  label: String = "On",
+  label: String = stringResource(Res.string.device_target_on),
   enabled: Boolean = true,
 ) {
   val selected = options.firstOrNull { it.id == selectedId } ?: options.firstOrNull() ?: return
@@ -95,13 +107,13 @@ fun DeviceTargetChip(
           indication = null,
           enabled = enabled,
           role = Role.DropdownList,
-          onClickLabel = "Choose device",
+          onClickLabel = stringResource(Res.string.device_target_choose),
           onClick = { expanded = true },
         )
         .padding(start = spacing.s2, end = spacing.s2),
     ) {
       Text(
-        text = "$label:",
+        text = stringResource(Res.string.device_target_label, label),
         style = KetchTheme.typography.labelS,
         color = colors.textTertiary,
         maxLines = 1,
@@ -112,7 +124,7 @@ fun DeviceTargetChip(
         size = DevicePennantDefaults.XSmall,
       )
       Text(
-        text = selected.name,
+        text = selected.name.resolve(),
         style = KetchTheme.typography.labelS,
         fontWeight = FontWeight.SemiBold,
         color = colors.textPrimary,
@@ -121,7 +133,8 @@ fun DeviceTargetChip(
       )
       KetchIconImage(KetchIcon.ChevronDown, size = ChevronSize, tint = colors.textSecondary)
     }
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = MENU_TITLE) {
+    val title = stringResource(Res.string.device_target_menu_title)
+    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = title) {
       for (option in options) {
         item(
           label = option.name,
@@ -137,12 +150,10 @@ fun DeviceTargetChip(
 }
 
 /** The line under a device in the target menu: why it cannot be picked, or its [summary]. */
-internal fun deviceOptionCaption(option: DeviceOption): String? = when (option.health) {
-  DeviceHealth.Connecting -> "Connecting…"
-  is DeviceHealth.Offline -> "Offline"
-  DeviceHealth.Unauthorized -> "Needs a new access token"
+internal fun deviceOptionCaption(option: DeviceOption): UiText? = when (option.health) {
+  DeviceHealth.Connecting -> Res.string.device_target_connecting.text()
+  is DeviceHealth.Offline -> Res.string.device_target_offline.text()
+  DeviceHealth.Unauthorized -> Res.string.device_target_unauthorized.text()
   is DeviceHealth.Local, DeviceHealth.Live -> option.summary
 }
-
-private const val MENU_TITLE = "Download on"
 private val ChevronSize = 12.dp

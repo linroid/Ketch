@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The add sheet: pasted links, their options, torrents and the checks before adding. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- How much a torrent's chosen files take. %1$s is a size, such as "4.2 GB". -->
+  <string name="intake_space_needed">needs %1$s</string>
+  <!-- %1$s is free space, %2$s a device name. -->
+  <string name="intake_space_free_on">%1$s free on %2$s</string>
+  <!-- %1$s is the size the downloads need, %2$s the free space, %3$s the device. -->
+  <string name="intake_space_warning">Needs %1$s · only %2$s free on %3$s</string>
+  <!-- After adding while the device shows. %1$s is a file name or a count of downloads, %2$s
+       the device. -->
+  <string name="intake_added_here">Added %1$s → %2$s</string>
+  <!-- After adding to a device that does not show. -->
+  <string name="intake_added_to">Added %1$s to %2$s</string>
+  <!-- Follow intake_added_here or intake_added_to after " · ". -->
+  <plurals name="intake_added_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="one">%1$d left out</item>
+    <item quantity="other">%1$d left out</item>
+  </plurals>
+  <!-- Nothing could be added. %1$s is a file name or a count of downloads. -->
+  <string name="intake_add_failed">Couldn't add %1$s</string>
+  <!-- %1$s is a file name, %2$s a device. -->
+  <string name="intake_restart_failed">Couldn't start %1$s over on %2$s</string>
+  <!-- After a retry added a failed download again from its changed link. %1$s is a file name. -->
+  <string name="intake_restarted">Started %1$s over</string>
+  <!-- A retry or a change of options that failed. %1$s is a file name, %2$s a device. -->
+  <string name="intake_retry_failed">Couldn't retry %1$s on %2$s</string>
+  <string name="intake_apply_failed">Couldn't change the options of %1$s on %2$s</string>
+  <!-- A toast once the file list of a torrent left to load in the background arrived. %1$s is
+       the torrent's name. -->
+  <string name="intake_file_list_ready">File list of %1$s is ready</string>
+  <string name="intake_file_list_ready_unnamed">File list of the torrent is ready</string>
+  <string name="intake_file_list_failed">Couldn't get the file list of %1$s</string>
+  <string name="intake_file_list_failed_unnamed">Couldn't get the file list of the torrent</string>
+  <string name="intake_choose_files">Choose files</string>
+
+  <!-- The sheet's title. -->
+  <string name="intake_title_add">Add downloads</string>
+  <string name="intake_title_retry">Retry with options</string>
+  <string name="intake_title_edit">Download options</string>
+
+  <!-- The input, empty. -->
+  <string name="intake_drop_to_add">Drop to add</string>
+  <string name="intake_paste_hint_short">Paste links or magnets</string>
+  <string name="intake_paste_hint">Paste links or magnets — or drop a .torrent file</string>
+  <!-- Under the input, when it holds a command copied from a browser. -->
+  <string name="intake_curl_command">cURL command</string>
+  <string name="intake_paste_clipboard">Paste from clipboard</string>
+  <string name="intake_open_torrent">Open .torrent file</string>
+  <!-- Under the input, when its text came from the clipboard. -->
+  <string name="intake_from_clipboard">From clipboard</string>
+  <string name="intake_clear_clipboard">Clear the text from the clipboard</string>
+  <!-- A chip that pastes a link found on the clipboard. %1$s is a file name. -->
+  <string name="intake_offer_paste">Paste %1$s</string>
+  <string name="intake_offer_paste_clipboard">Paste %1$s from clipboard</string>
+  <string name="intake_offer_paste_copied">Paste copied link</string>
+  <!-- Text without links. %1$s is the text, which Discover would search for. -->
+  <string name="intake_discover_offer">No links here. Search Discover for "%1$s"?</string>
+  <string name="intake_no_links">No links here. Paste a link, a magnet or a cURL command.</string>
+  <!-- The button that searches Discover for the text. -->
+  <string name="intake_discover">Discover</string>
+
+  <!-- Notes under the input. -->
+  <string name="intake_notice_no_curl">The clipboard holds no cURL command. In the browser's network panel, right-click the request and choose Copy as cURL.</string>
+  <string name="intake_notice_close_first">Close this sheet to add other downloads</string>
+  <string name="intake_notice_unsupported_files">Only .torrent files and lists of links can be added</string>
+  <!-- %1$s is a file name. -->
+  <string name="intake_notice_read_failed">Couldn't read %1$s</string>
+  <!-- %1$s is a file name, %2$s why, as the system says it. -->
+  <string name="intake_notice_read_failed_reason">Couldn't read %1$s: %2$s</string>
+  <string name="intake_notice_no_links">Found no links in what was dropped</string>
+  <!-- The sheet holds at most this many rows. -->
+  <plurals name="intake_notice_first_links">
+    <item quantity="one">Showing the first %1$d link</item>
+    <item quantity="other">Showing the first %1$d links</item>
+  </plurals>
+  <!-- A pattern such as part[1-500].rar expands to at most this many links. -->
+  <plurals name="intake_range_truncated">
+    <item quantity="one">Expanded to the first %1$d link</item>
+    <item quantity="other">Expanded to the first %1$d links</item>
+  </plurals>
+
+  <!-- The summary of the rows, joined by " · ": "7 links · 5 ready · 1 checking · 29.1 GB". -->
+  <plurals name="intake_summary_links">
+    <item quantity="one">%1$d link</item>
+    <item quantity="other">%1$d links</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="one">%1$d ready</item>
+    <item quantity="other">%1$d ready</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="one">%1$d checking</item>
+    <item quantity="other">%1$d checking</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="one">%1$d needs attention</item>
+    <item quantity="other">%1$d need attention</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="one">%1$d already in Ketch</item>
+    <item quantity="other">%1$d already in Ketch</item>
+  </plurals>
+
+  <!-- A row's status line. -->
+  <string name="intake_status_waiting">Waiting to check…</string>
+  <!-- %1$s is how long it has waited, in minutes and seconds: "0:14". -->
+  <string name="intake_status_fetching">Fetching file list from peers… %1$s</string>
+  <string name="intake_status_reading_torrent">Reading the torrent file…</string>
+  <string name="intake_status_checking">Checking…</string>
+  <!-- A link already in Ketch, added again. %1$s is the rest of its status line. -->
+  <string name="intake_status_downloads_again">Downloads again · %1$s</string>
+  <!-- The chosen files of a torrent: "3 of 128 files". %2$d picks the form. -->
+  <plurals name="intake_status_files_chosen">
+    <item quantity="one">%1$d of %2$d file</item>
+    <item quantity="other">%1$d of %2$d files</item>
+  </plurals>
+  <!-- A size split in equal parts: "4 × 1.1 GB" for four links, "16 × 360 MB" for sixteen
+       connections. %1$d is the count, %2$s a size. -->
+  <string name="intake_split">%1$d × %2$s</string>
+  <!-- What a pattern such as part[01-04].rar expands to, after " · ". -->
+  <plurals name="intake_status_expands">
+    <item quantity="one">expands to %1$d link</item>
+    <item quantity="other">expands to %1$d links</item>
+  </plurals>
+  <!-- The same when the pattern stands for more links than the sheet takes. -->
+  <plurals name="intake_status_expands_first">
+    <item quantity="one">expands to %1$d link (the first %1$d)</item>
+    <item quantity="other">expands to %1$d links (the first %1$d)</item>
+  </plurals>
+  <string name="intake_status_unknown_size">Unknown size</string>
+  <!-- What downloads a link, among HTTPS, HTTP, FTP and FTPS. -->
+  <string name="intake_scheme_torrent">Torrent</string>
+  <!-- After the size and the scheme, joined by " · ". -->
+  <string name="intake_status_resumable">resumable</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="one">up to %1$d connection</item>
+    <item quantity="other">up to %1$d connections</item>
+  </plurals>
+  <!-- Pills before a row's status line. -->
+  <string name="intake_badge_duplicate">Already in Ketch</string>
+  <string name="intake_badge_no_resume">No resume</string>
+  <!-- What the download already in Ketch is doing, after the "Already in Ketch" pill. %1$s is
+       when it finished: "just now", "5 min ago", "yesterday" or a date such as "Sep 28". -->
+  <string name="intake_duplicate_finished">finished %1$s</string>
+  <!-- %1$s is how far it got: "40%" or a size. -->
+  <string name="intake_duplicate_downloading">downloading · %1$s</string>
+  <string name="intake_duplicate_paused">paused at %1$s</string>
+  <string name="intake_duplicate_waiting">waiting to start</string>
+  <string name="intake_duplicate_failed">failed</string>
+  <string name="intake_duplicate_canceled">canceled</string>
+  <!-- How long ago a download finished, after intake_duplicate_finished. -->
+  <string name="intake_age_just_now">just now</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="one">%1$d min ago</item>
+    <item quantity="other">%1$d min ago</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="one">%1$d h ago</item>
+    <item quantity="other">%1$d h ago</item>
+  </plurals>
+  <string name="intake_age_yesterday">yesterday</string>
+  <plurals name="intake_age_days">
+    <item quantity="one">%1$d day ago</item>
+    <item quantity="other">%1$d days ago</item>
+  </plurals>
+
+  <!-- Why a link cannot be added as it is, on its row; a detail follows the title after " · ",
+       starting in lower case in English. -->
+  <!-- %1$d is how many minutes it waited. -->
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="one">No peers sent the file list in %1$d min</item>
+    <item quantity="other">No peers sent the file list in %1$d min</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketch can't download this kind of link</string>
+  <string name="intake_problem_unsupported_detail">it supports http(s), ftp(s), magnet and .torrent</string>
+  <string name="intake_problem_forbidden">The server refused access (403)</string>
+  <string name="intake_problem_forbidden_detail">links copied from a signed-in page often need its cookies</string>
+  <string name="intake_problem_not_found">Not found</string>
+  <string name="intake_problem_not_found_detail">the link may have expired</string>
+  <!-- %1$d is the HTTP status, such as 503. -->
+  <string name="intake_problem_busy">Server busy (%1$d)</string>
+  <string name="intake_problem_busy_detail">Ketch will retry automatically</string>
+  <!-- %1$d is the HTTP status, such as 418. -->
+  <string name="intake_problem_http">The server answered %1$d</string>
+  <string name="intake_problem_no_peers">Can't reach any peers</string>
+  <!-- %1$s is a host name, such as files.example.com. -->
+  <string name="intake_problem_unreachable">Can't reach %1$s</string>
+  <string name="intake_problem_unreachable_server">Can't reach the server</string>
+  <string name="intake_problem_torrent">Couldn't read this torrent</string>
+  <string name="intake_problem_ftp">The FTP server reported an error</string>
+  <string name="intake_problem_check_failed">Couldn't check this link</string>
+  <string name="intake_problem_sign_in">Sign-in required</string>
+  <!-- What a row with a problem offers. -->
+  <string name="intake_action_sign_in">Sign in</string>
+  <string name="intake_action_paste_curl">Paste as cURL</string>
+  <string name="intake_action_add_headers">Add headers</string>
+  <string name="intake_action_find_mirror">Find a working mirror</string>
+  <string name="intake_action_keep_waiting">Keep waiting</string>
+  <string name="intake_action_add_anyway">Add anyway</string>
+
+  <!-- Buttons of a row. -->
+  <string name="intake_download_all_now">Download all files now</string>
+  <string name="intake_finish_background">Finish in background</string>
+  <string name="intake_rename">Rename</string>
+  <string name="intake_keep_out">Keep out</string>
+  <string name="intake_download_again">Download again</string>
+  <string name="intake_add_all">Add all</string>
+  <!-- %1$s is a file name or an option's value, such as "⚡ Urgent". -->
+  <string name="intake_remove_named">Remove %1$s</string>
+  <string name="intake_user_name">User name</string>
+  <string name="intake_password">Password</string>
+  <string name="intake_connections">Connections</string>
+
+  <!-- The Options pill and its popover. -->
+  <string name="intake_options">Options</string>
+  <!-- The label before a pill's value: "Save to: Downloads". %1$s is the label. -->
+  <string name="intake_pill_label">%1$s:</string>
+  <!-- What the ✕ of a changed option's chip does. -->
+  <string name="intake_reset_speed">Reset speed</string>
+  <string name="intake_reset_priority">Reset priority</string>
+  <string name="intake_reset_start">Reset start</string>
+  <string name="intake_reset_connections">Reset connections</string>
+  <!-- A chip that tells headers are sent while the Advanced section is closed. -->
+  <plurals name="intake_headers_count">
+    <item quantity="one">%1$d header</item>
+    <item quantity="other">%1$d headers</item>
+  </plurals>
+  <string name="intake_advanced_hide">Hide advanced options</string>
+  <string name="intake_advanced_show">Advanced options…</string>
+  <string name="intake_advanced_caption">File name, referer, cookies and other headers</string>
+  <string name="intake_speed_limit">Speed limit</string>
+  <string name="intake_priority">Priority</string>
+  <string name="intake_start">Start</string>
+  <string name="intake_peer_limit">Peer limit</string>
+  <string name="intake_single_connection">This server allows 1 connection</string>
+  <string name="intake_auto_device">Auto lets the device decide</string>
+  <!-- %1$d is the connections a download gets on the device by default. -->
+  <string name="intake_auto_setting">Auto uses the device's setting: %1$d</string>
+  <!-- What each priority does. -->
+  <string name="intake_priority_low_caption">Runs when nothing else is waiting</string>
+  <string name="intake_priority_normal_caption">Default order</string>
+  <string name="intake_priority_high_caption">Ahead of Normal and Low</string>
+  <string name="intake_priority_urgent_caption">Jumps the queue; may pause a lower-priority download</string>
+  <!-- The options as the pill sums them up, joined by " · ", and as chips once changed. -->
+  <string name="intake_option_unlimited">Unlimited</string>
+  <!-- %1$s is a speed, such as "2 MB/s". -->
+  <string name="intake_option_max_speed">Max %1$s</string>
+  <string name="intake_option_urgent">⚡ Urgent</string>
+  <string name="intake_option_priority_low">Low priority</string>
+  <string name="intake_option_priority_high">High priority</string>
+  <!-- The peer limit of torrents. -->
+  <plurals name="intake_option_peers">
+    <item quantity="one">%1$d peer</item>
+    <item quantity="other">%1$d peers</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="one">%1$d connection</item>
+    <item quantity="other">%1$d connections</item>
+  </plurals>
+  <!-- Connections chosen by the device. -->
+  <string name="intake_option_auto">Auto</string>
+
+  <!-- Where the downloads are saved. -->
+  <string name="intake_save_to">Save to</string>
+  <!-- The default folder's name before the device says it. -->
+  <string name="intake_folder_downloads">Downloads</string>
+  <string name="intake_default_folder">Default folder</string>
+  <string name="intake_recent">Recent</string>
+  <string name="intake_pinned">Pinned</string>
+  <!-- %1$s is a folder name. -->
+  <string name="intake_unpin">Unpin %1$s</string>
+  <string name="intake_pin">Pin %1$s</string>
+  <string name="intake_choose_folder">Choose folder…</string>
+  <!-- A field for a path on another device. %1$s is the device, such as "NAS-Basement". -->
+  <string name="intake_folder_on">Folder on %1$s</string>
+  <string name="intake_torrents_app_folder">Torrents save to the app folder: folders picked in Files only take links</string>
+
+  <!-- The Advanced section: the file name and request headers. -->
+  <string name="intake_advanced">Advanced</string>
+  <string name="intake_hide">Hide</string>
+  <!-- %1$s lists header names, such as "Cookie, Referer". -->
+  <string name="intake_also_sent">Also sent with this link: %1$s</string>
+  <string name="intake_file_name">File name</string>
+  <string name="intake_server_file_name">Uses the server's file name</string>
+  <!-- The user agent typed by hand, next to Ketch, Chrome, Firefox and Safari. -->
+  <string name="intake_user_agent_custom">Custom</string>
+  <string name="intake_add_header">Add header</string>
+  <string name="intake_paste_curl">Paste cURL</string>
+  <string name="intake_headers_saved">Headers are saved with the task and visible to devices connected to this one.</string>
+  <!-- Placeholders of a further header's name and value. -->
+  <string name="intake_header_name">Header</string>
+  <string name="intake_header_value">Value</string>
+  <string name="intake_remove_header">Remove header</string>
+
+  <!-- The main button, which says what it does. %1$s is a file name. -->
+  <string name="intake_submit_download_name">Download %1$s</string>
+  <string name="intake_submit_schedule_name">Schedule %1$s</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="one">Download %1$d file</item>
+    <item quantity="other">Download %1$d files</item>
+  </plurals>
+  <!-- %2$s is their size, such as "1.2 GB". -->
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="one">Download %1$d file · %2$s</item>
+    <item quantity="other">Download %1$d files · %2$s</item>
+  </plurals>
+  <!-- Items rather than files when the batch holds a torrent, which holds files of its own. -->
+  <plurals name="intake_submit_download_items">
+    <item quantity="one">Download %1$d item</item>
+    <item quantity="other">Download %1$d items</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="one">Download %1$d item · %2$s</item>
+    <item quantity="other">Download %1$d items · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="one">Schedule %1$d file</item>
+    <item quantity="other">Schedule %1$d files</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="one">Schedule %1$d item</item>
+    <item quantity="other">Schedule %1$d items</item>
+  </plurals>
+  <string name="intake_submit_apply">Apply changes</string>
+  <string name="intake_submit_start_over">Start over</string>
+  <string name="intake_submit_waiting_files">Waiting for file list</string>
+  <string name="intake_submit_no_files">No files chosen</string>
+  <string name="intake_submit_nothing">Nothing to add</string>
+  <!-- Next to the main button: what a key does. %1$s is the key, such as ↩. -->
+  <string name="intake_hint_download">%1$s to download</string>
+  <string name="intake_hint_schedule">%1$s to schedule</string>
+  <string name="intake_hint_retry">%1$s to retry</string>
+  <string name="intake_hint_start_over">%1$s to start over</string>
+  <string name="intake_hint_apply">%1$s to apply</string>
+  <string name="intake_download_all">Download all</string>
+  <string name="intake_task_gone">This download is no longer in the list.</string>
+  <string name="intake_confirm_close">Close and discard what you typed?</string>
+  <string name="intake_keep_editing">Keep editing</string>
+  <string name="intake_discard">Discard</string>
+
+  <!-- What happens once the links are added, joined by " · ". -->
+  <string name="intake_outcome_starts_now">Starts now</string>
+  <!-- %1$d slots of the %2$d the device runs at once are free; %2$d picks the form. -->
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="one">%1$d of %2$d slots free</item>
+    <item quantity="other">%1$d of %2$d slots free</item>
+  </plurals>
+  <!-- How long the links take at the device's current speed. %1$s is a time, such as "4 min". -->
+  <string name="intake_outcome_eta">≈ %1$s at current speed</string>
+  <string name="intake_outcome_eta_soon">under a minute at current speed</string>
+  <!-- %1$s is the name of the download that pauses, %2$s its priority, such as "Low". -->
+  <string name="intake_outcome_urgent">⚡ Urgent: starts now and pauses %1$s (%2$s)</string>
+  <!-- %1$s is a host name, %2$d how many downloads it may run at once. -->
+  <string name="intake_outcome_waits_for_host">Waits for %1$s · %2$d per server</string>
+  <!-- A single link that waits first in the queue. -->
+  <string name="intake_outcome_queued_next">Queued · next in line</string>
+  <!-- A single link that waits behind %1$d queued downloads. -->
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="one">Queued · %1$d ahead</item>
+    <item quantity="other">Queued · %1$d ahead</item>
+  </plurals>
+  <!-- How many of the links start now and how many wait. -->
+  <plurals name="intake_outcome_start_now">
+    <item quantity="one">%1$d start now</item>
+    <item quantity="other">%1$d start now</item>
+  </plurals>
+  <!-- %2$s is intake_outcome_slots_free. -->
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="one">%1$d start now (%2$s)</item>
+    <item quantity="other">%1$d start now (%2$s)</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="one">%1$d queued</item>
+    <item quantity="other">%1$d queued</item>
+  </plurals>
+  <!-- Approximate times, rounded up to the minute; minutes alone use duration_minutes. -->
+  <string name="intake_time_hours">%1$d h</string>
+  <string name="intake_time_hours_minutes">%1$d h %2$d min</string>
+  <!-- After a retry whose changed link starts the download over. %1$s is a size. -->
+  <string name="intake_start_over_discard">Starts over · %1$s downloaded so far will be discarded.</string>
+  <string name="intake_start_over_new">Starts over as a new download.</string>
+
+  <!-- The torrent file picker. -->
+  <string name="intake_stage_back">Back to every link</string>
+  <!-- "3 of 128 files · 4.2 GB of 9.3 GB". %2$d picks the form, %3$s and %4$s are sizes. -->
+  <plurals name="intake_stage_selection">
+    <item quantity="one">%1$d of %2$d file · %3$s of %4$s</item>
+    <item quantity="other">%1$d of %2$d files · %3$s of %4$s</item>
+  </plurals>
+  <string name="intake_filter_files">Filter files</string>
+  <string name="intake_largest_file">Largest file</string>
+  <!-- Leaves out samples, .nfo files and other extras. -->
+  <string name="intake_skip_samples">Skip samples</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="one">Skipped %1$d extra</item>
+    <item quantity="other">Skipped %1$d extras</item>
+  </plurals>
+  <!-- A kind of file the picker selects with one chip, next to Video, Audio and Images. -->
+  <string name="intake_kind_subtitles">Subtitles</string>
+  <string name="intake_sort">Sort</string>
+  <string name="intake_sort_files">Sort files</string>
+  <!-- What a click on a folder's arrow does. -->
+  <string name="intake_expand">Expand</string>
+  <string name="intake_collapse">Collapse</string>
+
+  <!-- Why a .torrent file opened from the system could not be added. -->
+  <string name="intake_file_unreadable">The file could not be read</string>
+  <string name="intake_file_empty">The file is empty</string>
+  <!-- %1$d is the largest size the app reads, in mebibytes. -->
+  <string name="intake_file_too_large">The file is larger than %1$d MiB</string>
+
+  <!-- Why a typed tracker URL was not added, in the BitTorrent settings. -->
+  <string name="intake_tracker_too_long">Too long.</string>
+  <string name="intake_tracker_spaces">Contains spaces.</string>
+  <string name="intake_tracker_scheme">Start it with http://, https:// or udp://.</string>
+  <string name="intake_tracker_no_host">Missing the host name.</string>
+  <string name="intake_tracker_udp_user_info">UDP trackers can't include a user name or password.</string>
+  <string name="intake_tracker_udp_port">UDP trackers need a port.</string>
+  <string name="intake_tracker_port">Use a port from 1 to 65535.</string>
+</resources>

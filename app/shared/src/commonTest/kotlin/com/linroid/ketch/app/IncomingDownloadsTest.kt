@@ -2,6 +2,7 @@ package com.linroid.ketch.app
 
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
@@ -9,8 +10,8 @@ import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
-import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.state.ResolveState
+import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.state.torrentFileDownload
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runCurrent
@@ -44,13 +45,15 @@ class IncomingDownloadsTest {
   }
 
   @Test
-  fun `empty and oversized torrent files are rejected`() {
-    assertIs<IncomingDownload.Failed>(torrentFileDownload("empty.torrent", ByteArray(0)))
+  fun `empty and oversized torrent files are rejected`() = runTest {
+    val empty = torrentFileDownload("empty.torrent", ByteArray(0))
+    assertEquals("The file is empty", assertIs<IncomingDownload.Failed>(empty).reason.load())
     assertIs<IncomingDownload.Ready>(
       torrentFileDownload("max.torrent", ByteArray(MAX_TORRENT_FILE_BYTES)),
     )
     val large = torrentFileDownload("large.torrent", ByteArray(MAX_TORRENT_FILE_BYTES + 1))
-    assertEquals("The file is larger than 4 MiB", assertIs<IncomingDownload.Failed>(large).message)
+    val reason = assertIs<IncomingDownload.Failed>(large).reason
+    assertEquals("The file is larger than 4 MiB", reason.load())
   }
 
   @Test
@@ -75,6 +78,14 @@ class IncomingDownloadsTest {
       IncomingDownload.Failed("b.torrent", "Permission denied"),
       incoming.failures.first(),
     )
+  }
+
+  @Test
+  fun `unreadable files without a reason say the file could not be read`() = runTest {
+    val incoming = IncomingDownloads()
+    incoming.offerUnreadable("c.torrent", Exception())
+
+    assertEquals("The file could not be read", incoming.failures.first().reason.load())
   }
 
   @Test
@@ -148,7 +159,10 @@ class IncomingDownloadsTest {
 
       assertFalse(state.showAddDialog)
       val error = state.messages.active.value.single { it.level == MessageLevel.Error }
-      assertEquals("Couldn't open a.torrent" to "The file is empty", error.title to error.detail)
+      assertEquals(
+        "Couldn't open a.torrent" to "The file is empty",
+        error.title.load() to error.detail.load()
+      )
     }
   }
 

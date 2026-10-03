@@ -1,5 +1,10 @@
 package com.linroid.ketch.app.util
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.intake_range_truncated
+
 /** Most links one pattern such as `part[001-500].rar` expands to; the rest are left out. */
 const val MAX_EXPANDED_LINKS: Int = 200
 
@@ -37,8 +42,8 @@ sealed interface IntakeItem {
     val headers: Map<String, String> = emptyMap(),
   ) : IntakeItem {
     /** "Expanded to the first 200 links" when the pattern was cut short, else `null`. */
-    val warning: String?
-      get() = if (truncated) "Expanded to the first ${urls.size} links" else null
+    val warning: UiText?
+      get() = if (truncated) Res.plurals.intake_range_truncated.text(urls.size) else null
 
     /** The links the pattern expands to. */
     val links: List<Link> get() = urls.map { Link(it, headers) }

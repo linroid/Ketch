@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.Dp
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.isEmpty
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.RowGroup
@@ -49,6 +52,12 @@ import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.listKeyboard
 import com.linroid.ketch.app.ui.downloads.actions.pageSizeOf
 import com.linroid.ketch.app.ui.downloads.actions.rubberBand
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_group_collapsed
+import ketch.app.shared.generated.resources.downloads_group_expanded
+import ketch.app.shared.generated.resources.downloads_group_hide
+import ketch.app.shared.generated.resources.downloads_group_show
+import org.jetbrains.compose.resources.stringResource
 
 /** One item of a grouped task list: a group's header or a row. */
 internal sealed interface ListEntry {
@@ -95,8 +104,8 @@ internal class GroupCollapse {
 internal fun listEntries(groups: List<RowGroup>, collapse: GroupCollapse): List<ListEntry> =
   buildList {
     for (group in groups) {
-      val collapsed = group.title.isNotEmpty() && collapse.isCollapsed(group)
-      if (group.title.isNotEmpty()) add(ListEntry.Header(group, collapsed))
+      val collapsed = !group.title.isEmpty() && collapse.isCollapsed(group)
+      if (!group.title.isEmpty()) add(ListEntry.Header(group, collapsed))
       if (!collapsed) group.rows.forEach { add(ListEntry.Row(it, group.id)) }
     }
   }
@@ -201,6 +210,17 @@ internal fun GroupHeader(
   val focus = rememberFocusVisibility()
   val interactions = remember { MutableInteractionSource() }
   val hairline = colors.hairline
+  val title = group.title.resolve()
+  val toggleLabel = if (entry.collapsed) {
+    stringResource(Res.string.downloads_group_show, title)
+  } else {
+    stringResource(Res.string.downloads_group_hide, title)
+  }
+  val stateLabel = if (entry.collapsed) {
+    stringResource(Res.string.downloads_group_collapsed)
+  } else {
+    stringResource(Res.string.downloads_group_expanded)
+  }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -217,12 +237,12 @@ internal fun GroupHeader(
       .clickable(
         interactionSource = interactions,
         indication = null,
-        onClickLabel = if (entry.collapsed) "Show ${group.title}" else "Hide ${group.title}",
+        onClickLabel = toggleLabel,
         onClick = onToggle,
       )
       .semantics {
         heading()
-        stateDescription = if (entry.collapsed) "Collapsed" else "Expanded"
+        stateDescription = stateLabel
       }
       .padding(horizontal = padding),
   ) {
@@ -232,14 +252,14 @@ internal fun GroupHeader(
       tint = colors.textTertiary,
     )
     Text(
-      text = eyebrowText(group.title),
+      text = eyebrowText(title),
       style = type.eyebrow,
       color = colors.textSecondary,
       maxLines = 1,
     )
     if (group.details.isNotEmpty()) {
       Text(
-        text = group.details.joinToString(prefix = "· ", separator = " · "),
+        text = "· " + group.details.joinText().resolve(),
         style = type.numeralS,
         color = colors.textTertiary,
         maxLines = 1,

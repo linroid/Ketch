@@ -52,6 +52,8 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -60,7 +62,19 @@ import com.linroid.ketch.app.state.ListArrangement
 import com.linroid.ketch.app.state.SortKey
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_clear_missing_tooltip
+import ketch.app.shared.generated.resources.downloads_group
+import ketch.app.shared.generated.resources.downloads_group_by
+import ketch.app.shared.generated.resources.downloads_label_value
+import ketch.app.shared.generated.resources.downloads_sort
+import ketch.app.shared.generated.resources.downloads_sort_by
+import ketch.app.shared.generated.resources.downloads_tab_failed
+import ketch.app.shared.generated.resources.downloads_tab_needs_link
+import ketch.app.shared.generated.resources.downloads_tab_retry_all
 import kotlinx.coroutines.flow.first
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The status tabs with their counts, omitted at zero; the Failed count is drawn white on the
@@ -90,7 +104,7 @@ internal fun StatusTabs(
         options = StatusFilter.entries,
         selected = selected,
         onSelect = onSelect,
-        label = { it.label },
+        label = { it.label.resolve() },
         count = { counts[it] },
         alert = { it == StatusFilter.Failed },
         shortcut = { KetchCommands.tab(it).shortcutLabel() },
@@ -137,7 +151,7 @@ internal fun StatusChips(
         }
       }
       KetchChip(
-        label = filter.label,
+        label = filter.label.resolve(),
         selected = filter == selected,
         onClick = { onSelect(filter) },
         count = counts[filter]?.takeIf { it > 0 },
@@ -174,11 +188,11 @@ internal fun TabAction(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
     ) {
-      TextAction(clearFinishedLabel(count), onClearFinished)
+      TextAction(clearFinishedLabel(count).resolve(), onClearFinished)
       if (missing > 0) {
         Separator()
-        KetchTooltip(text = "Remove the finished downloads whose files were moved or deleted") {
-          TextAction(clearMissingLabel(missing), onClearMissing)
+        KetchTooltip(text = stringResource(Res.string.downloads_clear_missing_tooltip)) {
+          TextAction(clearMissingLabel(missing).resolve(), onClearMissing)
         }
       }
     }
@@ -187,17 +201,17 @@ internal fun TabAction(
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
     ) {
       Text(
-        text = "$count failed",
+        text = pluralStringResource(Res.plurals.downloads_tab_failed, count, count),
         style = KetchTheme.typography.caption,
         color = colors.textSecondary,
         maxLines = 1,
       )
       Separator()
-      TextAction("Retry all", onRetryAll)
+      TextAction(stringResource(Res.string.downloads_tab_retry_all), onRetryAll)
       if (needsLink > 0) {
         Separator()
         Text(
-          text = if (needsLink == 1) "1 needs a new link" else "$needsLink need a new link",
+          text = pluralStringResource(Res.plurals.downloads_tab_needs_link, needsLink, needsLink),
           style = KetchTheme.typography.caption,
           color = colors.textTertiary,
           maxLines = 1,
@@ -275,14 +289,16 @@ internal fun ArrangementMenu(
   var open by remember { mutableStateOf(false) }
   Box {
     if (table) {
-      MenuLabel("Group", arrangement.group.label, open) { open = true }
+      val label = stringResource(Res.string.downloads_group)
+      MenuLabel(label, arrangement.group.label.resolve(), open) { open = true }
     } else {
       val arrow = when {
         arrangement.sort == SortKey.Smart -> ""
         arrangement.descending -> " ↓"
         else -> " ↑"
       }
-      MenuLabel("Sort", arrangement.sort.label + arrow, open) { open = true }
+      val label = stringResource(Res.string.downloads_sort)
+      MenuLabel(label, arrangement.sort.label.resolve() + arrow, open) { open = true }
     }
     KetchMenu(expanded = open, onDismissRequest = { open = false }) {
       if (table) {
@@ -294,7 +310,7 @@ internal fun ArrangementMenu(
           )
         }
       } else {
-        header("Sort by")
+        header(Res.string.downloads_sort_by.text())
         for (key in ListSortKeys) {
           item(
             label = key.label,
@@ -303,7 +319,7 @@ internal fun ArrangementMenu(
           )
         }
         divider()
-        header("Group by")
+        header(Res.string.downloads_group_by.text())
         for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
           item(
             label = group.label,
@@ -316,7 +332,7 @@ internal fun ArrangementMenu(
   }
 }
 
-/** A quiet "Label: value ▾" button that opens a menu. */
+/** A quiet "Label: value ▾" button that opens a menu; the value shows brighter. */
 @Composable
 internal fun MenuLabel(label: String, value: String, open: Boolean, onClick: () -> Unit) {
   val colors = KetchTheme.colors
@@ -325,6 +341,8 @@ internal fun MenuLabel(label: String, value: String, open: Boolean, onClick: () 
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
+  val text = stringResource(Res.string.downloads_label_value, label, value)
+  val at = text.lastIndexOf(value)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -345,8 +363,15 @@ internal fun MenuLabel(label: String, value: String, open: Boolean, onClick: () 
   ) {
     Text(
       text = buildAnnotatedString {
-        withStyle(SpanStyle(color = colors.textTertiary)) { append("$label: ") }
-        append(value)
+        if (at < 0) {
+          append(text)
+        } else {
+          withStyle(SpanStyle(color = colors.textTertiary)) { append(text.substring(0, at)) }
+          append(value)
+          withStyle(SpanStyle(color = colors.textTertiary)) {
+            append(text.substring(at + value.length))
+          }
+        }
       },
       style = KetchTheme.typography.labelS,
       color = colors.textPrimary,

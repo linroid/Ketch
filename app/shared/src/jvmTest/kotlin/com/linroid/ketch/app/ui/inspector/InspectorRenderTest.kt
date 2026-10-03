@@ -27,6 +27,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.snapshot.SampleData
 import com.linroid.ketch.app.snapshot.SampleEnvironment
 import com.linroid.ketch.app.snapshot.SnapshotHarness
@@ -136,7 +137,8 @@ class InspectorRenderTest {
   @Test
   fun inspector_urgentWithEverySlotTaken_asksBeforeStarting() {
     inspectSample(QUEUED) { state, key, scene ->
-      val starting = "start now"
+      // The pending key of AppState.startNow.
+      val starting = "startNow"
       scene.press(scene.centerOf("Urgent"))
       scene.release(scene.centerOf("Urgent"))
       frames(scene, 300.milliseconds)
@@ -195,7 +197,7 @@ class InspectorRenderTest {
       presets = listOf(SpeedLimit.mbps(5), SpeedLimit.mbps(2), SpeedLimit.mbps(1)),
       onCommit = { commits += it },
       globalCap = SpeedLimit.Unlimited,
-      globalName = "Global limit",
+      globalName = verbatim("Global limit"),
       pending = false,
     )
   }

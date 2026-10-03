@@ -65,17 +65,56 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.LocalDeviceKind
+import com.linroid.ketch.app.platform.localDeviceKind
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.folderName
+import com.linroid.ketch.app.state.folderNameText
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.canvasWash
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_back
+import ketch.app.shared.generated.resources.action_continue
+import ketch.app.shared.generated.resources.action_skip
+import ketch.app.shared.generated.resources.onboarding_files_body
+import ketch.app.shared.generated.resources.onboarding_files_path
+import ketch.app.shared.generated.resources.onboarding_files_title
+import ketch.app.shared.generated.resources.onboarding_folder_body
+import ketch.app.shared.generated.resources.onboarding_folder_choose_another
+import ketch.app.shared.generated.resources.onboarding_folder_not_now
+import ketch.app.shared.generated.resources.onboarding_folder_saving_to
+import ketch.app.shared.generated.resources.onboarding_folder_title
+import ketch.app.shared.generated.resources.onboarding_folder_torrents
+import ketch.app.shared.generated.resources.onboarding_folder_use_download
+import ketch.app.shared.generated.resources.onboarding_intake_body
+import ketch.app.shared.generated.resources.onboarding_intake_copy
+import ketch.app.shared.generated.resources.onboarding_intake_copy_body
+import ketch.app.shared.generated.resources.onboarding_intake_notify
+import ketch.app.shared.generated.resources.onboarding_intake_notify_body
+import ketch.app.shared.generated.resources.onboarding_intake_select
+import ketch.app.shared.generated.resources.onboarding_intake_select_body
+import ketch.app.shared.generated.resources.onboarding_intake_share
+import ketch.app.shared.generated.resources.onboarding_intake_share_body
+import ketch.app.shared.generated.resources.onboarding_intake_start
+import ketch.app.shared.generated.resources.onboarding_intake_title
+import ketch.app.shared.generated.resources.onboarding_intake_torrents
+import ketch.app.shared.generated.resources.onboarding_intake_torrents_body
+import ketch.app.shared.generated.resources.onboarding_recommended
+import ketch.app.shared.generated.resources.onboarding_step
+import ketch.app.shared.generated.resources.onboarding_use_body
+import ketch.app.shared.generated.resources.onboarding_use_control
+import ketch.app.shared.generated.resources.onboarding_use_control_body
+import ketch.app.shared.generated.resources.onboarding_use_download
+import ketch.app.shared.generated.resources.onboarding_use_download_android
+import ketch.app.shared.generated.resources.onboarding_use_download_ios
+import ketch.app.shared.generated.resources.onboarding_use_title
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The phone and tablet apps' first screens, full screen over the canvas wash: where downloads go,
@@ -86,7 +125,7 @@ import kotlinx.coroutines.launch
  * shows the app; choosing to control a computer also opens pairing.
  *
  * @param platform the platform, whose folder step and advice differ.
- * @param deviceNoun what the app calls this device, such as "This phone" or "This iPad".
+ * @param deviceKind the kind of device this is, which names it, such as "This phone".
  * @param welcome where the flow starts, for previews; a new flow starts on the folder.
  */
 @Composable
@@ -95,7 +134,7 @@ internal fun WelcomeFlow(
   platform: WelcomePlatform,
   onDone: () -> Unit,
   modifier: Modifier = Modifier,
-  deviceNoun: String = localDeviceNoun(),
+  deviceKind: LocalDeviceKind = localDeviceKind(),
   welcome: WelcomeState = rememberWelcomeState(),
 ) {
   val colors = KetchTheme.colors
@@ -140,8 +179,8 @@ internal fun WelcomeFlow(
       modifier = Modifier.weight(1f).fillMaxWidth(),
     ) { step ->
       when (step) {
-        WelcomeStep.Folder -> FolderStep(state, platform, deviceNoun, welcome)
-        WelcomeStep.Use -> UseStep(platform, deviceNoun) { use ->
+        WelcomeStep.Folder -> FolderStep(state, platform, deviceKind, welcome)
+        WelcomeStep.Use -> UseStep(platform, deviceKind) { use ->
           if (!welcome.choose(use)) finish(use == WelcomeUse.Control)
         }
         WelcomeStep.Intake -> IntakeStep(platform, onDone = { finish(false) })
@@ -162,14 +201,14 @@ private fun TopRow(welcome: WelcomeState, onSkip: () -> Unit, modifier: Modifier
       KetchIconButton(
         icon = KetchIcon.ChevronLeft,
         onClick = { welcome.back() },
-        contentDescription = "Back",
+        contentDescription = stringResource(Res.string.action_back),
         modifier = Modifier.align(Alignment.CenterStart),
       )
     }
     ProgressDots(count = WelcomeStep.entries.size, current = welcome.index)
     if (welcome.step != WelcomeStep.entries.last()) {
       KetchButton(
-        text = "Skip",
+        text = stringResource(Res.string.action_skip),
         onClick = onSkip,
         variant = KetchButtonVariant.Ghost,
         modifier = Modifier.align(Alignment.CenterEnd),
@@ -184,10 +223,11 @@ private fun ProgressDots(count: Int, current: Int) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val motion = KetchTheme.motion
+  val description = stringResource(Res.string.onboarding_step, current + 1, count)
   Row(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier.semantics { contentDescription = "Step ${current + 1} of $count" },
+    modifier = Modifier.semantics { contentDescription = description },
   ) {
     repeat(count) { index ->
       val active = index == current
@@ -283,18 +323,17 @@ private fun StepScaffold(
 private fun FolderStep(
   state: AppState,
   platform: WelcomePlatform,
-  deviceNoun: String,
+  deviceKind: LocalDeviceKind,
   welcome: WelcomeState,
 ) {
   if (platform == WelcomePlatform.Ios) {
     StepScaffold(
-      title = "Your downloads, in Files",
-      body = "Ketch saves what you download where the Files app can open it, share it and " +
-        "move it.",
+      title = stringResource(Res.string.onboarding_files_title),
+      body = stringResource(Res.string.onboarding_files_body),
       header = { SailLanesIllustration(width = SailLanesIllustrationDefaults.CompactWidth) },
       actions = {
         KetchButton(
-          text = "Continue",
+          text = stringResource(Res.string.action_continue),
           onClick = { welcome.next() },
           size = KetchButtonSize.Large,
           modifier = Modifier.fillMaxWidth(),
@@ -303,7 +342,7 @@ private fun FolderStep(
     ) {
       FolderPath(
         icon = KetchIcon.Folder,
-        text = filesPath(deviceNoun),
+        text = filesPath(deviceKind),
       )
     }
     return
@@ -320,14 +359,13 @@ private fun FolderStep(
     }
   }
   StepScaffold(
-    title = "Where should downloads\u00A0go?",
-    body = "Other apps can't open Ketch's own folder. Save to Download, and your files show " +
-      "up everywhere.",
+    title = stringResource(Res.string.onboarding_folder_title),
+    body = stringResource(Res.string.onboarding_folder_body),
     header = { SailLanesIllustration(width = SailLanesIllustrationDefaults.CompactWidth) },
     actions = {
       if (chosen == null) {
         KetchButton(
-          text = "Use the Download folder",
+          text = stringResource(Res.string.onboarding_folder_use_download),
           onClick = choose,
           size = KetchButtonSize.Large,
           leadingIcon = KetchIcon.Folder,
@@ -335,7 +373,7 @@ private fun FolderStep(
           modifier = Modifier.fillMaxWidth(),
         )
         KetchButton(
-          text = "Not now",
+          text = stringResource(Res.string.onboarding_folder_not_now),
           onClick = { welcome.next() },
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Large,
@@ -343,13 +381,13 @@ private fun FolderStep(
         )
       } else {
         KetchButton(
-          text = "Continue",
+          text = stringResource(Res.string.action_continue),
           onClick = { welcome.next() },
           size = KetchButtonSize.Large,
           modifier = Modifier.fillMaxWidth(),
         )
         KetchButton(
-          text = "Choose another folder",
+          text = stringResource(Res.string.onboarding_folder_choose_another),
           onClick = choose,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Large,
@@ -367,17 +405,20 @@ private fun FolderStep(
       when {
         error != null -> Note(
           icon = KetchIcon.Warning,
-          text = error,
+          text = error.resolve(),
           color = KetchTheme.colors.status.failed.color,
         )
         chosen != null -> FolderPath(
           icon = KetchIcon.CheckCircle,
-          text = "Saving to ${folderName(chosen)}",
+          text = stringResource(
+            Res.string.onboarding_folder_saving_to,
+            folderNameText(chosen).resolve(),
+          ),
           tint = KetchTheme.colors.status.completed.color,
         )
       }
       // The folder only takes HTTP and FTP downloads; torrents can't write to it.
-      Note(icon = KetchIcon.Info, text = "Torrents stay in Ketch's folder.")
+      Note(icon = KetchIcon.Info, text = stringResource(Res.string.onboarding_folder_torrents))
     }
   }
 }
@@ -386,24 +427,27 @@ private fun FolderStep(
 @Composable
 private fun UseStep(
   platform: WelcomePlatform,
-  deviceNoun: String,
+  deviceKind: LocalDeviceKind,
   onChoose: (WelcomeUse) -> Unit,
 ) {
   val spacing = KetchTheme.spacing
   val ios = platform == WelcomePlatform.Ios
   StepScaffold(
-    title = "How will you use Ketch\u00A0here?",
-    body = "Pick one to start. You can always do the other later.",
+    title = stringResource(Res.string.onboarding_use_title),
+    body = stringResource(Res.string.onboarding_use_body),
   ) {
     val here: @Composable () -> Unit = {
       ChoiceCard(
-        icon = if (deviceNoun.endsWith("phone")) KetchIcon.Phone else KetchIcon.Tablet,
+        icon = if (deviceKind == LocalDeviceKind.Phone) KetchIcon.Phone else KetchIcon.Tablet,
         hue = FileTypeHue.Sky,
-        title = "Download on ${deviceNoun.replaceFirstChar { it.lowercase() }}",
+        title = stringResource(
+          Res.string.onboarding_use_download,
+          stringResource(deviceKind.inSentence),
+        ),
         detail = if (ios) {
-          "Downloads can pause while Ketch is in the background."
+          stringResource(Res.string.onboarding_use_download_ios)
         } else {
-          "Downloads keep going while you use other apps."
+          stringResource(Res.string.onboarding_use_download_android)
         },
         onClick = { onChoose(WelcomeUse.Download) },
       )
@@ -412,8 +456,8 @@ private fun UseStep(
       ChoiceCard(
         icon = KetchIcon.Laptop,
         hue = FileTypeHue.Indigo,
-        title = "Control a computer",
-        detail = "Add downloads to Ketch on your computer from here.",
+        title = stringResource(Res.string.onboarding_use_control),
+        detail = stringResource(Res.string.onboarding_use_control_body),
         recommended = ios,
         onClick = { onChoose(WelcomeUse.Control) },
       )
@@ -437,11 +481,11 @@ private fun IntakeStep(platform: WelcomePlatform, onDone: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   StepScaffold(
-    title = "Send links to Ketch",
-    body = "Start downloads from the apps you already use.",
+    title = stringResource(Res.string.onboarding_intake_title),
+    body = stringResource(Res.string.onboarding_intake_body),
     actions = {
       KetchButton(
-        text = "Start downloading",
+        text = stringResource(Res.string.onboarding_intake_start),
         onClick = onDone,
         size = KetchButtonSize.Large,
         modifier = Modifier.fillMaxWidth(),
@@ -460,34 +504,34 @@ private fun IntakeStep(platform: WelcomePlatform, onDone: () -> Unit) {
         Way(
           icon = KetchIcon.Browser,
           hue = FileTypeHue.Sky,
-          title = "Share from your browser",
-          detail = "Tap Share, then Ketch. The download starts without leaving the page.",
+          title = stringResource(Res.string.onboarding_intake_share),
+          detail = stringResource(Res.string.onboarding_intake_share_body),
         )
         Way(
           icon = KetchIcon.Link,
           hue = FileTypeHue.Jade,
-          title = "Select a link",
-          detail = "Choose Download with Ketch in the menu over any selected text.",
+          title = stringResource(Res.string.onboarding_intake_select),
+          detail = stringResource(Res.string.onboarding_intake_select_body),
         )
       } else {
         Way(
           icon = KetchIcon.Copy,
           hue = FileTypeHue.Sky,
-          title = "Copy a link",
-          detail = "Come back to Ketch, and it offers to download the link.",
+          title = stringResource(Res.string.onboarding_intake_copy),
+          detail = stringResource(Res.string.onboarding_intake_copy_body),
         )
       }
       Way(
         icon = KetchIcon.FileTorrent,
         hue = FileTypeHue.Violet,
-        title = "Open magnets and .torrent files",
-        detail = "They open in Ketch, ready to choose the files you want.",
+        title = stringResource(Res.string.onboarding_intake_torrents),
+        detail = stringResource(Res.string.onboarding_intake_torrents_body),
       )
       Way(
         icon = KetchIcon.Bell,
         hue = FileTypeHue.Amber,
-        title = "Hear when downloads finish",
-        detail = "Ketch lets you know when a download finishes or fails; choose what in Settings.",
+        title = stringResource(Res.string.onboarding_intake_notify),
+        detail = stringResource(Res.string.onboarding_intake_notify_body),
       )
     }
   }
@@ -533,7 +577,7 @@ private fun ChoiceCard(
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       if (recommended) {
         KetchBadge(
-          "Recommended",
+          stringResource(Res.string.onboarding_recommended),
           tone = KetchBadgeTone.Accent,
           modifier = Modifier.padding(bottom = spacing.s1),
         )
@@ -604,17 +648,17 @@ private fun Note(
 
 /** Uses [folder] for the downloads of the embedded device, saved for the next launch. */
 private suspend fun useFolder(state: AppState, folder: String) {
-  val device = checkNotNull(state.instances.value.firstOrNull { it is EmbeddedInstance }) {
-    "This device can't download"
-  }
+  val device = state.instances.value.firstOrNull { it is EmbeddedInstance }
+  checkNotNull(device) { "This device can't download" }
   val config = device.instance.status().config
   state.settingsFor(device).updateDownload(config.copy(defaultDirectory = folder))
 }
 
 /** Where the Files app shows Ketch's downloads on this iPhone or iPad. */
-private fun filesPath(deviceNoun: String): String {
-  val device = if (deviceNoun.endsWith("iPad")) "iPad" else "iPhone"
-  return "On My $device › Ketch › Downloads"
+@Composable
+private fun filesPath(deviceKind: LocalDeviceKind): String {
+  val device = if (deviceKind == LocalDeviceKind.IPad) "iPad" else "iPhone"
+  return stringResource(Res.string.onboarding_files_path, device)
 }
 
 // The shared Download folder, where Android's folder picker opens.

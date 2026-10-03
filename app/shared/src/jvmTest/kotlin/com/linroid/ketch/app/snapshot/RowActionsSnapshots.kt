@@ -49,6 +49,9 @@ import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppController
@@ -68,6 +71,7 @@ import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
 import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
 import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
+import com.linroid.ketch.app.ui.downloads.actions.dragCount
 import com.linroid.ketch.app.ui.downloads.actions.drawDragPreview
 import com.linroid.ketch.app.ui.downloads.actions.listKeyboard
 import com.linroid.ketch.app.ui.downloads.actions.pageSizeOf
@@ -237,15 +241,16 @@ class RowActionsSnapshots {
       snapshot("row-actions-drag-preview", size, theme) {
         val measurer = rememberTextMeasurer()
         val style = rememberDragPreviewStyle()
+        val count = dragCount(rows)
         Column(
           Modifier.padding(16.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows.take(1), measurer, style)
+            drawDragPreview(rows.take(1), measurer, style, count = null)
           }
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows, measurer, style)
+            drawDragPreview(rows, measurer, style, count)
           }
         }
       }
@@ -306,7 +311,7 @@ private class DemoScope(val actions: ListActions, val state: AppState) {
 
 /** Files that exist and can go to the Trash, without touching this machine. */
 private class SnapshotFiles(override val canTrash: Boolean = true) : FileActions {
-  override val revealLabel: String = "Show in Finder"
+  override val revealLabel: UiText = verbatim("Show in Finder")
   override val canShare: Boolean = false
 
   override suspend fun open(path: String) {}
@@ -480,7 +485,7 @@ private fun Tabs(state: AppState) {
       options = StatusFilter.entries,
       selected = StatusFilter.All,
       onSelect = {},
-      label = { it.label },
+      label = { it.label.resolve() },
     )
   }
 }
@@ -550,7 +555,7 @@ private fun TableRow(row: TaskRow, actions: ListActions) {
         )
         PriorityGlyph(row.request.priority, Modifier.padding(start = 4.dp))
       }
-      NumeralCell(content.size, 128.dp)
+      NumeralCell(content.size.resolve(), 128.dp)
       if (running) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
@@ -569,10 +574,10 @@ private fun TableRow(row: TaskRow, actions: ListActions) {
             modifier = Modifier.padding(start = 8.dp),
           )
         }
-        NumeralCell(content.speed, 92.dp)
+        NumeralCell(content.speed.resolve(), 92.dp)
       } else {
         Text(
-          text = content.error?.title ?: content.detail,
+          text = (content.error?.title ?: content.detail).resolve(),
           style = type.caption,
           color = if (content.error != null) colors.status.failed.color else colors.textSecondary,
           maxLines = 1,
@@ -583,7 +588,7 @@ private fun TableRow(row: TaskRow, actions: ListActions) {
       Box(Modifier.width(132.dp).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
         if (!frame.hovered) {
           Text(
-            text = content.time.ifEmpty { content.added },
+            text = content.time.resolve().ifEmpty { content.added.resolve() },
             style = type.numeral,
             color = colors.textTertiary,
           )
@@ -638,7 +643,7 @@ private fun PhoneRow(row: TaskRow, actions: ListActions) {
           overflow = TextOverflow.Ellipsis,
         )
         Text(
-          text = content.error?.title ?: content.detail,
+          text = (content.error?.title ?: content.detail).resolve(),
           style = type.caption,
           color = colors.textSecondary,
           maxLines = 1,

@@ -4,6 +4,9 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.feedback.AppMessage
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.plain
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.FileActions
@@ -28,10 +31,10 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 
 /** The embedded device of a test. */
-internal val LocalDevice = DeviceInfo("This Mac", RowCapabilities.local())
+internal val LocalDevice = DeviceInfo(verbatim("This Mac"), RowCapabilities.local())
 
 /** A remote device of a test. */
-internal val RemoteDevice = DeviceInfo("NAS", RowCapabilities.remote())
+internal val RemoteDevice = DeviceInfo(verbatim("NAS"), RowCapabilities.remote())
 
 /**
  * An app with one recording device and a [RowActionRunner] over it, run by the test's scheduler.
@@ -41,7 +44,7 @@ internal val RemoteDevice = DeviceInfo("NAS", RowCapabilities.remote())
  */
 internal class ActionsFixture(
   scope: TestScope,
-  revealLabel: String? = "Show in Finder",
+  revealLabel: UiText? = verbatim("Show in Finder"),
   canTrash: Boolean = false,
 ) {
   val api = RecordingKetchApi()
@@ -94,6 +97,8 @@ internal fun rowOf(
     createdAt = task.createdAt,
     device = device,
     content = rowContent(request, state, task.createdAt, context),
+    deviceName = device.name.plain,
+    errorTitle = null,
   )
 }
 
@@ -102,7 +107,7 @@ internal val NOW: Instant = Instant.parse("2026-10-01T12:00:00Z")
 
 /** File actions that record their calls. */
 internal class FakeFileActions(
-  override val revealLabel: String?,
+  override val revealLabel: UiText?,
   override val canTrash: Boolean = false,
 ) : FileActions {
   val calls = mutableListOf<String>()

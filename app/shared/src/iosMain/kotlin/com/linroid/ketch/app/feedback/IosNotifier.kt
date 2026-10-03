@@ -1,6 +1,9 @@
 package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.state.AppController
@@ -8,6 +11,14 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_open
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.feedback_file_action_failed
+import ketch.app.shared.generated.resources.notify_action_share
+import ketch.app.shared.generated.resources.notify_paused
+import ketch.app.shared.generated.resources.notify_paused_body
+import ketch.app.shared.generated.resources.reveal_in_files
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -70,6 +81,13 @@ object IosNotifier : SystemNotifier {
     if (installed) return
     installed = true
     center.delegate = delegate
+  }
+
+  /**
+   * Registers the buttons of Ketch's notifications, named in the app's language; do it before
+   * the first notification posts.
+   */
+  internal suspend fun registerCategories() {
     center.setNotificationCategories(
       setOf(
         category(CATEGORY_COMPLETED, NotificationAction.Open, NotificationAction.Share),
@@ -127,10 +145,10 @@ object IosNotifier : SystemNotifier {
    * Tells the user that [count] downloads were paused for the background. The notice shows
    * after a minute, so a quick trip to another app never posts it.
    */
-  internal fun notifyPaused(count: Int) {
+  internal suspend fun notifyPaused(count: Int) {
     val content = UNMutableNotificationContent()
-    content.setTitle(if (count == 1) "1 download paused" else "$count downloads paused")
-    content.setBody("Open Ketch to continue")
+    content.setTitle(Res.plurals.notify_paused.text(count).load())
+    content.setBody(Res.string.notify_paused_body.text().load())
     val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(
       timeInterval = PAUSED_NOTICE_DELAY_SECONDS,
       repeats = false,
@@ -163,24 +181,27 @@ object IosNotifier : SystemNotifier {
     }
   }
 
-  private fun category(id: String, vararg actions: NotificationAction): UNNotificationCategory =
-    UNNotificationCategory.categoryWithIdentifier(
-      identifier = id,
-      actions = actions.map { action ->
-        UNNotificationAction.actionWithIdentifier(
-          identifier = action.name,
-          title = when (action) {
-            NotificationAction.Open -> "Open"
-            NotificationAction.Reveal -> "Show in Files"
-            NotificationAction.Share -> "Share"
-            NotificationAction.Retry -> "Retry"
-          },
-          options = UNNotificationActionOptionForeground,
-        )
-      },
-      intentIdentifiers = emptyList<String>(),
-      options = UNNotificationCategoryOptionNone,
-    )
+  private suspend fun category(
+    id: String,
+    vararg actions: NotificationAction,
+  ): UNNotificationCategory = UNNotificationCategory.categoryWithIdentifier(
+    identifier = id,
+    actions = actions.map { action ->
+      val title = when (action) {
+        NotificationAction.Open -> Res.string.action_open
+        NotificationAction.Reveal -> Res.string.reveal_in_files
+        NotificationAction.Share -> Res.string.notify_action_share
+        NotificationAction.Retry -> Res.string.action_retry
+      }
+      UNNotificationAction.actionWithIdentifier(
+        identifier = action.name,
+        title = title.text().load(),
+        options = UNNotificationActionOptionForeground,
+      )
+    },
+    intentIdentifiers = emptyList<String>(),
+    options = UNNotificationCategoryOptionNone,
+  )
 
   private fun NSError.describe(): String = "$domain ${code}: $localizedDescription"
 
@@ -256,6 +277,7 @@ internal fun IosNotifier.reportActivity(
   val monitor = ActivityMonitor(devices, controller.scope)
   val toasts = Channel<ActivityEvent>(Channel.UNLIMITED)
   controller.scope.launch {
+    registerCategories()
     monitor.events.collect { event ->
       if (event is ActivityEvent.Added) requestAuthorization()
       val inFront = UIApplication.sharedApplication.applicationState !=
@@ -289,7 +311,8 @@ private suspend fun MessageCenter.runFileAction(action: suspend () -> Unit) {
   try {
     action()
   } catch (e: FileActionException) {
-    post(MessageLevel.Error, e.message ?: "Couldn't open the file", cause = e)
+    val title = e.message?.let(::verbatim) ?: Res.string.feedback_file_action_failed.text()
+    post(MessageLevel.Error, title, cause = e)
   }
 }
 

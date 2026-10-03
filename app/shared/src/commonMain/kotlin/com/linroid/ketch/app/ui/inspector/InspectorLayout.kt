@@ -39,7 +39,11 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.inspector_hide
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.seconds
 
 /** A titled part of the inspector, such as CONTROLS or DETAILS. */
@@ -148,7 +152,9 @@ internal fun Disclosure(text: String, open: Boolean, onToggle: () -> Unit) {
       .trackFocusVisibility(focus)
       .clickable(
         role = Role.Button,
-        onClickLabel = if (open) "Hide" else "Show",
+        onClickLabel = stringResource(
+          if (open) Res.string.inspector_hide else Res.string.action_show,
+        ),
         onClick = onToggle,
       )
       .padding(vertical = KetchTheme.spacing.s1),

@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.discover
 
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.displayName
@@ -37,12 +38,12 @@ class DiscoverActionsTest {
 
   private fun AppController.lastMessage(): AppMessage = messages.history.value.last()
 
-  private fun AppController.click(label: String) {
-    lastMessage().actions.first { it.label == label }.onClick()
+  private suspend fun AppController.click(label: String) {
+    lastMessage().actions.first { it.label.load() == label }.onClick()
   }
 
-  private fun AppController.deviceName(): String =
-    checkNotNull(state.activeInstance.value).displayName
+  private suspend fun AppController.deviceName(): String =
+    checkNotNull(state.activeInstance.value).displayName.load()
 
   @Test
   fun addDiscovered_oneFails_addsTheOthersAndReportsBoth() = runTest {
@@ -61,8 +62,11 @@ class DiscoverActionsTest {
     assertTrue(api.requests.all { it.properties["ketch.origin"] == "discover" })
     val message = controller.lastMessage()
     assertEquals(MessageLevel.Warning, message.level)
-    assertEquals("Added 2 downloads → ${controller.deviceName()} · 1 failed", message.title)
-    assertEquals(listOf("Review", "Undo"), message.actions.map { it.label })
+    assertEquals(
+      "Added 2 downloads → ${controller.deviceName()} · 1 failed",
+      message.title.load(),
+    )
+    assertEquals(listOf("Review", "Undo"), message.actions.map { it.label }.load())
     val stillSelected = controller.state.aiDiscover.draft.selected
     assertEquals(setOf("https://example.com/broken.iso"), stillSelected)
     controller.close()
@@ -79,8 +83,8 @@ class DiscoverActionsTest {
 
     val message = controller.lastMessage()
     assertEquals(MessageLevel.Success, message.level)
-    assertEquals("Added blender.dmg → ${controller.deviceName()}", message.title)
-    assertEquals(listOf("Show", "Undo"), message.actions.map { it.label })
+    assertEquals("Added blender.dmg → ${controller.deviceName()}", message.title.load())
+    assertEquals(listOf("Show", "Undo"), message.actions.map { it.label }.load())
     controller.close()
   }
 
@@ -94,7 +98,7 @@ class DiscoverActionsTest {
     runCurrent()
     controller.click("Review")
 
-    assertEquals("Couldn't add broken.iso", controller.lastMessage().title)
+    assertEquals("Couldn't add broken.iso", controller.lastMessage().title.load())
     assertEquals(MessageLevel.Error, controller.lastMessage().level)
     val seed = checkNotNull(controller.state.intakeRequest).seeds.single()
     assertEquals("https://example.com/broken.iso", seed.url)

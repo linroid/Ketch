@@ -4,14 +4,23 @@ import androidx.compose.ui.state.ToggleableState
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.app.state.isTorrentExtra
 import com.linroid.ketch.app.util.FileKind
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.file_type_audio
+import ketch.app.shared.generated.resources.file_type_image
+import ketch.app.shared.generated.resources.file_type_other
+import ketch.app.shared.generated.resources.file_type_video
+import ketch.app.shared.generated.resources.intake_kind_subtitles
+import ketch.app.shared.generated.resources.sort_name
+import ketch.app.shared.generated.resources.sort_size
+import org.jetbrains.compose.resources.StringResource
 
 /** Kinds of torrent files the picker selects with one chip. */
-internal enum class TorrentFileKind(val label: String) {
-  Video("Video"),
-  Subtitles("Subtitles"),
-  Audio("Audio"),
-  Images("Images"),
-  Other("Other");
+internal enum class TorrentFileKind(val label: StringResource) {
+  Video(Res.string.file_type_video),
+  Subtitles(Res.string.intake_kind_subtitles),
+  Audio(Res.string.file_type_audio),
+  Images(Res.string.file_type_image),
+  Other(Res.string.file_type_other);
 
   companion object {
     /** The kind of a file named [name]. */
@@ -26,9 +35,9 @@ internal enum class TorrentFileKind(val label: String) {
 }
 
 /** How the picker orders the files of a folder. */
-internal enum class TorrentSort(val label: String) {
-  Name("Name"),
-  Size("Size"),
+internal enum class TorrentSort(val label: StringResource) {
+  Name(Res.string.sort_name),
+  Size(Res.string.sort_size),
 }
 
 /** One row of the torrent picker's tree. */

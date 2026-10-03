@@ -44,11 +44,18 @@ import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
+import com.linroid.ketch.app.i18n.SEPARATOR
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.isEmpty
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
@@ -64,6 +71,8 @@ import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.addedRow
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.formatSizeOf
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.row_speed_limit
 import kotlinx.coroutines.launch
 
 /**
@@ -209,74 +218,102 @@ private fun Metric(row: TaskRow) {
   val content = row.content
   when {
     content.status == RowStatus.Downloading -> Text(
-      text = listOf(content.speed, content.time).filter { it.isNotEmpty() }.joinToString(" · "),
+      text = listOf(content.speed, content.time).filterNot { it.isEmpty() }.joinText().resolve(),
       style = KetchTheme.typography.numeral,
       color = colors.textSecondary,
       maxLines = 1,
     )
     row.state is DownloadState.Completed && content.status == RowStatus.Completed -> Text(
-      text = content.added,
+      text = content.added.resolve(),
       style = KetchTheme.typography.numeral,
       color = colors.textTertiary,
       maxLines = 1,
     )
-    else -> StatusDot(content.status, label = content.statusText)
+    else -> StatusDot(content.status, label = content.statusText.resolve())
   }
 }
+
+/**
+ * A part of a row's second line.
+ *
+ * @property unbroken whether the line never wraps inside it, as inside a size, speed or time.
+ */
+internal data class LinePart(val text: UiText, val unbroken: Boolean = true)
 
 /**
  * The second line: the size so far and where the download stands, the reason it waits, how
  * long it took, or a failure's title in the failed color and its hint. On [touch] a running
  * download shows its speed and time left here too.
  */
+@Composable
 internal fun secondLine(row: TaskRow, touch: Boolean, colors: KetchColors): AnnotatedString {
+  val error = row.content.error
+  return secondLine(
+    title = error?.title?.resolve(),
+    hint = error?.shortHint?.resolve(),
+    parts = secondLineParts(row, touch).map { part ->
+      part.text.resolve().let { if (part.unbroken) it.unbroken() else it }
+    },
+    colors = colors,
+  )
+}
+
+/** The parts of [row]'s second line after a failure's title and hint; see [secondLine]. */
+internal fun secondLineParts(row: TaskRow, touch: Boolean): List<LinePart> {
   val content = row.content
   val state = row.state
-  val error = content.error
   val size = when (state) {
     is DownloadState.Downloading -> sizeOf(state.progress)
     is DownloadState.Paused -> sizeOf(state.progress)
     is DownloadState.Completed -> content.size.takeIf { it != UNKNOWN }
     else -> null
   }
-  // The line wraps between its parts, never inside a size, speed or time.
-  val parts = buildList {
-    size?.let { add(it.unbroken()) }
+  return buildList {
+    size?.let { add(LinePart(it)) }
     if (touch && content.status == RowStatus.Downloading) {
-      add(content.speed.unbroken())
-      content.time.takeIf { it.isNotEmpty() && it != UNKNOWN }?.let { add(it.unbroken()) }
-    } else if (error == null) {
+      add(LinePart(content.speed))
+      content.time.takeIf { !it.isEmpty() && it != UNKNOWN }?.let { add(LinePart(it)) }
+    } else if (content.error == null) {
+      val detail = content.detail
       // A queue reason is a sentence and may wrap; the other details are short facts.
-      if (state is DownloadState.Queued) {
-        add(content.detail)
-      } else {
-        content.detail.split(SEPARATOR).forEach { add(it.unbroken()) }
+      when {
+        state is DownloadState.Queued -> add(LinePart(detail, unbroken = false))
+        detail is UiText.Joined && detail.separator == SEPARATOR ->
+          detail.parts.forEach { add(LinePart(it)) }
+        else -> add(LinePart(detail))
       }
     }
     val limit = row.request.speedLimit
     if (state is DownloadState.Downloading && !limit.isUnlimited) {
-      add("limit ${formatSpeedLimit(limit)}".unbroken())
+      add(LinePart(Res.string.row_speed_limit.text(speedLimitText(limit))))
     }
   }
-  return buildAnnotatedString {
-    if (error != null) {
-      withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
-      error.shortHint?.let { hint ->
-        append(SEPARATOR)
-        append(hint)
-      }
-      if (parts.isNotEmpty()) append(SEPARATOR)
+}
+
+/** The second line from a failure's [title] and [hint], if any, and the other [parts]. */
+internal fun secondLine(
+  title: String?,
+  hint: String?,
+  parts: List<String>,
+  colors: KetchColors,
+): AnnotatedString = buildAnnotatedString {
+  if (title != null) {
+    withStyle(SpanStyle(color = colors.status.failed.color)) { append(title) }
+    hint?.let {
+      append(SEPARATOR)
+      append(it)
     }
-    append(parts.joinToString(SEPARATOR))
+    if (parts.isNotEmpty()) append(SEPARATOR)
   }
+  append(parts.joinToString(SEPARATOR))
 }
 
 /** This text with no-break spaces, so a line never wraps inside it. */
 private fun String.unbroken(): String = replace(' ', NO_BREAK_SPACE)
 
-private fun sizeOf(progress: DownloadProgress): String? =
+private fun sizeOf(progress: DownloadProgress): UiText? =
   progress.totalBytes.takeIf { it > 0 }
-    ?.let { formatSizeOf(progress.downloadedBytes, it, separator = " of ") }
+    ?.let { formatSizeOf(progress.downloadedBytes, it, compact = false) }
 
 /** A touch row's primary action, such as Pause or Retry, in a 44 dp button. */
 @Composable
@@ -294,7 +331,7 @@ private fun TrailingAction(row: TaskRow, actions: ListActions) {
     } else {
       KetchIconButton(
         icon = action.icon,
-        contentDescription = rowActionLabel(action, runner.files?.revealLabel),
+        contentDescription = rowActionLabel(action, runner.files?.revealLabel).resolve(),
         onClick = { runner.run(action, listOf(row)) },
         tint = if (action == RowAction.Open) KetchTheme.colors.textSecondary else {
           KetchTheme.colors.accentText
@@ -443,7 +480,5 @@ private fun SwipeableRow(
  * drift while scrolling act on the row.
  */
 private const val SWIPE_THRESHOLD = 0.4f
-
-private const val SEPARATOR = " · "
 private const val NO_BREAK_SPACE = '\u00A0'
-private const val UNKNOWN = "–"
+private val UNKNOWN = verbatim("–")

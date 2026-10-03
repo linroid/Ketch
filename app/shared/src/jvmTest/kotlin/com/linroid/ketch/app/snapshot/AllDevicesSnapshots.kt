@@ -20,6 +20,7 @@ import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenuPanel
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -170,7 +171,8 @@ class AllDevicesSnapshots {
         val rows = state.taskList.rows.value.filter { it.key.deviceId == LOCAL_DEVICE_ID }.take(1)
         val targets = sendTargets(state.instances.value, rows, presence) + SendTarget(
           entry = state.instances.value.last(),
-          option = DeviceOption("den-pc:8642", "Den-PC", DeviceHealth.Offline()),
+          option =
+            DeviceOption("den-pc:8642", verbatim("Den-PC"), DeviceHealth.Offline(), "Den-PC"),
         )
         for ((name, mode) in modes) {
           snapshot(name, size, theme) {

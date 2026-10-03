@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Messages about what happened: toasts, banners, the Activity history and system notifications.
+  See docs/development/localization.md.
+-->
+<resources>
+  <!-- A notification's or a message's title about another device. %1$s is the device, %2$s the
+       title. -->
+  <string name="notify_on_device">On %1$s: %2$s</string>
+  <string name="notify_download_complete">Download complete</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="one">%1$d download finished</item>
+    <item quantity="other">%1$d downloads finished</item>
+  </plurals>
+  <string name="notify_download_failed">Download failed</string>
+  <!-- %1$s is the file, %2$s why it failed, such as "Access denied (403)". -->
+  <string name="notify_failed_body">%1$s: %2$s</string>
+  <string name="notify_all_finished">All downloads finished</string>
+  <!-- Buttons of a notification. The others are action_open and action_retry. -->
+  <string name="notify_action_share">Share</string>
+
+  <!-- Android's notification channels, as its notification settings list them. -->
+  <string name="notify_channel_active">Active downloads</string>
+  <string name="notify_channel_done">Finished downloads</string>
+  <string name="notify_channel_failed">Failed downloads</string>
+  <!-- Title of the Android notification that bundles several finished downloads. -->
+  <string name="notify_finished_group">Finished downloads</string>
+  <!-- The Android download service's notification while it only shares this device. %1$d is a
+       port number, such as 8642. -->
+  <string name="notify_sharing_device">Sharing this device</string>
+  <string name="notify_server_on_port">Server on port %1$d</string>
+  <!-- Next to the app's name while the slow lane is on. -->
+  <string name="notify_slow_lane_on">Slow lane</string>
+  <!-- Buttons of the Android download service's notification. -->
+  <string name="notify_action_pause_all">Pause all</string>
+  <string name="notify_action_slow_lane">Slow lane</string>
+  <string name="notify_action_full_speed">Full speed</string>
+  <!-- Under the files the notification lists, how many more there are. -->
+  <plurals name="notify_more_files">
+    <item quantity="one">+%1$d more</item>
+    <item quantity="other">+%1$d more</item>
+  </plurals>
+  <!-- On iOS, a minute after Ketch went to the background with downloads it had to pause. -->
+  <plurals name="notify_paused">
+    <item quantity="one">%1$d download paused</item>
+    <item quantity="other">%1$d downloads paused</item>
+  </plurals>
+  <string name="notify_paused_body">Open Ketch to continue</string>
+  <!-- The web app asks on its first finished download whether to notify next time. -->
+  <string name="notify_web_offer">Notify me</string>
+  <string name="notify_web_on">Notifications on</string>
+
+  <!-- The ongoing notification of downloads in progress, and iOS's progress while Ketch runs in
+       the background. Parts are joined by " · ". -->
+  <plurals name="ongoing_downloading">
+    <item quantity="one">Downloading %1$d file</item>
+    <item quantity="other">Downloading %1$d files</item>
+  </plurals>
+  <!-- %1$s is a file name. -->
+  <string name="ongoing_downloading_file">Downloading %1$s</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="one">Waiting to download %1$d file</item>
+    <item quantity="other">Waiting to download %1$d files</item>
+  </plurals>
+  <!-- Bytes so far of the total. %1$s and %2$s are sizes, such as "1.2 GB". -->
+  <string name="ongoing_size_of">%1$s of %2$s</string>
+  <!-- How long the downloads take; they follow the sizes after " · ". -->
+  <string name="ongoing_left_under_minute">less than a minute left</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="one">about %1$d min left</item>
+    <item quantity="other">about %1$d min left</item>
+  </plurals>
+  <!-- %1$s is a duration, such as "1h 5m". -->
+  <string name="ongoing_left">about %1$s left</string>
+  <!-- After a file's name in the notification's list, for a download waiting for a slot. -->
+  <string name="ongoing_line_waiting">Waiting</string>
+
+  <!-- A banner on iOS while downloads run that iOS would pause in the background. -->
+  <string name="feedback_background_pause">Downloads pause when Ketch is in the background</string>
+  <string name="feedback_background_use_computer">Use a computer instead</string>
+  <!-- When a notification's Open or Share fails without saying why. -->
+  <string name="feedback_file_action_failed">Couldn't open the file</string>
+
+  <!-- The Activity history. -->
+  <string name="activity_title">Activity</string>
+  <string name="activity_mark_all_read">Mark all read</string>
+  <string name="activity_clear">Clear</string>
+  <!-- The dot on an entry not read yet, for screen readers. -->
+  <string name="activity_unread">Unread</string>
+  <string name="activity_empty_title">No activity yet</string>
+  <string name="activity_empty_body">Finished downloads, failures and devices going offline show up here.</string>
+  <!-- The group of entries older than today; the newer group is date_today. -->
+  <string name="activity_earlier">Earlier</string>
+
+  <!-- Messages after a command, as toasts and in the Activity history. Names in them are file
+       names, such as "ubuntu.iso", and device names, such as "NAS-Basement" or "this device". -->
+  <!-- %1$s is a file or a link opened from outside the app. -->
+  <string name="feedback_open_failed">Couldn't open %1$s</string>
+  <string name="feedback_drop_unsupported">Only .torrent files and link lists can be dropped to add downloads</string>
+  <!-- %1$s is a file name. -->
+  <string name="feedback_read_failed">Couldn't read %1$s</string>
+  <string name="feedback_torrent_invalid">%1$s is not a valid torrent file</string>
+  <string name="feedback_file_unsupported">%1$s is not a supported file</string>
+  <string name="feedback_file_read_failed">Failed to read %1$s</string>
+  <!-- %1$s is a link or a file name. -->
+  <string name="feedback_add_failed">Couldn't add %1$s</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="one">Couldn't add %1$d download</item>
+    <item quantity="other">Couldn't add %1$d downloads</item>
+  </plurals>
+  <!-- %1$s is a device name. -->
+  <string name="feedback_switch_failed">Couldn't switch to %1$s</string>
+  <string name="feedback_reconnect_failed">Couldn't reconnect to %1$s</string>
+  <string name="feedback_remove_device_failed">Couldn't remove %1$s</string>
+  <string name="feedback_discovery_failed">Failed to discover LAN servers</string>
+
+  <!-- Follows a message's title after " · ": how many of its downloads failed. -->
+  <plurals name="feedback_part_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">Nothing to pause</string>
+  <plurals name="feedback_paused">
+    <item quantity="one">Paused %1$d download</item>
+    <item quantity="other">Paused %1$d downloads</item>
+  </plurals>
+  <!-- %1$d is how many downloads, %2$d on how many devices, two or more. -->
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="one">Paused %1$d download on %2$d devices</item>
+    <item quantity="other">Paused %1$d downloads on %2$d devices</item>
+  </plurals>
+  <!-- Follow feedback_paused after " · ": scheduled downloads a pause leaves alone. %2$s is a
+       time of day, such as 02:00. -->
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="one">%1$d scheduled still starts on time</item>
+    <item quantity="other">%1$d scheduled still start on time</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="one">%1$d scheduled still starts at %2$s</item>
+    <item quantity="other">%1$d scheduled still start at %2$s</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="one">Resumed %1$d download</item>
+    <item quantity="other">Resumed %1$d downloads</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="one">Resumed %1$d download on %2$d devices</item>
+    <item quantity="other">Resumed %1$d downloads on %2$d devices</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="one">Retrying %1$d download</item>
+    <item quantity="other">Retrying %1$d downloads</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="one">Retrying %1$d download on %2$d devices</item>
+    <item quantity="other">Retrying %1$d downloads on %2$d devices</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="one">Cleared %1$d finished download</item>
+    <item quantity="other">Cleared %1$d finished downloads</item>
+  </plurals>
+  <string name="feedback_nothing_missing">No missing files to clear</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="one">Cleared %1$d download with a missing file</item>
+    <item quantity="other">Cleared %1$d downloads with missing files</item>
+  </plurals>
+  <!-- %1$s is a file name. -->
+  <string name="feedback_removed_one">Removed %1$s</string>
+  <plurals name="feedback_removed">
+    <item quantity="one">Removed %1$d download</item>
+    <item quantity="other">Removed %1$d downloads</item>
+  </plurals>
+  <string name="feedback_discarded_one">Discarded progress of %1$s</string>
+  <plurals name="feedback_discarded">
+    <item quantity="one">Discarded progress of %1$d download</item>
+    <item quantity="other">Discarded progress of %1$d downloads</item>
+  </plurals>
+  <string name="feedback_restarted_one">Restarted %1$s</string>
+  <plurals name="feedback_restarted">
+    <item quantity="one">Restarted %1$d download</item>
+    <item quantity="other">Restarted %1$d downloads</item>
+  </plurals>
+  <!-- %1$s is a file name, %2$s a device. -->
+  <string name="feedback_redownload_failed_one">Couldn't download %1$s again on %2$s</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="one">Couldn't download %1$d download again</item>
+    <item quantity="other">Couldn't download %1$d downloads again</item>
+  </plurals>
+  <string name="feedback_started_now_one">Started %1$s now</string>
+  <plurals name="feedback_started_now">
+    <item quantity="one">Started %1$d download now</item>
+    <item quantity="other">Started %1$d downloads now</item>
+  </plurals>
+  <!-- Follows feedback_started_now after " · ". %1$s lists the file names Start now paused,
+       such as "debian.iso, fedora.iso". -->
+  <string name="feedback_started_preempted">paused %1$s to make room</string>
+  <!-- %1$s is a file name, %2$s a device. -->
+  <string name="feedback_start_now_failed_one">Couldn't start %1$s now on %2$s</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="one">Couldn't start %1$d download now</item>
+    <item quantity="other">Couldn't start %1$d downloads now</item>
+  </plurals>
+  <!-- %1$s is a file name, %2$s the device it went to. -->
+  <string name="feedback_send_failed_one">Couldn't send %1$s to %2$s</string>
+  <!-- %1$d is how many downloads, %2$s the device. -->
+  <plurals name="feedback_send_failed">
+    <item quantity="one">Couldn't send %1$d download to %2$s</item>
+    <item quantity="other">Couldn't send %1$d downloads to %2$s</item>
+  </plurals>
+  <string name="feedback_moved_one">Moved %1$s to %2$s</string>
+  <plurals name="feedback_moved">
+    <item quantity="one">Moved %1$d download to %2$s</item>
+    <item quantity="other">Moved %1$d downloads to %2$s</item>
+  </plurals>
+  <string name="feedback_sent_one">Sent %1$s to %2$s</string>
+  <plurals name="feedback_sent">
+    <item quantity="one">Sent %1$d download to %2$s</item>
+    <item quantity="other">Sent %1$d downloads to %2$s</item>
+  </plurals>
+  <!-- After sending downloads to another device: removes them from this one. -->
+  <string name="feedback_remove_here">Remove here</string>
+  <!-- After adding while the device shows. %1$s is a file name, %2$s the device. -->
+  <string name="feedback_added_here_one">Added %1$s → %2$s</string>
+  <plurals name="feedback_added_here">
+    <item quantity="one">Added %1$d download → %2$s</item>
+    <item quantity="other">Added %1$d downloads → %2$s</item>
+  </plurals>
+  <!-- Opens the add sheet on a download just added, to change its options. -->
+  <string name="feedback_options">Options</string>
+
+  <!-- A command on a download that failed, from code whose commands are not translated yet:
+       %1$s is the command in English, such as "set speed limit", %2$s a device. -->
+  <!-- A command that failed. %1$s is a file name, %2$s a device. -->
+  <string name="feedback_pause_failed_one">Couldn't pause %1$s on %2$s</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="one">Couldn't pause %1$d download on %2$s</item>
+    <item quantity="other">Couldn't pause %1$d downloads on %2$s</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">Couldn't resume %1$s on %2$s</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="one">Couldn't resume %1$d download on %2$s</item>
+    <item quantity="other">Couldn't resume %1$d downloads on %2$s</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">Couldn't retry %1$s on %2$s</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="one">Couldn't retry %1$d download on %2$s</item>
+    <item quantity="other">Couldn't retry %1$d downloads on %2$s</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">Couldn't discard progress of %1$s on %2$s</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="one">Couldn't discard progress of %1$d download on %2$s</item>
+    <item quantity="other">Couldn't discard progress of %1$d downloads on %2$s</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">Couldn't undo start now of %1$s on %2$s</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="one">Couldn't undo start now of %1$d download on %2$s</item>
+    <item quantity="other">Couldn't undo start now of %1$d downloads on %2$s</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">Couldn't remove %1$s on %2$s</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="one">Couldn't remove %1$d download on %2$s</item>
+    <item quantity="other">Couldn't remove %1$d downloads on %2$s</item>
+  </plurals>
+
+  <!-- What the command palette's Undo says it undoes. -->
+  <string name="feedback_undo_pause_all">Undo pause all</string>
+  <string name="feedback_undo_clear_finished">Undo clear finished</string>
+  <string name="feedback_undo_clear_missing">Undo clear missing</string>
+  <string name="feedback_undo_remove">Undo remove</string>
+  <string name="feedback_undo_discard">Undo discard progress</string>
+  <string name="feedback_undo_start_now">Undo start now</string>
+  <string name="feedback_undo_move">Undo move</string>
+  <string name="feedback_undo_add">Undo add</string>
+
+  <!-- Asked before sending downloads to another device. %1$s is that device. -->
+  <string name="feedback_send_cookies_and_sign_in">Cookies and sign-in details from your browser will be sent to %1$s.</string>
+  <string name="feedback_send_cookies">Cookies from your browser will be sent to %1$s.</string>
+  <string name="feedback_send_sign_in">Sign-in details will be sent to %1$s.</string>
+
+  <!-- What the devices report, in the Activity history. %1$s is a file name. -->
+  <string name="feedback_added">Added %1$s</string>
+  <plurals name="feedback_recovered">
+    <item quantity="one">Resuming %1$d download from your last session</item>
+    <item quantity="other">Resuming %1$d downloads from your last session</item>
+  </plurals>
+  <!-- %1$s is a device name. -->
+  <string name="feedback_device_offline">%1$s went offline</string>
+  <string name="feedback_device_online">Reconnected to %1$s</string>
+</resources>

@@ -2,7 +2,38 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.util.toCopy
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_row_connections
+import ketch.app.shared.generated.resources.action_row_copy_details
+import ketch.app.shared.generated.resources.action_row_copy_error
+import ketch.app.shared.generated.resources.action_row_copy_link
+import ketch.app.shared.generated.resources.action_row_copy_path
+import ketch.app.shared.generated.resources.action_row_details
+import ketch.app.shared.generated.resources.action_row_download_again
+import ketch.app.shared.generated.resources.action_row_edit_link
+import ketch.app.shared.generated.resources.action_row_enter_credentials
+import ketch.app.shared.generated.resources.action_row_find_another_source
+import ketch.app.shared.generated.resources.action_row_open
+import ketch.app.shared.generated.resources.action_row_open_source_page
+import ketch.app.shared.generated.resources.action_row_pause
+import ketch.app.shared.generated.resources.action_row_priority
+import ketch.app.shared.generated.resources.action_row_reconnect
+import ketch.app.shared.generated.resources.action_row_remove
+import ketch.app.shared.generated.resources.action_row_remove_and_delete
+import ketch.app.shared.generated.resources.action_row_remove_and_trash
+import ketch.app.shared.generated.resources.action_row_resume
+import ketch.app.shared.generated.resources.action_row_retry
+import ketch.app.shared.generated.resources.action_row_retry_with_connections
+import ketch.app.shared.generated.resources.action_row_retry_with_options
+import ketch.app.shared.generated.resources.action_row_send_to
+import ketch.app.shared.generated.resources.action_row_show_in_folder
+import ketch.app.shared.generated.resources.action_row_speed_limit
+import ketch.app.shared.generated.resources.action_row_start_later
+import ketch.app.shared.generated.resources.action_row_start_now
+import ketch.app.shared.generated.resources.action_row_stop_and_discard
 
 /**
  * Something the user can do with a task. Row buttons, hover actions, the context menu, the
@@ -13,63 +44,63 @@ import com.linroid.ketch.app.util.toCopy
  * @property destructive whether the action discards the task or its progress. Menus put these
  *   last, after a divider.
  */
-sealed class RowAction(val label: String, val destructive: Boolean = false) {
+sealed class RowAction(val label: UiText, val destructive: Boolean = false) {
   /** Pauses a downloading or queued task. */
-  data object Pause : RowAction("Pause")
+  data object Pause : RowAction(Res.string.action_row_pause.text())
 
   /** Resumes a paused task. */
-  data object Resume : RowAction("Resume")
+  data object Resume : RowAction(Res.string.action_row_resume.text())
 
   /** Pauses a stalled task and resumes it, so it opens fresh connections. */
-  data object Reconnect : RowAction("Reconnect")
+  data object Reconnect : RowAction(Res.string.action_row_reconnect.text())
 
   /**
    * Starts a waiting task now: a queued task becomes urgent, which may pause another, and a
    * scheduled task is rescheduled to start immediately.
    */
-  data object StartNow : RowAction("Start now")
+  data object StartNow : RowAction(Res.string.action_row_start_now.text())
 
   /** Opens the speed limit choices. */
-  data object SpeedLimit : RowAction("Speed limit")
+  data object SpeedLimit : RowAction(Res.string.action_row_speed_limit.text())
 
   /** Opens the connection count choices, or the peer limit of a torrent. */
-  data object Connections : RowAction("Connections")
+  data object Connections : RowAction(Res.string.action_row_connections.text())
 
   /** Opens the priority choices. */
-  data object Priority : RowAction("Priority")
+  data object Priority : RowAction(Res.string.action_row_priority.text())
 
   /** Opens the choices of when to start. */
-  data object StartLater : RowAction("Start later")
+  data object StartLater : RowAction(Res.string.action_row_start_later.text())
 
   /** Opens the devices to send the task to. */
-  data object SendTo : RowAction("Send to")
+  data object SendTo : RowAction(Res.string.action_row_send_to.text())
 
   /** Copies the task's link. */
-  data object CopyLink : RowAction("Copy link")
+  data object CopyLink : RowAction(Res.string.action_row_copy_link.text())
 
   /** Opens the task in the inspector. */
-  data object Details : RowAction("Details")
+  data object Details : RowAction(Res.string.action_row_details.text())
 
   /** Opens the downloaded file. */
-  data object Open : RowAction("Open")
+  data object Open : RowAction(Res.string.action_row_open.text())
 
   /** Shows the file, or the folder it belongs in, in the file manager. */
-  data object ShowInFolder : RowAction("Show in folder")
+  data object ShowInFolder : RowAction(Res.string.action_row_show_in_folder.text())
 
   /** Copies the path of the downloaded file. */
-  data object CopyPath : RowAction("Copy file path")
+  data object CopyPath : RowAction(Res.string.action_row_copy_path.text())
 
   /** Adds the task's request again from the start and removes this task. */
-  data object DownloadAgain : RowAction("Download again")
+  data object DownloadAgain : RowAction(Res.string.action_row_download_again.text())
 
   /** Resumes a failed task from where it stopped. */
-  data object Retry : RowAction("Retry")
+  data object Retry : RowAction(Res.string.action_row_retry.text())
 
   /** Opens the add sheet with the task's options, to retry with changes. */
-  data object RetryWithOptions : RowAction("Retry with options…")
+  data object RetryWithOptions : RowAction(Res.string.action_row_retry_with_options.text())
 
   /** Opens the add sheet to change the link of a task the server turned away. */
-  data object EditLink : RowAction("Edit link…")
+  data object EditLink : RowAction(Res.string.action_row_edit_link.text())
 
   /**
    * Lowers the task to [connections] connections and resumes it.
@@ -77,35 +108,38 @@ sealed class RowAction(val label: String, val destructive: Boolean = false) {
    * @property connections connection count to retry with.
    */
   data class RetryWithConnections(val connections: Int) : RowAction(
-    if (connections == 1) "Retry with 1 connection" else "Retry with $connections connections"
+    Res.plurals.action_row_retry_with_connections.text(connections)
   )
 
   /** Opens the add sheet with user name and password fields. */
-  data object EnterCredentials : RowAction("Enter credentials…")
+  data object EnterCredentials : RowAction(Res.string.action_row_enter_credentials.text())
 
   /** Opens Discover to look for the file elsewhere, searching for its name. */
-  data object FindAnotherSource : RowAction("Find another source")
+  data object FindAnotherSource : RowAction(Res.string.action_row_find_another_source.text())
 
   /** Opens the page the link was captured from (its `Referer`). */
-  data object OpenSourcePage : RowAction("Open source page")
+  data object OpenSourcePage : RowAction(Res.string.action_row_open_source_page.text())
 
   /** Copies the error's title and hint. */
-  data object CopyError : RowAction("Copy error")
+  data object CopyError : RowAction(Res.string.action_row_copy_error.text())
 
   /** Copies technical details for a bug report. */
-  data object CopyDetails : RowAction("Copy details")
+  data object CopyDetails : RowAction(Res.string.action_row_copy_details.text())
 
   /** Cancels the task after confirmation; its progress cannot be resumed. */
-  data object StopAndDiscard : RowAction("Stop and discard progress…", destructive = true)
+  data object StopAndDiscard :
+    RowAction(Res.string.action_row_stop_and_discard.text(), destructive = true)
 
   /** Removes the task from the list and keeps its files, with Undo. */
-  data object Remove : RowAction("Remove from list", destructive = true)
+  data object Remove : RowAction(Res.string.action_row_remove.text(), destructive = true)
 
   /** Removes the task and moves its files to the Trash, after confirmation. */
-  data object RemoveAndTrash : RowAction("Remove and trash file…", destructive = true)
+  data object RemoveAndTrash :
+    RowAction(Res.string.action_row_remove_and_trash.text(), destructive = true)
 
   /** Removes the task and deletes its files, after confirmation. */
-  data object RemoveAndDelete : RowAction("Remove and delete files…", destructive = true)
+  data object RemoveAndDelete :
+    RowAction(Res.string.action_row_remove_and_delete.text(), destructive = true)
 }
 
 /**
@@ -158,7 +192,7 @@ data class RowCapabilities(
  * @property usableSpace usable space in its download directory in bytes, or `null` if unknown.
  */
 data class DeviceInfo(
-  val name: String,
+  val name: UiText,
   val capabilities: RowCapabilities,
   val usableSpace: Long? = null,
 )

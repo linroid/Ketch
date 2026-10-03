@@ -46,6 +46,8 @@ import com.linroid.ketch.app.components.StartTimePicker
 import com.linroid.ketch.app.components.winningLimitCaption
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.StatusFilter
@@ -120,8 +122,13 @@ private fun ControlsGallery() {
       KetchIconButton(command = KetchCommands.ToggleSidebar, onClick = {}, selected = true)
       KetchPillGroup(
         items = listOf(
-          KetchPillItem(icon = KetchIcon.Filter, label = "List", onClick = {}),
-          KetchPillItem(icon = KetchIcon.Columns, label = "Table", onClick = {}, selected = true),
+          KetchPillItem(icon = KetchIcon.Filter, label = verbatim("List"), onClick = {}),
+          KetchPillItem(
+            icon = KetchIcon.Columns,
+            label = verbatim("Table"),
+            onClick = {},
+            selected = true,
+          ),
           KetchPillItem(command = KetchCommands.ToggleSidebar, onClick = {}),
         ),
       )
@@ -132,7 +139,7 @@ private fun ControlsGallery() {
         options = StatusFilter.entries,
         selected = filter,
         onSelect = { filter = it },
-        label = { it.label },
+        label = { it.label.resolve() },
         count = { if (it == StatusFilter.Failed) 2 else it.ordinal * 3 },
         alert = { it == StatusFilter.Failed },
       )
@@ -214,10 +221,20 @@ private fun ControlsGallery() {
       KetchMenuPanel {
         item(command = KetchCommands.PauseAll, onClick = {})
         item(command = KetchCommands.ResumeAll, onClick = {}, enabled = false)
-        submenu(label = "Speed limit", icon = KetchIcon.Speed) {}
-        item(label = "Normal", onClick = {}, checked = true, caption = "Default order")
+        submenu(label = verbatim("Speed limit"), icon = KetchIcon.Speed) {}
+        item(
+          label = verbatim("Normal"),
+          onClick = {},
+          checked = true,
+          caption = verbatim("Default order"),
+        )
         divider()
-        item(label = "Remove from list", onClick = {}, icon = KetchIcon.Trash, destructive = true)
+        item(
+          label = verbatim("Remove from list"),
+          onClick = {},
+          icon = KetchIcon.Trash,
+          destructive = true,
+        )
       }
       KetchTooltipBubble(text = "Pause all", shortcut = KetchCommands.PauseAll.shortcutLabel())
     }
@@ -243,7 +260,7 @@ private fun ControlsGallery() {
       KetchToast(
         title = "Removed 5 downloads",
         level = MessageLevel.Success,
-        actions = listOf(MessageAction("Undo") {}),
+        actions = listOf(MessageAction(verbatim("Undo")) {}),
         duration = null,
         onDismiss = {},
       )
@@ -251,7 +268,7 @@ private fun ControlsGallery() {
         title = "Couldn't set speed limit on NAS-Basement",
         detail = "Connection lost",
         level = MessageLevel.Error,
-        actions = listOf(MessageAction("Try again") {}),
+        actions = listOf(MessageAction(verbatim("Try again")) {}),
         onDismiss = {},
       )
     }
@@ -260,7 +277,7 @@ private fun ControlsGallery() {
       SpeedLimitPicker(
         value = limit,
         onCommit = { limit = it },
-        caption = winningLimitCaption(limit, SpeedLimit.mbps(1), "Slow lane"),
+        caption = winningLimitCaption(limit, SpeedLimit.mbps(1), verbatim("Slow lane"))?.resolve(),
       )
       var schedule by remember { mutableStateOf<DownloadSchedule>(DownloadSchedule.Immediate) }
       StartTimePicker(value = schedule, onSelect = { schedule = it })

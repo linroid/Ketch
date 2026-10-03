@@ -51,6 +51,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -74,6 +75,12 @@ import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.SEPARATOR
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
@@ -82,7 +89,7 @@ import com.linroid.ketch.app.state.RowGroup
 import com.linroid.ketch.app.state.SortKey
 import com.linroid.ketch.app.state.TaskListView
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
@@ -103,7 +110,22 @@ import com.linroid.ketch.app.ui.list.showsLanes
 import com.linroid.ketch.app.ui.list.withMissingFile
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.SearchToken
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_clear_selection
+import ketch.app.shared.generated.resources.downloads_columns
+import ketch.app.shared.generated.resources.downloads_select_all
+import ketch.app.shared.generated.resources.downloads_table_capped_at
+import ketch.app.shared.generated.resources.downloads_table_column_auto
+import ketch.app.shared.generated.resources.downloads_table_origin_unknown
+import ketch.app.shared.generated.resources.downloads_table_reset_columns
+import ketch.app.shared.generated.resources.downloads_table_sort_by
+import ketch.app.shared.generated.resources.downloads_table_sorted_ascending
+import ketch.app.shared.generated.resources.downloads_table_sorted_descending
+import ketch.app.shared.generated.resources.downloads_table_source_magnet
+import ketch.app.shared.generated.resources.downloads_table_speed_limited
+import ketch.app.shared.generated.resources.sort_connections
+import ketch.app.shared.generated.resources.sort_name
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /**
@@ -141,8 +163,10 @@ internal fun DownloadTable(
   val spacing = KetchTheme.spacing
   // A width being dragged shows at once and is saved when the drag ends.
   var dragged by remember(layout) { mutableStateOf(layout) }
+  val room = headerRoom()
   BoxWithConstraints(modifier) {
     val shown = autoColumns.fold(dragged) { shown, column -> shown.withVisible(column, true) }
+      .withHeaderRoom(room)
     val columns = shown.fit(maxWidth, TablePadding)
     val namePennant = TableColumn.Device in autoColumns &&
       columns.none { it.column == TableColumn.Device }
@@ -244,7 +268,7 @@ private fun TableHeader(
         SelectAllBox(view, actions)
       }
       HeaderCell(
-        label = "Name",
+        label = stringResource(Res.string.sort_name),
         sort = SortKey.Name,
         arrangement = view.arrangement,
         numeric = false,
@@ -255,7 +279,7 @@ private fun TableHeader(
         val column = setting.column
         Box(Modifier.width(setting.width).fillMaxHeight()) {
           HeaderCell(
-            label = column.label,
+            label = column.label.resolve(),
             sort = column.sort,
             arrangement = view.arrangement,
             numeric = column.numeric,
@@ -296,12 +320,12 @@ internal fun KetchMenuScope.columnChooser(
   autoColumns: Set<TableColumn> = emptySet(),
   onLayoutChange: (TableLayout) -> Unit,
 ) {
-  header("Columns")
+  header(Res.string.downloads_columns.text())
   for (setting in layout.columns.filterNot { it.column.fixed }) {
     val auto = setting.column in autoColumns
     item(
       label = setting.column.title,
-      caption = if (auto) "Shown for All devices" else null,
+      caption = if (auto) Res.string.downloads_table_column_auto.text() else null,
       checked = setting.visible || auto,
       enabled = !auto,
       keepOpen = true,
@@ -310,15 +334,15 @@ internal fun KetchMenuScope.columnChooser(
   }
   divider()
   item(
-    label = "Reset columns",
+    label = Res.string.downloads_table_reset_columns.text(),
     enabled = layout != TableLayout(),
     onClick = { onLayoutChange(TableLayout()) },
   )
 }
 
 /** The column's name in menus, spelled out where the header abbreviates it. */
-internal val TableColumn.title: String
-  get() = if (this == TableColumn.Connections) "Connections" else label
+internal val TableColumn.title: UiText
+  get() = if (this == TableColumn.Connections) Res.string.sort_connections.text() else label
 
 /** Selects every row on screen, or clears the selection when all of them are selected. */
 @Composable
@@ -330,15 +354,18 @@ private fun SelectAllBox(view: TaskListView, actions: ListActions) {
     selected == keys.size -> ToggleableState.On
     else -> ToggleableState.Indeterminate
   }
-  KetchTooltip(text = if (state == ToggleableState.On) "Clear selection" else "Select all") {
+  val label = if (state == ToggleableState.On) {
+    stringResource(Res.string.downloads_clear_selection)
+  } else {
+    stringResource(Res.string.downloads_select_all)
+  }
+  KetchTooltip(text = label) {
     KetchTriStateCheckbox(
       state = state,
       onClick = {
         if (state == ToggleableState.On) actions.selection.clear() else actions.selectAll()
       },
-      modifier = Modifier.semantics {
-        contentDescription = if (state == ToggleableState.On) "Clear selection" else "Select all"
-      },
+      modifier = Modifier.semantics { contentDescription = label },
     )
   }
 }
@@ -359,7 +386,12 @@ private fun HeaderCell(
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
   val ink = if (active || hovered) colors.textPrimary else colors.textTertiary
-  val direction = if (arrangement.descending) "descending" else "ascending"
+  val sortBy = stringResource(Res.string.downloads_table_sort_by, label)
+  val sorted = if (arrangement.descending) {
+    stringResource(Res.string.downloads_table_sorted_descending, label)
+  } else {
+    stringResource(Res.string.downloads_table_sorted_ascending, label)
+  }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(
@@ -375,11 +407,11 @@ private fun HeaderCell(
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = "Sort by $label",
+        onClickLabel = sortBy,
         onClick = { onSort(sort) },
       )
       .semantics {
-        if (active) contentDescription = "$label, sorted $direction"
+        if (active) contentDescription = sorted
       }
       .padding(horizontal = CellPadding),
   ) {
@@ -389,9 +421,29 @@ private fun HeaderCell(
       style = KetchTheme.typography.eyebrow,
       color = ink,
       maxLines = 1,
-      overflow = TextOverflow.Clip,
+      overflow = TextOverflow.Ellipsis,
     )
     if (!numeric && active) SortChevron(arrangement.descending, ink)
+  }
+}
+
+/**
+ * The width each column's header needs, label and sort chevron, in the language shown; see
+ * [TableLayout.withHeaderRoom].
+ */
+@Composable
+private fun headerRoom(): (TableColumn) -> Dp {
+  val measurer = rememberTextMeasurer()
+  val style = KetchTheme.typography.eyebrow
+  val density = LocalDensity.current
+  val chevron = KetchTheme.spacing.s1 + KetchTheme.spacing.s3
+  val labels = TableColumn.entries.associateWith { eyebrowText(it.label.resolve()) }
+  return remember(measurer, style, density, chevron, labels) {
+    val widths = labels.mapValues { (_, label) ->
+      val text = measurer.measure(label, style, maxLines = 1, softWrap = false)
+      with(density) { text.size.width.toDp() } + chevron + CellPadding * 2
+    }
+    return@remember { column -> widths.getValue(column) }
   }
 }
 
@@ -575,7 +627,7 @@ private fun NameCell(
         row = row,
         modifier = Modifier
           .padding(end = spacing.s2)
-          .altClick { onAddToken(SearchToken.Device(row.device.name)) },
+          .altClick { onAddToken(SearchToken.Device(row.deviceName)) },
       )
     }
     KetchFileTypeChip(
@@ -594,7 +646,7 @@ private fun NameCell(
     PriorityGlyph(row.request.priority, Modifier.padding(start = spacing.s1))
     val limit = row.request.speedLimit
     if (!limit.isUnlimited && row.state.isLive) {
-      CapPill(formatSpeedLimit(limit), Modifier.padding(start = spacing.s1))
+      CapPill(speedLimitText(limit).resolve(), Modifier.padding(start = spacing.s1))
     }
   }
 }
@@ -609,7 +661,10 @@ private val DownloadState.isLive: Boolean
 private fun CapPill(text: String, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  KetchTooltip(text = "Capped at $text", modifier = modifier) {
+  KetchTooltip(
+    text = stringResource(Res.string.downloads_table_capped_at, text),
+    modifier = modifier,
+  ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s0_5),
@@ -640,7 +695,7 @@ private fun Cell(
   val cell = Modifier.width(setting.width).then(modifier).padding(horizontal = CellPadding)
   val muted = if (frame.selected) colors.textSecondary else colors.textTertiary
   when (setting.column) {
-    TableColumn.Size -> NumberCell(content.size, cell, color = colors.textSecondary)
+    TableColumn.Size -> NumberCell(content.size.resolve(), cell, color = colors.textSecondary)
     TableColumn.Progress -> Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -658,7 +713,7 @@ private fun Cell(
         val progress = content.progress
         if (progress != null && row.state !is DownloadState.Completed) {
           Text(
-            text = "${(progress * 100).toInt()}%",
+            text = percentText((progress * 100).toInt()).resolve(),
             style = KetchTheme.typography.numeralS,
             color = colors.textSecondary,
             textAlign = TextAlign.End,
@@ -669,10 +724,10 @@ private fun Cell(
       }
     }
     TableColumn.Speed -> SpeedCell(row, cell)
-    TableColumn.Left -> NumberCell(content.time, cell, color = colors.textSecondary)
-    TableColumn.Added -> TextCell(content.added, cell, color = colors.textSecondary)
+    TableColumn.Left -> NumberCell(content.time.resolve(), cell, color = colors.textSecondary)
+    TableColumn.Added -> TextCell(content.added.resolve(), cell, color = colors.textSecondary)
     TableColumn.Status -> TextCell(
-      text = content.statusText,
+      text = content.statusText.resolve(),
       modifier = cell,
       color = if (content.status == RowStatus.Failed) colors.status.failed.color else {
         colors.textSecondary
@@ -702,7 +757,11 @@ private fun Cell(
     TableColumn.Source -> {
       val host = row.sourceHost
       TextCell(
-        text = host ?: if (row.isTorrent) "Magnet" else "–",
+        text = host ?: if (row.isTorrent) {
+          stringResource(Res.string.downloads_table_source_magnet)
+        } else {
+          "–"
+        },
         modifier = cell.altClick { host?.let { onAddToken(SearchToken.Host(it)) } },
         color = if (host == null) muted else colors.textSecondary,
       )
@@ -710,7 +769,8 @@ private fun Cell(
     TableColumn.Origin -> {
       val origin = row.origin
       TextCell(
-        text = origin?.label ?: "Unknown",
+        text = origin?.label?.resolve()
+          ?: stringResource(Res.string.downloads_table_origin_unknown),
         modifier = cell.altClick { origin?.let { onAddToken(SearchToken.Origin(it)) } },
         color = if (origin == null) muted else colors.textSecondary,
       )
@@ -722,7 +782,7 @@ private fun Cell(
     ) {
       PriorityGlyph(row.request.priority)
       Text(
-        text = priorityLabel(row.request.priority),
+        text = priorityText(row.request.priority).resolve(),
         style = KetchTheme.typography.cell,
         color = colors.textSecondary,
         maxLines = 1,
@@ -731,11 +791,11 @@ private fun Cell(
     TableColumn.Device -> Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-      modifier = cell.altClick { onAddToken(SearchToken.Device(row.device.name)) },
+      modifier = cell.altClick { onAddToken(SearchToken.Device(row.deviceName)) },
     ) {
       RowPennant(row)
       Text(
-        text = row.device.name,
+        text = row.device.name.resolve(),
         style = KetchTheme.typography.cell,
         color = colors.textSecondary,
         maxLines = 1,
@@ -759,13 +819,13 @@ private fun SpeedCell(row: TaskRow, modifier: Modifier) {
     if (row.state !is DownloadState.Downloading) return@Row
     val stalled = content.status == RowStatus.Stalled
     Text(
-      text = content.speed.ifEmpty { "–" },
+      text = content.speed.resolve().ifEmpty { "–" },
       style = KetchTheme.typography.numeral,
       color = if (stalled) colors.status.paused.color else colors.textPrimary,
       maxLines = 1,
     )
     if (content.limited) {
-      KetchTooltip(text = "A speed limit caps this download") {
+      KetchTooltip(text = stringResource(Res.string.downloads_table_speed_limited)) {
         KetchIconImage(KetchIcon.SlowLane, size = spacing.s3, tint = colors.status.paused.color)
       }
     }
@@ -776,8 +836,14 @@ private fun SpeedCell(row: TaskRow, modifier: Modifier) {
 @Composable
 private fun ReasonCell(row: TaskRow, modifier: Modifier) {
   val colors = KetchTheme.colors
+  val error = row.content.error
   Text(
-    text = reasonText(row, colors),
+    text = reasonText(
+      detail = row.content.detail.resolve(),
+      title = error?.title?.resolve(),
+      hint = error?.shortHint?.resolve(),
+      colors = colors,
+    ),
     style = KetchTheme.typography.caption,
     color = colors.textSecondary,
     maxLines = 1,
@@ -786,14 +852,22 @@ private fun ReasonCell(row: TaskRow, modifier: Modifier) {
   )
 }
 
-/** A row's reason: a failure's title in the failed color and its hint, else its detail. */
-internal fun reasonText(row: TaskRow, colors: KetchColors): AnnotatedString {
-  val error = row.content.error ?: return AnnotatedString(row.content.detail)
+/**
+ * A row's reason: a failure's [title] in the failed color and its short [hint], else its
+ * [detail].
+ */
+internal fun reasonText(
+  detail: String,
+  title: String?,
+  hint: String?,
+  colors: KetchColors,
+): AnnotatedString {
+  if (title == null) return AnnotatedString(detail)
   return buildAnnotatedString {
-    withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
-    error.shortHint?.let { hint ->
-      append(" · ")
-      append(hint)
+    withStyle(SpanStyle(color = colors.status.failed.color)) { append(title) }
+    hint?.let {
+      append(SEPARATOR)
+      append(it)
     }
   }
 }

@@ -27,6 +27,10 @@ import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
 import com.linroid.ketch.app.components.StatusDotDefaults
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SpeedHistory
@@ -34,12 +38,26 @@ import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.TimelineKind
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_activity_empty
+import ketch.app.shared.generated.resources.inspector_activity_now
+import ketch.app.shared.generated.resources.inspector_activity_show_earlier
+import ketch.app.shared.generated.resources.inspector_activity_since
+import ketch.app.shared.generated.resources.inspector_global_slow_lane
+import ketch.app.shared.generated.resources.inspector_limit_global
+import ketch.app.shared.generated.resources.inspector_limit_marker
+import ketch.app.shared.generated.resources.inspector_limit_task
+import ketch.app.shared.generated.resources.inspector_stat_average
+import ketch.app.shared.generated.resources.inspector_stat_connections
+import ketch.app.shared.generated.resources.inspector_stat_peak
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Activity tab of the inspector: the task's speed over the last five minutes and what
@@ -66,7 +84,11 @@ fun ActivityTab(state: AppState, row: TaskRow, modifier: Modifier = Modifier) {
       timeline = timelines[row.key].orEmpty(),
       modifier = modifier,
       globalLimit = device?.cap ?: SpeedLimit.Unlimited,
-      globalLabel = if (slowLane) "Slow lane" else "Global",
+      globalLabel = if (slowLane) {
+        Res.string.inspector_global_slow_lane.text()
+      } else {
+        Res.string.inspector_limit_global.text()
+      },
     )
   }
 }
@@ -85,7 +107,7 @@ internal fun ActivityTabContent(
   timeline: List<TimelineEntry>,
   modifier: Modifier = Modifier,
   globalLimit: SpeedLimit = SpeedLimit.Unlimited,
-  globalLabel: String = "Global",
+  globalLabel: UiText = Res.string.inspector_limit_global.text(),
   timeZone: TimeZone = remember { TimeZone.currentSystemDefault() },
 ) {
   val colors = KetchTheme.colors
@@ -97,16 +119,15 @@ internal fun ActivityTabContent(
   ) {
     if (history == null && timeline.isEmpty()) {
       Text(
-        text = "Speed and events show here once the download starts.",
+        text = stringResource(Res.string.inspector_activity_empty),
         style = type.caption,
         color = colors.textTertiary,
       )
     }
     if (history != null) {
       val bands = remember(history, colors) { activityBands(history, colors) }
-      val limits = remember(row.request.speedLimit, globalLimit, globalLabel) {
-        activityLimits(row.request.speedLimit, globalLimit, globalLabel)
-      }
+      val limits = activityLimits(row.request.speedLimit, globalLimit, globalLabel)
+        .map { SpeedLimitLine(it.bytesPerSecond, it.label?.resolve()) }
       val offset = SpeedHistoryStore.CAPACITY - history.size
       KetchSpeedChart(
         bands = bands,
@@ -125,7 +146,11 @@ internal fun ActivityTabContent(
           modifier = Modifier.weight(1f),
         )
         Text(
-          text = if (downloading) "Now" else clockTime(history.lastAt, timeZone),
+          text = if (downloading) {
+            stringResource(Res.string.inspector_activity_now)
+          } else {
+            clockTime(history.lastAt, timeZone)
+          },
           style = type.numeralS,
           color = colors.textTertiary,
         )
@@ -138,7 +163,7 @@ internal fun ActivityTabContent(
 
 /** Named numbers side by side, sharing the width. */
 @Composable
-private fun Stats(stats: List<Pair<String, String>>) {
+private fun Stats(stats: List<Pair<UiText, UiText>>) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   Row(modifier = Modifier.fillMaxWidth()) {
@@ -147,8 +172,18 @@ private fun Stats(stats: List<Pair<String, String>>) {
         verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s0_5),
         modifier = Modifier.weight(1f),
       ) {
-        Text(text = name, style = type.caption, color = colors.textTertiary, maxLines = 1)
-        Text(text = value, style = type.numeral, color = colors.textPrimary, maxLines = 1)
+        Text(
+          text = name.resolve(),
+          style = type.caption,
+          color = colors.textTertiary,
+          maxLines = 1,
+        )
+        Text(
+          text = value.resolve(),
+          style = type.numeral,
+          color = colors.textPrimary,
+          maxLines = 1,
+        )
       }
     }
   }
@@ -164,13 +199,13 @@ private fun Timeline(entries: List<TimelineEntry>, timeZone: TimeZone) {
   val hidden = if (expanded) 0 else (entries.size - TIMELINE_SHOWN).coerceAtLeast(0)
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
     Text(
-      text = eyebrowText("Since Ketch opened"),
+      text = eyebrowText(stringResource(Res.string.inspector_activity_since)),
       style = type.eyebrow,
       color = colors.textTertiary,
     )
     if (hidden > 0) {
       KetchButton(
-        text = "Show $hidden earlier",
+        text = pluralStringResource(Res.plurals.inspector_activity_show_earlier, hidden, hidden),
         onClick = { expanded = true },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -188,7 +223,7 @@ private fun Timeline(entries: List<TimelineEntry>, timeZone: TimeZone) {
         )
         KetchDot(color = colors.timelineColor(entry.kind), size = StatusDotDefaults.TableSize)
         Text(
-          text = entry.text,
+          text = entry.label.resolve(),
           style = type.bodyS,
           color = colors.textPrimary,
           maxLines = 2,
@@ -215,6 +250,9 @@ internal fun activityBands(history: SpeedHistory, colors: KetchColors): List<Spe
   }
 }
 
+/** A dashed line of the chart at [bytesPerSecond], with its [label] when there is room. */
+internal data class LimitLine(val bytesPerSecond: Long, val label: UiText? = null)
+
 /**
  * Dashed lines at the [task]'s own limit and at the [global] one, called [globalLabel]. A global
  * limit equal to the task's is drawn once, and of two limits too close for both labels only the
@@ -223,17 +261,20 @@ internal fun activityBands(history: SpeedHistory, colors: KetchColors): List<Spe
 internal fun activityLimits(
   task: SpeedLimit,
   global: SpeedLimit,
-  globalLabel: String,
-): List<SpeedLimitLine> {
+  globalLabel: UiText,
+): List<LimitLine> {
   val lines = buildList {
-    if (!task.isUnlimited) add(task.bytesPerSecond to "Task ${formatSpeedLimit(task)}")
+    if (!task.isUnlimited) {
+      add(task.bytesPerSecond to Res.string.inspector_limit_task.text(speedLimitText(task)))
+    }
     if (!global.isUnlimited && global != task) {
-      add(global.bytesPerSecond to "$globalLabel ${formatSpeedLimit(global)}")
+      val label = Res.string.inspector_limit_marker.text(globalLabel, speedLimitText(global))
+      add(global.bytesPerSecond to label)
     }
   }.sortedBy { it.first }
   val close = lines.size == 2 && lines[1].first < lines[0].first * CLOSE_LIMITS
   return lines.mapIndexed { index, (bytes, label) ->
-    SpeedLimitLine(bytes, label.takeUnless { close && index == 1 })
+    LimitLine(bytes, label.takeUnless { close && index == 1 })
   }
 }
 
@@ -241,11 +282,13 @@ internal fun activityLimits(
  * Peak, average and connections under the chart: "31.2 MB/s", "14.0 MB/s" and "8", each with
  * its name; connections only for a task that has them.
  */
-internal fun activityStats(history: SpeedHistory, connections: Int?): List<Pair<String, String>> =
+internal fun activityStats(history: SpeedHistory, connections: Int?): List<Pair<UiText, UiText>> =
   buildList {
-    add("Peak" to formatSpeed(history.peak))
-    add("Average" to formatSpeed(history.average))
-    if (connections != null && connections > 0) add("Connections" to connections.toString())
+    add(Res.string.inspector_stat_peak.text() to compactSpeedText(history.peak))
+    add(Res.string.inspector_stat_average.text() to compactSpeedText(history.average))
+    if (connections != null && connections > 0) {
+      add(Res.string.inspector_stat_connections.text() to verbatim(connections.toString()))
+    }
   }
 
 /** The dot of a timeline entry, in the color of the state it records. */

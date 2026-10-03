@@ -26,16 +26,25 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.formatSpeedAmount
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.parseSpeedLimit
 import com.linroid.ketch.app.state.preferredUnit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_limit_applies
+import ketch.app.shared.generated.resources.component_limit_custom
+import ketch.app.shared.generated.resources.component_limit_custom_hint
+import ketch.app.shared.generated.resources.component_limit_unit_tooltip
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -51,13 +60,15 @@ val SpeedLimitPickerPresets: List<SpeedLimit> = listOf(
 )
 
 /**
- * Reads a typed speed limit: "500k", "2m", "1.5 MB/s", "unlimited", or a bare number in
- * [defaultUnit]. Decimals may use a point or a comma. Returns `null` for anything else,
- * including 0.
+ * Reads a typed speed limit: "500k", "2m", "1.5 MB/s", "unlimited" or [unlimited], the word for
+ * it in the language shown, or a bare number in [defaultUnit]. Decimals may use a point or a
+ * comma. Returns `null` for anything else, including 0.
  */
-fun parseSpeedInput(text: String, defaultUnit: SpeedUnit): SpeedLimit? {
-  val compact = text.lowercase().filterNot { it.isWhitespace() }.replace(',', '.')
-  if (compact == "unlimited") return SpeedLimit.Unlimited
+fun parseSpeedInput(text: String, defaultUnit: SpeedUnit, unlimited: String? = null): SpeedLimit? {
+  val compact = compact(text).replace(',', '.')
+  if (compact == UNLIMITED || unlimited != null && compact == compact(unlimited)) {
+    return SpeedLimit.Unlimited
+  }
   val amount = compact.removeSuffix("/s").removeSuffix("ps").removeSuffix("b")
   return when {
     amount.endsWith("k") -> parseSpeedLimit(amount.dropLast(1), SpeedUnit.KB)
@@ -66,15 +77,20 @@ fun parseSpeedInput(text: String, defaultUnit: SpeedUnit): SpeedLimit? {
   }
 }
 
+// text in lower case without whitespace, as speeds are compared.
+private fun compact(text: String): String = text.lowercase().filterNot { it.isWhitespace() }
+
+private const val UNLIMITED = "unlimited"
+
 /**
  * The caption naming the limit that caps a download whose own limit is [own] while the global
  * limit called [globalName] is [global], such as "Slow lane 1 MB/s applies to all downloads";
  * `null` when its own limit is the one that applies.
  */
-fun winningLimitCaption(own: SpeedLimit, global: SpeedLimit, globalName: String): String? {
+fun winningLimitCaption(own: SpeedLimit, global: SpeedLimit, globalName: UiText): UiText? {
   if (global.isUnlimited) return null
   if (!own.isUnlimited && own.bytesPerSecond <= global.bytesPerSecond) return null
-  return "$globalName ${formatSpeedLimit(global)} applies to all downloads"
+  return Res.string.component_limit_applies.text(globalName, speedLimitText(global))
 }
 
 /**
@@ -165,7 +181,7 @@ fun SpeedLimitPicker(
     ) {
       presets.forEach { preset ->
         KetchChip(
-          label = formatSpeedLimit(preset),
+          label = speedLimitText(preset).resolve(),
           selected = shown == preset,
           enabled = enabled,
           onClick = {
@@ -176,7 +192,7 @@ fun SpeedLimitPicker(
         )
       }
       KetchChip(
-        label = "Custom…",
+        label = stringResource(Res.string.component_limit_custom),
         selected = !isPreset,
         enabled = enabled,
         onClick = {
@@ -194,7 +210,7 @@ fun SpeedLimitPicker(
           val limit = parseSpeedInput(input, unit)
           if (limit != null) debounce.update(limit) else debounce.cancel()
         },
-        placeholder = "e.g. 750k or 1.5m",
+        placeholder = stringResource(Res.string.component_limit_custom_hint),
         enabled = enabled,
         clearable = false,
         keyboardOptions = KeyboardOptions(
@@ -209,7 +225,7 @@ fun SpeedLimitPicker(
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
             enabled = enabled,
-            tooltip = "Unit of a number without k or m",
+            tooltip = stringResource(Res.string.component_limit_unit_tooltip),
             onClick = {
               unit = if (unit == SpeedUnit.MB) SpeedUnit.KB else SpeedUnit.MB
               parseSpeedInput(text, unit)?.let { debounce.update(it) }

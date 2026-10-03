@@ -1,8 +1,10 @@
 package com.linroid.ketch.app.components
 
 import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.config.SpeedRule
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -20,11 +22,11 @@ class StartTimePickerTest {
 
   private fun local(dateTime: String): Instant = LocalDateTime.parse(dateTime).toInstant(zone)
 
-  private fun option(label: String, now: Instant): DownloadSchedule =
-    startTimeOptions(now, zone).first { it.label == label }.schedule
+  private suspend fun option(label: String, now: Instant): DownloadSchedule =
+    startTimeOptions(now, zone).first { it.label.load() == label }.schedule
 
   @Test
-  fun startTimeOptions_tonightInTheEvening_isTheNextLocal0100() {
+  fun startTimeOptions_tonightInTheEvening_isTheNextLocal0100() = runTest {
     assertEquals(
       DownloadSchedule.AtTime(local("2026-10-02T01:00")),
       option("Tonight 01:00", local("2026-10-01T22:30")),
@@ -32,7 +34,7 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startTimeOptions_tonightAfterMidnight_isLaterThatNight() {
+  fun startTimeOptions_tonightAfterMidnight_isLaterThatNight() = runTest {
     assertEquals(
       DownloadSchedule.AtTime(local("2026-10-02T01:00")),
       option("Tonight 01:00", local("2026-10-02T00:30")),
@@ -40,7 +42,7 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startTimeOptions_tonightAtExactly0100_isTheNextNight() {
+  fun startTimeOptions_tonightAtExactly0100_isTheNextNight() = runTest {
     assertEquals(
       DownloadSchedule.AtTime(local("2026-10-03T01:00")),
       option("Tonight 01:00", local("2026-10-02T01:00")),
@@ -48,7 +50,7 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startTimeOptions_timedChoices_areAtTimeNeverDelays() {
+  fun startTimeOptions_timedChoices_areAtTimeNeverDelays() = runTest {
     val now = local("2026-10-01T09:15")
     val options = startTimeOptions(now, zone, offPeak = local("2026-10-01T18:00"))
 
@@ -58,9 +60,11 @@ class StartTimePickerTest {
       DownloadSchedule.AtTime(local("2026-10-02T08:00")),
       option("Tomorrow 08:00", now),
     )
+    assertEquals("Off-peak · 18:00", options.last().label.load())
+    assertEquals(DownloadSchedule.AtTime(local("2026-10-01T18:00")), options.last().schedule)
     assertEquals(
-      StartTimeOption("Off-peak · 18:00", DownloadSchedule.AtTime(local("2026-10-01T18:00"))),
-      options.last(),
+      listOf("Start now", "In 1 hour", "Tonight 01:00", "Tomorrow 08:00", "Off-peak · 18:00"),
+      options.map { it.label }.load(),
     )
   }
 
@@ -79,22 +83,23 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startTimeLabel_nightAfterToday_saysTonight() {
+  fun startTimeText_nightAfterToday_saysTonight() = runTest {
     val now = local("2026-10-01T22:30")
     assertEquals(
       "Starts 01:00 tonight",
-      startTimeLabel(DownloadSchedule.AtTime(local("2026-10-02T01:00")), now, zone),
+      startTimeText(DownloadSchedule.AtTime(local("2026-10-02T01:00")), now, zone).load(),
     )
     assertEquals(
       "Starts 23:00 tonight",
-      startTimeLabel(DownloadSchedule.AtTime(local("2026-10-01T23:00")), now, zone),
+      startTimeText(DownloadSchedule.AtTime(local("2026-10-01T23:00")), now, zone).load(),
     )
   }
 
   @Test
-  fun startTimeLabel_laterDays_sayTodayTomorrowOrTheWeekday() {
+  fun startTimeText_laterDays_sayTodayTomorrowOrTheWeekday() = runTest {
     val now = local("2026-10-01T09:00")
-    fun label(at: String) = startTimeLabel(DownloadSchedule.AtTime(local(at)), now, zone)
+    suspend fun label(at: String) =
+      startTimeText(DownloadSchedule.AtTime(local(at)), now, zone).load()
 
     assertEquals("Starts 14:00 today", label("2026-10-01T14:00"))
     assertEquals("Starts tomorrow 08:00", label("2026-10-02T08:00"))
@@ -103,10 +108,31 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startTimeLabel_immediateOrPast_isNow() {
+  fun startTimeText_immediateOrPast_isNow() = runTest {
     val now = local("2026-10-01T09:00")
-    assertEquals("Now", startTimeLabel(DownloadSchedule.Immediate, now, zone))
-    assertEquals("Now", startTimeLabel(DownloadSchedule.AtTime(now - 1.minutes), now, zone))
+    assertEquals("Now", startTimeText(DownloadSchedule.Immediate, now, zone).load())
+    assertEquals("Now", startTimeText(DownloadSchedule.AtTime(now - 1.minutes), now, zone).load())
+    assertEquals(
+      "Starts after 1h 5m",
+      startTimeText(DownloadSchedule.AfterDelay(65.minutes), now, zone).load(),
+    )
+  }
+
+  @Test
+  fun startTimeFollowOnText_laterTimes_startInLowerCase() = runTest {
+    val now = local("2026-10-01T09:00")
+    suspend fun label(at: String) =
+      startTimeFollowOnText(DownloadSchedule.AtTime(local(at)), now, zone).load()
+
+    assertEquals("starts 14:00 today", label("2026-10-01T14:00"))
+    assertEquals("starts 01:00 tonight", label("2026-10-02T01:00"))
+    assertEquals("starts tomorrow 08:00", label("2026-10-02T08:00"))
+    assertEquals("starts Mon 08:00", label("2026-10-05T08:00"))
+    assertEquals("starts Oct 12 08:00", label("2026-10-12T08:00"))
+    assertEquals(
+      "starts after 5m 0s",
+      startTimeFollowOnText(DownloadSchedule.AfterDelay(5.minutes), now, zone).load(),
+    )
   }
 
   @Test

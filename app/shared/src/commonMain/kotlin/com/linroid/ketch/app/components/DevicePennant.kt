@@ -25,6 +25,9 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_pennant_failures
+import org.jetbrains.compose.resources.pluralStringResource
 
 /** Sizes of a [DevicePennant]. */
 object DevicePennantDefaults {
@@ -73,12 +76,17 @@ fun DevicePennant(
   val ringColor = health?.let { colors.healthColor(it) }
   val pulse = rememberPulse(health == DeviceHealth.Connecting)
   val ringRoom = if (health != null) RingGap + RingWidth else 0.dp
+  val description = if (failures > 0) {
+    pluralStringResource(Res.plurals.component_pennant_failures, failures, failures)
+  } else {
+    null
+  }
   Box(
     contentAlignment = Alignment.Center,
     modifier = modifier
       .size(size + ringRoom * 2)
       .clearAndSetSemantics {
-        if (failures > 0) contentDescription = "$failures failed"
+        if (description != null) contentDescription = description
       }
       .drawWithCache {
         val ring = Stroke(RingWidth.toPx())

@@ -7,6 +7,8 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.ListFixtures.row
@@ -15,6 +17,7 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.util.RowContext
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.rowContent
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,38 +30,40 @@ class InspectorModelTest {
   private val start = ListFixtures.START
 
   @Test
-  fun inspectorReason_stalledDownload_offersReconnect() {
+  fun inspectorReason_stalledDownload_offersReconnect() = runTest {
     val reason = inspectorReason(stalled(), slowLane = false, globalCap = SpeedLimit.Unlimited)
 
     assertEquals(ReasonAction.Reconnect, reason?.action)
     assertTrue(reason!!.warning)
-    assertTrue(reason.text.startsWith("Stalled"))
+    assertTrue(reason.text.load().startsWith("Stalled"))
   }
 
   @Test
-  fun inspectorReason_slowLaneBelowOwnLimit_offersFullSpeed() {
+  fun inspectorReason_slowLaneBelowOwnLimit_offersFullSpeed() = runTest {
     val row = downloading(SpeedLimit.mbps(8))
 
     val reason = inspectorReason(row, slowLane = true, globalCap = SpeedLimit.mbps(1))
 
-    assertEquals(InspectorReason("Limited by Slow lane (1 MB/s)", ReasonAction.FullSpeed), reason)
+    assertEquals(ReasonAction.FullSpeed, reason?.action)
+    assertEquals("Limited by Slow lane (1 MB/s)", reason?.text.load())
   }
 
   @Test
-  fun inspectorReason_ownLimitLowerThanGlobal_offersRemoveLimit() {
+  fun inspectorReason_ownLimitLowerThanGlobal_offersRemoveLimit() = runTest {
     val row = downloading(SpeedLimit.kbps(512))
 
     val reason = inspectorReason(row, slowLane = true, globalCap = SpeedLimit.mbps(1))
 
-    assertEquals(InspectorReason("Limited to 512 KB/s", ReasonAction.RemoveLimit), reason)
+    assertEquals(ReasonAction.RemoveLimit, reason?.action)
+    assertEquals("Limited to 512 KB/s", reason?.text.load())
   }
 
   @Test
-  fun inspectorReason_globalLimitWithoutSlowLane_opensSpeedSettings() {
+  fun inspectorReason_globalLimitWithoutSlowLane_opensSpeedSettings() = runTest {
     val reason = inspectorReason(downloading(), slowLane = false, globalCap = SpeedLimit.mbps(5))
 
     assertEquals(ReasonAction.SpeedSettings, reason?.action)
-    assertEquals("Limited by the global limit (5 MB/s)", reason?.text)
+    assertEquals("Limited by the global limit (5 MB/s)", reason?.text?.load())
   }
 
   @Test
@@ -77,7 +82,7 @@ class InspectorModelTest {
   }
 
   @Test
-  fun inspectorReason_pausedWithoutResumeSupport_saysItStartsOver() {
+  fun inspectorReason_pausedWithoutResumeSupport_saysItStartsOver() = runTest {
     val source = ResolvedSource("https://example.com/a.bin", "http", 100, false, "a.bin", 1)
     val paused = row(
       id = "p",
@@ -87,24 +92,26 @@ class InspectorModelTest {
 
     val reason = inspectorReason(paused, slowLane = false, globalCap = SpeedLimit.Unlimited)
 
-    assertEquals("Paused · resuming starts over", reason?.text)
+    assertEquals("Paused · resuming starts over", reason?.text?.load())
   }
 
   @Test
-  fun inspectorReason_completedFileMissing_warnsOnlyOnLocalDevices() {
+  fun inspectorReason_completedFileMissing_warnsOnlyOnLocalDevices() = runTest {
     val state = DownloadState.Completed("/tmp/a.bin", 100)
     val local = row("a", state)
-    val remote = row("b", state, device = DeviceInfo("NAS", RowCapabilities.remote()))
+    val remote = row("b", state, device = DeviceInfo(verbatim("NAS"), RowCapabilities.remote()))
 
     val reason = inspectorReason(local, false, SpeedLimit.Unlimited, fileMissing = true)
 
-    assertEquals(InspectorReason("File moved or deleted", warning = true), reason)
+    assertEquals("File moved or deleted", reason?.text.load())
+    assertTrue(reason!!.warning)
+    assertNull(reason.action)
     assertNull(inspectorReason(remote, false, SpeedLimit.Unlimited, fileMissing = true))
     assertNull(inspectorReason(local, false, SpeedLimit.Unlimited))
   }
 
   @Test
-  fun metricParts_downloading_listsShareBytesSpeedTimeLeftAndFinish() {
+  fun metricParts_downloading_listsShareBytesSpeedTimeLeftAndFinish() = runTest {
     val row = row(
       id = "a",
       state = DownloadState.Downloading(DownloadProgress(42 * MB, 100 * MB, MB)),
@@ -113,16 +120,20 @@ class InspectorModelTest {
 
     val parts = metricParts(row, start, TimeZone.UTC)
 
-    assertEquals(listOf("42%", "42.0 of 100 MB", "1.0 MB/s", "58s left", "done ≈ 12:00"), parts)
+    assertEquals(
+      listOf("42%", "42.0 of 100 MB", "1.0 MB/s", "58s left", "done ≈ 12:00"),
+      parts.map { it.text }.load(),
+    )
+    assertEquals(listOf(true, false, true, false, false), parts.map { it.strong })
   }
 
   @Test
-  fun metricParts_pausedBelowAUnitOfTheSize_writesBothUnits() {
+  fun metricParts_pausedBelowAUnitOfTheSize_writesBothUnits() = runTest {
     val state = DownloadState.Paused(DownloadProgress(497_025_024, 1_342_177_280))
 
     val parts = metricParts(row("p", state), start, TimeZone.UTC)
 
-    assertEquals(listOf("37%", "474 MB of 1.3 GB"), parts)
+    assertEquals(listOf("37%", "474 MB of 1.3 GB"), parts.map { it.text }.load())
   }
 
   @Test
@@ -138,31 +149,31 @@ class InspectorModelTest {
   }
 
   @Test
-  fun addedDetail_earlierDay_addsTheTime() {
+  fun addedDetail_earlierDay_addsTheTime() = runTest {
     val today = row("t", DownloadState.Queued, createdAt = start - 2.hours)
     val yesterday = row("y", DownloadState.Queued, createdAt = start - 18.hours)
 
-    assertEquals("Today 10:00", addedDetail(today, start, TimeZone.UTC))
-    assertEquals("Yesterday 18:00", addedDetail(yesterday, start, TimeZone.UTC))
+    assertEquals("Today 10:00", addedDetail(today, start, TimeZone.UTC).load())
+    assertEquals("Yesterday 18:00", addedDetail(yesterday, start, TimeZone.UTC).load())
   }
 
   @Test
-  fun sourceLabel_eachKindOfLink_namesProtocolAndHost() {
+  fun sourceLabel_eachKindOfLink_namesProtocolAndHost() = runTest {
     assertEquals(
       "HTTPS · releases.ubuntu.com",
-      sourceLabel(DownloadRequest("https://releases.ubuntu.com/a.iso"), isTorrent = false)
+      sourceLabel(DownloadRequest("https://releases.ubuntu.com/a.iso"), isTorrent = false).load()
     )
     assertEquals(
       "FTP · ftp.example.org",
-      sourceLabel(DownloadRequest("ftp://user:pw@ftp.example.org/a.bin"), isTorrent = false)
+      sourceLabel(DownloadRequest("ftp://user:pw@ftp.example.org/a.bin"), isTorrent = false).load()
     )
     assertEquals(
       "BitTorrent · magnet",
-      sourceLabel(DownloadRequest("magnet:?xt=urn:btih:abc"), isTorrent = true)
+      sourceLabel(DownloadRequest("magnet:?xt=urn:btih:abc"), isTorrent = true).load()
     )
     assertEquals(
       "BitTorrent · torrent file",
-      sourceLabel(DownloadRequest("https://example.com/a.torrent?x=1"), isTorrent = true)
+      sourceLabel(DownloadRequest("https://example.com/a.torrent?x=1"), isTorrent = true).load()
     )
   }
 
@@ -194,21 +205,21 @@ class InspectorModelTest {
   }
 
   @Test
-  fun capturedText_browserWithCookiesAndReferer_saysWhatCameAlong() {
+  fun capturedText_browserWithCookiesAndReferer_saysWhatCameAlong() = runTest {
     val request = DownloadRequest(
       url = "https://example.com/a.bin",
       headers = mapOf("Cookie" to "s=1", "Referer" to "https://example.com/", "User-Agent" to "x"),
       properties = mapOf(TaskOrigin.PROPERTY to "browser"),
     )
 
-    assertEquals("From the browser, with cookies and referrer", capturedText(request))
+    assertEquals("From the browser, with cookies and referrer", capturedText(request).load())
   }
 
   @Test
-  fun capturedText_headersWithoutOrigin_startsWithThem() {
+  fun capturedText_headersWithoutOrigin_startsWithThem() = runTest {
     val request = DownloadRequest("https://example.com/a", headers = mapOf("referer" to "x"))
 
-    assertEquals("With referrer", capturedText(request))
+    assertEquals("With referrer", capturedText(request).load())
     assertNull(capturedText(DownloadRequest("https://example.com/a")))
   }
 
@@ -266,18 +277,21 @@ class InspectorModelTest {
   }
 
   @Test
-  fun urgentNote_victim_namesItAndItsPriority() {
+  fun urgentNote_victim_namesItAndItsPriority() = runTest {
     val victim = running("debian-12", DownloadPriority.LOW)
 
-    assertEquals("Starts now; may pause \"debian-12.bin\" (Low)", urgentNote(victim))
-    assertEquals("Starts 2 now; may pause \"debian-12.bin\" (Low)", urgentNote(victim, 2))
+    assertEquals("Starts now; may pause \"debian-12.bin\" (Low)", urgentNote(victim).load())
+    assertEquals("Starts 2 now; may pause \"debian-12.bin\" (Low)", urgentNote(victim, 2).load())
   }
 
   @Test
-  fun rescheduleNote_tonight_saysItPausesFirst() {
+  fun rescheduleNote_tonight_saysItPausesFirst() = runTest {
     val at = DownloadSchedule.AtTime(start + 13.hours)
 
-    assertEquals("Pauses now and starts 01:00 tonight", rescheduleNote(at, start, TimeZone.UTC))
+    assertEquals(
+      "Pauses now and starts 01:00 tonight",
+      rescheduleNote(at, start, TimeZone.UTC).load(),
+    )
   }
 
   @Test
@@ -311,7 +325,7 @@ class InspectorModelTest {
   }
 
   @Test
-  fun selectionLine_mixedRows_sumsKnownSizesAndSpeeds() {
+  fun selectionLine_mixedRows_sumsKnownSizesAndSpeeds() = runTest {
     val rows = listOf(
       row(
         id = "a",
@@ -322,7 +336,7 @@ class InspectorModelTest {
       row("c", DownloadState.Queued)
     )
 
-    assertEquals("3 selected · 3.0 GB · 1.0 MB/s", selectionLine(rows))
+    assertEquals("3 selected · 3.0 GB · 1.0 MB/s", selectionLine(rows).load())
   }
 
   private fun downloading(limit: SpeedLimit = SpeedLimit.Unlimited): TaskRow = row(

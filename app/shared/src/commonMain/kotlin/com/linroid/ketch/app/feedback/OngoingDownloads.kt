@@ -4,14 +4,29 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.etaText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.formatEta
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.ongoing_downloading
+import ketch.app.shared.generated.resources.ongoing_left
+import ketch.app.shared.generated.resources.ongoing_left_minutes
+import ketch.app.shared.generated.resources.ongoing_left_under_minute
+import ketch.app.shared.generated.resources.ongoing_line_waiting
+import ketch.app.shared.generated.resources.ongoing_size_of
+import ketch.app.shared.generated.resources.ongoing_waiting
 
 /**
  * What an ongoing notification says about a device's downloads, such as the one the Android
- * download service shows: the tasks downloading or waiting for a slot, in list order.
+ * download service shows: the tasks downloading or waiting for a slot, in list order. Notifiers
+ * read its text with `load()` as they post.
  *
  * @property title "Downloading 3 files · 4.2 MB/s", or "Waiting to download 2 files" while every
  *   task waits.
@@ -27,10 +42,10 @@ import com.linroid.ketch.app.util.formatEta
  * @property filter status tab that lists these tasks.
  */
 internal data class OngoingDownloads(
-  val title: String,
-  val text: String?,
+  val title: UiText,
+  val text: UiText?,
   val permille: Int?,
-  val lines: List<String>,
+  val lines: List<UiText>,
   val more: Int,
   val lanes: List<Int>?,
   val filter: StatusFilter,
@@ -68,14 +83,16 @@ internal data class OngoingDownloads(
       // Names are only worked out for the lines that show.
       val lines = buildList {
         for ((task, progress) in downloading.take(MAX_LINES)) {
-          add("${nameOf(task)}  ${progressLine(progress)}")
+          add(line(nameOf(task), progressLine(progress)))
         }
-        for (task in queued.take(MAX_LINES - size)) add("${nameOf(task)}  Waiting")
+        for (task in queued.take(MAX_LINES - size)) {
+          add(line(nameOf(task), Res.string.ongoing_line_waiting.text()))
+        }
       }
       val more = downloading.size + queued.size - lines.size
       if (downloading.isEmpty()) {
         return OngoingDownloads(
-          title = "Waiting to download ${files(queued.size)}",
+          title = Res.plurals.ongoing_waiting.text(queued.size),
           text = null,
           permille = null,
           lines = lines,
@@ -93,15 +110,17 @@ internal data class OngoingDownloads(
       }
       val text = if (total > 0) {
         val left = timeLeft((total - received).coerceAtLeast(0), speed)
-        listOfNotNull("${formatBytes(received)} of ${formatBytes(total)}", left)
-          .joinToString(" · ")
+        listOfNotNull(Res.string.ongoing_size_of.text(sizeText(received), sizeText(total)), left)
+          .joinText()
       } else {
-        formatBytes(received)
+        sizeText(received)
       }
       val single = downloading.singleOrNull()?.takeIf { queued.isEmpty() }
       return OngoingDownloads(
-        title = "Downloading ${files(downloading.size)}" +
-          if (speed > 0) " · ${formatBytes(speed)}/s" else "",
+        title = listOfNotNull(
+          Res.plurals.ongoing_downloading.text(downloading.size),
+          speedText(speed).takeIf { speed > 0 },
+        ).joinText(),
         text = text,
         permille = if (total > 0) permilleOf(received, total) else null,
         lines = lines,
@@ -116,15 +135,19 @@ internal data class OngoingDownloads(
     private fun nameOf(task: DownloadTask): String =
       displayName(task.requestState.value, task.state.value)
 
+    // "ubuntu.iso  45% · 2.1 MB/s": the name, then what goes on.
+    private fun line(name: String, state: UiText): UiText =
+      listOf(verbatim(name), state).joinText(LINE_SEPARATOR)
+
     // "45% · 2.1 MB/s"; the bytes so far while the size is unknown.
-    private fun progressLine(progress: DownloadProgress): String = listOfNotNull(
+    private fun progressLine(progress: DownloadProgress): UiText = listOfNotNull(
       if (progress.totalBytes > 0) {
-        "${permilleOf(progress.downloadedBytes, progress.totalBytes) / 10}%"
+        percentText(permilleOf(progress.downloadedBytes, progress.totalBytes) / 10)
       } else {
-        formatBytes(progress.downloadedBytes)
+        sizeText(progress.downloadedBytes)
       },
-      progress.bytesPerSecond.takeIf { it > 0 }?.let { "${formatBytes(it)}/s" }
-    ).joinToString(" · ")
+      progress.bytesPerSecond.takeIf { it > 0 }?.let(::speedText)
+    ).joinText()
 
     private fun permilleOf(received: Long, total: Long): Int =
       (received.coerceIn(0, total) * PROGRESS_MAX / total).toInt()
@@ -139,16 +162,17 @@ internal data class OngoingDownloads(
       return ranges.chunked(perLane).map { maxOf(1, (it.sum() * PROGRESS_MAX / bytes).toInt()) }
     }
 
-    private fun timeLeft(bytes: Long, speed: Long): String? {
+    private fun timeLeft(bytes: Long, speed: Long): UiText? {
       if (speed <= 0) return null
       val seconds = bytes / speed
       return when {
-        seconds < 60 -> "less than a minute left"
-        seconds < 3600 -> "about ${(seconds + 59) / 60} min left"
-        else -> "about ${formatEta(seconds)} left"
+        seconds < 60 -> Res.string.ongoing_left_under_minute.text()
+        seconds < 3600 -> Res.plurals.ongoing_left_minutes.text(((seconds + 59) / 60).toInt())
+        else -> Res.string.ongoing_left.text(etaText(seconds))
       }
     }
 
-    private fun files(count: Int): String = if (count == 1) "1 file" else "$count files"
+    // Between a file's name and what it does, as notifications line them up.
+    private const val LINE_SEPARATOR = "  "
   }
 }

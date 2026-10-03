@@ -3,6 +3,7 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -99,7 +100,7 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_oneDownload_namesItsFile() {
+  fun backgroundProgress_oneDownload_namesItsFile() = runTest {
     val api = RecordingKetchApi()
     api.add(DownloadState.Downloading(RecordingTask.PROGRESS))
 
@@ -110,7 +111,7 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_severalDownloads_countsThem() {
+  fun backgroundProgress_severalDownloads_countsThem() = runTest {
     val api = RecordingKetchApi()
     repeat(3) { api.add(DownloadState.Downloading(RecordingTask.PROGRESS)) }
 
@@ -118,7 +119,7 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_onlyWaiting_isIndeterminate() {
+  fun backgroundProgress_onlyWaiting_isIndeterminate() = runTest {
     val api = RecordingKetchApi()
     api.add(DownloadState.Queued)
 
@@ -130,7 +131,7 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_nothingActive_isNull() {
+  fun backgroundProgress_nothingActive_isNull() = runTest {
     val api = RecordingKetchApi()
     api.add(DownloadState.Paused(RecordingTask.PROGRESS))
 

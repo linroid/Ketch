@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.input
 
 import androidx.compose.ui.input.key.Key
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.StatusFilter
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -149,7 +150,7 @@ class ShortcutMatcherTest {
     val chord = KeyChord(Key.N, primary = true)
     val duplicate = KetchCommand(
       id = "duplicate",
-      label = "Duplicate",
+      label = verbatim("Duplicate"),
       icon = null,
       scope = CommandScope.Global,
       mac = chord,

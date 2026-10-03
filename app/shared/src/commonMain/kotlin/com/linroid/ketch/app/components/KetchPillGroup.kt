@@ -22,6 +22,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommand
@@ -37,7 +40,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 @Immutable
 class KetchPillItem(
   val icon: KetchIcon,
-  val label: String,
+  val label: UiText,
   val onClick: () -> Unit,
   val selected: Boolean = false,
   val enabled: Boolean = true,
@@ -95,7 +98,8 @@ private fun PillButton(item: KetchPillItem) {
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions, item.enabled)
   val focus = rememberFocusVisibility()
-  KetchTooltip(text = item.label, shortcut = item.shortcut) {
+  val label = item.label.resolve()
+  KetchTooltip(text = label, shortcut = item.shortcut) {
     Box(
       contentAlignment = Alignment.Center,
       modifier = Modifier
@@ -106,7 +110,7 @@ private fun PillButton(item: KetchPillItem) {
         .background(if (item.selected) colors.accentSoft else Color.Transparent)
         .background(overlay)
         .semantics {
-          contentDescription = item.label
+          contentDescription = label
           selected = item.selected
         }
         .trackFocusVisibility(focus)

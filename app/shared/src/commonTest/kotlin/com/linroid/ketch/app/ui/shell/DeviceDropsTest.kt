@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.shell
 
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -70,23 +71,23 @@ class DeviceDropsTest {
   }
 
   @Test
-  fun dropHint_content_offersTheFreeSpace() {
+  fun dropHint_content_offersTheFreeSpace() = runTest {
     val hint = dropHint(DeviceDrag.Content, nas(), move = false)
 
-    assertEquals(DropHint("Drop here · 1.8 TB free", true), hint)
+    assertEquals("Drop here · 1.8 TB free" to true, hint.loaded())
   }
 
   @Test
-  fun dropHint_rowsFromAnotherDevice_sendsOrMovesThem() {
+  fun dropHint_rowsFromAnotherDevice_sendsOrMovesThem() = runTest {
     val send = dropHint(rows, nas(), move = false, moveKey = "Alt")
 
-    assertEquals(DropHint("Send 2 here · Alt moves", true), send)
-    assertEquals(DropHint("Move 2 here", true), dropHint(rows, nas(), move = true))
+    assertEquals("Send 2 here · Alt moves" to true, send.loaded())
+    assertEquals("Move 2 here" to true, dropHint(rows, nas(), move = true).loaded())
   }
 
   @Test
-  fun dropHint_rowsWithoutAMoveKey_leavesTheKeyOut() {
-    assertEquals(DropHint("Send 2 here", true), dropHint(rows, nas(), move = false))
+  fun dropHint_rowsWithoutAMoveKey_leavesTheKeyOut() = runTest {
+    assertEquals("Send 2 here" to true, dropHint(rows, nas(), move = false).loaded())
   }
 
   @Test
@@ -95,12 +96,12 @@ class DeviceDropsTest {
   }
 
   @Test
-  fun dropHint_unreachableDevice_turnsTheDropDown() {
+  fun dropHint_unreachableDevice_turnsTheDropDown() = runTest {
     val offline = nas(health = DeviceHealth.Offline())
 
     assertEquals(
-      DropHint("Not reachable now", false),
-      dropHint(DeviceDrag.Content, offline, move = false)
+      "Not reachable now" to false,
+      dropHint(DeviceDrag.Content, offline, move = false).loaded(),
     )
     assertFalse(dropHint(rows, nas(connected = false), move = false).accepts)
   }
@@ -130,4 +131,6 @@ class DeviceDropsTest {
     assertEquals(NAS_ID, fleet.state.intakeRequest?.targetDeviceId)
     assertTrue(fleet.nas.requests.isEmpty())
   }
+
+  private suspend fun DropHint.loaded(): Pair<String, Boolean> = text.load() to accepts
 }

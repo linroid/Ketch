@@ -22,6 +22,11 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.discover_step_starting
+import ketch.app.shared.generated.resources.discover_steps_earlier
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The steps the agent reported, as a line of "✓ Plan  ✓ Searching  ◌ Filtering…". While
@@ -49,7 +54,7 @@ internal fun DiscoverSteps(
     ) {
       if (hidden > 0) {
         Text(
-          text = "$hidden earlier",
+          text = pluralStringResource(Res.plurals.discover_steps_earlier, hidden, hidden),
           style = KetchTheme.typography.caption,
           color = colors.textTertiary,
           modifier = Modifier.align(Alignment.CenterVertically),
@@ -59,7 +64,9 @@ internal fun DiscoverSteps(
         val current = running && index == shown.lastIndex
         StepItem(step.title, step.detail, current)
       }
-      if (shown.isEmpty()) StepItem("Starting the search", detail = "", current = true)
+      if (shown.isEmpty()) {
+        StepItem(stringResource(Res.string.discover_step_starting), detail = "", current = true)
+      }
     }
     val detail = shown.lastOrNull()?.detail.orEmpty()
     if (running && detail.isNotBlank()) {

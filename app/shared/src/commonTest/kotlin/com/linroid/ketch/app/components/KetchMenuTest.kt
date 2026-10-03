@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.components
 
+import com.linroid.ketch.app.i18n.verbatim
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,15 +14,15 @@ class KetchMenuTest {
   private var dismissals = 0
 
   private val entries = buildMenu {
-    header("Task")
-    item(label = "Pause", onClick = { clicks += "pause" })
-    item(label = "Start now", onClick = { clicks += "start" }, enabled = false)
+    header(verbatim("Task"))
+    item(label = verbatim("Pause"), onClick = { clicks += "pause" })
+    item(label = verbatim("Start now"), onClick = { clicks += "start" }, enabled = false)
     divider()
-    submenu(label = "Speed limit") {
-      item(label = "Unlimited", onClick = { clicks += "unlimited" })
-      item(label = "1 MB/s", onClick = { clicks += "1m" })
+    submenu(label = verbatim("Speed limit")) {
+      item(label = verbatim("Unlimited"), onClick = { clicks += "unlimited" })
+      item(label = verbatim("1 MB/s"), onClick = { clicks += "1m" })
     }
-    item(label = "Columns", onClick = { clicks += "columns" }, keepOpen = true)
+    item(label = verbatim("Columns"), onClick = { clicks += "columns" }, keepOpen = true)
   }
 
   private fun MenuLevel.press(vararg keys: MenuKey) {
@@ -32,10 +33,10 @@ class KetchMenuTest {
   fun buildMenu_dividersAtTheEndsOrRepeated_areDropped() {
     val menu = buildMenu {
       divider()
-      item(label = "A", onClick = {})
+      item(label = verbatim("A"), onClick = {})
       divider()
       divider()
-      item(label = "B", onClick = {})
+      item(label = verbatim("B"), onClick = {})
       divider()
     }
 
@@ -55,7 +56,7 @@ class KetchMenuTest {
 
   @Test
   fun nextSelectable_nothingSelectable_isMinusOne() {
-    assertEquals(-1, nextSelectable(buildMenu { header("Empty") }, -1, 1))
+    assertEquals(-1, nextSelectable(buildMenu { header(verbatim("Empty")) }, -1, 1))
   }
 
   @Test

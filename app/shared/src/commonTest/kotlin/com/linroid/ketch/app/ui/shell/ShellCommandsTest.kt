@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.shell
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -137,7 +138,7 @@ class ShellCommandsTest {
 
     assertEquals("https://example.com/ubuntu.iso", fixture.api.requests.single().url)
     val toast = fixture.controller.messages.active.value.last()
-    assertTrue("Undo" in toast.actions.map { it.label })
+    assertTrue("Undo" in toast.actions.map { it.label.load() })
     assertFalse(fixture.controller.state.showAddDialog)
     fixture.controller.close()
   }
@@ -189,7 +190,7 @@ class ShellCommandsTest {
 
     val message = fixture.controller.messages.active.value.last()
     assertEquals(MessageLevel.Warning, message.level)
-    assertEquals("The clipboard holds no link", message.title)
+    assertEquals("The clipboard holds no link", message.title.load())
     fixture.controller.close()
   }
 

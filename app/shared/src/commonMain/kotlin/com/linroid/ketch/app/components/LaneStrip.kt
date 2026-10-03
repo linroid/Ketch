@@ -40,8 +40,18 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_lanes_active
+import ketch.app.shared.generated.resources.component_lanes_connections
+import ketch.app.shared.generated.resources.component_lanes_percent
+import ketch.app.shared.generated.resources.component_lanes_size_unknown
+import ketch.app.shared.generated.resources.component_lanes_stalled
 import kotlinx.coroutines.launch
 
 /** Heights of a [LaneStrip] in each place it appears. */
@@ -224,7 +234,7 @@ internal fun LaneStripCanvas(
   }
   val description = remember(segments, progress, phase, stalled) {
     laneStripDescription(segments, progress, phase, stalled.size)
-  }
+  }.resolve()
   val fraction = remember(segments, progress, phase) { laneFraction(segments, progress, phase) }
   val palette = palettes.of(phase)
   val fadeMillis = motion.medium
@@ -701,18 +711,25 @@ internal fun laneStripDescription(
   progress: DownloadProgress?,
   phase: LanePhase,
   stalled: Int = 0,
-): String {
-  val parts = ArrayList<String>(4)
+): UiText {
+  val parts = ArrayList<UiText>(4)
   val connections = segments.size
-  if (connections > 0) parts += if (connections == 1) "1 connection" else "$connections connections"
+  if (connections > 0) parts += Res.plurals.component_lanes_connections.text(connections)
   if (connections > 0 && phase == LanePhase.Downloading) {
-    parts += "${segments.count { !it.isComplete }} active"
+    parts += Res.plurals.component_lanes_active.text(segments.count { !it.isComplete })
   }
   val fraction = laneFraction(segments, progress, phase)
-  parts += if (fraction != null) "${(fraction * 100).toInt()} percent" else "size unknown"
-  if (stalled > 0) parts += "$stalled stalled"
-  return parts.joinToString(", ")
+  parts += if (fraction != null) {
+    Res.plurals.component_lanes_percent.text((fraction * 100).toInt())
+  } else {
+    Res.string.component_lanes_size_unknown.text()
+  }
+  if (stalled > 0) parts += Res.plurals.component_lanes_stalled.text(stalled)
+  return parts.joinText(DESCRIPTION_SEPARATOR)
 }
+
+/** Separator of the parts of [laneStripDescription]. */
+private const val DESCRIPTION_SEPARATOR = ", "
 
 /** Index of the last key at or before [key] in these ascending keys, or -1. */
 private fun LongArray.indexAtOrBefore(key: Long): Int {

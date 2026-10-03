@@ -1,5 +1,7 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AiConnectionTest
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
@@ -253,7 +255,7 @@ class AiSettingsControllerTest {
     )
     controller.testConnection(usableSettings())
     assertEquals(
-      AiConnectionTest.Failure("401 no key"), controller.connectionTest,
+      AiConnectionTest.Failure(verbatim("401 no key")), controller.connectionTest,
     )
   }
 
@@ -266,7 +268,7 @@ class AiSettingsControllerTest {
     controller.testConnection(AiSettings(enabled = true))
     val result = controller.connectionTest
     assertTrue(result is AiConnectionTest.Failure)
-    assertTrue(result.message.contains("Fill in"))
+    assertTrue(result.message.load().contains("Fill in"))
   }
 
   @Test

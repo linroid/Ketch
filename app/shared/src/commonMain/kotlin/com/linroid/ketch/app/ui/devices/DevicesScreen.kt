@@ -30,15 +30,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
@@ -51,7 +50,16 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_add
+import ketch.app.shared.generated.resources.device_add_card_body
+import ketch.app.shared.generated.resources.device_add_card_title
+import ketch.app.shared.generated.resources.device_page_title
+import ketch.app.shared.generated.resources.device_pair_computer
+import ketch.app.shared.generated.resources.device_pair_phone
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Devices page (`⌘0`), the overview of every device the app knows: a card for each with
@@ -81,7 +89,7 @@ fun DevicesScreen(state: AppState) {
     mode = devices.firstOrNull { it.entry is EmbeddedInstance }?.speedMode ?: SpeedMode.Full,
     now = LocalClock.current.now(),
     timeZone = TimeZone.currentSystemDefault(),
-  )
+  ).resolve()
   Column(Modifier.fillMaxSize()) {
     if (!phone) PageHeader(sentence, actions.takeUnless { addCard })
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -165,7 +173,11 @@ private fun PageHeader(sentence: String, actions: PageActions?) {
       .padding(top = spacing.s3, bottom = spacing.s2),
   ) {
     Column(Modifier.weight(1f)) {
-      Text(text = "Devices", style = KetchTheme.typography.pageTitle, color = colors.textPrimary)
+      Text(
+        text = stringResource(Res.string.device_page_title),
+        style = KetchTheme.typography.pageTitle,
+        color = colors.textPrimary,
+      )
       Text(
         text = sentence,
         style = KetchTheme.typography.bodyS,
@@ -177,13 +189,17 @@ private fun PageHeader(sentence: String, actions: PageActions?) {
     if (actions != null) {
       actions.onPair?.let { onPair ->
         KetchButton(
-          text = PairLabel,
+          text = stringResource(PairLabel),
           onClick = onPair,
           variant = KetchButtonVariant.Secondary,
           leadingIcon = KetchIcon.QrCode,
         )
       }
-      KetchButton(text = "Add device", onClick = actions.onAdd, leadingIcon = KetchIcon.Plus)
+      KetchButton(
+        text = stringResource(Res.string.device_add),
+        onClick = actions.onAdd,
+        leadingIcon = KetchIcon.Plus,
+      )
     }
   }
 }
@@ -247,13 +263,17 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
     ) {
       KetchIconImage(KetchIcon.Fleet, size = KetchTheme.density.navGlyph, tint = colors.accentText)
     }
-    Text(text = "Add a device", style = type.titleM, color = colors.textPrimary)
     Text(
-      text = buildAnnotatedString {
-        append("Control a NAS or another computer from here. Run ")
-        withStyle(SpanStyle(fontFamily = type.mono.fontFamily)) { append("ketch\u00A0server") }
-        append(" there, or turn on Settings › Sharing in its Ketch app.")
-      },
+      text = stringResource(Res.string.device_add_card_title),
+      style = type.titleM,
+      color = colors.textPrimary,
+    )
+    Text(
+      text = styledPart(
+        text = stringResource(Res.string.device_add_card_body, SERVER_COMMAND),
+        part = SERVER_COMMAND,
+        style = SpanStyle(fontFamily = type.mono.fontFamily),
+      ),
       style = type.bodyS,
       color = colors.textSecondary,
       textAlign = TextAlign.Center,
@@ -264,7 +284,7 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
       modifier = Modifier.padding(top = spacing.s1),
     ) {
       KetchButton(
-        text = "Add device",
+        text = stringResource(Res.string.device_add),
         onClick = actions.onAdd,
         size = KetchButtonSize.Small,
         leadingIcon = KetchIcon.Plus,
@@ -272,7 +292,7 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
       )
       actions.onPair?.let { onPair ->
         KetchButton(
-          text = PairLabel,
+          text = stringResource(PairLabel),
           onClick = onPair,
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
@@ -285,7 +305,8 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
 }
 
 // A computer pairs a phone that controls it; a phone pairs a computer the same way.
-private val PairLabel: String get() = if (isMobilePlatform) "Pair a computer" else "Pair a phone"
+private val PairLabel: StringResource
+  get() = if (isMobilePlatform) Res.string.device_pair_computer else Res.string.device_pair_phone
 
 private val MinCardWidth: Dp = 300.dp
 private val PlaceholderHeight: Dp = 236.dp

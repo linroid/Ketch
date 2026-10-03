@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.input
 
 import androidx.compose.runtime.Immutable
+import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.icons.KetchIcon
 
 /** Where the chords of a command are listened for. A chord runs one command per scope. */
@@ -35,7 +36,7 @@ enum class CommandScope {
 @Immutable
 class KetchCommand internal constructor(
   val id: String,
-  val label: String,
+  val label: UiText,
   val icon: KetchIcon?,
   val scope: CommandScope,
   private val mac: KeyChord?,

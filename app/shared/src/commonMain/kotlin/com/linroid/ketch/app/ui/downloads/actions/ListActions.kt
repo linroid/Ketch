@@ -38,6 +38,10 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_row_select
+import ketch.app.shared.generated.resources.downloads_row_show_actions
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Everything the Downloads list needs to make its rows selectable and actionable, in one place
@@ -56,6 +60,12 @@ internal class ListActions(
 ) {
   /** The rows on screen, in display order, those of collapsed groups included. */
   var rows: List<TaskRow> by mutableStateOf(emptyList())
+
+  /**
+   * What a drag of the selection shows after the first row's name, such as "3 files"; kept
+   * current by [TrackDragCount].
+   */
+  var dragCount: String? by mutableStateOf(null)
 
   /** Keys of [rows]. */
   val visibleKeys: List<TaskKey> get() = rows.map { it.key }
@@ -144,6 +154,16 @@ internal fun rememberListActions(
 }
 
 /**
+ * Keeps [ListActions.dragCount] current with the selection, in a scope of its own so a new
+ * selection recomposes nothing else. Place it once next to the list.
+ */
+@Composable
+internal fun TrackDragCount(actions: ListActions) {
+  val count = dragCount(actions.selectedRows)
+  SideEffect { actions.dragCount = count }
+}
+
+/**
  * How a row looks while it is used, for its content.
  *
  * @property hovered whether the pointer is over the row, or a menu of the row is open, which
@@ -200,6 +220,8 @@ internal fun TaskRowFrame(
   )
   val pointer = KetchTheme.density == KetchDensity.Compact
   val state = RowFrameState(hovered, selected, isSelectionMode(actions.selection.count, pointer))
+  val selectLabel = stringResource(Res.string.downloads_row_select)
+  val actionsLabel = stringResource(Res.string.downloads_row_show_actions)
   Box(
     modifier = modifier
       // Inside the row, so neighbors and the card edge never cut the ring off.
@@ -217,16 +239,25 @@ internal fun TaskRowFrame(
       .hoverable(interactions)
       .semantics(mergeDescendants = true) {
         this.selected = selected
-        onClick(label = "Select") {
+        onClick(label = selectLabel) {
           actions.click(row, RowClick())
           true
         }
-        onLongClick(label = "Show actions") {
+        onLongClick(label = actionsLabel) {
           if (pointer) actions.contextClick(row, Offset.Zero) else actions.showMenu(row)
           true
         }
       }
-      .then(if (pointer) Modifier.taskDragSource { actions.dragRows(row) } else Modifier)
+      .then(
+        if (pointer) {
+          Modifier.taskDragSource(
+            rows = { actions.dragRows(row) },
+            count = { actions.dragCount },
+          )
+        } else {
+          Modifier
+        }
+      )
       .taskRowPointer(
         onClick = { actions.click(row, it) },
         onDoubleClick = { actions.doubleClick(row) },

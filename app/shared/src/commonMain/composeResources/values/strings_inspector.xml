@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The task inspector: a download's header, reasons, controls and details, and its Connections,
+  Files and Activity tabs. See docs/development/localization.md.
+-->
+<resources>
+  <!-- The inspector's tabs. Connections and Files are followed by a count. -->
+  <string name="inspector_tab_overview">Overview</string>
+  <string name="inspector_tab_connections">Connections</string>
+  <string name="inspector_tab_files">Files</string>
+  <string name="inspector_tab_activity">Activity</string>
+
+  <!-- How long a connection has received nothing. %1$d is a number of seconds or minutes. -->
+  <string name="inspector_stalled_seconds">Stalled %1$d s</string>
+  <string name="inspector_stalled_minutes">Stalled %1$d min</string>
+  <!-- A size of another size, in their own units, such as "474 MB of 1.3 GB". -->
+  <string name="inspector_size_of">%1$s of %2$s</string>
+
+  <!-- The metric line under a download's name, parts joined by " · ". %1$s is a duration,
+       such as "2m 10s". -->
+  <string name="inspector_metric_left">%1$s left</string>
+  <!-- %1$s is when the download should finish, such as 14:32. -->
+  <string name="inspector_metric_done_at">done ≈ %1$s</string>
+
+  <!-- The reason line: why a download is where it is, with a chip that changes it. -->
+  <string name="inspector_reason_reconnect">Reconnect</string>
+  <string name="inspector_reason_full_speed">Full speed</string>
+  <string name="inspector_reason_remove_limit">Remove limit</string>
+  <string name="inspector_reason_speed_settings">Speed settings</string>
+  <string name="inspector_reason_paused_resumes">Paused · resumes where it stopped</string>
+  <string name="inspector_reason_paused_restarts">Paused · resuming starts over</string>
+  <string name="inspector_file_missing">File moved or deleted</string>
+  <!-- %1$s is a speed limit, such as "1 MB/s". -->
+  <string name="inspector_reason_slow_lane">Limited by Slow lane (%1$s)</string>
+  <string name="inspector_reason_global_limit">Limited by the global limit (%1$s)</string>
+  <string name="inspector_reason_own_limit">Limited to %1$s</string>
+
+  <!-- The Source detail of a torrent. -->
+  <string name="inspector_source_magnet">BitTorrent · magnet</string>
+  <string name="inspector_source_torrent_file">BitTorrent · torrent file</string>
+  <!-- The Source detail of a link without a scheme, in place of a protocol such as HTTPS. -->
+  <string name="inspector_source_link">Link</string>
+
+  <!-- The Captured detail: where a download came from. -->
+  <string name="inspector_origin_browser">From the browser</string>
+  <string name="inspector_origin_discover">From Discover</string>
+  <string name="inspector_origin_agent">From an AI agent</string>
+  <string name="inspector_origin_app">Added in Ketch</string>
+  <string name="inspector_origin_cli">From the command line</string>
+  <!-- What came along with it, after the origin: "From the browser, with cookies". -->
+  <string name="inspector_with_cookies">with cookies</string>
+  <string name="inspector_with_referrer">with referrer</string>
+  <string name="inspector_with_cookies_referrer">with cookies and referrer</string>
+  <!-- The same when the origin is not known. -->
+  <string name="inspector_with_cookies_alone">With cookies</string>
+  <string name="inspector_with_referrer_alone">With referrer</string>
+  <string name="inspector_with_cookies_referrer_alone">With cookies and referrer</string>
+  <!-- %1$s is the origin, %2$s what came along. -->
+  <string name="inspector_captured">%1$s, %2$s</string>
+
+  <!-- Asked before Urgent starts a waiting download while every slot is taken. %1$s is the
+       download it may pause, %2$s that one's priority, such as "Low". -->
+  <string name="inspector_urgent_note">Starts now; may pause "%1$s" (%2$s)</string>
+  <!-- The same for two or more downloads. %1$d is how many start, %2$s and %3$s as above. -->
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="one">Starts %1$d now; may pause "%2$s" (%3$s)</item>
+    <item quantity="other">Starts %1$d now; may pause "%2$s" (%3$s)</item>
+  </plurals>
+  <!-- Asked before a running download is rescheduled. %1$s is when it starts, in lower case,
+       such as "starts 01:00 tonight". -->
+  <string name="inspector_reschedule_note">Pauses now and %1$s</string>
+
+  <!-- The summary of several selected downloads, followed by their size and speed. -->
+  <plurals name="inspector_selected">
+    <item quantity="one">%1$d selected</item>
+    <item quantity="other">%1$d selected</item>
+  </plurals>
+  <!-- Under the first downloads of a selection. %1$d is how many more are selected. -->
+  <plurals name="inspector_selection_more">
+    <item quantity="one">and %1$d more</item>
+    <item quantity="other">and %1$d more</item>
+  </plurals>
+  <!-- %1$d is how many selected downloads the Controls set, %2$d how many are selected. -->
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="one">Controls apply to %1$d of %2$d; the others have ended.</item>
+    <item quantity="other">Controls apply to %1$d of %2$d; the others have ended.</item>
+  </plurals>
+
+  <!-- The inspector's header and action bar. -->
+  <string name="inspector_close">Close inspector</string>
+  <string name="inspector_copy_name">Copy name</string>
+  <string name="inspector_copied_name">Copied the name</string>
+  <string name="inspector_copy_failed_name">Couldn't copy the name</string>
+  <string name="inspector_share">Share</string>
+  <!-- %1$s is a file name, %2$s the device it is on. -->
+  <string name="inspector_share_failed">Couldn't share %1$s on %2$s</string>
+  <string name="inspector_more_actions">More actions</string>
+
+  <!-- The CONTROLS section, shown in capitals. -->
+  <string name="inspector_section_controls">Controls</string>
+  <string name="inspector_control_speed">Speed</string>
+  <string name="inspector_control_connections">Connections</string>
+  <!-- In place of Connections for torrents. -->
+  <string name="inspector_control_peer_limit">Peer limit</string>
+  <string name="inspector_control_priority">Priority</string>
+  <string name="inspector_control_start">Start</string>
+  <!-- What sets the device's own limit, as the Speed control names it. -->
+  <string name="inspector_global_slow_lane">Slow lane</string>
+  <string name="inspector_global_limit">Global limit</string>
+  <!-- The device's limit marked on the speed slider. %1$s is inspector_global_slow_lane or
+       inspector_global_limit, %2$s a speed, such as "1 MB/s". -->
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">Speed limit</string>
+  <!-- The ⋯ option of the Speed control, to a screen reader. -->
+  <string name="inspector_speed_more">Another speed limit</string>
+  <string name="inspector_mixed_limits">These downloads have different limits</string>
+  <string name="inspector_mixed_priorities">These downloads have different priorities</string>
+  <string name="inspector_server_one_connection">This server allows only 1 connection</string>
+  <string name="inspector_remote_schedule">Scheduling remote downloads isn't supported yet</string>
+  <!-- Confirms Urgent for one waiting download. -->
+  <string name="inspector_start_now">Start now</string>
+  <!-- Confirms Urgent for %1$d waiting downloads, two or more. -->
+  <plurals name="inspector_start_count_now">
+    <item quantity="one">Start %1$d now</item>
+    <item quantity="other">Start %1$d now</item>
+  </plurals>
+  <string name="inspector_reschedule">Reschedule</string>
+
+  <!-- The DETAILS section, shown in capitals, and its labels. -->
+  <string name="inspector_section_details">Details</string>
+  <string name="inspector_detail_source">Source</string>
+  <string name="inspector_detail_link">Link</string>
+  <string name="inspector_detail_path">Saved to</string>
+  <string name="inspector_detail_size">Size</string>
+  <string name="inspector_detail_added">Added</string>
+  <string name="inspector_detail_time">Time spent</string>
+  <string name="inspector_detail_average">Avg speed</string>
+  <string name="inspector_detail_connections">Connections</string>
+  <string name="inspector_detail_device">Device</string>
+  <string name="inspector_detail_captured">Captured</string>
+  <string name="inspector_section_advanced">Advanced</string>
+  <string name="inspector_detail_task_id">Task ID</string>
+  <string name="inspector_detail_headers">Headers</string>
+  <string name="inspector_detail_property">Property</string>
+  <!-- What a click on a detail does, to a screen reader. %1$s is the detail's label. -->
+  <string name="inspector_copy_detail">Copy %1$s</string>
+  <!-- In place of a detail's value for a moment after it is copied. -->
+  <string name="inspector_copied">Copied</string>
+  <!-- When the system refuses to copy a detail. -->
+  <string name="inspector_copy_failed_source">Couldn't copy the source</string>
+  <string name="inspector_copy_failed_link">Couldn't copy the link</string>
+  <string name="inspector_copy_failed_path">Couldn't copy the saved to</string>
+  <string name="inspector_copy_failed_size">Couldn't copy the size</string>
+  <string name="inspector_copy_failed_added">Couldn't copy the added</string>
+  <string name="inspector_copy_failed_time">Couldn't copy the time spent</string>
+  <string name="inspector_copy_failed_average">Couldn't copy the avg speed</string>
+  <string name="inspector_copy_failed_connections">Couldn't copy the connections</string>
+  <string name="inspector_copy_failed_device">Couldn't copy the device</string>
+  <string name="inspector_copy_failed_captured">Couldn't copy the captured</string>
+  <string name="inspector_copy_failed_task_id">Couldn't copy the task id</string>
+  <string name="inspector_copy_failed_headers">Couldn't copy the headers</string>
+  <string name="inspector_copy_failed_property">Couldn't copy the property</string>
+  <string name="inspector_show_full_link">Show full link</string>
+  <string name="inspector_hide_full_link">Hide full link</string>
+  <!-- What a click on an open fold does, to a screen reader. -->
+  <string name="inspector_hide">Hide</string>
+
+  <!-- The card of a failed download. -->
+  <string name="inspector_technical_details">Technical details</string>
+  <string name="inspector_copy_details">Copy details</string>
+  <string name="inspector_open_logs">Open logs</string>
+  <!-- On phones, which share a copy of the logs. -->
+  <string name="inspector_share_logs">Share logs</string>
+  <string name="inspector_open_logs_failed">Couldn't open the logs</string>
+
+  <!-- The Activity tab. -->
+  <string name="inspector_activity_empty">Speed and events show here once the download starts.</string>
+  <!-- At the right end of the chart's time axis while the download runs. -->
+  <string name="inspector_activity_now">Now</string>
+  <!-- The heading of the session timeline, shown in capitals. -->
+  <string name="inspector_activity_since">Since Ketch opened</string>
+  <!-- %1$d is how many older timeline entries are folded away. -->
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="one">Show %1$d earlier</item>
+    <item quantity="other">Show %1$d earlier</item>
+  </plurals>
+  <!-- The dashed line at the download's own limit. %1$s is a speed, such as "5 MB/s". -->
+  <string name="inspector_limit_task">Task %1$s</string>
+  <!-- The device's own limit, as the chart's line names it. -->
+  <string name="inspector_limit_global">Global</string>
+  <!-- Under the chart. -->
+  <string name="inspector_stat_peak">Peak</string>
+  <string name="inspector_stat_average">Average</string>
+  <string name="inspector_stat_connections">Connections</string>
+
+  <!-- The Connections tab's summary. %1$d is how many connections are unfinished, %2$s the
+       share of the download done, such as "34%". -->
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="one">%1$d unfinished · %2$s</item>
+    <item quantity="other">%1$d unfinished · %2$s</item>
+  </plurals>
+  <!-- %1$d is how many connections download, %2$s their speed, such as "6.4 MB/s". -->
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="one">%1$d active · %2$s</item>
+    <item quantity="other">%1$d active · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d active</item>
+  </plurals>
+  <!-- %1$d is how many connections finished, %2$s the bytes they brought, such as "1.2 GB". -->
+  <plurals name="inspector_connections_finished">
+    <item quantity="one">%1$d finished · %2$s</item>
+    <item quantity="other">%1$d finished · %2$s</item>
+  </plurals>
+  <!-- The note under the lanes. -->
+  <string name="inspector_single_connection">Single connection</string>
+  <string name="inspector_connections_live">A new count re-splits the remaining bytes live.</string>
+  <string name="inspector_connections_on_resume">A new count applies when the download resumes.</string>
+  <!-- A lane to a screen reader: "Connection 3, 1.4–2.1 GB, 1.3 MB/s". %1$d is its number,
+       %2$s its byte range, %3$s its speed, a stall or how much of it is done. -->
+  <string name="inspector_lane_description">Connection %1$d, %2$s, %3$s</string>
+  <!-- A share to a screen reader. %1$d is a whole number from 0 to 100. -->
+  <string name="inspector_percent_spoken">%1$d percent</string>
+
+  <!-- The Files tab of a torrent. -->
+  <string name="inspector_files_waiting">The file list arrives with the torrent's metadata.</string>
+  <!-- %1$d is how many files are done, %2$d how many the torrent downloads. -->
+  <plurals name="inspector_files_done_of">
+    <item quantity="one">%1$d of %2$d file done</item>
+    <item quantity="other">%1$d of %2$d files done</item>
+  </plurals>
+  <string name="inspector_files_one_done">1 file done</string>
+  <!-- %1$d is how many files there are, two or more. -->
+  <plurals name="inspector_files_all_done">
+    <item quantity="one">All %1$d files done</item>
+    <item quantity="other">All %1$d files done</item>
+  </plurals>
+  <!-- After the bytes of the files, joined by " · ". %1$d is how many files are left out. -->
+  <plurals name="inspector_files_not_selected">
+    <item quantity="one">%1$d not selected</item>
+    <item quantity="other">%1$d not selected</item>
+  </plurals>
+  <!-- The map of the files to a screen reader. %1$d is how many files there are, %2$d how many
+       are done, %3$d the share downloaded in percent. -->
+  <plurals name="inspector_files_map">
+    <item quantity="one">%1$d file, %2$d done, %3$d percent</item>
+    <item quantity="other">%1$d files, %2$d done, %3$d percent</item>
+  </plurals>
+  <string name="inspector_files_filter">Filter files</string>
+  <!-- %1$s is what was typed in the filter. -->
+  <string name="inspector_files_no_match">No files match “%1$s”</string>
+  <string name="inspector_files_sort">Sort files</string>
+  <string name="inspector_sort_incomplete">Incomplete first</string>
+  <string name="inspector_sort_name">Name</string>
+  <string name="inspector_sort_size">Size</string>
+  <!-- A file the torrent does not name. %1$d is its place in the torrent, counting from 1. -->
+  <string name="inspector_file_unnamed">File %1$d</string>
+  <!-- A file to a screen reader. %1$s is its name, %2$s its size, %3$s how much is done, such
+       as "40 percent". -->
+  <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
+  <!-- The same for a file of unknown size. -->
+  <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+</resources>

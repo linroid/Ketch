@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Strings shared by every part of the app: units, durations, dates and the most common button
+  labels. See docs/development/localization.md before adding or changing strings.
+-->
+<resources>
+  <!-- Data sizes. %1$s is a number already formatted for the locale, such as 1.5 or 1,5. -->
+  <string name="size_bytes">%1$s B</string>
+  <string name="size_kb">%1$s KB</string>
+  <string name="size_mb">%1$s MB</string>
+  <string name="size_gb">%1$s GB</string>
+  <string name="size_tb">%1$s TB</string>
+  <!-- Bytes so far of a total in the total's unit. %1$s is a number, %2$s a size: "2.41 of 5.69 GB". -->
+  <string name="size_progress">%1$s of %2$s</string>
+  <!-- The same, as compact as a column needs: "2.41/5.69 GB". -->
+  <string name="size_progress_compact">%1$s/%2$s</string>
+  <!-- A speed. %1$s is a size, such as "1.5 MB". -->
+  <string name="speed_per_second">%1$s/s</string>
+  <!-- A percentage. %1$d is a whole number from 0 to 100. -->
+  <string name="percent">%1$d%</string>
+
+  <!-- Short durations and countdowns, at most two units. -->
+  <string name="duration_days_hours">%1$dd %2$dh</string>
+  <string name="duration_days">%1$dd</string>
+  <string name="duration_hours_minutes">%1$dh %2$dm</string>
+  <string name="duration_hours">%1$dh</string>
+  <string name="duration_minutes_seconds">%1$dm %2$ds</string>
+  <!-- Whole minutes of a countdown without seconds, such as "30 min". -->
+  <string name="duration_minutes">%1$d min</string>
+  <string name="duration_seconds">%1$ds</string>
+  <string name="duration_under_second">&lt;1s</string>
+
+  <!-- Dates. %1$s is the short month name, %2$d the month number, %3$d the day, %4$d the year. -->
+  <string name="date_month_day">%1$s %3$d</string>
+  <string name="date_month_day_year">%1$s %3$d, %4$d</string>
+  <string name="date_today">Today</string>
+  <string name="date_yesterday">Yesterday</string>
+  <string name="date_tomorrow">Tomorrow</string>
+  <!-- %1$s is a time of day, such as 09:05. -->
+  <string name="date_today_at">Today %1$s</string>
+  <string name="date_yesterday_at">Yesterday %1$s</string>
+  <string name="date_tomorrow_at">Tomorrow %1$s</string>
+  <!-- A date with a time of day. %1$s is the date, such as "Sep 28", %2$s the time. -->
+  <string name="date_at_time">%1$s %2$s</string>
+
+  <string name="month_jan">Jan</string>
+  <string name="month_feb">Feb</string>
+  <string name="month_mar">Mar</string>
+  <string name="month_apr">Apr</string>
+  <string name="month_may">May</string>
+  <string name="month_jun">Jun</string>
+  <string name="month_jul">Jul</string>
+  <string name="month_aug">Aug</string>
+  <string name="month_sep">Sep</string>
+  <string name="month_oct">Oct</string>
+  <string name="month_nov">Nov</string>
+  <string name="month_dec">Dec</string>
+
+  <string name="weekday_mon">Mon</string>
+  <string name="weekday_tue">Tue</string>
+  <string name="weekday_wed">Wed</string>
+  <string name="weekday_thu">Thu</string>
+  <string name="weekday_fri">Fri</string>
+  <string name="weekday_sat">Sat</string>
+  <string name="weekday_sun">Sun</string>
+
+  <!-- A number of downloads, as messages name them. -->
+  <plurals name="count_downloads">
+    <item quantity="one">%1$d download</item>
+    <item quantity="other">%1$d downloads</item>
+  </plurals>
+
+  <!-- Download priorities. -->
+  <string name="priority_low">Low</string>
+  <string name="priority_normal">Normal</string>
+  <string name="priority_high">High</string>
+  <string name="priority_urgent">Urgent</string>
+
+  <!-- Buttons used across the app. -->
+  <string name="action_cancel">Cancel</string>
+  <string name="action_ok">OK</string>
+  <string name="action_done">Done</string>
+  <string name="action_close">Close</string>
+  <string name="action_back">Back</string>
+  <string name="action_next">Next</string>
+  <string name="action_continue">Continue</string>
+  <string name="action_skip">Skip</string>
+  <string name="action_save">Save</string>
+  <string name="action_add">Add</string>
+  <string name="action_edit">Edit</string>
+  <string name="action_remove">Remove</string>
+  <string name="action_delete">Delete</string>
+  <string name="action_copy">Copy</string>
+  <string name="action_open">Open</string>
+  <string name="action_show">Show</string>
+  <string name="action_undo">Undo</string>
+  <string name="action_retry">Retry</string>
+  <string name="action_try_again">Try again</string>
+  <string name="action_dismiss">Dismiss</string>
+  <string name="action_review">Review</string>
+  <string name="action_connect">Connect</string>
+  <string name="action_pause">Pause</string>
+  <string name="action_resume">Resume</string>
+</resources>

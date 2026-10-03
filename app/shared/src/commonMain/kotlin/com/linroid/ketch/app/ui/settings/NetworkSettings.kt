@@ -11,11 +11,24 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
+import com.linroid.ketch.app.i18n.SEPARATOR
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.pairingAddresses
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_action_refresh
+import ketch.app.shared.generated.resources.settings_network_gone
+import ketch.app.shared.generated.resources.settings_network_http_only
+import ketch.app.shared.generated.resources.settings_network_looking
+import ketch.app.shared.generated.resources.settings_network_networks
+import ketch.app.shared.generated.resources.settings_network_none_found
+import ketch.app.shared.generated.resources.settings_network_resets
+import ketch.app.shared.generated.resources.settings_network_spread
+import ketch.app.shared.generated.resources.settings_network_system_default
+import ketch.app.shared.generated.resources.settings_network_unsupported
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The networks [device] spreads its HTTP requests over, as chips: the system's default
@@ -35,10 +48,11 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
     val unread = error != null && networks?.supported != true
     DeviceSettingsError(error, loaded = !unread) { controller.loadNetworks() }
     when {
-      networks == null -> SettingsLoading("Looking for networks on ${device.label}…")
+      networks == null ->
+        SettingsLoading(stringResource(Res.string.settings_network_looking, device.label))
       unread -> Unit
       !networks.supported -> SettingsNotice(
-        text = "${device.label} can't choose which networks downloads use.",
+        text = stringResource(Res.string.settings_network_unsupported, device.label),
         tone = NoticeTone.Info,
       )
       else -> {
@@ -48,11 +62,11 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
         val missing = selected.filter { it !in available }
           .map { NetworkInterfaceInfo(id = it, name = it, addresses = emptyList()) }
         SettingsGroup(
-          title = "Networks",
-          footer = "Resets when ${device.label} restarts.",
+          title = stringResource(Res.string.settings_network_networks),
+          footer = stringResource(Res.string.settings_network_resets, device.label),
           action = {
             KetchButton(
-              text = "Refresh",
+              text = stringResource(Res.string.settings_action_refresh),
               onClick = { controller.loadNetworks() },
               variant = KetchButtonVariant.Ghost,
               size = KetchButtonSize.Small,
@@ -61,11 +75,11 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
           },
         ) {
           SettingsRow(
-            title = "Spread downloads across",
+            title = stringResource(Res.string.settings_network_spread),
             description = if (networks.available.isEmpty() && missing.isEmpty()) {
-              "No networks found. Connect to Wi-Fi or Ethernet, then refresh."
+              stringResource(Res.string.settings_network_none_found)
             } else {
-              "HTTP only. FTP and torrents use the system default."
+              stringResource(Res.string.settings_network_http_only)
             },
           ) {
             FlowRow(
@@ -73,7 +87,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
               verticalArrangement = Arrangement.spacedBy(spacing.s2),
             ) {
               KetchChip(
-                label = "System default",
+                label = stringResource(Res.string.settings_network_system_default),
                 selected = selected.isEmpty(),
                 onClick = { if (selected.isNotEmpty()) controller.selectNetworks(emptyList()) },
               )
@@ -101,8 +115,9 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
  * "en0 · 192.168.1.20", "utun3" without a routable IPv4 address, whose IPv6 ones are too long
  * for a chip, or "en5 · not connected".
  */
+@Composable
 private fun chipLabel(info: NetworkInterfaceInfo, gone: Boolean): String {
-  if (gone) return "${info.name} · not connected"
+  if (gone) return stringResource(Res.string.settings_network_gone, info.name)
   val address = pairingAddresses(listOf(info)).firstOrNull()
-  return if (address == null) info.name else "${info.name} · $address"
+  return if (address == null) info.name else info.name + SEPARATOR + address
 }

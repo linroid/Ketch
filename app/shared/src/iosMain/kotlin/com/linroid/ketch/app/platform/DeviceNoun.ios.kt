@@ -3,9 +3,9 @@ package com.linroid.ketch.app.platform
 import platform.UIKit.UIDevice
 import platform.UIKit.UIUserInterfaceIdiomPad
 
-actual fun localDeviceNoun(): String =
+actual fun localDeviceKind(): LocalDeviceKind =
   if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-    "This iPad"
+    LocalDeviceKind.IPad
   } else {
-    "This phone"
+    LocalDeviceKind.Phone
   }

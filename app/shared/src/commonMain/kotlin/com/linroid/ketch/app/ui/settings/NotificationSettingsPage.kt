@@ -10,6 +10,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchSwitch
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -20,6 +21,36 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_notifications_all_finished
+import ketch.app.shared.generated.resources.settings_notifications_all_finished_hint
+import ketch.app.shared.generated.resources.settings_notifications_all_finished_off
+import ketch.app.shared.generated.resources.settings_notifications_allow
+import ketch.app.shared.generated.resources.settings_notifications_allow_button
+import ketch.app.shared.generated.resources.settings_notifications_allow_hint
+import ketch.app.shared.generated.resources.settings_notifications_allowed
+import ketch.app.shared.generated.resources.settings_notifications_allowed_hint
+import ketch.app.shared.generated.resources.settings_notifications_background
+import ketch.app.shared.generated.resources.settings_notifications_background_none
+import ketch.app.shared.generated.resources.settings_notifications_background_off
+import ketch.app.shared.generated.resources.settings_notifications_background_on
+import ketch.app.shared.generated.resources.settings_notifications_blocked
+import ketch.app.shared.generated.resources.settings_notifications_blocked_hint
+import ketch.app.shared.generated.resources.settings_notifications_browser
+import ketch.app.shared.generated.resources.settings_notifications_devices
+import ketch.app.shared.generated.resources.settings_notifications_devices_footer
+import ketch.app.shared.generated.resources.settings_notifications_devices_group
+import ketch.app.shared.generated.resources.settings_notifications_downloads
+import ketch.app.shared.generated.resources.settings_notifications_failed
+import ketch.app.shared.generated.resources.settings_notifications_finished
+import ketch.app.shared.generated.resources.settings_notifications_footer
+import ketch.app.shared.generated.resources.settings_notifications_mode_in_app
+import ketch.app.shared.generated.resources.settings_notifications_mode_notify
+import ketch.app.shared.generated.resources.settings_notifications_mode_off
+import ketch.app.shared.generated.resources.settings_notifications_offline
+import ketch.app.shared.generated.resources.settings_notifications_offline_hint
+import ketch.app.shared.generated.resources.settings_notifications_this_device
+import org.jetbrains.compose.resources.stringResource
 
 /** Whether this app may show system notifications, where the platform asks the user first. */
 internal enum class NotificationPermissionState {
@@ -76,11 +107,11 @@ fun NotificationSettingsPage(state: AppState) {
   val notifies = settings.finished == NotificationMode.Notify ||
     settings.failed == NotificationMode.Notify
   SettingsGroup(
-    title = "Downloads",
-    footer = "Notify uses system notifications. In app only stays inside Ketch.",
+    title = stringResource(Res.string.settings_notifications_downloads),
+    footer = stringResource(Res.string.settings_notifications_footer),
   ) {
     SettingsRow(
-      title = "Download finished",
+      title = stringResource(Res.string.settings_notifications_finished),
       trailing = {
         ModeSegmented(settings.finished) { mode ->
           save { it.copy(finished = mode) }
@@ -89,7 +120,7 @@ fun NotificationSettingsPage(state: AppState) {
       },
     )
     SettingsRow(
-      title = "Download failed",
+      title = stringResource(Res.string.settings_notifications_failed),
       trailing = {
         ModeSegmented(settings.failed) { mode ->
           save { it.copy(failed = mode) }
@@ -98,33 +129,35 @@ fun NotificationSettingsPage(state: AppState) {
       },
     )
     SettingsSwitchRow(
-      title = "All downloads finished",
+      title = stringResource(Res.string.settings_notifications_all_finished),
       description = if (finishedOn) {
-        "One message when the queue is empty."
+        stringResource(Res.string.settings_notifications_all_finished_hint)
       } else {
-        "Follows Download finished, which is off."
+        stringResource(Res.string.settings_notifications_all_finished_off)
       },
       checked = finishedOn && settings.queueDrained,
       enabled = finishedOn,
       onCheckedChange = { on -> save { it.copy(queueDrained = on) } },
     )
     SettingsSwitchRow(
-      title = "Only when Ketch is in the background",
-      description = when {
-        !notifies -> "Nothing is set to Notify."
-        settings.onlyInBackground -> "While Ketch is in front, they show inside it."
-        else -> "Notifications also show while Ketch is in front."
-      },
+      title = stringResource(Res.string.settings_notifications_background),
+      description = stringResource(
+        when {
+          !notifies -> Res.string.settings_notifications_background_none
+          settings.onlyInBackground -> Res.string.settings_notifications_background_on
+          else -> Res.string.settings_notifications_background_off
+        },
+      ),
       checked = settings.onlyInBackground,
       enabled = notifies,
       onCheckedChange = { on -> save { it.copy(onlyInBackground = on) } },
     )
   }
 
-  SettingsGroup(title = "Devices") {
+  SettingsGroup(title = stringResource(Res.string.settings_notifications_devices_group)) {
     SettingsSwitchRow(
-      title = "Devices going offline",
-      description = "Shown as a message inside Ketch.",
+      title = stringResource(Res.string.settings_notifications_offline),
+      description = stringResource(Res.string.settings_notifications_offline_hint),
       checked = settings.deviceOffline,
       onCheckedChange = { on -> save { it.copy(deviceOffline = on) } },
     )
@@ -142,19 +175,19 @@ fun NotificationSettingsPage(state: AppState) {
 @Composable
 private fun BrowserPermissionGroup(permission: NotificationPermission) {
   val colors = KetchTheme.colors
-  SettingsGroup(title = "Browser notifications") {
+  SettingsGroup(title = stringResource(Res.string.settings_notifications_browser)) {
     when (permission.state) {
       NotificationPermissionState.Granted -> SettingsRow(
-        title = "Notifications are allowed",
-        description = "Shown while the Ketch tab is in the background.",
+        title = stringResource(Res.string.settings_notifications_allowed),
+        description = stringResource(Res.string.settings_notifications_allowed_hint),
         descriptionColor = colors.status.completed.color,
       )
       NotificationPermissionState.Undecided -> SettingsRow(
-        title = "Allow notifications",
-        description = "Your browser asks once. Ketch notifies only as set below.",
+        title = stringResource(Res.string.settings_notifications_allow),
+        description = stringResource(Res.string.settings_notifications_allow_hint),
         trailing = {
           KetchButton(
-            text = "Allow",
+            text = stringResource(Res.string.settings_notifications_allow_button),
             onClick = permission::request,
             variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
@@ -162,8 +195,8 @@ private fun BrowserPermissionGroup(permission: NotificationPermission) {
         },
       )
       NotificationPermissionState.Denied -> SettingsRow(
-        title = "Notifications are blocked",
-        description = "Allow them for this site in your browser's settings.",
+        title = stringResource(Res.string.settings_notifications_blocked),
+        description = stringResource(Res.string.settings_notifications_blocked_hint),
         descriptionColor = colors.status.paused.color,
       )
     }
@@ -184,8 +217,8 @@ private fun DeviceMutesGroup(
   val instances by state.instances.collectAsState()
   if (instances.size < 2) return
   SettingsGroup(
-    title = "Notify me about these devices",
-    footer = "Ketch stays connected to the devices it reports on.",
+    title = stringResource(Res.string.settings_notifications_devices),
+    footer = stringResource(Res.string.settings_notifications_devices_footer),
   ) {
     instances.forEach { entry ->
       key(entry.deviceId) {
@@ -195,8 +228,12 @@ private fun DeviceMutesGroup(
           if (on && entry is RemoteInstance) state.instanceManager.setWatched(entry, true)
         }
         SettingsRow(
-          title = entry.displayName,
-          description = if (entry is EmbeddedInstance) "This device" else entry.detail,
+          title = entry.displayName.resolve(),
+          description = if (entry is EmbeddedInstance) {
+            stringResource(Res.string.settings_notifications_this_device)
+          } else {
+            entry.detail
+          },
           leading = {
             DevicePennant(
               deviceId = entry.deviceId,
@@ -221,11 +258,13 @@ private fun ModeSegmented(value: NotificationMode, onSelect: (NotificationMode) 
     value = value,
     options = NotificationMode.entries,
     label = { mode ->
-      when (mode) {
-        NotificationMode.Notify -> "Notify"
-        NotificationMode.InApp -> "In app only"
-        NotificationMode.Off -> "Off"
-      }
+      stringResource(
+        when (mode) {
+          NotificationMode.Notify -> Res.string.settings_notifications_mode_notify
+          NotificationMode.InApp -> Res.string.settings_notifications_mode_in_app
+          NotificationMode.Off -> Res.string.settings_notifications_mode_off
+        },
+      )
     },
     onSelect = onSelect,
   )

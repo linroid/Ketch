@@ -44,12 +44,18 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchIconButton
-import com.linroid.ketch.app.components.connectionLabel
+import com.linroid.ketch.app.components.connectionText
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.durationText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -64,11 +70,44 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import com.linroid.ketch.app.util.averageSpeed
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.formatDuration
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_copied
+import ketch.app.shared.generated.resources.inspector_copy_detail
+import ketch.app.shared.generated.resources.inspector_copy_failed_added
+import ketch.app.shared.generated.resources.inspector_copy_failed_average
+import ketch.app.shared.generated.resources.inspector_copy_failed_captured
+import ketch.app.shared.generated.resources.inspector_copy_failed_connections
+import ketch.app.shared.generated.resources.inspector_copy_failed_device
+import ketch.app.shared.generated.resources.inspector_copy_failed_headers
+import ketch.app.shared.generated.resources.inspector_copy_failed_link
+import ketch.app.shared.generated.resources.inspector_copy_failed_path
+import ketch.app.shared.generated.resources.inspector_copy_failed_property
+import ketch.app.shared.generated.resources.inspector_copy_failed_size
+import ketch.app.shared.generated.resources.inspector_copy_failed_source
+import ketch.app.shared.generated.resources.inspector_copy_failed_task_id
+import ketch.app.shared.generated.resources.inspector_copy_failed_time
+import ketch.app.shared.generated.resources.inspector_detail_added
+import ketch.app.shared.generated.resources.inspector_detail_average
+import ketch.app.shared.generated.resources.inspector_detail_captured
+import ketch.app.shared.generated.resources.inspector_detail_connections
+import ketch.app.shared.generated.resources.inspector_detail_device
+import ketch.app.shared.generated.resources.inspector_detail_headers
+import ketch.app.shared.generated.resources.inspector_detail_link
+import ketch.app.shared.generated.resources.inspector_detail_path
+import ketch.app.shared.generated.resources.inspector_detail_property
+import ketch.app.shared.generated.resources.inspector_detail_size
+import ketch.app.shared.generated.resources.inspector_detail_source
+import ketch.app.shared.generated.resources.inspector_detail_task_id
+import ketch.app.shared.generated.resources.inspector_detail_time
+import ketch.app.shared.generated.resources.inspector_hide_full_link
+import ketch.app.shared.generated.resources.inspector_section_advanced
+import ketch.app.shared.generated.resources.inspector_section_details
+import ketch.app.shared.generated.resources.inspector_show_full_link
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** Copies text to the clipboard, posting an error when the system refuses. */
 @Stable
@@ -82,15 +121,18 @@ internal class Copier(
   /** Whether there is a clipboard to copy to. */
   val enabled: Boolean get() = clipboard != null
 
-  /** Copies [text], called [what] in an error, and runs [onCopied] once it is copied. */
-  fun copy(text: String, what: String, onCopied: () -> Unit = {}) {
+  /**
+   * Copies [text] and runs [onCopied] once it is copied; when the system refuses, posts
+   * [failure], such as "Couldn't copy the link".
+   */
+  fun copy(text: String, failure: UiText, onCopied: () -> Unit = {}) {
     val clipboard = clipboard ?: return
     scope.launch {
       catchingUnlessCancelled { clipboard.writeText(text) }
         .onSuccess { onCopied() }
         .onFailure { e ->
-          log.w { "Couldn't copy the $what: ${e.describeCauses()}" }
-          state.messages.post(MessageLevel.Error, "Couldn't copy the $what", cause = e)
+          log.w { "Couldn't copy to the clipboard: ${e.describeCauses()}" }
+          state.messages.post(MessageLevel.Error, failure, cause = e)
         }
     }
   }
@@ -121,15 +163,15 @@ internal fun TaskDetails(
 ) {
   val request = row.request
   val completed = row.state as? DownloadState.Completed
-  InspectorSection("Details", modifier) {
-    DetailRow("Source", copier, sourceLabel(request, row.isTorrent))
+  InspectorSection(stringResource(Res.string.inspector_section_details), modifier) {
+    DetailRow(Detail.Source, copier, sourceLabel(request, row.isTorrent).resolve())
     LinkRow(request.url, copier)
     val path = row.outputPath
     if (path != null) {
       val reveal = !row.device.capabilities.isRemote &&
         runner.commands.canRun(RowAction.ShowInFolder, row)
       DetailRow(
-        label = "Saved to",
+        detail = Detail.SavedTo,
         copier = copier,
         copy = path,
         mono = true,
@@ -137,7 +179,8 @@ internal fun TaskDetails(
           {
             KetchIconButton(
               icon = KetchIcon.Reveal,
-              contentDescription = runner.files?.revealLabel ?: RowAction.ShowInFolder.label,
+              contentDescription =
+                (runner.files?.revealLabel ?: RowAction.ShowInFolder.label).resolve(),
               onClick = { runner.run(RowAction.ShowInFolder, listOf(row)) },
               size = KetchButtonSize.Small,
             )
@@ -147,22 +190,24 @@ internal fun TaskDetails(
         },
       ) { MiddleText(path, KetchTheme.typography.monoS, KetchTheme.colors.textPrimary) }
     }
-    row.sizeBytes?.let { DetailRow("Size", copier, formatBytes(it)) }
+    row.sizeBytes?.let { DetailRow(Detail.Size, copier, sizeText(it).resolve()) }
     val zone = remember { TimeZone.currentSystemDefault() }
-    DetailRow("Added", copier, addedDetail(row, LocalClock.current.now(), zone))
+    val added = addedDetail(row, LocalClock.current.now(), zone).resolve()
+    DetailRow(Detail.Added, copier, added)
     val time = completed?.downloadTime
     if (completed != null && time != null) {
-      DetailRow("Time spent", copier, formatDuration(time))
+      DetailRow(Detail.TimeSpent, copier, durationText(time).resolve())
       val total = completed.totalBytes
       val average = total?.let { averageSpeed(it, time) }
-      if (average != null) DetailRow("Avg speed", copier, "${formatBytes(average)}/s")
+      if (average != null) DetailRow(Detail.AverageSpeed, copier, speedText(average).resolve())
     }
     // While the Controls show, they show the connections too.
     if (!row.state.hasControls && !row.isTorrent) {
       val auto = autoConnectionsOf(state, listOf(row))
-      DetailRow("Connections", copier, connectionLabel(request.connections, auto))
+      val connections = connectionText(request.connections, auto).resolve()
+      DetailRow(Detail.Connections, copier, connections)
     }
-    DetailRow("Device", copier, copy = device.name) {
+    DetailRow(Detail.Device, copier, copy = device.name) {
       // The pennant is taller than a line; it overhangs the row's padding instead.
       Box(
         contentAlignment = Alignment.CenterStart,
@@ -175,7 +220,7 @@ internal fun TaskDetails(
         )
       }
     }
-    capturedText(request)?.let { DetailRow("Captured", copier, it) }
+    capturedText(request)?.let { DetailRow(Detail.Captured, copier, it.resolve()) }
     Advanced(row, copier)
   }
 }
@@ -185,7 +230,7 @@ internal fun TaskDetails(
 private fun LinkRow(url: String, copier: Copier) {
   val parts = remember(url) { linkParts(url) }
   var full by remember(url) { mutableStateOf(false) }
-  DetailRow("Link", copier, copy = url) {
+  DetailRow(Detail.Link, copier, copy = url) {
     Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
       if (full) {
         Text(
@@ -197,7 +242,12 @@ private fun LinkRow(url: String, copier: Copier) {
         LinkText(parts)
       }
       if (parts.query != null) {
-        TextLink(if (full) "Hide full link" else "Show full link") { full = !full }
+        val label = if (full) {
+          Res.string.inspector_hide_full_link
+        } else {
+          Res.string.inspector_show_full_link
+        }
+        TextLink(stringResource(label)) { full = !full }
       }
     }
   }
@@ -228,22 +278,42 @@ private fun LinkText(parts: LinkParts) {
 @Composable
 private fun Advanced(row: TaskRow, copier: Copier) {
   var open by remember(row.key) { mutableStateOf(false) }
-  Disclosure("Advanced", open) { open = !open }
+  Disclosure(stringResource(Res.string.inspector_section_advanced), open) { open = !open }
   if (!open) return
   val request = row.request
-  DetailRow("Task ID", copier, row.key.taskId, mono = true)
+  DetailRow(Detail.TaskId, copier, row.key.taskId, mono = true)
   if (request.headers.isNotEmpty()) {
     val names = request.headers.keys.sortedBy { it.lowercase() }.joinToString(", ")
-    DetailRow("Headers", copier, names)
+    DetailRow(Detail.Headers, copier, names)
   }
   for ((name, value) in request.properties.entries.sortedBy { it.key }) {
-    DetailRow("Property", copier, "$name = $value", mono = true)
+    DetailRow(Detail.Property, copier, "$name = $value", mono = true)
   }
 }
 
+/** A detail of the inspector: its [label], and what a failed copy of it says. */
+private enum class Detail(val label: StringResource, val copyFailed: StringResource) {
+  Source(Res.string.inspector_detail_source, Res.string.inspector_copy_failed_source),
+  Link(Res.string.inspector_detail_link, Res.string.inspector_copy_failed_link),
+  SavedTo(Res.string.inspector_detail_path, Res.string.inspector_copy_failed_path),
+  Size(Res.string.inspector_detail_size, Res.string.inspector_copy_failed_size),
+  Added(Res.string.inspector_detail_added, Res.string.inspector_copy_failed_added),
+  TimeSpent(Res.string.inspector_detail_time, Res.string.inspector_copy_failed_time),
+  AverageSpeed(Res.string.inspector_detail_average, Res.string.inspector_copy_failed_average),
+  Connections(
+    Res.string.inspector_detail_connections,
+    Res.string.inspector_copy_failed_connections,
+  ),
+  Device(Res.string.inspector_detail_device, Res.string.inspector_copy_failed_device),
+  Captured(Res.string.inspector_detail_captured, Res.string.inspector_copy_failed_captured),
+  TaskId(Res.string.inspector_detail_task_id, Res.string.inspector_copy_failed_task_id),
+  Headers(Res.string.inspector_detail_headers, Res.string.inspector_copy_failed_headers),
+  Property(Res.string.inspector_detail_property, Res.string.inspector_copy_failed_property),
+}
+
 @Composable
-private fun DetailRow(label: String, copier: Copier, value: String, mono: Boolean = false) {
-  DetailRow(label = label, copier = copier, copy = value, mono = mono) {
+private fun DetailRow(detail: Detail, copier: Copier, value: String, mono: Boolean = false) {
+  DetailRow(detail = detail, copier = copier, copy = value, mono = mono) {
     Text(
       text = value,
       style = if (mono) KetchTheme.typography.monoS else KetchTheme.typography.bodyS,
@@ -253,7 +323,7 @@ private fun DetailRow(label: String, copier: Copier, value: String, mono: Boolea
 }
 
 /**
- * One detail: [label] in the label column, then the value, which [copy] puts on the clipboard
+ * One detail: its label in the label column, then the value, which [copy] puts on the clipboard
  * on a click, or a long press on touch. While the pointer is over it a copy glyph shows at its
  * end, over the value, and after a copy the value reads "Copied" for a moment.
  *
@@ -263,7 +333,7 @@ private fun DetailRow(label: String, copier: Copier, value: String, mono: Boolea
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DetailRow(
-  label: String,
+  detail: Detail,
   copier: Copier,
   copy: String?,
   mono: Boolean = false,
@@ -281,9 +351,11 @@ private fun DetailRow(
   var copies by remember { mutableIntStateOf(0) }
   val copied = rememberFlash(copies)
   val touch = KetchTheme.density == KetchDensity.Comfortable
+  val label = stringResource(detail.label)
   val copyIt: () -> Unit = {
-    if (copy != null) copier.copy(copy, label.lowercase()) { copies++ }
+    if (copy != null) copier.copy(copy, detail.copyFailed.text()) { copies++ }
   }
+  val copyLabel = stringResource(Res.string.inspector_copy_detail, label)
   val clickable = if (copyable) {
     Modifier
       .focusRing(focus.visible, shape, colors.focusRing)
@@ -294,8 +366,8 @@ private fun DetailRow(
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = "Copy $label",
-        onLongClickLabel = "Copy $label",
+        onClickLabel = copyLabel,
+        onLongClickLabel = copyLabel,
         onLongClick = copyIt,
         onClick = if (touch) ({}) else copyIt,
       )
@@ -324,7 +396,7 @@ private fun DetailRow(
       Box(Modifier.weight(1f)) {
         if (copied) {
           Text(
-            text = "Copied",
+            text = stringResource(Res.string.inspector_copied),
             style = if (mono) KetchTheme.typography.monoS else KetchTheme.typography.bodyS,
             color = colors.accentText,
           )

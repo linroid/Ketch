@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.util.IntakeAction.AddAnyway
 import com.linroid.ketch.app.util.IntakeAction.AddHeaders
 import com.linroid.ketch.app.util.IntakeAction.FindMirror
@@ -8,6 +9,7 @@ import com.linroid.ketch.app.util.IntakeAction.KeepWaiting
 import com.linroid.ketch.app.util.IntakeAction.PasteCurl
 import com.linroid.ketch.app.util.IntakeAction.Retry
 import com.linroid.ketch.app.util.IntakeAction.SignIn
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,60 +17,60 @@ class IntakeProblemsTest {
   private val url = "https://user:secret@files.example.com:8443/q3-report.pdf?token=abc"
 
   @Test
-  fun toIntakeProblem_eachFailure_matchesTheCatalog() {
+  fun toIntakeProblem_eachFailure_matchesTheCatalog() = runTest {
     val cases = listOf(
-      KetchError.Unsupported() to IntakeProblem(
+      KetchError.Unsupported() to Expected(
         "Ketch can't download this kind of link",
         "it supports http(s), ftp(s), magnet and .torrent",
       ),
-      KetchError.Http(401) to IntakeProblem("Sign-in required", actions = listOf(SignIn)),
+      KetchError.Http(401) to Expected("Sign-in required", actions = listOf(SignIn)),
       KetchError.AuthenticationFailed("ftp") to
-        IntakeProblem("Sign-in required", actions = listOf(SignIn)),
-      KetchError.Http(403, "Forbidden") to IntakeProblem(
+        Expected("Sign-in required", actions = listOf(SignIn)),
+      KetchError.Http(403, "Forbidden") to Expected(
         "The server refused access (403)",
         "links copied from a signed-in page often need its cookies",
         listOf(PasteCurl, AddHeaders),
       ),
-      KetchError.Http(404) to IntakeProblem("Not found", "the link may have expired"),
-      KetchError.Http(410) to IntakeProblem("Not found", "the link may have expired"),
+      KetchError.Http(404) to Expected("Not found", "the link may have expired"),
+      KetchError.Http(410) to Expected("Not found", "the link may have expired"),
       KetchError.Http(429) to
-        IntakeProblem("Server busy (429)", "Ketch will retry automatically", blocksAdd = false),
+        Expected("Server busy (429)", "Ketch will retry automatically", blocksAdd = false),
       KetchError.Http(503) to
-        IntakeProblem("Server busy (503)", "Ketch will retry automatically", blocksAdd = false),
+        Expected("Server busy (503)", "Ketch will retry automatically", blocksAdd = false),
       KetchError.Http(500) to
-        IntakeProblem("Server busy (500)", "Ketch will retry automatically", blocksAdd = false),
+        Expected("Server busy (500)", "Ketch will retry automatically", blocksAdd = false),
       KetchError.Http(418, "I'm a teapot") to
-        IntakeProblem("The server answered 418", "I'm a teapot", listOf(Retry)),
-      KetchError.Http(400, " ") to IntakeProblem("The server answered 400", null, listOf(Retry)),
+        Expected("The server answered 418", "I'm a teapot", listOf(Retry)),
+      KetchError.Http(400, " ") to Expected("The server answered 400", null, listOf(Retry)),
       KetchError.Network() to
-        IntakeProblem("Can't reach files.example.com", actions = listOf(Retry)),
+        Expected("Can't reach files.example.com", actions = listOf(Retry)),
       KetchError.SourceError("torrent") to
-        IntakeProblem("Couldn't read this torrent", actions = listOf(Retry)),
+        Expected("Couldn't read this torrent", actions = listOf(Retry)),
       KetchError.SourceError("ftp") to
-        IntakeProblem("The FTP server reported an error", actions = listOf(Retry)),
+        Expected("The FTP server reported an error", actions = listOf(Retry)),
       KetchError.SourceError("hls") to
-        IntakeProblem("Couldn't check this link", actions = listOf(Retry)),
+        Expected("Couldn't check this link", actions = listOf(Retry)),
       KetchError.Unknown(errorMessage = "boom") to
-        IntakeProblem("Couldn't check this link", "boom", listOf(Retry)),
-      KetchError.Disk() to IntakeProblem("Couldn't check this link", actions = listOf(Retry)),
+        Expected("Couldn't check this link", "boom", listOf(Retry)),
+      KetchError.Disk() to Expected("Couldn't check this link", actions = listOf(Retry)),
       IllegalStateException("Device went away") to
-        IntakeProblem("Couldn't check this link", "Device went away", listOf(Retry)),
+        Expected("Couldn't check this link", "Device went away", listOf(Retry)),
     )
-    cases.forEach { (error, problem) ->
-      assertEquals(problem, error.toIntakeProblem(url), error.toString())
+    cases.forEach { (error, expected) ->
+      assertEquals(expected, error.toIntakeProblem(url).loaded(), error.toString())
     }
   }
 
   @Test
-  fun toIntakeProblem_missingFileWithDiscover_offersAMirror() {
+  fun toIntakeProblem_missingFileWithDiscover_offersAMirror() = runTest {
     val problem = KetchError.Http(404).toIntakeProblem(url, discoverAvailable = true)
 
     assertEquals(listOf(FindMirror), problem.actions)
-    assertEquals("Not found · the link may have expired", problem.text)
+    assertEquals("Not found · the link may have expired", problem.text.load())
   }
 
   @Test
-  fun toIntakeProblem_networkFailure_namesTheHost() {
+  fun toIntakeProblem_networkFailure_namesTheHost() = runTest {
     val cases = mapOf(
       "ftp://ftp.example.org/pub/a.iso" to "Can't reach ftp.example.org",
       "http://[fd00::20]:8642/a" to "Can't reach [fd00::20]",
@@ -77,20 +79,18 @@ class IntakeProblemsTest {
       "not a url" to "Can't reach the server",
     )
     cases.forEach { (link, title) ->
-      assertEquals(title, KetchError.Network().toIntakeProblem(link).title, link)
+      assertEquals(title, KetchError.Network().toIntakeProblem(link).title.load(), link)
     }
   }
 
   @Test
-  fun magnetTimeout_afterTwoMinutes_offersToWaitOrAdd() {
+  fun magnetTimeout_afterTwoMinutes_offersToWaitOrAdd() = runTest {
     assertEquals(
-      IntakeProblem(
-        "No peers sent the file list in 2 min",
-        actions = listOf(KeepWaiting, AddAnyway),
-      ),
-      IntakeProblem.MagnetTimeout,
+      Expected("No peers sent the file list in 2 min", actions = listOf(KeepWaiting, AddAnyway)),
+      IntakeProblem.MagnetTimeout.loaded(),
     )
-    assertEquals("Sign-in required", IntakeProblem("Sign-in required").text)
+    val signIn = KetchError.Http(401).toIntakeProblem(url)
+    assertEquals("Sign-in required", signIn.text.load())
   }
 
   @Test
@@ -121,4 +121,15 @@ class IntakeProblemsTest {
       assertEquals(IntakeItem.Link(expected), signedIn, url)
     }
   }
+
+  /** A problem as the user reads it. */
+  private data class Expected(
+    val title: String,
+    val detail: String? = null,
+    val actions: List<IntakeAction> = emptyList(),
+    val blocksAdd: Boolean = true,
+  )
+
+  private suspend fun IntakeProblem.loaded() =
+    Expected(title.load(), detail.load(), actions, blocksAdd)
 }

@@ -1,10 +1,11 @@
 package com.linroid.ketch.app
 
-import com.linroid.ketch.app.state.RejectedTracker
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.parseTrackers
 import com.linroid.ketch.app.state.trackerHost
 import com.linroid.ketch.app.state.trackerUrlError
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -33,25 +34,28 @@ class TrackerUrlsTest {
   }
 
   @Test
-  fun `udp trackers need a port and no credentials`() {
-    assertEquals("UDP trackers need a port.", trackerUrlError("udp://tracker.example/announce"))
+  fun `udp trackers need a port and no credentials`() = runTest {
+    assertEquals(
+      "UDP trackers need a port.",
+      trackerUrlError("udp://tracker.example/announce").load(),
+    )
     assertEquals(
       "UDP trackers can't include a user name or password.",
-      trackerUrlError("udp://user@tracker.example:1337/announce"),
+      trackerUrlError("udp://user@tracker.example:1337/announce").load(),
     )
   }
 
   @Test
-  fun `other schemes and malformed hosts or ports are rejected`() {
+  fun `other schemes and malformed hosts or ports are rejected`() = runTest {
     val schemeError = "Start it with http://, https:// or udp://."
-    assertEquals(schemeError, trackerUrlError("tracker.example:1337/announce"))
-    assertEquals(schemeError, trackerUrlError("wss://tracker.example/announce"))
-    assertEquals("Missing the host name.", trackerUrlError("http:///announce"))
-    assertEquals("Missing the host name.", trackerUrlError("udp://[2001:db8::1/announce"))
+    assertEquals(schemeError, trackerUrlError("tracker.example:1337/announce").load())
+    assertEquals(schemeError, trackerUrlError("wss://tracker.example/announce").load())
+    assertEquals("Missing the host name.", trackerUrlError("http:///announce").load())
+    assertEquals("Missing the host name.", trackerUrlError("udp://[2001:db8::1/announce").load())
     for (port in listOf("0", "65536", "", "+80")) {
       assertEquals(
         "Use a port from 1 to 65535.",
-        trackerUrlError("http://tracker.example:$port/announce"),
+        trackerUrlError("http://tracker.example:$port/announce").load(),
         port,
       )
     }
@@ -59,7 +63,7 @@ class TrackerUrlsTest {
   }
 
   @Test
-  fun `adding appends new trackers and returns the rejected ones in order`() {
+  fun `adding appends new trackers and returns the rejected ones in order`() = runTest {
     val current = listOf("udp://a.example:1337/announce")
     val added = addTrackers(
       current,
@@ -69,10 +73,10 @@ class TrackerUrlsTest {
     assertEquals(current + "https://b.example/announce", added.trackers)
     assertEquals(
       listOf(
-        RejectedTracker("bad", "Start it with http://, https:// or udp://."),
-        RejectedTracker("udp://c.example/announce", "UDP trackers need a port."),
+        "bad" to "Start it with http://, https:// or udp://.",
+        "udp://c.example/announce" to "UDP trackers need a port.",
       ),
-      added.rejected,
+      added.rejected.map { it.url to it.problem.load() },
     )
   }
 

@@ -10,6 +10,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.plain
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.RowContext
 import com.linroid.ketch.app.util.rowContent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,7 +59,7 @@ internal object ListFixtures {
   /** 2026-10-01 12:00 UTC, a Thursday. */
   val START: Instant = Instant.parse("2026-10-01T12:00:00Z")
 
-  val device: DeviceInfo = DeviceInfo("This Mac", RowCapabilities.local())
+  val device: DeviceInfo = DeviceInfo(verbatim("This Mac"), RowCapabilities.local())
 
   fun downloading(downloaded: Long, total: Long = 1000, speed: Long = 100): DownloadState =
     DownloadState.Downloading(DownloadProgress(downloaded, total, speed))
@@ -83,6 +85,8 @@ internal object ListFixtures {
       createdAt = createdAt,
       device = device,
       content = rowContent(request, state, createdAt, context),
+      deviceName = device.name.plain,
+      errorTitle = null,
       speedSamples = speedSamples,
     )
   }

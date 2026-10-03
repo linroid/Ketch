@@ -2,11 +2,11 @@ package com.linroid.ketch.app.platform
 
 import android.content.res.Resources
 
-actual fun localDeviceNoun(): String =
+actual fun localDeviceKind(): LocalDeviceKind =
   if (Resources.getSystem().configuration.smallestScreenWidthDp >= TABLET_MIN_WIDTH_DP) {
-    "This tablet"
+    LocalDeviceKind.Tablet
   } else {
-    "This phone"
+    LocalDeviceKind.Phone
   }
 
 /** Smallest width from which Android treats a screen as a tablet's. */

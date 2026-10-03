@@ -1,11 +1,33 @@
 package com.linroid.ketch.app.state
 
+import androidx.compose.runtime.Composable
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.SegmentRate
 import com.linroid.ketch.app.util.SegmentRateTracker
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.pulse_timeline_added
+import ketch.app.shared.generated.resources.pulse_timeline_auto
+import ketch.app.shared.generated.resources.pulse_timeline_canceled
+import ketch.app.shared.generated.resources.pulse_timeline_completed
+import ketch.app.shared.generated.resources.pulse_timeline_connections
+import ketch.app.shared.generated.resources.pulse_timeline_failed
+import ketch.app.shared.generated.resources.pulse_timeline_limit
+import ketch.app.shared.generated.resources.pulse_timeline_limit_removed
+import ketch.app.shared.generated.resources.pulse_timeline_paused
+import ketch.app.shared.generated.resources.pulse_timeline_priority
+import ketch.app.shared.generated.resources.pulse_timeline_queued
+import ketch.app.shared.generated.resources.pulse_timeline_resumed
+import ketch.app.shared.generated.resources.pulse_timeline_retried
+import ketch.app.shared.generated.resources.pulse_timeline_scheduled
+import ketch.app.shared.generated.resources.pulse_timeline_started
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -156,9 +178,9 @@ enum class TimelineKind {
  * Something that happened to a task while the app was open, for the Activity tab's timeline.
  *
  * @property at when it happened, or when the app noticed.
- * @property text what happened, such as "Paused" or "Connections 4 → 8".
+ * @property label what happened, such as "Paused" or "Connections 4 → 8".
  */
-data class TimelineEntry(val at: Instant, val kind: TimelineKind, val text: String)
+data class TimelineEntry(val at: Instant, val kind: TimelineKind, val label: UiText)
 
 /**
  * Speed history of every downloading task, sampled once a second from task rows and kept for
@@ -405,7 +427,7 @@ internal fun timelineEntries(
 ): List<TimelineEntry> = buildList {
   if (before == null) {
     if (after.createdAt < since) return@buildList
-    add(TimelineEntry(after.createdAt, TimelineKind.Added, "Added"))
+    add(TimelineEntry(after.createdAt, TimelineKind.Added, Res.string.pulse_timeline_added.text()))
     if (after.state !is DownloadState.Queued) add(stateEntry(null, after, now, started))
     return@buildList
   }
@@ -419,17 +441,22 @@ private fun requestEntries(
   now: Instant,
 ): List<TimelineEntry> = buildList {
   if (before.connections != after.connections) {
-    val text = "Connections ${connectionsText(before.connections)} → " +
-      connectionsText(after.connections)
+    val text = Res.string.pulse_timeline_connections
+      .text(connectionsText(before.connections), connectionsText(after.connections))
     add(TimelineEntry(now, TimelineKind.Changed, text))
   }
   if (before.speedLimit != after.speedLimit) {
     val limit = after.speedLimit
-    val text = if (limit.isUnlimited) "Limit removed" else "Limit → ${formatSpeedLimit(limit)}"
+    val text = if (limit.isUnlimited) {
+      Res.string.pulse_timeline_limit_removed.text()
+    } else {
+      Res.string.pulse_timeline_limit.text(speedLimitText(limit))
+    }
     add(TimelineEntry(now, TimelineKind.Changed, text))
   }
   if (before.priority != after.priority) {
-    add(TimelineEntry(now, TimelineKind.Changed, "Priority → ${priorityLabel(after.priority)}"))
+    val text = Res.string.pulse_timeline_priority.text(priorityText(after.priority))
+    add(TimelineEntry(now, TimelineKind.Changed, text))
   }
 }
 
@@ -441,22 +468,26 @@ private fun stateEntry(
 ): TimelineEntry {
   val (kind, text) = when (row.state) {
     is DownloadState.Downloading -> when {
-      before is DownloadState.Failed -> TimelineKind.Started to "Retried"
-      before is DownloadState.Paused || started -> TimelineKind.Resumed to "Resumed"
-      else -> TimelineKind.Started to "Started"
+      before is DownloadState.Failed ->
+        TimelineKind.Started to Res.string.pulse_timeline_retried.text()
+      before is DownloadState.Paused || started ->
+        TimelineKind.Resumed to Res.string.pulse_timeline_resumed.text()
+      else -> TimelineKind.Started to Res.string.pulse_timeline_started.text()
     }
-    is DownloadState.Paused -> TimelineKind.Paused to "Paused"
-    is DownloadState.Queued -> TimelineKind.Queued to "Queued"
-    is DownloadState.Scheduled -> TimelineKind.Scheduled to "Scheduled"
-    is DownloadState.Completed -> TimelineKind.Completed to "Completed"
+    is DownloadState.Paused -> TimelineKind.Paused to Res.string.pulse_timeline_paused.text()
+    is DownloadState.Queued -> TimelineKind.Queued to Res.string.pulse_timeline_queued.text()
+    is DownloadState.Scheduled ->
+      TimelineKind.Scheduled to Res.string.pulse_timeline_scheduled.text()
+    is DownloadState.Completed ->
+      TimelineKind.Completed to Res.string.pulse_timeline_completed.text()
     is DownloadState.Failed -> {
-      val title = row.content.error?.title
-      TimelineKind.Failed to if (title != null) "Failed · $title" else "Failed"
+      val failed = Res.string.pulse_timeline_failed.text()
+      TimelineKind.Failed to listOfNotNull(failed, row.content.error?.title).joinText()
     }
-    is DownloadState.Canceled -> TimelineKind.Canceled to "Canceled"
+    is DownloadState.Canceled -> TimelineKind.Canceled to Res.string.pulse_timeline_canceled.text()
   }
   return TimelineEntry(now, kind, text)
 }
 
-private fun connectionsText(connections: Int): String =
-  if (connections == 0) "Auto" else connections.toString()
+private fun connectionsText(connections: Int): UiText =
+  if (connections == 0) Res.string.pulse_timeline_auto.text() else verbatim(connections.toString())

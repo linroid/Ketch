@@ -4,14 +4,30 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.SortKey
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_density_compact
+import ketch.app.shared.generated.resources.downloads_density_default
+import ketch.app.shared.generated.resources.downloads_table_connections_short
+import ketch.app.shared.generated.resources.sort_added
+import ketch.app.shared.generated.resources.sort_device
+import ketch.app.shared.generated.resources.sort_origin
+import ketch.app.shared.generated.resources.sort_priority
+import ketch.app.shared.generated.resources.sort_progress
+import ketch.app.shared.generated.resources.sort_size
+import ketch.app.shared.generated.resources.sort_source
+import ketch.app.shared.generated.resources.sort_speed
+import ketch.app.shared.generated.resources.sort_status
+import ketch.app.shared.generated.resources.sort_time_left
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * A column of the Downloads table after its Name column, in the order the table shows them by
  * default.
  *
  * @property id name used in [TableLayout.encode].
- * @property label header label.
  * @property width default width, cell padding included.
  * @property sort what clicking the header sorts by.
  * @property optional whether the column starts hidden.
@@ -20,24 +36,34 @@ import com.linroid.ketch.app.state.SortKey
  */
 internal enum class TableColumn(
   val id: String,
-  val label: String,
+  private val header: StringResource,
   val width: Dp,
   val sort: SortKey,
   val optional: Boolean = false,
   val numeric: Boolean = false,
   val fixed: Boolean = false,
 ) {
-  Size("size", "Size", 96.dp, SortKey.Size, numeric = true),
-  Progress("progress", "Progress", 140.dp, SortKey.Progress, fixed = true),
-  Speed("speed", "Speed", 92.dp, SortKey.Speed, numeric = true, fixed = true),
-  Left("left", "Left", 76.dp, SortKey.TimeLeft, numeric = true),
-  Added("added", "Added", 104.dp, SortKey.Added),
-  Status("status", "Status", 120.dp, SortKey.Status),
-  Connections("connections", "Conn.", 72.dp, SortKey.Connections, optional = true),
-  Source("source", "Source", 128.dp, SortKey.Source, optional = true),
-  Origin("origin", "Origin", 88.dp, SortKey.Origin, optional = true),
-  Priority("priority", "Priority", 72.dp, SortKey.Priority, optional = true),
-  Device("device", "Device", 128.dp, SortKey.Device, optional = true);
+  Size("size", Res.string.sort_size, 96.dp, SortKey.Size, numeric = true),
+  Progress("progress", Res.string.sort_progress, 140.dp, SortKey.Progress, fixed = true),
+  Speed("speed", Res.string.sort_speed, 92.dp, SortKey.Speed, numeric = true, fixed = true),
+  Left("left", Res.string.sort_time_left, 76.dp, SortKey.TimeLeft, numeric = true),
+  Added("added", Res.string.sort_added, 104.dp, SortKey.Added),
+  Status("status", Res.string.sort_status, 120.dp, SortKey.Status),
+  Connections(
+    "connections",
+    Res.string.downloads_table_connections_short,
+    72.dp,
+    SortKey.Connections,
+    optional = true,
+  ),
+  Source("source", Res.string.sort_source, 128.dp, SortKey.Source, optional = true),
+  Origin("origin", Res.string.sort_origin, 88.dp, SortKey.Origin, optional = true),
+  Priority("priority", Res.string.sort_priority, 72.dp, SortKey.Priority, optional = true),
+  Device("device", Res.string.sort_device, 128.dp, SortKey.Device, optional = true);
+
+  /** The header label, such as "Size" or "Conn.". */
+  val label: UiText
+    get() = header.text()
 
   /** Whether the reason of a waiting, failed or finished row spans this column. */
   val inReasonSpan: Boolean
@@ -100,6 +126,18 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
   /** This layout with [column] [width] wide, kept between [TableColumn.MinWidth] and MaxWidth. */
   fun withWidth(column: TableColumn, width: Dp): TableLayout =
     update(column) { it.copy(width = width.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)) }
+
+  /**
+   * This layout with each column still at its default width widened to [room], the width its
+   * header needs, so a header longer than the English one is not cut. Widths the user chose stay.
+   */
+  fun withHeaderRoom(room: (TableColumn) -> Dp): TableLayout = TableLayout(
+    columns.map { setting ->
+      if (setting.width != setting.column.width) return@map setting
+      val needed = room(setting.column).coerceAtMost(TableColumn.MaxWidth)
+      if (needed > setting.width) setting.copy(width = needed) else setting
+    },
+  )
 
   /** The width of [column]. */
   fun widthOf(column: TableColumn): Dp =
@@ -167,11 +205,14 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
  * How tall the table's rows are, chosen in the "⋯" menu.
  *
  * @property id value saved under [ROWS_KEY] in `UiPreferences.table`.
- * @property label menu label.
  */
-internal enum class RowDensity(val id: String, val label: String) {
-  Default("default", "Default"),
-  Compact("compact", "Compact");
+internal enum class RowDensity(val id: String, private val resource: StringResource) {
+  Default("default", Res.string.downloads_density_default),
+  Compact("compact", Res.string.downloads_density_compact);
+
+  /** The menu label. */
+  val label: UiText
+    get() = resource.text()
 
   companion object {
     /** Key of the row density in `UiPreferences.table`, next to the tabs' column layouts. */

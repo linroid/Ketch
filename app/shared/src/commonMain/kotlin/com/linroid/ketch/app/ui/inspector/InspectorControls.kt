@@ -34,8 +34,13 @@ import com.linroid.ketch.app.components.PEER_LIMIT_STEP
 import com.linroid.ketch.app.components.PeerLimitRange
 import com.linroid.ketch.app.components.StartTimeMenu
 import com.linroid.ketch.app.components.StartTimePicker
+import com.linroid.ketch.app.components.StepperCount
 import com.linroid.ketch.app.components.offPeakStart
 import com.linroid.ketch.app.components.winningLimitCaption
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -48,9 +53,26 @@ import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.connectionEntries
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.util.SegmentRateTracker
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.inspector_control_connections
+import ketch.app.shared.generated.resources.inspector_control_peer_limit
+import ketch.app.shared.generated.resources.inspector_control_priority
+import ketch.app.shared.generated.resources.inspector_control_speed
+import ketch.app.shared.generated.resources.inspector_control_start
+import ketch.app.shared.generated.resources.inspector_global_limit
+import ketch.app.shared.generated.resources.inspector_global_slow_lane
+import ketch.app.shared.generated.resources.inspector_mixed_limits
+import ketch.app.shared.generated.resources.inspector_mixed_priorities
+import ketch.app.shared.generated.resources.inspector_remote_schedule
+import ketch.app.shared.generated.resources.inspector_reschedule
+import ketch.app.shared.generated.resources.inspector_section_controls
+import ketch.app.shared.generated.resources.inspector_server_one_connection
+import ketch.app.shared.generated.resources.inspector_start_count_now
+import ketch.app.shared.generated.resources.inspector_start_now
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
 /**
@@ -78,15 +100,19 @@ internal fun InspectorControls(
   val pulse by state.pulse.state.collectAsState()
   val cap = pulse.devices.firstOrNull { it.deviceId == deviceId }?.cap ?: SpeedLimit.Unlimited
   val slowLane = deviceId == LOCAL_DEVICE_ID && pulse.mode.isSlowLane
-  val globalName = if (slowLane) "Slow lane" else "Global limit"
+  val globalName = if (slowLane) {
+    Res.string.inspector_global_slow_lane.text()
+  } else {
+    Res.string.inspector_global_limit.text()
+  }
   fun isPending(label: (TaskRow) -> String): Boolean =
     single != null && (single.key to label(single)) in pending
 
-  InspectorSection("Controls", modifier) {
+  InspectorSection(stringResource(Res.string.inspector_section_controls), modifier) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
       val inline = maxWidth >= InspectorLabelWidth + spacing.inspectorWidth
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-        ControlRow("Speed", inline, wide = true) {
+        ControlRow(stringResource(Res.string.inspector_control_speed), inline, wide = true) {
           Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
             val presets = remember(single?.key) {
               speedPresets(single?.let { state.speedHistory.history(it.key)?.peak ?: it.speed })
@@ -100,11 +126,11 @@ internal fun InspectorControls(
               pending = isPending(RowCommands::speedLimitLabel),
             )
             val caption = if (shared.speedLimit == null) {
-              "These downloads have different limits"
+              Res.string.inspector_mixed_limits.text()
             } else {
               winningLimitCaption(shared.speedLimit, cap, globalName)
             }
-            if (caption != null) Caption(caption)
+            if (caption != null) Caption(caption.resolve())
           }
         }
         val connectionsPending = isPending(RowCommands::connectionsLabel)
@@ -133,9 +159,11 @@ private fun ConnectionsRow(
   } else {
     targets.map { it.request.connections }.distinct().singleOrNull()
   }
-  ControlRow(if (torrent) "Peer limit" else "Connections", inline) {
+  val connections = stringResource(Res.string.inspector_control_connections)
+  val label = if (torrent) stringResource(Res.string.inspector_control_peer_limit) else connections
+  ControlRow(label, inline) {
     when {
-      value == null -> MixedChip(title = "Connections") {
+      value == null -> MixedChip(title = connections) {
         connectionEntries(targets, runner, peers = torrent)
       }
       torrent -> ConnectionStepper(
@@ -144,7 +172,7 @@ private fun ConnectionsRow(
         range = PeerLimitRange,
         step = PEER_LIMIT_STEP,
         pending = pending,
-        noun = "peers",
+        counts = StepperCount.Peers,
       )
       else -> {
         val single = rows.singleOrNull()
@@ -157,7 +185,11 @@ private fun ConnectionsRow(
           autoValue = auto,
           enabled = !limited,
           pending = pending,
-          disabledReason = if (limited) SERVER_LIMIT else null,
+          disabledReason = if (limited) {
+            stringResource(Res.string.inspector_server_one_connection)
+          } else {
+            null
+          },
         )
       }
     }
@@ -203,7 +235,7 @@ private fun PriorityRow(
     val running = rows - waiting.toSet()
     if (running.isNotEmpty()) runner.setPriority(running, DownloadPriority.URGENT)
   }
-  ControlRow("Priority", inline, wide = true) {
+  ControlRow(stringResource(Res.string.inspector_control_priority), inline, wide = true) {
     Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
       FirstThatFits(count = 2) { variant ->
         KetchSegmented(
@@ -223,20 +255,26 @@ private fun PriorityRow(
               }
             }
           },
-          label = { priority -> priority?.let(::priorityLabel).orEmpty() },
+          label = { priority -> priority?.let { priorityText(it).resolve() }.orEmpty() },
           icon = { priority ->
             KetchIcon.Bolt.takeIf { variant == 0 && priority == DownloadPriority.URGENT }
           },
         )
       }
-      if (shared.priority == null) Caption("These downloads have different priorities")
+      if (shared.priority == null) {
+        Caption(stringResource(Res.string.inspector_mixed_priorities))
+      }
     }
   }
   val victim = asking
   if (victim != null) {
     ConfirmNote(
       text = urgentNote(victim, waiting.size),
-      confirm = if (waiting.size == 1) "Start now" else "Start ${waiting.size} now",
+      confirm = if (waiting.size == 1) {
+        Res.string.inspector_start_now.text()
+      } else {
+        Res.plurals.inspector_start_count_now.text(waiting.size)
+      },
       onConfirm = ::urgent,
       onCancel = { asking = null },
     )
@@ -298,7 +336,7 @@ private fun StartRow(
       else -> runner.reschedule(targets, schedule)
     }
   }
-  ControlRow("Start", inline) {
+  ControlRow(stringResource(Res.string.inspector_control_start), inline) {
     val value = shared.schedule
     if (value == null) {
       MixedStartChip(onSelect = select, offPeak = offPeak, enabled = canReschedule)
@@ -309,7 +347,11 @@ private fun StartRow(
         enabled = canReschedule,
         offPeak = offPeak,
         pending = pending,
-        disabledReason = REMOTE_SCHEDULE.takeUnless { canReschedule },
+        disabledReason = if (canReschedule) {
+          null
+        } else {
+          stringResource(Res.string.inspector_remote_schedule)
+        },
       )
     }
   }
@@ -317,7 +359,7 @@ private fun StartRow(
   if (schedule != null) {
     ConfirmNote(
       text = rescheduleNote(schedule, LocalClock.current.now(), zone),
-      confirm = "Reschedule",
+      confirm = Res.string.inspector_reschedule.text(),
       onConfirm = {
         asking = null
         runner.reschedule(rows, schedule)
@@ -374,8 +416,8 @@ private fun MixedStartChip(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConfirmNote(
-  text: String,
-  confirm: String,
+  text: UiText,
+  confirm: UiText,
   onConfirm: () -> Unit,
   onCancel: () -> Unit,
 ) {
@@ -388,16 +430,16 @@ private fun ConfirmNote(
       .background(colors.status.paused.soft, KetchTheme.shapes.sm)
       .padding(spacing.s2),
   ) {
-    Text(text = text, style = KetchTheme.typography.bodyS, color = colors.textPrimary)
+    Text(text = text.resolve(), style = KetchTheme.typography.bodyS, color = colors.textPrimary)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
       KetchButton(
-        text = confirm,
+        text = confirm.resolve(),
         onClick = onConfirm,
         variant = KetchButtonVariant.Tonal,
         size = KetchButtonSize.Small,
       )
       KetchButton(
-        text = "Cancel",
+        text = stringResource(Res.string.action_cancel),
         onClick = onCancel,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -419,5 +461,3 @@ private val Priorities = listOf(
 )
 
 private const val MIXED = "—"
-private const val SERVER_LIMIT = "This server allows only 1 connection"
-private const val REMOTE_SCHEDULE = "Scheduling remote downloads isn't supported yet"

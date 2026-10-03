@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Devices: the one the app runs on, remote ones and connecting to them. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- How the app names the device it runs on, on its own, as in a list of devices. -->
+  <string name="device_this_mac">This Mac</string>
+  <string name="device_this_pc">This PC</string>
+  <string name="device_this_computer">This computer</string>
+  <string name="device_this_phone">This phone</string>
+  <string name="device_this_tablet">This tablet</string>
+  <string name="device_this_ipad">This iPad</string>
+  <string name="device_this_browser">This browser</string>
+  <!-- The same inside a sentence, as in "Control this Mac from your phone". -->
+  <string name="device_this_mac_in_sentence">this Mac</string>
+  <string name="device_this_pc_in_sentence">this PC</string>
+  <string name="device_this_computer_in_sentence">this computer</string>
+  <string name="device_this_phone_in_sentence">this phone</string>
+  <string name="device_this_tablet_in_sentence">this tablet</string>
+  <string name="device_this_ipad_in_sentence">this iPad</string>
+  <string name="device_this_browser_in_sentence">this browser</string>
+  <!-- A device not chosen yet, inside a sentence. -->
+  <string name="device_any_in_sentence">this device</string>
+
+  <!-- What a device is doing, as menus that pick a device say it, joined by " · ". %1$s is free
+       space, such as "1.8 TB". -->
+  <string name="device_free_space">%1$s free</string>
+  <!-- %1$s is free space, %2$s the disk's size: "412 GB free of 926 GB". -->
+  <string name="device_free_of_total">%1$s free of %2$s</string>
+  <!-- Follows device_free_of_total after " · " when the downloads would not fit. -->
+  <string name="device_storage_short">not enough</string>
+  <!-- %1$d is how many downloads run on the device. -->
+  <string name="device_active_downloads">%1$d active</string>
+
+  <!-- In a device's menu. %1$s is the device's name. -->
+  <string name="device_switch_to">Switch to %1$s</string>
+
+  <!-- The pill that picks the device downloads go to: "On: This Mac". -->
+  <string name="device_target_on">On</string>
+  <!-- %1$s is device_target_on or a similar word. -->
+  <string name="device_target_label">%1$s:</string>
+  <string name="device_target_choose">Choose device</string>
+  <string name="device_target_menu_title">Download on</string>
+  <string name="device_target_connecting">Connecting…</string>
+  <string name="device_target_offline">Offline</string>
+  <string name="device_target_unauthorized">Needs a new access token</string>
+
+  <!-- Why sharing this device could not start, when the server gave no reason. -->
+  <string name="device_server_start_failed">Could not start the server.</string>
+
+  <!-- How long ago or for how long, in its largest whole unit, as device cards say it. -->
+  <string name="device_duration_minutes">%1$d min</string>
+  <string name="device_duration_hours">%1$d h</string>
+  <string name="device_duration_days">%1$d d</string>
+
+  <!-- The line under a device card's name follows "Ketch 0.0.1 · macOS arm64" after " · ".
+       %1$s is a duration, such as "3 h". -->
+  <string name="device_meta_uptime">up %1$s</string>
+  <string name="device_show_downloads">Show downloads</string>
+  <string name="device_not_connected">Not connected</string>
+
+  <!-- What the card of a device that is not online says instead of its numbers. -->
+  <string name="device_problem_unauthorized">Needs a new access token</string>
+  <string name="device_problem_token_rejected">It turned down the access token saved for it.</string>
+  <string name="device_problem_over_limit">Ketch keeps only a few devices connected at once. It connects to this one while it shows.</string>
+  <string name="device_problem_not_kept">Ketch connects to it while it shows, or while it stays connected.</string>
+  <string name="device_problem_connecting">Connecting…</string>
+  <!-- %1$s is how long the device has been offline, such as "2 h". -->
+  <string name="device_problem_offline_for">Offline for %1$s · retrying</string>
+  <string name="device_problem_offline">Offline · retrying</string>
+  <!-- Buttons that fix what keeps a device card from showing what the device is doing. -->
+  <string name="device_fix_retry_now">Retry now</string>
+  <string name="device_fix_enter_token">Enter token</string>
+
+  <!-- The chip about sharing this device on its card. %1$d is the port, such as 8642. -->
+  <string name="device_sharing_on">Sharing on :%1$d</string>
+  <string name="device_sharing_discoverable">Sharing on :%1$d · discoverable</string>
+
+  <!-- A device card on the Devices page. %1$s is the device's name. -->
+  <string name="device_drop_to_download">Drop to download on %1$s</string>
+  <!-- In place of the device's speed while nothing downloads. -->
+  <string name="device_idle">Idle</string>
+  <!-- The strip of the device's downloads, to a screen reader. -->
+  <string name="device_lane_empty">Nothing downloading</string>
+  <!-- %1$d is how many files download, %2$s what they still need, such as "1.2 GB". -->
+  <plurals name="device_lane_downloads">
+    <item quantity="one">%1$d download, %2$s left</item>
+    <item quantity="other">%1$d downloads, %2$s left</item>
+  </plurals>
+  <!-- Under the device's counts of downloads on each tab. -->
+  <string name="device_count_active">Active</string>
+  <string name="device_count_waiting">Waiting</string>
+  <string name="device_count_paused">Paused</string>
+  <string name="device_count_failed">Failed</string>
+  <!-- The counts to a screen reader. %1$d is the count, %2$s the device's name. -->
+  <plurals name="device_count_downloading_on">
+    <item quantity="one">%1$d downloading on %2$s</item>
+    <item quantity="other">%1$d downloading on %2$s</item>
+  </plurals>
+  <plurals name="device_count_waiting_on">
+    <item quantity="one">%1$d waiting on %2$s</item>
+    <item quantity="other">%1$d waiting on %2$s</item>
+  </plurals>
+  <plurals name="device_count_paused_on">
+    <item quantity="one">%1$d paused on %2$s</item>
+    <item quantity="other">%1$d paused on %2$s</item>
+  </plurals>
+  <plurals name="device_count_failed_on">
+    <item quantity="one">%1$d failed on %2$s</item>
+    <item quantity="other">%1$d failed on %2$s</item>
+  </plurals>
+  <string name="device_free_space_unknown">Free space unknown</string>
+  <!-- Tooltips of the chips on a device card. -->
+  <string name="device_chip_networks">Networks it downloads over</string>
+  <string name="device_chip_sharing_settings">Sharing settings</string>
+  <string name="device_chip_share_tooltip">Let other devices control it</string>
+  <!-- The sharing chip of this device while other devices cannot reach it. -->
+  <string name="device_chip_not_shared">Not shared · Share…</string>
+  <!-- Buttons at the bottom of a device card. %1$d is how many downloads failed. -->
+  <plurals name="device_retry_failed">
+    <item quantity="one">Retry %1$d failed</item>
+    <item quantity="other">Retry %1$d failed</item>
+  </plurals>
+  <string name="device_pause_all_here">Pause all here</string>
+  <!-- %1$s is the name of the download that would start next, such as "ubuntu-24.04.iso". -->
+  <string name="device_start_now">Start %1$s now</string>
+
+  <!-- Toasts after changing a device's speed mode. %1$s is a mode, such as "Slow lane". -->
+  <string name="device_speed_mode_failed">Couldn't switch to %1$s</string>
+  <!-- %1$s is the Slow lane's speed, such as "1 MB/s". -->
+  <string name="device_slow_lane_on">Slow lane on · %1$s</string>
+  <string name="device_slow_lane_off">Slow lane off</string>
+  <string name="device_speed_follows_rules">Speed follows your rules</string>
+  <!-- %1$s is the device's name. -->
+  <string name="device_reconnect_failed">Couldn't reconnect to %1$s</string>
+  <!-- Files dropped on a device card that cannot be added. -->
+  <string name="device_drop_unsupported">Only .torrent files and lists of links can be dropped to add downloads</string>
+  <!-- %1$s is the name of a dropped file. -->
+  <string name="device_drop_read_failed">Couldn't read %1$s</string>
+
+  <!-- The ⋯ menu of a device card. %1$s is the device's name. -->
+  <string name="device_more_for">More for %1$s</string>
+  <string name="device_menu_settings">Settings for this device…</string>
+  <string name="device_menu_rename">Rename…</string>
+  <!-- Checked while the app keeps a connection to the device. -->
+  <string name="device_menu_stay_connected">Stay connected</string>
+  <string name="device_menu_remove">Remove…</string>
+  <!-- Renaming a device. %1$s is its name. -->
+  <string name="device_rename_title">Rename %1$s</string>
+  <string name="device_rename_confirm">Rename</string>
+  <string name="device_rename_remote_hint">Leave it empty for the name it announces.</string>
+  <string name="device_rename_local_hint">Your other devices see this name after a restart.</string>
+  <string name="device_rename_name">Name</string>
+  <!-- Removing a remote device. %1$s is its name. -->
+  <string name="device_remove_title">Remove %1$s?</string>
+  <string name="device_remove_body">Ketch stops showing its downloads here. They keep running on %1$s, and you can add it again later.</string>
+
+  <!-- The speed popover of a device card. %1$s is the device's name. -->
+  <string name="device_speed_of">Speed of %1$s</string>
+  <string name="device_speed_mode">Speed mode</string>
+  <string name="device_speed_limit">Speed limit</string>
+  <!-- %1$s is the device's name, %2$s why its limit could not be changed. -->
+  <string name="device_speed_update_failed">Couldn't update %1$s · %2$s</string>
+  <string name="device_speed_applies">Applies to every download on %1$s.</string>
+  <string name="device_speed_settings">Speed settings…</string>
+
+  <!-- The Devices page. -->
+  <string name="device_page_title">Devices</string>
+  <string name="device_add">Add device</string>
+  <string name="device_add_card_title">Add a device</string>
+  <!-- %1$s is the command "ketch server", shown in a monospaced font. -->
+  <string name="device_add_card_body">Control a NAS or another computer from here. Run %1$s there, or turn on Settings › Sharing in its Ketch app.</string>
+  <!-- On a phone, which pairs with a computer that it then controls. -->
+  <string name="device_pair_computer">Pair a computer</string>
+  <!-- On a computer, which pairs with a phone that controls it. -->
+  <string name="device_pair_phone">Pair a phone</string>
+
+  <!-- Connecting to another device: the fields of the Add device sheet, the pairing
+       confirmation and the connect page. -->
+  <string name="connect_link_label">Pairing link or address</string>
+  <!-- Placeholder of the pairing link field; the link and the address stay as they are. -->
+  <string name="connect_link_placeholder">ketch://pair… or nas.local:8642</string>
+  <!-- Follows the device's name and address after " · " under the field. -->
+  <string name="connect_link_has_code">includes its access code</string>
+  <string name="connect_error_link_empty">Paste a pairing link or type an address</string>
+  <string name="connect_error_link_invalid">Use a pairing link or an address such as nas.local:8642</string>
+  <string name="connect_error_host">Type a host name or an IP address</string>
+  <string name="connect_error_port">Use a port from 1 to 65535</string>
+  <string name="connect_code_label">Access code</string>
+  <string name="connect_code_placeholder">Paste or type the code</string>
+  <string name="connect_code_link_rejected">The code in the link no longer works. Enter the current one from Settings › Sharing on that device.</string>
+  <string name="connect_code_rejected">That code didn't work. Check it, or copy a new pairing link.</string>
+  <!-- %1$s is the device's name or address. -->
+  <string name="connect_code_requested">%1$s asks for its access code. It's in Settings › Sharing there.</string>
+  <string name="connect_details_manually">Enter details manually</string>
+  <string name="connect_address_manually">Enter address manually</string>
+  <string name="connect_host">Host</string>
+  <string name="connect_port">Port</string>
+  <string name="connect_use_https">Use HTTPS</string>
+  <!-- %1$s is the address that did not answer, such as "nas.local:8642". -->
+  <string name="connect_unreachable">Couldn't reach %1$s. Check that Ketch is sharing there and that both devices are on the same network.</string>
+  <string name="connect_add_anyway">Add anyway</string>
+  <!-- %1$s says why, such as "Connection lost. Check the connection and try again." -->
+  <string name="connect_add_failed">Couldn't add the device: %1$s</string>
+  <!-- Toasts once a device is added. %1$s is its name. -->
+  <string name="connect_connected">Connected to %1$s</string>
+  <string name="connect_added">Added %1$s</string>
+  <string name="connect_added_detail">Ketch connects to it once it's reachable</string>
+  <!-- A pairing link opened from outside the app that names no device. -->
+  <string name="connect_link_incomplete">That pairing link is incomplete</string>
+  <string name="connect_link_incomplete_detail">Copy it again from Settings › Sharing on the other device</string>
+
+  <!-- The Add device sheet. -->
+  <string name="connect_add_title">Add a device</string>
+  <!-- For a device that turned down its access code. %1$s is its name. -->
+  <string name="connect_new_code_title">New access code for %1$s</string>
+  <string name="connect_code_no_longer_accepted">%1$s no longer accepts the code Ketch has. Paste a new pairing link from Settings › Sharing on that device, or enter its access code.</string>
+  <!-- On phones. -->
+  <string name="connect_scan_hint">Scan the pairing code in Settings › Sharing on the other device with your camera app, or paste its pairing link.</string>
+  <string name="connect_paste_hint">Paste the pairing link from Settings › Sharing on the other device, or type its address.</string>
+  <string name="connect_find_on_network">Find on network</string>
+  <string name="connect_on_your_network">On your network</string>
+  <string name="connect_searching">Searching…</string>
+  <string name="connect_search_again">Search again</string>
+  <string name="connect_looking">Looking for Ketch devices on this network…</string>
+  <string name="connect_nearby_failed">Couldn't search your network</string>
+  <!-- %1$s is connect_nearby_failed. -->
+  <string name="connect_nearby_failed_hint">%1$s. Paste a pairing link instead.</string>
+  <string name="connect_none_found">No devices found. On the other device, open Settings › Sharing and allow another device.</string>
+  <!-- Under a device found on the network. %1$s is its address, such as "192.168.1.7:8642". -->
+  <string name="connect_asks_for_code">%1$s · asks for a code</string>
+  <!-- At the end of a device found on the network that is added already. -->
+  <string name="connect_added_badge">Added</string>
+  <!-- %1$s names this device inside a sentence, such as "this Mac". -->
+  <string name="connect_share_instead">Want to control %1$s from another device?</string>
+  <string name="connect_show_pairing_code">Show its pairing code</string>
+
+  <!-- The page shown while no device is connected, as in the web app. -->
+  <string name="connect_landing_title">Connect to a Ketch device</string>
+  <string name="connect_landing_body">Control the downloads of a computer, NAS or phone that runs Ketch.</string>
+  <string name="connect_your_devices">Your devices</string>
+  <string name="connect_where_link">Where to find the link</string>
+  <!-- %1$s is the command "ketch server", shown in a monospaced font. -->
+  <string name="connect_where_link_body">On the computer that runs Ketch, open Settings › Sharing › Allow another device, then copy the pairing link. On a NAS or server, run %1$s.</string>
+  <string name="connect_enter_code">Enter its access code</string>
+  <!-- How a device added before is reached, at the end of its row. -->
+  <string name="connect_status_needs_code">Needs a code</string>
+  <string name="connect_status_online">Online</string>
+
+  <!-- Asking before connecting to the device a pairing link names. %1$s is its name. -->
+  <string name="connect_pairing_title">Connect to %1$s?</string>
+  <string name="connect_not_now">Not now</string>
+  <!-- %1$s names this device inside a sentence, such as "this Mac". -->
+  <string name="connect_pairing_new">You'll see its downloads here and can add new ones to it from %1$s.</string>
+  <!-- %1$s is the device's name. -->
+  <string name="connect_pairing_known">You've added %1$s already. Connecting shows it.</string>
+  <string name="connect_pairing_known_code">You've added %1$s already. Connecting shows it and gives it this link's code.</string>
+  <string name="connect_pairing_has_code">The link includes its access code.</string>
+
+  <!-- The desktop's file dialogs. -->
+  <string name="device_pick_torrents">Open torrent files</string>
+  <string name="device_pick_folder">Choose a download folder</string>
+  <!-- The button that picks the folder in the folder dialog. -->
+  <string name="device_pick_choose">Choose</string>
+</resources>

@@ -23,9 +23,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_devices
+import ketch.app.shared.generated.resources.shell_settings
+import ketch.app.shared.generated.resources.switcher_overview
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The phone's device sheet, from the top bar's pennant: All devices, every device with what it
@@ -49,8 +55,12 @@ internal fun DeviceSheet(
   )
   val added = rememberDeviceActions(state, share = false)
   val actions = remember(added, onShowOverview) {
-    listOf(SwitcherEntry.Action("Overview", KetchIcon.Devices, onShowOverview)) + added +
-      SwitcherEntry.Action("Settings", KetchIcon.Settings) { state.openSettings() }
+    val overview =
+      SwitcherEntry.Action(Res.string.switcher_overview.text(), KetchIcon.Devices, onShowOverview)
+    listOf(overview) + added +
+      SwitcherEntry.Action(Res.string.shell_settings.text(), KetchIcon.Settings) {
+        state.openSettings()
+      }
   }
   val entries = rememberSwitcherEntries(state, actions)
   var highlighted by remember { mutableIntStateOf(-1) }
@@ -76,7 +86,11 @@ internal fun DeviceSheet(
           .heightIn(min = spacing.s12)
           .padding(horizontal = KetchTheme.density.pagePadding),
       ) {
-        Text(text = "Devices", style = KetchTheme.typography.titleM, color = colors.textPrimary)
+        Text(
+          text = stringResource(Res.string.shell_devices),
+          style = KetchTheme.typography.titleM,
+          color = colors.textPrimary,
+        )
       }
       SwitcherRows(
         state = state,

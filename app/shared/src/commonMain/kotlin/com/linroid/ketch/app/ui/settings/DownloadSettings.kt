@@ -31,6 +31,8 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -41,7 +43,7 @@ import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.countChoices
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.folderName
+import com.linroid.ketch.app.state.folderNameText
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
@@ -49,8 +51,54 @@ import com.linroid.ketch.app.state.offersDefaultFolder
 import com.linroid.ketch.app.state.recentDownloadFolders
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.IntakePreferences
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.device_free_space
+import ketch.app.shared.generated.resources.settings_count_unlimited
+import ketch.app.shared.generated.resources.settings_downloads_at_once
+import ketch.app.shared.generated.resources.settings_downloads_at_once_fewer
+import ketch.app.shared.generated.resources.settings_downloads_at_once_more
+import ketch.app.shared.generated.resources.settings_downloads_at_once_unlimited
+import ketch.app.shared.generated.resources.settings_downloads_change
+import ketch.app.shared.generated.resources.settings_downloads_choose_folder
+import ketch.app.shared.generated.resources.settings_downloads_enter_path
+import ketch.app.shared.generated.resources.settings_downloads_folder
+import ketch.app.shared.generated.resources.settings_downloads_folders
+import ketch.app.shared.generated.resources.settings_downloads_folders_footer
+import ketch.app.shared.generated.resources.settings_downloads_path_placeholder
+import ketch.app.shared.generated.resources.settings_downloads_per_server
+import ketch.app.shared.generated.resources.settings_downloads_per_server_count
+import ketch.app.shared.generated.resources.settings_downloads_per_server_fewer
+import ketch.app.shared.generated.resources.settings_downloads_per_server_hint
+import ketch.app.shared.generated.resources.settings_downloads_per_server_more
+import ketch.app.shared.generated.resources.settings_downloads_per_server_unlimited
+import ketch.app.shared.generated.resources.settings_downloads_pin
+import ketch.app.shared.generated.resources.settings_downloads_pinned
+import ketch.app.shared.generated.resources.settings_downloads_private_folder
+import ketch.app.shared.generated.resources.settings_downloads_queue
+import ketch.app.shared.generated.resources.settings_downloads_queue_footer
+import ketch.app.shared.generated.resources.settings_downloads_recent
+import ketch.app.shared.generated.resources.settings_downloads_remote
+import ketch.app.shared.generated.resources.settings_downloads_retries
+import ketch.app.shared.generated.resources.settings_downloads_retries_count
+import ketch.app.shared.generated.resources.settings_downloads_retries_fewer
+import ketch.app.shared.generated.resources.settings_downloads_retries_hint
+import ketch.app.shared.generated.resources.settings_downloads_retries_more
+import ketch.app.shared.generated.resources.settings_downloads_retries_never
+import ketch.app.shared.generated.resources.settings_downloads_retries_never_state
+import ketch.app.shared.generated.resources.settings_downloads_run_at_once
+import ketch.app.shared.generated.resources.settings_downloads_run_at_once_hint
+import ketch.app.shared.generated.resources.settings_downloads_save_to
+import ketch.app.shared.generated.resources.settings_downloads_save_to_row
+import ketch.app.shared.generated.resources.settings_downloads_torrents_own_folder
+import ketch.app.shared.generated.resources.settings_downloads_unpin
+import ketch.app.shared.generated.resources.settings_downloads_use_default
+import ketch.app.shared.generated.resources.settings_loading_from
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("DownloadSettings")
 
@@ -66,14 +114,17 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
   val config = controller.download
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     if (controller.isRemote) {
-      SettingsNotice(text = "Saved on ${device.label} until it restarts.", tone = NoticeTone.Info)
+      SettingsNotice(
+        text = stringResource(Res.string.settings_downloads_remote, device.label),
+        tone = NoticeTone.Info,
+      )
     }
     DeviceSettingsError(controller.downloadError, loaded = config != null) {
       controller.loadDownload()
     }
     if (config == null) {
       if (controller.downloadError == null) {
-        SettingsLoading("Loading settings from ${device.label}…")
+        SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
       }
       return@Column
     }
@@ -113,20 +164,22 @@ private fun FolderGroup(
     }
   }
 
-  SettingsGroup(title = "Save to") {
+  SettingsGroup(title = stringResource(Res.string.settings_downloads_save_to)) {
     // The folder shows below, so the row only explains what went wrong.
     SettingsRow(
-      title = "Save downloads to",
+      title = stringResource(Res.string.settings_downloads_save_to_row),
       description = failure,
       descriptionColor = KetchTheme.colors.status.failed.color,
     ) {
-      val free = system?.usableSpace?.takeIf { it > 0 }?.let { "${formatSpace(it)} free" }
+      val free = system?.usableSpace?.takeIf { it > 0 }
+        ?.let { Res.string.device_free_space.text(formatSpace(it)).resolve() }
       // Typing replaces the pill, so the folder shows once.
       if (typing) {
         SettingsTextInput(
           value = config.defaultDirectory.orEmpty(),
           onCommit = { onChange(config.copy(defaultDirectory = it.ifBlank { null })) },
-          placeholder = defaultFolder ?: "Path of a folder on ${device.label}",
+          placeholder = defaultFolder
+            ?: stringResource(Res.string.settings_downloads_path_placeholder, device.label),
           mono = true,
           actions = if (free != null) {
             { FreeSpace(free, Modifier.padding(end = spacing.s2)) }
@@ -139,12 +192,12 @@ private fun FolderGroup(
       }
       if (local && folder != null && isAppPrivateFolder(folder)) {
         SettingsNotice(
-          text = "Only Ketch can see this folder. Choose one such as Download.",
+          text = stringResource(Res.string.settings_downloads_private_folder),
           tone = NoticeTone.Warning,
           action = if (canPick) {
             {
               KetchButton(
-                text = "Choose folder",
+                text = stringResource(Res.string.settings_downloads_choose_folder),
                 onClick = pick,
                 variant = KetchButtonVariant.Secondary,
                 size = KetchButtonSize.Small,
@@ -157,7 +210,7 @@ private fun FolderGroup(
       }
       if (folder != null && isDocumentTree(folder)) {
         SettingsNotice(
-          text = "Torrents still save to Ketch's own folder.",
+          text = stringResource(Res.string.settings_downloads_torrents_own_folder),
           tone = NoticeTone.Info,
         )
       }
@@ -168,7 +221,7 @@ private fun FolderGroup(
       ) {
         if (canPick) {
           KetchButton(
-            text = "Change…",
+            text = stringResource(Res.string.settings_downloads_change),
             onClick = pick,
             variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
@@ -177,8 +230,8 @@ private fun FolderGroup(
         }
         if (revealLabel != null && folder != null) {
           KetchButton(
-            text = "Show",
-            tooltip = revealLabel,
+            text = stringResource(Res.string.action_show),
+            tooltip = revealLabel.resolve(),
             onClick = {
               scope.launch {
                 failure = try {
@@ -196,7 +249,7 @@ private fun FolderGroup(
         }
         if (canPick && !typing) {
           KetchButton(
-            text = "Enter path…",
+            text = stringResource(Res.string.settings_downloads_enter_path),
             onClick = { typing = true },
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
@@ -204,7 +257,7 @@ private fun FolderGroup(
         }
         if (offerDefault) {
           KetchButton(
-            text = "Use the Downloads folder",
+            text = stringResource(Res.string.settings_downloads_use_default),
             onClick = { onChange(config.copy(defaultDirectory = null)) },
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
@@ -234,7 +287,8 @@ private fun FolderPill(path: String?, free: String?) {
       tint = colors.textTertiary,
     )
     MiddleEllipsisText(
-      text = path?.let { if (isDocumentTree(it)) folderName(it) else it } ?: "Downloads folder",
+      text = path?.let { if (isDocumentTree(it)) folderNameText(it).resolve() else it }
+        ?: stringResource(Res.string.settings_downloads_folder),
       style = KetchTheme.typography.mono,
       color = colors.textPrimary,
       modifier = Modifier.weight(1f),
@@ -275,8 +329,8 @@ private fun FolderShortcuts(state: AppState, device: InstanceEntry, config: Down
     }
   }
   SettingsGroup(
-    title = "Folders in the add sheet",
-    footer = "Pinned folders come first when you add a download.",
+    title = stringResource(Res.string.settings_downloads_folders),
+    footer = stringResource(Res.string.settings_downloads_folders_footer),
   ) {
     pinned.forEach { path ->
       FolderShortcutRow(path = path, pinned = true, onToggle = { savePinned(pinned - path) })
@@ -291,7 +345,7 @@ private fun FolderShortcuts(state: AppState, device: InstanceEntry, config: Down
 private fun FolderShortcutRow(path: String, pinned: Boolean, onToggle: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val name = folderName(path)
+  val name = folderNameText(path).resolve()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
@@ -314,7 +368,11 @@ private fun FolderShortcutRow(path: String, pinned: Boolean, onToggle: () -> Uni
         overflow = TextOverflow.Ellipsis,
       )
       MiddleEllipsisText(
-        text = if (pinned) "Pinned · $path" else "Recent · $path",
+        text = if (pinned) {
+          stringResource(Res.string.settings_downloads_pinned, path)
+        } else {
+          stringResource(Res.string.settings_downloads_recent, path)
+        },
         style = KetchTheme.typography.caption,
         color = colors.textSecondary,
       )
@@ -324,11 +382,11 @@ private fun FolderShortcutRow(path: String, pinned: Boolean, onToggle: () -> Uni
         icon = KetchIcon.Close,
         onClick = onToggle,
         size = KetchButtonSize.Small,
-        contentDescription = "Unpin $name",
+        contentDescription = stringResource(Res.string.settings_downloads_unpin, name),
       )
     } else {
       KetchButton(
-        text = "Pin",
+        text = stringResource(Res.string.settings_downloads_pin),
         onClick = onToggle,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -340,50 +398,77 @@ private fun FolderShortcutRow(path: String, pinned: Boolean, onToggle: () -> Uni
 /** How many downloads run, per device and per server, and how often failures are retried. */
 @Composable
 private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Unit) {
-  val unlimited = { count: Int -> if (count == 0) "Unlimited" else "$count" }
   SettingsGroup(
-    title = "Queue",
-    footer = "Lowering a limit lets running downloads finish. Retries apply as downloads start " +
-      "or resume.",
+    title = stringResource(Res.string.settings_downloads_queue),
+    footer = stringResource(Res.string.settings_downloads_queue_footer),
   ) {
+    val atOnce = config.maxConcurrentDownloads
     StepperRow(
-      title = "Run at once",
-      description = "The rest wait in the queue, by priority.",
-      value = config.maxConcurrentDownloads,
-      values = countChoices(RunAtOnceChoices, config.maxConcurrentDownloads),
-      label = unlimited,
-      noun = "downloads at once",
+      title = stringResource(Res.string.settings_downloads_run_at_once),
+      description = stringResource(Res.string.settings_downloads_run_at_once_hint),
+      value = atOnce,
+      values = countChoices(RunAtOnceChoices, atOnce),
+      label = countLabel(atOnce, Res.string.settings_count_unlimited),
+      state = if (atOnce == 0) {
+        stringResource(Res.string.settings_downloads_at_once_unlimited)
+      } else {
+        pluralStringResource(Res.plurals.settings_downloads_at_once, atOnce, atOnce)
+      },
+      fewer = stringResource(Res.string.settings_downloads_at_once_fewer),
+      more = stringResource(Res.string.settings_downloads_at_once_more),
       onChange = { onChange(config.copy(maxConcurrentDownloads = it)) },
     )
+    val perServer = config.maxConnectionsPerHost
     StepperRow(
-      title = "Per server",
-      description = "Downloads from one website or FTP server at once.",
-      value = config.maxConnectionsPerHost,
-      values = countChoices(PerServerChoices, config.maxConnectionsPerHost),
-      label = unlimited,
-      noun = "downloads per server",
+      title = stringResource(Res.string.settings_downloads_per_server),
+      description = stringResource(Res.string.settings_downloads_per_server_hint),
+      value = perServer,
+      values = countChoices(PerServerChoices, perServer),
+      label = countLabel(perServer, Res.string.settings_count_unlimited),
+      state = if (perServer == 0) {
+        stringResource(Res.string.settings_downloads_per_server_unlimited)
+      } else {
+        pluralStringResource(Res.plurals.settings_downloads_per_server_count, perServer, perServer)
+      },
+      fewer = stringResource(Res.string.settings_downloads_per_server_fewer),
+      more = stringResource(Res.string.settings_downloads_per_server_more),
       onChange = { onChange(config.copy(maxConnectionsPerHost = it)) },
     )
+    val retries = config.retryCount
     StepperRow(
-      title = "Retries",
-      description = "For network errors and busy servers.",
-      value = config.retryCount,
-      values = (RetryChoices + config.retryCount).distinct().sorted(),
-      label = { if (it == 0) "Never" else "$it" },
-      noun = "retries",
+      title = stringResource(Res.string.settings_downloads_retries),
+      description = stringResource(Res.string.settings_downloads_retries_hint),
+      value = retries,
+      values = (RetryChoices + retries).distinct().sorted(),
+      label = countLabel(retries, Res.string.settings_downloads_retries_never),
+      state = if (retries == 0) {
+        stringResource(Res.string.settings_downloads_retries_never_state)
+      } else {
+        pluralStringResource(Res.plurals.settings_downloads_retries_count, retries, retries)
+      },
+      fewer = stringResource(Res.string.settings_downloads_retries_fewer),
+      more = stringResource(Res.string.settings_downloads_retries_more),
       onChange = { onChange(config.copy(retryCount = it)) },
     )
   }
 }
 
+/** [count] as a stepper shows it, or the word [zero] stands for, such as "Unlimited". */
+@Composable
+private fun countLabel(count: Int, zero: StringResource): String =
+  if (count == 0) stringResource(zero) else count.toString()
+
+/** A count chosen with a [SettingsStepper]; see it for [label], [state], [fewer] and [more]. */
 @Composable
 private fun StepperRow(
   title: String,
   description: String,
   value: Int,
   values: List<Int>,
-  label: (Int) -> String,
-  noun: String,
+  label: String,
+  state: String,
+  fewer: String,
+  more: String,
   onChange: (Int) -> Unit,
 ) {
   SettingsRow(
@@ -394,8 +479,10 @@ private fun StepperRow(
         value = value,
         values = values,
         label = label,
+        state = state,
+        fewer = fewer,
+        more = more,
         onChange = onChange,
-        noun = noun,
       )
     },
   )
@@ -407,9 +494,8 @@ private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {
   throw e
 } catch (e: Exception) {
   // A device that is offline shows its folder without the free space.
-  log.d {
-    "Couldn't read the download folder of deviceId=${device.deviceId}: ${e.describeCauses()}"
-  }
+  val id = device.deviceId
+  log.d { "Couldn't read the download folder of deviceId=$id: ${e.describeCauses()}" }
   null
 }
 

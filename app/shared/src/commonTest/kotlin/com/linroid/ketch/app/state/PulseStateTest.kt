@@ -15,6 +15,8 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -88,7 +90,7 @@ class PulseStateTest {
 
     fun source(): PulseSource = PulseSource(
       deviceId = id,
-      name = id,
+      name = verbatim(id),
       tasks = tasks,
       config = config,
       status = {
@@ -152,7 +154,7 @@ class PulseStateTest {
     history: List<Long> = emptyList(),
   ) = DevicePulse(
     deviceId = name,
-    name = name,
+    name = verbatim(name),
     health = health,
     counts = counts,
     failures = failures,
@@ -166,7 +168,7 @@ class PulseStateTest {
     history = history,
   )
 
-  private fun PulseState.sentenceAtNow(): String = sentence(now, TimeZone.UTC)
+  private suspend fun PulseState.sentenceAtNow(): String = sentence(now, TimeZone.UTC).load()
 
   @Test
   fun of_everyState_countsMatchStatusFilter() {
@@ -338,7 +340,7 @@ class PulseStateTest {
     assertEquals(1, local.statusCalls)
     assertNull(model.state.value.devices.single().disk)
     assertFalse(model.state.value.isDiskShort)
-    assertEquals("All quiet", model.state.value.sentence(now, TimeZone.UTC))
+    assertEquals("All quiet", model.state.value.sentence(now, TimeZone.UTC).load())
   }
 
   @Test
@@ -370,7 +372,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_idleWithDisk_namesFreeSpace() {
+  fun sentence_idleWithDisk_namesFreeSpace() = runTest {
     val disk = DiskSpace(usableBytes = 412 * gb, totalBytes = 1000 * gb, directory = "/d")
     val state = PulseState(listOf(device(disk = disk)))
 
@@ -378,7 +380,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_idleAcrossDevices_namesDeviceWithLeastSpace() {
+  fun sentence_idleAcrossDevices_namesDeviceWithLeastSpace() = runTest {
     val roomy = DiskSpace(usableBytes = 2 * 1024 * gb, totalBytes = 4096 * gb, directory = "/d")
     val tight = DiskSpace(usableBytes = 8 * gb + 200 * mb, totalBytes = 64 * gb, directory = "/d")
     val state = PulseState(
@@ -390,12 +392,12 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_idleWithoutDisk_isAllQuiet() {
+  fun sentence_idleWithoutDisk_isAllQuiet() = runTest {
     assertEquals("All quiet", PulseState(listOf(device())).sentenceAtNow())
   }
 
   @Test
-  fun sentence_downloading_estimatesFinishTime() {
+  fun sentence_downloading_estimatesFinishTime() = runTest {
     val state = PulseState(
       listOf(
         device(
@@ -411,7 +413,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_downloadingOnTwoDevices_namesDeviceCount() {
+  fun sentence_downloadingOnTwoDevices_namesDeviceCount() = runTest {
     val state = PulseState(
       devices = listOf(
         device(counts = PulseCounts(downloading = 2), speed = 5 * mb, sizeBytes = 300 * mb),
@@ -433,7 +435,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_slowerSecondDevice_finishesWhenItDoes() {
+  fun sentence_slowerSecondDevice_finishesWhenItDoes() = runTest {
     val state = PulseState(
       devices = listOf(
         device(counts = PulseCounts(downloading = 2), speed = 5 * mb, sizeBytes = 300 * mb),
@@ -455,7 +457,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_capBelowSpeed_estimatesWithCap() {
+  fun sentence_capBelowSpeed_estimatesWithCap() = runTest {
     val state = PulseState(
       listOf(
         device(
@@ -471,7 +473,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_unknownSize_omitsFinishTime() {
+  fun sentence_unknownSize_omitsFinishTime() = runTest {
     val state = PulseState(
       listOf(device(counts = PulseCounts(downloading = 1), speed = mb, sizesKnown = false))
     )
@@ -480,7 +482,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_finishTomorrow_namesWeekday() {
+  fun sentence_finishTomorrow_namesWeekday() = runTest {
     val state = PulseState(
       listOf(device(counts = PulseCounts(downloading = 1), speed = mb, sizeBytes = 36_000 * mb))
     )
@@ -489,7 +491,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_failures_needAttention() {
+  fun sentence_failures_needAttention() = runTest {
     val one = PulseState(listOf(device(counts = PulseCounts(failed = 2), failures = 1)))
     val two = PulseState(listOf(device(counts = PulseCounts(failed = 2), failures = 2)))
 
@@ -498,14 +500,14 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_onlyCanceledTasks_isAllQuiet() {
+  fun sentence_onlyCanceledTasks_isAllQuiet() = runTest {
     val state = PulseState(listOf(device(counts = PulseCounts(failed = 1), failures = 0)))
 
     assertEquals("All quiet", state.sentenceAtNow())
   }
 
   @Test
-  fun sentence_offlineDevice_saysRetrying() {
+  fun sentence_offlineDevice_saysRetrying() = runTest {
     val state = PulseState(
       listOf(device(name = "NAS-Basement", health = DeviceHealth.Offline(), failures = 1))
     )
@@ -514,7 +516,7 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_offlineDeviceWhileAnotherDownloads_reportsDownloads() {
+  fun sentence_offlineDeviceWhileAnotherDownloads_reportsDownloads() = runTest {
     val state = PulseState(
       devices = listOf(
         device(counts = PulseCounts(downloading = 1), speed = mb, sizesKnown = false),
@@ -527,14 +529,14 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_slowLaneByHand_appendsSlowLane() {
+  fun sentence_slowLaneByHand_appendsSlowLane() = runTest {
     val state = PulseState(listOf(device()), mode = SpeedMode.SlowLane)
 
     assertEquals("All quiet · Slow lane", state.sentenceAtNow())
   }
 
   @Test
-  fun sentence_slowLaneByRule_appendsEndTime() {
+  fun sentence_slowLaneByRule_appendsEndTime() = runTest {
     val mode = SpeedMode.Auto(slowLane = true, until = Instant.parse("2026-10-01T18:00:00Z"))
     val state = PulseState(listOf(device(failures = 1)), mode = mode)
 
@@ -542,14 +544,14 @@ class PulseStateTest {
   }
 
   @Test
-  fun sentence_autoOutsideRule_appendsNothing() {
+  fun sentence_autoOutsideRule_appendsNothing() = runTest {
     val mode = SpeedMode.Auto(slowLane = false, until = Instant.parse("2026-10-01T18:00:00Z"))
 
     assertEquals("All quiet", PulseState(listOf(device()), mode = mode).sentenceAtNow())
   }
 
   @Test
-  fun shortSentence_downloading_countsAndPercent() {
+  fun shortSentence_downloading_countsAndPercent() = runTest {
     val state = PulseState(
       listOf(
         device(
@@ -561,21 +563,24 @@ class PulseStateTest {
       )
     )
 
-    assertEquals("3 downloading · 45%", state.shortSentence())
+    assertEquals("3 downloading · 45%", state.shortSentence().load())
   }
 
   @Test
-  fun tabTitle_downloadingAndIdle_showsTheShareOrTheName() {
+  fun tabTitle_downloadingAndIdle_showsTheShareOrTheName() = runTest {
     val downloading = PulseState(
       listOf(device(counts = PulseCounts(downloading = 3), downloadedBytes = 45, sizeBytes = 100))
     )
 
-    assertEquals("↓ 45% · Ketch", downloading.tabTitle())
-    assertEquals("Ketch", PulseState(listOf(device(counts = PulseCounts(done = 2)))).tabTitle())
+    assertEquals("↓ 45% · Ketch", downloading.tabTitle().load())
+    assertEquals(
+      "Ketch",
+      PulseState(listOf(device(counts = PulseCounts(done = 2)))).tabTitle().load()
+    )
   }
 
   @Test
-  fun shortSentence_offlineDeviceDownloading_ignoresItsProgress() {
+  fun shortSentence_offlineDeviceDownloading_ignoresItsProgress() = runTest {
     val state = PulseState(
       devices = listOf(
         device(counts = PulseCounts(downloading = 1), downloadedBytes = 45, sizeBytes = 100),
@@ -590,7 +595,7 @@ class PulseStateTest {
       allDevices = true,
     )
 
-    assertEquals("1 downloading · 45%", state.shortSentence())
+    assertEquals("1 downloading · 45%", state.shortSentence().load())
     assertEquals(0.45f, state.progress)
   }
 

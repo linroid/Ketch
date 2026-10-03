@@ -49,6 +49,8 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.SEPARATOR
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -58,7 +60,7 @@ import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -68,8 +70,42 @@ import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.shell.KetchLayout
-import kotlin.time.Duration.Companion.days
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.launchpad_browser_connected
+import ketch.app.shared.generated.resources.launchpad_browser_get
+import ketch.app.shared.generated.resources.launchpad_browser_none
+import ketch.app.shared.generated.resources.launchpad_browser_title
+import ketch.app.shared.generated.resources.launchpad_checklist_change
+import ketch.app.shared.generated.resources.launchpad_checklist_close
+import ketch.app.shared.generated.resources.launchpad_checklist_connected
+import ketch.app.shared.generated.resources.launchpad_checklist_detected
+import ketch.app.shared.generated.resources.launchpad_checklist_extension
+import ketch.app.shared.generated.resources.launchpad_checklist_folder
+import ketch.app.shared.generated.resources.launchpad_checklist_folder_choose
+import ketch.app.shared.generated.resources.launchpad_checklist_get_it
+import ketch.app.shared.generated.resources.launchpad_checklist_phone
+import ketch.app.shared.generated.resources.launchpad_checklist_show_qr
+import ketch.app.shared.generated.resources.launchpad_checklist_title
+import ketch.app.shared.generated.resources.launchpad_discover
+import ketch.app.shared.generated.resources.launchpad_pair_hint
+import ketch.app.shared.generated.resources.launchpad_pair_title
+import ketch.app.shared.generated.resources.launchpad_paste
+import ketch.app.shared.generated.resources.launchpad_paste_download
+import ketch.app.shared.generated.resources.launchpad_paste_hint
+import ketch.app.shared.generated.resources.launchpad_paste_hint_phone
+import ketch.app.shared.generated.resources.launchpad_paste_hint_plain
+import ketch.app.shared.generated.resources.launchpad_paste_maybe
+import ketch.app.shared.generated.resources.launchpad_paste_title
+import ketch.app.shared.generated.resources.launchpad_subtitle
+import ketch.app.shared.generated.resources.launchpad_subtitle_phone
+import ketch.app.shared.generated.resources.launchpad_title
+import ketch.app.shared.generated.resources.launchpad_torrent_hint
+import ketch.app.shared.generated.resources.launchpad_torrent_hint_phone
+import ketch.app.shared.generated.resources.launchpad_torrent_title
+import ketch.app.shared.generated.resources.launchpad_torrent_title_phone
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Duration.Companion.days
 
 /**
  * What the Downloads page shows before the first download: the sail lanes, three ways to add
@@ -99,7 +135,7 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
       )
       Spacer(Modifier.height(spacing.s6))
       Text(
-        text = "No downloads yet",
+        text = stringResource(Res.string.launchpad_title),
         style = KetchTheme.typography.largeTitle,
         color = colors.textPrimary,
         textAlign = TextAlign.Center,
@@ -107,9 +143,9 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
       Spacer(Modifier.height(spacing.s2))
       Text(
         text = if (phone) {
-          "Paste a link, open a .torrent file, or add downloads from your computer."
+          stringResource(Res.string.launchpad_subtitle_phone)
         } else {
-          "Paste a link, drop a file, or send one from your browser."
+          stringResource(Res.string.launchpad_subtitle)
         },
         style = KetchTheme.typography.body,
         color = colors.textSecondary,
@@ -158,34 +194,35 @@ private fun PasteTile(state: AppState, phone: Boolean, modifier: Modifier) {
     }
     Unit
   }
+  val title = stringResource(Res.string.launchpad_paste_title)
   when (clip) {
     is ClipboardLink.Found -> LaunchTile(
       icon = KetchIcon.Link,
-      title = "Paste a link",
+      title = title,
       detail = clip.label,
       hint = shortcut.takeUnless { phone },
-      action = "Download it",
+      action = stringResource(Res.string.launchpad_paste_download),
       onClick = { state.quickAdd(listOf(clip.url)) },
       modifier = modifier,
       compact = phone,
     )
     ClipboardLink.Maybe -> LaunchTile(
       icon = KetchIcon.Link,
-      title = "Paste a link",
-      detail = "There's a link on the clipboard.",
+      title = title,
+      detail = stringResource(Res.string.launchpad_paste_maybe),
       hint = shortcut.takeUnless { phone },
-      action = "Paste",
+      action = stringResource(Res.string.launchpad_paste),
       onClick = paste,
       modifier = modifier,
       compact = phone,
     )
     ClipboardLink.None -> LaunchTile(
       icon = KetchIcon.Link,
-      title = "Paste a link",
-      detail = if (phone) {
-        "Copy a link in any app, then paste it here."
-      } else {
-        "Copy a link, then press ${shortcut ?: "paste"} anywhere in Ketch."
+      title = title,
+      detail = when {
+        phone -> stringResource(Res.string.launchpad_paste_hint_phone)
+        shortcut != null -> stringResource(Res.string.launchpad_paste_hint, shortcut)
+        else -> stringResource(Res.string.launchpad_paste_hint_plain)
       },
       hint = shortcut.takeUnless { phone },
       onClick = { state.openIntake() },
@@ -202,9 +239,15 @@ private fun TorrentTile(state: AppState, phone: Boolean, modifier: Modifier) {
   val scope = rememberCoroutineScope()
   LaunchTile(
     icon = KetchIcon.Drop,
-    title = if (phone) "Open a .torrent file" else "Drop a link, magnet or .torrent",
-    detail = if (phone) "Or open a magnet link from your browser." else {
-      "Anywhere in this window, or choose a .torrent file."
+    title = if (phone) {
+      stringResource(Res.string.launchpad_torrent_title_phone)
+    } else {
+      stringResource(Res.string.launchpad_torrent_title)
+    },
+    detail = if (phone) {
+      stringResource(Res.string.launchpad_torrent_hint_phone)
+    } else {
+      stringResource(Res.string.launchpad_torrent_hint)
     },
     hint = KetchCommands.OpenTorrent.shortcutLabel().takeUnless { phone },
     onClick = {
@@ -223,16 +266,20 @@ private fun TorrentTile(state: AppState, phone: Boolean, modifier: Modifier) {
 /** Tile 3 on desktop: the browsers found and whether Ketch's extension is in them. */
 @Composable
 private fun BrowserTile(state: AppState, integration: IntegrationStatus, modifier: Modifier) {
-  val browsers = integration.browsers
-  val detail = when {
-    browsers.isEmpty() -> "Send downloads to Ketch from Chrome, Edge or Firefox."
-    else -> browsers.joinToString("  ") { browser ->
-      if (browser.extensionConnected) "${browser.name} ✓" else "${browser.name}: Get it"
+  val browsers = integration.browsers.map { browser ->
+    if (browser.extensionConnected) {
+      stringResource(Res.string.launchpad_browser_connected, browser.name)
+    } else {
+      stringResource(Res.string.launchpad_browser_get, browser.name)
     }
+  }
+  val detail = when {
+    browsers.isEmpty() -> stringResource(Res.string.launchpad_browser_none)
+    else -> browsers.joinToString("  ")
   }
   LaunchTile(
     icon = KetchIcon.Browser,
-    title = "Capture from your browser",
+    title = stringResource(Res.string.launchpad_browser_title),
     detail = detail,
     onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Integration)) },
     modifier = modifier,
@@ -244,8 +291,8 @@ private fun BrowserTile(state: AppState, integration: IntegrationStatus, modifie
 private fun PairTile(state: AppState, modifier: Modifier) {
   LaunchTile(
     icon = KetchIcon.Laptop,
-    title = "Control your computer's downloads",
-    detail = "Connect to Ketch on your computer and add downloads from here.",
+    title = stringResource(Res.string.launchpad_pair_title),
+    detail = stringResource(Res.string.launchpad_pair_hint),
     onClick = { state.showAddRemoteDialog = true },
     modifier = modifier,
     compact = true,
@@ -262,7 +309,7 @@ private fun DiscoverLine(state: AppState, phone: Boolean, modifier: Modifier = M
     modifier = modifier,
   ) {
     KetchButton(
-      text = "Or describe what you want · Discover",
+      text = stringResource(Res.string.launchpad_discover),
       onClick = { state.runInShell(KetchCommands.Discover) },
       variant = KetchButtonVariant.Ghost,
       size = KetchButtonSize.Small,
@@ -413,22 +460,29 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
   val items = buildList {
     add(
       ChecklistItem(
-        text = if (folder != null) "Downloads go to ${shortPath(folder)}" else {
-          "Choose where downloads go"
+        text = if (folder != null) {
+          stringResource(Res.string.launchpad_checklist_folder, shortPath(folder))
+        } else {
+          stringResource(Res.string.launchpad_checklist_folder_choose)
         },
         done = folder != null,
-        action = "Change…",
+        action = stringResource(Res.string.launchpad_checklist_change),
         onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Downloads)) },
       )
     )
     if (hooks.isSupported) {
       val detected = integration.browsers.firstOrNull()?.name
+        ?.let { stringResource(Res.string.launchpad_checklist_detected, it) }
       add(
         ChecklistItem(
-          text = listOfNotNull("Browser extension", detected?.let { "$it detected" })
-            .joinToString(" · "),
+          text = listOfNotNull(stringResource(Res.string.launchpad_checklist_extension), detected)
+            .joinToString(SEPARATOR),
           done = integration.extensionConnected,
-          action = if (integration.extensionConnected) "Connected" else "Get it",
+          action = if (integration.extensionConnected) {
+            stringResource(Res.string.launchpad_checklist_connected)
+          } else {
+            stringResource(Res.string.launchpad_checklist_get_it)
+          },
           onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Integration)) },
         )
       )
@@ -436,9 +490,12 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
     if (local && hooks.isSupported) {
       add(
         ChecklistItem(
-          text = "Control ${localDeviceNoun().replaceFirstChar { it.lowercase() }} from your phone",
+          text = stringResource(
+            Res.string.launchpad_checklist_phone,
+            localDeviceNounInSentence().resolve(),
+          ),
           done = server is ServerState.Running,
-          action = "Show QR",
+          action = stringResource(Res.string.launchpad_checklist_show_qr),
           onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing)) },
         )
       )
@@ -452,14 +509,14 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
   Column(modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        text = eyebrowText("Set up Ketch"),
+        text = eyebrowText(stringResource(Res.string.launchpad_checklist_title)),
         style = KetchTheme.typography.eyebrow,
         color = colors.textTertiary,
         modifier = Modifier.weight(1f),
       )
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Close the setup checklist",
+        contentDescription = stringResource(Res.string.launchpad_checklist_close),
         onClick = { state.appSettings.saveUi { it.copy(setupChecklistDismissed = true) } },
       )
     }

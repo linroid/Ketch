@@ -21,6 +21,8 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
@@ -34,12 +36,20 @@ import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.effectiveCap
-import com.linroid.ketch.app.ui.pulse.modeCaption
+import com.linroid.ketch.app.ui.pulse.modeCaptionText
 import com.linroid.ketch.app.ui.pulse.rememberPendingJob
-import com.linroid.ketch.app.ui.pulse.speedModeLabel
-import com.linroid.ketch.app.ui.pulse.speedModeName
+import com.linroid.ketch.app.ui.pulse.speedModeLabelText
+import com.linroid.ketch.app.ui.pulse.speedModeText
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_speed_applies
+import ketch.app.shared.generated.resources.device_speed_limit
+import ketch.app.shared.generated.resources.device_speed_mode
+import ketch.app.shared.generated.resources.device_speed_of
+import ketch.app.shared.generated.resources.device_speed_settings
+import ketch.app.shared.generated.resources.device_speed_update_failed
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What [device]'s speed mode pill shows: its own mode and limit, whether or not it is the device
@@ -59,7 +69,8 @@ internal fun rememberDeviceSpeedView(state: AppState, device: DevicePresence): S
   } else {
     effectiveCap(mode, cap, controller.slowLaneSpeed, settings.standard)
   }
-  val label = speedModeLabel(mode, limit, LocalClock.current.now(), TimeZone.currentSystemDefault())
+  val now = LocalClock.current.now()
+  val label = speedModeLabelText(mode, limit, now, TimeZone.currentSystemDefault())
   return SpeedModeView(mode, limit, label, controller)
 }
 
@@ -96,7 +107,7 @@ internal fun DeviceSpeedPill(
       onDismissRequest = { open = false },
       width = PopoverWidth,
       alignment = PopoverAlignment.End,
-      title = "Speed of ${device.name}",
+      title = stringResource(Res.string.device_speed_of, device.name.resolve()),
     ) {
       if (active) {
         SpeedModeOptions(state, onOpenSettings = { open = false })
@@ -124,33 +135,36 @@ private fun ColumnScope.DeviceSpeedOptions(
   val command = rememberPendingJob()
   if (controller != null) {
     val settings by controller.settings.collectAsState()
-    Eyebrow("Speed mode")
+    Eyebrow(stringResource(Res.string.device_speed_mode))
     KetchSegmented(
       options = SpeedLimitMode.entries,
       selected = settings.mode,
       onSelect = { command.track(state.switchSpeedMode(controller, it)) },
-      label = ::speedModeName,
+      label = { speedModeText(it).resolve() },
     )
     Spacer(Modifier.height(spacing.s2))
+    val now = LocalClock.current.now()
     Text(
-      text = modeCaption(view.mode, view.limit, settings.rules.isEmpty(), LocalClock.current.now()),
+      text = modeCaptionText(view.mode, view.limit, settings.rules.isEmpty(), now).resolve(),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
     )
   } else {
     val settings = state.settingsFor(device.entry)
-    Eyebrow("Speed limit")
+    val caption = settings.downloadError
+      ?.let { Res.string.device_speed_update_failed.text(device.name, it) }
+      ?: Res.string.device_speed_applies.text(device.name)
+    Eyebrow(stringResource(Res.string.device_speed_limit))
     SpeedLimitPicker(
       value = settings.download?.speedLimit ?: view.limit,
       onCommit = { state.setSpeedLimit(device.entry, it) },
-      caption = settings.downloadError?.let { "Couldn't update ${device.name} · $it" }
-        ?: "Applies to every download on ${device.name}.",
+      caption = caption.resolve(),
       enabled = settings.download != null,
     )
   }
   Spacer(Modifier.height(spacing.s3))
   KetchButton(
-    text = "Speed settings…",
+    text = stringResource(Res.string.device_speed_settings),
     onClick = {
       onOpenSettings()
       state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, device.deviceId))

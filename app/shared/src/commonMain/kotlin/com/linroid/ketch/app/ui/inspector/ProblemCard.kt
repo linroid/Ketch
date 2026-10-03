@@ -24,9 +24,12 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.log.rememberLogFilesAction
+import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
@@ -36,7 +39,14 @@ import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.util.ErrorCopy
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_copy_details
+import ketch.app.shared.generated.resources.inspector_open_logs
+import ketch.app.shared.generated.resources.inspector_open_logs_failed
+import ketch.app.shared.generated.resources.inspector_share_logs
+import ketch.app.shared.generated.resources.inspector_technical_details
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What went wrong with a failed [row], from its [error] copy: the title, the hint, up to two of
@@ -79,8 +89,8 @@ internal fun ProblemCard(
       modifier = Modifier.weight(1f),
     ) {
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-        Text(text = error.title, style = type.titleM, color = colors.textPrimary)
-        val hint = error.hint
+        Text(text = error.title.resolve(), style = type.titleM, color = colors.textPrimary)
+        val hint = error.hint?.resolve()
         if (hint != null) Text(text = hint, style = type.bodyS, color = colors.textSecondary)
       }
       val details = error.details
@@ -92,7 +102,7 @@ internal fun ProblemCard(
         ) {
           for (fix in fixes) {
             KetchButton(
-              text = rowActionLabel(fix, runner.files?.revealLabel),
+              text = rowActionLabel(fix, runner.files?.revealLabel).resolve(),
               onClick = { runner.run(fix, listOf(row)) },
               variant = KetchButtonVariant.Secondary,
               size = KetchButtonSize.Small,
@@ -111,7 +121,7 @@ internal fun ProblemCard(
 private fun TechnicalDetails(details: String) {
   var open by remember { mutableStateOf(false) }
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
-    Disclosure("Technical details", open) { open = !open }
+    Disclosure(stringResource(Res.string.inspector_technical_details), open) { open = !open }
     if (open) {
       Text(
         text = details,
@@ -122,7 +132,7 @@ private fun TechnicalDetails(details: String) {
   }
 }
 
-/** Copy details and, where the app keeps log files, Open logs. */
+/** Copy details and, where the app keeps log files, Open logs, or Share logs on phones. */
 @Composable
 private fun ProblemLinks(row: TaskRow, runner: RowActionRunner) {
   val logger = LocalFileLogger.current
@@ -134,16 +144,30 @@ private fun ProblemLinks(row: TaskRow, runner: RowActionRunner) {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
   ) {
-    if (copy) TextLink("Copy details") { runner.run(RowAction.CopyDetails, listOf(row)) }
+    if (copy) {
+      TextLink(stringResource(Res.string.inspector_copy_details)) {
+        runner.run(RowAction.CopyDetails, listOf(row))
+      }
+    }
     if (copy && logs != null) {
       Text(text = "·", style = KetchTheme.typography.labelS, color = KetchTheme.colors.textTertiary)
     }
     if (logs != null) {
-      TextLink(if (logs.title.startsWith("Open")) "Open logs" else logs.title) {
+      // Phones share a copy of the logs; elsewhere their folder opens.
+      val label = if (isMobilePlatform) {
+        Res.string.inspector_share_logs
+      } else {
+        Res.string.inspector_open_logs
+      }
+      TextLink(stringResource(label)) {
         scope.launch {
           catchingUnlessCancelled { logs.run() }.onFailure { e ->
             log.w { "Couldn't open the logs: ${e.describeCauses()}" }
-            state.messages.post(MessageLevel.Error, "Couldn't open the logs", cause = e)
+            state.messages.post(
+              level = MessageLevel.Error,
+              title = Res.string.inspector_open_logs_failed.text(),
+              cause = e,
+            )
           }
         }
       }

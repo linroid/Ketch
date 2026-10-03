@@ -2,6 +2,8 @@ package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.app.i18n.load
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -9,29 +11,29 @@ class QueueReasonTest {
   private val queued = DownloadRequest("https://github.com/a/b.zip")
 
   @Test
-  fun of_allSlotsTaken_waitsForSlot() {
+  fun of_allSlotsTaken_waitsForSlot() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = listOf(request("https://a.com/1"), request("https://b.com/2"))
 
     val reason = QueueReason.of(queued, config, running)
 
     assertEquals(QueueReason.SlotsFull(running = 2, limit = 2), reason)
-    assertEquals("Waiting for a free slot (2 of 2 in use)", reason.text)
+    assertEquals("Waiting for a free slot (2 of 2 in use)", reason.text.load())
   }
 
   @Test
-  fun of_loweredSlotLimit_countsEveryRunningTask() {
+  fun of_loweredSlotLimit_countsEveryRunningTask() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = List(3) { request("https://a.com/$it") }
 
     assertEquals(
       "Waiting for a free slot (3 of 2 in use)",
-      QueueReason.of(queued, config, running).text
+      QueueReason.of(queued, config, running).text.load()
     )
   }
 
   @Test
-  fun of_hostLimitReached_waitsForHost() {
+  fun of_hostLimitReached_waitsForHost() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 10, maxConnectionsPerHost = 2)
     val running = listOf(
       request("https://GitHub.com/1"),
@@ -42,7 +44,7 @@ class QueueReasonTest {
     val reason = QueueReason.of(queued, config, running)
 
     assertEquals(QueueReason.HostFull("github.com", 2), reason)
-    assertEquals("Waiting for github.com (2 per site)", reason.text)
+    assertEquals("Waiting for github.com (2 per site)", reason.text.load())
   }
 
   @Test
@@ -71,13 +73,13 @@ class QueueReasonTest {
   }
 
   @Test
-  fun of_freeSlotAndHost_isNext() {
+  fun of_freeSlotAndHost_isNext() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2, maxConnectionsPerHost = 8)
 
     val reason = QueueReason.of(queued, config, listOf(request("https://github.com/1")))
 
     assertEquals(QueueReason.Next, reason)
-    assertEquals("Waiting to start", reason.text)
+    assertEquals("Waiting to start", reason.text.load())
   }
 
   private fun request(url: String) = DownloadRequest(url)

@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AiDiscoverState
 import com.linroid.ketch.app.state.AiSettingsController
@@ -29,6 +33,12 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.discover_hero_title
+import ketch.app.shared.generated.resources.discover_intro_body
+import ketch.app.shared.generated.resources.discover_settings
+import ketch.app.shared.generated.resources.discover_title
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Discover destination: an AI search for downloads, in the user's own words.
@@ -69,19 +79,19 @@ private fun DiscoverHeader(state: AppState, showModel: Boolean) {
       .padding(horizontal = spacing.pageHeaderPadding),
   ) {
     Text(
-      text = "Discover",
+      text = stringResource(Res.string.discover_title),
       style = KetchTheme.typography.pageTitle,
       color = KetchTheme.colors.textPrimary,
     )
     Spacer(Modifier.weight(1f))
     if (showModel) {
       KetchButton(
-        text = modelLabel(state.aiSettings),
+        text = modelLabel(state.aiSettings).resolve(),
         onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
         leadingIcon = KetchIcon.Ai,
-        tooltip = "Discover settings",
+        tooltip = stringResource(Res.string.discover_settings),
       )
     }
   }
@@ -149,9 +159,8 @@ private fun DiscoverIntro(
 ) {
   val provider = state.aiSettings.settings.llm.provider
   DiscoverHero(
-    title = "Describe it. Ketch finds the download.",
-    body = "Discover asks ${provider.shortLabel} to search the web and read the pages it " +
-      "finds, then lists the files it trusts. Nothing downloads until you add it.",
+    title = stringResource(Res.string.discover_hero_title),
+    body = stringResource(Res.string.discover_intro_body, provider.shortLabel.resolve()),
     modifier = modifier,
   ) {
     DiscoverExamples(onClick = onExample)
@@ -159,11 +168,10 @@ private fun DiscoverIntro(
 }
 
 /** The model discovery runs on, such as "Anthropic · claude-opus-5". */
-internal fun modelLabel(ai: AiSettingsController): String {
+internal fun modelLabel(ai: AiSettingsController): UiText {
   val llm = ai.withPlatformCredentials(ai.settings).llm
-  return listOf(llm.provider.shortLabel, llm.effectiveModel)
-    .filter { it.isNotBlank() }
-    .joinToString(" · ")
+  val model = llm.effectiveModel.takeIf { it.isNotBlank() }?.let(::verbatim)
+  return listOfNotNull(llm.provider.shortLabel, model).joinText()
 }
 
 /** Below this width, the website chip and Find sit under the search field. */

@@ -11,6 +11,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.linroid.ketch.app.i18n.ProvideLoadEnvironment
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.config.DensityMode
 
@@ -57,6 +58,7 @@ fun KetchTheme(
   windowChrome: WindowChrome = LocalWindowChrome.current,
   content: @Composable () -> Unit,
 ) {
+  ProvideLoadEnvironment()
   DensityHost(density) { resolvedDensity ->
     val colors = remember(darkTheme, accent) {
       if (darkTheme) darkKetchColors(accent) else lightKetchColors(accent)

@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_chip_remove
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Pill-shaped choice, filter or token.
@@ -114,13 +117,14 @@ private fun RemoveButton(label: String, onRemove: () -> Unit, enabled: Boolean) 
   val colors = KetchTheme.colors
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions, enabled)
+  val description = stringResource(Res.string.component_chip_remove, label)
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
       .size(RemoveTarget)
       .clip(KetchTheme.shapes.full)
       .background(overlay)
-      .semantics { contentDescription = "Remove $label" }
+      .semantics { contentDescription = description }
       .clickable(
         interactionSource = interactions,
         indication = null,

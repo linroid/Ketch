@@ -54,6 +54,9 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -68,6 +71,30 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.config.DownloadsLayout
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.downloads_all_devices
+import ketch.app.shared.generated.resources.downloads_clear_finished
+import ketch.app.shared.generated.resources.downloads_clear_finished_count
+import ketch.app.shared.generated.resources.downloads_clear_missing
+import ketch.app.shared.generated.resources.downloads_clear_missing_caption
+import ketch.app.shared.generated.resources.downloads_clear_missing_count
+import ketch.app.shared.generated.resources.downloads_close_search
+import ketch.app.shared.generated.resources.downloads_columns
+import ketch.app.shared.generated.resources.downloads_copy_all_links
+import ketch.app.shared.generated.resources.downloads_count_downloading
+import ketch.app.shared.generated.resources.downloads_more
+import ketch.app.shared.generated.resources.downloads_resolving
+import ketch.app.shared.generated.resources.downloads_resolving_tooltip
+import ketch.app.shared.generated.resources.downloads_row_density
+import ketch.app.shared.generated.resources.downloads_search_placeholder
+import ketch.app.shared.generated.resources.downloads_show_add_sheet
+import ketch.app.shared.generated.resources.downloads_switch_device
+import ketch.app.shared.generated.resources.downloads_title
+import ketch.app.shared.generated.resources.downloads_view_list
+import ketch.app.shared.generated.resources.downloads_view_table
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Downloads page header: the title with its count pill, the device chip when the sidebar
@@ -116,7 +143,7 @@ internal fun DownloadsHeader(
       SearchField(page, fill = true, modifier = Modifier.weight(1f))
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Close search",
+        contentDescription = stringResource(Res.string.downloads_close_search),
         onClick = {
           state.searchQuery = ""
           page.searchOpen = false
@@ -156,13 +183,13 @@ private fun ViewToggles(page: DownloadsPage, showsTable: Boolean) {
     listOf(
       KetchPillItem(
         icon = KetchIcon.All,
-        label = "List",
+        label = Res.string.downloads_view_list.text(),
         onClick = { page.saveViewMode(DownloadsLayout.List) },
         selected = !showsTable,
       ),
       KetchPillItem(
         icon = KetchIcon.Columns,
-        label = "Table",
+        label = Res.string.downloads_view_table.text(),
         onClick = { page.saveViewMode(DownloadsLayout.Table) },
         selected = showsTable,
       ),
@@ -179,26 +206,25 @@ private fun Title(page: DownloadsPage) {
   val total = counts[StatusFilter.All] ?: 0
   val downloading = counts[StatusFilter.Downloading] ?: 0
   Text(
-    text = "Downloads",
+    text = stringResource(Res.string.downloads_title),
     style = KetchTheme.typography.pageTitle,
     color = colors.textPrimary,
     maxLines = 1,
   )
   if (total > 0) {
     val text = if (downloading > 0) "$downloading↓/$total" else "$total"
+    val description = if (downloading > 0) {
+      pluralStringResource(Res.plurals.downloads_count_downloading, total, downloading, total)
+    } else {
+      pluralStringResource(Res.plurals.count_downloads, total, total)
+    }
     Box(
       contentAlignment = Alignment.Center,
       modifier = Modifier
         .height(spacing.s5)
         .background(colors.surfaceSunken, KetchTheme.shapes.full)
         .padding(horizontal = spacing.s2)
-        .semantics {
-          contentDescription = if (downloading > 0) {
-            "$downloading downloading of $total"
-          } else {
-            "$total downloads"
-          }
-        },
+        .semantics { contentDescription = description },
     ) {
       Text(
         text = text,
@@ -241,7 +267,7 @@ private fun DeviceChip(state: AppState, modifier: Modifier = Modifier) {
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = "Switch device",
+        onClickLabel = stringResource(Res.string.downloads_switch_device),
         onClick = { state.showInstanceSelector = true },
       )
       .padding(start = spacing.s1, end = spacing.s2),
@@ -256,7 +282,11 @@ private fun DeviceChip(state: AppState, modifier: Modifier = Modifier) {
       )
     }
     Text(
-      text = if (devices.several) "All devices" else entry.displayName,
+      text = if (devices.several) {
+        stringResource(Res.string.downloads_all_devices)
+      } else {
+        entry.displayName.resolve()
+      },
       style = KetchTheme.typography.labelS,
       color = colors.textPrimary,
       maxLines = 1,
@@ -290,7 +320,7 @@ private fun SearchField(page: DownloadsPage, fill: Boolean, modifier: Modifier =
   KetchTextField(
     value = query,
     onValueChange = { state.searchQuery = it },
-    placeholder = "Search or paste a link",
+    placeholder = stringResource(Res.string.downloads_search_placeholder),
     leadingIcon = KetchIcon.Search,
     onFocusChange = { focused = it },
     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -358,7 +388,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
-      contentDescription = "More",
+      contentDescription = stringResource(Res.string.downloads_more),
       onClick = { open = true },
       selected = open,
     )
@@ -389,7 +419,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
         item(
           label = clearMissingLabel(missing),
           icon = KetchIcon.Warning,
-          caption = CLEAR_MISSING_CAPTION,
+          caption = clearMissingCaption,
           onClick = { runner.clearMissing(finishedRows) },
           enabled = missing > 0,
         )
@@ -401,18 +431,26 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
         enabled = visible.isNotEmpty(),
       )
       item(
-        label = "Copy all links",
+        label = Res.string.downloads_copy_all_links.text(),
         icon = KetchIcon.Copy,
         onClick = { copyLinks(page, visible) },
         enabled = visible.isNotEmpty(),
       )
       divider()
-      submenu(label = "Columns", icon = KetchIcon.Columns, enabled = showsTable) {
+      submenu(
+        label = Res.string.downloads_columns.text(),
+        icon = KetchIcon.Columns,
+        enabled = showsTable,
+      ) {
         columnChooser(page.tableLayout(state.statusFilter), autoColumns = auto, onLayoutChange = {
           page.saveTableLayout(state.statusFilter, it)
         })
       }
-      submenu(label = "Row density", icon = KetchIcon.Lanes, enabled = showsTable) {
+      submenu(
+        label = Res.string.downloads_row_density.text(),
+        icon = KetchIcon.Lanes,
+        enabled = showsTable,
+      ) {
         for (density in RowDensity.entries) {
           item(
             label = density.label,
@@ -440,7 +478,7 @@ private fun ResolvingChip(state: AppState) {
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
-  KetchTooltip(text = "Fetching file lists from peers · click to choose files") {
+  KetchTooltip(text = stringResource(Res.string.downloads_resolving_tooltip)) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -455,14 +493,14 @@ private fun ResolvingChip(state: AppState) {
           interactionSource = interactions,
           indication = null,
           role = Role.Button,
-          onClickLabel = "Show the add sheet",
+          onClickLabel = stringResource(Res.string.downloads_show_add_sheet),
           onClick = { state.intake.resume(session) },
         )
         .padding(horizontal = spacing.s2),
     ) {
       KetchSpinner(size = spacing.s3, color = colors.accentText)
       Text(
-        text = "Resolving $count",
+        text = stringResource(Res.string.downloads_resolving, count),
         style = KetchTheme.typography.labelS,
         color = colors.accentText,
         maxLines = 1,
@@ -475,15 +513,22 @@ private val DownloadState.isPausable: Boolean
   get() = this is DownloadState.Downloading || this is DownloadState.Queued
 
 /** "Clear 4 finished", or "Clear finished" when there are none. */
-internal fun clearFinishedLabel(count: Int): String =
-  if (count > 0) "Clear $count finished" else "Clear finished"
+internal fun clearFinishedLabel(count: Int): UiText = if (count > 0) {
+  Res.plurals.downloads_clear_finished_count.text(count)
+} else {
+  Res.string.downloads_clear_finished.text()
+}
 
 /** "Clear 2 missing", or "Clear missing" when no finished file is known to be gone. */
-internal fun clearMissingLabel(count: Int): String =
-  if (count > 0) "Clear $count missing" else "Clear missing"
+internal fun clearMissingLabel(count: Int): UiText = if (count > 0) {
+  Res.plurals.downloads_clear_missing_count.text(count)
+} else {
+  Res.string.downloads_clear_missing.text()
+}
 
 /** What "Clear missing" removes, for its caption in menus. */
-internal const val CLEAR_MISSING_CAPTION: String = "Files moved or deleted"
+internal val clearMissingCaption: UiText
+  get() = Res.string.downloads_clear_missing_caption.text()
 
 private fun copyLinks(page: DownloadsPage, rows: List<TaskRow>) {
   page.actions.runner.run(RowAction.CopyLink, rows)

@@ -37,6 +37,8 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DiscoveredServer
@@ -45,7 +47,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.instance.deviceNameOrNull
 import com.linroid.ketch.app.platform.isMobilePlatform
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SettingsTarget
@@ -54,6 +56,27 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.util.PairingLink
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.action_connect
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.connect_add_title
+import ketch.app.shared.generated.resources.connect_added_badge
+import ketch.app.shared.generated.resources.connect_asks_for_code
+import ketch.app.shared.generated.resources.connect_code_no_longer_accepted
+import ketch.app.shared.generated.resources.connect_find_on_network
+import ketch.app.shared.generated.resources.connect_looking
+import ketch.app.shared.generated.resources.connect_nearby_failed_hint
+import ketch.app.shared.generated.resources.connect_new_code_title
+import ketch.app.shared.generated.resources.connect_none_found
+import ketch.app.shared.generated.resources.connect_on_your_network
+import ketch.app.shared.generated.resources.connect_paste_hint
+import ketch.app.shared.generated.resources.connect_scan_hint
+import ketch.app.shared.generated.resources.connect_search_again
+import ketch.app.shared.generated.resources.connect_searching
+import ketch.app.shared.generated.resources.connect_share_instead
+import ketch.app.shared.generated.resources.connect_show_pairing_code
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Add device sheet: connects this app to another Ketch device from its pairing link or
@@ -161,23 +184,34 @@ internal fun AddDeviceDialog(
     dismissible = !form.isEdited && !form.connecting,
     contentSpacing = spacing.s4,
     title = {
-      Text(if (device == null) "Add a device" else "New access code for ${device.label}")
+      Text(
+        if (device == null) {
+          stringResource(Res.string.connect_add_title)
+        } else {
+          stringResource(Res.string.connect_new_code_title, device.label)
+        },
+      )
     },
     confirmButton = {
-      KetchButton(text = "Connect", onClick = { onSubmit(true) }, loading = form.connecting)
+      KetchButton(
+        text = stringResource(Res.string.action_connect),
+        onClick = { onSubmit(true) },
+        loading = form.connecting,
+      )
     },
     dismissButton = {
-      KetchButton(text = "Cancel", onClick = onDismiss, variant = KetchButtonVariant.Secondary)
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Secondary,
+      )
     },
   ) {
     Text(
       text = when {
-        device != null -> "${device.label} no longer accepts the code Ketch has. Paste a new " +
-          "pairing link from Settings › Sharing on that device, or enter its access code."
-        isMobilePlatform -> "Scan the pairing code in Settings › Sharing on the other device " +
-          "with your camera app, or paste its pairing link."
-        else -> "Paste the pairing link from Settings › Sharing on the other device, or type " +
-          "its address."
+        device != null -> stringResource(Res.string.connect_code_no_longer_accepted, device.label)
+        isMobilePlatform -> stringResource(Res.string.connect_scan_hint)
+        else -> stringResource(Res.string.connect_paste_hint)
       },
       style = type.bodyS,
       color = colors.textSecondary,
@@ -220,7 +254,7 @@ private fun NearbySection(
   val spacing = KetchTheme.spacing
   if (!nearby.searched && !nearby.searching) {
     KetchButton(
-      text = "Find on network",
+      text = stringResource(Res.string.connect_find_on_network),
       onClick = onFind,
       variant = KetchButtonVariant.Secondary,
       leadingIcon = KetchIcon.Search,
@@ -234,7 +268,7 @@ private fun NearbySection(
       modifier = Modifier.fillMaxWidth().heightIn(min = KetchTheme.density.buttonSmall),
     ) {
       Text(
-        text = eyebrowText("On your network"),
+        text = eyebrowText(stringResource(Res.string.connect_on_your_network)),
         style = type.eyebrow,
         color = colors.textSecondary,
         modifier = Modifier.weight(1f),
@@ -242,10 +276,14 @@ private fun NearbySection(
       when {
         nearby.searching -> {
           KetchSpinner()
-          Text("Searching…", style = type.caption, color = colors.textTertiary)
+          Text(
+            text = stringResource(Res.string.connect_searching),
+            style = type.caption,
+            color = colors.textTertiary,
+          )
         }
         nearby.searched -> KetchButton(
-          text = "Search again",
+          text = stringResource(Res.string.connect_search_again),
           onClick = onFind,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -254,17 +292,17 @@ private fun NearbySection(
         )
       }
     }
+    val error = nearby.error
     when {
       servers.isNotEmpty() -> NearbyList(servers, added, busy, onPick)
       else -> Text(
         text = when {
-          nearby.searching -> "Looking for Ketch devices on this network…"
-          nearby.error != null -> "${nearby.error}. Paste a pairing link instead."
-          else -> "No devices found. On the other device, open Settings › Sharing and allow " +
-            "another device."
-        },
+          nearby.searching -> Res.string.connect_looking.text()
+          error != null -> Res.string.connect_nearby_failed_hint.text(error)
+          else -> Res.string.connect_none_found.text()
+        }.resolve(),
         style = type.caption,
-        color = if (nearby.error != null) colors.status.failed.color else colors.textSecondary,
+        color = if (error != null) colors.status.failed.color else colors.textSecondary,
       )
     }
   }
@@ -328,7 +366,9 @@ private fun NearbyRow(
         indication = null,
         enabled = enabled,
         role = Role.Button,
-        onClickLabel = if (added) "Show" else "Connect",
+        onClickLabel = stringResource(
+          if (added) Res.string.action_show else Res.string.action_connect,
+        ),
         onClick = onClick,
       )
       .padding(horizontal = spacing.s3, vertical = spacing.s2),
@@ -348,7 +388,11 @@ private fun NearbyRow(
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        text = if (server.tokenRequired) "$address · asks for a code" else address,
+        text = if (server.tokenRequired) {
+          stringResource(Res.string.connect_asks_for_code, address)
+        } else {
+          address
+        },
         style = type.caption,
         color = colors.textSecondary,
         maxLines = 1,
@@ -358,7 +402,11 @@ private fun NearbyRow(
     Box(contentAlignment = Alignment.Center, modifier = Modifier.heightIn(min = spacing.s4)) {
       when {
         busy -> KetchSpinner(size = KetchTheme.density.controlGlyph, color = colors.accent)
-        added -> Text("Added", style = type.labelS, color = colors.textTertiary)
+        added -> Text(
+          text = stringResource(Res.string.connect_added_badge),
+          style = type.labelS,
+          color = colors.textTertiary,
+        )
         else -> KetchIconImage(
           icon = KetchIcon.Chevron,
           size = KetchTheme.density.controlGlyph,
@@ -375,20 +423,20 @@ private fun NearbyRow(
 private fun ShareInstead(onShare: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val noun = localDeviceNoun().replaceFirstChar { it.lowercase() }
+  val noun = localDeviceNounInSentence().resolve()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier.fillMaxWidth(),
   ) {
     Text(
-      text = "Want to control $noun from another device?",
+      text = stringResource(Res.string.connect_share_instead, noun),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
       modifier = Modifier.weight(1f),
     )
     KetchButton(
-      text = "Show its pairing code",
+      text = stringResource(Res.string.connect_show_pairing_code),
       onClick = onShare,
       variant = KetchButtonVariant.Ghost,
       size = KetchButtonSize.Small,

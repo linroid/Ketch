@@ -1,11 +1,13 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.components.SpeedLimitLine
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures.START
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TimelineKind
 import com.linroid.ketch.app.theme.lightKetchColors
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
@@ -46,40 +48,43 @@ class ActivityTabTest {
   }
 
   @Test
-  fun activityLimits_taskAndGlobal_drawsEachOnce() {
+  fun activityLimits_taskAndGlobal_drawsEachOnce() = runTest {
+    suspend fun lines(task: SpeedLimit, global: SpeedLimit, name: String) =
+      activityLimits(task, global, verbatim(name)).map { it.bytesPerSecond to it.label.load() }
+
     assertEquals(
       listOf(
-        SpeedLimitLine(SpeedLimit.mbps(1).bytesPerSecond, "Slow lane 1 MB/s"),
-        SpeedLimitLine(SpeedLimit.mbps(5).bytesPerSecond, "Task 5 MB/s")
+        SpeedLimit.mbps(1).bytesPerSecond to "Slow lane 1 MB/s",
+        SpeedLimit.mbps(5).bytesPerSecond to "Task 5 MB/s"
       ),
-      activityLimits(SpeedLimit.mbps(5), SpeedLimit.mbps(1), "Slow lane")
+      lines(SpeedLimit.mbps(5), SpeedLimit.mbps(1), "Slow lane")
     )
     assertEquals(
-      listOf(SpeedLimitLine(SpeedLimit.mbps(2).bytesPerSecond, "Task 2 MB/s")),
-      activityLimits(SpeedLimit.mbps(2), SpeedLimit.mbps(2), "Global")
+      listOf(SpeedLimit.mbps(2).bytesPerSecond to "Task 2 MB/s"),
+      lines(SpeedLimit.mbps(2), SpeedLimit.mbps(2), "Global")
     )
     assertEquals(
       listOf(
-        SpeedLimitLine(SpeedLimit.mbps(4).bytesPerSecond, "Global 4 MB/s"),
-        SpeedLimitLine(SpeedLimit.mbps(5).bytesPerSecond, null)
+        SpeedLimit.mbps(4).bytesPerSecond to "Global 4 MB/s",
+        SpeedLimit.mbps(5).bytesPerSecond to null
       ),
-      activityLimits(SpeedLimit.mbps(5), SpeedLimit.mbps(4), "Global")
+      lines(SpeedLimit.mbps(5), SpeedLimit.mbps(4), "Global")
     )
-    assertEquals(
-      emptyList(),
-      activityLimits(SpeedLimit.Unlimited, SpeedLimit.Unlimited, "Global")
-    )
+    assertEquals(emptyList(), lines(SpeedLimit.Unlimited, SpeedLimit.Unlimited, "Global"))
   }
 
   @Test
-  fun activityStats_peakAverageAndConnections() {
+  fun activityStats_peakAverageAndConnections() = runTest {
     val history = SpeedHistory.of(1_048_576, START).plus(3_145_728, START + 1.seconds)
 
     assertEquals(
       listOf("Peak" to "3.0 MB/s", "Average" to "2.0 MB/s", "Connections" to "8"),
-      activityStats(history, 8)
+      activityStats(history, 8).map { (name, value) -> name.load() to value.load() }
     )
-    assertEquals(listOf("Peak", "Average"), activityStats(history, null).map { it.first })
+    assertEquals(
+      listOf("Peak", "Average"),
+      activityStats(history, null).map { it.first }.load(),
+    )
   }
 
   @Test

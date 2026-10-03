@@ -2,11 +2,49 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.clockTime
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.group_all_done_at
+import ketch.app.shared.generated.resources.group_day
+import ketch.app.shared.generated.resources.group_device
+import ketch.app.shared.generated.resources.group_in_start_order
+import ketch.app.shared.generated.resources.group_none
+import ketch.app.shared.generated.resources.group_site
+import ketch.app.shared.generated.resources.group_smart
+import ketch.app.shared.generated.resources.group_status
+import ketch.app.shared.generated.resources.group_title_attention
+import ketch.app.shared.generated.resources.group_title_downloading
+import ketch.app.shared.generated.resources.group_title_earlier
+import ketch.app.shared.generated.resources.group_title_other_site
+import ketch.app.shared.generated.resources.group_title_paused
+import ketch.app.shared.generated.resources.group_title_today
+import ketch.app.shared.generated.resources.group_title_waiting
+import ketch.app.shared.generated.resources.group_title_week
+import ketch.app.shared.generated.resources.group_title_yesterday
+import ketch.app.shared.generated.resources.group_type
+import ketch.app.shared.generated.resources.sort_added
+import ketch.app.shared.generated.resources.sort_connections
+import ketch.app.shared.generated.resources.sort_device
+import ketch.app.shared.generated.resources.sort_name
+import ketch.app.shared.generated.resources.sort_origin
+import ketch.app.shared.generated.resources.sort_priority
+import ketch.app.shared.generated.resources.sort_progress
+import ketch.app.shared.generated.resources.sort_size
+import ketch.app.shared.generated.resources.sort_smart
+import ketch.app.shared.generated.resources.sort_source
+import ketch.app.shared.generated.resources.sort_speed
+import ketch.app.shared.generated.resources.sort_status
+import ketch.app.shared.generated.resources.sort_time_left
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -15,49 +53,57 @@ import kotlin.time.Instant
  * What the Downloads list sorts by: a column, or [Smart] order.
  *
  * @property id name used in [ListArrangement.encode].
- * @property label column or menu label.
  * @property descendingFirst whether the first click on the column sorts high to low.
  */
-enum class SortKey(val id: String, val label: String, val descendingFirst: Boolean) {
+enum class SortKey(
+  val id: String,
+  private val resource: StringResource,
+  val descendingFirst: Boolean,
+) {
   /**
    * Downloading first by priority then progress, then waiting tasks in start order, paused,
    * failed and canceled, and finished tasks, the newest first.
    */
-  Smart("smart", "Smart", descendingFirst = false),
-  Name("name", "Name", descendingFirst = false),
-  Size("size", "Size", descendingFirst = true),
-  Progress("progress", "Progress", descendingFirst = true),
+  Smart("smart", Res.string.sort_smart, descendingFirst = false),
+  Name("name", Res.string.sort_name, descendingFirst = false),
+  Size("size", Res.string.sort_size, descendingFirst = true),
+  Progress("progress", Res.string.sort_progress, descendingFirst = true),
 
   /** Speed averaged over the last 3 samples, so rows do not swap on every tick. */
-  Speed("speed", "Speed", descendingFirst = true),
-  TimeLeft("left", "Left", descendingFirst = false),
-  Added("added", "Added", descendingFirst = true),
-  Status("status", "Status", descendingFirst = false),
-  Connections("connections", "Connections", descendingFirst = true),
-  Source("source", "Source", descendingFirst = false),
-  Origin("origin", "Origin", descendingFirst = false),
-  Priority("priority", "Priority", descendingFirst = true),
-  Device("device", "Device", descendingFirst = false),
+  Speed("speed", Res.string.sort_speed, descendingFirst = true),
+  TimeLeft("left", Res.string.sort_time_left, descendingFirst = false),
+  Added("added", Res.string.sort_added, descendingFirst = true),
+  Status("status", Res.string.sort_status, descendingFirst = false),
+  Connections("connections", Res.string.sort_connections, descendingFirst = true),
+  Source("source", Res.string.sort_source, descendingFirst = false),
+  Origin("origin", Res.string.sort_origin, descendingFirst = false),
+  Priority("priority", Res.string.sort_priority, descendingFirst = true),
+  Device("device", Res.string.sort_device, descendingFirst = false);
+
+  /** Column or menu label. */
+  val label: UiText get() = resource.text()
 }
 
 /**
  * How the Downloads list groups rows under headers.
  *
  * @property id name used in [ListArrangement.encode].
- * @property label menu label.
  */
-enum class GroupBy(val id: String, val label: String) {
+enum class GroupBy(val id: String, private val resource: StringResource) {
   /**
    * Downloading, waiting, paused, needing attention, then finished tasks by the day they were
    * added: today, yesterday, this week and earlier.
    */
-  Smart("smart", "Smart"),
-  Status("status", "Status"),
-  Day("day", "Day"),
-  Device("device", "Device"),
-  Site("site", "Site"),
-  Type("type", "Type"),
-  None("none", "None"),
+  Smart("smart", Res.string.group_smart),
+  Status("status", Res.string.group_status),
+  Day("day", Res.string.group_day),
+  Device("device", Res.string.group_device),
+  Site("site", Res.string.group_site),
+  Type("type", Res.string.group_type),
+  None("none", Res.string.group_none);
+
+  /** Menu label. */
+  val label: UiText get() = resource.text()
 }
 
 /**
@@ -127,9 +173,9 @@ data class ListArrangement(
  */
 data class RowGroup(
   val id: String,
-  val title: String,
+  val title: UiText,
   val rows: List<TaskRow>,
-  val details: List<String> = emptyList(),
+  val details: List<UiText> = emptyList(),
   val collapsedByDefault: Boolean = false,
 ) {
   companion object {
@@ -257,7 +303,7 @@ private enum class SlotKind { Downloading, Waiting, Day, Plain }
  */
 private class Slot(
   val id: String,
-  val title: String,
+  val title: UiText,
   val order: Int,
   val name: String = "",
   val kind: SlotKind = SlotKind.Plain,
@@ -270,11 +316,17 @@ private class Slot(
 
 private val SLOT_ORDER: Comparator<Slot> = compareBy({ it.order }, { it.name })
 
-private val DOWNLOADING = Slot("smart:downloading", "Downloading", 0, kind = SlotKind.Downloading)
-private val WAITING = Slot("smart:waiting", "Waiting", 1, kind = SlotKind.Waiting)
-private val PAUSED = Slot("smart:paused", "Paused", 2)
-private val ATTENTION = Slot("smart:attention", "Needs attention", 3)
-private val ALL = Slot("all", "", 0)
+private val DOWNLOADING = Slot(
+  "smart:downloading",
+  Res.string.group_title_downloading.text(),
+  0,
+  kind = SlotKind.Downloading,
+)
+private val WAITING =
+  Slot("smart:waiting", Res.string.group_title_waiting.text(), 1, kind = SlotKind.Waiting)
+private val PAUSED = Slot("smart:paused", Res.string.group_title_paused.text(), 2)
+private val ATTENTION = Slot("smart:attention", Res.string.group_title_attention.text(), 3)
+private val ALL = Slot("all", UiText.Empty, 0)
 
 /** [rows] grouped as [arrangement] says, groups in order and rows sorted inside each. */
 private fun sortedSlots(
@@ -310,8 +362,8 @@ private fun slotOf(row: TaskRow, group: GroupBy, now: Instant, timeZone: TimeZon
     }
     GroupBy.Day -> daySlot("day", row.createdAt, now, timeZone)
     GroupBy.Device -> Slot("device:${row.key.deviceId}", row.device.name, 0)
-    GroupBy.Site -> row.sourceHost?.let { Slot("site:$it", it, 0, name = it) }
-      ?: Slot("site:", "Other", 1)
+    GroupBy.Site -> row.sourceHost?.let { Slot("site:$it", verbatim(it), 0, name = it) }
+      ?: Slot("site:", Res.string.group_title_other_site.text(), 1)
     GroupBy.Type -> Slot("type:${row.fileType.id}", row.fileType.label, row.fileType.ordinal)
     GroupBy.None -> ALL
   }
@@ -321,12 +373,13 @@ private fun daySlot(prefix: String, createdAt: Instant, now: Instant, timeZone: 
   val today = now.toLocalDateTime(timeZone).date
   val date = createdAt.toLocalDateTime(timeZone).date
   return when {
-    date >= today -> Slot("$prefix:today", "Added today", 4, kind = SlotKind.Day)
+    date >= today ->
+      Slot("$prefix:today", Res.string.group_title_today.text(), 4, kind = SlotKind.Day)
     date == today.minus(1, DateTimeUnit.DAY) ->
-      Slot("$prefix:yesterday", "Added yesterday", 5, kind = SlotKind.Day)
+      Slot("$prefix:yesterday", Res.string.group_title_yesterday.text(), 5, kind = SlotKind.Day)
     date > today.minus(7, DateTimeUnit.DAY) ->
-      Slot("$prefix:week", "Added this week", 6, kind = SlotKind.Day)
-    else -> Slot("$prefix:earlier", "Added earlier", 7, collapsible = true)
+      Slot("$prefix:week", Res.string.group_title_week.text(), 6, kind = SlotKind.Day)
+    else -> Slot("$prefix:earlier", Res.string.group_title_earlier.text(), 7, collapsible = true)
   }
 }
 
@@ -338,22 +391,25 @@ private fun groupOf(
   timeZone: TimeZone,
 ): RowGroup {
   val details = buildList {
-    add(rows.size.toString())
+    add(verbatim(rows.size.toString()))
     when (slot.kind) {
       SlotKind.Downloading -> {
         val speed = rows.sumOf { row ->
           (row.state as? DownloadState.Downloading)?.progress?.bytesPerSecond ?: 0L
         }
-        add("${formatBytes(speed)}/s")
+        add(speedText(speed))
         val left = rows.mapNotNull { it.timeLeft }
         if (left.isNotEmpty() && left.size == rows.size) {
-          add("all done ≈ ${clockTime(now + left.max(), timeZone)}")
+          val done = (now + left.max()).toLocalDateTime(timeZone)
+          add(Res.string.group_all_done_at.text(clockTime(done)))
         }
       }
-      SlotKind.Waiting -> if (arrangement.sort == SortKey.Smart) add("in start order")
+      SlotKind.Waiting -> if (arrangement.sort == SortKey.Smart) {
+        add(Res.string.group_in_start_order.text())
+      }
       SlotKind.Day -> {
         val size = rows.sumOf { it.sizeBytes ?: 0L }
-        if (size > 0) add(formatBytes(size))
+        if (size > 0) add(sizeText(size))
       }
       SlotKind.Plain -> Unit
     }
@@ -380,9 +436,9 @@ private fun rowOrder(arrangement: ListArrangement): Comparator<TaskRow> {
     SortKey.Status -> valueOrder(descending) { smartRank(it.state) }
     SortKey.Connections -> valueOrder(descending) { it.connections }
     SortKey.Source -> textOrder(descending) { it.sourceHost }
-    SortKey.Origin -> textOrder(descending) { it.origin?.label }
+    SortKey.Origin -> textOrder(descending) { it.origin?.id }
     SortKey.Priority -> valueOrder(descending) { it.request.priority }
-    SortKey.Device -> textOrder(descending) { it.device.name }
+    SortKey.Device -> textOrder(descending) { it.deviceName }
   }
   return order.then(TIEBREAK)
 }
@@ -457,9 +513,4 @@ private fun <T : Comparable<T>> nullsLast(x: T?, y: T?, descending: Boolean): In
   y == null -> -1
   descending -> y.compareTo(x)
   else -> x.compareTo(y)
-}
-
-private fun clockTime(instant: Instant, timeZone: TimeZone): String {
-  val time = instant.toLocalDateTime(timeZone)
-  return "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
 }

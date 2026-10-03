@@ -22,16 +22,43 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.StartTimeDialog
 import com.linroid.ketch.app.components.parseSpeedInput
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.formatSpeedAmount
+import com.linroid.ketch.app.state.preferredUnit
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.dialog.RemoveTasksDialog
 import com.linroid.ketch.app.util.displayName
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.downloads_discard_body
+import ketch.app.shared.generated.resources.downloads_discard_body_many
+import ketch.app.shared.generated.resources.downloads_discard_confirm
+import ketch.app.shared.generated.resources.downloads_discard_keep
+import ketch.app.shared.generated.resources.downloads_discard_title
+import ketch.app.shared.generated.resources.downloads_discard_title_many
+import ketch.app.shared.generated.resources.downloads_move_confirm
+import ketch.app.shared.generated.resources.downloads_move_title
+import ketch.app.shared.generated.resources.downloads_send_confirm
+import ketch.app.shared.generated.resources.downloads_send_note
+import ketch.app.shared.generated.resources.downloads_send_title
+import ketch.app.shared.generated.resources.downloads_speed_caps
+import ketch.app.shared.generated.resources.downloads_speed_caps_many
+import ketch.app.shared.generated.resources.downloads_speed_invalid
+import ketch.app.shared.generated.resources.downloads_speed_limit
+import ketch.app.shared.generated.resources.downloads_speed_limit_each
+import ketch.app.shared.generated.resources.downloads_speed_placeholder
+import ketch.app.shared.generated.resources.downloads_speed_set
+import ketch.app.shared.generated.resources.downloads_speed_title
+import ketch.app.shared.generated.resources.settings_speed_unlimited
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Shows the dialog [runner] asks for, if any: Remove with its files, Stop and discard progress,
@@ -68,10 +95,10 @@ private fun RemoveDialog(dialog: RowDialog.Remove, runner: RowActionRunner) {
   val first = rows.first()
   val pulse by runner.state.pulse.state.collectAsState()
   val free = pulse.devices.firstOrNull { it.deviceId == first.key.deviceId }?.disk?.usableBytes
-  val deviceName = if (first.device.capabilities.isRemote) first.device.name else localDeviceNoun()
+  val device = if (first.device.capabilities.isRemote) first.device.name else localDeviceNoun()
   RemoveTasksDialog(
     plan = remember(rows) { RemovalPlan.of(rows, canTrash = rows.all(runner::canTrash)) },
-    deviceName = deviceName,
+    deviceName = device,
     withFiles = dialog.withFiles,
     freeBytes = free,
     onDismiss = runner::dismissDialog,
@@ -88,19 +115,23 @@ internal fun DiscardProgressDialog(
 ) {
   val single = rows.singleOrNull()
   val title = if (single != null) {
-    "Stop and discard progress?"
+    stringResource(Res.string.downloads_discard_title)
   } else {
-    "Discard the progress of ${downloads(rows.size)}?"
+    pluralStringResource(Res.plurals.downloads_discard_title_many, rows.size, rows.size)
   }
   AdaptiveModal(
     onDismissRequest = onDismiss,
     title = { Text(title) },
     dismissButton = {
-      KetchButton(text = "Keep", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+      KetchButton(
+        text = stringResource(Res.string.downloads_discard_keep),
+        variant = KetchButtonVariant.Secondary,
+        onClick = onDismiss,
+      )
     },
     confirmButton = {
       KetchButton(
-        text = "Discard progress",
+        text = stringResource(Res.string.downloads_discard_confirm),
         variant = KetchButtonVariant.Danger,
         onClick = {
           onConfirm()
@@ -111,9 +142,9 @@ internal fun DiscardProgressDialog(
   ) {
     Text(
       text = if (single != null) {
-        "${single.name} can't be resumed after this."
+        stringResource(Res.string.downloads_discard_body, single.name)
       } else {
-        "They can't be resumed after this."
+        stringResource(Res.string.downloads_discard_body_many)
       },
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
@@ -133,15 +164,16 @@ internal fun CustomSpeedDialog(
 ) {
   val current = rows.map { it.request.speedLimit }.distinct().singleOrNull()
   var text by remember {
-    mutableStateOf(current?.takeUnless { it.isUnlimited }?.let(::formatSpeedLimit).orEmpty())
+    mutableStateOf(current?.takeUnless { it.isUnlimited }?.let(::typedSpeed).orEmpty())
   }
-  var error by remember { mutableStateOf<String?>(null) }
+  var invalid by remember { mutableStateOf(false) }
   val focus = remember { FocusRequester() }
   LaunchedEffect(Unit) { focus.requestFocus() }
+  val unlimited = stringResource(Res.string.settings_speed_unlimited)
   val apply = {
-    val limit = parseSpeedInput(text, SpeedUnit.MB)
+    val limit = parseSpeedInput(text, SpeedUnit.MB, unlimited)
     if (limit == null) {
-      error = "Type a speed such as 2m or 500k"
+      invalid = true
     } else {
       onConfirm(limit)
       onDismiss()
@@ -150,17 +182,23 @@ internal fun CustomSpeedDialog(
   val single = rows.singleOrNull()
   AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text("Speed limit") },
+    title = { Text(stringResource(Res.string.downloads_speed_title)) },
     dismissButton = {
-      KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        variant = KetchButtonVariant.Secondary,
+        onClick = onDismiss,
+      )
     },
-    confirmButton = { KetchButton(text = "Set limit", onClick = apply) },
+    confirmButton = {
+      KetchButton(text = stringResource(Res.string.downloads_speed_set), onClick = apply)
+    },
   ) {
     Text(
       text = if (single != null) {
-        "Caps ${single.name}; the global limit still applies."
+        stringResource(Res.string.downloads_speed_caps, single.name)
       } else {
-        "Caps each of ${downloads(rows.size)}; the global limit still applies."
+        pluralStringResource(Res.plurals.downloads_speed_caps_many, rows.size, rows.size)
       },
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
@@ -169,16 +207,26 @@ internal fun CustomSpeedDialog(
       value = text,
       onValueChange = {
         text = it
-        error = null
+        invalid = false
       },
-      placeholder = "2m, 500k or unlimited",
-      label = if (single != null) "Limit" else "Limit for each",
-      error = error,
+      placeholder = stringResource(Res.string.downloads_speed_placeholder),
+      label = if (single != null) {
+        stringResource(Res.string.downloads_speed_limit)
+      } else {
+        stringResource(Res.string.downloads_speed_limit_each)
+      },
+      error = if (invalid) stringResource(Res.string.downloads_speed_invalid) else null,
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
       keyboardActions = KeyboardActions(onDone = { apply() }),
       modifier = Modifier.fillMaxWidth().focusRequester(focus),
     )
   }
+}
+
+/** [limit] as the speed field shows it to edit, in the units it reads back: "1.5 MB/s". */
+private fun typedSpeed(limit: SpeedLimit): String {
+  val unit = preferredUnit(limit)
+  return "${formatSpeedAmount(limit, unit)} ${unit.label}"
 }
 
 /**
@@ -188,36 +236,41 @@ internal fun CustomSpeedDialog(
 @Composable
 internal fun SendConfirmationDialog(state: AppState) {
   val pending = state.sendConfirmation ?: return
-  val verb = if (pending.move) "Move" else "Send"
   val task = pending.tasks.singleOrNull()
   val what = task?.let { displayName(it.requestState.value, it.state.value) }
-    ?: downloads(pending.tasks.size)
+    ?: pluralStringResource(Res.plurals.count_downloads, pending.tasks.size, pending.tasks.size)
   // A device name such as NAS-Basement reads as one word, never broken at its hyphen.
   val device = pending.target.label
   val whole = device.replace("-", "-$WORD_JOINER")
+  val title = if (pending.move) Res.string.downloads_move_title else Res.string.downloads_send_title
+  val verb = if (pending.move) {
+    Res.string.downloads_move_confirm
+  } else {
+    Res.string.downloads_send_confirm
+  }
   AdaptiveModal(
     onDismissRequest = state::dismissSendConfirmation,
-    title = { Text("$verb $what to $whole?") },
+    title = { Text(stringResource(title, what, whole)) },
     dismissButton = {
       KetchButton(
-        text = "Cancel",
+        text = stringResource(Res.string.action_cancel),
         variant = KetchButtonVariant.Secondary,
         onClick = state::dismissSendConfirmation,
       )
     },
-    confirmButton = { KetchButton(text = verb, onClick = state::confirmSend) },
+    confirmButton = { KetchButton(text = stringResource(verb), onClick = state::confirmSend) },
   ) {
     Text(
-      text = pending.warning.replace(device, whole),
+      text = pending.warningText.resolve().replace(device, whole),
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
     )
     Text(
-      text = "They are saved with the download there, where anyone who controls it can see them.",
+      text = stringResource(Res.string.downloads_send_note),
       style = KetchTheme.typography.bodyS,
       color = KetchTheme.colors.textTertiary,
     )
   }
 }
 
-private const val WORD_JOINER = "\u2060"
+private const val WORD_JOINER = "⁠"

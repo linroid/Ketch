@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.palette
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
@@ -17,6 +18,9 @@ import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.palette_full_speed_already
+import ketch.app.shared.generated.resources.palette_speed_not_loaded
 
 /**
  * Carries out the [PaletteAction] of a palette row on [state].
@@ -68,7 +72,7 @@ internal class PaletteRunner(
 
   private fun capSpeed(limit: SpeedLimit) {
     if (state.activeSpeedMode == null && state.instanceSettings.download == null) {
-      state.messages.post(MessageLevel.Warning, "The speed limit isn't loaded yet")
+      state.messages.post(MessageLevel.Warning, Res.string.palette_speed_not_loaded.text())
       return
     }
     state.setSpeedLimit(limit, asSlowLane = false)
@@ -83,7 +87,7 @@ internal class PaletteRunner(
     // At full speed the device's own limit is the only cap left.
     val cap = state.instanceSettings.download?.speedLimit
     if (cap == null || cap.isUnlimited) {
-      state.messages.post(MessageLevel.Info, "Already at full speed")
+      state.messages.post(MessageLevel.Info, Res.string.palette_full_speed_already.text())
       return
     }
     state.setSpeedLimit(SpeedLimit.Unlimited, asSlowLane = false)

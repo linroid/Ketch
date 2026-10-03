@@ -11,6 +11,7 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
 import com.linroid.ketch.config.TorrentSettings
@@ -161,7 +162,7 @@ class InstanceSettingsControllerTest {
     advanceUntilIdle()
 
     assertEquals(edited, store.load().torrent)
-    assertEquals("Engine closed", controller.torrentError)
+    assertEquals("Engine closed", controller.torrentError.load())
   }
 
   @Test
@@ -228,7 +229,7 @@ class InstanceSettingsControllerTest {
     controller.updateDownload(DownloadConfig(retryCount = 1))
     advanceUntilIdle()
 
-    assertEquals("Server said no", controller.downloadError)
+    assertEquals("Server said no", controller.downloadError.load())
   }
 
   @Test

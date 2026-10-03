@@ -14,7 +14,11 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_priority_high
+import ketch.app.shared.generated.resources.component_priority_low
+import ketch.app.shared.generated.resources.component_priority_urgent
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Marks a task's [priority] without borrowing a status color: a tertiary chevron down for Low,
@@ -26,7 +30,12 @@ fun PriorityGlyph(
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
-  val description = "${priorityLabel(priority)} priority"
+  val description = when (priority) {
+    DownloadPriority.NORMAL -> return
+    DownloadPriority.LOW -> stringResource(Res.string.component_priority_low)
+    DownloadPriority.HIGH -> stringResource(Res.string.component_priority_high)
+    DownloadPriority.URGENT -> stringResource(Res.string.component_priority_urgent)
+  }
   when (priority) {
     DownloadPriority.NORMAL -> Unit
     DownloadPriority.LOW, DownloadPriority.HIGH -> KetchIconImage(

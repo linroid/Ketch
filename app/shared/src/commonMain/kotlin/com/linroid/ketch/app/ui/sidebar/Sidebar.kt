@@ -36,6 +36,7 @@ import com.linroid.ketch.app.components.KetchLogoTile
 import com.linroid.ketch.app.components.KetchLogoTileDefaults
 import com.linroid.ketch.app.components.KetchSidebarItem
 import com.linroid.ketch.app.components.KetchTooltip
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -47,6 +48,11 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AppearanceToggle
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_devices
+import ketch.app.shared.generated.resources.shell_hide_sidebar
+import ketch.app.shared.generated.resources.shell_settings
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
@@ -78,9 +84,10 @@ internal fun Sidebar(
     TitleZone(state, onToggleSidebar = onToggleSidebar)
     for (entry in destinations) {
       val downloads = entry == AppDestination.Downloads
-      KetchTooltip(text = entry.label, shortcut = entry.command.shortcutLabel()) {
+      val label = entry.label.resolve()
+      KetchTooltip(text = label, shortcut = entry.command.shortcutLabel()) {
         KetchSidebarItem(
-          label = entry.label,
+          label = label,
           icon = entry.icon,
           selected = entry == destination && !settingsSelected,
           onClick = { onSelect(entry) },
@@ -120,9 +127,10 @@ internal fun Sidebar(
       }
       AddDeviceRow(onClick = { state.addDevice() })
     }
-    KetchTooltip(text = "Settings", shortcut = KetchCommands.Settings.shortcutLabel()) {
+    val settings = stringResource(Res.string.shell_settings)
+    KetchTooltip(text = settings, shortcut = KetchCommands.Settings.shortcutLabel()) {
       KetchSidebarItem(
-        label = "Settings",
+        label = settings,
         icon = KetchIcon.Settings,
         selected = settingsSelected,
         onClick = onOpenSettings,
@@ -144,7 +152,7 @@ private fun DevicesEyebrow(showShortcut: Boolean) {
       .padding(start = spacing.s4, end = spacing.s4, top = spacing.s6, bottom = spacing.s1),
   ) {
     Text(
-      text = eyebrowText("Devices"),
+      text = eyebrowText(stringResource(Res.string.shell_devices)),
       style = KetchTheme.typography.eyebrow,
       color = colors.textSecondary,
       modifier = Modifier.weight(1f),
@@ -188,7 +196,7 @@ private fun TitleZone(state: AppState, onToggleSidebar: () -> Unit) {
       icon = KetchIcon.Sidebar,
       onClick = onToggleSidebar,
       size = KetchButtonSize.Small,
-      contentDescription = "Hide sidebar",
+      contentDescription = stringResource(Res.string.shell_hide_sidebar),
       shortcut = KetchCommands.ToggleSidebar.shortcutLabel(),
     )
   }

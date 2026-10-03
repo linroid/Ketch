@@ -45,6 +45,12 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
@@ -54,7 +60,28 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.diskUsed
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.device_chip_networks
+import ketch.app.shared.generated.resources.device_chip_not_shared
+import ketch.app.shared.generated.resources.device_chip_share_tooltip
+import ketch.app.shared.generated.resources.device_chip_sharing_settings
+import ketch.app.shared.generated.resources.device_count_active
+import ketch.app.shared.generated.resources.device_count_downloading_on
+import ketch.app.shared.generated.resources.device_count_failed
+import ketch.app.shared.generated.resources.device_count_failed_on
+import ketch.app.shared.generated.resources.device_count_paused
+import ketch.app.shared.generated.resources.device_count_paused_on
+import ketch.app.shared.generated.resources.device_count_waiting
+import ketch.app.shared.generated.resources.device_count_waiting_on
+import ketch.app.shared.generated.resources.device_free_space_unknown
+import ketch.app.shared.generated.resources.device_lane_downloads
+import ketch.app.shared.generated.resources.device_lane_empty
+import ketch.app.shared.generated.resources.device_start_now
+import ketch.app.shared.generated.resources.device_storage_short
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A 6 dp strip of the device's downloads, one block per downloading task sized by what it still
@@ -65,6 +92,10 @@ internal fun DeviceLane(blocks: List<LaneBlock>, modifier: Modifier = Modifier) 
   val colors = KetchTheme.colors
   val shares = remember(blocks) { laneShares(blocks) }
   val left = blocks.mapNotNull { it.remainingBytes }.sum()
+  val description = when (blocks.size) {
+    0 -> Res.string.device_lane_empty.text()
+    else -> Res.plurals.device_lane_downloads.text(blocks.size, blocks.size, sizeText(left))
+  }.resolve()
   Spacer(
     modifier
       .fillMaxWidth()
@@ -85,13 +116,7 @@ internal fun DeviceLane(blocks: List<LaneBlock>, modifier: Modifier = Modifier) 
           x += width
         }
       }
-      .semantics {
-        contentDescription = when (blocks.size) {
-          0 -> "Nothing downloading"
-          1 -> "1 download, ${formatBytes(left)} left"
-          else -> "${blocks.size} downloads, ${formatBytes(left)} left"
-        }
-      }
+      .semantics { contentDescription = description }
   )
 }
 
@@ -107,18 +132,19 @@ internal fun CountsRow(state: AppState, device: DevicePresence) {
     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
   ) {
     val cells = listOf(
-      Triple(StatusFilter.Downloading, counts.downloading, "Active"),
-      Triple(StatusFilter.Waiting, counts.waiting, "Waiting"),
-      Triple(StatusFilter.Paused, counts.paused, "Paused"),
-      Triple(StatusFilter.Failed, counts.failed, "Failed")
+      StatusFilter.Downloading to counts.downloading,
+      StatusFilter.Waiting to counts.waiting,
+      StatusFilter.Paused to counts.paused,
+      StatusFilter.Failed to counts.failed,
     )
-    cells.forEachIndexed { index, (filter, count, label) ->
+    cells.forEachIndexed { index, (filter, count) ->
       if (index > 0) CountDivider()
+      val cell = CountTexts.getValue(filter)
       CountCell(
         count = count,
-        label = label,
+        label = stringResource(cell.label),
         alert = filter == StatusFilter.Failed && device.failures > 0,
-        description = "$count ${filter.label.lowercase()} on ${device.name}",
+        description = cell.description.text(count, count, device.name).resolve(),
         onClick = { state.showDeviceTab(device.entry, filter) },
       )
     }
@@ -151,7 +177,7 @@ private fun RowScope.CountCell(
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = "Show",
+        onClickLabel = stringResource(Res.string.action_show),
         onClick = onClick,
       )
       .padding(vertical = KetchTheme.spacing.s1),
@@ -218,9 +244,10 @@ internal fun Storage(device: DevicePresence, work: DeviceWork) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
         text = when {
-          disk == null -> "Free space unknown"
-          short -> "${storageLabel(disk)} · not enough"
-          else -> storageLabel(disk)
+          disk == null -> stringResource(Res.string.device_free_space_unknown)
+          short -> listOf(storageLabel(disk), Res.string.device_storage_short.text()).joinText()
+            .resolve()
+          else -> storageLabel(disk).resolve()
         },
         style = KetchTheme.typography.caption,
         color = ink,
@@ -229,7 +256,7 @@ internal fun Storage(device: DevicePresence, work: DeviceWork) {
       if (folder != null) {
         Spacer(Modifier.width(KetchTheme.spacing.s3))
         Text(
-          text = shortPath(folder),
+          text = shortPathText(folder).resolve(),
           style = KetchTheme.typography.mono,
           color = colors.textTertiary,
           maxLines = 1,
@@ -248,8 +275,8 @@ internal fun Storage(device: DevicePresence, work: DeviceWork) {
  */
 internal data class DeviceChip(
   val icon: KetchIcon,
-  val label: String,
-  val tooltip: String,
+  val label: UiText,
+  val tooltip: UiText,
   val onClick: () -> Unit,
 )
 
@@ -272,8 +299,8 @@ internal fun deviceChips(state: AppState, device: DevicePresence): List<DeviceCh
       add(
         DeviceChip(
           icon = KetchIcon.Network,
-          label = networks.joinToString(" + "),
-          tooltip = "Networks it downloads over",
+          label = verbatim(networks.joinToString(" + ")),
+          tooltip = Res.string.device_chip_networks.text(),
           onClick = {
             state.openSettings(SettingsTarget(SettingsTarget.Page.Network, device.deviceId))
           },
@@ -285,8 +312,12 @@ internal fun deviceChips(state: AppState, device: DevicePresence): List<DeviceCh
       add(
         DeviceChip(
           icon = KetchIcon.Server,
-          label = sharing ?: "Not shared · Share…",
-          tooltip = if (sharing != null) "Sharing settings" else "Let other devices control it",
+          label = sharing ?: Res.string.device_chip_not_shared.text(),
+          tooltip = if (sharing != null) {
+            Res.string.device_chip_sharing_settings.text()
+          } else {
+            Res.string.device_chip_share_tooltip.text()
+          },
           onClick = { state.pairDevice() },
         )
       )
@@ -318,7 +349,7 @@ private fun InfoChip(chip: DeviceChip, modifier: Modifier = Modifier) {
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
-  KetchTooltip(text = chip.tooltip, modifier = modifier) {
+  KetchTooltip(text = chip.tooltip.resolve(), modifier = modifier) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -343,7 +374,7 @@ private fun InfoChip(chip: DeviceChip, modifier: Modifier = Modifier) {
         tint = colors.textTertiary,
       )
       Text(
-        text = chip.label,
+        text = chip.label.resolve(),
         style = KetchTheme.typography.labelS,
         color = colors.textSecondary,
         maxLines = 1,
@@ -364,7 +395,7 @@ internal fun ActionsRow(actions: List<NextAction>, onAction: (NextAction) -> Uni
   ) {
     actions.forEach { action ->
       KetchButton(
-        text = action.label,
+        text = action.label.resolve(),
         onClick = { onAction(action) },
         variant = KetchButtonVariant.Secondary,
         size = KetchButtonSize.Small,
@@ -373,12 +404,28 @@ internal fun ActionsRow(actions: List<NextAction>, onAction: (NextAction) -> Uni
           NextAction.PauseAll -> KetchIcon.Pause
           is NextAction.StartNow -> KetchIcon.Play
         },
-        tooltip = (action as? NextAction.StartNow)?.let { "Start ${it.name} now" },
+        tooltip = (action as? NextAction.StartNow)?.let {
+          stringResource(Res.string.device_start_now, it.name)
+        },
         modifier = Modifier.width(IntrinsicSize.Max),
       )
     }
   }
 }
+
+/** What a cell of [CountsRow] says under its count, and to a screen reader. */
+private class CountText(val label: StringResource, val description: PluralStringResource)
+
+private val CountTexts = mapOf(
+  StatusFilter.Downloading to
+    CountText(Res.string.device_count_active, Res.plurals.device_count_downloading_on),
+  StatusFilter.Waiting to
+    CountText(Res.string.device_count_waiting, Res.plurals.device_count_waiting_on),
+  StatusFilter.Paused to
+    CountText(Res.string.device_count_paused, Res.plurals.device_count_paused_on),
+  StatusFilter.Failed to
+    CountText(Res.string.device_count_failed, Res.plurals.device_count_failed_on),
+)
 
 private val LaneHeight: Dp = 6.dp
 private val SeamWidth: Dp = 1.dp

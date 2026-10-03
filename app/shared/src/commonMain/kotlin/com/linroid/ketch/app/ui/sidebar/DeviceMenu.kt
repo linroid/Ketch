@@ -10,12 +10,15 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.devices.RemoveDeviceDialog
 import com.linroid.ketch.app.ui.devices.RenameDeviceDialog
 import com.linroid.ketch.app.ui.devices.openDeviceSettings
@@ -24,6 +27,20 @@ import com.linroid.ketch.app.ui.devices.speedModeOf
 import com.linroid.ketch.app.ui.devices.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_switch_to
+import ketch.app.shared.generated.resources.sidebar_menu_full_speed
+import ketch.app.shared.generated.resources.sidebar_menu_no_limit
+import ketch.app.shared.generated.resources.sidebar_menu_pause_all
+import ketch.app.shared.generated.resources.sidebar_menu_remove
+import ketch.app.shared.generated.resources.sidebar_menu_rename
+import ketch.app.shared.generated.resources.sidebar_menu_resume_all
+import ketch.app.shared.generated.resources.sidebar_menu_retry_failed
+import ketch.app.shared.generated.resources.sidebar_menu_retry_failed_count
+import ketch.app.shared.generated.resources.sidebar_menu_settings
+import ketch.app.shared.generated.resources.sidebar_menu_slow_lane
+import ketch.app.shared.generated.resources.sidebar_menu_speed
+import ketch.app.shared.generated.resources.sidebar_menu_stay_connected
 
 /**
  * The menu of [device], opened by a right click or a long press on its sidebar row or rail
@@ -51,7 +68,8 @@ internal fun DeviceMenu(
       state.settingsFor(device.entry).loadDownload()
     }
   }
-  KetchMenu(expanded = expanded, onDismissRequest = onDismissRequest, title = device.name) {
+  val title = device.name.resolve()
+  KetchMenu(expanded = expanded, onDismissRequest = onDismissRequest, title = title) {
     deviceCommands(
       state = state,
       device = device,
@@ -78,7 +96,7 @@ internal fun KetchMenuScope.deviceCommands(
   val online = device.connected && device.health.isOnline
   val counts = device.counts
   item(
-    label = "Switch to ${device.name}",
+    label = Res.string.device_switch_to.text(device.name),
     onClick = { state.switchInstance(entry) },
     icon = KetchIcon.Devices,
     shortcut = deviceShortcut(number),
@@ -86,41 +104,50 @@ internal fun KetchMenuScope.deviceCommands(
   )
   divider()
   item(
-    label = "Pause all here",
+    label = Res.string.sidebar_menu_pause_all.text(),
     onClick = { state.pauseAll(listOf(entry)) },
     icon = KetchIcon.Pause,
     enabled = online && counts.downloading + counts.waiting > 0,
   )
   item(
-    label = "Resume all here",
+    label = Res.string.sidebar_menu_resume_all.text(),
     onClick = { state.resumeAll(listOf(entry)) },
     icon = KetchIcon.Play,
     enabled = online && counts.paused > 0,
   )
   item(
-    label = "Retry failed here" + if (device.failures > 0) " (${device.failures})" else "",
+    label = if (device.failures > 0) {
+      Res.string.sidebar_menu_retry_failed_count.text(device.failures)
+    } else {
+      Res.string.sidebar_menu_retry_failed.text()
+    },
     onClick = { state.retryFailed(listOf(entry)) },
     icon = KetchIcon.Retry,
     enabled = online && device.failures > 0,
   )
-  submenu(label = "Speed", icon = KetchIcon.Speed, enabled = online) {
+  submenu(label = Res.string.sidebar_menu_speed.text(), icon = KetchIcon.Speed, enabled = online) {
     speedEntries(state, device)
   }
   divider()
   item(
-    label = "Settings for this device…",
+    label = Res.string.sidebar_menu_settings.text(),
     onClick = { state.openDeviceSettings(entry) },
     icon = KetchIcon.Settings,
   )
-  item(label = "Rename…", onClick = onRename)
+  item(label = Res.string.sidebar_menu_rename.text(), onClick = onRename)
   val remote = entry as? RemoteInstance ?: return
   item(
-    label = "Stay connected",
+    label = Res.string.sidebar_menu_stay_connected.text(),
     onClick = { state.instanceManager.setWatched(remote, !device.watched) },
     checked = device.watched,
   )
   divider()
-  item(label = "Remove…", onClick = onRemove, icon = KetchIcon.Trash, destructive = true)
+  item(
+    label = Res.string.sidebar_menu_remove.text(),
+    onClick = onRemove,
+    icon = KetchIcon.Trash,
+    destructive = true,
+  )
 }
 
 /**
@@ -132,12 +159,12 @@ private fun KetchMenuScope.speedEntries(state: AppState, device: DevicePresence)
   if (controller != null) {
     val slow = controller.mode.value.isSlowLane
     item(
-      label = "Full speed",
+      label = Res.string.sidebar_menu_full_speed.text(),
       onClick = { state.switchSpeedMode(controller, SpeedLimitMode.Full) },
       checked = !slow,
     )
     item(
-      label = "Slow lane · ${formatSpeedLimit(controller.slowLaneLimit)}",
+      label = Res.string.sidebar_menu_slow_lane.text(speedLimitText(controller.slowLaneLimit)),
       onClick = { state.switchSpeedMode(controller, SpeedLimitMode.SlowLane) },
       checked = slow,
     )
@@ -156,5 +183,5 @@ private fun KetchMenuScope.speedEntries(state: AppState, device: DevicePresence)
 }
 
 /** A speed limit as the Speed menu lists it: "No limit" or "2 MB/s". */
-internal fun speedLimitLabel(limit: SpeedLimit): String =
-  if (limit.isUnlimited) "No limit" else formatSpeedLimit(limit)
+internal fun speedLimitLabel(limit: SpeedLimit): UiText =
+  if (limit.isUnlimited) Res.string.sidebar_menu_no_limit.text() else speedLimitText(limit)

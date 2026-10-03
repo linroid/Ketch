@@ -6,12 +6,53 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.ByteUnit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.clockTime
+import com.linroid.ketch.app.i18n.decimal
+import com.linroid.ketch.app.i18n.durationText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.shortDateText
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.spanText
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.taskActions
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.date_today_at
+import ketch.app.shared.generated.resources.date_yesterday
+import ketch.app.shared.generated.resources.row_canceled
+import ketch.app.shared.generated.resources.row_completed
+import ketch.app.shared.generated.resources.row_connections
+import ketch.app.shared.generated.resources.row_files
+import ketch.app.shared.generated.resources.row_limited_by_slow_lane
+import ketch.app.shared.generated.resources.row_missing_file
+import ketch.app.shared.generated.resources.row_paused
+import ketch.app.shared.generated.resources.row_saved_on
+import ketch.app.shared.generated.resources.row_stalled_for
+import ketch.app.shared.generated.resources.row_starts_after
+import ketch.app.shared.generated.resources.row_starts_in
+import ketch.app.shared.generated.resources.row_starts_on
+import ketch.app.shared.generated.resources.row_starts_today
+import ketch.app.shared.generated.resources.row_starts_tomorrow
+import ketch.app.shared.generated.resources.row_status_canceled
+import ketch.app.shared.generated.resources.row_status_done
+import ketch.app.shared.generated.resources.row_status_downloading
+import ketch.app.shared.generated.resources.row_status_failed
+import ketch.app.shared.generated.resources.row_status_file_missing
+import ketch.app.shared.generated.resources.row_status_paused
+import ketch.app.shared.generated.resources.row_status_queued
+import ketch.app.shared.generated.resources.row_status_scheduled
+import ketch.app.shared.generated.resources.row_status_stalled
+import ketch.app.shared.generated.resources.row_took
+import ketch.app.shared.generated.resources.row_waiting_for_conditions
+import ketch.app.shared.generated.resources.size_progress
+import ketch.app.shared.generated.resources.size_progress_compact
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -76,12 +117,12 @@ data class RowContext(
  */
 data class RowContent(
   val status: RowStatus,
-  val statusText: String,
-  val detail: String,
-  val size: String,
-  val speed: String,
-  val time: String,
-  val added: String,
+  val statusText: UiText,
+  val detail: UiText,
+  val size: UiText,
+  val speed: UiText,
+  val time: UiText,
+  val added: UiText,
   val progress: Float? = null,
   val limited: Boolean = false,
   val error: ErrorCopy? = null,
@@ -126,14 +167,18 @@ fun rowContent(
         context.config?.speedLimit?.isUnlimited == false
       RowContent(
         status = if (stalled) RowStatus.Stalled else RowStatus.Downloading,
-        statusText = if (stalled) "Stalled" else "Downloading",
+        statusText = if (stalled) {
+          Res.string.row_status_stalled.text()
+        } else {
+          Res.string.row_status_downloading.text()
+        },
         detail = if (stalled) {
-          "Stalled · no data for ${formatDuration(stalledFor)}"
+          Res.string.row_stalled_for.text(durationText(stalledFor))
         } else {
           downloadingDetail(request, segments, host, context.slowLane)
         },
         size = runningSize(state),
-        speed = "${formatBytes(progress.bytesPerSecond.coerceAtLeast(0))}/s",
+        speed = speedText(progress.bytesPerSecond),
         time = if (stalled) UNKNOWN else timeLeft(progress),
         added = added,
         progress = fraction(progress),
@@ -143,38 +188,38 @@ fun rowContent(
     is DownloadState.Paused -> {
       val progress = state.progress
       val percent = if (progress.totalBytes > 0) {
-        "${(progress.downloadedBytes * 100 / progress.totalBytes).coerceIn(0, 100)}%"
+        percentText((progress.downloadedBytes * 100 / progress.totalBytes).coerceIn(0, 100).toInt())
       } else {
         null
       }
       RowContent(
         status = RowStatus.Paused,
-        statusText = "Paused",
-        detail = listOfNotNull("Paused", percent).joinToString(SEPARATOR),
+        statusText = Res.string.row_status_paused.text(),
+        detail = listOfNotNull(Res.string.row_paused.text(), percent).joinText(),
         size = runningSize(state),
-        speed = "",
-        time = "",
+        speed = UiText.Empty,
+        time = UiText.Empty,
         added = added,
         progress = fraction(progress),
       )
     }
     is DownloadState.Queued -> RowContent(
       status = RowStatus.Queued,
-      statusText = "Queued",
+      statusText = Res.string.row_status_queued.text(),
       detail = (context.config?.let { QueueReason.of(request, it, context.running) }
         ?: QueueReason.Next).text,
       size = knownSize(request),
-      speed = "",
-      time = "",
+      speed = UiText.Empty,
+      time = UiText.Empty,
       added = added,
     )
     is DownloadState.Scheduled -> RowContent(
       status = RowStatus.Scheduled,
-      statusText = "Scheduled",
+      statusText = Res.string.row_status_scheduled.text(),
       detail = scheduleText(state.schedule, context.now, context.timeZone),
       size = knownSize(request),
-      speed = "",
-      time = "",
+      speed = UiText.Empty,
+      time = UiText.Empty,
       added = added,
     )
     is DownloadState.Completed -> completedContent(state, host, context.device, missing, added)
@@ -182,22 +227,22 @@ fun rowContent(
       val copy = state.error.toCopy(request, retryCount, context.device)
       RowContent(
         status = RowStatus.Failed,
-        statusText = "Failed",
-        detail = listOfNotNull(copy.title, copy.shortHint).joinToString(SEPARATOR),
+        statusText = Res.string.row_status_failed.text(),
+        detail = listOfNotNull(copy.title, copy.shortHint).joinText(),
         size = knownSize(request),
-        speed = "",
-        time = "",
+        speed = UiText.Empty,
+        time = UiText.Empty,
         added = added,
         error = copy,
       )
     }
     is DownloadState.Canceled -> RowContent(
       status = RowStatus.Canceled,
-      statusText = "Canceled",
-      detail = listOfNotNull("Canceled", host).joinToString(SEPARATOR),
-      size = "",
-      speed = "",
-      time = "",
+      statusText = Res.string.row_status_canceled.text(),
+      detail = listOfNotNull(Res.string.row_canceled.text(), host?.let(::verbatim)).joinText(),
+      size = UiText.Empty,
+      speed = UiText.Empty,
+      time = UiText.Empty,
       added = added,
     )
   }
@@ -208,13 +253,13 @@ fun rowContent(
  * When a task was added, in [timeZone]: "Today 11:42", "Yesterday", "Sep 28", or "Sep 28, 2025"
  * in an earlier year.
  */
-fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): String {
+fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): UiText {
   val added = createdAt.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (added.date) {
-    today -> "Today ${clockTime(added)}"
-    today.minus(1, DateTimeUnit.DAY) -> "Yesterday"
-    else -> shortDate(added.date, today)
+    today -> Res.string.date_today_at.text(clockTime(added))
+    today.minus(1, DateTimeUnit.DAY) -> Res.string.date_yesterday.text()
+    else -> shortDateText(added.date, today)
   }
 }
 
@@ -226,22 +271,29 @@ private fun completedContent(
   host: String?,
   device: DeviceInfo,
   missing: Boolean,
-  added: String,
+  added: UiText,
 ): RowContent {
-  val size = state.totalBytes?.let(::formatBytes)
+  val size = state.totalBytes?.let(::sizeText)
   val detail = when {
-    device.capabilities.isRemote -> "Saved on ${device.name}"
-    missing -> "File moved or deleted"
-    else -> (transferSummary(state).filter { it != size } + listOfNotNull(host))
-      .joinToString(SEPARATOR).ifEmpty { "Completed" }
+    device.capabilities.isRemote -> Res.string.row_saved_on.text(device.name)
+    missing -> Res.string.row_missing_file.text()
+    else -> {
+      val parts = transferSummary(state).filter { it != size } +
+        listOfNotNull(host?.let(::verbatim))
+      if (parts.isEmpty()) Res.string.row_completed.text() else parts.joinText()
+    }
   }
   return RowContent(
     status = if (missing) RowStatus.FileMissing else RowStatus.Completed,
-    statusText = if (missing) "File missing" else "Done",
+    statusText = if (missing) {
+      Res.string.row_status_file_missing.text()
+    } else {
+      Res.string.row_status_done.text()
+    },
     detail = detail,
     size = size ?: UNKNOWN,
-    speed = "",
-    time = state.downloadTime?.let { "took ${formatDuration(it)}" }.orEmpty(),
+    speed = UiText.Empty,
+    time = state.downloadTime?.let { Res.string.row_took.text(durationText(it)) } ?: UiText.Empty,
     added = added,
   )
 }
@@ -251,22 +303,22 @@ private fun downloadingDetail(
   segments: List<Segment>,
   host: String?,
   slowLane: Boolean,
-): String {
+): UiText {
   // A torrent's segments are its selected files, not connections.
   val parts = if (isTorrent(request)) {
-    listOfNotNull(segments.size.takeIf { it > 1 }?.let { "$it files" })
+    listOfNotNull(segments.size.takeIf { it > 1 }?.let { Res.plurals.row_files.text(it) })
   } else {
     val connections = segments.count { !it.isComplete }
-    listOfNotNull(connections.takeIf { it > 0 }?.let(::connectionsText))
+    listOfNotNull(connections.takeIf { it > 0 }?.let { Res.plurals.row_connections.text(it) })
   }
-  val detail = parts + listOfNotNull(host, "limited by Slow lane".takeIf { slowLane })
-  return detail.joinToString(SEPARATOR).ifEmpty { "Downloading" }
+  val detail = parts + listOfNotNull(
+    host?.let(::verbatim),
+    Res.string.row_limited_by_slow_lane.text().takeIf { slowLane },
+  )
+  return if (detail.isEmpty()) Res.string.row_status_downloading.text() else detail.joinText()
 }
 
-private fun connectionsText(count: Int): String =
-  if (count == 1) "1 connection" else "$count connections"
-
-private fun runningSize(state: DownloadState): String {
+private fun runningSize(state: DownloadState): UiText {
   val progress = when (state) {
     is DownloadState.Downloading -> state.progress
     is DownloadState.Paused -> state.progress
@@ -274,109 +326,72 @@ private fun runningSize(state: DownloadState): String {
   }
   return when {
     progress.totalBytes > 0 -> formatSizeOf(progress.downloadedBytes, progress.totalBytes)
-    progress.downloadedBytes > 0 -> formatBytes(progress.downloadedBytes)
+    progress.downloadedBytes > 0 -> sizeText(progress.downloadedBytes)
     else -> UNKNOWN
   }
 }
 
 /**
  * [downloaded] of [total] bytes in the unit of [total], to three significant digits, as the
- * table's Size column shows it: "2.41/5.69 GB", "0.49/1.20 GB", "138/512 MB". With [separator]
- * " of " it reads as list rows show it: "2.41 of 5.69 GB".
+ * table's Size column shows it: "2.41/5.69 GB", "0.49/1.20 GB", "138/512 MB". When not
+ * [compact] it reads as list rows show it: "2.41 of 5.69 GB".
  */
-fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String {
-  val unit = SIZE_UNITS.lastOrNull { total >= it.second } ?: SIZE_UNITS.first()
+fun formatSizeOf(downloaded: Long, total: Long, compact: Boolean = true): UiText {
+  val unit = ByteUnit.of(total)
   fun number(bytes: Long): String {
-    val value = bytes.coerceAtLeast(0).toDouble() / unit.second
-    if (unit.second == 1L) return bytes.coerceAtLeast(0).toString()
+    if (unit == ByteUnit.B) return bytes.coerceAtLeast(0).toString()
+    val value = bytes.coerceAtLeast(0).toDouble() / unit.bytes
     val decimals = when {
       value < 10 -> 2
       value < 100 -> 1
       else -> 0
     }
-    return formatDecimal(value, decimals)
+    return decimal(value, decimals)
   }
-  return "${number(downloaded.coerceAtMost(total))}$separator${number(total)} ${unit.first}"
+  val totalText = unit.text(number(total))
+  val part = number(downloaded.coerceAtMost(total))
+  return if (compact) {
+    Res.string.size_progress_compact.text(part, totalText)
+  } else {
+    Res.string.size_progress.text(part, totalText)
+  }
 }
 
-private val SIZE_UNITS = listOf(
-  "B" to 1L,
-  "KB" to (1L shl 10),
-  "MB" to (1L shl 20),
-  "GB" to (1L shl 30),
-  "TB" to (1L shl 40)
-)
-
-/** [value] rounded half up to [decimals] places, with a dot. */
-private fun formatDecimal(value: Double, decimals: Int): String {
-  var scale = 1L
-  repeat(decimals) { scale *= 10 }
-  val scaled = (value * scale + 0.5).toLong()
-  if (decimals == 0) return scaled.toString()
-  val fraction = (scaled % scale).toString().padStart(decimals, '0')
-  return "${scaled / scale}.$fraction"
-}
-
-private fun knownSize(request: DownloadRequest): String =
-  request.resolvedSource?.totalBytes?.takeIf { it > 0 }?.let(::formatBytes) ?: UNKNOWN
+private fun knownSize(request: DownloadRequest): UiText =
+  request.resolvedSource?.totalBytes?.takeIf { it > 0 }?.let(::sizeText) ?: UNKNOWN
 
 /** Fraction downloaded, kept within `0..1`, or `null` while the size is unknown. */
 private fun fraction(progress: DownloadProgress): Float? =
   progress.percent.coerceIn(0f, 1f).takeIf { progress.totalBytes > 0 }
 
-private fun timeLeft(progress: DownloadProgress): String {
+private fun timeLeft(progress: DownloadProgress): UiText {
   if (progress.totalBytes <= 0 || progress.bytesPerSecond <= 0) return UNKNOWN
   val remaining = (progress.totalBytes - progress.downloadedBytes).coerceAtLeast(0)
-  return formatDuration((remaining / progress.bytesPerSecond).seconds)
+  return durationText((remaining / progress.bytesPerSecond).seconds)
 }
 
-private fun scheduleText(schedule: DownloadSchedule, now: Instant, timeZone: TimeZone): String =
+private fun scheduleText(schedule: DownloadSchedule, now: Instant, timeZone: TimeZone): UiText =
   when (schedule) {
     is DownloadSchedule.AtTime -> {
       val start = schedule.startAt.toLocalDateTime(timeZone)
       val today = now.toLocalDateTime(timeZone).date
-      val day = when (start.date) {
-        today -> "today"
-        today.plus(1, DateTimeUnit.DAY) -> "tomorrow"
-        else -> shortDate(start.date, today)
+      val time = clockTime(start)
+      val startsAt = when (start.date) {
+        today -> Res.string.row_starts_today.text(time)
+        today.plus(1, DateTimeUnit.DAY) -> Res.string.row_starts_tomorrow.text(time)
+        else -> Res.string.row_starts_on.text(shortDateText(start.date, today), time)
       }
-      val startsAt = "Starts $day at ${clockTime(start)}"
       val remaining = schedule.startAt - now
-      if (remaining > Duration.ZERO) "$startsAt · in ${formatSpan(remaining)}" else startsAt
+      if (remaining > Duration.ZERO) {
+        listOf(startsAt, Res.string.row_starts_in.text(spanText(remaining))).joinText()
+      } else {
+        startsAt
+      }
     }
     // The delay counts from when the task was added, which the state does not tell.
-    is DownloadSchedule.AfterDelay -> "Starts after ${formatSpan(schedule.delay)}"
-    is DownloadSchedule.Immediate -> "Waiting for conditions"
+    is DownloadSchedule.AfterDelay -> Res.string.row_starts_after.text(spanText(schedule.delay))
+    is DownloadSchedule.Immediate -> Res.string.row_waiting_for_conditions.text()
   }
 
-/**
- * A span to the minute, rounded up so a countdown never reads zero early: "45s", "30 min",
- * "3h 12m", "2d 4h".
- */
-private fun formatSpan(duration: Duration): String {
-  val seconds = duration.inWholeSeconds.coerceAtLeast(0)
-  if (seconds < 60) return "${seconds}s"
-  val minutes = (seconds + 59) / 60
-  val days = minutes / (24 * 60)
-  val hours = minutes / 60 % 24
-  val mins = minutes % 60
-  return when {
-    days > 0 -> if (hours > 0) "${days}d ${hours}h" else "${days}d"
-    hours > 0 -> if (mins > 0) "${hours}h ${mins}m" else "${hours}h"
-    else -> "$mins min"
-  }
-}
-
-private fun clockTime(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
-
-private fun shortDate(date: LocalDate, today: LocalDate): String {
-  val day = "${MONTHS[date.month.ordinal]} ${date.day}"
-  return if (date.year == today.year) day else "$day, ${date.year}"
-}
-
-private const val SEPARATOR = " · "
-private const val UNKNOWN = "–"
-private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-)
+/** What a column shows while its value is unknown. */
+private val UNKNOWN: UiText = verbatim("–")

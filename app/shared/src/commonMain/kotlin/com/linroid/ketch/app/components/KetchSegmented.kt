@@ -64,7 +64,7 @@ fun <T> KetchSegmented(
   options: List<T>,
   selected: T,
   onSelect: (T) -> Unit,
-  label: (T) -> String,
+  label: @Composable (T) -> String,
   modifier: Modifier = Modifier,
   enabled: Boolean = true,
   count: (T) -> Int? = { null },
@@ -72,7 +72,7 @@ fun <T> KetchSegmented(
   icon: (T) -> KetchIcon? = { null },
   shortcut: (T) -> String? = { null },
   fill: Boolean = false,
-  description: (T) -> String? = { null },
+  description: @Composable (T) -> String? = { null },
 ) {
   val colors = KetchTheme.colors
   val motion = KetchTheme.motion

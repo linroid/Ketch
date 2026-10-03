@@ -2,6 +2,12 @@ package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
@@ -10,12 +16,19 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.notify_all_finished
+import ketch.app.shared.generated.resources.notify_download_complete
+import ketch.app.shared.generated.resources.notify_download_failed
+import ketch.app.shared.generated.resources.notify_downloads_finished
+import ketch.app.shared.generated.resources.notify_failed_body
+import ketch.app.shared.generated.resources.notify_on_device
+import ketch.app.shared.generated.resources.row_files
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -62,39 +75,47 @@ object ActivityRouting {
   }
 
   /**
-   * What the notification for [event] says, or `null` for events that are never notified.
-   * Every action a platform might offer is listed; notifiers leave out the ones they lack.
+   * What the notification for [event] says, in the language of the app's window, or `null` for
+   * events that are never notified. Every action a platform might offer is listed; notifiers
+   * leave out the ones they lack.
    *
    * @param deviceName device to name in the title, such as "NAS-Basement" for "On
    *   NAS-Basement: Download complete"; `null` when the event is about the device the app shows.
    */
-  fun copyOf(event: ActivityEvent, deviceName: String? = null): NotificationCopy? {
-    fun on(title: String) = if (deviceName == null) title else "On $deviceName: $title"
+  suspend fun copyOf(event: ActivityEvent, deviceName: String? = null): NotificationCopy? {
+    suspend fun on(title: UiText): String = if (deviceName == null) {
+      title.load()
+    } else {
+      Res.string.notify_on_device.text(deviceName, title).load()
+    }
     return when (event) {
       is ActivityEvent.Completed -> NotificationCopy(
-        title = on("Download complete"),
-        body = (listOf(displayName(event.request, event.state)) + transferSummary(event.state))
-          .joinToString(" · "),
+        title = on(Res.string.notify_download_complete.text()),
+        body = (listOf(verbatim(displayName(event.request, event.state))) +
+          transferSummary(event.state)).joinText().load(),
         actions = COMPLETED_ACTIONS,
       )
       is ActivityEvent.CompletedBatch -> {
         val bytes = event.completions.sumOf { it.state.totalBytes ?: 0L }
         NotificationCopy(
-          title = on("${event.completions.size} downloads finished"),
-          body = if (bytes > 0) formatBytes(bytes) else "",
+          title = on(Res.plurals.notify_downloads_finished.text(event.completions.size)),
+          body = if (bytes > 0) sizeText(bytes).load() else "",
         )
       }
       is ActivityEvent.Failed -> NotificationCopy(
-        title = on("Download failed"),
-        body = "${displayName(event.request, event.state)}: ${event.state.error.toCopy().title}",
+        title = on(Res.string.notify_download_failed.text()),
+        body = Res.string.notify_failed_body.text(
+          displayName(event.request, event.state),
+          event.state.error.toCopy().title,
+        ).load(),
         actions = listOf(NotificationAction.Retry),
       )
       is ActivityEvent.QueueDrained -> NotificationCopy(
-        title = on("All downloads finished"),
+        title = on(Res.string.notify_all_finished.text()),
         body = listOfNotNull(
-          if (event.files == 1) "1 file" else "${event.files} files",
-          formatBytes(event.bytes).takeIf { event.bytes > 0 },
-        ).joinToString(" · "),
+          Res.plurals.row_files.text(event.files),
+          sizeText(event.bytes).takeIf { event.bytes > 0 },
+        ).joinText().load(),
       )
       is ActivityEvent.Added,
       is ActivityEvent.Recovered,

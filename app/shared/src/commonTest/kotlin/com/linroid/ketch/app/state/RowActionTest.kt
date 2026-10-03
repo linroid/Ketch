@@ -5,7 +5,10 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.util.toCopy
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,8 +18,8 @@ import kotlin.time.Duration.Companion.hours
 
 class RowActionTest {
   private val request = DownloadRequest("https://example.com/a.iso")
-  private val local = DeviceInfo("This Mac", RowCapabilities.local(canTrash = true))
-  private val remote = DeviceInfo("NAS-Basement", RowCapabilities.remote())
+  private val local = DeviceInfo(verbatim("This Mac"), RowCapabilities.local(canTrash = true))
+  private val remote = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote())
   private val progress = DownloadProgress(10, 100, 5)
 
   private val errors = listOf(
@@ -185,8 +188,8 @@ class RowActionTest {
   }
 
   @Test
-  fun retryWithConnections_label_countsConnections() {
-    assertEquals("Retry with 1 connection", RowAction.RetryWithConnections(1).label)
-    assertEquals("Retry with 2 connections", RowAction.RetryWithConnections(2).label)
+  fun retryWithConnections_label_countsConnections() = runTest {
+    assertEquals("Retry with 1 connection", RowAction.RetryWithConnections(1).label.load())
+    assertEquals("Retry with 2 connections", RowAction.RetryWithConnections(2).label.load())
   }
 }

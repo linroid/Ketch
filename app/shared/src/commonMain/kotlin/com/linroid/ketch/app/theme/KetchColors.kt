@@ -5,7 +5,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_accent_beacon
+import ketch.app.shared.generated.resources.settings_accent_fathom
+import ketch.app.shared.generated.resources.settings_accent_harbor
+import ketch.app.shared.generated.resources.settings_accent_signal
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * Color tokens of the Ketch design system, for one accent in one theme.
@@ -166,11 +174,14 @@ data class KetchStatusColors(
 }
 
 /** Accent palettes, chosen in Settings → General → Accent. */
-enum class KetchAccent(val displayName: String) {
-  Signal("Signal"),
-  Harbor("Harbor"),
-  Fathom("Fathom"),
-  Beacon("Beacon"),
+enum class KetchAccent(private val nameResource: StringResource) {
+  Signal(Res.string.settings_accent_signal),
+  Harbor(Res.string.settings_accent_harbor),
+  Fathom(Res.string.settings_accent_fathom),
+  Beacon(Res.string.settings_accent_beacon);
+
+  /** The palette's name, as Settings shows it under its swatch. */
+  val displayName: UiText get() = nameResource.text()
 }
 
 internal object KetchPalette {

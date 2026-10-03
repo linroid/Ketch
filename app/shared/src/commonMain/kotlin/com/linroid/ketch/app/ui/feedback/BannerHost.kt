@@ -46,6 +46,11 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -56,8 +61,19 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_dismiss
+import ketch.app.shared.generated.resources.banner_connecting
+import ketch.app.shared.generated.resources.banner_enter_token
+import ketch.app.shared.generated.resources.banner_offline
+import ketch.app.shared.generated.resources.banner_retry_now
+import ketch.app.shared.generated.resources.banner_retrying
+import ketch.app.shared.generated.resources.banner_switch_to
+import ketch.app.shared.generated.resources.banner_unauthorized
+import ketch.app.shared.generated.resources.feedback_reconnect_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -86,7 +102,7 @@ internal enum class BannerTone {
 internal data class Banner(
   val id: String,
   val tone: BannerTone,
-  val text: String,
+  val text: UiText,
   val icon: KetchIcon = KetchIcon.Info,
   val busy: Boolean = false,
   val actions: List<MessageAction> = emptyList(),
@@ -103,34 +119,43 @@ internal data class Banner(
  */
 internal fun deviceBanner(
   health: DeviceHealth?,
-  name: String,
+  name: UiText,
   connectingLong: Boolean,
-  localName: String?,
+  localName: UiText?,
   onRetry: () -> Unit,
   onSwitchToLocal: () -> Unit,
   onEnterToken: () -> Unit,
 ): Banner? = when (health) {
   DeviceHealth.Connecting -> if (connectingLong) {
-    Banner(DEVICE_BANNER, BannerTone.Warning, "Connecting to $name…", busy = true)
+    Banner(
+      DEVICE_BANNER,
+      BannerTone.Warning,
+      Res.string.banner_connecting.text(name),
+      busy = true,
+    )
   } else {
     null
   }
   is DeviceHealth.Offline -> Banner(
     id = DEVICE_BANNER,
     tone = BannerTone.Danger,
-    text = listOfNotNull("$name is offline", "retrying", health.reason).joinToString(" · "),
+    text = listOfNotNull(
+      Res.string.banner_offline.text(name),
+      Res.string.banner_retrying.text(),
+      health.reason?.let(::verbatim),
+    ).joinText(),
     icon = KetchIcon.Warning,
     actions = listOfNotNull(
-      MessageAction("Retry now", onRetry),
-      localName?.let { MessageAction("Switch to $it", onSwitchToLocal) }
+      MessageAction(Res.string.banner_retry_now.text(), onRetry),
+      localName?.let { MessageAction(Res.string.banner_switch_to.text(it), onSwitchToLocal) }
     ),
   )
   DeviceHealth.Unauthorized -> Banner(
     id = DEVICE_BANNER,
     tone = BannerTone.Danger,
-    text = "$name needs a new access token",
+    text = Res.string.banner_unauthorized.text(name),
     icon = KetchIcon.Warning,
-    actions = listOf(MessageAction("Enter token", onEnterToken)),
+    actions = listOf(MessageAction(Res.string.banner_enter_token.text(), onEnterToken)),
   )
   else -> null
 }
@@ -143,7 +168,7 @@ internal fun messageBanner(message: AppMessage, onDismiss: () -> Unit): Banner =
     MessageLevel.Warning -> BannerTone.Warning
     MessageLevel.Error -> BannerTone.Danger
   },
-  text = listOfNotNull(message.title, toastDetail(message)).joinToString(" · "),
+  text = listOfNotNull(message.title, toastDetail(message)).joinText(),
   icon = message.level.icon,
   actions = message.actions,
   onDismiss = onDismiss,
@@ -205,7 +230,7 @@ private fun AppState.retryNow(device: RemoteInstance) {
       log.w { "Couldn't reconnect to ${device.deviceId}: ${e.describeCauses()}" }
       messages.post(
         level = MessageLevel.Error,
-        title = "Couldn't reconnect to ${device.label}",
+        title = Res.string.feedback_reconnect_failed.text(device.label),
         cause = e,
         deviceId = device.deviceId,
       )
@@ -281,7 +306,7 @@ private fun BannerRow(banner: Banner, modifier: Modifier = Modifier) {
           }
         }
         Text(
-          text = banner.text,
+          text = banner.text.resolve(),
           style = textStyle,
           color = colors.textPrimary,
           maxLines = if (stacked) STACKED_LINES else 2,
@@ -296,7 +321,7 @@ private fun BannerRow(banner: Banner, modifier: Modifier = Modifier) {
             icon = KetchIcon.Close,
             onClick = dismiss,
             size = KetchButtonSize.Small,
-            contentDescription = "Dismiss",
+            contentDescription = stringResource(Res.string.action_dismiss),
             modifier = firstLineOnly,
           )
         } else {
@@ -319,7 +344,7 @@ private fun BannerRow(banner: Banner, modifier: Modifier = Modifier) {
 private fun BannerActions(actions: List<MessageAction>) {
   actions.forEach { action ->
     KetchButton(
-      text = action.label,
+      text = action.label.resolve(),
       onClick = action.onClick,
       variant = KetchButtonVariant.Secondary,
       size = KetchButtonSize.Small,

@@ -10,6 +10,11 @@ import com.linroid.ketch.app.components.DebouncedCommit
 import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.plain
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.FileActions
@@ -50,8 +55,8 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class RowCommandsTest {
 
-  private val local = DeviceInfo("This Mac", RowCapabilities.local())
-  private val remote = DeviceInfo("NAS", RowCapabilities.remote())
+  private val local = DeviceInfo(verbatim("This Mac"), RowCapabilities.local())
+  private val remote = DeviceInfo(verbatim("NAS"), RowCapabilities.remote())
   private val downloading = DownloadState.Downloading(RecordingTask.PROGRESS)
 
   private class Fixture(
@@ -66,7 +71,7 @@ class RowCommandsTest {
   }
 
   private fun TestScope.fixture(
-    revealLabel: String? = "Show in Finder",
+    revealLabel: UiText? = verbatim("Show in Finder"),
     openUri: (String) -> Unit = {},
   ): Fixture {
     val api = RecordingKetchApi()
@@ -95,6 +100,8 @@ class RowCommandsTest {
       createdAt = task.createdAt,
       device = device,
       content = rowContent(request, state, task.createdAt, context),
+      deviceName = device.name.plain,
+      errorTitle = null,
     )
   }
 
@@ -170,7 +177,7 @@ class RowCommandsTest {
     runCurrent()
 
     val error = f.errors().single()
-    assertEquals("Couldn't pause ${rowOf(task).name} on This Mac", error.title)
+    assertEquals("Couldn't pause ${rowOf(task).name} on This Mac", error.title.load())
     f.controller.close()
   }
 
@@ -199,7 +206,7 @@ class RowCommandsTest {
     assertTrue(f.controller.state.tasks.value.isEmpty())
     assertTrue(task.calls.isEmpty())
     val toast = f.controller.messages.active.value.last()
-    assertTrue(toast.actions.any { it.label == "Undo" })
+    assertTrue(toast.actions.any { it.label.load() == "Undo" })
     advanceTimeBy(7.seconds)
     runCurrent()
     assertEquals(listOf("remove deleteFiles=false"), task.calls)
@@ -227,7 +234,25 @@ class RowCommandsTest {
     runCurrent()
 
     assertEquals(listOf(task.request.url), f.clipboard.written)
-    assertEquals("Copied link", f.controller.messages.history.value.first().title)
+    assertEquals("Copied link", f.controller.messages.history.value.first().title.load())
+    f.controller.close()
+  }
+
+  @Test
+  fun run_copyError_putsTheErrorsTitleAndHintOnTheClipboard() = runTest {
+    // The copy reads the error's text while virtual time runs.
+    warmStrings()
+    val f = fixture()
+    val task = f.api.add(DownloadState.Failed(KetchError.Http(404)))
+
+    f.commands.run(RowAction.CopyError, rowOf(task))
+    runCurrent()
+
+    assertEquals(
+      listOf("File not found (404)\nThe server no longer has this file."),
+      f.clipboard.written,
+    )
+    assertEquals("Copied error", f.controller.messages.history.value.first().title.load())
     f.controller.close()
   }
 
@@ -264,7 +289,7 @@ class RowCommandsTest {
 
     f.commands.run(RowAction.OpenSourcePage, rowOf(task))
 
-    assertEquals("Couldn't open the source page", f.errors().single().title)
+    assertEquals("Couldn't open the source page", f.errors().single().title.load())
     f.controller.close()
   }
 
@@ -318,7 +343,7 @@ class RowCommandsTest {
   fun isBusy_pauseInFlight_isBusy() {
     val row = ListFixtures.row("a", downloading)
 
-    assertTrue(RowCommands.isBusy(row, setOf(row.key to "pause ${row.name}")))
+    assertTrue(RowCommands.isBusy(row, setOf(row.key to TaskCommand.Pause.key)))
   }
 
   @Test
@@ -340,7 +365,7 @@ class RowCommandsTest {
 }
 
 /** File actions that record what they were asked to do. */
-internal class RecordingFileActions(override val revealLabel: String?) : FileActions {
+internal class RecordingFileActions(override val revealLabel: UiText?) : FileActions {
   val calls = mutableListOf<String>()
 
   override val canShare: Boolean = false

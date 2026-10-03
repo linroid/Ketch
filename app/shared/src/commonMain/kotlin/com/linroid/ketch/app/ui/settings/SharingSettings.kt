@@ -38,6 +38,8 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.SEPARATOR
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -45,6 +47,7 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.parseHostList
@@ -56,9 +59,61 @@ import com.linroid.ketch.config.ServerConfig
 import io.github.alexzhirkevich.qrose.options.QrBrush
 import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.settings_action_hide
+import ketch.app.shared.generated.resources.settings_action_refresh
+import ketch.app.shared.generated.resources.settings_sharing_access_code
+import ketch.app.shared.generated.resources.settings_sharing_advanced
+import ketch.app.shared.generated.resources.settings_sharing_advanced_hint
+import ketch.app.shared.generated.resources.settings_sharing_allow
+import ketch.app.shared.generated.resources.settings_sharing_also
+import ketch.app.shared.generated.resources.settings_sharing_anyone
+import ketch.app.shared.generated.resources.settings_sharing_auto_start
+import ketch.app.shared.generated.resources.settings_sharing_code_create
+import ketch.app.shared.generated.resources.settings_sharing_code_open
+import ketch.app.shared.generated.resources.settings_sharing_code_rotate
+import ketch.app.shared.generated.resources.settings_sharing_code_set
+import ketch.app.shared.generated.resources.settings_sharing_code_web
+import ketch.app.shared.generated.resources.settings_sharing_control_from_computer
+import ketch.app.shared.generated.resources.settings_sharing_control_from_phone
+import ketch.app.shared.generated.resources.settings_sharing_copied
+import ketch.app.shared.generated.resources.settings_sharing_copy_link
+import ketch.app.shared.generated.resources.settings_sharing_discoverable
+import ketch.app.shared.generated.resources.settings_sharing_discoverable_hint
+import ketch.app.shared.generated.resources.settings_sharing_failed
+import ketch.app.shared.generated.resources.settings_sharing_local_only
+import ketch.app.shared.generated.resources.settings_sharing_looking
+import ketch.app.shared.generated.resources.settings_sharing_new_code
+import ketch.app.shared.generated.resources.settings_sharing_new_code_hint
+import ketch.app.shared.generated.resources.settings_sharing_no_address
+import ketch.app.shared.generated.resources.settings_sharing_no_code
+import ketch.app.shared.generated.resources.settings_sharing_off_hint
+import ketch.app.shared.generated.resources.settings_sharing_open_no_code
+import ketch.app.shared.generated.resources.settings_sharing_open_web
+import ketch.app.shared.generated.resources.settings_sharing_pair
+import ketch.app.shared.generated.resources.settings_sharing_port
+import ketch.app.shared.generated.resources.settings_sharing_qr
+import ketch.app.shared.generated.resources.settings_sharing_reachable
+import ketch.app.shared.generated.resources.settings_sharing_reachable_off
+import ketch.app.shared.generated.resources.settings_sharing_reachable_on
+import ketch.app.shared.generated.resources.settings_sharing_remote
+import ketch.app.shared.generated.resources.settings_sharing_restart
+import ketch.app.shared.generated.resources.settings_sharing_restart_notice
+import ketch.app.shared.generated.resources.settings_sharing_scan_other
+import ketch.app.shared.generated.resources.settings_sharing_scan_phone
+import ketch.app.shared.generated.resources.settings_sharing_stop
+import ketch.app.shared.generated.resources.settings_sharing_unreadable_address
+import ketch.app.shared.generated.resources.settings_sharing_unsupported
+import ketch.app.shared.generated.resources.settings_sharing_websites
+import ketch.app.shared.generated.resources.settings_sharing_websites_hint
+import ketch.app.shared.generated.resources.settings_sharing_websites_needs_code
+import ketch.app.shared.generated.resources.settings_sharing_websites_none
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -77,14 +132,14 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
   when {
     device !is EmbeddedInstance -> {
       SettingsNotice(
-        text = "Set up sharing on ${device.label} itself, in Ketch or with ketch server.",
+        text = stringResource(Res.string.settings_sharing_remote, device.label),
         tone = NoticeTone.Info,
       )
       return
     }
     !manager.isLocalServerSupported -> {
       SettingsNotice(
-        text = "${device.label} can't share its downloads with other devices.",
+        text = stringResource(Res.string.settings_sharing_unsupported, device.label),
         tone = NoticeTone.Info,
       )
       return
@@ -126,11 +181,11 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     // Starting with Ketch only matters at launch, so it never calls for a restart.
     if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
       SettingsNotice(
-        text = "Restart sharing to apply changes. Devices reconnect on their own.",
+        text = stringResource(Res.string.settings_sharing_restart_notice),
         tone = NoticeTone.Warning,
         action = {
           KetchButton(
-            text = "Restart",
+            text = stringResource(Res.string.settings_sharing_restart),
             onClick = restart,
             variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
@@ -178,11 +233,11 @@ private fun PairCard(
     null
   }
   SettingsGroup(
-    title = "Pair a device",
+    title = stringResource(Res.string.settings_sharing_pair),
     action = if (running != null) {
       {
         KetchButton(
-          text = "Stop sharing",
+          text = stringResource(Res.string.settings_sharing_stop),
           onClick = onStop,
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -243,7 +298,7 @@ private fun PairDetails(
   val type = KetchTheme.typography
   val spacing = KetchTheme.spacing
   // "this Mac" in the middle of a sentence; the host name follows the address.
-  val noun = localDeviceNoun().replaceFirstChar { it.lowercase() }
+  val noun = localDeviceNounInSentence().resolve()
   val port = (serverState as? ServerState.Running)?.port
   val clipboard = rememberSystemClipboard()
   val uriHandler = LocalUriHandler.current
@@ -258,9 +313,9 @@ private fun PairDetails(
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
     Text(
       text = if (isMobilePlatform) {
-        "Control $noun from a computer or another device."
+        stringResource(Res.string.settings_sharing_control_from_computer, noun)
       } else {
-        "Control $noun from your phone, tablet or another browser."
+        stringResource(Res.string.settings_sharing_control_from_phone, noun)
       },
       style = type.titleM,
       color = colors.textPrimary,
@@ -268,32 +323,35 @@ private fun PairDetails(
     when {
       serverState is ServerState.Failed -> {
         SettingsNotice(
-          text = "Couldn't start sharing: ${serverState.message}",
+          text = stringResource(Res.string.settings_sharing_failed, serverState.reason.resolve()),
           tone = NoticeTone.Error,
         )
-        KetchButton(text = "Try again", onClick = onAllow, leadingIcon = KetchIcon.Retry)
+        KetchButton(
+          text = stringResource(Res.string.action_try_again),
+          onClick = onAllow,
+          leadingIcon = KetchIcon.Retry,
+        )
       }
       !shared -> {
         if (serverState is ServerState.Running && !serverState.config.isLoopbackOnly) {
           // Reachable from the network, but without an access code.
           SettingsNotice(
-            text = "Anyone on your network can control $noun. Allowing a device adds a code.",
+            text = stringResource(Res.string.settings_sharing_open_no_code, noun),
             tone = NoticeTone.Warning,
           )
         } else {
           Text(
             text = if (serverState is ServerState.Running) {
-              "Only apps on $noun can connect. Allowing a device shares it on your network, " +
-                "with a code."
+              stringResource(Res.string.settings_sharing_local_only, noun)
             } else {
-              "Ketch shares $noun on your network, protected by a code."
+              stringResource(Res.string.settings_sharing_off_hint, noun)
             },
             style = type.bodyS,
             color = colors.textSecondary,
           )
         }
         KetchButton(
-          text = "Allow another device",
+          text = stringResource(Res.string.settings_sharing_allow),
           onClick = onAllow,
           leadingIcon = KetchIcon.QrCode,
         )
@@ -301,17 +359,20 @@ private fun PairDetails(
       link == null -> {
         Text(
           text = when {
-            addresses == null -> "Looking for the network address of $noun…"
-            !addressesReadable -> "Ketch can't read the address of $noun. On the other " +
-              "device, open http://<its address>:$port with the code from Advanced."
+            addresses == null -> stringResource(Res.string.settings_sharing_looking, noun)
+            !addressesReadable -> stringResource(
+              Res.string.settings_sharing_unreadable_address,
+              noun,
+              port?.toString().orEmpty(),
+            )
             else ->
-              "${localDeviceNoun()} has no network address. Connect to Wi-Fi or Ethernet."
+              stringResource(Res.string.settings_sharing_no_address, localDeviceNoun().resolve())
           },
           style = type.bodyS,
           color = colors.textSecondary,
         )
         KetchButton(
-          text = "Refresh",
+          text = stringResource(Res.string.settings_action_refresh),
           onClick = onRefresh,
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
@@ -322,9 +383,9 @@ private fun PairDetails(
         Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
           Text(
             text = if (isMobilePlatform) {
-              "Scan with another device's camera, or open"
+              stringResource(Res.string.settings_sharing_scan_other)
             } else {
-              "Scan with your phone's camera, or open"
+              stringResource(Res.string.settings_sharing_scan_phone)
             },
             style = type.bodyS,
             color = colors.textSecondary,
@@ -335,14 +396,15 @@ private fun PairDetails(
             color = colors.accentText,
           )
         }
+        val others = addresses.orEmpty().drop(1)
+        val also = stringResource(Res.string.settings_sharing_also, others.joinToString(", "))
         Text(
           text = buildAnnotatedString {
-            append("$name · ")
+            append(name + SEPARATOR)
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = colors.textPrimary)) {
               append(link.host)
             }
-            val others = addresses.orEmpty().drop(1)
-            if (others.isNotEmpty()) append(" · also ${others.joinToString(", ")}")
+            if (others.isNotEmpty()) append(SEPARATOR + also)
           },
           style = type.caption,
           color = colors.textSecondary,
@@ -352,7 +414,11 @@ private fun PairDetails(
           verticalArrangement = Arrangement.spacedBy(spacing.s2),
         ) {
           KetchButton(
-            text = if (copied) "Copied" else "Copy pairing link",
+            text = if (copied) {
+              stringResource(Res.string.settings_sharing_copied)
+            } else {
+              stringResource(Res.string.settings_sharing_copy_link)
+            },
             onClick = {
               scope.launch {
                 try {
@@ -370,7 +436,7 @@ private fun PairDetails(
             leadingIcon = if (copied) KetchIcon.Check else KetchIcon.Copy,
           )
           KetchButton(
-            text = "Open web app",
+            text = stringResource(Res.string.settings_sharing_open_web),
             onClick = {
               try {
                 uriHandler.openUri(link.webAppUrl())
@@ -388,17 +454,17 @@ private fun PairDetails(
           horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         ) {
           Text(
-            text = "Anyone with it can control $noun.",
+            text = stringResource(Res.string.settings_sharing_anyone, noun),
             style = type.caption,
             color = colors.textSecondary,
             modifier = Modifier.weight(1f, fill = false),
           )
           KetchButton(
-            text = "New code",
+            text = stringResource(Res.string.settings_sharing_new_code),
             onClick = onNewCode,
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
-            tooltip = "Disconnects the devices paired so far",
+            tooltip = stringResource(Res.string.settings_sharing_new_code_hint),
           )
         }
       }
@@ -436,7 +502,7 @@ private fun QrTile(link: PairingLink?, modifier: Modifier = Modifier) {
       }
       Image(
         painter = painter,
-        contentDescription = "Pairing code for ${link.name ?: link.host}",
+        contentDescription = stringResource(Res.string.settings_sharing_qr, link.name ?: link.host),
         modifier = Modifier.size(QrSize),
       )
     }
@@ -455,8 +521,9 @@ private fun AdvancedGroup(
   var open by rememberSaveable { mutableStateOf(false) }
   // A search result for one of the rows inside opens the section, so the jump finds it.
   val asked = LocalSettingsJump.current?.requested.orEmpty()
+  val rows = AdvancedRows.map { stringResource(it) }
   LaunchedEffect(asked) {
-    if (asked.any { it in AdvancedRows }) open = true
+    if (asked.any { it in rows }) open = true
   }
   val lanOpen = !config.isLoopbackOnly
   val token = config.apiToken.orEmpty()
@@ -465,16 +532,27 @@ private fun AdvancedGroup(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s3),
       modifier = Modifier.fillMaxWidth()
-        .clickable(role = Role.Button, onClickLabel = if (open) "Hide" else "Show") {
+        .clickable(
+          role = Role.Button,
+          onClickLabel = if (open) {
+            stringResource(Res.string.settings_action_hide)
+          } else {
+            stringResource(Res.string.action_show)
+          },
+        ) {
           open = !open
         }
         .background(colors.surface)
         .padding(horizontal = spacing.s4, vertical = spacing.s3),
     ) {
       Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
-        Text("Advanced", style = KetchTheme.typography.body, color = colors.textPrimary)
         Text(
-          text = "Port, access code, discovery and websites",
+          text = stringResource(Res.string.settings_sharing_advanced),
+          style = KetchTheme.typography.body,
+          color = colors.textPrimary,
+        )
+        Text(
+          text = stringResource(Res.string.settings_sharing_advanced_hint),
           style = KetchTheme.typography.caption,
           color = colors.textSecondary,
         )
@@ -487,11 +565,11 @@ private fun AdvancedGroup(
     }
     if (!open) return@SettingsGroup
     SettingsSwitchRow(
-      title = "Reachable from other devices",
+      title = stringResource(Res.string.settings_sharing_reachable),
       description = if (lanOpen) {
-        "Devices on your network can connect with the code."
+        stringResource(Res.string.settings_sharing_reachable_on)
       } else {
-        "Only apps on this device can connect."
+        stringResource(Res.string.settings_sharing_reachable_off)
       },
       checked = lanOpen,
       onCheckedChange = { allow ->
@@ -500,7 +578,7 @@ private fun AdvancedGroup(
       },
     )
     SettingsRow(
-      title = "Port",
+      title = stringResource(Res.string.settings_sharing_port),
       trailing = {
         SettingsTextInput(
           value = config.port.toString(),
@@ -514,12 +592,14 @@ private fun AdvancedGroup(
       },
     )
     SettingsRow(
-      title = "Access code",
-      description = when {
-        token.isNotEmpty() -> "Paired devices and the web app connect with it."
-        lanOpen -> "Without one, anyone on your network can control your downloads."
-        else -> "Needed for the web app."
-      },
+      title = stringResource(Res.string.settings_sharing_access_code),
+      description = stringResource(
+        when {
+          token.isNotEmpty() -> Res.string.settings_sharing_code_set
+          lanOpen -> Res.string.settings_sharing_code_open
+          else -> Res.string.settings_sharing_code_web
+        },
+      ),
       descriptionColor = if (token.isEmpty() && lanOpen) {
         colors.status.paused.color
       } else {
@@ -529,12 +609,16 @@ private fun AdvancedGroup(
       SettingsTextInput(
         value = token,
         onCommit = { onChange(config.copy(apiToken = it.ifBlank { null })) },
-        placeholder = "No code",
+        placeholder = stringResource(Res.string.settings_sharing_no_code),
         secret = true,
         mono = true,
         actions = {
           KetchButton(
-            text = if (token.isEmpty()) "Create" else "Rotate",
+            text = if (token.isEmpty()) {
+              stringResource(Res.string.settings_sharing_code_create)
+            } else {
+              stringResource(Res.string.settings_sharing_code_rotate)
+            },
             onClick = onRotate,
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
@@ -543,18 +627,18 @@ private fun AdvancedGroup(
       )
     }
     SettingsSwitchRow(
-      title = "Discoverable on the local network",
-      description = "Other devices find this one without typing an address.",
+      title = stringResource(Res.string.settings_sharing_discoverable),
+      description = stringResource(Res.string.settings_sharing_discoverable_hint),
       checked = config.mdnsEnabled && lanOpen,
       enabled = lanOpen,
       onCheckedChange = { onChange(config.copy(mdnsEnabled = it)) },
     )
     SettingsRow(
-      title = "Websites allowed to connect",
+      title = stringResource(Res.string.settings_sharing_websites),
       description = if (token.isEmpty()) {
-        "Needs an access code."
+        stringResource(Res.string.settings_sharing_websites_needs_code)
       } else {
-        "Such as app.example.com, separated by commas. * allows any."
+        stringResource(Res.string.settings_sharing_websites_hint)
       },
       enabled = token.isNotEmpty(),
     ) {
@@ -562,13 +646,13 @@ private fun AdvancedGroup(
         value = config.corsAllowedHosts.joinToString(", "),
         onCommit = { onChange(config.copy(corsAllowedHosts = parseHostList(it))) },
         normalize = { parseHostList(it).joinToString(", ") },
-        placeholder = "None",
+        placeholder = stringResource(Res.string.settings_sharing_websites_none),
         mono = true,
         enabled = token.isNotEmpty(),
       )
     }
     SettingsSwitchRow(
-      title = "Start sharing when Ketch opens",
+      title = stringResource(Res.string.settings_sharing_auto_start),
       checked = config.autoStart,
       onCheckedChange = { onChange(config.copy(autoStart = it)) },
     )
@@ -582,13 +666,13 @@ private fun newToken(): String = Uuid.random().toHexString()
 private const val COPIED_MILLIS = 2_000L
 
 /** Titles of the rows the Advanced section holds. */
-private val AdvancedRows = setOf(
-  "Reachable from other devices",
-  "Port",
-  "Access code",
-  "Discoverable on the local network",
-  "Websites allowed to connect",
-  "Start sharing when Ketch opens",
+private val AdvancedRows = listOf(
+  Res.string.settings_sharing_reachable,
+  Res.string.settings_sharing_port,
+  Res.string.settings_sharing_access_code,
+  Res.string.settings_sharing_discoverable,
+  Res.string.settings_sharing_websites,
+  Res.string.settings_sharing_auto_start,
 )
 private val QrSize = 180.dp
 private val QrPlaceholderGlyph = 48.dp

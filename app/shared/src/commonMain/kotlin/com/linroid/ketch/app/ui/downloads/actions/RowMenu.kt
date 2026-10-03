@@ -30,31 +30,62 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.deviceOptionCaption
 import com.linroid.ketch.app.components.startTimeOptions
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.input.altKeyName
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.intake.targetSummary
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.batch_copy_link
+import ketch.app.shared.generated.resources.batch_copy_path
+import ketch.app.shared.generated.resources.batch_discard
+import ketch.app.shared.generated.resources.batch_download_again
+import ketch.app.shared.generated.resources.batch_open
+import ketch.app.shared.generated.resources.batch_pause
+import ketch.app.shared.generated.resources.batch_remove
+import ketch.app.shared.generated.resources.batch_remove_files
+import ketch.app.shared.generated.resources.batch_resume
+import ketch.app.shared.generated.resources.batch_retry
+import ketch.app.shared.generated.resources.batch_show_in_folder
+import ketch.app.shared.generated.resources.batch_start_now
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.downloads_menu_clear_schedule
+import ketch.app.shared.generated.resources.downloads_menu_file_missing
+import ketch.app.shared.generated.resources.downloads_menu_hold_to_move
+import ketch.app.shared.generated.resources.downloads_menu_moving
+import ketch.app.shared.generated.resources.downloads_menu_pick_start
+import ketch.app.shared.generated.resources.downloads_menu_speed_custom
+import ketch.app.shared.generated.resources.downloads_menu_speed_each
+import ketch.app.shared.generated.resources.downloads_menu_speed_share
+import ketch.app.shared.generated.resources.downloads_menu_urgent_may_pause
+import ketch.app.shared.generated.resources.downloads_menu_urgent_starts_now
+import ketch.app.shared.generated.resources.row_menu_peer_limit
+import ketch.app.shared.generated.resources.send_move_to
+import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.datetime.TimeZone
 
 /**
  * A context menu open on the Downloads list.
@@ -156,7 +187,8 @@ internal fun RowMenu(
     urgentVictim = urgentVictim(rows, runner),
     send = rememberSendMode(),
   )
-  val title = single?.name ?: downloads(rows.size)
+  val title = single?.name
+    ?: pluralStringResource(Res.plurals.count_downloads, rows.size, rows.size)
   KetchMenu(
     expanded = true,
     onDismissRequest = onDismissRequest,
@@ -187,7 +219,7 @@ internal data class SendTarget(val entry: InstanceEntry, val option: DeviceOptio
  * @property send whether Send to moves the rows, and whether it says how to.
  */
 internal data class RowMenuContext(
-  val revealLabel: String? = null,
+  val revealLabel: UiText? = null,
   val devices: List<SendTarget> = emptyList(),
   val now: Instant = Clock.System.now(),
   val zone: TimeZone = TimeZone.currentSystemDefault(),
@@ -212,10 +244,13 @@ internal fun rememberSendMode(): SendMode {
   val window = LocalWindowInfo.current
   // Only ⌥ matters, so pressing ⇧ or ⌘ to select rows recomposes nothing.
   val move by remember(window) { derivedStateOf { window.keyboardModifiers.isAltPressed } }
-  val key = if (KeyboardPlatform.current.isApple) "⌥" else "Alt"
   return SendMode(
     move = move,
-    hint = if (move) "Removed from the old device once sent" else "Hold $key to move instead",
+    hint = if (move) {
+      stringResource(Res.string.downloads_menu_moving)
+    } else {
+      stringResource(Res.string.downloads_menu_hold_to_move, altKeyName(KeyboardPlatform.current))
+    },
   )
 }
 
@@ -228,7 +263,12 @@ internal fun KetchMenuScope.rowMenuEntries(
   val single = rows.singleOrNull()
   val entries: List<Pair<RowAction, List<TaskRow>>> = if (single != null) {
     if (runner.isFileMissing(single)) {
-      item(label = "File moved or deleted", onClick = {}, icon = KetchIcon.Warning, enabled = false)
+      item(
+        label = Res.string.downloads_menu_file_missing.text(),
+        onClick = {},
+        icon = KetchIcon.Warning,
+        enabled = false,
+      )
     }
     runner.menu(single).map { it to rows }
   } else {
@@ -249,7 +289,7 @@ internal fun KetchMenuScope.rowMenuEntries(
       RowAction.SpeedLimit -> submenu(label, action.icon) { speedEntries(targets, runner) }
       RowAction.Connections -> {
         val peers = targets.all { it.isTorrent }
-        val name = if (single != null && peers) "Peer limit" else label
+        val name = if (single != null && peers) Res.string.row_menu_peer_limit.text() else label
         // A connection count is no peer limit, so a mixed selection leaves its torrents alone.
         val counted = if (peers) targets else targets.filterNot { it.isTorrent }
         submenu(name, action.icon) { connectionEntries(counted, runner, peers) }
@@ -307,20 +347,23 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
   val current = rows.map { it.request.speedLimit }.distinct().singleOrNull()
   for (limit in MenuSpeedLimits) {
     item(
-      label = formatSpeedLimit(limit),
+      label = speedLimitText(limit),
       onClick = { runner.setSpeedLimit(rows, limit) },
       checked = limit == current,
     )
   }
-  item(label = "Custom…", onClick = { runner.requestCustomSpeed(rows) })
+  item(
+    label = Res.string.downloads_menu_speed_custom.text(),
+    onClick = { runner.requestCustomSpeed(rows) },
+  )
   if (rows.size > 1) {
     divider()
-    submenu("Share across these ${rows.size}", KetchIcon.Lanes) {
+    submenu(Res.plurals.downloads_menu_speed_share.text(rows.size), KetchIcon.Lanes) {
       for (total in SharedSpeedLimits) {
         val each = SpeedLimit.of((total.bytesPerSecond / rows.size).coerceAtLeast(1))
         item(
-          label = formatSpeedLimit(total),
-          caption = "${formatSpeedLimit(each)} each",
+          label = speedLimitText(total),
+          caption = Res.string.downloads_menu_speed_each.text(speedLimitText(each)),
           onClick = { runner.shareSpeed(rows, total) },
         )
       }
@@ -337,7 +380,7 @@ internal fun KetchMenuScope.connectionEntries(
   val current = rows.map { it.request.connections }.distinct().singleOrNull()
   for (count in if (peers) PeerLimits else ConnectionCounts) {
     item(
-      label = count.toString(),
+      label = verbatim(count.toString()),
       onClick = { runner.setConnections(rows, count) },
       checked = count == current,
     )
@@ -357,11 +400,11 @@ internal fun KetchMenuScope.priorityEntries(
   val waiting = rows.filter { it.state !is DownloadState.Downloading }
   val caption = when {
     waiting.isEmpty() -> null
-    victim != null -> "Starts now · may pause $victim"
-    else -> "Starts now"
+    victim != null -> Res.string.downloads_menu_urgent_may_pause.text(victim)
+    else -> Res.string.downloads_menu_urgent_starts_now.text()
   }
   item(
-    label = priorityLabel(DownloadPriority.URGENT),
+    label = priorityText(DownloadPriority.URGENT),
     onClick = {
       if (waiting.isNotEmpty()) runner.state.startNow(waiting.map { it.task })
       val running = rows - waiting.toSet()
@@ -373,7 +416,7 @@ internal fun KetchMenuScope.priorityEntries(
   )
   for (priority in listOf(DownloadPriority.HIGH, DownloadPriority.NORMAL, DownloadPriority.LOW)) {
     item(
-      label = priorityLabel(priority),
+      label = priorityText(priority),
       onClick = { runner.setPriority(rows, priority) },
       checked = priority == current,
     )
@@ -395,10 +438,16 @@ internal fun KetchMenuScope.startLaterEntries(
       checked = option.schedule == current,
     )
   }
-  item(label = "Pick date & time…", onClick = { runner.requestStartTime(rows) })
+  item(
+    label = Res.string.downloads_menu_pick_start.text(),
+    onClick = { runner.requestStartTime(rows) },
+  )
   if (current != null && current != DownloadSchedule.Immediate) {
     divider()
-    item(label = "Clear", onClick = { runner.reschedule(rows, DownloadSchedule.Immediate) })
+    item(
+      label = Res.string.downloads_menu_clear_schedule.text(),
+      onClick = { runner.reschedule(rows, DownloadSchedule.Immediate) },
+    )
   }
 }
 
@@ -414,7 +463,11 @@ internal fun KetchMenuScope.sendEntries(
 ) {
   for (device in devices) {
     item(
-      label = if (mode.move) "Move to ${device.option.name}" else device.option.name,
+      label = if (mode.move) {
+        Res.string.send_move_to.text(device.option.name)
+      } else {
+        device.option.name
+      },
       onClick = { runner.sendTo(rows, device.entry, move = mode.move) },
       caption = deviceOptionCaption(device.option),
       enabled = device.option.health.isOnline,
@@ -448,9 +501,17 @@ internal fun sendTargets(
       is RemoteInstance -> entry.connectionState.value.toDeviceHealth()
       else -> DeviceHealth.Local()
     }
-    val name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
     val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
-    SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
+    SendTarget(
+      entry,
+      DeviceOption(
+        id = entry.deviceId,
+        name = entry.displayName,
+        health = health,
+        pennantName = entry.label,
+        summary = summary,
+      ),
+    )
   }
 }
 
@@ -472,35 +533,31 @@ internal fun urgentVictim(rows: List<TaskRow>, runner: RowActionRunner): String?
 }
 
 /** Menu label of [action] on one row; Show in folder takes the platform's [revealLabel]. */
-internal fun rowActionLabel(action: RowAction, revealLabel: String?): String =
+internal fun rowActionLabel(action: RowAction, revealLabel: UiText?): UiText =
   if (action == RowAction.ShowInFolder) revealLabel ?: action.label else action.label
 
 /**
  * Menu label of [action] over [count] selected rows, such as "Pause 3 downloads" or "Copy 3
  * links"; submenus keep their plain label.
  */
-internal fun batchLabel(action: RowAction, count: Int, revealLabel: String?): String {
-  val what = downloads(count)
-  return when (action) {
-    RowAction.Pause -> "Pause $what"
-    RowAction.Resume -> "Resume $what"
-    RowAction.StartNow -> "Start $what now"
-    RowAction.Retry -> "Retry $what"
-    RowAction.Open -> if (count == 1) "Open 1 file" else "Open $count files"
-    RowAction.ShowInFolder -> "${revealLabel ?: action.label} ($count)"
-    RowAction.CopyLink -> if (count == 1) "Copy 1 link" else "Copy $count links"
-    RowAction.CopyPath -> if (count == 1) "Copy 1 file path" else "Copy $count file paths"
-    RowAction.DownloadAgain -> {
-      if (count == 1) "Download 1 file again" else "Download $count files again"
-    }
-    RowAction.StopAndDiscard -> "Discard progress of $what…"
-    RowAction.Remove -> "Remove $what from list"
-    RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> {
-      if (count == 1) "Remove 1 download and its file…" else "Remove $what and their files…"
-    }
+internal fun batchLabel(action: RowAction, count: Int, revealLabel: UiText?): UiText =
+  when (action) {
+    RowAction.Pause -> Res.plurals.batch_pause.text(count)
+    RowAction.Resume -> Res.plurals.batch_resume.text(count)
+    RowAction.StartNow -> Res.plurals.batch_start_now.text(count)
+    RowAction.Retry -> Res.plurals.batch_retry.text(count)
+    RowAction.Open -> Res.plurals.batch_open.text(count)
+    RowAction.ShowInFolder ->
+      Res.string.batch_show_in_folder.text(revealLabel ?: action.label, count)
+    RowAction.CopyLink -> Res.plurals.batch_copy_link.text(count)
+    RowAction.CopyPath -> Res.plurals.batch_copy_path.text(count)
+    RowAction.DownloadAgain -> Res.plurals.batch_download_again.text(count)
+    RowAction.StopAndDiscard -> Res.plurals.batch_discard.text(count)
+    RowAction.Remove -> Res.plurals.batch_remove.text(count)
+    RowAction.RemoveAndTrash, RowAction.RemoveAndDelete ->
+      Res.plurals.batch_remove_files.text(count)
     else -> action.label
   }
-}
 
 /** The command whose shortcut runs [this] action from the list, for hints; `null` if none. */
 internal val RowAction.command: KetchCommand?

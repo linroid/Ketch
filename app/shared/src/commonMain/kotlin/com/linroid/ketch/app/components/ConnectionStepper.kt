@@ -33,8 +33,27 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.component_stepper_auto
+import ketch.app.shared.generated.resources.component_stepper_auto_count
+import ketch.app.shared.generated.resources.component_stepper_connections
+import ketch.app.shared.generated.resources.component_stepper_connections_auto
+import ketch.app.shared.generated.resources.component_stepper_connections_auto_count
+import ketch.app.shared.generated.resources.component_stepper_fewer_connections
+import ketch.app.shared.generated.resources.component_stepper_fewer_peers
+import ketch.app.shared.generated.resources.component_stepper_more_connections
+import ketch.app.shared.generated.resources.component_stepper_more_peers
+import ketch.app.shared.generated.resources.component_stepper_peers
+import ketch.app.shared.generated.resources.component_stepper_peers_auto
+import ketch.app.shared.generated.resources.component_stepper_peers_auto_count
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -64,10 +83,50 @@ fun stepConnections(
 }
 
 /** "8", or "Auto (4)" for a [value] of 0 with the [autoValue] it resolves to. */
-fun connectionLabel(value: Int, autoValue: Int? = null): String = when {
-  value != 0 -> value.toString()
-  autoValue != null -> "Auto ($autoValue)"
-  else -> "Auto"
+fun connectionText(value: Int, autoValue: Int? = null): UiText = when {
+  value != 0 -> verbatim(value.toString())
+  autoValue != null -> Res.string.component_stepper_auto_count.text(autoValue)
+  else -> Res.string.component_stepper_auto.text()
+}
+
+/** What a [ConnectionStepper] counts, which names its value and buttons for screen readers. */
+enum class StepperCount(
+  private val fewer: StringResource,
+  private val more: StringResource,
+  private val count: PluralStringResource,
+  private val auto: StringResource,
+  private val autoCount: StringResource,
+) {
+  /** A task's connections. */
+  Connections(
+    Res.string.component_stepper_fewer_connections,
+    Res.string.component_stepper_more_connections,
+    Res.plurals.component_stepper_connections,
+    Res.string.component_stepper_connections_auto,
+    Res.string.component_stepper_connections_auto_count,
+  ),
+
+  /** A torrent's peer limit. */
+  Peers(
+    Res.string.component_stepper_fewer_peers,
+    Res.string.component_stepper_more_peers,
+    Res.plurals.component_stepper_peers,
+    Res.string.component_stepper_peers_auto,
+    Res.string.component_stepper_peers_auto_count,
+  );
+
+  /** The − button: "Fewer connections". */
+  val fewerLabel: UiText get() = fewer.text()
+
+  /** The + button: "More connections". */
+  val moreLabel: UiText get() = more.text()
+
+  /** [value] as the stepper shows it, with what it counts: "8 connections", "Auto (4) peers". */
+  fun valueLabel(value: Int, autoValue: Int? = null): UiText = when {
+    value != 0 -> count.text(value)
+    autoValue != null -> autoCount.text(autoValue)
+    else -> auto.text()
+  }
 }
 
 /**
@@ -79,7 +138,7 @@ fun connectionLabel(value: Int, autoValue: Int? = null): String = when {
  *
  * @param value the requested count; 0 means Auto, shown as "Auto ([autoValue])".
  * @param onCommit applies a new count.
- * @param noun what is counted, for screen readers, such as "connections" or "peers".
+ * @param counts what is counted, which names the value and the buttons for screen readers.
  * @param disabledReason why it is disabled, shown as its tooltip, such as "This server allows
  *   1 connection".
  */
@@ -93,7 +152,7 @@ fun ConnectionStepper(
   step: Int = 1,
   enabled: Boolean = true,
   pending: Boolean = false,
-  noun: String = "connections",
+  counts: StepperCount = StepperCount.Connections,
   disabledReason: String? = null,
 ) {
   val colors = KetchTheme.colors
@@ -125,21 +184,22 @@ fun ConnectionStepper(
   }
   val effective = if (shown == 0) autoValue ?: range.first else shown
   val stepper = @Composable { stepperModifier: Modifier ->
+    val state = counts.valueLabel(shown, autoValue).resolve()
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
       modifier = stepperModifier
         .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-        .semantics { stateDescription = "${connectionLabel(shown, autoValue)} $noun" },
+        .semantics { stateDescription = state },
     ) {
       StepButton(
         plus = false,
-        description = "Fewer $noun",
+        description = counts.fewerLabel.resolve(),
         enabled = enabled && effective > range.first,
         onClick = { press(-1) },
       )
       Text(
-        text = connectionLabel(shown, autoValue),
+        text = connectionText(shown, autoValue).resolve(),
         style = KetchTheme.typography.numeral,
         color = colors.textPrimary,
         textAlign = TextAlign.Center,
@@ -148,7 +208,7 @@ fun ConnectionStepper(
       )
       StepButton(
         plus = true,
-        description = "More $noun",
+        description = counts.moreLabel.resolve(),
         enabled = enabled && (shown == 0 || effective < range.last),
         onClick = { press(1) },
       )

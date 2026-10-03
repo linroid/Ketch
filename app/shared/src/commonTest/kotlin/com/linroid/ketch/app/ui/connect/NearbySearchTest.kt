@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.connect
 
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.MdnsDiscoverer
 import com.linroid.ketch.app.instance.NoOpMdnsDiscoverer
@@ -80,7 +81,7 @@ class NearbySearchTest {
     search.search()
     runCurrent()
 
-    assertEquals("Couldn't search your network", search.error)
+    assertEquals("Couldn't search your network", search.error.load())
     assertTrue(search.searched)
     assertFalse(search.searching)
   }

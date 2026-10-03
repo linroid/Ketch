@@ -42,11 +42,16 @@ import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.clockTime
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.shortDateText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
@@ -56,11 +61,21 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.activity_clear
+import ketch.app.shared.generated.resources.activity_earlier
+import ketch.app.shared.generated.resources.activity_empty_body
+import ketch.app.shared.generated.resources.activity_empty_title
+import ketch.app.shared.generated.resources.activity_mark_all_read
+import ketch.app.shared.generated.resources.activity_title
+import ketch.app.shared.generated.resources.activity_unread
+import ketch.app.shared.generated.resources.date_today
+import ketch.app.shared.generated.resources.date_yesterday_at
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
 /**
@@ -129,12 +144,12 @@ internal fun ActivityContent(
   history: List<AppMessage>,
   active: List<AppMessage>,
   unread: Int,
-  deviceName: (String) -> String,
+  deviceName: (String) -> UiText,
   activeDeviceId: String?,
   onMarkAllRead: () -> Unit,
   onClear: () -> Unit,
   onShowTask: (TaskKey) -> Unit,
-  pennantName: (String) -> String = deviceName,
+  pennantName: (String) -> String = { it },
   onActionUsed: (Long) -> Unit = {},
   now: Instant = LocalClock.current.now(),
   timeZone: TimeZone = TimeZone.currentSystemDefault(),
@@ -150,14 +165,14 @@ internal fun ActivityContent(
       .padding(bottom = spacing.s2),
   ) {
     Text(
-      text = "Activity",
+      text = stringResource(Res.string.activity_title),
       style = KetchTheme.typography.titleM,
       color = colors.textPrimary,
       modifier = Modifier.weight(1f),
     )
     if (unread > 0) {
       KetchButton(
-        text = "Mark all read",
+        text = stringResource(Res.string.activity_mark_all_read),
         onClick = onMarkAllRead,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -165,7 +180,7 @@ internal fun ActivityContent(
     }
     if (history.isNotEmpty()) {
       KetchButton(
-        text = "Clear",
+        text = stringResource(Res.string.activity_clear),
         onClick = onClear,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -180,10 +195,10 @@ internal fun ActivityContent(
   val unreadIds = remember(history, unread) { history.take(unread).mapTo(HashSet()) { it.id } }
   val activeIds = remember(active) { active.mapTo(HashSet()) { it.id } }
   LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = ListMaxHeight)) {
-    groups.forEach { (title, messages) ->
-      item(key = "group-$title") {
+    groups.forEach { (day, messages) ->
+      item(key = "group-${day.name}") {
         Text(
-          text = eyebrowText(title),
+          text = eyebrowText(day.title.resolve()),
           style = KetchTheme.typography.eyebrow,
           color = colors.textTertiary,
           modifier = Modifier.padding(top = spacing.s2, bottom = spacing.s1),
@@ -209,7 +224,7 @@ internal fun ActivityContent(
 @Composable
 private fun ActivityEntry(
   message: AppMessage,
-  time: String,
+  time: UiText,
   unread: Boolean,
   device: EntryDevice?,
   showActions: Boolean,
@@ -255,7 +270,7 @@ private fun ActivityEntry(
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       Row {
         Text(
-          text = message.title,
+          text = message.title.resolve(),
           style = KetchTheme.typography.bodyS,
           color = colors.textPrimary,
           maxLines = 2,
@@ -269,16 +284,17 @@ private fun ActivityEntry(
           modifier = Modifier.alignByBaseline(),
         ) {
           if (unread) {
+            val description = stringResource(Res.string.activity_unread)
             KetchDot(
               color = colors.accent,
               size = UnreadDotSize,
               modifier = Modifier
                 .padding(end = spacing.s1)
-                .semantics { contentDescription = "Unread" },
+                .semantics { contentDescription = description },
             )
           }
           Text(
-            text = time,
+            text = time.resolve(),
             // Tabular figures, so the times and their dots line up down the list.
             style = KetchTheme.typography.caption.copy(fontFeatureSettings = "tnum"),
             color = if (unread) colors.accentText else colors.textTertiary,
@@ -286,7 +302,7 @@ private fun ActivityEntry(
           )
         }
       }
-      val detail = toastDetail(message)
+      val detail = toastDetail(message)?.resolve()
       if (detail != null) {
         Text(
           text = detail,
@@ -312,7 +328,7 @@ private fun ActivityEntry(
             size = DevicePennantDefaults.XSmall,
           )
           Text(
-            text = device.name,
+            text = device.name.resolve(),
             style = KetchTheme.typography.caption,
             color = colors.textSecondary,
             maxLines = 1,
@@ -327,7 +343,7 @@ private fun ActivityEntry(
         ) {
           message.actions.forEach { action ->
             KetchButton(
-              text = action.label,
+              text = action.label.resolve(),
               onClick = {
                 action.onClick()
                 onActionUsed()
@@ -353,12 +369,12 @@ private fun EmptyActivity() {
   ) {
     KetchIconImage(icon = KetchIcon.Bell, size = EmptyIconSize, tint = colors.textTertiary)
     Text(
-      text = "No activity yet",
+      text = stringResource(Res.string.activity_empty_title),
       style = KetchTheme.typography.bodyStrong,
       color = colors.textPrimary,
     )
     Text(
-      text = "Finished downloads, failures and devices going offline show up here.",
+      text = stringResource(Res.string.activity_empty_body),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
       textAlign = TextAlign.Center,
@@ -368,30 +384,36 @@ private fun EmptyActivity() {
 }
 
 /** A device an Activity entry names, with what its pennant's monogram is made from. */
-private class EntryDevice(val id: String, val name: String, val pennantName: String)
+private class EntryDevice(val id: String, val name: UiText, val pennantName: String)
 
-/** [history], newest first, split into "Today" and "Earlier" by the local day of [now]. */
+/** A group of the Activity history, by the day its entries were posted. */
+internal enum class ActivityDay(val title: UiText) {
+  Today(Res.string.date_today.text()),
+  Earlier(Res.string.activity_earlier.text()),
+}
+
+/** [history], newest first, split into Today and Earlier by the local day of [now]. */
 internal fun activityGroups(
   history: List<AppMessage>,
   now: Instant,
   timeZone: TimeZone,
-): List<Pair<String, List<AppMessage>>> {
+): List<Pair<ActivityDay, List<AppMessage>>> {
   val today = now.toLocalDateTime(timeZone).date
   val (todays, earlier) = history.partition { it.at.toLocalDateTime(timeZone).date == today }
   return listOfNotNull(
-    todays.takeIf { it.isNotEmpty() }?.let { "Today" to it },
-    earlier.takeIf { it.isNotEmpty() }?.let { "Earlier" to it }
+    todays.takeIf { it.isNotEmpty() }?.let { ActivityDay.Today to it },
+    earlier.takeIf { it.isNotEmpty() }?.let { ActivityDay.Earlier to it }
   )
 }
 
 /** When an entry happened: "14:02" today, "Yesterday 18:20", or "Sep 28" before. */
-internal fun activityTime(at: Instant, now: Instant, timeZone: TimeZone): String {
+internal fun activityTime(at: Instant, now: Instant, timeZone: TimeZone): UiText {
   val time = at.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (time.date) {
-    today -> clock(time)
-    today.minus(1, DateTimeUnit.DAY) -> "Yesterday ${clock(time)}"
-    else -> "${MONTHS[time.month.ordinal]} ${time.day}"
+    today -> verbatim(clockTime(time))
+    today.minus(1, DateTimeUnit.DAY) -> Res.string.date_yesterday_at.text(clockTime(time))
+    else -> shortDateText(time.date, today)
   }
 }
 
@@ -404,13 +426,8 @@ internal fun showsActions(message: AppMessage, onScreen: Boolean): Boolean =
     (onScreen || message.level == MessageLevel.Error || message.level == MessageLevel.Warning)
 
 /** How the app names the device [deviceId]: "This Mac" for the embedded one. */
-internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String {
-  val entry = instances.firstOrNull { it.deviceId == deviceId } ?: return deviceId
-  return if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
-}
-
-private fun clock(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
+internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): UiText =
+  instances.firstOrNull { it.deviceId == deviceId }?.displayName ?: verbatim(deviceId)
 
 internal val MessageLevel.icon: KetchIcon
   get() = when (this) {
@@ -427,8 +444,6 @@ internal fun MessageLevel.tint(colors: KetchColors): Color = when (this) {
   MessageLevel.Error -> colors.status.failed.color
 }
 
-private val MONTHS =
-  listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 private val UnreadDotSize = 6.dp
 private val PopoverWidth = 380.dp
 private val ListMaxHeight = 440.dp

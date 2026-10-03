@@ -54,6 +54,7 @@ import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
 import com.linroid.ketch.app.ui.downloads.actions.SendConfirmationDialog
+import com.linroid.ketch.app.ui.downloads.actions.TrackDragCount
 import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
@@ -63,7 +64,10 @@ import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.config.DownloadsLayout
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_retry_all_count
 import kotlinx.coroutines.flow.drop
+import org.jetbrains.compose.resources.stringResource
 
 /** Width tiers of the window, which set how the app lays itself out. */
 enum class LayoutTier {
@@ -145,6 +149,7 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
     }
     RowActionDialogs(actions.runner)
     SendConfirmationDialog(state)
+    TrackDragCount(actions)
   }
 }
 
@@ -583,7 +588,10 @@ private fun PageBody(
 @Composable
 private fun RowScope.RetryGroup(page: DownloadsPage, group: RowGroup) {
   if (group.rows.isEmpty() || !group.rows.all { it.state.needsAttention }) return
-  TextAction("Retry all (${group.rows.size})", onClick = { page.retry(group.rows) })
+  TextAction(
+    text = stringResource(Res.string.downloads_retry_all_count, group.rows.size),
+    onClick = { page.retry(group.rows) },
+  )
 }
 
 /** Whether a task in this state failed or was canceled. */

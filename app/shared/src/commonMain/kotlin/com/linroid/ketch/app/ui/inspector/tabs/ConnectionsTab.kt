@@ -51,6 +51,11 @@ import com.linroid.ketch.app.components.LaneStripCanvas
 import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.components.lanePhase
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
@@ -59,10 +64,24 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.app.ui.list.TaskCommand
 import com.linroid.ketch.app.util.LaneHealth
 import com.linroid.ketch.app.util.SegmentRate
 import com.linroid.ketch.app.util.SegmentRateTracker
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_connections_active
+import ketch.app.shared.generated.resources.inspector_connections_active_speed
+import ketch.app.shared.generated.resources.inspector_connections_finished
+import ketch.app.shared.generated.resources.inspector_connections_live
+import ketch.app.shared.generated.resources.inspector_connections_on_resume
+import ketch.app.shared.generated.resources.inspector_connections_unfinished
+import ketch.app.shared.generated.resources.inspector_lane_description
+import ketch.app.shared.generated.resources.inspector_percent_spoken
+import ketch.app.shared.generated.resources.inspector_server_one_connection
+import ketch.app.shared.generated.resources.inspector_single_connection
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Connections tab of the inspector: where each connection of an HTTP or FTP download is in
@@ -87,7 +106,8 @@ fun ConnectionsTab(
 ) {
   val rates by state.speedHistory.rates.collectAsState()
   val pending by state.pending.collectAsState()
-  val label = "set the connections of ${row.name}"
+  // The same key as the Controls' stepper, which shows the change pending too.
+  val label = RowCommands.connectionsLabel(row)
   // Lanes, highlight and animations never carry over from another task.
   key(row.key) {
     ConnectionsTabContent(
@@ -96,7 +116,11 @@ fun ConnectionsTab(
       modifier = modifier,
       connectionsPending = (row.key to label) in pending,
       onConnectionsChange = { connections ->
-        state.runTaskCommand(row.task, label) { setConnections(connections) }
+        state.runTaskCommand(
+          task = row.task,
+          pendingKey = label,
+          failure = { device -> TaskCommand.Connections.failure(verbatim(row.name), device) },
+        ) { setConnections(connections) }
       },
       onHighlight = onHighlight,
     )
@@ -155,7 +179,7 @@ internal fun ConnectionsTabContent(
       modifier = Modifier.fillMaxWidth().heightIn(min = KetchTheme.density.buttonSmall),
     ) {
       Text(
-        text = connectionsSummary(model, downloading, row.speed),
+        text = connectionsSummary(model, downloading, row.speed).resolve(),
         style = type.numeral,
         color = colors.textPrimary,
         maxLines = 1,
@@ -169,7 +193,11 @@ internal fun ConnectionsTabContent(
           autoValue = row.segments.size.takeIf { it > 0 },
           enabled = !serverLimited,
           pending = connectionsPending,
-          disabledReason = if (serverLimited) SERVER_LIMIT else null,
+          disabledReason = if (serverLimited) {
+            stringResource(Res.string.inspector_server_one_connection)
+          } else {
+            null
+          },
         )
       }
     }
@@ -200,7 +228,9 @@ internal fun ConnectionsTabContent(
           tint = colors.status.completed.color,
         )
         Text(
-          text = "${model.finished} finished · ${formatSize(model.finishedBytes)}",
+          text = Res.plurals.inspector_connections_finished
+            .text(model.finished, model.finished, compactSizeText(model.finishedBytes))
+            .resolve(),
           style = type.caption,
           color = colors.textSecondary,
         )
@@ -208,7 +238,7 @@ internal fun ConnectionsTabContent(
     }
     val caption = connectionsCaption(model.lanes.size, serverLimited, editable, downloading)
     if (caption != null) {
-      Text(text = caption, style = type.caption, color = colors.textTertiary)
+      Text(text = caption.resolve(), style = type.caption, color = colors.textTertiary)
     }
   }
 }
@@ -282,7 +312,7 @@ private fun LaneRow(
   val own = remember(lane.segment) { listOf(lane.segment.rebased()) }
   val currentOnHighlight by rememberUpdatedState(onHighlight)
   val currentHighlighted by rememberUpdatedState(highlighted)
-  val description = laneDescription(lane)
+  val description = laneDescription(lane).resolve()
   val dense = scale == LaneScale.Dense
   // Dense lanes carry no text, except the slowest three, which get a row tall enough for it.
   val labelled = !dense || lane.annotated
@@ -335,7 +365,8 @@ private fun LaneRow(
     )
     if (!dense) {
       Text(
-        text = rate?.stalledFor?.let(::formatStall) ?: formatByteRange(start, lane.segment.end + 1),
+        text = (rate?.stalledFor?.let(::stallText) ?: byteRangeText(start, lane.segment.end + 1))
+          .resolve(),
         style = type.caption,
         color = if (health != null) colors.laneTextColor(health) else colors.textTertiary,
         maxLines = 1,
@@ -349,7 +380,11 @@ private fun LaneRow(
     ) {
       if (labelled) {
         Text(
-          text = if (rate != null) formatSpeed(rate.bytesPerSecond) else "${lane.percent}%",
+          text = if (rate != null) {
+            compactSpeedText(rate.bytesPerSecond)
+          } else {
+            percentText(lane.percent)
+          }.resolve(),
           style = if (dense) type.numeralS else type.numeral,
           color = when {
             rate == null -> colors.textSecondary
@@ -498,10 +533,15 @@ internal fun connectionsSummary(
   model: ConnectionsModel,
   downloading: Boolean,
   speed: Long?,
-): String {
+): UiText {
   val lanes = model.lanes.size
-  if (!downloading) return "$lanes unfinished · ${model.percent}%"
-  return if (speed != null) "$lanes active · ${formatSpeed(speed)}" else "$lanes active"
+  return when {
+    !downloading ->
+      Res.plurals.inspector_connections_unfinished.text(lanes, lanes, percentText(model.percent))
+    speed != null ->
+      Res.plurals.inspector_connections_active_speed.text(lanes, lanes, compactSpeedText(speed))
+    else -> Res.plurals.inspector_connections_active.text(lanes)
+  }
 }
 
 /** Share of [segments] downloaded, in whole percent. */
@@ -521,12 +561,12 @@ internal fun connectionsCaption(
   serverLimited: Boolean,
   editable: Boolean,
   downloading: Boolean,
-): String? = when {
-  lanes == 1 && serverLimited -> SERVER_LIMIT
-  lanes == 1 -> "Single connection"
+): UiText? = when {
+  lanes == 1 && serverLimited -> Res.string.inspector_server_one_connection.text()
+  lanes == 1 -> Res.string.inspector_single_connection.text()
   !editable -> null
-  downloading -> "A new count re-splits the remaining bytes live."
-  else -> "A new count applies when the download resumes."
+  downloading -> Res.string.inspector_connections_live.text()
+  else -> Res.string.inspector_connections_on_resume.text()
 }
 
 /** The color of a lane's dot: green while data arrives, amber once stalled, red when stuck. */
@@ -545,15 +585,15 @@ private fun KetchColors.laneRateColor(health: LaneHealth): Color =
   if (health == LaneHealth.Moving) textPrimary else laneHealthColor(health)
 
 /** What a screen reader says for a lane, such as "Connection 3, 1.4–2.1 GB, 1.3 MB/s". */
-private fun laneDescription(lane: ConnectionLane): String {
+private fun laneDescription(lane: ConnectionLane): UiText {
   val rate = lane.rate
-  val range = formatByteRange(lane.segment.start, lane.segment.end + 1)
+  val range = byteRangeText(lane.segment.start, lane.segment.end + 1)
   val status = when {
-    rate == null -> "${lane.percent} percent"
-    rate.stalledFor != null -> formatStall(rate.stalledFor)
-    else -> formatSpeed(rate.bytesPerSecond)
+    rate == null -> Res.string.inspector_percent_spoken.text(lane.percent)
+    rate.stalledFor != null -> stallText(rate.stalledFor)
+    else -> compactSpeedText(rate.bytesPerSecond)
   }
-  return "Connection ${lane.number}, $range, $status"
+  return Res.string.inspector_lane_description.text(lane.number, range, status)
 }
 
 /** Whether a new number of connections can be asked for in this state. */
@@ -571,7 +611,6 @@ private fun DownloadState.acceptsConnections(): Boolean = when (this) {
 private fun Segment.rebased(): Segment = Segment(index, 0, end - start, downloadedBytes)
 
 private val StalledOwnLane = setOf(0L)
-private const val SERVER_LIMIT = "This server allows only 1 connection"
 private const val TALL_LANES = 8
 private const val MEDIUM_LANES = 16
 private const val ANNOTATED_LANES = 3

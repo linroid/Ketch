@@ -49,6 +49,10 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.IntakeEntry
@@ -56,7 +60,22 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.downloads.MenuLabel
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.intake_collapse
+import ketch.app.shared.generated.resources.intake_expand
+import ketch.app.shared.generated.resources.intake_filter_files
+import ketch.app.shared.generated.resources.intake_largest_file
+import ketch.app.shared.generated.resources.intake_skip_samples
+import ketch.app.shared.generated.resources.intake_skipped_extras
+import ketch.app.shared.generated.resources.intake_sort
+import ketch.app.shared.generated.resources.intake_sort_files
+import ketch.app.shared.generated.resources.intake_space_free_on
+import ketch.app.shared.generated.resources.intake_space_needed
+import ketch.app.shared.generated.resources.intake_stage_back
+import ketch.app.shared.generated.resources.intake_stage_selection
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Picks the files of a torrent: a filter, chips that pick a kind of file, the folder tree with
@@ -93,7 +112,7 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
       if (onBack != null) {
         KetchIconButton(
           icon = KetchIcon.ChevronLeft,
-          contentDescription = "Back to every link",
+          contentDescription = stringResource(Res.string.intake_stage_back),
           size = KetchButtonSize.Small,
           onClick = onBack,
         )
@@ -107,8 +126,13 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
           overflow = TextOverflow.Ellipsis,
         )
         Text(
-          text = "${selection.size} of ${files.size} files · " +
-            "${formatBytes(tree.bytesOf(selection))} of ${formatBytes(tree.totalBytes)}",
+          text = Res.plurals.intake_stage_selection.text(
+            files.size,
+            selection.size,
+            files.size,
+            sizeText(tree.bytesOf(selection)),
+            sizeText(tree.totalBytes),
+          ).resolve(),
           style = type.caption,
           color = colors.textSecondary,
           maxLines = 1,
@@ -123,7 +147,7 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
       KetchTextField(
         value = filter,
         onValueChange = { filter = it },
-        placeholder = "Filter files",
+        placeholder = stringResource(Res.string.intake_filter_files),
         leadingIcon = KetchIcon.Search,
         modifier = Modifier.weight(1f),
       )
@@ -137,21 +161,21 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
       for ((kind, count) in tree.kindCounts) {
         val ids = tree.idsOf(kind)
         KindChip(
-          label = kind.label,
+          label = stringResource(kind.label),
           count = count,
           selected = ids.isNotEmpty() && selection.containsAll(ids),
           onClick = { add -> select(if (add) selection + ids else ids) },
         )
       }
       KetchChip(
-        label = "Largest file",
+        label = stringResource(Res.string.intake_largest_file),
         selected = selection.size == 1 && selection.single() == tree.largest(),
         onClick = { tree.largest()?.let { select(setOf(it)) } },
       )
       val extras = tree.extras()
       if (extras.isNotEmpty()) {
         KetchChip(
-          label = "Skip samples",
+          label = stringResource(Res.string.intake_skip_samples),
           selected = extras.none { it in selection },
           onClick = {
             select(if (extras.none { it in selection }) selection + extras else selection - extras)
@@ -204,12 +228,16 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
     ) {
       if (skipped.isNotEmpty() && skipped.none { it in selection }) {
         Text(
-          text = "Skipped ${skipped.size} ${if (skipped.size == 1) "extra" else "extras"}",
+          text = pluralStringResource(
+            Res.plurals.intake_skipped_extras,
+            skipped.size,
+            skipped.size,
+          ),
           style = type.caption,
           color = colors.textSecondary,
         )
         KetchButton(
-          text = "Undo",
+          text = stringResource(Res.string.action_undo),
           onClick = { select(selection + skipped) },
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -219,7 +247,7 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
       SpaceNeeded(
         needed = tree.bytesOf(selection),
         free = session.targetStatus?.system?.usableSpace,
-        device = session.targetName(),
+        device = session.targetName().resolve(),
       )
     }
   }
@@ -260,10 +288,19 @@ private fun KindChip(
 private fun SortButton(sort: TorrentSort, onSort: (TorrentSort) -> Unit) {
   var expanded by remember { mutableStateOf(false) }
   Box {
-    MenuLabel(label = "Sort", value = sort.label, open = expanded, onClick = { expanded = true })
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Sort files") {
+    MenuLabel(
+      label = stringResource(Res.string.intake_sort),
+      value = stringResource(sort.label),
+      open = expanded,
+      onClick = { expanded = true },
+    )
+    KetchMenu(
+      expanded = expanded,
+      onDismissRequest = { expanded = false },
+      title = stringResource(Res.string.intake_sort_files),
+    ) {
       for (option in TorrentSort.entries) {
-        item(label = option.label, checked = option == sort, onClick = { onSort(option) })
+        item(label = option.label.text(), checked = option == sort, onClick = { onSort(option) })
       }
     }
   }
@@ -322,7 +359,9 @@ private fun TreeRow(
         size = glyph,
         tint = colors.textSecondary,
         modifier = Modifier.clickable(
-          onClickLabel = if (collapsed) "Expand" else "Collapse",
+          onClickLabel = stringResource(
+            if (collapsed) Res.string.intake_expand else Res.string.intake_collapse,
+          ),
           role = Role.Button,
           onClick = onExpand,
         ),
@@ -345,7 +384,7 @@ private fun TreeRow(
       modifier = Modifier.weight(1f),
     )
     Text(
-      text = formatBytes(node.size),
+      text = sizeText(node.size).resolve(),
       style = KetchTheme.typography.numeral,
       color = colors.textSecondary,
       maxLines = 1,
@@ -370,10 +409,11 @@ private fun SpaceNeeded(needed: Long, free: Long?, device: String) {
       )
     }
     Text(
-      text = buildString {
-        append("needs ${formatBytes(needed)}")
-        if (free != null && free > 0) append(" · ${freeSpace(free)} free on $device")
-      },
+      text = listOfNotNull(
+        Res.string.intake_space_needed.text(sizeText(needed)),
+        free?.takeIf { it > 0 }
+          ?.let { Res.string.intake_space_free_on.text(freeSpace(it), device) },
+      ).joinText().resolve(),
       style = KetchTheme.typography.caption,
       color = if (free != null && needed > free) {
         colors.status.failed.color

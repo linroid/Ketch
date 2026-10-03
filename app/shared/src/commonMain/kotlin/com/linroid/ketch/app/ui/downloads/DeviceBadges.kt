@@ -61,7 +61,7 @@ internal fun RowPennant(row: TaskRow, modifier: Modifier = Modifier) {
   val devices = LocalShownDevices.current
   DevicePennant(
     deviceId = row.key.deviceId,
-    name = devices.pennantName(row.key.deviceId, row.device.name),
+    name = devices.pennantName(row.key.deviceId, row.deviceName),
     size = DevicePennantDefaults.XSmall,
     modifier = modifier,
   )

@@ -4,9 +4,14 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -20,9 +25,95 @@ import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.taskActions
 import com.linroid.ketch.app.util.errorDetails
 import com.linroid.ketch.app.util.referer
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_copied_details
+import ketch.app.shared.generated.resources.downloads_copied_error
+import ketch.app.shared.generated.resources.downloads_copied_link
+import ketch.app.shared.generated.resources.downloads_copied_links
+import ketch.app.shared.generated.resources.downloads_copied_path
+import ketch.app.shared.generated.resources.downloads_copied_paths
+import ketch.app.shared.generated.resources.downloads_copy_failed_details
+import ketch.app.shared.generated.resources.downloads_copy_failed_error
+import ketch.app.shared.generated.resources.downloads_copy_failed_link
+import ketch.app.shared.generated.resources.downloads_copy_failed_links
+import ketch.app.shared.generated.resources.downloads_copy_failed_path
+import ketch.app.shared.generated.resources.downloads_copy_failed_paths
+import ketch.app.shared.generated.resources.downloads_failed_connections
+import ketch.app.shared.generated.resources.downloads_failed_open
+import ketch.app.shared.generated.resources.downloads_failed_pause
+import ketch.app.shared.generated.resources.downloads_failed_priority
+import ketch.app.shared.generated.resources.downloads_failed_reconnect
+import ketch.app.shared.generated.resources.downloads_failed_reschedule
+import ketch.app.shared.generated.resources.downloads_failed_resume
+import ketch.app.shared.generated.resources.downloads_failed_retry
+import ketch.app.shared.generated.resources.downloads_failed_reveal
+import ketch.app.shared.generated.resources.downloads_failed_speed_limit
+import ketch.app.shared.generated.resources.downloads_open_source_failed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
+
+/**
+ * A command the Downloads list runs on tasks, as [AppState.pending] holds it and as a failure
+ * names it.
+ *
+ * @property key what [AppState.pending] holds a task with while the command runs, and the
+ *   command in logs; never shown.
+ */
+internal enum class TaskCommand(val key: String, private val failure: StringResource) {
+  Pause("pause", Res.string.downloads_failed_pause),
+  Resume("resume", Res.string.downloads_failed_resume),
+  Retry("retry", Res.string.downloads_failed_retry),
+  Reconnect("reconnect", Res.string.downloads_failed_reconnect),
+  Open("open", Res.string.downloads_failed_open),
+  Reveal("reveal", Res.string.downloads_failed_reveal),
+  SpeedLimit("speed-limit", Res.string.downloads_failed_speed_limit),
+  Priority("priority", Res.string.downloads_failed_priority),
+  Connections("connections", Res.string.downloads_failed_connections),
+  Reschedule("reschedule", Res.string.downloads_failed_reschedule);
+
+  /**
+   * The failure of this command on [what], a task's name or a number of downloads, on [device]:
+   * "Couldn't pause ubuntu.iso on NAS-Basement".
+   */
+  fun failure(what: UiText, device: UiText): UiText = failure.text(what, device)
+}
+
+/** What the Downloads list copies to the clipboard, as its confirmations and failures name it. */
+internal enum class CopiedText(
+  private val one: StringResource,
+  private val many: PluralStringResource?,
+  private val failedOne: StringResource,
+  private val failedMany: StringResource?,
+) {
+  Link(
+    Res.string.downloads_copied_link,
+    Res.plurals.downloads_copied_links,
+    Res.string.downloads_copy_failed_link,
+    Res.string.downloads_copy_failed_links,
+  ),
+  Path(
+    Res.string.downloads_copied_path,
+    Res.plurals.downloads_copied_paths,
+    Res.string.downloads_copy_failed_path,
+    Res.string.downloads_copy_failed_paths,
+  ),
+  Error(Res.string.downloads_copied_error, null, Res.string.downloads_copy_failed_error, null),
+  Details(
+    Res.string.downloads_copied_details,
+    null,
+    Res.string.downloads_copy_failed_details,
+    null,
+  );
+
+  /** "Copied link", or "Copied 3 links" for [count] of them. */
+  fun copied(count: Int = 1): UiText = many?.takeIf { count > 1 }?.text(count) ?: one.text()
+
+  /** "Couldn't copy the link", or "Couldn't copy the links" for several. */
+  fun failed(count: Int = 1): UiText = failedMany?.takeIf { count > 1 }?.text() ?: failedOne.text()
+}
 
 /**
  * Runs the [RowAction]s of the Downloads list on their tasks.
@@ -76,16 +167,15 @@ internal class RowCommands(
    */
   fun run(action: RowAction, row: TaskRow) {
     val task = row.task
-    val name = row.name
     when (action) {
-      RowAction.Pause -> state.runTaskCommand(task, "pause $name") { pause() }
-      RowAction.Resume -> state.runTaskCommand(task, "resume $name") { resume() }
-      RowAction.Retry -> state.runTaskCommand(task, "retry $name") { resume() }
-      RowAction.Reconnect -> state.runTaskCommand(task, "reconnect $name") {
+      RowAction.Pause -> command(row, TaskCommand.Pause) { pause() }
+      RowAction.Resume -> command(row, TaskCommand.Resume) { resume() }
+      RowAction.Retry -> command(row, TaskCommand.Retry) { resume() }
+      RowAction.Reconnect -> command(row, TaskCommand.Reconnect) {
         pause()
         resume()
       }
-      is RowAction.RetryWithConnections -> state.runTaskCommand(task, "retry $name") {
+      is RowAction.RetryWithConnections -> command(row, TaskCommand.Retry) {
         setConnections(action.connections)
         resume()
       }
@@ -94,25 +184,27 @@ internal class RowCommands(
       RowAction.Open -> {
         val path = outputPath(row) ?: return
         val files = files ?: return
-        state.runTaskCommand(task, "open $name") { files.open(path) }
+        command(row, TaskCommand.Open) { files.open(path) }
       }
       RowAction.ShowInFolder -> {
         val path = folderPath(row) ?: return
         val files = files ?: return
-        state.runTaskCommand(task, "show $name in its folder") { files.reveal(path) }
+        command(row, TaskCommand.Reveal) { files.reveal(path) }
       }
-      RowAction.CopyLink -> copy(row.request.url, "link")
-      RowAction.CopyPath -> outputPath(row)?.let { copy(it, "file path") }
+      RowAction.CopyLink -> copy(CopiedText.Link) { row.request.url }
+      RowAction.CopyPath -> outputPath(row)?.let { path -> copy(CopiedText.Path) { path } }
       RowAction.CopyError -> row.content.error?.let { error ->
-        copy(listOfNotNull(error.title, error.hint).joinToString("\n"), "error")
+        copy(CopiedText.Error) {
+          listOfNotNull(error.title, error.hint).map { it.load() }.joinToString("\n")
+        }
       }
       RowAction.CopyDetails -> (row.state as? DownloadState.Failed)?.let { failed ->
-        copy(errorDetails(failed.error, row.request, task.taskId), "details")
+        copy(CopiedText.Details) { errorDetails(failed.error, row.request, task.taskId) }
       }
       RowAction.EditLink,
       RowAction.RetryWithOptions,
       RowAction.EnterCredentials -> state.openIntake(retryRequest(row))
-      RowAction.FindAnotherSource -> state.openDiscover(DiscoverRequest(query = name))
+      RowAction.FindAnotherSource -> state.openDiscover(DiscoverRequest(query = row.name))
       RowAction.OpenSourcePage -> sourcePage(row)?.let(::openPage)
       RowAction.Remove -> state.remove(listOf(task))
       RowAction.StopAndDiscard -> state.cancel(listOf(task))
@@ -129,40 +221,53 @@ internal class RowCommands(
 
   /** Caps [row]'s task at [limit]. */
   fun setSpeedLimit(row: TaskRow, limit: SpeedLimit): Job =
-    state.runTaskCommand(row.task, speedLimitLabel(row)) { setSpeedLimit(limit) }
+    command(row, TaskCommand.SpeedLimit) { setSpeedLimit(limit) }
 
   /** Gives [row]'s task [priority]. */
   fun setPriority(row: TaskRow, priority: DownloadPriority): Job =
-    state.runTaskCommand(row.task, priorityLabel(row)) { setPriority(priority) }
+    command(row, TaskCommand.Priority) { setPriority(priority) }
 
   /** Lets [row]'s task open [connections] connections, or peers for a torrent. */
   fun setConnections(row: TaskRow, connections: Int): Job =
-    state.runTaskCommand(row.task, connectionsLabel(row)) { setConnections(connections) }
+    command(row, TaskCommand.Connections) { setConnections(connections) }
 
   /** Starts [row]'s task at [schedule]. */
   fun reschedule(row: TaskRow, schedule: DownloadSchedule): Job =
-    state.runTaskCommand(row.task, rescheduleLabel(row)) { reschedule(schedule) }
+    command(row, TaskCommand.Reschedule) { reschedule(schedule) }
 
   /** Removes [row]'s task, and its files with [deleteFiles], once the Undo window ends. */
   fun remove(row: TaskRow, deleteFiles: Boolean) {
     state.remove(listOf(row.task), deleteFiles)
   }
 
-  private fun copy(text: String, what: String) {
+  private fun command(
+    row: TaskRow,
+    command: TaskCommand,
+    block: suspend DownloadTask.() -> Unit,
+  ): Job = state.runTaskCommand(
+    task = row.task,
+    pendingKey = command.key,
+    failure = { device -> command.failure(verbatim(row.name), device) },
+    block = block,
+  )
+
+  private fun copy(what: CopiedText, text: suspend () -> String) {
     val clipboard = clipboard ?: return
     scope.launch {
-      catchingUnlessCancelled { clipboard.writeText(text) }
-        .onSuccess { state.messages.post(MessageLevel.Success, "Copied $what") }
-        .onFailure { e ->
-          state.messages.post(MessageLevel.Error, "Couldn't copy the $what", cause = e)
-        }
+      catchingUnlessCancelled { clipboard.writeText(text()) }
+        .onSuccess { state.messages.post(MessageLevel.Success, what.copied()) }
+        .onFailure { e -> state.messages.post(MessageLevel.Error, what.failed(), cause = e) }
     }
   }
 
   private fun openPage(url: String) {
     // A link the platform cannot parse, or a device without a browser, throws.
     runCatching { openUri(url) }.onFailure { e ->
-      state.messages.post(MessageLevel.Error, "Couldn't open the source page", cause = e)
+      state.messages.post(
+        MessageLevel.Error,
+        Res.string.downloads_open_source_failed.text(),
+        cause = e,
+      )
     }
   }
 
@@ -183,17 +288,17 @@ internal class RowCommands(
   }
 
   companion object {
-    /** Command label of [setSpeedLimit], which marks the speed limit control pending. */
-    fun speedLimitLabel(row: TaskRow): String = "set the speed limit of ${row.name}"
+    /** Pending key of [setSpeedLimit], which marks the speed limit control pending. */
+    fun speedLimitLabel(row: TaskRow): String = TaskCommand.SpeedLimit.key
 
-    /** Command label of [setPriority]. */
-    fun priorityLabel(row: TaskRow): String = "set the priority of ${row.name}"
+    /** Pending key of [setPriority]. */
+    fun priorityLabel(row: TaskRow): String = TaskCommand.Priority.key
 
-    /** Command label of [setConnections]. */
-    fun connectionsLabel(row: TaskRow): String = "set the connections of ${row.name}"
+    /** Pending key of [setConnections]. */
+    fun connectionsLabel(row: TaskRow): String = TaskCommand.Connections.key
 
-    /** Command label of [reschedule]. */
-    fun rescheduleLabel(row: TaskRow): String = "reschedule ${row.name}"
+    /** Pending key of [reschedule]. */
+    fun rescheduleLabel(row: TaskRow): String = TaskCommand.Reschedule.key
 
     /**
      * Whether a command in [pending] runs on [row]'s task, other than a change of its settings,

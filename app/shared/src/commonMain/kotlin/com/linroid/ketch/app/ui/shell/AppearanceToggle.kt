@@ -9,6 +9,10 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.ThemeMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_appearance_dark
+import ketch.app.shared.generated.resources.shell_appearance_light
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The moon or sun in the sidebar's title zone and at the top of the rail, which switches the app
@@ -22,7 +26,9 @@ internal fun AppearanceToggle(settings: AppSettingsController, modifier: Modifie
     icon = if (dark) KetchIcon.Sun else KetchIcon.Moon,
     onClick = { settings.saveThemeMode(themeModeFor(dark = !dark, systemDark = systemDark)) },
     size = KetchButtonSize.Small,
-    contentDescription = if (dark) "Switch to light" else "Switch to dark",
+    contentDescription = stringResource(
+      if (dark) Res.string.shell_appearance_light else Res.string.shell_appearance_dark
+    ),
     modifier = modifier,
   )
 }

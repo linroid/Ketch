@@ -26,12 +26,13 @@ import kotlin.time.Duration.Companion.milliseconds
 class SettingsSearchRenderTest {
   @Test
   fun settingsIndex_everyEntry_namesARowOrGroupOnItsPage() {
+    val index = runBlocking { loadSettingsSearchIndex() }
     val missing = SettingsCategory.entries.flatMap { category ->
       val texts = renderedTexts(category)
-      SettingsIndex
+      index.entries
         .filter { it.category == category && it.needs in Shown && it.title !in Conditional }
         .filter { entry -> entry.anchors.none { it.lowercase() in texts } }
-        .map { "${category.title}: ${it.title}" }
+        .map { "${it.page}: ${it.title}" }
     }
 
     assertEquals(emptyList(), missing)
