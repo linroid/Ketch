@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">Соединение потеряно</string>
+  <string name="error_network_hint">Не удалось связаться с %1$s.</string>
+  <string name="error_network_hint_short">не удалось связаться с %1$s</string>
+  <string name="error_network_hint_server">Не удалось связаться с сервером.</string>
+  <string name="error_network_hint_server_short">не удалось связаться с сервером</string>
+  <string name="error_retried_once">Ketch повторил попытку один раз.</string>
+  <plurals name="error_retried">
+    <item quantity="one">Ketch повторил попытку %1$d раз.</item>
+    <item quantity="few">Ketch повторил попытку %1$d раза.</item>
+    <item quantity="many">Ketch повторил попытку %1$d раз.</item>
+    <item quantity="other">Ketch повторил попытку %1$d раза.</item>
+  </plurals>
+  <string name="error_check_connection">Проверьте подключение и попробуйте снова.</string>
+  <string name="error_check_connection_short">проверьте подключение и попробуйте снова</string>
+  <string name="error_not_supported">Не поддерживается на этом устройстве</string>
+  <string name="error_something_went_wrong">Что-то пошло не так</string>
+
+  <string name="error_disk">Не удалось записать файл</string>
+  <string name="error_disk_hint">Проверьте свободное место и права доступа к папке.</string>
+  <string name="error_disk_hint_short">проверьте свободное место и права доступа к папке</string>
+  <string name="error_disk_hint_on">Проверьте свободное место и права доступа к папке на устройстве «%1$s».</string>
+  <string name="error_disk_hint_on_short">проверьте свободное место и права доступа к папке на устройстве «%1$s»</string>
+  <string name="error_disk_hint_free">Свободно %1$s на устройстве «%2$s». Проверьте место и права доступа к папке.</string>
+  <string name="error_disk_hint_free_short">свободно %1$s на устройстве «%2$s»</string>
+
+  <string name="error_unsupported">Этот сервер не поддерживает такую загрузку</string>
+  <string name="error_unsupported_hint">Он не сообщает размер и не поддерживает диапазоны.</string>
+  <string name="error_unsupported_hint_short">он не сообщает размер и не поддерживает диапазоны</string>
+  <string name="error_file_changed">Файл на сервере изменился</string>
+  <string name="error_file_changed_hint">Возобновление повредило бы его (%1$s).</string>
+  <string name="error_file_changed_hint_short">возобновление повредило бы его (%1$s)</string>
+  <string name="error_corrupt_resume">Сохранённый прогресс повреждён</string>
+  <string name="error_corrupt_resume_hint">Скачанную часть нельзя использовать повторно.</string>
+  <string name="error_corrupt_resume_hint_short">скачанную часть нельзя использовать повторно</string>
+  <string name="error_canceled">Отменено</string>
+  <string name="error_wrong_credentials">Неверное имя пользователя или пароль</string>
+  <string name="error_wrong_credentials_hint">Сервер %1$s отклонил вход.</string>
+  <string name="error_wrong_credentials_hint_short">сервер %1$s отклонил вход</string>
+  <string name="error_torrent_stopped">Торрент остановился</string>
+  <string name="error_torrent_stopped_hint">Нет доступных пиров или трекеров.</string>
+  <string name="error_torrent_stopped_hint_short">нет доступных пиров или трекеров</string>
+  <string name="error_source">Сервер %1$s сообщил об ошибке</string>
+
+  <string name="error_http_sign_in">Требуется вход (%1$d)</string>
+  <string name="error_http_sign_in_hint">%1$s требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint_short">%1$s требует входа в аккаунт</string>
+  <string name="error_http_sign_in_hint_server">Сервер требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint_server_short">сервер требует входа в аккаунт</string>
+  <string name="error_http_forbidden">Доступ запрещён (403)</string>
+  <string name="error_http_forbidden_hint">Возможно, срок действия ссылки истёк.</string>
+  <string name="error_http_forbidden_hint_browser">Возможно, срок действия ссылки истёк. Загрузка перехвачена из %1$s? Перехватите её снова со страницы.</string>
+  <string name="error_http_forbidden_hint_short">возможно, срок действия ссылки истёк</string>
+  <string name="error_browser_yours">вашего браузера</string>
+  <string name="error_http_not_found">Файл не найден (%1$d)</string>
+  <string name="error_http_not_found_hint">На сервере больше нет этого файла.</string>
+  <string name="error_http_not_found_hint_short">на сервере больше нет этого файла</string>
+  <string name="error_http_range">Сервер отказался возобновлять загрузку</string>
+  <string name="error_http_range_hint">Сохранённая позиция больше недействительна.</string>
+  <string name="error_http_range_hint_short">сохранённая позиция больше недействительна</string>
+  <string name="error_http_rate_limited">Сервер ограничивает частоту запросов</string>
+  <string name="error_http_rate_limited_hint_in">Повторите через %1$d с, уменьшив число подключений.</string>
+  <string name="error_http_rate_limited_hint_in_short">повторите через %1$d с, уменьшив число подключений</string>
+  <string name="error_http_rate_limited_hint">Повторите позже, уменьшив число подключений.</string>
+  <string name="error_http_rate_limited_hint_short">повторите позже, уменьшив число подключений</string>
+  <string name="error_http_server">Ошибка сервера (%1$d)</string>
+  <string name="error_http_server_hint">Обычно это временно.</string>
+  <string name="error_http_server_hint_short">обычно это временно</string>
+  <string name="error_http_other">Ответ сервера: %1$d</string>
+</resources>

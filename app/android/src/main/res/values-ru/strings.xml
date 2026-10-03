@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="process_text_label">Скачать через Ketch</string>
+  <string name="quick_add_no_link">Нет ссылки для скачивания</string>
+
+  <string name="notifications_offer_title">Узнавайте о завершении загрузок</string>
+  <string name="notifications_offer_message">Ketch может сообщать, когда загрузка завершилась или прервалась с ошибкой, пока вы пользуетесь другими приложениями.</string>
+  <string name="notifications_offer_allow">Разрешить</string>
+  <string name="notifications_offer_not_now">Не сейчас</string>
+</resources>

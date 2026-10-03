@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <plurals name="pulse_downloading">
+    <item quantity="one">Загружается %1$d файл</item>
+    <item quantity="few">Загружаются %1$d файла</item>
+    <item quantity="many">Загружается %1$d файлов</item>
+    <item quantity="other">Загружается %1$d файла</item>
+  </plurals>
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="one">Загружается %1$d файл на устройствах: %2$d</item>
+    <item quantity="few">Загружаются %1$d файла на устройствах: %2$d</item>
+    <item quantity="many">Загружается %1$d файлов на устройствах: %2$d</item>
+    <item quantity="other">Загружается %1$d файла на устройствах: %2$d</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="one">%1$d загрузка требует внимания</item>
+    <item quantity="few">%1$d загрузки требуют внимания</item>
+    <item quantity="many">%1$d загрузок требуют внимания</item>
+    <item quantity="other">%1$d загрузки требуют внимания</item>
+  </plurals>
+  <string name="pulse_all_quiet">Всё спокойно</string>
+  <string name="pulse_all_quiet_free">Всё спокойно · %2$s: %1$s свободно</string>
+  <string name="pulse_connecting">Подключение к %1$s</string>
+  <string name="pulse_needs_token">%1$s: нужен токен</string>
+  <string name="pulse_offline">%1$s не в сети · повторная попытка</string>
+  <string name="pulse_slow_lane">Медленная полоса</string>
+  <string name="pulse_slow_lane_until">Медленная полоса до %1$s</string>
+  <string name="pulse_disk_tooltip">%2$s: %1$s · %3$s</string>
+  <string name="pulse_downloading_count">Загружается: %1$d</string>
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <plurals name="pulse_count_downloading">
+    <item quantity="one">%1$d загружается</item>
+    <item quantity="few">%1$d загружаются</item>
+    <item quantity="many">%1$d загружается</item>
+    <item quantity="other">%1$d загружается</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="one">%1$d ожидает</item>
+    <item quantity="few">%1$d ожидают</item>
+    <item quantity="many">%1$d ожидают</item>
+    <item quantity="other">%1$d ожидают</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <string name="pulse_count_description">%1$s, показать вкладку «%2$s»</string>
+  <string name="pulse_speed_offline">Скорость неизвестна, пока устройство не в сети</string>
+  <string name="pulse_speed_downloading">Загрузка со скоростью %1$s, показать последние 5 минут</string>
+  <string name="pulse_speed_idle">Простой, показать последние 5 минут</string>
+  <string name="pulse_idle">Простой</string>
+  <string name="pulse_disk_short">не хватит для ожидающих загрузок</string>
+  <plurals name="pulse_activity_unread">
+    <item quantity="one">Активность, непрочитанных: %1$d</item>
+    <item quantity="few">Активность, непрочитанных: %1$d</item>
+    <item quantity="many">Активность, непрочитанных: %1$d</item>
+    <item quantity="other">Активность, непрочитанных: %1$d</item>
+  </plurals>
+  <plurals name="pulse_selected">
+    <item quantity="one">Выбрано: %1$d</item>
+    <item quantity="few">Выбрано: %1$d</item>
+    <item quantity="many">Выбрано: %1$d</item>
+    <item quantity="other">Выбрано: %1$d</item>
+  </plurals>
+
+  <string name="pulse_health_sharing">Общий доступ :%1$d</string>
+  <string name="pulse_health_not_shared">Нет общего доступа</string>
+  <string name="pulse_health_live">В сети</string>
+  <string name="pulse_health_connecting">Подключение</string>
+  <string name="pulse_health_offline">Не в сети</string>
+  <string name="pulse_health_needs_token">Нужен токен</string>
+  <string name="pulse_health_description">%1$s: %2$s</string>
+
+  <string name="pulse_mode_full">Полная скорость</string>
+  <string name="pulse_mode_auto_name">Авто</string>
+  <string name="pulse_mode_capped">Ограничено · %1$s</string>
+  <string name="pulse_mode_slow_lane">Медленная полоса · %1$s</string>
+  <string name="pulse_mode_auto">Авто · %1$s</string>
+  <string name="pulse_full_speed_until">Полная скорость до %1$s</string>
+  <string name="pulse_mode_full_short">Полная</string>
+
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <plurals name="pulse_active">
+    <item quantity="one">%1$d активна</item>
+    <item quantity="few">%1$d активны</item>
+    <item quantity="many">%1$d активно</item>
+    <item quantity="other">%1$d активно</item>
+  </plurals>
+  <string name="pulse_subtitle_description">%1$s, показать скорость</string>
+  <string name="pulse_last_minute">Последняя минута</string>
+
+  <string name="pulse_speed">Скорость</string>
+  <string name="pulse_last_5_minutes">Последние 5 минут</string>
+  <string name="pulse_history_empty">За последние 5 минут ничего не скачано.</string>
+  <string name="pulse_no_limit">Без ограничения</string>
+  <string name="pulse_limit">Ограничение %1$s</string>
+
+  <string name="pulse_slow_lane_turn_on">Включить медленную полосу</string>
+  <string name="pulse_slow_lane_turn_off">Выключить медленную полосу</string>
+  <string name="pulse_speed_limit">Ограничение скорости</string>
+  <string name="pulse_limited">Ограничено</string>
+  <string name="pulse_not_limited">Не ограничено</string>
+  <string name="pulse_speed_options">Параметры скорости</string>
+  <string name="pulse_speed_mode">Режим скорости</string>
+  <string name="pulse_slow_lane_speed">Скорость медленной полосы</string>
+  <string name="pulse_use_as_slow_lane">Использовать как скорость медленной полосы</string>
+  <string name="pulse_speed_settings">Настройки скорости…</string>
+  <string name="pulse_update_failed">Не удалось настроить %1$s · %2$s</string>
+  <string name="pulse_caption_full">Загрузки идут так быстро, как позволяет сеть.</string>
+  <string name="pulse_caption_capped">Скорость загрузок ограничена до %1$s.</string>
+  <string name="pulse_caption_slow_lane">Загрузки делят %1$s, оставляя пропускную способность для всего остального.</string>
+  <string name="pulse_caption_no_rules">Правил скорости пока нет. Добавьте их в настройках скорости.</string>
+  <string name="pulse_caption_rule_slow_lane">Правило держит медленную полосу включённой.</string>
+  <string name="pulse_caption_rule_full">Полная скорость, пока правило не включит медленную полосу.</string>
+  <string name="pulse_caption_slow_lane_until">Медленная полоса до %1$s, дальше решают ваши правила.</string>
+  <string name="pulse_caption_full_until">Полная скорость до %1$s, дальше решают ваши правила.</string>
+  <string name="pulse_limit_for_slow_lane">Используется, когда включена медленная полоса.</string>
+  <string name="pulse_limit_for_device">Действует для всех загрузок на устройстве «%1$s».</string>
+  <string name="pulse_limit_after_slow_lane">Действует после выключения медленной полосы.</string>
+
+  <string name="pulse_slow_lane_on">Медленная полоса включена · %1$s</string>
+  <string name="pulse_slow_lane_off">Медленная полоса выключена</string>
+  <string name="pulse_speed_follows_rules">Скорость задаётся вашими правилами</string>
+  <string name="pulse_switch_failed">Не удалось включить режим «%1$s»</string>
+  <string name="pulse_limit_failed">Не удалось задать ограничение скорости</string>
+
+  <string name="pulse_timeline_added">Добавлена</string>
+  <string name="pulse_timeline_started">Запущена</string>
+  <string name="pulse_timeline_resumed">Возобновлена</string>
+  <string name="pulse_timeline_retried">Повторена</string>
+  <string name="pulse_timeline_paused">Приостановлена</string>
+  <string name="pulse_timeline_queued">В очереди</string>
+  <string name="pulse_timeline_scheduled">Запланирована</string>
+  <string name="pulse_timeline_completed">Завершена</string>
+  <string name="pulse_timeline_failed">Ошибка</string>
+  <string name="pulse_timeline_canceled">Отменена</string>
+  <string name="pulse_timeline_connections">Подключения %1$s → %2$s</string>
+  <string name="pulse_timeline_auto">Авто</string>
+  <string name="pulse_timeline_limit">Ограничение → %1$s</string>
+  <string name="pulse_timeline_limit_removed">Ограничение снято</string>
+  <string name="pulse_timeline_priority">Приоритет → %1$s</string>
+</resources>
