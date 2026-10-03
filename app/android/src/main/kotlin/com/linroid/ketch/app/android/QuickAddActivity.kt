@@ -27,6 +27,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.platform.rememberReduceMotion
@@ -55,6 +56,10 @@ import kotlin.time.Duration.Companion.seconds
 class QuickAddActivity : ComponentActivity() {
 
   private val model: QuickAddModel by viewModels()
+
+  override fun attachBaseContext(newBase: Context) {
+    super.attachBaseContext(appLanguageContext(newBase))
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

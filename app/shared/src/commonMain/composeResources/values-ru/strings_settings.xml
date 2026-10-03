@@ -112,6 +112,8 @@
   <string name="settings_general_reduce_motion_auto">«Авто» следует настройке системы.</string>
   <string name="settings_general_language">Язык</string>
   <string name="settings_general_language_current">Русский</string>
+  <string name="settings_general_language_system">Как в системе</string>
+  <string name="settings_general_language_in_settings">Измените в приложении «Настройки»</string>
   <string name="settings_general_shortcuts">Сочетания клавиш…</string>
   <string name="settings_general_startup">Запуск и окно</string>
   <string name="settings_general_close">При закрытии окна</string>

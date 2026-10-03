@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -101,22 +102,25 @@ fun App(
       welcome = false
     }
   }
-  KetchTheme(
-    darkTheme = darkTheme,
-    accent = appSettings.accent,
-    density = appSettings.ui.density,
-    reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
-  ) {
-    val platform = welcomePlatform
-    Crossfade(
-      targetState = welcome,
-      animationSpec = tween(KetchTheme.motion.long),
-      label = "welcome",
-    ) { welcoming ->
-      if (welcoming && platform != null) {
-        WelcomeFlow(controller.state, platform, onDone = { welcome = false })
-      } else {
-        AppShell(controller.state, openSettingsRequests, fileLogger)
+  // Text resolves as it composes, so a new language composes the app again.
+  key(appSettings.language) {
+    KetchTheme(
+      darkTheme = darkTheme,
+      accent = appSettings.accent,
+      density = appSettings.ui.density,
+      reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
+    ) {
+      val platform = welcomePlatform
+      Crossfade(
+        targetState = welcome,
+        animationSpec = tween(KetchTheme.motion.long),
+        label = "welcome",
+      ) { welcoming ->
+        if (welcoming && platform != null) {
+          WelcomeFlow(controller.state, platform, onDone = { welcome = false })
+        } else {
+          AppShell(controller.state, openSettingsRequests, fileLogger)
+        }
       }
     }
   }

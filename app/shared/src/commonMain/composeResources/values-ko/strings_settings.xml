@@ -100,6 +100,8 @@
   <string name="settings_general_reduce_motion_auto">자동은 시스템 설정을 따릅니다.</string>
   <string name="settings_general_language">언어</string>
   <string name="settings_general_language_current">한국어</string>
+  <string name="settings_general_language_system">시스템</string>
+  <string name="settings_general_language_in_settings">설정 앱에서 변경</string>
   <string name="settings_general_shortcuts">키보드 단축키…</string>
   <string name="settings_general_startup">시작 및 창</string>
   <string name="settings_general_close">창을 닫을 때</string>
