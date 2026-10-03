@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <plurals name="pulse_downloading">
+    <item quantity="other">파일 %1$d개 다운로드 중</item>
+  </plurals>
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="other">기기 %2$d대에서 파일 %1$d개 다운로드 중</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="other">다운로드 %1$d개 확인 필요</item>
+  </plurals>
+  <string name="pulse_all_quiet">진행 중인 다운로드 없음</string>
+  <string name="pulse_all_quiet_free">진행 중인 다운로드 없음 · %2$s에 %1$s 남음</string>
+  <string name="pulse_connecting">%1$s에 연결 중</string>
+  <string name="pulse_needs_token">%1$s에 토큰 필요</string>
+  <string name="pulse_offline">%1$s 오프라인 · 재시도 중</string>
+  <string name="pulse_slow_lane">저속 차로</string>
+  <string name="pulse_slow_lane_until">%1$s까지 저속 차로</string>
+  <string name="pulse_disk_tooltip">%2$s에 %1$s · %3$s</string>
+  <string name="pulse_downloading_count">%1$d개 다운로드 중</string>
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <plurals name="pulse_count_downloading">
+    <item quantity="other">%1$d개 다운로드 중</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="other">%1$d개 대기 중</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <string name="pulse_count_description">%1$s, %2$s 탭 보기</string>
+  <string name="pulse_speed_offline">오프라인 상태라 속도를 알 수 없음</string>
+  <string name="pulse_speed_downloading">다운로드 중(%1$s), 최근 5분 보기</string>
+  <string name="pulse_speed_idle">유휴 상태, 최근 5분 보기</string>
+  <string name="pulse_idle">유휴</string>
+  <string name="pulse_disk_short">대기 중인 다운로드에 공간 부족</string>
+  <plurals name="pulse_activity_unread">
+    <item quantity="other">활동, 읽지 않음 %1$d개</item>
+  </plurals>
+  <plurals name="pulse_selected">
+    <item quantity="other">%1$d개 선택됨</item>
+  </plurals>
+
+  <string name="pulse_health_sharing">공유 중 :%1$d</string>
+  <string name="pulse_health_not_shared">공유 안 함</string>
+  <string name="pulse_health_live">연결됨</string>
+  <string name="pulse_health_connecting">연결 중</string>
+  <string name="pulse_health_offline">오프라인</string>
+  <string name="pulse_health_needs_token">토큰 필요</string>
+  <string name="pulse_health_description">%1$s: %2$s</string>
+
+  <string name="pulse_mode_full">최대 속도</string>
+  <string name="pulse_mode_auto_name">자동</string>
+  <string name="pulse_mode_capped">제한 · %1$s</string>
+  <string name="pulse_mode_slow_lane">저속 차로 · %1$s</string>
+  <string name="pulse_mode_auto">자동 · %1$s</string>
+  <string name="pulse_full_speed_until">%1$s까지 최대 속도</string>
+  <string name="pulse_mode_full_short">최대</string>
+
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <plurals name="pulse_active">
+    <item quantity="other">%1$d개 진행 중</item>
+  </plurals>
+  <string name="pulse_subtitle_description">%1$s, 속도 보기</string>
+  <string name="pulse_last_minute">최근 1분</string>
+
+  <string name="pulse_speed">속도</string>
+  <string name="pulse_last_5_minutes">최근 5분</string>
+  <string name="pulse_history_empty">최근 5분 동안 다운로드한 내용이 없습니다.</string>
+  <string name="pulse_no_limit">제한 없음</string>
+  <string name="pulse_limit">제한 %1$s</string>
+
+  <string name="pulse_slow_lane_turn_on">저속 차로 켜기</string>
+  <string name="pulse_slow_lane_turn_off">저속 차로 끄기</string>
+  <string name="pulse_speed_limit">속도 제한</string>
+  <string name="pulse_limited">제한됨</string>
+  <string name="pulse_not_limited">제한 없음</string>
+  <string name="pulse_speed_options">속도 옵션</string>
+  <string name="pulse_speed_mode">속도 모드</string>
+  <string name="pulse_slow_lane_speed">저속 차로 속도</string>
+  <string name="pulse_use_as_slow_lane">저속 차로 속도로 사용</string>
+  <string name="pulse_speed_settings">속도 설정…</string>
+  <string name="pulse_update_failed">%1$s의 설정을 변경할 수 없음 · %2$s</string>
+  <string name="pulse_caption_full">네트워크가 허용하는 최대 속도로 다운로드합니다.</string>
+  <string name="pulse_caption_capped">다운로드 속도를 %1$s 이하로 제한합니다.</string>
+  <string name="pulse_caption_slow_lane">다운로드는 모두 합쳐 %1$s 이내로 진행되어 다른 작업에 대역폭을 남겨 둡니다.</string>
+  <string name="pulse_caption_no_rules">아직 속도 규칙이 없습니다. 속도 설정에서 추가하세요.</string>
+  <string name="pulse_caption_rule_slow_lane">규칙에 따라 저속 차로가 켜져 있습니다.</string>
+  <string name="pulse_caption_rule_full">규칙이 저속 차로를 켤 때까지 최대 속도로 다운로드합니다.</string>
+  <string name="pulse_caption_slow_lane_until">%1$s까지 저속 차로, 그 후에는 규칙에 따릅니다.</string>
+  <string name="pulse_caption_full_until">%1$s까지 최대 속도, 그 후에는 규칙에 따릅니다.</string>
+  <string name="pulse_limit_for_slow_lane">저속 차로가 켜져 있을 때마다 사용됩니다.</string>
+  <string name="pulse_limit_for_device">%1$s의 모든 다운로드에 적용됩니다.</string>
+  <string name="pulse_limit_after_slow_lane">저속 차로가 꺼지면 적용됩니다.</string>
+
+  <string name="pulse_slow_lane_on">저속 차로 켜짐 · %1$s</string>
+  <string name="pulse_slow_lane_off">저속 차로 꺼짐</string>
+  <string name="pulse_speed_follows_rules">규칙에 따라 속도 조절</string>
+  <string name="pulse_switch_failed">%1$s 모드로 전환할 수 없음</string>
+  <string name="pulse_limit_failed">속도 제한을 설정할 수 없음</string>
+
+  <string name="pulse_timeline_added">추가됨</string>
+  <string name="pulse_timeline_started">시작됨</string>
+  <string name="pulse_timeline_resumed">재개됨</string>
+  <string name="pulse_timeline_retried">재시도됨</string>
+  <string name="pulse_timeline_paused">일시정지됨</string>
+  <string name="pulse_timeline_queued">대기열에 추가됨</string>
+  <string name="pulse_timeline_scheduled">예약됨</string>
+  <string name="pulse_timeline_completed">완료</string>
+  <string name="pulse_timeline_failed">실패</string>
+  <string name="pulse_timeline_canceled">취소됨</string>
+  <string name="pulse_timeline_connections">연결 %1$s → %2$s</string>
+  <string name="pulse_timeline_auto">자동</string>
+  <string name="pulse_timeline_limit">제한 → %1$s</string>
+  <string name="pulse_timeline_limit_removed">제한 해제됨</string>
+  <string name="pulse_timeline_priority">우선순위 → %1$s</string>
+</resources>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="component_chip_remove">%1$s 제거</string>
+
+  <string name="component_field_paste">붙여넣기</string>
+  <string name="component_field_clear">텍스트 지우기</string>
+
+  <string name="component_priority_low">낮은 우선순위</string>
+  <string name="component_priority_high">높은 우선순위</string>
+  <string name="component_priority_urgent">긴급 우선순위</string>
+
+  <plurals name="component_pennant_failures">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+
+  <string name="component_speed_chart">속도 %1$s, 최고 %2$s</string>
+
+  <string name="component_add_clip">%1$s 추가</string>
+  <string name="component_add_link">링크 추가</string>
+  <string name="component_add_drop">놓아서 다운로드</string>
+
+  <plurals name="component_lanes_connections">
+    <item quantity="other">연결 %1$d개</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="other">%1$d개 활성</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="other">%1$d퍼센트</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">크기 알 수 없음</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="other">%1$d개 멈춤</item>
+  </plurals>
+
+  <string name="component_limit_applies">모든 다운로드에 %1$s %2$s 적용 중</string>
+  <string name="component_limit_custom">사용자 지정…</string>
+  <string name="component_limit_custom_hint">예: 750k 또는 1.5m</string>
+  <string name="component_limit_unit_tooltip">k나 m 없이 입력한 숫자의 단위</string>
+
+  <string name="component_stepper_auto">자동</string>
+  <string name="component_stepper_auto_count">자동(%1$d)</string>
+  <string name="component_stepper_fewer_connections">연결 줄이기</string>
+  <string name="component_stepper_more_connections">연결 늘리기</string>
+  <plurals name="component_stepper_connections">
+    <item quantity="other">연결 %1$d개</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">연결 자동</string>
+  <string name="component_stepper_connections_auto_count">연결 자동(%1$d개)</string>
+  <string name="component_stepper_fewer_peers">피어 줄이기</string>
+  <string name="component_stepper_more_peers">피어 늘리기</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="other">피어 %1$d개</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">피어 자동</string>
+  <string name="component_stepper_peers_auto_count">피어 자동(%1$d개)</string>
+
+  <string name="component_start_now">지금 시작</string>
+  <string name="component_start_in_hour">1시간 후</string>
+  <string name="component_start_tonight">오늘 밤 %1$s</string>
+  <string name="component_start_off_peak">비혼잡 시간대 · %1$s</string>
+  <string name="component_start_label_now">지금</string>
+  <string name="component_start_after">%1$s 후 시작</string>
+  <string name="component_start_tonight_at">오늘 밤 %1$s에 시작</string>
+  <string name="component_start_today_at">오늘 %1$s에 시작</string>
+  <string name="component_start_tomorrow_at">내일 %1$s에 시작</string>
+  <string name="component_start_weekday_at">%1$s요일 %2$s에 시작</string>
+  <string name="component_start_date_at">%1$s %2$s에 시작</string>
+  <string name="component_start_follow_now">바로 시작</string>
+  <string name="component_start_follow_after">%1$s 후 시작</string>
+  <string name="component_start_follow_tonight">오늘 밤 %1$s에 시작</string>
+  <string name="component_start_follow_today">오늘 %1$s에 시작</string>
+  <string name="component_start_follow_tomorrow">내일 %1$s에 시작</string>
+  <string name="component_start_follow_weekday">%1$s요일 %2$s에 시작</string>
+  <string name="component_start_follow_date">%1$s %2$s에 시작</string>
+  <string name="component_start_menu_title">시작</string>
+  <string name="component_start_pick">날짜 및 시간 선택…</string>
+  <string name="component_start_clear">지우기</string>
+  <string name="component_start_dialog_title">시작 시간</string>
+  <string name="component_start_schedule">예약</string>
+  <string name="component_start_passed">이미 지난 시간입니다</string>
+</resources>
