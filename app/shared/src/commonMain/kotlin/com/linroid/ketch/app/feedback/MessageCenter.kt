@@ -78,7 +78,7 @@ data class AppMessage(
 
 /**
  * Collects the messages the app shows as toasts and banners, and keeps the most recent toasts
- * for the Activity history.
+ * for the Activity history. Successful user commands use [postFeedback] instead.
  *
  * Any component can [post] without touching the shell; the toast and banner hosts render
  * [active].
@@ -96,8 +96,8 @@ class MessageCenter(
   private val unreadState = MutableStateFlow(0)
 
   /**
-   * Recent messages, newest first, at most `historyLimit`. Banners are left out: they show a
-   * condition for as long as it lasts rather than report an event.
+   * Recent messages, newest first, at most `historyLimit`. Successful command feedback and
+   * banners are left out; banners show a condition for as long as it lasts.
    */
   val history: StateFlow<List<AppMessage>> = historyState.asStateFlow()
 
@@ -114,6 +114,7 @@ class MessageCenter(
    * Posts a message and returns it.
    *
    * @param actions at most two buttons; more are dropped.
+   * @param recordInHistory whether this message adds an Activity entry and unread count.
    */
   fun post(
     level: MessageLevel,
@@ -126,6 +127,7 @@ class MessageCenter(
     notify: Boolean = false,
     placement: MessagePlacement = MessagePlacement.Toast,
     cause: Throwable? = null,
+    recordInHistory: Boolean = true,
   ): AppMessage {
     val message = AppMessage(
       id = nextId++,
@@ -142,13 +144,37 @@ class MessageCenter(
       cause = cause,
     )
     // A banner is a condition shown while it lasts, not an event for the history.
-    if (placement == MessagePlacement.Toast) {
+    if (recordInHistory && placement == MessagePlacement.Toast) {
       historyState.update { (listOf(message) + it).take(historyLimit) }
       unreadState.update { minOf(it + 1, historyLimit) }
     }
     if (toast != ToastMode.Silent) activeState.update { (it + message).takeLast(historyLimit) }
     return message
   }
+
+  /**
+   * Shows the result of a user command without recording a notification for a successful
+   * action. Warnings and errors still enter the history so failures can be reviewed later.
+   * Action buttons, including Undo, remain available on the toast.
+   */
+  fun postFeedback(
+    level: MessageLevel,
+    title: UiText,
+    detail: UiText? = null,
+    taskKey: TaskKey? = null,
+    deviceId: String? = null,
+    actions: List<MessageAction> = emptyList(),
+    cause: Throwable? = null,
+  ): AppMessage = post(
+    level = level,
+    title = title,
+    detail = detail,
+    taskKey = taskKey,
+    deviceId = deviceId,
+    actions = actions,
+    cause = cause,
+    recordInHistory = level == MessageLevel.Warning || level == MessageLevel.Error,
+  )
 
   fun dismiss(id: Long) {
     activeState.update { messages -> messages.filterNot { it.id == id } }

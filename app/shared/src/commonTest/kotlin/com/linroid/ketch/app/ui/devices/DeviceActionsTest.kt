@@ -157,7 +157,9 @@ class DeviceActionsTest {
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
-    val message = f.state.messages.history.value.first()
+    val message = f.state.messages.active.value.last()
+    assertTrue(f.state.messages.history.value.isEmpty())
+    assertEquals(0, f.state.messages.unreadCount.value)
     assertEquals("Slow lane on · 1 MB/s", message.title.load())
     message.actions.single { it.label.load() == "Undo" }.onClick()
     runCurrent()

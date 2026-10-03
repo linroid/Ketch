@@ -91,7 +91,7 @@ internal fun AppState.switchSpeedMode(
     val undo = MessageAction(Res.string.action_undo.text()) {
       switchSpeedMode(controller, previous, undoable = false)
     }
-    messages.post(
+    messages.postFeedback(
       level = MessageLevel.Success,
       title = title,
       actions = if (undoable) listOf(undo) else emptyList(),

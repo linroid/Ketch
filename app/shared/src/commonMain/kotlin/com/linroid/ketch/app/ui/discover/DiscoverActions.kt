@@ -84,7 +84,7 @@ private fun AppState.reportDiscovered(
   val show = MessageAction(Res.string.action_show.text()) { showOn(target, single) }
   val what = added.singleOrNull()?.takeIf { single != null }?.let { verbatim(candidateName(it)) }
     ?: Res.plurals.count_downloads.text(tasks.size)
-  messages.post(
+  messages.postFeedback(
     level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
     title = addedTitle(what, target, failed.size),
     detail = firstError?.message?.let(::verbatim),

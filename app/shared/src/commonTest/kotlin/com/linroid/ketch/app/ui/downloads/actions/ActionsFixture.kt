@@ -51,7 +51,7 @@ internal class ActionsFixture(
   ): RecordingTask = api.add(state, request)
 
   /** Messages posted so far, oldest first. */
-  fun messages(): List<AppMessage> = controller.messages.history.value.reversed()
+  fun messages(): List<AppMessage> = controller.messages.active.value
 
   fun close() {
     controller.close()

@@ -1447,7 +1447,7 @@ class IntakeSession internal constructor(
       Res.plurals.count_downloads.text(added.size)
     }
     val title = state.addedTitle(what, target, failed.size, left = skipped.sumOf { it.linkCount })
-    state.messages.post(
+    state.messages.postFeedback(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failed.firstOrNull()?.third?.exceptionOrNull()?.message?.let(::verbatim),
@@ -1524,7 +1524,7 @@ class IntakeSession internal constructor(
       onDone()
       result.onSuccess { copy ->
         state.claimAdds(listOf(TaskKey(target.deviceId, copy.taskId)))
-        state.messages.post(
+        state.messages.postFeedback(
           MessageLevel.Success,
           Res.string.intake_restarted.text(displayName(request)),
           deviceId = target.deviceId,

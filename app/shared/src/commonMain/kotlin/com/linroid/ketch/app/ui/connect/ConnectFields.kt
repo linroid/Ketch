@@ -334,13 +334,13 @@ internal fun rememberDeviceConnector(state: AppState): DeviceConnector =
 /** Tells that [device] is connected, or added when it was not tried. */
 internal fun AppState.reportConnected(device: RemoteInstance, tried: Boolean) {
   if (tried) {
-    messages.post(
+    messages.postFeedback(
       level = MessageLevel.Success,
       title = Res.string.connect_connected.text(device.displayName),
       deviceId = device.deviceId,
     )
   } else {
-    messages.post(
+    messages.postFeedback(
       level = MessageLevel.Info,
       title = Res.string.connect_added.text(device.displayName),
       detail = Res.string.connect_added_detail.text(),

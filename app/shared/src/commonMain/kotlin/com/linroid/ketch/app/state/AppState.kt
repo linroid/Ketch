@@ -1005,7 +1005,7 @@ class AppState(
       if (paused.isEmpty()) {
         // Nothing to undo, so no operation is registered for ⌘Z to land on.
         if (failures.isEmpty()) {
-          messages.post(MessageLevel.Info, Res.string.feedback_nothing_to_pause.text())
+          messages.postFeedback(MessageLevel.Info, Res.string.feedback_nothing_to_pause.text())
         } else {
           reportFailures(FailedCommand.Pause, failures)
         }
@@ -1024,7 +1024,7 @@ class AppState(
         scheduledNote(scheduled),
         failedNote(failures.size),
       ).joinText()
-      messages.post(
+      messages.postFeedback(
         level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
         title = title,
         detail = failures.firstOrNull()?.second?.detail(),
@@ -1100,7 +1100,7 @@ class AppState(
         .map { it.first }
         .filter { keyOf(it) !in hidden }
       if (missing.isEmpty()) {
-        messages.post(MessageLevel.Info, Res.string.feedback_nothing_missing.text())
+        messages.postFeedback(MessageLevel.Info, Res.string.feedback_nothing_missing.text())
         return@launch
       }
       deferRemoval(
@@ -1152,7 +1152,7 @@ class AppState(
       undo = { reportFailures(FailedCommand.Resume, runEach(paused) { it.resume() }) },
     )
     val title = what(tasks, Res.string.feedback_discarded_one, Res.plurals.feedback_discarded)
-    messages.post(MessageLevel.Success, title, actions = listOf(undoAction(op)))
+    messages.postFeedback(MessageLevel.Success, title, actions = listOf(undoAction(op)))
   }
 
   /**
@@ -1200,7 +1200,7 @@ class AppState(
       what(done, Res.string.feedback_restarted_one, Res.plurals.feedback_restarted),
       failedNote(failed.size),
     ).joinText()
-    messages.post(
+    messages.postFeedback(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failed.firstOrNull()?.second?.detail(),
@@ -1302,7 +1302,7 @@ class AppState(
       },
       failedNote(failed.size),
     ).joinText()
-    messages.post(
+    messages.postFeedback(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failed.firstOrNull()?.second?.detail(),
@@ -1403,7 +1403,7 @@ class AppState(
             reportFailures(FailedCommand.Remove, runEach(copies) { it.remove(deleteFiles = true) })
           },
         )
-        messages.post(
+        messages.postFeedback(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
           title = listOfNotNull(
             what(sources, Res.string.feedback_moved_one, Res.plurals.feedback_moved, targetText),
@@ -1413,7 +1413,7 @@ class AppState(
           actions = listOf(undoAction(op)),
         )
       } else {
-        messages.post(
+        messages.postFeedback(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
           title = listOfNotNull(
             what(sources, Res.string.feedback_sent_one, Res.plurals.feedback_sent, targetText),
@@ -1625,7 +1625,7 @@ class AppState(
         reportFailures(FailedCommand.Remove, runEach(tasks) { it.remove(deleteFiles(it)) })
       },
     )
-    messages.post(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
+    messages.postFeedback(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
   }
 
   /** Keys of [tasks], which leave the selection and the inspector as their rows hide. */
@@ -1781,7 +1781,7 @@ class AppState(
       }
       add(undoAddAction(added))
     }
-    messages.post(
+    messages.postFeedback(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failures.firstOrNull()?.first?.let(::verbatim),
@@ -1820,7 +1820,7 @@ class AppState(
       if (devices > 1) verb.onDevices.text(done, done, devices) else verb.here.text(done),
       failedNote(failures.size),
     ).joinText()
-    messages.post(
+    messages.postFeedback(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failures.firstOrNull()?.second?.detail(),

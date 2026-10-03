@@ -154,6 +154,8 @@ class AppStateCommandsTest {
       assertTrue((running + queued).all { it.state.value is DownloadState.Paused })
       assertTrue(done.calls.isEmpty())
       assertEquals("Paused 5 downloads", controller.messages.active.value.last().title.load())
+      assertTrue(controller.messages.history.value.isEmpty())
+      assertEquals(0, controller.messages.unreadCount.value)
     }
 
   @Test
@@ -169,6 +171,7 @@ class AppStateCommandsTest {
     val toast = controller.messages.active.value.last()
     assertEquals(MessageLevel.Warning, toast.level)
     assertEquals("Paused 2 downloads · 1 failed", toast.title.load())
+    assertEquals(listOf(toast), controller.messages.history.value)
   }
 
   @Test
@@ -332,7 +335,7 @@ class AppStateCommandsTest {
     assertEquals(request.connections, sent.connections)
     assertEquals(Destination("ubuntu.iso"), sent.destination)
     assertTrue(task.calls.isEmpty())
-    assertEquals("Sent ubuntu.iso to NAS", controller.messages.history.value.first().title.load())
+    assertEquals("Sent ubuntu.iso to NAS", controller.messages.active.value.last().title.load())
   }
 
   @Test
