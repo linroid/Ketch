@@ -186,7 +186,7 @@ private fun isLocalNetwork(network: NetworkInterfaceInfo): Boolean {
 /** Interface names of VM and container bridges, VPN tunnels and mobile data. */
 private val VIRTUAL_PREFIXES = listOf(
   "bridge", "vmenet", "vmnet", "vboxnet", "docker", "br-", "veth", "virbr", "utun", "tun", "tap",
-  "wg", "zt", "mobile data",
+  "wg", "zt", "mobile",
 )
 
 /** Words in the Windows names of virtual adapters, such as "vEthernet (WSL)", and Android's VPN. */
