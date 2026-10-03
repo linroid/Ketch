@@ -15,6 +15,7 @@ class AgentOutputParserTest {
     "bit.ly" to "203.0.113.2",
     "releases.ubuntu.com" to "203.0.113.3",
     "notubuntu.com" to "203.0.113.4",
+    "download.blender.org" to "203.0.113.5",
   )
 
   private val parser = AgentOutputParser(
@@ -49,6 +50,18 @@ class AgentOutputParserTest {
     """
     val result = parser.parse(output)
     assertEquals(1, result.size)
+  }
+
+  @Test
+  fun parse_blenderInstaller_survivesSafetyFilter() = runTest {
+    val url = "https://download.blender.org/release/Blender4.1/blender-4.1.1-macos-arm64.dmg"
+    val output = """[
+      {"name":"Blender 4.1.1","url":"$url",
+       "fileType":"dmg","sourcePageUrl":"https://www.blender.org/download/",
+       "confidence":0.9,"deviceSafetyNotes":"Official Blender download repository"}
+    ]"""
+    val result = parser.parse(output, SiteAllowlist.of(listOf("blender.org")))
+    assertEquals(listOf(url), result.map { it.url })
   }
 
   @Test

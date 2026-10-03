@@ -59,6 +59,32 @@ class DeviceSafetyFilterTest {
   }
 
   @Test
+  fun evaluate_blenderInstaller_allowed() {
+    val result = filter.evaluate(
+      url = "https://download.blender.org/release/Blender4.1/blender-4.1.1-macos-arm64.dmg",
+    )
+    assertFalse(result.blocked)
+    assertTrue(result.score > 0.8f)
+  }
+
+  @Test
+  fun evaluate_blenderLookalikes_blocked() {
+    val urls = listOf(
+      "https://download.blender.org.example.com/blender.dmg",
+      "https://fake-download.blender.org/blender.dmg",
+      "https://download.blender.org@evil.example/blender.dmg"
+    )
+    for (url in urls) {
+      val result = filter.evaluate(
+        url = url,
+        sourcePageUrl = "https://www.blender.org/download/",
+        context = "Official Blender download",
+      )
+      assertTrue(result.blocked, url)
+    }
+  }
+
+  @Test
   fun evaluate_piracySignalInContext_blocked() {
     val result = filter.evaluate(
       url = "https://example.com/software.zip",
