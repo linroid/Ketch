@@ -108,7 +108,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `updater` (JVM only)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
-  `ReleasePlatform`, `ReleaseFeed`, `GitHubReleases`, `ReleaseDownloader`, `UpdateException`
+  `ReleasePlatform`, `ReleaseFeed`, `GitHubReleases`, `ReleaseDownloader`, `UpdateException`,
+  `extractArchive()`
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
@@ -376,6 +377,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `pkexec dpkg -i`) and opens it again. The installers carry a monotonic numeric version
   (`installerVersion()` in `app/desktop/build.gradle.kts`) and the MSI a pinned `upgradeUuid`,
   so Windows Installer upgrades; see [updates](docs/updates.md)
+- Portable Windows app (`packageReleasePortableZip`, released as `…-windows-<arch>-portable.zip`):
+  a `data` folder beside `Ketch.exe` (`PortableApp`) keeps everything the app writes there
+  instead of `%APPDATA%\ketch`, and `WindowsPortable` updates it by replacing its own files with
+  those of the new `-portable.zip`
 - Phones: a welcome flow on first launch (`ui/onboarding`); Android shows a splash while its
   service binds, and iOS 26 keeps user-started downloads running in the background with
   `BGContinuedProcessingTaskRequest`

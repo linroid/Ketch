@@ -1,4 +1,4 @@
-package com.linroid.ketch.cli
+package com.linroid.ketch.updater
 
 import java.io.File
 import java.io.IOException
@@ -12,7 +12,7 @@ import java.util.zip.ZipInputStream
  *
  * @throws IOException when the archive is damaged or names a path outside [dir].
  */
-internal fun extractArchive(archive: File, dir: File) {
+fun extractArchive(archive: File, dir: File) {
   dir.mkdirs()
   when {
     archive.name.endsWith(".zip") -> extractZip(archive, dir)

@@ -29,6 +29,28 @@ class ReleaseTest {
   }
 
   @Test
+  fun asset_portableDesktop_usesTheZipOnWindowsOnly() {
+    val release = release(
+      "ketch-desktop-0.0.2-rc1-windows-arm64.msi",
+      "ketch-desktop-0.0.2-rc1-windows-arm64-portable.zip",
+      "ketch-desktop-0.0.2-rc1-macos-arm64.dmg",
+    )
+    assertEquals(
+      "ketch-desktop-0.0.2-rc1-windows-arm64-portable.zip",
+      release.asset(
+        ReleaseProduct.PortableDesktop,
+        platform(ReleaseOs.Windows, ReleaseArch.Arm64),
+      )?.name,
+    )
+    assertEquals(
+      "ketch-desktop-0.0.2-rc1-windows-arm64.msi",
+      release.asset(ReleaseProduct.Desktop, platform(ReleaseOs.Windows, ReleaseArch.Arm64))?.name,
+    )
+    val mac = platform(ReleaseOs.MacOs, ReleaseArch.Arm64)
+    assertNull(release.asset(ReleaseProduct.PortableDesktop, mac))
+  }
+
+  @Test
   fun asset_cli_usesZipOnWindowsOnly() {
     val release = release(
       "ketch-cli-0.0.2-rc1-windows-x64.zip",

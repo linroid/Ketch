@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.updater.ReleaseProduct
+import com.linroid.ketch.updater.extractArchive
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
@@ -15,6 +17,9 @@ internal interface UpdateInstaller {
    * the installer for the user to finish.
    */
   val restarts: Boolean
+
+  /** The release file it installs. */
+  val product: ReleaseProduct get() = ReleaseProduct.Desktop
 
   /**
    * Readies [download], the release's installer, for [install], such as by unpacking it; returns
@@ -97,6 +102,45 @@ internal interface UpdateInstaller {
   }
 
   /**
+   * Replaces the files of the portable copy [app] with those in the release's portable `.zip`,
+   * then opens it. The new app is unpacked in [workDir], inside the copy's data folder, so once
+   * the app quits each of its top-level items swaps with the old one by two renames on the same
+   * volume; the data folder stays. If one fails the old items go back and the old app opens.
+   */
+  class WindowsPortable(
+    private val app: PortableApp,
+    private val workDir: File,
+    private val log: File,
+  ) : UpdateInstaller {
+    override val restarts: Boolean get() = true
+    override val product: ReleaseProduct get() = ReleaseProduct.PortableDesktop
+
+    override fun prepare(download: File): File {
+      val unpacked = File(workDir, "unpacked").apply { deleteRecursively() }
+      extractArchive(download, unpacked)
+      // The archive holds the app's folder, or its files at the top.
+      val folders = listOf(unpacked) + unpacked.listFiles().orEmpty().filter { it.isDirectory }
+      val folder = folders.firstOrNull {
+        File(it, app.launcher.name).isFile && File(it, "app").isDirectory
+      } ?: throw IOException("${download.name} holds no ${app.launcher.name}")
+      download.delete()
+      return folder
+    }
+
+    override fun install(prepared: File, pid: Long) {
+      val script = writeScript(workDir, "install-update-windows-portable.ps1")
+      val command = listOf(
+        "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-WindowStyle", "Hidden", "-File", script.path,
+        "-ProcessId", pid.toString(), "-Source", prepared.path, "-Target", app.dir.path,
+        "-Backup", File(workDir, "previous").path, "-App", app.launcher.path,
+      )
+      // Windows refuses to rename a folder that holds a process's current directory.
+      launch(command, log, directory = app.dir)
+    }
+  }
+
+  /**
    * Installs the release's Debian package with `pkexec dpkg -i`, which asks for the user's
    * password, then opens [launcher] again, updated or not.
    */
@@ -118,11 +162,13 @@ internal interface UpdateInstaller {
 
   /**
    * Opens the installer with the system, for the user to finish, where the app cannot replace
-   * itself: a macOS bundle in a folder the user cannot write or run from the disk image, or a
-   * Linux system without `pkexec`.
+   * itself: a macOS bundle in a folder the user cannot write or run from the disk image, a
+   * portable copy in a folder the user cannot write, or a Linux system without `pkexec`.
    */
-  class OpenInstaller(private val open: (File) -> Unit = { Desktop.getDesktop().open(it) }) :
-    UpdateInstaller {
+  class OpenInstaller(
+    override val product: ReleaseProduct = ReleaseProduct.Desktop,
+    private val open: (File) -> Unit = { Desktop.getDesktop().open(it) },
+  ) : UpdateInstaller {
     override val restarts: Boolean get() = false
 
     override fun install(prepared: File, pid: Long) {
@@ -151,7 +197,15 @@ internal interface UpdateInstaller {
             ?.takeIf { it.name.endsWith(".app") } ?: return null
           if (canReplace(bundle)) MacBundle(bundle, workDir, log) else OpenInstaller()
         }
-        DesktopOs.WINDOWS -> WindowsMsi(launcher, workDir, log)
+        DesktopOs.WINDOWS -> {
+          val portable = PortableApp.detect(appPath, os)
+          when {
+            portable == null -> WindowsMsi(launcher, workDir, log)
+            portable.canReplaceFiles() -> WindowsPortable(portable, workDir, log)
+            // Explorer shows the archive, to unpack over the copy by hand once the app quits.
+            else -> OpenInstaller(ReleaseProduct.PortableDesktop)
+          }
+        }
         DesktopOs.LINUX -> if (File(PKEXEC).canExecute() && File(DPKG).canExecute()) {
           DebPackage(launcher, workDir, log)
         } else {
@@ -198,11 +252,12 @@ internal fun writeScript(dir: File, name: String): File {
   return File(dir, name).apply { writeText(text) }
 }
 
-/** Starts [command] on its own, appending what it prints to [log]. */
-private fun launch(command: List<String>, log: File) {
+/** Starts [command] on its own, in [directory] when given, appending what it prints to [log]. */
+private fun launch(command: List<String>, log: File, directory: File? = null) {
   log.parentFile?.mkdirs()
   val nullDevice = File(if (DesktopOs.current == DesktopOs.WINDOWS) "NUL" else "/dev/null")
   ProcessBuilder(command)
+    .directory(directory)
     .redirectInput(ProcessBuilder.Redirect.from(nullDevice))
     .redirectOutput(ProcessBuilder.Redirect.appendTo(log))
     .redirectErrorStream(true)

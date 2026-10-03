@@ -221,9 +221,9 @@ internal class DesktopUpdater(
     installable = installer != null && asset(release) != null,
   )
 
-  /** The installer of [release] for this system, or `null` when it has none. */
+  /** The file of [release] that [installer] installs on this system, or `null` without one. */
   private fun asset(release: Release): ReleaseAsset? =
-    platform?.let { release.asset(ReleaseProduct.Desktop, it) }
+    platform?.let { release.asset(installer?.product ?: ReleaseProduct.Desktop, it) }
 
   private suspend fun reportPreviousInstall() {
     val record = File(workDir, PENDING_INSTALL)

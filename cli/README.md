@@ -304,6 +304,8 @@ over config file values. The download command reads only `[torrent]`, and `ai-di
 
 If no `--config` flag is provided, the CLI automatically loads from the default path when the file
 exists. The desktop app uses the same directory, so the CLI shares its settings and task database.
+The [portable Windows app](../docs/updates.md#the-portable-windows-app) keeps both in its own
+`data` folder instead, which the CLI does not read.
 
 ### Generating a config file
 
