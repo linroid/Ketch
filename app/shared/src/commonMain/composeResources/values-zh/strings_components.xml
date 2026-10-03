@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="component_chip_remove">移除 %1$s</string>
+
+  <string name="component_field_paste">粘贴</string>
+  <string name="component_field_clear">清除文本</string>
+
+  <string name="component_priority_low">低优先级</string>
+  <string name="component_priority_high">高优先级</string>
+  <string name="component_priority_urgent">紧急优先级</string>
+
+  <plurals name="component_pennant_failures">
+    <item quantity="other">%1$d 个失败</item>
+  </plurals>
+
+  <string name="component_speed_chart">速度 %1$s，峰值 %2$s</string>
+
+  <string name="component_add_clip">添加 %1$s</string>
+  <string name="component_add_link">添加链接</string>
+  <string name="component_add_drop">松开以下载</string>
+
+  <plurals name="component_lanes_connections">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="other">%1$d 个活跃</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="other">百分之 %1$d</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">大小未知</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="other">%1$d 个停滞</item>
+  </plurals>
+
+  <string name="component_limit_applies">%1$s %2$s 适用于所有下载</string>
+  <string name="component_limit_custom">自定义…</string>
+  <string name="component_limit_custom_hint">例如 750k 或 1.5m</string>
+  <string name="component_limit_unit_tooltip">不带 k 或 m 的数字所用的单位</string>
+
+  <string name="component_stepper_auto">自动</string>
+  <string name="component_stepper_auto_count">自动（%1$d）</string>
+  <string name="component_stepper_fewer_connections">减少连接数</string>
+  <string name="component_stepper_more_connections">增加连接数</string>
+  <plurals name="component_stepper_connections">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">连接数自动</string>
+  <string name="component_stepper_connections_auto_count">连接数自动（%1$d）</string>
+  <string name="component_stepper_fewer_peers">减少节点数</string>
+  <string name="component_stepper_more_peers">增加节点数</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="other">%1$d 个节点</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">节点数自动</string>
+  <string name="component_stepper_peers_auto_count">节点数自动（%1$d）</string>
+
+  <string name="component_start_now">立即开始</string>
+  <string name="component_start_in_hour">1小时后</string>
+  <string name="component_start_tonight">今晚 %1$s</string>
+  <string name="component_start_off_peak">闲时 · %1$s</string>
+  <string name="component_start_label_now">立即</string>
+  <string name="component_start_after">%1$s后开始</string>
+  <string name="component_start_tonight_at">今晚 %1$s 开始</string>
+  <string name="component_start_today_at">今天 %1$s 开始</string>
+  <string name="component_start_tomorrow_at">明天 %1$s 开始</string>
+  <string name="component_start_weekday_at">%1$s %2$s 开始</string>
+  <string name="component_start_date_at">%1$s %2$s 开始</string>
+  <string name="component_start_follow_now">立即开始</string>
+  <string name="component_start_follow_after">%1$s后开始</string>
+  <string name="component_start_follow_tonight">今晚 %1$s 开始</string>
+  <string name="component_start_follow_today">今天 %1$s 开始</string>
+  <string name="component_start_follow_tomorrow">明天 %1$s 开始</string>
+  <string name="component_start_follow_weekday">%1$s %2$s 开始</string>
+  <string name="component_start_follow_date">%1$s %2$s 开始</string>
+  <string name="component_start_menu_title">开始时间</string>
+  <string name="component_start_pick">选择日期和时间…</string>
+  <string name="component_start_clear">清除</string>
+  <string name="component_start_dialog_title">选择开始时间</string>
+  <string name="component_start_schedule">计划</string>
+  <string name="component_start_passed">该时间已过</string>
+</resources>
