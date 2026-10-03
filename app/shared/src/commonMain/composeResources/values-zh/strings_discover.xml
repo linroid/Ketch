@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">发现</string>
+  <string name="discover_settings">发现设置</string>
+  <string name="discover_hero_title">描述一下，Ketch 帮你找到下载。</string>
+  <string name="discover_intro_body">“发现”会让 %1$s 搜索网络并阅读找到的网页，然后列出它信任的文件。在你添加之前，不会下载任何内容。</string>
+  <string name="discover_example_blender">适用于 Apple 芯片的 Blender</string>
+  <string name="discover_example_ubuntu">Ubuntu 24.04 服务器版 ISO</string>
+  <string name="discover_example_footage">公有领域的 4K 自然风光视频素材</string>
+  <string name="discover_example_quoted">“%1$s”</string>
+
+  <string name="discover_setup_body">“发现”会让 AI 模型搜索网络并阅读找到的网页，然后列出它信任的文件。搜索内容会发送给你选择的服务商。</string>
+  <string name="discover_setup_unsupported">“发现”可在电脑或 Android 手机上的 Ketch 应用中使用。</string>
+  <string name="discover_setup_pending">设置好“发现”后，会立即搜索“%1$s”。</string>
+  <string name="discover_setup_choose_model">选择模型</string>
+  <string name="discover_setup_local_provider">%1$s · 本地运行，无需密钥</string>
+  <string name="discover_setup_finish">完成 %1$s 的设置</string>
+  <string name="discover_setup_in_settings">在设置中配置</string>
+  <string name="discover_provider_openai_compatible">OpenAI 兼容</string>
+
+  <string name="discover_query_placeholder">描述你想下载的内容</string>
+  <string name="discover_find">查找</string>
+  <string name="discover_stop">停止</string>
+  <string name="discover_sites_limit">限定网站</string>
+  <plurals name="discover_sites_count">
+    <item quantity="other">%1$d 个网站</item>
+  </plurals>
+  <string name="discover_sites_hint">仅搜索这些网站及其子域名。用逗号分隔。</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="other">之前的 %1$d 步</item>
+  </plurals>
+  <string name="discover_step_starting">正在开始搜索</string>
+
+  <string name="discover_select_all">全选</string>
+  <string name="discover_clear_selection">取消选择</string>
+  <plurals name="discover_results">
+    <item quantity="other">%1$d 个下载</item>
+  </plurals>
+  <string name="discover_results_for">与“%1$s”相关</string>
+  <string name="discover_match">匹配度 %1$s</string>
+  <string name="discover_match_tooltip">与搜索内容的匹配程度</string>
+  <string name="discover_not_encrypted">未加密</string>
+  <string name="discover_error_title">“发现”未能完成此次搜索</string>
+  <string name="discover_failed">发现失败</string>
+  <string name="discover_unavailable">此设备不支持 AI 发现。</string>
+  <string name="discover_none_title">未找到下载</string>
+  <string name="discover_none_body">“发现”只列出来自可信来源的文件。可以试着写明版本、平台或发布它的网站。</string>
+  <string name="discover_search_everywhere">搜索整个网络</string>
+
+  <string name="discover_select_to_add">选择要添加的下载</string>
+  <plurals name="discover_selected">
+    <item quantity="other">已选 %1$d 个</item>
+  </plurals>
+  <string name="discover_add_now">立即添加</string>
+  <string name="discover_review_add">检查并添加</string>
+  <string name="discover_review_add_count">检查并添加 %1$d 个</string>
+</resources>

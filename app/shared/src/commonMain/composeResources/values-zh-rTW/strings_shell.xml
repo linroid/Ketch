@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">下載</string>
+  <string name="shell_destination_discover">探索</string>
+  <string name="shell_destination_devices">裝置</string>
+  <string name="shell_settings">設定</string>
+  <string name="shell_devices">裝置</string>
+  <string name="shell_show_sidebar">顯示側邊欄</string>
+  <string name="shell_hide_sidebar">隱藏側邊欄</string>
+  <string name="shell_appearance_light">切換為淺色</string>
+  <string name="shell_appearance_dark">切換為深色</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="other">%1$s，%2$d 個下載中</item>
+  </plurals>
+  <string name="shell_device_described">%1$s，%2$s</string>
+
+  <string name="shell_device_needs_token">需要權杖</string>
+  <string name="shell_device_needs_a_token">需要權杖</string>
+  <string name="shell_device_needs_new_token">需要新的存取權杖</string>
+  <string name="shell_device_off">未連線</string>
+  <string name="shell_device_not_connected">未連線</string>
+  <string name="shell_device_offline">離線</string>
+  <string name="shell_device_last_seen">%1$s前上線</string>
+  <string name="shell_device_connecting">正在連線</string>
+  <string name="shell_device_connecting_now">正在連線…</string>
+  <string name="shell_device_idle">閒置</string>
+  <string name="shell_device_slow_lane">慢車道</string>
+  <plurals name="shell_device_active">
+    <item quantity="other">%1$d 個進行中</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="other">%1$d 個等待中</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%2$d 台中有 %1$d 台在線上</string>
+
+  <string name="sidebar_all_devices_tooltip">所有裝置的下載</string>
+  <string name="sidebar_add_device">新增裝置</string>
+  <string name="sidebar_device_menu">裝置選單</string>
+  <string name="sidebar_menu_pause_all">全部暫停</string>
+  <string name="sidebar_menu_resume_all">全部繼續</string>
+  <string name="sidebar_menu_retry_failed">重試失敗項目</string>
+  <string name="sidebar_menu_retry_failed_count">重試失敗項目（%1$d）</string>
+  <string name="sidebar_menu_speed">速度</string>
+  <string name="sidebar_menu_settings">此裝置的設定…</string>
+  <string name="sidebar_menu_full_speed">全速</string>
+  <string name="sidebar_menu_slow_lane">慢車道 · %1$s</string>
+  <string name="sidebar_menu_no_limit">無限制</string>
+
+  <string name="switcher_overview">總覽</string>
+  <string name="switcher_add_device">新增裝置…</string>
+  <string name="switcher_find_on_network">在網路上尋找</string>
+  <string name="switcher_share">共享%1$s…</string>
+
+  <string name="shell_device_button">%1$s，切換裝置</string>
+  <string name="shell_device_button_back">返回上一個裝置</string>
+  <string name="shell_more">更多</string>
+  <string name="shell_clear_finished">清除已完成項目</string>
+  <string name="shell_search_close">關閉搜尋</string>
+  <string name="shell_search_placeholder">搜尋或貼上連結</string>
+  <string name="shell_search_download_on">在 %1$s 上下載</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="other">在 %2$s 上下載 %1$d 個連結</item>
+  </plurals>
+  <string name="shell_discover_query">探索「%1$s」</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="other">%1$d 則未讀</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">剪貼簿中沒有連結</string>
+  <string name="shell_file_picker_failed">無法開啟檔案選擇器</string>
+
+  <string name="banner_connecting">正在連線至 %1$s…</string>
+  <string name="banner_offline">%1$s 已離線</string>
+  <string name="banner_retrying">正在重試</string>
+  <string name="banner_retry_now">立即重試</string>
+  <string name="banner_switch_to">切換至 %1$s</string>
+  <string name="banner_unauthorized">%1$s 需要新的存取權杖</string>
+  <string name="banner_enter_token">輸入權杖</string>
+  <string name="toast_subject_reason">%1$s：%2$s</string>
+
+  <string name="drop_to_download">放開以下載</string>
+  <string name="drop_kinds">連結、磁力連結、.torrent 檔案和連結清單</string>
+  <string name="drop_unreachable">目前無法連線</string>
+  <string name="drop_here">拖放到這裡</string>
+  <string name="drop_already_here">已在這裡</string>
+  <string name="drop_move_it">移到這裡</string>
+  <string name="drop_send_it">傳送到這裡</string>
+  <string name="drop_move_count">將 %1$d 個移到這裡</string>
+  <string name="drop_send_count">將 %1$d 個傳送到這裡</string>
+  <string name="drop_key_moves">按住 %1$s 改為移動</string>
+  <string name="berth_drop_on">拖放到 %1$s</string>
+  <string name="berth_ready">就緒</string>
+
+  <string name="palette_placeholder">貼上連結、搜尋下載項目，或輸入命令</string>
+  <string name="palette_placeholder_short">貼上連結、搜尋或輸入命令</string>
+  <string name="palette_clear">清除</string>
+  <string name="palette_no_matches">沒有符合「%1$s」的項目</string>
+  <string name="palette_no_matches_hint">試試檔案名稱、「暫停」這類命令、連結或 /speed</string>
+  <string name="palette_hint_move">移動</string>
+  <string name="palette_hint_run">執行</string>
+  <string name="palette_hint_alternate">替代動作</string>
+  <string name="palette_hint_discover">探索</string>
+  <string name="palette_hint_close">關閉</string>
+  <string name="palette_section_recent">最近使用</string>
+  <string name="palette_section_links">下載</string>
+  <string name="palette_section_speed">速度</string>
+  <string name="palette_section_commands">命令</string>
+  <string name="palette_section_downloads">下載項目</string>
+  <string name="palette_section_navigation">前往</string>
+  <string name="palette_section_devices">裝置</string>
+  <string name="palette_section_search">搜尋</string>
+
+  <plurals name="palette_links">
+    <item quantity="other">%1$d 個連結</item>
+  </plurals>
+  <string name="palette_download">下載 %1$s</string>
+  <string name="palette_on_device">在 %1$s 上</string>
+  <string name="palette_verb_download">下載</string>
+  <string name="palette_add_with_options">使用選項新增…</string>
+  <string name="palette_add_with_options_detail">資料夾、速度、優先順序和開始時間</string>
+  <string name="palette_limit_to">將下載速度限制為 %1$s</string>
+  <string name="palette_slow_lane_to">將慢車道設為 %1$s</string>
+  <string name="palette_slow_lane_turns_on">會開啟慢車道</string>
+  <string name="palette_slow_lane_is_on">慢車道已開啟</string>
+  <string name="palette_slow_lane_now">目前為 %1$s</string>
+  <string name="palette_limit_while_off">慢車道關閉時套用</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="other">暫停 %1$d 個下載項目</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">沒有可暫停的項目</string>
+  <plurals name="palette_resume_count">
+    <item quantity="other">繼續 %1$d 個已暫停的項目</item>
+  </plurals>
+  <string name="palette_nothing_paused">沒有已暫停的項目</string>
+  <plurals name="palette_retry_count">
+    <item quantity="other">重試 %1$d 個失敗的下載項目</item>
+  </plurals>
+  <string name="palette_nothing_failed">沒有失敗的項目</string>
+  <string name="palette_slow_lane_off">關閉慢車道</string>
+  <string name="palette_slow_lane_on">開啟慢車道</string>
+  <string name="palette_nothing_to_undo">沒有可復原的動作</string>
+  <string name="palette_full_speed">全速</string>
+  <string name="palette_full_speed_slow_lane">會關閉慢車道</string>
+  <string name="palette_full_speed_rules">會關閉速度規則</string>
+  <string name="palette_full_speed_cap">解除 %1$s 的限制</string>
+  <string name="palette_full_speed_already">已是全速</string>
+  <string name="palette_full_speed_keywords">無限制、不限速、最快、最高速度、解除限速</string>
+  <string name="palette_speed_not_loaded">尚未載入速度限制</string>
+
+  <string name="palette_downloads_tab">下載 › %1$s</string>
+  <string name="palette_none">無</string>
+  <string name="palette_settings_page">設定 › %1$s</string>
+  <string name="palette_pause_all_on">暫停 %1$s 上的全部項目</string>
+  <string name="palette_resume_all_on">繼續 %1$s 上的全部項目</string>
+  <string name="palette_retry_failed_on">重試 %1$s 上的失敗項目</string>
+  <string name="palette_show_in_downloads">在「下載」中顯示「%1$s」</string>
+  <plurals name="palette_matches">
+    <item quantity="other">%1$d 個符合項目</item>
+  </plurals>
+  <string name="palette_discover_detail">在網路上尋找下載</string>
+</resources>

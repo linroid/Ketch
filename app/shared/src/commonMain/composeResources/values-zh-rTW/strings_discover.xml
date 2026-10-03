@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">探索</string>
+  <string name="discover_settings">探索設定</string>
+  <string name="discover_hero_title">說出你要什麼，Ketch 幫你找到下載。</string>
+  <string name="discover_intro_body">「探索」會請 %1$s 搜尋網路並閱讀找到的網頁，再列出它信任的檔案。在你新增之前，不會下載任何內容。</string>
+  <string name="discover_example_blender">適用於 Apple 晶片的 Blender</string>
+  <string name="discover_example_ubuntu">Ubuntu 24.04 伺服器版 ISO</string>
+  <string name="discover_example_footage">公有領域的 4K 自然景觀影片</string>
+  <string name="discover_example_quoted">「%1$s」</string>
+
+  <string name="discover_setup_body">「探索」會請 AI 模型搜尋網路並閱讀找到的網頁，再列出它信任的檔案。你的搜尋內容會傳送給你選擇的供應商。</string>
+  <string name="discover_setup_unsupported">「探索」可在電腦或 Android 手機上的 Ketch 中使用。</string>
+  <string name="discover_setup_pending">設定好「探索」後，就會立即搜尋「%1$s」。</string>
+  <string name="discover_setup_choose_model">選擇模型</string>
+  <string name="discover_setup_local_provider">%1$s · 在本機執行，不需金鑰</string>
+  <string name="discover_setup_finish">完成 %1$s 的設定</string>
+  <string name="discover_setup_in_settings">前往設定</string>
+  <string name="discover_provider_openai_compatible">相容 OpenAI</string>
+
+  <string name="discover_query_placeholder">描述你想下載的內容</string>
+  <string name="discover_find">尋找</string>
+  <string name="discover_stop">停止</string>
+  <string name="discover_sites_limit">限定網站</string>
+  <plurals name="discover_sites_count">
+    <item quantity="other">%1$d 個網站</item>
+  </plurals>
+  <string name="discover_sites_hint">只搜尋這些網站及其子網域。請以逗號分隔。</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="other">%1$d 個較早的步驟</item>
+  </plurals>
+  <string name="discover_step_starting">正在開始搜尋</string>
+
+  <string name="discover_select_all">全選</string>
+  <string name="discover_clear_selection">取消選取</string>
+  <plurals name="discover_results">
+    <item quantity="other">%1$d 個下載項目</item>
+  </plurals>
+  <string name="discover_results_for">符合「%1$s」</string>
+  <string name="discover_match">符合度 %1$s</string>
+  <string name="discover_match_tooltip">與你的搜尋的符合程度</string>
+  <string name="discover_not_encrypted">未加密</string>
+  <string name="discover_error_title">「探索」無法完成這次搜尋</string>
+  <string name="discover_failed">探索失敗</string>
+  <string name="discover_unavailable">此裝置無法使用 AI 探索。</string>
+  <string name="discover_none_title">找不到下載項目</string>
+  <string name="discover_none_body">「探索」只會列出來自可信來源的檔案。試著指明版本或平台，或發布它的網站。</string>
+  <string name="discover_search_everywhere">搜尋整個網路</string>
+
+  <string name="discover_select_to_add">選擇要新增的下載項目</string>
+  <plurals name="discover_selected">
+    <item quantity="other">已選取 %1$d 個</item>
+  </plurals>
+  <string name="discover_add_now">立即新增</string>
+  <string name="discover_review_add">檢視並新增</string>
+  <string name="discover_review_add_count">檢視並新增 %1$d 個</string>
+</resources>

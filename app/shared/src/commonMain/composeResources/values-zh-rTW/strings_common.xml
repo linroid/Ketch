@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="language_tag">zh-Hant</string>
+  <string name="size_bytes">%1$s B</string>
+  <string name="size_kb">%1$s KB</string>
+  <string name="size_mb">%1$s MB</string>
+  <string name="size_gb">%1$s GB</string>
+  <string name="size_tb">%1$s TB</string>
+  <string name="size_progress">%1$s / %2$s</string>
+  <string name="size_progress_compact">%1$s/%2$s</string>
+  <string name="speed_per_second">%1$s/s</string>
+  <string name="percent">%1$d%</string>
+
+  <string name="duration_days_hours">%1$d天%2$d小時</string>
+  <string name="duration_days">%1$d天</string>
+  <string name="duration_hours_minutes">%1$d小時%2$d分鐘</string>
+  <string name="duration_hours">%1$d小時</string>
+  <string name="duration_minutes_seconds">%1$d分%2$d秒</string>
+  <string name="duration_minutes">%1$d分鐘</string>
+  <string name="duration_seconds">%1$d秒</string>
+  <string name="duration_under_second">&lt;1秒</string>
+
+  <string name="date_month_day">%1$s%3$d日</string>
+  <string name="date_month_day_year">%4$d年%1$s%3$d日</string>
+  <string name="date_today">今天</string>
+  <string name="date_yesterday">昨天</string>
+  <string name="date_today_at">今天 %1$s</string>
+  <string name="date_yesterday_at">昨天 %1$s</string>
+  <string name="date_tomorrow_at">明天 %1$s</string>
+  <string name="date_at_time">%1$s %2$s</string>
+
+  <string name="month_jan">1月</string>
+  <string name="month_feb">2月</string>
+  <string name="month_mar">3月</string>
+  <string name="month_apr">4月</string>
+  <string name="month_may">5月</string>
+  <string name="month_jun">6月</string>
+  <string name="month_jul">7月</string>
+  <string name="month_aug">8月</string>
+  <string name="month_sep">9月</string>
+  <string name="month_oct">10月</string>
+  <string name="month_nov">11月</string>
+  <string name="month_dec">12月</string>
+
+  <string name="weekday_mon">週一</string>
+  <string name="weekday_tue">週二</string>
+  <string name="weekday_wed">週三</string>
+  <string name="weekday_thu">週四</string>
+  <string name="weekday_fri">週五</string>
+  <string name="weekday_sat">週六</string>
+  <string name="weekday_sun">週日</string>
+
+  <plurals name="count_downloads">
+    <item quantity="other">%1$d 個下載項目</item>
+  </plurals>
+
+  <string name="priority_low">低</string>
+  <string name="priority_normal">一般</string>
+  <string name="priority_high">高</string>
+  <string name="priority_urgent">緊急</string>
+
+  <string name="action_cancel">取消</string>
+  <string name="action_done">完成</string>
+  <string name="action_close">關閉</string>
+  <string name="action_back">返回</string>
+  <string name="action_next">下一步</string>
+  <string name="action_continue">繼續</string>
+  <string name="action_skip">略過</string>
+  <string name="action_add">新增</string>
+  <string name="action_remove">移除</string>
+  <string name="action_open">開啟</string>
+  <string name="action_show">顯示</string>
+  <string name="action_undo">復原</string>
+  <string name="action_retry">重試</string>
+  <string name="action_try_again">再試一次</string>
+  <string name="action_dismiss">關閉</string>
+  <string name="action_review">檢視</string>
+  <string name="action_connect">連線</string>
+</resources>
