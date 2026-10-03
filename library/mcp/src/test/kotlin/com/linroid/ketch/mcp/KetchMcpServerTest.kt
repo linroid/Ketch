@@ -9,13 +9,16 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.Buffer
 import kotlinx.io.IOException
 import kotlinx.io.RawSink
@@ -44,6 +47,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
 
 // Each test also checks that serveStdio returns before the timeout: the MCP stdio transport
@@ -120,6 +124,35 @@ class KetchMcpServerTest {
         input.close()
       }
     }
+
+  // The next two tests repeat a race: when a session ended right after it started, Server.close()
+  // could wait forever for a notification collector that had not started yet. serveStdio runs
+  // outside the test's scope, so a hang fails the test instead of keeping it from completing.
+  @Test
+  fun `serveStdio returns every time it is cancelled as the session starts`() = runBlocking {
+    val scope = CoroutineScope(Dispatchers.Default)
+    repeat(RACE_ROUNDS) { round ->
+      val input = OpenInput()
+      try {
+        val serving = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+          serveStdio(ToolRegistry {}, input, Buffer())
+        }
+        serving.cancel()
+        withTimeoutOrNull(10.seconds) { serving.join() } ?: fail("Hung in round $round")
+      } finally {
+        input.close()
+      }
+    }
+  }
+
+  @Test
+  fun `serveStdio returns every time the input has already ended`() = runBlocking {
+    val scope = CoroutineScope(Dispatchers.Default)
+    repeat(RACE_ROUNDS) { round ->
+      val serving = scope.launch { serveStdio(ToolRegistry {}, Buffer(), Buffer()) }
+      withTimeoutOrNull(10.seconds) { serving.join() } ?: fail("Hung in round $round")
+    }
+  }
 
   @Test
   fun `serveStdio stops and closes the input when writing a reply fails`() =
@@ -326,6 +359,7 @@ class KetchMcpServerTest {
       .map { Json.parseToJsonElement(it).jsonObject }
 
   private companion object {
+    const val RACE_ROUNDS = 2000
     const val INITIALIZE = """{"jsonrpc":"2.0","id":1,"method":"initialize",""" +
       """"params":{"protocolVersion":"2025-06-18","capabilities":{},""" +
       """"clientInfo":{"name":"test","version":"1"}}}"""

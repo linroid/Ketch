@@ -10,6 +10,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -38,6 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * running until the client writes, closes or reads. The streams are closed when it returns.
  *
  * Messages are handled one at a time, in the order they arrive, like the SDK transport does.
+ * Nothing is read before [startReading], so the input cannot end and close the transport while
+ * the server is still setting up the session it connected.
  */
 internal class StdioTransport(
   private val rawInput: RawSource,
@@ -52,15 +55,22 @@ internal class StdioTransport(
   private val outgoing = Channel<JSONRPCMessage>(Channel.UNLIMITED)
   private val started = AtomicBoolean(false)
   private val closed = AtomicBoolean(false)
+  private val readingAllowed = Job()
 
   override suspend fun start() {
     check(started.compareAndSet(false, true)) { "StdioTransport already started" }
     scope.launch { writeOutput() }
     scope.launch {
+      readingAllowed.join()
       readInput()
       // The writer sends the replies queued so far, then closes the transport
       outgoing.close()
     }
+  }
+
+  /** Starts reading the input, once the server has set up the session connected to it. */
+  fun startReading() {
+    readingAllowed.complete()
   }
 
   override suspend fun send(message: JSONRPCMessage, options: TransportSendOptions?) {

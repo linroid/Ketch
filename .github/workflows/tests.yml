@@ -46,10 +46,14 @@ jobs:
       - name: Verify conformance gate behavior
         run: python3 -m unittest discover -s tools/torrent -p 'test_*.py'
 
+      # allJvmTests also runs `test` in the JVM-only modules. The CLI tests do not read the web app
+      # the CLI bundles, so a prebuiltWebDir that does not exist skips its wasm build.
       - name: Run JVM tests
         env:
           TRANSMISSION_DAEMON: ${{ runner.temp }}/ketch-transmission/build/daemon/transmission-daemon
-        run: ./gradlew jvmTest :library:torrent:verifyNoNativeTorrentRuntime -PtorrentConformance=true
+        run: |
+          ./gradlew allJvmTests :library:torrent:verifyNoNativeTorrentRuntime \
+            -PtorrentConformance=true -PprebuiltWebDir=build/no-web-app
 
       - name: Compile publication metadata
         run: ./gradlew compileCommonMainKotlinMetadata
