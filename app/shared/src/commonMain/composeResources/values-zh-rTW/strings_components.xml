@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="component_chip_remove">移除 %1$s</string>
+
+  <string name="component_field_paste">貼上</string>
+  <string name="component_field_clear">清除文字</string>
+
+  <string name="component_priority_low">低優先順序</string>
+  <string name="component_priority_high">高優先順序</string>
+  <string name="component_priority_urgent">緊急優先順序</string>
+
+  <plurals name="component_pennant_failures">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+
+  <string name="component_speed_chart">速度 %1$s，最高 %2$s</string>
+
+  <string name="component_add_clip">新增 %1$s</string>
+  <string name="component_add_link">新增連結</string>
+  <string name="component_add_drop">放開以下載</string>
+
+  <plurals name="component_lanes_connections">
+    <item quantity="other">%1$d 個連線</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="other">%1$d 個使用中</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="other">百分之 %1$d</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">大小不明</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="other">%1$d 個停滯</item>
+  </plurals>
+
+  <string name="component_limit_applies">%1$s %2$s 適用於所有下載</string>
+  <string name="component_limit_custom">自訂…</string>
+  <string name="component_limit_custom_hint">例如 750k 或 1.5m</string>
+  <string name="component_limit_unit_tooltip">未加 k 或 m 的數字所用的單位</string>
+
+  <string name="component_stepper_auto">自動</string>
+  <string name="component_stepper_auto_count">自動（%1$d）</string>
+  <string name="component_stepper_fewer_connections">減少連線數</string>
+  <string name="component_stepper_more_connections">增加連線數</string>
+  <plurals name="component_stepper_connections">
+    <item quantity="other">%1$d 個連線</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">連線數：自動</string>
+  <string name="component_stepper_connections_auto_count">連線數：自動（%1$d）</string>
+  <string name="component_stepper_fewer_peers">減少對等端</string>
+  <string name="component_stepper_more_peers">增加對等端</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="other">%1$d 個對等端</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">對等端數：自動</string>
+  <string name="component_stepper_peers_auto_count">對等端數：自動（%1$d）</string>
+
+  <string name="component_start_now">立即開始</string>
+  <string name="component_start_in_hour">1 小時後</string>
+  <string name="component_start_tonight">今晚 %1$s</string>
+  <string name="component_start_off_peak">離峰時段 · %1$s</string>
+  <string name="component_start_label_now">立即</string>
+  <string name="component_start_after">%1$s後開始</string>
+  <string name="component_start_tonight_at">今晚 %1$s 開始</string>
+  <string name="component_start_today_at">今天 %1$s 開始</string>
+  <string name="component_start_tomorrow_at">明天 %1$s 開始</string>
+  <string name="component_start_weekday_at">%1$s %2$s 開始</string>
+  <string name="component_start_date_at">%1$s %2$s 開始</string>
+  <string name="component_start_follow_now">立即開始</string>
+  <string name="component_start_follow_after">於%1$s後開始</string>
+  <string name="component_start_follow_tonight">於今晚 %1$s 開始</string>
+  <string name="component_start_follow_today">於今天 %1$s 開始</string>
+  <string name="component_start_follow_tomorrow">於明天 %1$s 開始</string>
+  <string name="component_start_follow_weekday">於%1$s %2$s 開始</string>
+  <string name="component_start_follow_date">於%1$s %2$s 開始</string>
+  <string name="component_start_menu_title">開始時間</string>
+  <string name="component_start_pick">選擇日期與時間…</string>
+  <string name="component_start_clear">清除</string>
+  <string name="component_start_dialog_title">設定開始時間</string>
+  <string name="component_start_schedule">排程</string>
+  <string name="component_start_passed">這個時間已經過了</string>
+</resources>

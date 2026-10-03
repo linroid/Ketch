@@ -22,6 +22,11 @@ class LocaleFallbackTest {
     for (folder in translations()) assertShows(folder, tagOf(folder))
   }
 
+  @Test fun chinese_byRegionOrScript_getsItsScript() = runTest {
+    assertShows("values-zh", "zh-CN", "zh-SG", "zh-Hans", "zh-Hans-HK", "zh-Hans-TW", "zh")
+    assertShows("values-zh-rTW", "zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-HK", "zh-Hant-CN")
+  }
+
   @Test fun languagesWithoutATranslation_fallBackToEnglish() = runTest {
     assertShows("values", "en-US", "en-GB", "it-IT", "nl", "ar-EG")
   }
