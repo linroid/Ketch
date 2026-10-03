@@ -60,11 +60,13 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.downloads.CLEAR_MISSING_CAPTION
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
 import com.linroid.ketch.app.ui.pulse.PulseSubtitle
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
@@ -249,12 +251,16 @@ private fun DeviceButton(shell: ShellState) {
   }
 }
 
-/** The ⋮ menu: queue commands, Activity, Devices without a bottom bar, and Settings. */
+/**
+ * The ⋮ menu: queue commands, clearing finished downloads or those whose files are gone,
+ * Activity, Devices without a bottom bar, and Settings.
+ */
 @Composable
 private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
   val state = shell.app
   val pulse by state.pulse.state.collectAsState()
   val unread by state.messages.unreadCount.collectAsState()
+  val files = rememberFileActions()
   var open by remember { mutableStateOf(false) }
   val counts = pulse.counts
   Box {
@@ -281,6 +287,15 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
         icon = KetchIcon.Done,
         enabled = counts.done > 0,
       )
+      if (files != null) {
+        item(
+          label = "Clear missing",
+          onClick = { state.clearMissing(files) },
+          icon = KetchIcon.Warning,
+          caption = CLEAR_MISSING_CAPTION,
+          enabled = counts.done > 0,
+        )
+      }
       divider()
       item(
         label = KetchCommands.Activity.label,

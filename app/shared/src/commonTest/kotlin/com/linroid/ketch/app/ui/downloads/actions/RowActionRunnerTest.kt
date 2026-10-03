@@ -168,6 +168,61 @@ class RowActionRunnerTest {
   }
 
   @Test
+  fun clearMissing_someFilesGone_removesOnlyThoseOnceTheUndoWindowEnds() = actionsTest { f ->
+    val gone = f.add(completed)
+    val kept = f.add(DownloadState.Completed("/downloads/b.iso", totalBytes = 100))
+    val running = f.add(downloading)
+    backgroundScope.launch { f.state.tasks.collect {} }
+    runCurrent()
+    f.files.missing += "/downloads/a.iso"
+
+    f.runner.clearMissing(listOf(gone, kept).map { rowOf(it) })
+    runCurrent()
+
+    assertEquals(listOf(kept, running), f.state.tasks.value)
+    val message = f.messages().last()
+    assertEquals("Cleared 1 download with a missing file", message.title)
+    assertTrue(message.actions.any { it.label == "Undo" })
+    assertTrue(gone.calls.isEmpty())
+    advanceTimeBy(7.seconds)
+    runCurrent()
+    assertEquals(listOf("remove deleteFiles=false"), gone.calls)
+    assertTrue(kept.calls.isEmpty())
+    assertTrue(running.calls.isEmpty())
+  }
+
+  @Test
+  fun clearMissing_everyFileInPlace_removesNothing() = actionsTest { f ->
+    val task = f.add(completed)
+
+    f.runner.clearMissing(listOf(rowOf(task)))
+    advanceTimeBy(7.seconds)
+    runCurrent()
+
+    assertTrue(task.calls.isEmpty())
+    val message = f.messages().last()
+    assertEquals("No missing files to clear", message.title)
+    assertEquals(MessageLevel.Info, message.level)
+  }
+
+  @Test
+  fun clearMissing_filePutBackSinceChecked_readsAsPresentAgain() = actionsTest { f ->
+    val task = f.add(completed)
+    val row = rowOf(task)
+    f.files.missing += "/downloads/a.iso"
+    f.runner.checkFile(row)
+    runCurrent()
+    f.files.missing.clear()
+
+    f.runner.clearMissing(listOf(row))
+    runCurrent()
+
+    assertFalse(f.runner.isFileMissing(row))
+    assertTrue(task.calls.isEmpty())
+    assertEquals("No missing files to clear", f.messages().last().title)
+  }
+
+  @Test
   fun remove_withFilesToTheTrash_removesThenTrashesOnceTheUndoWindowEnds() =
     actionsTest(canTrash = true) { f ->
       val task = f.add(completed)

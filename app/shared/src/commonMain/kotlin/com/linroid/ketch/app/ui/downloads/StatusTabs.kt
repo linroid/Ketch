@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
@@ -145,17 +146,21 @@ internal fun StatusChips(
 }
 
 /**
- * The tab's own summary and action at the end of the tab row: "Clear 4 finished" on Done, and
- * on Failed "2 failed · Retry all · 1 needs a new link".
+ * The tab's own summary and action at the end of the tab row: on Done "Clear 4 finished", then
+ * "Clear 2 missing" while some finished files were moved or deleted, and on Failed
+ * "2 failed · Retry all · 1 needs a new link".
  *
  * @param needsLink failed downloads whose link has to change before a retry can work.
+ * @param missing finished downloads whose files were moved or deleted.
  */
 @Composable
 internal fun TabAction(
   filter: StatusFilter,
   counts: Map<StatusFilter, Int>,
   needsLink: Int,
+  missing: Int,
   onClearFinished: () -> Unit,
+  onClearMissing: () -> Unit,
   onRetryAll: () -> Unit,
 ) {
   val colors = KetchTheme.colors
@@ -163,7 +168,18 @@ internal fun TabAction(
   val count = counts[filter] ?: 0
   if (count == 0) return
   when (filter) {
-    StatusFilter.Done -> TextAction(clearFinishedLabel(count), onClearFinished)
+    StatusFilter.Done -> Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+    ) {
+      TextAction(clearFinishedLabel(count), onClearFinished)
+      if (missing > 0) {
+        Separator()
+        KetchTooltip(text = "Remove the finished downloads whose files were moved or deleted") {
+          TextAction(clearMissingLabel(missing), onClearMissing)
+        }
+      }
+    }
     StatusFilter.Failed -> Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
