@@ -15,9 +15,7 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
-import com.linroid.ketch.app.state.folderNameText
 import com.linroid.ketch.app.state.formatSpace
-import com.linroid.ketch.app.state.isDocumentTree
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_connect
 import ketch.app.shared.generated.resources.device_duration_days
@@ -234,20 +232,6 @@ internal fun deviceIcon(device: DevicePresence, localKind: LocalDeviceKind): Ket
   }
 }
 
-/**
- * [path] with the user's home folder as "~", as in "~/Downloads", for "/Users/alex/Downloads"
- * and "/home/alex/Downloads", or the name of an Android document tree; other paths are kept as
- * they are.
- */
-internal fun shortPathText(path: String): UiText =
-  if (isDocumentTree(path)) folderNameText(path) else verbatim(homeShortened(path))
-
-// The path with the user's home folder as "~"; other paths as they are.
-private fun homeShortened(path: String): String {
-  val match = HomeFolder.find(path) ?: return path
-  return "~" + path.substring(match.range.last + 1)
-}
-
 /** [name] cut to [max] characters with "…" at the end, for a button label. */
 internal fun clipName(name: String, max: Int = MAX_NAME_LENGTH): String =
   if (name.length <= max) name else name.take(max - 1).trimEnd() + "…"
@@ -263,6 +247,4 @@ internal fun styledPart(text: String, part: String, style: SpanStyle): Annotated
 /** The command that runs Ketch as a server, kept on one line. */
 internal const val SERVER_COMMAND = "ketch\u00A0server"
 
-private val HomeFolder =
-  Regex("""^(/Users/[^/]+|/home/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=$|[/\\])""")
 private const val MAX_NAME_LENGTH = 20

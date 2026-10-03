@@ -197,6 +197,10 @@
   <string name="intake_problem_torrent">Couldn't read this torrent</string>
   <string name="intake_problem_ftp">The FTP server reported an error</string>
   <string name="intake_problem_check_failed">Couldn't check this link</string>
+  <!-- A magnet or a dropped .torrent file on a device that cannot download torrents. -->
+  <string name="intake_problem_no_torrents">This device can't download torrents</string>
+  <!-- A dropped file that could not be read; why follows as the detail. -->
+  <string name="intake_problem_file_unreadable">Couldn't read this file</string>
   <string name="intake_problem_sign_in">Sign-in required</string>
   <!-- What a row with a problem offers. -->
   <string name="intake_action_sign_in">Sign in</string>

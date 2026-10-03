@@ -129,6 +129,8 @@
   <string name="intake_problem_torrent">이 토렌트를 읽을 수 없음</string>
   <string name="intake_problem_ftp">FTP 서버가 오류를 보고함</string>
   <string name="intake_problem_check_failed">이 링크를 확인할 수 없음</string>
+  <string name="intake_problem_no_torrents">이 기기는 토렌트를 다운로드할 수 없습니다</string>
+  <string name="intake_problem_file_unreadable">이 파일을 읽을 수 없음</string>
   <string name="intake_problem_sign_in">로그인 필요</string>
   <string name="intake_action_sign_in">로그인</string>
   <string name="intake_action_paste_curl">cURL로 붙여넣기</string>

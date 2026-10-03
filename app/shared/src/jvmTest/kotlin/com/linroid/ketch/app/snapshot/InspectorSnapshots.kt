@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -207,8 +205,7 @@ class InspectorSnapshots {
                   onCopyName = {},
                   onClose = {},
                 )
-                val instances by state.instances.collectAsState()
-                ActionBar(state, row, runner, instances)
+                ActionBar(state, row, runner)
               }
             }
           }

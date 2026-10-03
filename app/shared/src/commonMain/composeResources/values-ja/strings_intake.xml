@@ -129,6 +129,8 @@
   <string name="intake_problem_torrent">このトレントを読み込めませんでした</string>
   <string name="intake_problem_ftp">FTPサーバーがエラーを返しました</string>
   <string name="intake_problem_check_failed">このリンクを確認できませんでした</string>
+  <string name="intake_problem_no_torrents">このデバイスではトレントをダウンロードできません</string>
+  <string name="intake_problem_file_unreadable">このファイルを読み込めませんでした</string>
   <string name="intake_problem_sign_in">サインインが必要です</string>
   <string name="intake_action_sign_in">サインイン</string>
   <string name="intake_action_paste_curl">cURLとして貼り付け</string>

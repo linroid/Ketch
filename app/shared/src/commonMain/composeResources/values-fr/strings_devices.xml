@@ -93,13 +93,7 @@
   <string name="device_pause_all_here">Tout mettre en pause ici</string>
   <string name="device_start_now">Démarrer %1$s maintenant</string>
 
-  <string name="device_speed_mode_failed">Impossible de passer au mode %1$s</string>
-  <string name="device_slow_lane_on">Voie lente activée · %1$s</string>
-  <string name="device_slow_lane_off">Voie lente désactivée</string>
-  <string name="device_speed_follows_rules">La vitesse suit vos règles</string>
   <string name="device_reconnect_failed">Impossible de se reconnecter à %1$s</string>
-  <string name="device_drop_unsupported">Seuls les fichiers .torrent et les listes de liens peuvent être déposés pour ajouter des téléchargements</string>
-  <string name="device_drop_read_failed">Impossible de lire %1$s</string>
 
   <string name="device_more_for">Plus d'options pour %1$s</string>
   <string name="device_menu_settings">Réglages de cet appareil…</string>
@@ -115,9 +109,6 @@
   <string name="device_remove_body">Ketch n'affichera plus ses téléchargements ici. Ils continuent sur %1$s, et vous pourrez l'ajouter à nouveau plus tard.</string>
 
   <string name="device_speed_of">Vitesse de %1$s</string>
-  <string name="device_speed_limit">Limite de vitesse</string>
-  <string name="device_speed_update_failed">Impossible de mettre à jour %1$s · %2$s</string>
-  <string name="device_speed_applies">S'applique à tous les téléchargements sur %1$s.</string>
 
   <string name="device_page_title">Appareils</string>
   <string name="device_add">Ajouter un appareil</string>

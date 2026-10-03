@@ -43,6 +43,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
@@ -53,6 +54,8 @@ import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.startSchedule
+import com.linroid.ketch.app.ui.inspector.urgentVictim
 import com.linroid.ketch.app.ui.intake.targetSummary
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.batch_copy_link
@@ -175,9 +178,7 @@ internal fun RowMenu(
   if (rows.isEmpty()) return
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
-  val instances by runner.state.instances.collectAsState()
-  val presence by runner.state.instanceManager.presence.collectAsState()
-  val context = rowMenuContext(rows, runner, sendTargets(instances, rows, presence))
+  val context = rowMenuContext(rows, runner, rememberSendTargets(runner.state, rows))
   val title = single?.name
     ?: pluralStringResource(Res.plurals.count_downloads, rows.size, rows.size)
   KetchMenu(
@@ -229,7 +230,7 @@ internal fun rowMenuContext(
   devices = devices,
   now = LocalClock.current.now(),
   zone = TimeZone.currentSystemDefault(),
-  urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+  urgentVictim = urgentVictim(runner.state, rows)?.name,
   send = rememberSendMode(),
 )
 
@@ -296,9 +297,7 @@ internal fun KetchMenuScope.rowMenuEntries(
       RowAction.Connections -> {
         val peers = targets.all { it.isTorrent }
         val name = if (single != null && peers) Res.string.row_menu_peer_limit.text() else label
-        // A connection count is no peer limit, so a mixed selection leaves its torrents alone.
-        val counted = if (peers) targets else targets.filterNot { it.isTorrent }
-        submenu(name, action.icon) { connectionEntries(counted, runner, peers) }
+        submenu(name, action.icon) { connectionEntries(connectionTargets(targets), runner, peers) }
       }
       RowAction.Priority -> submenu(label, action.icon) {
         priorityEntries(targets, runner, context.urgentVictim)
@@ -378,6 +377,13 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
 }
 
 /** Adds the connection counts, or the peer limits when [peers], for [rows]. */
+/**
+ * The rows a connection count applies to: all of them when they are torrents, whose count is
+ * their peer limit, and otherwise the others, so a mixed selection leaves its torrents alone.
+ */
+internal fun connectionTargets(rows: List<TaskRow>): List<TaskRow> =
+  if (rows.all { it.isTorrent }) rows else rows.filterNot { it.isTorrent }
+
 internal fun KetchMenuScope.connectionEntries(
   rows: List<TaskRow>,
   runner: RowActionRunner,
@@ -435,7 +441,7 @@ internal fun KetchMenuScope.startLaterEntries(
   runner: RowActionRunner,
   context: RowMenuContext,
 ) {
-  val current = rows.map { it.request.schedule }.distinct().singleOrNull()
+  val current = rows.map { it.startSchedule }.distinct().singleOrNull()
   // Start now is an action of its own; the submenu only holds later times.
   for (option in startTimeOptions(context.now, context.zone).drop(1)) {
     item(
@@ -493,8 +499,20 @@ internal fun KetchMenuScope.sendEntries(
 }
 
 /**
+ * The devices [rows] can be sent to, [sendTargets], kept current as devices come, go and change
+ * health; the row menu, the selection bar and the inspector all list them this way.
+ */
+@Composable
+internal fun rememberSendTargets(state: AppState, rows: List<TaskRow>): List<SendTarget> {
+  val instances by state.instances.collectAsState()
+  val presence by state.instanceManager.presence.collectAsState()
+  return remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
+}
+
+/**
  * The devices other than those of [rows], with their health and, from [presence], what each
- * is doing, such as "1.8 TB free · 2 active".
+ * is doing, such as "1.8 TB free · 2 active". A device [presence] does not list yet takes its
+ * health from its connection.
  */
 internal fun sendTargets(
   instances: List<InstanceEntry>,
@@ -503,11 +521,11 @@ internal fun sendTargets(
 ): List<SendTarget> {
   val here = rows.mapTo(mutableSetOf()) { it.key.deviceId }
   return instances.filter { it.deviceId !in here }.map { entry ->
-    val health = when (entry) {
+    val device = presence.firstOrNull { it.deviceId == entry.deviceId }
+    val health = device?.health ?: when (entry) {
       is RemoteInstance -> entry.connectionState.value.toDeviceHealth()
       else -> DeviceHealth.Local()
     }
-    val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
     SendTarget(
       entry,
       DeviceOption(
@@ -515,27 +533,10 @@ internal fun sendTargets(
         name = entry.displayName,
         health = health,
         pennantName = entry.label,
-        summary = summary,
+        summary = targetSummary(device),
       ),
     )
   }
-}
-
-/**
- * The download Urgent would pause to start [rows]: the lowest-priority one running on their
- * device, when every slot is taken; `null` when a slot is free or nothing could be paused.
- */
-internal fun urgentVictim(rows: List<TaskRow>, runner: RowActionRunner): String? {
-  if (rows.all { it.state is DownloadState.Downloading }) return null
-  val deviceId = rows.first().key.deviceId
-  val keys = rows.mapTo(mutableSetOf()) { it.key }
-  val running = runner.state.taskList.rows.value.filter {
-    it.key.deviceId == deviceId && it.state is DownloadState.Downloading
-  }
-  val slots = runner.state.settingsOf(deviceId)?.download?.maxConcurrentDownloads
-  if (slots != null && running.size < slots) return null
-  return running.filter { it.key !in keys && it.request.priority < DownloadPriority.URGENT }
-    .minByOrNull { it.request.priority.ordinal }?.name
 }
 
 /** Menu label of [action] on one row; Show in folder takes the platform's [revealLabel]. */

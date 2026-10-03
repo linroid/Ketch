@@ -3,10 +3,10 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.instance.InstanceFactory
+import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
@@ -117,6 +117,49 @@ class AppStateDroppedFileTest {
   }
 
   @Test
+  fun addDroppedFiles_csvAndWebloc_opensIntakeRequestWithTheirLinks() = runTest {
+    val state = appState(FakeKetchApi())
+    val webloc = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0"><dict>
+        <key>URL</key><string>https://example.com/c.iso</string>
+      </dict></plist>
+    """.trimIndent()
+    val shortcut = "[InternetShortcut]\nURL=https://example.com/b.iso"
+
+    state.addDroppedFiles(
+      listOf(
+        DroppedFile("export.csv") { "name,url\na,https://example.com/a.iso,1".encodeToByteArray() },
+        DroppedFile("c.webloc") { webloc.encodeToByteArray() },
+        DroppedFile("b.url") { shortcut.encodeToByteArray() },
+      ),
+    )
+    runCurrent()
+
+    assertEquals(
+      "https://example.com/a.iso\nhttps://example.com/c.iso\n" +
+        "[InternetShortcut]\nURL=https://example.com/b.iso",
+      state.intakeRequest?.text,
+    )
+  }
+
+  @Test
+  fun addDroppedFiles_listWithoutLinks_reportsItWithoutOpeningDialog() = runTest {
+    val state = appState(FakeKetchApi())
+
+    state.addDroppedFiles(listOf(DroppedFile("empty.csv") { "name,size".encodeToByteArray() }))
+    runCurrent()
+
+    assertFalse(state.showAddDialog)
+    assertEquals(
+      "Found no links in what was dropped",
+      state.messages.history.value.single().title.load(),
+    )
+  }
+
+  @Test
   fun resolveDroppedFile_readFailure_reportsError() = runTest {
     val api = FakeKetchApi().apply { resolveContentResult = resolved }
     val state = appState(api)
@@ -126,12 +169,12 @@ class AppStateDroppedFileTest {
     )
     runCurrent()
 
-    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).text.load())
+    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).cause.message)
     assertNull(api.lastResolvedContent)
   }
 
   @Test
-  fun resolveDroppedFile_malformedTorrent_explainsTheFileIsInvalid() = runTest {
+  fun resolveDroppedFile_malformedTorrent_keepsTheDevicesError() = runTest {
     val api = object : KetchApi by FakeKetchApi() {
       override suspend fun resolveContent(content: ByteArray, fileName: String?) =
         throw KetchError.SourceError("torrent")
@@ -142,10 +185,7 @@ class AppStateDroppedFileTest {
     state.addDroppedFiles(listOf(DroppedFile("broken.torrent") { byteArrayOf(1) }))
     runCurrent()
 
-    assertEquals(
-      "broken.torrent is not a valid torrent file",
-      assertIs<ResolveState.Error>(state.resolveState).text.load(),
-    )
+    assertIs<KetchError.SourceError>(assertIs<ResolveState.Error>(state.resolveState).cause)
   }
 
   @Test

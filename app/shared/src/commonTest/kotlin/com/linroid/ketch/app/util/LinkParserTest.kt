@@ -368,11 +368,45 @@ class LinkParserTest {
   }
 
   @Test
-  fun isLinkList_textAndCsvFiles_areLists() {
-    assertTrue(LinkParser.isLinkList("links.txt"))
-    assertTrue(LinkParser.isLinkList("EXPORT.CSV"))
-    assertFalse(LinkParser.isLinkList("ubuntu.torrent"))
-    assertFalse(LinkParser.isLinkList("notes.txt.zip"))
+  fun isLinkList_textCsvAndShortcutFiles_areLists() {
+    listOf("links.txt", "EXPORT.CSV", "page.url", "Page.webloc")
+      .forEach { assertTrue(LinkParser.isLinkList(it), it) }
+    listOf("ubuntu.torrent", "notes.txt.zip", "txt")
+      .forEach { assertFalse(LinkParser.isLinkList(it), it) }
+  }
+
+  @Test
+  fun parseIntake_weblocFile_readsOnlyItsValues() {
+    val webloc = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>URL</key>
+        <string>https://example.com/a.zip?x=1&amp;y=2</string>
+      </dict>
+      </plist>
+    """.trimIndent()
+
+    assertEquals(
+      listOf("https://example.com/a.zip?x=1&y=2"),
+      parse(webloc, fileName = "a.webloc").links().map { it.url },
+    )
+  }
+
+  @Test
+  fun listText_csvAndWebloc_keepOnlyTheirLinks() {
+    assertEquals(
+      "https://example.com/a.iso\nhttps://example.com/b.iso",
+      LinkParser.listText("a,https://example.com/a.iso\nb,https://example.com/b.iso", "x.csv"),
+    )
+    assertEquals(
+      "https://example.com/c.iso",
+      LinkParser.listText("<string>https://example.com/c.iso</string>", "c.webloc"),
+    )
+    val curl = "curl -H 'Cookie: a=b' https://example.com/d.iso"
+    assertEquals(curl, LinkParser.listText(curl, "links.txt"))
   }
 
   @Test

@@ -59,10 +59,8 @@
 
   <string name="feedback_open_failed">无法打开 %1$s</string>
   <string name="feedback_drop_unsupported">只能拖入 .torrent 文件和链接列表来添加下载</string>
+  <string name="feedback_drop_no_links">拖入的内容中没有找到链接</string>
   <string name="feedback_read_failed">无法读取 %1$s</string>
-  <string name="feedback_torrent_invalid">%1$s 不是有效的种子文件</string>
-  <string name="feedback_file_unsupported">不支持 %1$s 这类文件</string>
-  <string name="feedback_file_read_failed">读取 %1$s 失败</string>
   <string name="feedback_add_failed">无法添加 %1$s</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="other">无法添加 %1$d 个下载</item>
@@ -146,10 +144,6 @@
     <item quantity="other">已将 %1$d 个下载发送到 %2$s</item>
   </plurals>
   <string name="feedback_remove_here">从这里移除</string>
-  <string name="feedback_added_here_one">已添加 %1$s → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="other">已添加 %1$d 个下载 → %2$s</item>
-  </plurals>
   <string name="feedback_options">选项</string>
 
   <string name="feedback_pause_failed_one">无法在 %2$s 上暂停 %1$s</string>

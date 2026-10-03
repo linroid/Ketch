@@ -59,10 +59,8 @@
 
   <string name="feedback_open_failed">無法開啟 %1$s</string>
   <string name="feedback_drop_unsupported">只能拖放 .torrent 檔案和連結清單來新增下載</string>
+  <string name="feedback_drop_no_links">拖放的內容中找不到連結</string>
   <string name="feedback_read_failed">無法讀取 %1$s</string>
-  <string name="feedback_torrent_invalid">%1$s 不是有效的種子檔案</string>
-  <string name="feedback_file_unsupported">不支援 %1$s 這種檔案</string>
-  <string name="feedback_file_read_failed">讀取 %1$s 失敗</string>
   <string name="feedback_add_failed">無法新增 %1$s</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="other">無法新增 %1$d 個下載項目</item>
@@ -146,10 +144,6 @@
     <item quantity="other">已將 %1$d 個下載項目傳送至 %2$s</item>
   </plurals>
   <string name="feedback_remove_here">從這裡移除</string>
-  <string name="feedback_added_here_one">已新增 %1$s → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="other">已新增 %1$d 個下載項目 → %2$s</item>
-  </plurals>
   <string name="feedback_options">選項</string>
 
   <string name="feedback_pause_failed_one">無法在 %2$s 上暫停 %1$s</string>

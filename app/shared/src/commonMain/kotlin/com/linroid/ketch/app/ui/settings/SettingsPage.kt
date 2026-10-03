@@ -93,6 +93,7 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.clipboardMode
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderNameText
+import com.linroid.ketch.app.state.homeShortened
 import com.linroid.ketch.app.state.isDocumentTree
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
@@ -884,17 +885,15 @@ internal fun downloadsSummary(config: DownloadConfig): UiText {
 }
 
 /**
- * [path] for a one-line summary: "~/Downloads" for a folder right in the home folder on macOS or
- * Linux, otherwise its name.
+ * [path] for a one-line summary: "~/Downloads" for a folder right in the home folder (see
+ * [shortPathText]), otherwise its name.
  */
 internal fun shortFolder(path: String): UiText {
   if (isDocumentTree(path)) return folderNameText(path)
-  val home = HomeFolder.find(path)
-  if (home != null) {
-    val rest = path.substring(home.value.length).trim('/')
-    if (rest.isNotEmpty() && '/' !in rest) return verbatim("~/$rest")
-  }
-  return folderNameText(path)
+  val short = homeShortened(path.trimEnd('/', '\\'))
+  val inHome = short.startsWith("~") && short.length > 2 &&
+    short.substring(2).none { it == '/' || it == '\\' }
+  return if (inHome) verbatim(short) else folderNameText(path)
 }
 
 /** "Slow lane · 1 MB/s": the mode of a device with speed modes, and the limit it applies. */
@@ -977,7 +976,6 @@ internal val ThemeMode.label: UiText
   }.text()
 
 /** Home folders of macOS and Linux, which summaries shorten to "~". */
-private val HomeFolder = Regex("^/(Users|home)/[^/]+")
 
 /** Widest the main pane of Settings lets its rows grow. */
 private val PageMaxWidth = 640.dp

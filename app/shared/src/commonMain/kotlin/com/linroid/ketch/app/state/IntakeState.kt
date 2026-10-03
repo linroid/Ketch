@@ -30,7 +30,6 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
-import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.priorityText
 import com.linroid.ketch.app.i18n.sizeText
 import com.linroid.ketch.app.i18n.text
@@ -67,10 +66,6 @@ import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.duration_minutes
 import ketch.app.shared.generated.resources.intake_add_failed
-import ketch.app.shared.generated.resources.intake_added_failed
-import ketch.app.shared.generated.resources.intake_added_here
-import ketch.app.shared.generated.resources.intake_added_left_out
-import ketch.app.shared.generated.resources.intake_added_to
 import ketch.app.shared.generated.resources.intake_apply_failed
 import ketch.app.shared.generated.resources.intake_choose_files
 import ketch.app.shared.generated.resources.intake_file_list_failed
@@ -1412,9 +1407,6 @@ class IntakeSession internal constructor(
   ) {
     val added = results.mapNotNull { it.third.getOrNull() }
     val failed = results.filter { it.third.isFailure }
-    val deviceName = targetName()
-    // Under All devices the target may show already; switching to it would hide the others.
-    val shown = target in state.shownInstances.value
     val review = (failed.map { it.first } + skipped).distinct()
     val failedUrls = failed.mapTo(HashSet()) { it.second.url }
     val reviewAction = if (review.isEmpty()) {
@@ -1439,9 +1431,9 @@ class IntakeSession internal constructor(
       )
       return
     }
-    if (shown) showNewRows()
+    if (target in state.shownInstances.value) showNewRows()
     state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
-    val undo = state.undoAddAction(added, log)
+    val undo = state.undoAddAction(added)
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
     val show = MessageAction(Res.string.action_show.text()) { state.showOn(target, single) }
@@ -1450,16 +1442,7 @@ class IntakeSession internal constructor(
     } else {
       Res.plurals.count_downloads.text(added.size)
     }
-    val left = skipped.sumOf { it.linkCount }
-    val title = listOfNotNull(
-      if (shown) {
-        Res.string.intake_added_here.text(what, deviceName)
-      } else {
-        Res.string.intake_added_to.text(what, deviceName)
-      },
-      Res.plurals.intake_added_failed.text(failed.size).takeIf { failed.isNotEmpty() },
-      Res.plurals.intake_added_left_out.text(left).takeIf { left > 0 },
-    ).joinText()
+    val title = state.addedTitle(what, target, failed.size, left = skipped.sumOf { it.linkCount })
     state.messages.post(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
@@ -1715,10 +1698,11 @@ class IntakeSession internal constructor(
       }
       if (!submitting) entry.duplicate = duplicateOf(duplicateDetector(), entry)
     }.onFailure { e ->
-      val url = entry.url ?: (entry.source as? IntakeSource.File)?.file?.name.orEmpty()
+      val file = (entry.source as? IntakeSource.File)?.file
+      val url = entry.url ?: file?.name.orEmpty()
       log.d { "Couldn't check ${redactUrl(url)}: ${e.describeCauses()}" }
       entry.status = IntakeStatus.Problem(
-        e.toIntakeProblem(url, discoverAvailable = state.aiSettings.available),
+        e.toIntakeProblem(url, discoverAvailable = state.aiSettings.available, file = file != null),
         e,
       )
     }
@@ -1745,9 +1729,7 @@ class IntakeSession internal constructor(
       if (current === file) {
         when (resolveState) {
           is ResolveState.Resolved -> return resolveState.result
-          is ResolveState.Error -> throw resolveState.cause ?: IllegalStateException(
-            resolveState.text.load(),
-          )
+          is ResolveState.Error -> throw resolveState.cause
           else -> Unit
         }
       }

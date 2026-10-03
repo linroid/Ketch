@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -183,9 +182,7 @@ internal fun SelectionBar(
   onSelectAll: (() -> Unit)? = null,
   compact: Boolean = false,
 ) {
-  val instances by runner.state.instances.collectAsState()
-  val presence by runner.state.instanceManager.presence.collectAsState()
-  val devices = remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
+  val devices = rememberSendTargets(runner.state, rows)
   val batch = remember(rows) { runner.batch(rows) }
   val (bar, more) = barVerbs(batch, devices.isNotEmpty(), runner.files?.revealLabel)
   val context = rowMenuContext(rows, runner, devices)
@@ -413,7 +410,8 @@ private fun KetchMenuScope.verbChoices(
     RowAction.SpeedLimit -> speedEntries(verb.rows, runner)
     RowAction.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
     RowAction.Connections -> {
-      connectionEntries(verb.rows, runner, peers = verb.rows.all { it.isTorrent })
+      val peers = verb.rows.all { it.isTorrent }
+      connectionEntries(connectionTargets(verb.rows), runner, peers)
     }
     RowAction.StartLater -> startLaterEntries(verb.rows, runner, context)
     else -> Unit

@@ -65,10 +65,8 @@
 
   <string name="feedback_open_failed">Não foi possível abrir %1$s</string>
   <string name="feedback_drop_unsupported">Só é possível soltar arquivos .torrent e listas de links para adicionar downloads</string>
+  <string name="feedback_drop_no_links">Nenhum link encontrado no que foi solto</string>
   <string name="feedback_read_failed">Não foi possível ler %1$s</string>
-  <string name="feedback_torrent_invalid">%1$s não é um arquivo torrent válido</string>
-  <string name="feedback_file_unsupported">%1$s não é um arquivo compatível</string>
-  <string name="feedback_file_read_failed">Falha ao ler %1$s</string>
   <string name="feedback_add_failed">Não foi possível adicionar %1$s</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="one">Não foi possível adicionar %1$d download</item>
@@ -173,11 +171,6 @@
     <item quantity="other">%1$d downloads enviados para %2$s</item>
   </plurals>
   <string name="feedback_remove_here">Remover daqui</string>
-  <string name="feedback_added_here_one">%1$s adicionado → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="one">%1$d download adicionado → %2$s</item>
-    <item quantity="other">%1$d downloads adicionados → %2$s</item>
-  </plurals>
   <string name="feedback_options">Opções</string>
 
   <string name="feedback_pause_failed_one">Não foi possível pausar %1$s (%2$s)</string>

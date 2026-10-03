@@ -65,10 +65,8 @@
 
   <string name="feedback_open_failed">%1$s konnte nicht geöffnet werden</string>
   <string name="feedback_drop_unsupported">Zum Hinzufügen von Downloads lassen sich nur .torrent-Dateien und Linklisten ablegen</string>
+  <string name="feedback_drop_no_links">Im Abgelegten wurden keine Links gefunden</string>
   <string name="feedback_read_failed">%1$s konnte nicht gelesen werden</string>
-  <string name="feedback_torrent_invalid">%1$s ist keine gültige Torrent-Datei</string>
-  <string name="feedback_file_unsupported">%1$s ist keine unterstützte Datei</string>
-  <string name="feedback_file_read_failed">Lesen von %1$s fehlgeschlagen</string>
   <string name="feedback_add_failed">%1$s konnte nicht hinzugefügt werden</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="one">%1$d Download konnte nicht hinzugefügt werden</item>
@@ -173,11 +171,6 @@
     <item quantity="other">%1$d Downloads an %2$s gesendet</item>
   </plurals>
   <string name="feedback_remove_here">Hier entfernen</string>
-  <string name="feedback_added_here_one">%1$s hinzugefügt → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="one">%1$d Download hinzugefügt → %2$s</item>
-    <item quantity="other">%1$d Downloads hinzugefügt → %2$s</item>
-  </plurals>
   <string name="feedback_options">Optionen</string>
 
   <string name="feedback_pause_failed_one">%1$s konnte auf %2$s nicht pausiert werden</string>

@@ -51,6 +51,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.connectionEntries
+import com.linroid.ketch.app.ui.downloads.actions.connectionTargets
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.util.SegmentRateTracker
 import ketch.app.shared.generated.resources.Res
@@ -152,8 +153,7 @@ private fun ConnectionsRow(
   pending: Boolean,
 ) {
   val torrent = rows.all { it.isTorrent }
-  // A torrent's count is its peer limit, so a mixed selection sets the HTTP and FTP ones only.
-  val targets = if (torrent) rows else rows.filter { !it.isTorrent }
+  val targets = connectionTargets(rows)
   val value = if (targets.size == rows.size) {
     shared.connections
   } else {
@@ -178,7 +178,6 @@ private fun ConnectionsRow(
         val single = rows.singleOrNull()
         val limited = single != null && rememberServerLimited(single)
         val auto = autoConnectionsOf(state, targets)
-          ?: single?.segments?.size?.takeIf { it > 0 }
         ConnectionStepper(
           value = value,
           onCommit = { runner.setConnections(targets, it) },
@@ -245,7 +244,7 @@ private fun PriorityRow(
             when {
               priority == null || priority == shown -> Unit
               priority == DownloadPriority.URGENT && waiting.isNotEmpty() -> {
-                val victim = victimFor(state, rows)
+                val victim = urgentVictim(state, rows)
                 if (victim != null) asking = victim else urgent()
               }
               priority == DownloadPriority.URGENT -> urgent()
@@ -282,10 +281,12 @@ private fun PriorityRow(
 }
 
 /**
- * The download starting [rows] now would pause: the lowest-priority one running on their
- * device when every slot is taken.
+ * The download Urgent would pause to start [rows] now: the lowest-priority one running on their
+ * device when every slot is taken (see [preemptionVictim]); `null` when they all run already, a
+ * slot is free or the device's slots are unknown.
  */
-private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
+internal fun urgentVictim(state: AppState, rows: List<TaskRow>): TaskRow? {
+  if (rows.all { it.state is DownloadState.Downloading }) return null
   val deviceId = rows.first().key.deviceId
   val running = state.taskList.rows.value.filter {
     it.key.deviceId == deviceId && it.state is DownloadState.Downloading
@@ -295,10 +296,12 @@ private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
 }
 
 /**
- * The connections Auto gives [rows] on their device, from its settings; `null` while they are
- * unknown or the rows are on several devices.
+ * The connections Auto gives [rows]: one per segment of a single row that has some, as its lanes
+ * show, else the default of the settings of their device; `null` while that is unknown or the
+ * rows are on several devices.
  */
 internal fun autoConnectionsOf(state: AppState, rows: List<TaskRow>): Int? {
+  rows.singleOrNull()?.segments?.size?.takeIf { it > 0 }?.let { return it }
   val deviceId = rows.map { it.key.deviceId }.distinct().singleOrNull() ?: return null
   return state.settingsOf(deviceId)?.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
 }

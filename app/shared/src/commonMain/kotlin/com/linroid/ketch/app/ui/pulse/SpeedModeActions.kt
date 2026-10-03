@@ -8,6 +8,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
@@ -28,11 +29,15 @@ import kotlinx.coroutines.Job
 private val log = KetchLogger("SpeedMode")
 
 /**
- * Speed mode of the active device, or `null` when it has none: only the embedded device has
- * one, and only when the host passed it to the app.
+ * Speed mode of [entry], or `null` when it has none: only the embedded device has one, and only
+ * when the host passed it to the app.
  */
+internal fun AppState.speedModeFor(entry: InstanceEntry?): SpeedModeController? =
+  speedMode?.takeIf { entry is EmbeddedInstance }
+
+/** Speed mode of the active device, or `null` when it has none (see [speedModeFor]). */
 val AppState.activeSpeedMode: SpeedModeController?
-  get() = speedMode?.takeIf { activeInstance.value is EmbeddedInstance }
+  get() = speedModeFor(activeInstance.value)
 
 /**
  * Turns the Slow lane off on the active device when it is in effect, by hand or by a rule, and
@@ -55,8 +60,20 @@ fun AppState.toggleSlowLane(): Job? {
  *
  * @return the change, or `null` when the device has no speed mode or is already in [mode].
  */
-fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Job? {
-  val controller = activeSpeedMode ?: return null
+fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Job? =
+  activeSpeedMode?.let { switchSpeedMode(it, mode, undoable) }
+
+/**
+ * Switches [controller]'s device to [mode], whether or not it is the one shown, and posts the
+ * result, with Undo when [undoable].
+ *
+ * @return the change, or `null` when the device is already in [mode].
+ */
+internal fun AppState.switchSpeedMode(
+  controller: SpeedModeController,
+  mode: SpeedLimitMode,
+  undoable: Boolean = true,
+): Job? {
   val previous = controller.settings.value.mode
   if (mode == previous) return null
   return launchCommand {
@@ -72,7 +89,7 @@ fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Jo
       SpeedLimitMode.Auto -> Res.string.pulse_speed_follows_rules.text()
     }
     val undo = MessageAction(Res.string.action_undo.text()) {
-      switchSpeedMode(previous, undoable = false)
+      switchSpeedMode(controller, previous, undoable = false)
     }
     messages.post(
       level = MessageLevel.Success,
@@ -82,8 +99,12 @@ fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Jo
   }
 }
 
+/** Sets the speed limit the speed mode popover edits on the active device, as on any other. */
+fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean): Job? =
+  activeInstance.value?.let { setSpeedLimit(it, limit, asSlowLane) }
+
 /**
- * Sets the speed limit the speed mode popover edits on the active device.
+ * Sets the speed limit the speed mode options edit on [entry], whether or not it is shown.
  *
  * As the slow lane's speed ([asSlowLane]) it is saved with the speed mode and turns the slow
  * lane on when the device runs at full speed. Otherwise it is the standing cap: at full speed,
@@ -93,10 +114,14 @@ fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Jo
  * @return the change, or `null` when it went to the device's download settings, which keep
  *   their own error.
  */
-fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean): Job? {
-  val controller = activeSpeedMode
-  if (controller == null || limitGoesToSettings(asSlowLane)) {
-    val settings = instanceSettings
+internal fun AppState.setSpeedLimit(
+  entry: InstanceEntry,
+  limit: SpeedLimit,
+  asSlowLane: Boolean = false,
+): Job? {
+  val controller = speedModeFor(entry)
+  if (controller == null || limitGoesToSettings(controller, asSlowLane)) {
+    val settings = settingsFor(entry)
     val download = settings.download ?: return null
     settings.updateDownload(download.copy(speedLimit = limit))
     return null
@@ -116,13 +141,11 @@ fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean): Job? {
 }
 
 /**
- * Whether [setSpeedLimit] hands the limit to the active device's download settings, which keep
- * their own error, rather than to its speed mode.
+ * Whether [setSpeedLimit] hands the limit to the device's download settings, which keep their
+ * own error, rather than to its speed mode [controller].
  */
-internal fun AppState.limitGoesToSettings(asSlowLane: Boolean): Boolean {
-  val controller = activeSpeedMode ?: return true
-  return !asSlowLane && controller.settings.value.mode == SpeedLimitMode.Full
-}
+internal fun limitGoesToSettings(controller: SpeedModeController?, asSlowLane: Boolean): Boolean =
+  controller == null || !asSlowLane && controller.settings.value.mode == SpeedLimitMode.Full
 
 /** Limit the slow lane runs at: its speed, held to the standing cap. */
 internal val SpeedModeController.slowLaneLimit: SpeedLimit
@@ -159,6 +182,7 @@ private suspend fun AppState.speedModeCommand(
     )
     return false
   }
-  instanceSettings.loadDownload()
+  // Only the embedded device has a speed mode.
+  instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
   return true
 }

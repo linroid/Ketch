@@ -130,7 +130,6 @@ fun DevicesScreen(state: AppState) {
                 state = state,
                 device = device,
                 work = work[device.deviceId] ?: DeviceWork(),
-                active = device.deviceId == active?.deviceId,
                 marked = device.deviceId == active?.deviceId && devices.size > 1,
                 onRename = { renaming = device },
                 onRemove = { removing = device },

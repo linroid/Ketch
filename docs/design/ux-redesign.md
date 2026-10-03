@@ -1835,7 +1835,8 @@ on phones, and applies to every item.
 | Input / error | Behavior and copy |
 |---|---|
 | Missing scheme | Fixed silently (`https://`) |
-| `KetchError.Unsupported` | "Ketch can't download this kind of link · it supports http(s), ftp(s), magnet and .torrent" |
+| `KetchError.Unsupported` | "Ketch can't download this kind of link · it supports http(s), ftp(s), magnet and .torrent"; for a magnet or a dropped `.torrent` file, "This device can't download torrents" |
+| A dropped file that can't be read | "Couldn't read this file", with the reason |
 | HTTP 401 / `AuthenticationFailed` | "Sign-in required", with inline user and password fields sent as `Authorization: Basic …` (FTP: embedded in the URL as today) |
 | HTTP 403 | "The server refused access (403) · links copied from a signed-in page often need its cookies" [Paste as cURL] [Add headers] |
 | HTTP 404 / 410 | "Not found · the link may have expired" [✦ Find a working mirror] (only where Discover is usable) |
@@ -1881,8 +1882,8 @@ when **every** item failed, with "Add anyway" as the secondary.
 
 #### 4.9.7 Drop berths
 
-While links, magnets, `.torrent` files, or a `.txt`/`.csv` list of URLs are dragged over the
-window, the drop overlay (`surfaceRaised` at 96%) splits into one berth per **online** device. Up
+While links, magnets, `.torrent` files, or lists of links (`.txt`, `.csv`, or `.url` and
+`.webloc` shortcuts) are dragged over the window, the drop overlay (`surfaceRaised` at 96%) splits into one berth per **online** device. Up
 to 4 sit in a row; more form a 2 × n grid. Offline devices show disabled berths.
 
 ```

@@ -17,6 +17,7 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
+import com.linroid.ketch.app.state.shortPathText
 import com.linroid.ketch.app.testStatus
 import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence

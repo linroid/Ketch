@@ -130,6 +130,8 @@ class SettingsPageTest {
     assertEquals("~/Videos", shortFolder("/home/sam/Videos/").load())
     assertEquals("Linux ISOs", shortFolder("/Users/alex/Movies/Linux ISOs").load())
     assertEquals("Downloads", shortFolder("D:\\Downloads").load())
+    assertEquals("~\\Downloads", shortFolder("C:\\Users\\sam\\Downloads\\").load())
+    assertEquals("Linux ISOs", shortFolder("C:\\Users\\sam\\Videos\\Linux ISOs").load())
     assertEquals(
       "Download",
       shortFolder("content://com.android.externalstorage.documents/tree/primary%3ADownload")

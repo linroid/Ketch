@@ -66,6 +66,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.catchingUnlessCancelled
+import com.linroid.ketch.app.state.shortPathText
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.KetchLayout
 import ketch.app.shared.generated.resources.Res
@@ -453,7 +454,7 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
     add(
       ChecklistItem(
         text = if (folder != null) {
-          stringResource(Res.string.launchpad_checklist_folder, shortPath(folder))
+          stringResource(Res.string.launchpad_checklist_folder, shortPathText(folder).resolve())
         } else {
           stringResource(Res.string.launchpad_checklist_folder_choose)
         },
@@ -575,12 +576,6 @@ private fun ChecklistRow(item: ChecklistItem) {
       size = KetchButtonSize.Small,
     )
   }
-}
-
-/** [path] with the home folder shortened to `~`. */
-private fun shortPath(path: String): String {
-  val home = Regex("""^(/Users/[^/]+|/home/[^/]+|[A-Za-z]:\\Users\\[^\\]+)""")
-  return path.replace(home, "~")
 }
 
 private val log = KetchLogger("Launchpad")
