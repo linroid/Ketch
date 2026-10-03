@@ -152,7 +152,7 @@ app logs to the browser console only.
 | App | Log folder |
 |---|---|
 | macOS | `~/Library/Application Support/ketch/logs/` |
-| Windows | `%APPDATA%\ketch\logs\` |
+| Windows | `%APPDATA%\ketch\logs\`; `data\logs\` beside `Ketch.exe` for the [portable app](updates.md#the-portable-windows-app) |
 | Linux | `$XDG_CONFIG_HOME/ketch/logs/`, or `~/.config/ketch/logs/` |
 | Android | `files/logs/` in the app's private storage |
 | iOS | `Library/Application Support/logs/` in the app's container |

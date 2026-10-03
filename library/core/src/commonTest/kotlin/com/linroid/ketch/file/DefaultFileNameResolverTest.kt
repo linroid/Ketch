@@ -5,6 +5,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class DefaultFileNameResolverTest {
   @Test
@@ -200,6 +201,76 @@ class DefaultFileNameResolverTest {
         request("https://example.com/url-name.zip"),
         info
       )
+    )
+  }
+
+  // --- Unsafe names ---
+
+  @Test
+  fun contentDisposition_encodedSlashTraversal_keepsLastSegment() {
+    assertEquals("x.desktop", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename*=UTF-8''..%2F..%2F.config%2Fautostart%2Fx.desktop"
+    ))
+  }
+
+  @Test
+  fun contentDisposition_encodedBackslashTraversal_keepsLastSegment() {
+    assertEquals("evil.bat", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename*=UTF-8''..%5C..%5Cevil.bat"
+    ))
+  }
+
+  @Test
+  fun contentDisposition_quotedAbsolutePath_keepsLastSegment() {
+    assertEquals("x", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename=\"/etc/x\""
+    ))
+  }
+
+  @Test
+  fun contentDisposition_unquotedTraversal_keepsLastSegment() {
+    assertEquals("evil.sh", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename=../../evil.sh"
+    ))
+  }
+
+  @Test
+  fun contentDisposition_extendedNameLeavesNothing_fallsBackToQuotedName() {
+    assertEquals("safe.zip", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename*=UTF-8''..%2F; filename=\"safe.zip\""
+    ))
+  }
+
+  @Test
+  fun contentDisposition_onlyDotSegments_returnsNull() {
+    assertNull(DefaultFileNameResolver.fromContentDisposition("attachment; filename=\"..\""))
+  }
+
+  @Test
+  fun fromUrl_encodedSlashTraversal_keepsLastSegment() {
+    assertEquals("evil.sh", DefaultFileNameResolver.fromUrl(
+      "https://example.com/files/..%2F..%2Fevil.sh"
+    ))
+  }
+
+  @Test
+  fun fromUrl_encodedBackslashTraversal_keepsLastSegment() {
+    assertEquals("evil.sh", DefaultFileNameResolver.fromUrl(
+      "https://example.com/files/..%5C..%5Cevil.sh"
+    ))
+  }
+
+  @Test
+  fun fromUrl_encodedDotSegment_returnsNull() {
+    assertNull(DefaultFileNameResolver.fromUrl("https://example.com/files/%2E%2E"))
+  }
+
+  @Test
+  fun resolve_unsafeDispositionAndUrl_fallsBackToDefault() {
+    val info = resolved("attachment; filename=\"../\"")
+    assertEquals(
+      "download",
+      resolver.resolve(request("https://example.com/a/..%2F"), info)
     )
   }
 

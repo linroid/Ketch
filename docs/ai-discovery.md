@@ -6,6 +6,8 @@ works much better with a web search provider.
 
 Configuration lives on the **Settings** page of the desktop and Android
 apps, and is persisted in `config.toml` so the CLI uses the same values.
+The [portable Windows app](updates.md#the-portable-windows-app) keeps its
+`config.toml` in its own `data` folder, which the CLI does not read.
 
 ## Settings page
 

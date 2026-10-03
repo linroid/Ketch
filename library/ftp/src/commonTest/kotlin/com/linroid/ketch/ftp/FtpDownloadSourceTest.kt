@@ -14,6 +14,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FtpDownloadSourceTest {
@@ -102,6 +103,22 @@ class FtpDownloadSourceTest {
       .resolve(URL, emptyMap(), DownloadConfig(maxConnectionsPerDownload = 6))
 
     assertEquals(6, resolved.maxSegments)
+  }
+
+  @Test
+  fun resolve_encodedBackslashTraversal_suggestsLastSegment() = runTest {
+    val resolved = source(FakeFtpServer(content(10)))
+      .resolve("ftp://ftp.example.com/pub/..%5C..%5Cevil.sh", emptyMap())
+
+    assertEquals("evil.sh", resolved.suggestedFileName)
+  }
+
+  @Test
+  fun resolve_directoryPath_suggestsNoName() = runTest {
+    val resolved = source(FakeFtpServer(content(10)))
+      .resolve("ftp://ftp.example.com/pub/", emptyMap())
+
+    assertNull(resolved.suggestedFileName)
   }
 
   @Test

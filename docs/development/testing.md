@@ -59,6 +59,13 @@ Runs every module's JVM tests, as the CI JVM job does: `jvmTest` in multiplatfor
 the wasm web app that the CLI bundles; pass `-PprebuiltWebDir=<dir>` to bundle prebuilt assets
 instead, or a directory that does not exist to bundle none, as CI does.
 
+`WindowsPortableScriptTest` runs the portable Windows app's PowerShell update script, so it only
+runs on Windows; CI runs it in a Windows job of its own:
+
+```shell
+./gradlew :app:desktop:test --tests '*WindowsPortableScriptTest*'
+```
+
 ## Public HTTP Download Smoke Tests
 
 Run the desktop app with `./gradlew :app:desktop:run`.

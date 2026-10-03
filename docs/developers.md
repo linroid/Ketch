@@ -162,7 +162,9 @@ Every part that varies by platform or use is an interface you can replace:
 A `DownloadSource` says which URLs it takes (`canHandle`), probes them (`resolve`), downloads and
 resumes them, and saves what it needs to resume as a `SourceResumeState`. Register it with
 `Ketch(additionalSources = listOf(MySource()))`; the first source whose `canHandle` matches wins,
-and HTTP(S) is the fallback. The [architecture](architecture.md#pluggable-components) shows how
+and HTTP(S) is the fallback. Pass a name read from a response or a URL through
+`sanitizeFileName()` before returning it as `suggestedFileName`; the engine sanitizes it again
+before saving into a folder. The [architecture](architecture.md#pluggable-components) shows how
 the parts fit together.
 
 To give AI agents control of a `KetchApi`, run `ketch mcp`
