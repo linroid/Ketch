@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">ディスカバー</string>
+  <string name="discover_settings">ディスカバーの設定</string>
+  <string name="discover_hero_title">説明するだけで、Ketchがダウンロードを見つけます。</string>
+  <string name="discover_intro_body">ディスカバーは%1$sにWebを検索させ、見つかったページを読み込んで、信頼できるファイルを一覧表示します。追加するまで何もダウンロードされません。</string>
+  <string name="discover_example_blender">Appleシリコン版Blender</string>
+  <string name="discover_example_ubuntu">Ubuntu 24.04 サーバー版ISO</string>
+  <string name="discover_example_footage">パブリックドメインの4K自然映像</string>
+  <string name="discover_example_quoted">「%1$s」</string>
+
+  <string name="discover_setup_body">ディスカバーはAIモデルにWebを検索させ、見つかったページを読み込んで、信頼できるファイルを一覧表示します。検索内容は選択したプロバイダに送信されます。</string>
+  <string name="discover_setup_unsupported">ディスカバーは、コンピュータまたはAndroidスマートフォンのKetchアプリで利用できます。</string>
+  <string name="discover_setup_pending">「%1$s」の検索は、ディスカバーの設定が完了するとすぐに実行されます。</string>
+  <string name="discover_setup_choose_model">モデルを選択</string>
+  <string name="discover_setup_local_provider">%1$s · ローカルで実行、キー不要</string>
+  <string name="discover_setup_finish">%1$sの設定を完了</string>
+  <string name="discover_setup_in_settings">「設定」でセットアップ</string>
+  <string name="discover_provider_openai_compatible">OpenAI互換</string>
+
+  <string name="discover_query_placeholder">ダウンロードしたいものを説明してください</string>
+  <string name="discover_find">検索</string>
+  <string name="discover_stop">停止</string>
+  <string name="discover_sites_limit">Webサイトを限定</string>
+  <plurals name="discover_sites_count">
+    <item quantity="other">%1$d件のWebサイト</item>
+  </plurals>
+  <string name="discover_sites_hint">これらのWebサイトとそのサブドメインのみを検索します。カンマで区切って入力してください。</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="other">以前のステップ%1$d件</item>
+  </plurals>
+  <string name="discover_step_starting">検索を開始しています</string>
+
+  <string name="discover_select_all">すべて選択</string>
+  <string name="discover_clear_selection">選択を解除</string>
+  <plurals name="discover_results">
+    <item quantity="other">%1$d件のダウンロード</item>
+  </plurals>
+  <string name="discover_results_for">（「%1$s」の検索結果）</string>
+  <string name="discover_match">一致度%1$s</string>
+  <string name="discover_match_tooltip">検索内容との一致度</string>
+  <string name="discover_not_encrypted">暗号化されていません</string>
+  <string name="discover_error_title">ディスカバーはこの検索を完了できませんでした</string>
+  <string name="discover_failed">ディスカバーに失敗しました</string>
+  <string name="discover_unavailable">このデバイスではAIディスカバーを利用できません。</string>
+  <string name="discover_none_title">ダウンロードが見つかりません</string>
+  <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
+  <string name="discover_search_everywhere">Web全体を検索</string>
+
+  <string name="discover_select_to_add">追加するダウンロードを選択</string>
+  <plurals name="discover_selected">
+    <item quantity="other">%1$d件を選択中</item>
+  </plurals>
+  <string name="discover_add_now">今すぐ追加</string>
+  <string name="discover_review_add">確認して追加</string>
+  <string name="discover_review_add_count">確認して%1$d件を追加</string>
+</resources>

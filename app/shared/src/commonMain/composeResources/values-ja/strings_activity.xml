@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="notify_on_device">%1$s：%2$s</string>
+  <string name="notify_download_complete">ダウンロード完了</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="other">%1$d件のダウンロードが完了しました</item>
+  </plurals>
+  <string name="notify_download_failed">ダウンロードに失敗しました</string>
+  <string name="notify_failed_body">%1$s：%2$s</string>
+  <string name="notify_all_finished">すべてのダウンロードが完了しました</string>
+  <string name="notify_action_share">共有</string>
+
+  <string name="notify_channel_active">実行中のダウンロード</string>
+  <string name="notify_channel_done">完了したダウンロード</string>
+  <string name="notify_channel_failed">失敗したダウンロード</string>
+  <string name="notify_finished_group">完了したダウンロード</string>
+  <string name="notify_sharing_device">このデバイスを共有中</string>
+  <string name="notify_server_on_port">ポート%1$dでサーバーを実行中</string>
+  <string name="notify_slow_lane_on">スローレーン</string>
+  <string name="notify_action_pause_all">すべて一時停止</string>
+  <string name="notify_action_slow_lane">スローレーン</string>
+  <string name="notify_action_full_speed">フルスピード</string>
+  <plurals name="notify_more_files">
+    <item quantity="other">ほか%1$d件</item>
+  </plurals>
+  <plurals name="notify_paused">
+    <item quantity="other">%1$d件のダウンロードが一時停止されました</item>
+  </plurals>
+  <string name="notify_paused_body">Ketchを開いて続行してください</string>
+  <string name="notify_web_offer">通知を受け取る</string>
+  <string name="notify_web_on">通知オン</string>
+
+  <plurals name="ongoing_downloading">
+    <item quantity="other">%1$d個のファイルをダウンロード中</item>
+  </plurals>
+  <string name="ongoing_downloading_file">%1$sをダウンロード中</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="other">%1$d個のファイルのダウンロードを待機中</item>
+  </plurals>
+  <string name="ongoing_size_of">%1$s / %2$s</string>
+  <string name="ongoing_left_under_minute">残り1分未満</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="other">残り約%1$d分</item>
+  </plurals>
+  <string name="ongoing_left">残り約%1$s</string>
+  <string name="ongoing_line_waiting">待機中</string>
+
+  <string name="feedback_background_pause">Ketchがバックグラウンドにあると、ダウンロードは一時停止します</string>
+  <string name="feedback_background_use_computer">代わりにコンピュータを使う</string>
+  <string name="feedback_file_action_failed">ファイルを開けませんでした</string>
+
+  <string name="activity_title">アクティビティ</string>
+  <string name="activity_mark_all_read">すべて既読にする</string>
+  <string name="activity_clear">クリア</string>
+  <string name="activity_unread">未読</string>
+  <string name="activity_empty_title">アクティビティはまだありません</string>
+  <string name="activity_empty_body">完了したダウンロード、失敗、オフラインになったデバイスがここに表示されます。</string>
+  <string name="activity_earlier">それ以前</string>
+
+  <string name="feedback_open_failed">%1$sを開けませんでした</string>
+  <string name="feedback_drop_unsupported">ドロップして追加できるのは、.torrentファイルとリンクの一覧のみです</string>
+  <string name="feedback_read_failed">%1$sを読み込めませんでした</string>
+  <string name="feedback_torrent_invalid">%1$sは有効なトレントファイルではありません</string>
+  <string name="feedback_file_unsupported">%1$sはサポートされていないファイルです</string>
+  <string name="feedback_file_read_failed">%1$sの読み込みに失敗しました</string>
+  <string name="feedback_add_failed">%1$sを追加できませんでした</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="other">%1$d件のダウンロードを追加できませんでした</item>
+  </plurals>
+  <string name="feedback_switch_failed">%1$sに切り替えられませんでした</string>
+  <string name="feedback_reconnect_failed">%1$sに再接続できませんでした</string>
+  <string name="feedback_remove_device_failed">%1$sを削除できませんでした</string>
+  <string name="feedback_discovery_failed">LAN上のサーバーを検出できませんでした</string>
+
+  <plurals name="feedback_part_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">一時停止するものはありません</string>
+  <plurals name="feedback_paused">
+    <item quantity="other">%1$d件のダウンロードを一時停止しました</item>
+  </plurals>
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="other">%2$d台のデバイスで%1$d件のダウンロードを一時停止しました</item>
+  </plurals>
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="other">予約済みの%1$d件は予定どおり開始します</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="other">予約済みの%1$d件は予定どおり%2$sに開始します</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="other">%1$d件のダウンロードを再開しました</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="other">%2$d台のデバイスで%1$d件のダウンロードを再開しました</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="other">%1$d件のダウンロードを再試行しています</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="other">%2$d台のデバイスで%1$d件のダウンロードを再試行しています</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="other">完了した%1$d件のダウンロードをクリアしました</item>
+  </plurals>
+  <string name="feedback_nothing_missing">ファイルが見つからないダウンロードはありません</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="other">ファイルが見つからない%1$d件のダウンロードをクリアしました</item>
+  </plurals>
+  <string name="feedback_removed_one">%1$sを削除しました</string>
+  <plurals name="feedback_removed">
+    <item quantity="other">%1$d件のダウンロードを削除しました</item>
+  </plurals>
+  <string name="feedback_discarded_one">%1$sの進捗を破棄しました</string>
+  <plurals name="feedback_discarded">
+    <item quantity="other">%1$d件のダウンロードの進捗を破棄しました</item>
+  </plurals>
+  <string name="feedback_restarted_one">%1$sを最初からやり直しました</string>
+  <plurals name="feedback_restarted">
+    <item quantity="other">%1$d件のダウンロードを最初からやり直しました</item>
+  </plurals>
+  <string name="feedback_redownload_failed_one">%2$sで%1$sを再ダウンロードできませんでした</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="other">%1$d件のダウンロードを再ダウンロードできませんでした</item>
+  </plurals>
+  <string name="feedback_started_now_one">%1$sを今すぐ開始しました</string>
+  <plurals name="feedback_started_now">
+    <item quantity="other">%1$d件のダウンロードを今すぐ開始しました</item>
+  </plurals>
+  <string name="feedback_started_preempted">空きを作るため%1$sを一時停止しました</string>
+  <string name="feedback_start_now_failed_one">%2$sで%1$sを今すぐ開始できませんでした</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="other">%1$d件のダウンロードを今すぐ開始できませんでした</item>
+  </plurals>
+  <string name="feedback_send_failed_one">%1$sを%2$sに送信できませんでした</string>
+  <plurals name="feedback_send_failed">
+    <item quantity="other">%1$d件のダウンロードを%2$sに送信できませんでした</item>
+  </plurals>
+  <string name="feedback_moved_one">%1$sを%2$sに移動しました</string>
+  <plurals name="feedback_moved">
+    <item quantity="other">%1$d件のダウンロードを%2$sに移動しました</item>
+  </plurals>
+  <string name="feedback_sent_one">%1$sを%2$sに送信しました</string>
+  <plurals name="feedback_sent">
+    <item quantity="other">%1$d件のダウンロードを%2$sに送信しました</item>
+  </plurals>
+  <string name="feedback_remove_here">このデバイスから削除</string>
+  <string name="feedback_added_here_one">%1$sを追加しました → %2$s</string>
+  <plurals name="feedback_added_here">
+    <item quantity="other">%1$d件のダウンロードを追加しました → %2$s</item>
+  </plurals>
+  <string name="feedback_options">オプション</string>
+
+  <string name="feedback_pause_failed_one">%2$sで%1$sを一時停止できませんでした</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードを一時停止できませんでした</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">%2$sで%1$sを再開できませんでした</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードを再開できませんでした</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">%2$sで%1$sを再試行できませんでした</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードを再試行できませんでした</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">%2$sで%1$sの進捗を破棄できませんでした</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードの進捗を破棄できませんでした</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">%2$sで%1$sの「今すぐ開始」を取り消せませんでした</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードの「今すぐ開始」を取り消せませんでした</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">%2$sで%1$sを削除できませんでした</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="other">%2$sで%1$d件のダウンロードを削除できませんでした</item>
+  </plurals>
+
+  <string name="feedback_undo_pause_all">すべて一時停止を取り消す</string>
+  <string name="feedback_undo_clear_finished">完了済みのクリアを取り消す</string>
+  <string name="feedback_undo_clear_missing">ファイルなしのクリアを取り消す</string>
+  <string name="feedback_undo_remove">削除を取り消す</string>
+  <string name="feedback_undo_discard">進捗の破棄を取り消す</string>
+  <string name="feedback_undo_start_now">今すぐ開始を取り消す</string>
+  <string name="feedback_undo_move">移動を取り消す</string>
+  <string name="feedback_undo_add">追加を取り消す</string>
+
+  <string name="feedback_send_cookies_and_sign_in">ブラウザのCookieとサインイン情報が%1$sに送信されます。</string>
+  <string name="feedback_send_cookies">ブラウザのCookieが%1$sに送信されます。</string>
+  <string name="feedback_send_sign_in">サインイン情報が%1$sに送信されます。</string>
+
+  <string name="feedback_added">%1$sを追加しました</string>
+  <plurals name="feedback_recovered">
+    <item quantity="other">前回のセッションから%1$d件のダウンロードを再開しています</item>
+  </plurals>
+  <string name="feedback_device_offline">%1$sがオフラインになりました</string>
+  <string name="feedback_device_online">%1$sに再接続しました</string>
+</resources>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">Archivo</string>
+  <string name="menu_edit">Edición</string>
+  <string name="menu_view">Visualización</string>
+  <string name="menu_downloads">Descargas</string>
+  <string name="menu_device">Dispositivo</string>
+  <string name="menu_window">Ventana</string>
+  <string name="menu_help">Ayuda</string>
+  <string name="menu_pause">Pausar</string>
+  <string name="menu_resume">Reanudar</string>
+  <string name="menu_add_device">Añadir dispositivo…</string>
+  <string name="menu_pair_device">Vincular un dispositivo…</string>
+  <string name="menu_item_keys">%1$s (%2$s)</string>
+
+
+  <string name="tray_devices">Dispositivos</string>
+  <string name="tray_recent">Recientes</string>
+  <string name="tray_show_ketch">Mostrar Ketch</string>
+  <string name="tray_speed">Velocidad</string>
+  <string name="tray_show">Mostrar</string>
+  <string name="tray_enter_token">Introducir token…</string>
+  <string name="tray_retry_now">Reintentar ahora</string>
+  <string name="tray_stay_connected">Mantener conectado</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="one">Reintentar %1$d fallida</item>
+    <item quantity="other">Reintentar %1$d fallidas</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">Añadir aquí el enlace del portapapeles</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">Necesita token</string>
+  <string name="tray_not_connected">No conectado</string>
+  <string name="tray_offline">Sin conexión</string>
+  <string name="tray_connecting">Conectando</string>
+  <string name="tray_idle">Inactivo</string>
+  <plurals name="tray_active">
+    <item quantity="one">%1$d activa</item>
+    <item quantity="other">%1$d activas</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="one">%1$d en espera</item>
+    <item quantity="other">%1$d en espera</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="one">%1$d en pausa</item>
+    <item quantity="other">%1$d en pausa</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="one">%1$d con error</item>
+    <item quantity="other">%1$d con error</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="one">↓ %2$s · %1$d activa</item>
+    <item quantity="other">↓ %2$s · %1$d activas</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">No hay ningún enlace en el portapapeles</string>
+  <string name="message_switch_speed_failed">No se pudo cambiar %1$s a %2$s</string>
+  <string name="message_try_again">Volver a intentarlo</string>
+  <string name="message_undo">Deshacer</string>
+  <string name="message_slow_lane_on">Carril lento activado en %1$s · %2$s</string>
+  <string name="message_slow_lane_off">Carril lento desactivado en %1$s</string>
+  <string name="message_speed_follows_rules">La velocidad de %1$s sigue tus reglas</string>
+  <string name="message_speed_limit_failed">No se pudo establecer el límite de velocidad en %1$s</string>
+  <string name="message_reconnect_failed">No se pudo volver a conectar con %1$s</string>
+  <string name="message_open_failed">No se pudo abrir %1$s</string>
+  <string name="message_show_failed">No se pudo mostrar %1$s</string>
+  <string name="message_pause_failed">No se pudo pausar %1$s en %2$s</string>
+  <string name="message_copy_links_failed">No se pudieron copiar los enlaces</string>
+  <plurals name="message_links_copied">
+    <item quantity="one">Enlace copiado</item>
+    <item quantity="other">Se copiaron %1$d enlaces</item>
+  </plurals>
+  <string name="message_window_error">Algo salió mal</string>
+  <string name="open_torrent_title">Abrir archivo torrent</string>
+
+  <string name="close_keep_running_title">¿Seguir descargando en segundo plano?</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="one">Ketch se queda en la barra de menús y termina %1$d descarga.</item>
+    <item quantity="other">Ketch se queda en la barra de menús y termina %1$d descargas.</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="one">Ketch se queda en el área de notificación y termina %1$d descarga.</item>
+    <item quantity="other">Ketch se queda en el área de notificación y termina %1$d descargas.</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="one">Ketch se queda en la bandeja del sistema y termina %1$d descarga.</item>
+    <item quantity="other">Ketch se queda en la bandeja del sistema y termina %1$d descargas.</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="one">Ketch se queda minimizado y termina %1$d descarga.</item>
+    <item quantity="other">Ketch se queda minimizado y termina %1$d descargas.</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">Puedes salir cuando quieras desde el icono de la barra de menús o con %1$s.</string>
+  <string name="close_quit_from_notification_area">Puedes salir cuando quieras desde el icono del área de notificación o con %1$s.</string>
+  <string name="close_quit_from_system_tray">Puedes salir cuando quieras desde el icono de la bandeja del sistema o con %1$s.</string>
+  <string name="close_quit_with_keys">Puedes salir cuando quieras con %1$s.</string>
+  <string name="close_sentences">%1$s %2$s</string>
+  <string name="close_keep_running">Seguir en ejecución</string>
+  <string name="close_quit_ketch">Salir de Ketch</string>
+  <string name="close_dont_ask_again">No volver a preguntar</string>
+  <string name="close_quit_title">¿Salir de Ketch?</string>
+  <plurals name="close_quit_body">
+    <item quantity="one">%1$d descarga se pausará y se reanudará la próxima vez que abras Ketch.</item>
+    <item quantity="other">%1$d descargas se pausarán y se reanudarán la próxima vez que abras Ketch.</item>
+  </plurals>
+  <string name="close_quit">Salir</string>
+  <string name="close_cancel">Cancelar</string>
+
+  <string name="notify_still_running">Ketch sigue ejecutándose en el área de notificación</string>
+  <plurals name="notify_added">
+    <item quantity="one">Descarga añadida</item>
+    <item quantity="other">%1$d descargas añadidas</item>
+  </plurals>
+  <string name="notify_on_device">En %1$s: %2$s</string>
+  <string name="notify_names_two">%1$s, %2$s</string>
+  <string name="notify_names_three">%1$s, %2$s, %3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="one">%1$s y %2$d más</item>
+    <item quantity="other">%1$s y %2$d más</item>
+  </plurals>
+
+  <string name="settings_window_title">Ajustes</string>
+</resources>

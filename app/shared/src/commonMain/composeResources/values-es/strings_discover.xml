@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">Descubrir</string>
+  <string name="discover_settings">Ajustes de Descubrir</string>
+  <string name="discover_hero_title">Descríbelo. Ketch encuentra la descarga.</string>
+  <string name="discover_intro_body">Descubrir pide a %1$s que busque en la web y lea las páginas que encuentre, y luego muestra los archivos que considera fiables. No se descarga nada hasta que lo añades.</string>
+  <string name="discover_example_blender">Blender para Apple silicon</string>
+  <string name="discover_example_ubuntu">ISO de Ubuntu 24.04 Server</string>
+  <string name="discover_example_footage">Vídeos de naturaleza en 4K de dominio público</string>
+  <string name="discover_example_quoted">«%1$s»</string>
+
+  <string name="discover_setup_body">Descubrir pide a un modelo de IA que busque en la web y lea las páginas que encuentre, y luego muestra los archivos que considera fiables. Tus búsquedas se envían al proveedor que elijas.</string>
+  <string name="discover_setup_unsupported">Descubrir funciona en la app de Ketch en un equipo o en un teléfono Android.</string>
+  <string name="discover_setup_pending">Tu búsqueda de «%1$s» se hará en cuanto configures Descubrir.</string>
+  <string name="discover_setup_choose_model">Elige un modelo</string>
+  <string name="discover_setup_local_provider">%1$s · se ejecuta en local, sin clave</string>
+  <string name="discover_setup_finish">Termina de configurar %1$s</string>
+  <string name="discover_setup_in_settings">Configurar en Ajustes</string>
+  <string name="discover_provider_openai_compatible">Compatible con OpenAI</string>
+
+  <string name="discover_query_placeholder">Describe lo que quieres descargar</string>
+  <string name="discover_find">Buscar</string>
+  <string name="discover_stop">Detener</string>
+  <string name="discover_sites_limit">Limitar a sitios web</string>
+  <plurals name="discover_sites_count">
+    <item quantity="one">%1$d sitio web</item>
+    <item quantity="other">%1$d sitios web</item>
+  </plurals>
+  <string name="discover_sites_hint">Solo busca en estos sitios web y sus subdominios. Sepáralos con comas.</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="one">%1$d anterior</item>
+    <item quantity="other">%1$d anteriores</item>
+  </plurals>
+  <string name="discover_step_starting">Iniciando la búsqueda</string>
+
+  <string name="discover_select_all">Seleccionar todo</string>
+  <string name="discover_clear_selection">Anular la selección</string>
+  <plurals name="discover_results">
+    <item quantity="one">%1$d descarga</item>
+    <item quantity="other">%1$d descargas</item>
+  </plurals>
+  <string name="discover_results_for">para «%1$s»</string>
+  <string name="discover_match">%1$s de coincidencia</string>
+  <string name="discover_match_tooltip">Cuánto se ajusta a tu búsqueda</string>
+  <string name="discover_not_encrypted">Sin cifrar</string>
+  <string name="discover_error_title">Descubrir no pudo terminar esta búsqueda</string>
+  <string name="discover_failed">La búsqueda falló</string>
+  <string name="discover_unavailable">La búsqueda con IA no está disponible en este dispositivo.</string>
+  <string name="discover_none_title">No se encontraron descargas</string>
+  <string name="discover_none_body">Descubrir solo muestra archivos de fuentes que considera fiables. Prueba a indicar la versión o la plataforma, o el sitio web que lo publica.</string>
+  <string name="discover_search_everywhere">Buscar en toda la web</string>
+
+  <string name="discover_select_to_add">Selecciona las descargas que quieras añadir</string>
+  <plurals name="discover_selected">
+    <item quantity="one">%1$d seleccionada</item>
+    <item quantity="other">%1$d seleccionadas</item>
+  </plurals>
+  <string name="discover_add_now">Añadir ahora</string>
+  <string name="discover_review_add">Revisar y añadir</string>
+  <string name="discover_review_add_count">Revisar y añadir %1$d</string>
+</resources>
