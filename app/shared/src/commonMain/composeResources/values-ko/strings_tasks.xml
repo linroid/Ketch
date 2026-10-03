@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="status_tab_all">전체</string>
+  <string name="status_tab_downloading">다운로드 중</string>
+  <string name="status_tab_waiting">대기 중</string>
+  <string name="status_tab_paused">일시정지됨</string>
+  <string name="status_tab_done">완료</string>
+  <string name="status_tab_failed">실패</string>
+
+  <string name="row_status_downloading">다운로드 중</string>
+  <string name="row_status_stalled">멈춤</string>
+  <string name="row_status_paused">일시정지됨</string>
+  <string name="row_status_queued">대기열</string>
+  <string name="row_status_scheduled">예약됨</string>
+  <string name="row_status_done">완료</string>
+  <string name="row_status_file_missing">파일 없음</string>
+  <string name="row_status_failed">실패</string>
+  <string name="row_status_canceled">취소됨</string>
+
+  <string name="row_stalled_for">멈춤 · %1$s 동안 데이터 없음</string>
+  <string name="row_paused">일시정지됨</string>
+  <string name="row_canceled">취소됨</string>
+  <string name="row_saved_on">%1$s에 저장됨</string>
+  <string name="row_missing_file">파일이 이동되었거나 삭제됨</string>
+  <string name="row_completed">완료</string>
+  <string name="row_took">%1$s 소요</string>
+  <plurals name="row_files">
+    <item quantity="other">파일 %1$d개</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="other">연결 %1$d개</item>
+  </plurals>
+  <string name="row_speed_limit">제한 %1$s</string>
+  <string name="row_limited_by_slow_lane">저속 차로로 제한됨</string>
+  <string name="row_starts_today">오늘 %1$s에 시작</string>
+  <string name="row_starts_tomorrow">내일 %1$s에 시작</string>
+  <string name="row_starts_on">%1$s %2$s에 시작</string>
+  <string name="row_starts_in">%1$s 후</string>
+  <string name="row_starts_after">%1$s 후 시작</string>
+  <string name="row_waiting_for_conditions">조건 대기 중</string>
+
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <string name="summary_average_speed">평균 %1$s</string>
+
+  <string name="sort_smart">스마트</string>
+  <string name="sort_name">이름</string>
+  <string name="sort_size">크기</string>
+  <string name="sort_progress">진행률</string>
+  <string name="sort_speed">속도</string>
+  <string name="sort_time_left">남은 시간</string>
+  <string name="sort_added">추가일</string>
+  <string name="sort_status">상태</string>
+  <string name="sort_connections">연결</string>
+  <string name="sort_source">소스</string>
+  <string name="sort_origin">출처</string>
+  <string name="sort_priority">우선순위</string>
+  <string name="sort_device">기기</string>
+  <string name="group_smart">스마트</string>
+  <string name="group_status">상태</string>
+  <string name="group_day">날짜</string>
+  <string name="group_device">기기</string>
+  <string name="group_site">사이트</string>
+  <string name="group_type">유형</string>
+  <string name="group_none">없음</string>
+  <string name="group_title_downloading">다운로드 중</string>
+  <string name="group_title_waiting">대기 중</string>
+  <string name="group_title_paused">일시정지됨</string>
+  <string name="group_title_attention">확인 필요</string>
+  <string name="group_title_other_site">기타</string>
+  <string name="group_title_today">오늘 추가됨</string>
+  <string name="group_title_yesterday">어제 추가됨</string>
+  <string name="group_title_week">이번 주에 추가됨</string>
+  <string name="group_title_earlier">이전에 추가됨</string>
+  <string name="group_all_done_at">≈ %1$s에 모두 완료</string>
+  <string name="group_in_start_order">시작 순서대로</string>
+
+  <string name="origin_browser">브라우저</string>
+  <string name="origin_discover">찾기</string>
+  <string name="origin_agent">에이전트</string>
+  <string name="origin_app">앱</string>
+  <string name="origin_cli">CLI</string>
+  <string name="file_type_video">동영상</string>
+  <string name="file_type_audio">오디오</string>
+  <string name="file_type_image">이미지</string>
+  <string name="file_type_doc">문서</string>
+  <string name="file_type_archive">압축 파일</string>
+  <string name="file_type_app">앱</string>
+  <string name="file_type_torrent">토렌트</string>
+  <string name="file_type_other">기타</string>
+
+  <string name="queue_waiting_slot">빈 슬롯 대기 중(%2$d개 중 %1$d개 사용 중)</string>
+  <string name="queue_waiting_host">%1$s 대기 중(사이트당 %2$d개)</string>
+  <string name="queue_waiting_start">시작 대기 중</string>
+
+  <string name="action_row_pause">일시정지</string>
+  <string name="action_row_resume">재개</string>
+  <string name="action_row_reconnect">다시 연결</string>
+  <string name="action_row_start_now">지금 시작</string>
+  <string name="action_row_speed_limit">속도 제한</string>
+  <string name="action_row_connections">연결</string>
+  <string name="action_row_priority">우선순위</string>
+  <string name="action_row_start_later">나중에 시작</string>
+  <string name="action_row_send_to">보내기</string>
+  <string name="action_row_copy_link">링크 복사</string>
+  <string name="action_row_details">세부 정보</string>
+  <string name="action_row_open">열기</string>
+  <string name="action_row_show_in_folder">폴더에서 보기</string>
+  <string name="action_row_copy_path">파일 경로 복사</string>
+  <string name="action_row_download_again">다시 다운로드</string>
+  <string name="action_row_retry">재시도</string>
+  <string name="action_row_retry_with_options">옵션을 바꿔 재시도…</string>
+  <string name="action_row_edit_link">링크 편집…</string>
+  <string name="action_row_enter_credentials">로그인 정보 입력…</string>
+  <string name="action_row_find_another_source">다른 소스 찾기</string>
+  <string name="action_row_open_source_page">소스 페이지 열기</string>
+  <string name="action_row_copy_error">오류 복사</string>
+  <string name="action_row_copy_details">세부 정보 복사</string>
+  <string name="action_row_stop_and_discard">중지하고 진행 상황 삭제…</string>
+  <string name="action_row_remove">목록에서 제거</string>
+  <string name="action_row_remove_and_trash">제거하고 파일을 휴지통으로 이동…</string>
+  <string name="action_row_remove_and_delete">제거하고 파일 삭제…</string>
+  <plurals name="batch_pause">
+    <item quantity="other">다운로드 %1$d개 일시정지</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="other">다운로드 %1$d개 재개</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="other">다운로드 %1$d개 지금 시작</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="other">다운로드 %1$d개 재시도</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="other">파일 %1$d개 열기</item>
+  </plurals>
+  <string name="batch_show_in_folder">%1$s(%2$d)</string>
+  <plurals name="batch_copy_link">
+    <item quantity="other">링크 %1$d개 복사</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="other">파일 경로 %1$d개 복사</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="other">파일 %1$d개 다시 다운로드</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="other">다운로드 %1$d개의 진행 상황 삭제…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="other">목록에서 다운로드 %1$d개 제거</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="other">다운로드 %1$d개와 파일 제거…</item>
+  </plurals>
+  <string name="bar_speed">속도</string>
+  <string name="bar_copy_links">링크 복사</string>
+  <string name="bar_remove">제거…</string>
+  <string name="bar_copy_paths">파일 경로 복사</string>
+  <string name="bar_discard">진행 상황 삭제…</string>
+  <string name="bar_label_count">%1$s(%2$d)</string>
+  <string name="bar_label_number">%1$s %2$d</string>
+  <string name="bar_tooltip_counted">선택한 %3$d개 중 %2$d개 %1$s</string>
+  <string name="bar_tooltip_partial">%1$s · 선택한 %3$d개 중 %2$d개</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="other">다운로드 %1$d개 제거…</item>
+  </plurals>
+  <string name="row_menu_peer_limit">피어 제한</string>
+  <string name="send_move_to">%1$s(으)로 이동</string>
+  <string name="reveal_in_finder">Finder에서 보기</string>
+  <string name="reveal_in_explorer">파일 탐색기에서 보기</string>
+  <string name="reveal_in_folder">폴더에서 보기</string>
+  <string name="reveal_in_files">파일 앱에서 보기</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="other">연결 %1$d개로 재시도</item>
+  </plurals>
+</resources>
