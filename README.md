@@ -18,7 +18,7 @@
 [![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Web app](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-16+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Desktop](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -55,7 +55,7 @@ home server, and you can watch and control the downloads on all of them from any
 | Windows (x64, ARM64) | `.msi` from the [latest release][release] |
 | Linux (x64, ARM64) | `.deb` from the [latest release][release] |
 | Android 8.0+ | `.apk` from the [latest release][release] |
-| iOS 16+ | Build from source with Xcode ([`app/ios`](app/ios/)) |
+| iOS 18+ | Build from source with Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), to control Ketch running on another device |
 | Browser extension | Chrome, Edge, Brave, Firefox and others: `.zip` from the [latest release][release] ([how to install](app/browser-extension/README.md#installing)) |
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |
@@ -182,7 +182,7 @@ the [CLI documentation](cli/README.md) lists every command.
 
 Everything the apps do is built on Ketch's Kotlin Multiplatform library, which you can use in your
 own app: embed the download engine on Android, iOS, the JVM, Node.js or WASI, or control a Ketch
-server from any platform, including the browser, through the same `KetchApi`.
+server from Android, iOS, the JVM or the browser, through the same `KetchApi`.
 
 - [Developer guide](docs/developers.md) — Modules, a quick start, the REST API and extending Ketch
 - [API reference](docs/api.md) — Installation, configuration, priorities, errors and logging
