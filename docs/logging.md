@@ -168,6 +168,12 @@ To attach them to a bug report, open **Settings → About → Troubleshooting**:
 - **Android and iOS**: *Share logs* joins the files, oldest first, into `ketch-logs.txt` and
   opens the system share sheet.
 
+R8 renames the classes and methods of the Android release, so its stack traces show short
+placeholder names. Each GitHub release carries the matching `ketch-android-<version>-mapping.zip`;
+unzip it and run `retrace mapping.txt ketch-logs.txt` (in the Android SDK's
+`cmdline-tools/latest/bin/`) to restore them. The desktop apps are shrunk but not renamed, so
+their stack traces need no mapping.
+
 Logging never waits for the disk: a log call only formats and queues its record, and one
 background writer appends the records in order, flushing whenever its queue runs empty. A
 record that cannot be written, for example on a full disk, is dropped.
