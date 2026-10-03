@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="inspector_tab_overview">Обзор</string>
+  <string name="inspector_tab_connections">Подключения</string>
+  <string name="inspector_tab_files">Файлы</string>
+  <string name="inspector_tab_activity">Активность</string>
+
+  <string name="inspector_stalled_seconds">Простой %1$d с</string>
+  <string name="inspector_stalled_minutes">Простой %1$d мин</string>
+  <string name="inspector_size_of">%1$s из %2$s</string>
+
+  <string name="inspector_metric_left">осталось %1$s</string>
+  <string name="inspector_metric_done_at">готово ≈ %1$s</string>
+
+  <string name="inspector_reason_reconnect">Переподключить</string>
+  <string name="inspector_reason_full_speed">Полная скорость</string>
+  <string name="inspector_reason_remove_limit">Снять ограничение</string>
+  <string name="inspector_reason_speed_settings">Настройки скорости</string>
+  <string name="inspector_reason_paused_resumes">Приостановлена · продолжится с того же места</string>
+  <string name="inspector_reason_paused_restarts">Приостановлена · при возобновлении начнётся заново</string>
+  <string name="inspector_file_missing">Файл перемещён или удалён</string>
+  <string name="inspector_reason_slow_lane">Ограничено медленной полосой (%1$s)</string>
+  <string name="inspector_reason_global_limit">Действует глобальное ограничение (%1$s)</string>
+  <string name="inspector_reason_own_limit">Ограничено до %1$s</string>
+
+  <string name="inspector_source_magnet">BitTorrent · magnet</string>
+  <string name="inspector_source_torrent_file">BitTorrent · торрент-файл</string>
+  <string name="inspector_source_link">Ссылка</string>
+
+  <string name="inspector_origin_browser">Из браузера</string>
+  <string name="inspector_origin_discover">Из поиска</string>
+  <string name="inspector_origin_agent">От ИИ-агента</string>
+  <string name="inspector_origin_app">Добавлено в Ketch</string>
+  <string name="inspector_origin_cli">Из командной строки</string>
+  <string name="inspector_with_cookies">с cookie</string>
+  <string name="inspector_with_referrer">с реферером</string>
+  <string name="inspector_with_cookies_referrer">с cookie и реферером</string>
+  <string name="inspector_with_cookies_alone">С cookie</string>
+  <string name="inspector_with_referrer_alone">С реферером</string>
+  <string name="inspector_with_cookies_referrer_alone">С cookie и реферером</string>
+  <string name="inspector_captured">%1$s, %2$s</string>
+
+  <string name="inspector_urgent_note">Начнётся сейчас; может приостановить «%1$s» (приоритет: %2$s)</string>
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="one">Сейчас начнётся %1$d загрузка; может приостановить «%2$s» (приоритет: %3$s)</item>
+    <item quantity="few">Сейчас начнутся %1$d загрузки; может приостановить «%2$s» (приоритет: %3$s)</item>
+    <item quantity="many">Сейчас начнётся %1$d загрузок; может приостановить «%2$s» (приоритет: %3$s)</item>
+    <item quantity="other">Сейчас начнётся %1$d загрузки; может приостановить «%2$s» (приоритет: %3$s)</item>
+  </plurals>
+  <string name="inspector_reschedule_note">Приостановится сейчас и %1$s</string>
+
+  <plurals name="inspector_selected">
+    <item quantity="one">Выбрано: %1$d</item>
+    <item quantity="few">Выбрано: %1$d</item>
+    <item quantity="many">Выбрано: %1$d</item>
+    <item quantity="other">Выбрано: %1$d</item>
+  </plurals>
+  <plurals name="inspector_selection_more">
+    <item quantity="one">и ещё %1$d</item>
+    <item quantity="few">и ещё %1$d</item>
+    <item quantity="many">и ещё %1$d</item>
+    <item quantity="other">и ещё %1$d</item>
+  </plurals>
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="one">Настройки применяются к %1$d из %2$d; остальные уже завершены.</item>
+    <item quantity="few">Настройки применяются к %1$d из %2$d; остальные уже завершены.</item>
+    <item quantity="many">Настройки применяются к %1$d из %2$d; остальные уже завершены.</item>
+    <item quantity="other">Настройки применяются к %1$d из %2$d; остальные уже завершены.</item>
+  </plurals>
+
+  <string name="inspector_close">Закрыть инспектор</string>
+  <string name="inspector_copy_name">Копировать имя</string>
+  <string name="inspector_copied_name">Имя скопировано</string>
+  <string name="inspector_copy_failed_name">Не удалось скопировать имя</string>
+  <string name="inspector_share">Поделиться</string>
+  <string name="inspector_share_failed">Не удалось поделиться файлом %1$s на устройстве «%2$s»</string>
+  <string name="inspector_more_actions">Другие действия</string>
+
+  <string name="inspector_section_controls">Управление</string>
+  <string name="inspector_control_speed">Скорость</string>
+  <string name="inspector_control_connections">Подключения</string>
+  <string name="inspector_control_peer_limit">Лимит пиров</string>
+  <string name="inspector_control_priority">Приоритет</string>
+  <string name="inspector_control_start">Запуск</string>
+  <string name="inspector_global_slow_lane">Медленная полоса</string>
+  <string name="inspector_global_limit">Глобальное ограничение</string>
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">Ограничение скорости</string>
+  <string name="inspector_speed_more">Другое ограничение скорости</string>
+  <string name="inspector_mixed_limits">У этих загрузок разные ограничения</string>
+  <string name="inspector_mixed_priorities">У этих загрузок разные приоритеты</string>
+  <string name="inspector_server_one_connection">Этот сервер разрешает только 1 подключение</string>
+  <string name="inspector_remote_schedule">Планирование удалённых загрузок пока не поддерживается</string>
+  <string name="inspector_start_now">Запустить сейчас</string>
+  <plurals name="inspector_start_count_now">
+    <item quantity="one">Запустить сейчас (%1$d)</item>
+    <item quantity="few">Запустить сейчас (%1$d)</item>
+    <item quantity="many">Запустить сейчас (%1$d)</item>
+    <item quantity="other">Запустить сейчас (%1$d)</item>
+  </plurals>
+  <string name="inspector_reschedule">Перенести</string>
+
+  <string name="inspector_section_details">Подробности</string>
+  <string name="inspector_detail_source">Источник</string>
+  <string name="inspector_detail_link">Ссылка</string>
+  <string name="inspector_detail_path">Сохранено в</string>
+  <string name="inspector_detail_size">Размер</string>
+  <string name="inspector_detail_added">Добавлено</string>
+  <string name="inspector_detail_time">Время загрузки</string>
+  <string name="inspector_detail_average">Средняя скорость</string>
+  <string name="inspector_detail_connections">Подключения</string>
+  <string name="inspector_detail_device">Устройство</string>
+  <string name="inspector_detail_captured">Откуда</string>
+  <string name="inspector_section_advanced">Дополнительно</string>
+  <string name="inspector_detail_task_id">ID задачи</string>
+  <string name="inspector_detail_headers">Заголовки</string>
+  <string name="inspector_detail_property">Свойство</string>
+  <string name="inspector_copy_detail">Копировать: %1$s</string>
+  <string name="inspector_copied">Скопировано</string>
+  <string name="inspector_copy_failed_source">Не удалось скопировать поле «Источник»</string>
+  <string name="inspector_copy_failed_link">Не удалось скопировать поле «Ссылка»</string>
+  <string name="inspector_copy_failed_path">Не удалось скопировать поле «Сохранено в»</string>
+  <string name="inspector_copy_failed_size">Не удалось скопировать поле «Размер»</string>
+  <string name="inspector_copy_failed_added">Не удалось скопировать поле «Добавлено»</string>
+  <string name="inspector_copy_failed_time">Не удалось скопировать поле «Время загрузки»</string>
+  <string name="inspector_copy_failed_average">Не удалось скопировать поле «Средняя скорость»</string>
+  <string name="inspector_copy_failed_connections">Не удалось скопировать поле «Подключения»</string>
+  <string name="inspector_copy_failed_device">Не удалось скопировать поле «Устройство»</string>
+  <string name="inspector_copy_failed_captured">Не удалось скопировать поле «Откуда»</string>
+  <string name="inspector_copy_failed_task_id">Не удалось скопировать поле «ID задачи»</string>
+  <string name="inspector_copy_failed_headers">Не удалось скопировать поле «Заголовки»</string>
+  <string name="inspector_copy_failed_property">Не удалось скопировать поле «Свойство»</string>
+  <string name="inspector_show_full_link">Показать ссылку полностью</string>
+  <string name="inspector_hide_full_link">Скрыть полную ссылку</string>
+  <string name="inspector_hide">Скрыть</string>
+
+  <string name="inspector_technical_details">Технические подробности</string>
+  <string name="inspector_copy_details">Копировать подробности</string>
+  <string name="inspector_open_logs">Открыть журналы</string>
+  <string name="inspector_share_logs">Поделиться журналами</string>
+  <string name="inspector_open_logs_failed">Не удалось открыть журналы</string>
+
+  <string name="inspector_activity_empty">Скорость и события появятся здесь, когда загрузка начнётся.</string>
+  <string name="inspector_activity_now">Сейчас</string>
+  <string name="inspector_activity_since">С момента запуска Ketch</string>
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="one">Показать ещё %1$d</item>
+    <item quantity="few">Показать ещё %1$d</item>
+    <item quantity="many">Показать ещё %1$d</item>
+    <item quantity="other">Показать ещё %1$d</item>
+  </plurals>
+  <string name="inspector_limit_task">Задача %1$s</string>
+  <string name="inspector_limit_global">Глобальное</string>
+  <string name="inspector_stat_peak">Пик</string>
+  <string name="inspector_stat_average">Среднее</string>
+  <string name="inspector_stat_connections">Подключения</string>
+
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="one">%1$d незавершённое · %2$s</item>
+    <item quantity="few">%1$d незавершённых · %2$s</item>
+    <item quantity="many">%1$d незавершённых · %2$s</item>
+    <item quantity="other">%1$d незавершённых · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="one">%1$d активное · %2$s</item>
+    <item quantity="few">%1$d активных · %2$s</item>
+    <item quantity="many">%1$d активных · %2$s</item>
+    <item quantity="other">%1$d активных · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="one">%1$d активное</item>
+    <item quantity="few">%1$d активных</item>
+    <item quantity="many">%1$d активных</item>
+    <item quantity="other">%1$d активных</item>
+  </plurals>
+  <plurals name="inspector_connections_finished">
+    <item quantity="one">%1$d завершённое · %2$s</item>
+    <item quantity="few">%1$d завершённых · %2$s</item>
+    <item quantity="many">%1$d завершённых · %2$s</item>
+    <item quantity="other">%1$d завершённых · %2$s</item>
+  </plurals>
+  <string name="inspector_single_connection">Одно подключение</string>
+  <string name="inspector_connections_live">Новое число подключений сразу перераспределяет оставшиеся байты.</string>
+  <string name="inspector_connections_on_resume">Новое число подключений применится при возобновлении загрузки.</string>
+  <string name="inspector_lane_description">Подключение %1$d, %2$s, %3$s</string>
+  <string name="inspector_percent_spoken">%1$d %</string>
+
+  <string name="inspector_files_waiting">Список файлов появится вместе с метаданными торрента.</string>
+  <plurals name="inspector_files_done_of">
+    <item quantity="one">Готово %1$d из %2$d файла</item>
+    <item quantity="few">Готово %1$d из %2$d файлов</item>
+    <item quantity="many">Готово %1$d из %2$d файлов</item>
+    <item quantity="other">Готово %1$d из %2$d файла</item>
+  </plurals>
+  <string name="inspector_files_one_done">Готов 1 файл</string>
+  <plurals name="inspector_files_all_done">
+    <item quantity="one">Все файлы готовы (%1$d)</item>
+    <item quantity="few">Все файлы готовы (%1$d)</item>
+    <item quantity="many">Все файлы готовы (%1$d)</item>
+    <item quantity="other">Все файлы готовы (%1$d)</item>
+  </plurals>
+  <plurals name="inspector_files_not_selected">
+    <item quantity="one">%1$d не выбран</item>
+    <item quantity="few">%1$d не выбраны</item>
+    <item quantity="many">%1$d не выбрано</item>
+    <item quantity="other">%1$d не выбрано</item>
+  </plurals>
+  <plurals name="inspector_files_map">
+    <item quantity="one">%1$d файл, готово %2$d, %3$d %</item>
+    <item quantity="few">%1$d файла, готово %2$d, %3$d %</item>
+    <item quantity="many">%1$d файлов, готово %2$d, %3$d %</item>
+    <item quantity="other">%1$d файла, готово %2$d, %3$d %</item>
+  </plurals>
+  <string name="inspector_files_filter">Фильтр файлов</string>
+  <string name="inspector_files_no_match">Нет файлов по запросу «%1$s»</string>
+  <string name="inspector_files_sort">Сортировка файлов</string>
+  <string name="inspector_sort_incomplete">Сначала незавершённые</string>
+  <string name="inspector_sort_name">Имя</string>
+  <string name="inspector_sort_size">Размер</string>
+  <string name="inspector_file_unnamed">Файл %1$d</string>
+  <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
+  <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+</resources>

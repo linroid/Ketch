@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="status_tab_all">Все</string>
+  <string name="status_tab_downloading">Загружаются</string>
+  <string name="status_tab_waiting">Ожидают</string>
+  <string name="status_tab_paused">Приостановлены</string>
+  <string name="status_tab_done">Готово</string>
+  <string name="status_tab_failed">Ошибки</string>
+
+  <string name="row_status_downloading">Загружается</string>
+  <string name="row_status_stalled">Зависла</string>
+  <string name="row_status_paused">Приостановлена</string>
+  <string name="row_status_queued">В очереди</string>
+  <string name="row_status_scheduled">Запланирована</string>
+  <string name="row_status_done">Готово</string>
+  <string name="row_status_file_missing">Файл отсутствует</string>
+  <string name="row_status_failed">Ошибка</string>
+  <string name="row_status_canceled">Отменена</string>
+
+  <string name="row_stalled_for">Зависла · нет данных %1$s</string>
+  <string name="row_paused">Приостановлена</string>
+  <string name="row_canceled">Отменена</string>
+  <string name="row_saved_on">Сохранено на устройстве «%1$s»</string>
+  <string name="row_missing_file">Файл перемещён или удалён</string>
+  <string name="row_completed">Завершена</string>
+  <string name="row_took">за %1$s</string>
+  <plurals name="row_files">
+    <item quantity="one">%1$d файл</item>
+    <item quantity="few">%1$d файла</item>
+    <item quantity="many">%1$d файлов</item>
+    <item quantity="other">%1$d файла</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="one">%1$d подключение</item>
+    <item quantity="few">%1$d подключения</item>
+    <item quantity="many">%1$d подключений</item>
+    <item quantity="other">%1$d подключения</item>
+  </plurals>
+  <string name="row_speed_limit">ограничение %1$s</string>
+  <string name="row_limited_by_slow_lane">ограничена медленной полосой</string>
+  <string name="row_starts_today">Начнётся сегодня в %1$s</string>
+  <string name="row_starts_tomorrow">Начнётся завтра в %1$s</string>
+  <string name="row_starts_on">Начнётся %1$s в %2$s</string>
+  <string name="row_starts_in">через %1$s</string>
+  <string name="row_starts_after">Начнётся через %1$s</string>
+  <string name="row_waiting_for_conditions">Ожидание условий</string>
+
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <string name="summary_average_speed">сред. %1$s</string>
+
+  <string name="sort_smart">Умная</string>
+  <string name="sort_name">Имя</string>
+  <string name="sort_size">Размер</string>
+  <string name="sort_progress">Прогресс</string>
+  <string name="sort_speed">Скорость</string>
+  <string name="sort_time_left">Осталось</string>
+  <string name="sort_added">Добавлено</string>
+  <string name="sort_status">Статус</string>
+  <string name="sort_connections">Подключения</string>
+  <string name="sort_source">Источник</string>
+  <string name="sort_origin">Откуда</string>
+  <string name="sort_priority">Приоритет</string>
+  <string name="sort_device">Устройство</string>
+  <string name="group_smart">Умная</string>
+  <string name="group_status">Статус</string>
+  <string name="group_day">День</string>
+  <string name="group_device">Устройство</string>
+  <string name="group_site">Сайт</string>
+  <string name="group_type">Тип</string>
+  <string name="group_none">Нет</string>
+  <string name="group_title_downloading">Загружаются</string>
+  <string name="group_title_waiting">Ожидают</string>
+  <string name="group_title_paused">Приостановлены</string>
+  <string name="group_title_attention">Требуют внимания</string>
+  <string name="group_title_other_site">Другие</string>
+  <string name="group_title_today">Добавлены сегодня</string>
+  <string name="group_title_yesterday">Добавлены вчера</string>
+  <string name="group_title_week">Добавлены на этой неделе</string>
+  <string name="group_title_earlier">Добавлены ранее</string>
+  <string name="group_all_done_at">всё будет готово ≈ %1$s</string>
+  <string name="group_in_start_order">в порядке запуска</string>
+
+  <string name="origin_browser">Браузер</string>
+  <string name="origin_discover">Поиск</string>
+  <string name="origin_agent">Агент</string>
+  <string name="origin_app">Приложение</string>
+  <string name="origin_cli">CLI</string>
+  <string name="file_type_video">Видео</string>
+  <string name="file_type_audio">Аудио</string>
+  <string name="file_type_image">Изображения</string>
+  <string name="file_type_doc">Документы</string>
+  <string name="file_type_archive">Архивы</string>
+  <string name="file_type_app">Приложения</string>
+  <string name="file_type_torrent">Торренты</string>
+  <string name="file_type_other">Другое</string>
+
+  <string name="queue_waiting_slot">Ожидает свободного слота (занято %1$d из %2$d)</string>
+  <string name="queue_waiting_host">Ожидает %1$s (до %2$d на сайт)</string>
+  <string name="queue_waiting_start">Ожидает запуска</string>
+
+  <string name="action_row_pause">Приостановить</string>
+  <string name="action_row_resume">Возобновить</string>
+  <string name="action_row_reconnect">Переподключить</string>
+  <string name="action_row_start_now">Запустить сейчас</string>
+  <string name="action_row_speed_limit">Ограничение скорости</string>
+  <string name="action_row_connections">Подключения</string>
+  <string name="action_row_priority">Приоритет</string>
+  <string name="action_row_start_later">Запустить позже</string>
+  <string name="action_row_send_to">Отправить на</string>
+  <string name="action_row_copy_link">Копировать ссылку</string>
+  <string name="action_row_details">Подробности</string>
+  <string name="action_row_open">Открыть</string>
+  <string name="action_row_show_in_folder">Показать в папке</string>
+  <string name="action_row_copy_path">Копировать путь к файлу</string>
+  <string name="action_row_download_again">Скачать снова</string>
+  <string name="action_row_retry">Повторить</string>
+  <string name="action_row_retry_with_options">Повторить с параметрами…</string>
+  <string name="action_row_edit_link">Изменить ссылку…</string>
+  <string name="action_row_enter_credentials">Ввести учётные данные…</string>
+  <string name="action_row_find_another_source">Найти другой источник</string>
+  <string name="action_row_open_source_page">Открыть исходную страницу</string>
+  <string name="action_row_copy_error">Копировать ошибку</string>
+  <string name="action_row_copy_details">Копировать подробности</string>
+  <string name="action_row_stop_and_discard">Остановить и сбросить прогресс…</string>
+  <string name="action_row_remove">Удалить из списка</string>
+  <string name="action_row_remove_and_trash">Удалить и переместить файл в корзину…</string>
+  <string name="action_row_remove_and_delete">Удалить вместе с файлами…</string>
+  <plurals name="batch_pause">
+    <item quantity="one">Приостановить %1$d загрузку</item>
+    <item quantity="few">Приостановить %1$d загрузки</item>
+    <item quantity="many">Приостановить %1$d загрузок</item>
+    <item quantity="other">Приостановить %1$d загрузки</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="one">Возобновить %1$d загрузку</item>
+    <item quantity="few">Возобновить %1$d загрузки</item>
+    <item quantity="many">Возобновить %1$d загрузок</item>
+    <item quantity="other">Возобновить %1$d загрузки</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="one">Запустить сейчас %1$d загрузку</item>
+    <item quantity="few">Запустить сейчас %1$d загрузки</item>
+    <item quantity="many">Запустить сейчас %1$d загрузок</item>
+    <item quantity="other">Запустить сейчас %1$d загрузки</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="one">Повторить %1$d загрузку</item>
+    <item quantity="few">Повторить %1$d загрузки</item>
+    <item quantity="many">Повторить %1$d загрузок</item>
+    <item quantity="other">Повторить %1$d загрузки</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="one">Открыть %1$d файл</item>
+    <item quantity="few">Открыть %1$d файла</item>
+    <item quantity="many">Открыть %1$d файлов</item>
+    <item quantity="other">Открыть %1$d файла</item>
+  </plurals>
+  <string name="batch_show_in_folder">%1$s (%2$d)</string>
+  <plurals name="batch_copy_link">
+    <item quantity="one">Копировать %1$d ссылку</item>
+    <item quantity="few">Копировать %1$d ссылки</item>
+    <item quantity="many">Копировать %1$d ссылок</item>
+    <item quantity="other">Копировать %1$d ссылки</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="one">Копировать %1$d путь к файлу</item>
+    <item quantity="few">Копировать %1$d пути к файлам</item>
+    <item quantity="many">Копировать %1$d путей к файлам</item>
+    <item quantity="other">Копировать %1$d пути к файлам</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="one">Скачать снова %1$d файл</item>
+    <item quantity="few">Скачать снова %1$d файла</item>
+    <item quantity="many">Скачать снова %1$d файлов</item>
+    <item quantity="other">Скачать снова %1$d файла</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="one">Сбросить прогресс %1$d загрузки…</item>
+    <item quantity="few">Сбросить прогресс %1$d загрузок…</item>
+    <item quantity="many">Сбросить прогресс %1$d загрузок…</item>
+    <item quantity="other">Сбросить прогресс %1$d загрузки…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="one">Удалить из списка %1$d загрузку</item>
+    <item quantity="few">Удалить из списка %1$d загрузки</item>
+    <item quantity="many">Удалить из списка %1$d загрузок</item>
+    <item quantity="other">Удалить из списка %1$d загрузки</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="one">Удалить %1$d загрузку вместе с файлами…</item>
+    <item quantity="few">Удалить %1$d загрузки вместе с файлами…</item>
+    <item quantity="many">Удалить %1$d загрузок вместе с файлами…</item>
+    <item quantity="other">Удалить %1$d загрузки вместе с файлами…</item>
+  </plurals>
+  <string name="bar_speed">Скорость</string>
+  <string name="bar_copy_links">Копировать ссылки</string>
+  <string name="bar_remove">Удалить…</string>
+  <string name="bar_copy_paths">Копировать пути к файлам</string>
+  <string name="bar_discard">Сбросить прогресс…</string>
+  <string name="bar_label_count">%1$s (%2$d)</string>
+  <string name="bar_label_number">%1$s %2$d</string>
+  <string name="bar_tooltip_counted">%1$s: %2$d из %3$d выбранных</string>
+  <string name="bar_tooltip_partial">%1$s · %2$d из %3$d выбранных</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="one">Удалить %1$d загрузку…</item>
+    <item quantity="few">Удалить %1$d загрузки…</item>
+    <item quantity="many">Удалить %1$d загрузок…</item>
+    <item quantity="other">Удалить %1$d загрузки…</item>
+  </plurals>
+  <string name="row_menu_peer_limit">Лимит пиров</string>
+  <string name="send_move_to">Переместить на %1$s</string>
+  <string name="reveal_in_finder">Показать в Finder</string>
+  <string name="reveal_in_explorer">Показать в Проводнике</string>
+  <string name="reveal_in_folder">Показать в папке</string>
+  <string name="reveal_in_files">Показать в «Файлах»</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="one">Повторить с %1$d подключением</item>
+    <item quantity="few">Повторить с %1$d подключениями</item>
+    <item quantity="many">Повторить с %1$d подключениями</item>
+    <item quantity="other">Повторить с %1$d подключениями</item>
+  </plurals>
+</resources>

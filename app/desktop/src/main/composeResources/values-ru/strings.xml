@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">Файл</string>
+  <string name="menu_edit">Правка</string>
+  <string name="menu_view">Вид</string>
+  <string name="menu_downloads">Загрузки</string>
+  <string name="menu_device">Устройство</string>
+  <string name="menu_window">Окно</string>
+  <string name="menu_help">Справка</string>
+  <string name="menu_pause">Приостановить</string>
+  <string name="menu_resume">Возобновить</string>
+  <string name="menu_add_device">Добавить устройство…</string>
+  <string name="menu_pair_device">Сопряжение с устройством…</string>
+  <string name="menu_item_keys">%1$s (%2$s)</string>
+
+
+  <string name="tray_devices">Устройства</string>
+  <string name="tray_recent">Недавние</string>
+  <string name="tray_show_ketch">Показать Ketch</string>
+  <string name="tray_speed">Скорость</string>
+  <string name="tray_show">Показать</string>
+  <string name="tray_enter_token">Ввести токен…</string>
+  <string name="tray_retry_now">Повторить сейчас</string>
+  <string name="tray_stay_connected">Оставаться подключённым</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="one">Повторить с ошибками (%1$d)</item>
+    <item quantity="few">Повторить с ошибками (%1$d)</item>
+    <item quantity="many">Повторить с ошибками (%1$d)</item>
+    <item quantity="other">Повторить с ошибками (%1$d)</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">Добавить сюда ссылку из буфера обмена</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">Нужен токен</string>
+  <string name="tray_not_connected">Не подключено</string>
+  <string name="tray_offline">Не в сети</string>
+  <string name="tray_connecting">Подключение</string>
+  <string name="tray_idle">Простой</string>
+  <plurals name="tray_active">
+    <item quantity="one">%1$d активна</item>
+    <item quantity="few">%1$d активны</item>
+    <item quantity="many">%1$d активно</item>
+    <item quantity="other">%1$d активно</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="one">%1$d ожидает</item>
+    <item quantity="few">%1$d ожидают</item>
+    <item quantity="many">%1$d ожидают</item>
+    <item quantity="other">%1$d ожидают</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="one">%1$d приостановлена</item>
+    <item quantity="few">%1$d приостановлены</item>
+    <item quantity="many">%1$d приостановлено</item>
+    <item quantity="other">%1$d приостановлено</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="one">↓ %2$s · %1$d активна</item>
+    <item quantity="few">↓ %2$s · %1$d активны</item>
+    <item quantity="many">↓ %2$s · %1$d активно</item>
+    <item quantity="other">↓ %2$s · %1$d активно</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">В буфере обмена нет ссылки</string>
+  <string name="message_switch_speed_failed">Не удалось включить режим «%2$s» на устройстве «%1$s»</string>
+  <string name="message_try_again">Попробовать снова</string>
+  <string name="message_undo">Отменить</string>
+  <string name="message_slow_lane_on">Медленная полоса включена на устройстве «%1$s» · %2$s</string>
+  <string name="message_slow_lane_off">Медленная полоса выключена на устройстве «%1$s»</string>
+  <string name="message_speed_follows_rules">Скорость на устройстве «%1$s» задаётся вашими правилами</string>
+  <string name="message_speed_limit_failed">Не удалось задать ограничение скорости на устройстве «%1$s»</string>
+  <string name="message_reconnect_failed">Не удалось переподключиться к %1$s</string>
+  <string name="message_open_failed">Не удалось открыть %1$s</string>
+  <string name="message_show_failed">Не удалось показать %1$s</string>
+  <string name="message_pause_failed">Не удалось приостановить %1$s на устройстве «%2$s»</string>
+  <string name="message_copy_links_failed">Не удалось скопировать ссылки</string>
+  <plurals name="message_links_copied">
+    <item quantity="one">Скопирована %1$d ссылка</item>
+    <item quantity="few">Скопированы %1$d ссылки</item>
+    <item quantity="many">Скопировано %1$d ссылок</item>
+    <item quantity="other">Скопировано %1$d ссылки</item>
+  </plurals>
+  <string name="message_window_error">Что-то пошло не так</string>
+  <string name="open_torrent_title">Открыть торрент-файл</string>
+
+  <string name="close_keep_running_title">Продолжить загрузку в фоне?</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="one">Ketch останется в строке меню и завершит %1$d загрузку.</item>
+    <item quantity="few">Ketch останется в строке меню и завершит %1$d загрузки.</item>
+    <item quantity="many">Ketch останется в строке меню и завершит %1$d загрузок.</item>
+    <item quantity="other">Ketch останется в строке меню и завершит %1$d загрузки.</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="one">Ketch останется в области уведомлений и завершит %1$d загрузку.</item>
+    <item quantity="few">Ketch останется в области уведомлений и завершит %1$d загрузки.</item>
+    <item quantity="many">Ketch останется в области уведомлений и завершит %1$d загрузок.</item>
+    <item quantity="other">Ketch останется в области уведомлений и завершит %1$d загрузки.</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="one">Ketch останется в системном трее и завершит %1$d загрузку.</item>
+    <item quantity="few">Ketch останется в системном трее и завершит %1$d загрузки.</item>
+    <item quantity="many">Ketch останется в системном трее и завершит %1$d загрузок.</item>
+    <item quantity="other">Ketch останется в системном трее и завершит %1$d загрузки.</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="one">Ketch останется свёрнутым и завершит %1$d загрузку.</item>
+    <item quantity="few">Ketch останется свёрнутым и завершит %1$d загрузки.</item>
+    <item quantity="many">Ketch останется свёрнутым и завершит %1$d загрузок.</item>
+    <item quantity="other">Ketch останется свёрнутым и завершит %1$d загрузки.</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">Завершить работу можно в любой момент через значок в строке меню или сочетанием %1$s.</string>
+  <string name="close_quit_from_notification_area">Завершить работу можно в любой момент через значок в области уведомлений или сочетанием %1$s.</string>
+  <string name="close_quit_from_system_tray">Завершить работу можно в любой момент через значок в системном трее или сочетанием %1$s.</string>
+  <string name="close_quit_with_keys">Завершить работу можно в любой момент сочетанием %1$s.</string>
+  <string name="close_sentences">%1$s %2$s</string>
+  <string name="close_keep_running">Продолжить работу</string>
+  <string name="close_quit_ketch">Завершить Ketch</string>
+  <string name="close_dont_ask_again">Больше не спрашивать</string>
+  <string name="close_quit_title">Завершить Ketch?</string>
+  <plurals name="close_quit_body">
+    <item quantity="one">%1$d загрузка будет приостановлена и возобновится при следующем запуске Ketch.</item>
+    <item quantity="few">%1$d загрузки будут приостановлены и возобновятся при следующем запуске Ketch.</item>
+    <item quantity="many">%1$d загрузок будут приостановлены и возобновятся при следующем запуске Ketch.</item>
+    <item quantity="other">%1$d загрузки будут приостановлены и возобновятся при следующем запуске Ketch.</item>
+  </plurals>
+  <string name="close_quit">Завершить</string>
+  <string name="close_cancel">Отмена</string>
+
+  <string name="notify_still_running">Ketch продолжает работать в области уведомлений</string>
+  <plurals name="notify_added">
+    <item quantity="one">Добавлена %1$d загрузка</item>
+    <item quantity="few">Добавлены %1$d загрузки</item>
+    <item quantity="many">Добавлено %1$d загрузок</item>
+    <item quantity="other">Добавлено %1$d загрузки</item>
+  </plurals>
+  <string name="notify_on_device">%1$s: %2$s</string>
+  <string name="notify_names_two">%1$s, %2$s</string>
+  <string name="notify_names_three">%1$s, %2$s, %3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="one">%1$s и ещё %2$d</item>
+    <item quantity="few">%1$s и ещё %2$d</item>
+    <item quantity="many">%1$s и ещё %2$d</item>
+    <item quantity="other">%1$s и ещё %2$d</item>
+  </plurals>
+
+  <string name="settings_window_title">Настройки</string>
+</resources>

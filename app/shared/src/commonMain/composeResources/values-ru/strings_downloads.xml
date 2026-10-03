@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="downloads_title">Загрузки</string>
+  <plurals name="downloads_count_downloading">
+    <item quantity="one">Загружается %1$d из %2$d</item>
+    <item quantity="few">Загружаются %1$d из %2$d</item>
+    <item quantity="many">Загружаются %1$d из %2$d</item>
+    <item quantity="other">Загружаются %1$d из %2$d</item>
+  </plurals>
+  <string name="downloads_view_list">Список</string>
+  <string name="downloads_view_table">Таблица</string>
+  <string name="downloads_close_search">Закрыть поиск</string>
+  <string name="downloads_switch_device">Сменить устройство</string>
+  <string name="downloads_all_devices">Все устройства</string>
+  <string name="downloads_search_placeholder">Найдите или вставьте ссылку</string>
+  <string name="downloads_more">Ещё</string>
+  <string name="downloads_more_actions">Другие действия</string>
+  <string name="downloads_copy_all_links">Копировать все ссылки</string>
+  <string name="downloads_columns">Столбцы</string>
+  <string name="downloads_row_density">Плотность строк</string>
+  <string name="downloads_density_default">Обычная</string>
+  <string name="downloads_density_compact">Компактная</string>
+  <string name="downloads_resolving">Получение данных: %1$d</string>
+  <string name="downloads_resolving_tooltip">Получение списков файлов от пиров · нажмите, чтобы выбрать файлы</string>
+  <string name="downloads_show_add_sheet">Показать окно добавления</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="one">Очистить завершённые (%1$d)</item>
+    <item quantity="few">Очистить завершённые (%1$d)</item>
+    <item quantity="many">Очистить завершённые (%1$d)</item>
+    <item quantity="other">Очистить завершённые (%1$d)</item>
+  </plurals>
+  <string name="downloads_clear_finished">Очистить завершённые</string>
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="one">Очистить отсутствующие (%1$d)</item>
+    <item quantity="few">Очистить отсутствующие (%1$d)</item>
+    <item quantity="many">Очистить отсутствующие (%1$d)</item>
+    <item quantity="other">Очистить отсутствующие (%1$d)</item>
+  </plurals>
+  <string name="downloads_clear_missing">Очистить отсутствующие</string>
+  <string name="downloads_clear_missing_caption">Файл перемещён или удалён</string>
+  <string name="downloads_clear_missing_tooltip">Убрать завершённые загрузки, файлы которых перемещены или удалены</string>
+  <string name="downloads_select_all">Выбрать все</string>
+  <string name="downloads_clear_selection">Снять выделение</string>
+  <string name="downloads_retry_all_count">Повторить все (%1$d)</string>
+
+  <plurals name="downloads_tab_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">Повторить все</string>
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="one">%1$d требует новой ссылки</item>
+    <item quantity="few">%1$d требуют новой ссылки</item>
+    <item quantity="many">%1$d требуют новой ссылки</item>
+    <item quantity="other">%1$d требуют новой ссылки</item>
+  </plurals>
+  <string name="downloads_sort">Сортировка</string>
+  <string name="downloads_group">Группировка</string>
+  <string name="downloads_label_value">%1$s: %2$s</string>
+  <string name="downloads_sort_by">Сортировать по</string>
+  <string name="downloads_group_by">Группировать по</string>
+
+  <string name="downloads_facet_type">Тип</string>
+  <string name="downloads_facet_site">Сайт</string>
+  <string name="downloads_facet_device">Устройство</string>
+  <string name="downloads_facet_origin">Откуда</string>
+  <string name="downloads_facet_matched">%1$d из %2$d</string>
+
+  <string name="downloads_table_connections_short">Подкл.</string>
+  <string name="downloads_table_column_auto">Показывается для всех устройств</string>
+  <string name="downloads_table_reset_columns">Сбросить столбцы</string>
+  <string name="downloads_table_sort_by">Сортировать: %1$s</string>
+  <string name="downloads_table_sorted_ascending">%1$s, по возрастанию</string>
+  <string name="downloads_table_sorted_descending">%1$s, по убыванию</string>
+  <string name="downloads_table_capped_at">Не более %1$s</string>
+  <string name="downloads_table_source_magnet">Magnet</string>
+  <string name="downloads_table_origin_unknown">Неизвестно</string>
+  <string name="downloads_table_speed_limited">Скорость этой загрузки ограничена</string>
+
+  <string name="downloads_group_show">Показать «%1$s»</string>
+  <string name="downloads_group_hide">Скрыть «%1$s»</string>
+  <string name="downloads_group_collapsed">Свёрнуто</string>
+  <string name="downloads_group_expanded">Развёрнуто</string>
+  <string name="downloads_row_select">Выбрать</string>
+  <string name="downloads_row_show_actions">Показать действия</string>
+  <string name="downloads_inspector_resize">Изменить ширину инспектора</string>
+
+  <string name="downloads_empty_clear_search">Очистить поиск</string>
+  <string name="downloads_empty_add_link">Добавить эту ссылку</string>
+  <string name="downloads_empty_add_links">Добавить эти ссылки</string>
+  <string name="downloads_empty_show_all">Показать все загрузки</string>
+  <string name="downloads_empty_add">Добавить ссылку</string>
+  <string name="downloads_empty_link_missing">Этой ссылки нет в ваших загрузках</string>
+  <string name="downloads_empty_links_missing">Этих ссылок нет в ваших загрузках</string>
+  <string name="downloads_empty_add_it_to">Вместо этого добавьте её на %1$s.</string>
+  <string name="downloads_empty_add_them_to">Вместо этого добавьте их на %1$s.</string>
+  <string name="downloads_empty_no_match">Нет загрузок по запросу «%1$s»</string>
+  <string name="downloads_empty_no_match_hint">Поиск идёт по именам, сайтам, папкам и ошибкам.</string>
+  <string name="downloads_empty_all">Загрузок пока нет</string>
+  <string name="downloads_empty_downloading">Ничего не загружается</string>
+  <string name="downloads_empty_downloading_hint">Здесь показываются текущие загрузки.</string>
+  <string name="downloads_empty_waiting">Ничего не ожидает</string>
+  <string name="downloads_empty_waiting_hint_one">%1$s выполняет загрузки по одной.</string>
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="one">%1$s выполняет одновременно %2$d загрузку.</item>
+    <item quantity="few">%1$s выполняет одновременно %2$d загрузки.</item>
+    <item quantity="many">%1$s выполняет одновременно %2$d загрузок.</item>
+    <item quantity="other">%1$s выполняет одновременно %2$d загрузки.</item>
+  </plurals>
+  <string name="downloads_empty_paused">Нет приостановленных загрузок</string>
+  <string name="downloads_empty_paused_hint">Здесь показываются загрузки, которые вы приостановили.</string>
+  <string name="downloads_empty_done">Нет завершённых загрузок</string>
+  <string name="downloads_empty_done_hint">Загрузки появятся здесь после завершения.</string>
+  <string name="downloads_empty_failed">Всё в порядке</string>
+  <string name="downloads_empty_failed_hint">Здесь показываются загрузки с ошибками и отменённые загрузки.</string>
+  <string name="downloads_empty_fleet">Ни на одном устройстве нет загрузок</string>
+  <string name="downloads_empty_fleet_hint">Здесь появятся загрузки со всех ваших устройств.</string>
+  <string name="downloads_empty_add_to">Добавить ссылку на %1$s</string>
+  <string name="downloads_empty_remote">Здесь появятся загрузки устройства «%1$s»</string>
+  <string name="downloads_empty_unauthorized">%1$s: нужен новый токен доступа</string>
+  <string name="downloads_empty_offline">Не удаётся связаться с %1$s</string>
+  <string name="downloads_empty_offline_hint">Его загрузки появятся здесь после подключения.</string>
+  <string name="downloads_empty_loading">Получение списка загрузок</string>
+
+  <string name="launchpad_title">Загрузок пока нет</string>
+  <string name="launchpad_subtitle">Вставьте ссылку, перетащите файл или отправьте его из браузера.</string>
+  <string name="launchpad_subtitle_phone">Вставьте ссылку, откройте файл .torrent или добавьте загрузки с компьютера.</string>
+  <string name="launchpad_paste_title">Вставьте ссылку</string>
+  <string name="launchpad_paste_download">Скачать</string>
+  <string name="launchpad_paste_maybe">В буфере обмена есть ссылка.</string>
+  <string name="launchpad_paste">Вставить</string>
+  <string name="launchpad_paste_hint_phone">Скопируйте ссылку в любом приложении и вставьте её сюда.</string>
+  <string name="launchpad_paste_hint">Скопируйте ссылку и нажмите %1$s в любом месте Ketch.</string>
+  <string name="launchpad_paste_hint_plain">Скопируйте ссылку и вставьте её в любом месте Ketch.</string>
+  <string name="launchpad_torrent_title">Перетащите ссылку, magnet или .torrent</string>
+  <string name="launchpad_torrent_title_phone">Откройте файл .torrent</string>
+  <string name="launchpad_torrent_hint">В любое место этого окна, или выберите файл .torrent.</string>
+  <string name="launchpad_torrent_hint_phone">Или откройте magnet-ссылку из браузера.</string>
+  <string name="launchpad_browser_title">Перехват из браузера</string>
+  <string name="launchpad_browser_none">Отправляйте загрузки в Ketch из Chrome, Edge или Firefox.</string>
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s: установить</string>
+  <string name="launchpad_pair_title">Управляйте загрузками на компьютере</string>
+  <string name="launchpad_pair_hint">Подключитесь к Ketch на компьютере и добавляйте загрузки отсюда.</string>
+  <string name="launchpad_discover">Или опишите, что нужно · Поиск</string>
+  <string name="launchpad_checklist_title">Настройка Ketch</string>
+  <string name="launchpad_checklist_close">Закрыть список настройки</string>
+  <string name="launchpad_checklist_folder">Загрузки сохраняются в %1$s</string>
+  <string name="launchpad_checklist_folder_choose">Выберите, куда сохранять загрузки</string>
+  <string name="launchpad_checklist_change">Изменить…</string>
+  <string name="launchpad_checklist_extension">Расширение браузера</string>
+  <string name="launchpad_checklist_detected">обнаружен %1$s</string>
+  <string name="launchpad_checklist_connected">Подключено</string>
+  <string name="launchpad_checklist_get_it">Установить</string>
+  <string name="launchpad_checklist_phone">Управляйте загрузками %1$s с телефона</string>
+  <string name="launchpad_checklist_show_qr">Показать QR-код</string>
+
+  <string name="downloads_clip_download">Скачать %1$s</string>
+  <string name="downloads_clip_download_from">Скачать %1$s с %2$s</string>
+  <string name="downloads_clip_copied">Скачать скопированную ссылку</string>
+  <string name="downloads_clip_dismiss">Не предлагать эту ссылку</string>
+
+  <plurals name="downloads_selected">
+    <item quantity="one">Выбрано: %1$d</item>
+    <item quantity="few">Выбрано: %1$d</item>
+    <item quantity="many">Выбрано: %1$d</item>
+    <item quantity="other">Выбрано: %1$d</item>
+  </plurals>
+
+  <string name="downloads_menu_file_missing">Файл перемещён или удалён</string>
+  <string name="downloads_menu_hold_to_move">Удерживайте %1$s, чтобы переместить</string>
+  <string name="downloads_menu_moving">После отправки удаляется со старого устройства</string>
+  <string name="downloads_menu_speed_custom">Своё…</string>
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="one">Разделить между выбранными (%1$d)</item>
+    <item quantity="few">Разделить между выбранными (%1$d)</item>
+    <item quantity="many">Разделить между выбранными (%1$d)</item>
+    <item quantity="other">Разделить между выбранными (%1$d)</item>
+  </plurals>
+  <string name="downloads_menu_speed_each">%1$s на каждую</string>
+  <string name="downloads_menu_urgent_may_pause">Начнётся сейчас · может приостановить %1$s</string>
+  <string name="downloads_menu_urgent_starts_now">Начнётся сейчас</string>
+  <string name="downloads_menu_pick_start">Выбрать дату и время…</string>
+  <string name="downloads_menu_clear_schedule">Сбросить</string>
+
+  <string name="downloads_discard_title">Остановить и сбросить прогресс?</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="one">Сбросить прогресс %1$d загрузки?</item>
+    <item quantity="few">Сбросить прогресс %1$d загрузок?</item>
+    <item quantity="many">Сбросить прогресс %1$d загрузок?</item>
+    <item quantity="other">Сбросить прогресс %1$d загрузки?</item>
+  </plurals>
+  <string name="downloads_discard_body">После этого %1$s нельзя будет возобновить.</string>
+  <string name="downloads_discard_body_many">После этого их нельзя будет возобновить.</string>
+  <string name="downloads_discard_keep">Оставить</string>
+  <string name="downloads_discard_confirm">Сбросить прогресс</string>
+  <string name="downloads_speed_title">Ограничение скорости</string>
+  <string name="downloads_speed_invalid">Введите скорость, например 2m или 500k</string>
+  <string name="downloads_speed_placeholder">2m, 500k или без ограничений</string>
+  <string name="downloads_speed_set">Установить</string>
+  <string name="downloads_speed_caps">Ограничивает %1$s; глобальное ограничение по-прежнему действует.</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="one">Ограничивает каждую из %1$d загрузки; глобальное ограничение по-прежнему действует.</item>
+    <item quantity="few">Ограничивает каждую из %1$d загрузок; глобальное ограничение по-прежнему действует.</item>
+    <item quantity="many">Ограничивает каждую из %1$d загрузок; глобальное ограничение по-прежнему действует.</item>
+    <item quantity="other">Ограничивает каждую из %1$d загрузки; глобальное ограничение по-прежнему действует.</item>
+  </plurals>
+  <string name="downloads_speed_limit">Ограничение</string>
+  <string name="downloads_speed_limit_each">Ограничение для каждой</string>
+  <string name="downloads_send_title">Отправить %1$s на %2$s?</string>
+  <string name="downloads_move_title">Переместить %1$s на %2$s?</string>
+  <string name="downloads_send_confirm">Отправить</string>
+  <string name="downloads_move_confirm">Переместить</string>
+  <string name="downloads_send_note">Они сохраняются вместе с загрузкой на том устройстве, и их увидит любой, кто им управляет.</string>
+
+  <string name="downloads_remove_title">Удалить «%1$s»?</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="one">Удалить %1$d загрузку?</item>
+    <item quantity="few">Удалить %1$d загрузки?</item>
+    <item quantity="many">Удалить %1$d загрузок?</item>
+    <item quantity="other">Удалить %1$d загрузки?</item>
+  </plurals>
+  <string name="downloads_remove_subtitle">Из списка на устройстве «%1$s».</string>
+  <string name="downloads_remove_trash_files">Также переместить файлы в корзину</string>
+  <string name="downloads_remove_trash_file">Также переместить файл в корзину</string>
+  <string name="downloads_remove_trash_partial">Также переместить неполный файл в корзину</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="one">Также переместить все файлы (%1$d) в корзину</item>
+    <item quantity="few">Также переместить все файлы (%1$d) в корзину</item>
+    <item quantity="many">Также переместить все файлы (%1$d) в корзину</item>
+    <item quantity="other">Также переместить все файлы (%1$d) в корзину</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">Также удалить файлы безвозвратно</string>
+  <string name="downloads_remove_delete_file">Также удалить файл безвозвратно</string>
+  <string name="downloads_remove_delete_partial">Также удалить неполный файл безвозвратно</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="one">Также безвозвратно удалить все файлы (%1$d)</item>
+    <item quantity="few">Также безвозвратно удалить все файлы (%1$d)</item>
+    <item quantity="many">Также безвозвратно удалить все файлы (%1$d)</item>
+    <item quantity="other">Также безвозвратно удалить все файлы (%1$d)</item>
+  </plurals>
+  <string name="downloads_remove_size_of">%1$s из %2$s</string>
+  <string name="downloads_remove_and_trash">Удалить и переместить в корзину</string>
+  <string name="downloads_remove_and_delete">Удалить вместе с файлами</string>
+  <string name="downloads_remove_and_trash_size">Удалить и переместить в корзину (%1$s)</string>
+  <string name="downloads_remove_and_delete_size">Удалить вместе с файлами (%1$s)</string>
+  <string name="downloads_remove_note_partial">Неполный файл удаляется безвозвратно</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="one">%1$d неполный файл удаляется безвозвратно</item>
+    <item quantity="few">%1$d неполных файла удаляются безвозвратно</item>
+    <item quantity="many">%1$d неполных файлов удаляются безвозвратно</item>
+    <item quantity="other">%1$d неполного файла удаляются безвозвратно</item>
+  </plurals>
+  <string name="downloads_remove_note_frees">Освободится %1$s</string>
+  <string name="downloads_remove_note_frees_after">освободится %1$s</string>
+  <string name="downloads_remove_note_free_on">%1$s свободно на устройстве «%2$s»</string>
+
+  <string name="downloads_failed_pause">Не удалось приостановить %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_resume">Не удалось возобновить %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_retry">Не удалось повторить %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_reconnect">Не удалось переподключить %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_open">Не удалось открыть %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_reveal">Не удалось показать %1$s в папке на устройстве «%2$s»</string>
+  <string name="downloads_failed_speed_limit">Не удалось задать ограничение скорости на устройстве «%2$s»: %1$s</string>
+  <string name="downloads_failed_priority">Не удалось изменить приоритет на устройстве «%2$s»: %1$s</string>
+  <string name="downloads_failed_connections">Не удалось изменить число подключений на устройстве «%2$s»: %1$s</string>
+  <string name="downloads_failed_reschedule">Не удалось перенести %1$s на устройстве «%2$s»</string>
+
+  <plurals name="downloads_batch_paused">
+    <item quantity="one">Приостановлена %1$d загрузка</item>
+    <item quantity="few">Приостановлены %1$d загрузки</item>
+    <item quantity="many">Приостановлено %1$d загрузок</item>
+    <item quantity="other">Приостановлено %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="one">Возобновлена %1$d загрузка</item>
+    <item quantity="few">Возобновлены %1$d загрузки</item>
+    <item quantity="many">Возобновлено %1$d загрузок</item>
+    <item quantity="other">Возобновлено %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="one">Повтор %1$d загрузки</item>
+    <item quantity="few">Повтор %1$d загрузок</item>
+    <item quantity="many">Повтор %1$d загрузок</item>
+    <item quantity="other">Повтор %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="one">Перенесена %1$d загрузка</item>
+    <item quantity="few">Перенесены %1$d загрузки</item>
+    <item quantity="many">Перенесено %1$d загрузок</item>
+    <item quantity="other">Перенесено %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="one">Снято ограничение скорости для %1$d загрузки</item>
+    <item quantity="few">Снято ограничение скорости для %1$d загрузок</item>
+    <item quantity="many">Снято ограничение скорости для %1$d загрузок</item>
+    <item quantity="other">Снято ограничение скорости для %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_limited">
+    <item quantity="one">%1$d загрузка ограничена до %2$s</item>
+    <item quantity="few">%1$d загрузки ограничены до %2$s</item>
+    <item quantity="many">%1$d загрузок ограничено до %2$s</item>
+    <item quantity="other">%1$d загрузки ограничено до %2$s</item>
+  </plurals>
+  <plurals name="downloads_batch_shared">
+    <item quantity="one">Скорость %2$s разделена между %1$d загрузкой</item>
+    <item quantity="few">Скорость %2$s разделена между %1$d загрузками</item>
+    <item quantity="many">Скорость %2$s разделена между %1$d загрузками</item>
+    <item quantity="other">Скорость %2$s разделена между %1$d загрузками</item>
+  </plurals>
+  <plurals name="downloads_batch_priority">
+    <item quantity="one">Приоритет «%2$s» задан для %1$d загрузки</item>
+    <item quantity="few">Приоритет «%2$s» задан для %1$d загрузок</item>
+    <item quantity="many">Приоритет «%2$s» задан для %1$d загрузок</item>
+    <item quantity="other">Приоритет «%2$s» задан для %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_connections">
+    <item quantity="one">Число подключений %2$d задано для %1$d загрузки</item>
+    <item quantity="few">Число подключений %2$d задано для %1$d загрузок</item>
+    <item quantity="many">Число подключений %2$d задано для %1$d загрузок</item>
+    <item quantity="other">Число подключений %2$d задано для %1$d загрузки</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <plurals name="downloads_skipped_finished">
+    <item quantity="one">%1$d уже завершена</item>
+    <item quantity="few">%1$d уже завершены</item>
+    <item quantity="many">%1$d уже завершено</item>
+    <item quantity="other">%1$d уже завершено</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="one">%1$d уже выполняется</item>
+    <item quantity="few">%1$d уже выполняются</item>
+    <item quantity="many">%1$d уже выполняется</item>
+    <item quantity="other">%1$d уже выполняется</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="one">%1$d уже приостановлена</item>
+    <item quantity="few">%1$d уже приостановлены</item>
+    <item quantity="many">%1$d уже приостановлено</item>
+    <item quantity="other">%1$d уже приостановлено</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="one">%1$d приостановлена</item>
+    <item quantity="few">%1$d приостановлены</item>
+    <item quantity="many">%1$d приостановлено</item>
+    <item quantity="other">%1$d приостановлено</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="one">%1$d запланирована</item>
+    <item quantity="few">%1$d запланированы</item>
+    <item quantity="many">%1$d запланировано</item>
+    <item quantity="other">%1$d запланировано</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="one">%1$d отменена</item>
+    <item quantity="few">%1$d отменены</item>
+    <item quantity="many">%1$d отменено</item>
+    <item quantity="other">%1$d отменено</item>
+  </plurals>
+
+  <string name="downloads_trash_removed">Удалено: %1$s</string>
+  <string name="downloads_trash_its_file">Файл перемещается в корзину</string>
+  <string name="downloads_trash_their_files">Их файлы перемещаются в корзину</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="one">%1$d файл перемещён в корзину</item>
+    <item quantity="few">%1$d файла перемещены в корзину</item>
+    <item quantity="many">%1$d файлов перемещено в корзину</item>
+    <item quantity="other">%1$d файла перемещено в корзину</item>
+  </plurals>
+  <string name="downloads_trash_failed">Не удалось переместить %1$s в корзину</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="one">Не удалось переместить %1$d файл в корзину</item>
+    <item quantity="few">Не удалось переместить %1$d файла в корзину</item>
+    <item quantity="many">Не удалось переместить %1$d файлов в корзину</item>
+    <item quantity="other">Не удалось переместить %1$d файла в корзину</item>
+  </plurals>
+  <string name="downloads_trash_stays">Загрузка остаётся в списке</string>
+  <string name="downloads_trash_stay">Загрузки остаются в списке</string>
+  <string name="downloads_remove_failed">Не удалось удалить %1$s</string>
+
+  <string name="downloads_copied_link">Ссылка скопирована</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="one">Скопирована %1$d ссылка</item>
+    <item quantity="few">Скопированы %1$d ссылки</item>
+    <item quantity="many">Скопировано %1$d ссылок</item>
+    <item quantity="other">Скопировано %1$d ссылки</item>
+  </plurals>
+  <string name="downloads_copied_path">Путь к файлу скопирован</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="one">Скопирован %1$d путь к файлу</item>
+    <item quantity="few">Скопированы %1$d пути к файлам</item>
+    <item quantity="many">Скопировано %1$d путей к файлам</item>
+    <item quantity="other">Скопировано %1$d пути к файлам</item>
+  </plurals>
+  <string name="downloads_copied_error">Текст ошибки скопирован</string>
+  <string name="downloads_copied_details">Подробности скопированы</string>
+  <string name="downloads_copy_failed_link">Не удалось скопировать ссылку</string>
+  <string name="downloads_copy_failed_links">Не удалось скопировать ссылки</string>
+  <string name="downloads_copy_failed_path">Не удалось скопировать путь к файлу</string>
+  <string name="downloads_copy_failed_paths">Не удалось скопировать пути к файлам</string>
+  <string name="downloads_copy_failed_error">Не удалось скопировать текст ошибки</string>
+  <string name="downloads_copy_failed_details">Не удалось скопировать подробности</string>
+  <string name="downloads_open_source_failed">Не удалось открыть исходную страницу</string>
+</resources>

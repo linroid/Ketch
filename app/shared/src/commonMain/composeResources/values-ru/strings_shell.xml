@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">Загрузки</string>
+  <string name="shell_destination_discover">Поиск</string>
+  <string name="shell_destination_devices">Устройства</string>
+  <string name="shell_settings">Настройки</string>
+  <string name="shell_devices">Устройства</string>
+  <string name="shell_show_sidebar">Показать боковую панель</string>
+  <string name="shell_hide_sidebar">Скрыть боковую панель</string>
+  <string name="shell_appearance_light">Светлое оформление</string>
+  <string name="shell_appearance_dark">Тёмное оформление</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="one">%1$s, %2$d загружается</item>
+    <item quantity="few">%1$s, %2$d загружаются</item>
+    <item quantity="many">%1$s, %2$d загружается</item>
+    <item quantity="other">%1$s, %2$d загружается</item>
+  </plurals>
+  <string name="shell_device_described">%1$s, %2$s</string>
+
+  <string name="shell_device_needs_token">Нужен токен</string>
+  <string name="shell_device_needs_a_token">Нужен токен</string>
+  <string name="shell_device_needs_new_token">Нужен новый токен доступа</string>
+  <string name="shell_device_off">Выкл.</string>
+  <string name="shell_device_not_connected">Не подключено</string>
+  <string name="shell_device_offline">Не в сети</string>
+  <string name="shell_device_last_seen">последний раз в сети %1$s назад</string>
+  <string name="shell_device_connecting">Подключение</string>
+  <string name="shell_device_connecting_now">Подключение…</string>
+  <string name="shell_device_idle">Простой</string>
+  <string name="shell_device_slow_lane">Медленная полоса</string>
+  <plurals name="shell_device_active">
+    <item quantity="one">%1$d активна</item>
+    <item quantity="few">%1$d активны</item>
+    <item quantity="many">%1$d активно</item>
+    <item quantity="other">%1$d активно</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="one">%1$d ожидает</item>
+    <item quantity="few">%1$d ожидают</item>
+    <item quantity="many">%1$d ожидают</item>
+    <item quantity="other">%1$d ожидают</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="one">%1$d с ошибкой</item>
+    <item quantity="few">%1$d с ошибкой</item>
+    <item quantity="many">%1$d с ошибкой</item>
+    <item quantity="other">%1$d с ошибкой</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%1$d из %2$d в сети</string>
+
+  <string name="sidebar_all_devices_tooltip">Загрузки всех устройств</string>
+  <string name="sidebar_add_device">Добавить устройство</string>
+  <string name="sidebar_device_menu">Меню устройства</string>
+  <string name="sidebar_menu_pause_all">Приостановить все здесь</string>
+  <string name="sidebar_menu_resume_all">Возобновить все здесь</string>
+  <string name="sidebar_menu_retry_failed">Повторить с ошибками здесь</string>
+  <string name="sidebar_menu_retry_failed_count">Повторить с ошибками здесь (%1$d)</string>
+  <string name="sidebar_menu_speed">Скорость</string>
+  <string name="sidebar_menu_settings">Настройки этого устройства…</string>
+  <string name="sidebar_menu_full_speed">Полная скорость</string>
+  <string name="sidebar_menu_slow_lane">Медленная полоса · %1$s</string>
+  <string name="sidebar_menu_no_limit">Без ограничения</string>
+
+  <string name="switcher_overview">Обзор</string>
+  <string name="switcher_add_device">Добавить устройство…</string>
+  <string name="switcher_find_on_network">Найти в сети</string>
+  <string name="switcher_share">Открыть доступ к загрузкам %1$s…</string>
+
+  <string name="shell_device_button">%1$s, сменить устройство</string>
+  <string name="shell_device_button_back">Назад к предыдущему устройству</string>
+  <string name="shell_more">Ещё</string>
+  <string name="shell_clear_finished">Очистить завершённые</string>
+  <string name="shell_search_close">Закрыть поиск</string>
+  <string name="shell_search_placeholder">Найдите или вставьте ссылку</string>
+  <string name="shell_search_download_on">Скачать на %1$s</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="one">Скачать %1$d ссылку на %2$s</item>
+    <item quantity="few">Скачать %1$d ссылки на %2$s</item>
+    <item quantity="many">Скачать %1$d ссылок на %2$s</item>
+    <item quantity="other">Скачать %1$d ссылки на %2$s</item>
+  </plurals>
+  <string name="shell_discover_query">Поиск «%1$s»</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="one">Непрочитанных: %1$d</item>
+    <item quantity="few">Непрочитанных: %1$d</item>
+    <item quantity="many">Непрочитанных: %1$d</item>
+    <item quantity="other">Непрочитанных: %1$d</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">В буфере обмена нет ссылки</string>
+  <string name="shell_file_picker_failed">Не удалось открыть окно выбора файла</string>
+
+  <string name="banner_connecting">Подключение к %1$s…</string>
+  <string name="banner_offline">%1$s не в сети</string>
+  <string name="banner_retrying">повторная попытка</string>
+  <string name="banner_retry_now">Повторить сейчас</string>
+  <string name="banner_switch_to">Переключиться на %1$s</string>
+  <string name="banner_unauthorized">%1$s: нужен новый токен доступа</string>
+  <string name="banner_enter_token">Ввести токен</string>
+  <string name="toast_subject_reason">%1$s: %2$s</string>
+
+  <string name="drop_to_download">Отпустите, чтобы скачать</string>
+  <string name="drop_kinds">Ссылки, magnet-ссылки, файлы .torrent и списки ссылок</string>
+  <string name="drop_unreachable">Сейчас недоступно</string>
+  <string name="drop_here">Отпустите здесь</string>
+  <string name="drop_already_here">Уже здесь</string>
+  <string name="drop_move_it">Переместить сюда</string>
+  <string name="drop_send_it">Отправить сюда</string>
+  <string name="drop_move_count">Переместить сюда: %1$d</string>
+  <string name="drop_send_count">Отправить сюда: %1$d</string>
+  <string name="drop_key_moves">%1$s — переместить</string>
+  <string name="berth_drop_on">Перетащите на %1$s</string>
+  <string name="berth_ready">Готово</string>
+
+  <string name="palette_placeholder">Вставьте ссылку, найдите загрузку или введите команду</string>
+  <string name="palette_placeholder_short">Вставьте ссылку, найдите или введите команду</string>
+  <string name="palette_clear">Очистить</string>
+  <string name="palette_no_matches">Ничего не найдено по запросу «%1$s»</string>
+  <string name="palette_no_matches_hint">Попробуйте имя файла, команду, например «приостановить», ссылку или /speed</string>
+  <string name="palette_hint_move">перейти</string>
+  <string name="palette_hint_run">выполнить</string>
+  <string name="palette_hint_alternate">другое действие</string>
+  <string name="palette_hint_discover">Поиск</string>
+  <string name="palette_hint_close">закрыть</string>
+  <string name="palette_section_recent">Недавние</string>
+  <string name="palette_section_links">Скачать</string>
+  <string name="palette_section_speed">Скорость</string>
+  <string name="palette_section_commands">Команды</string>
+  <string name="palette_section_downloads">Загрузки</string>
+  <string name="palette_section_navigation">Перейти</string>
+  <string name="palette_section_devices">Устройства</string>
+  <string name="palette_section_search">Поиск</string>
+
+  <plurals name="palette_links">
+    <item quantity="one">%1$d ссылка</item>
+    <item quantity="few">%1$d ссылки</item>
+    <item quantity="many">%1$d ссылок</item>
+    <item quantity="other">%1$d ссылки</item>
+  </plurals>
+  <string name="palette_download">Скачать %1$s</string>
+  <string name="palette_on_device">на %1$s</string>
+  <string name="palette_verb_download">Скачать</string>
+  <string name="palette_add_with_options">Добавить с параметрами…</string>
+  <string name="palette_add_with_options_detail">Папка, скорость, приоритет и время запуска</string>
+  <string name="palette_limit_to">Ограничить загрузки до %1$s</string>
+  <string name="palette_slow_lane_to">Скорость медленной полосы: %1$s</string>
+  <string name="palette_slow_lane_turns_on">Включает медленную полосу</string>
+  <string name="palette_slow_lane_is_on">Медленная полоса включена</string>
+  <string name="palette_slow_lane_now">Сейчас %1$s</string>
+  <string name="palette_limit_while_off">Действует, пока медленная полоса выключена</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="one">Приостановить %1$d загрузку</item>
+    <item quantity="few">Приостановить %1$d загрузки</item>
+    <item quantity="many">Приостановить %1$d загрузок</item>
+    <item quantity="other">Приостановить %1$d загрузки</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">Нечего приостанавливать</string>
+  <plurals name="palette_resume_count">
+    <item quantity="one">Возобновить приостановленные (%1$d)</item>
+    <item quantity="few">Возобновить приостановленные (%1$d)</item>
+    <item quantity="many">Возобновить приостановленные (%1$d)</item>
+    <item quantity="other">Возобновить приостановленные (%1$d)</item>
+  </plurals>
+  <string name="palette_nothing_paused">Нет приостановленных</string>
+  <plurals name="palette_retry_count">
+    <item quantity="one">Повторить %1$d загрузку с ошибкой</item>
+    <item quantity="few">Повторить %1$d загрузки с ошибкой</item>
+    <item quantity="many">Повторить %1$d загрузок с ошибкой</item>
+    <item quantity="other">Повторить %1$d загрузки с ошибкой</item>
+  </plurals>
+  <string name="palette_nothing_failed">Ошибок нет</string>
+  <string name="palette_slow_lane_off">Выключить медленную полосу</string>
+  <string name="palette_slow_lane_on">Включить медленную полосу</string>
+  <string name="palette_nothing_to_undo">Нечего отменять</string>
+  <string name="palette_full_speed">Полная скорость</string>
+  <string name="palette_full_speed_slow_lane">Выключает медленную полосу</string>
+  <string name="palette_full_speed_rules">Выключает правила скорости</string>
+  <string name="palette_full_speed_cap">Снимает ограничение %1$s</string>
+  <string name="palette_full_speed_already">Уже полная скорость</string>
+  <string name="palette_full_speed_keywords">без ограничений, без лимита, максимальная скорость, unlimited</string>
+  <string name="palette_speed_not_loaded">Ограничение скорости ещё не загружено</string>
+
+  <string name="palette_downloads_tab">Загрузки › %1$s</string>
+  <string name="palette_none">Нет</string>
+  <string name="palette_settings_page">Настройки › %1$s</string>
+  <string name="palette_pause_all_on">Приостановить все на устройстве «%1$s»</string>
+  <string name="palette_resume_all_on">Возобновить все на устройстве «%1$s»</string>
+  <string name="palette_retry_failed_on">Повторить с ошибками на устройстве «%1$s»</string>
+  <string name="palette_show_in_downloads">Показать «%1$s» в загрузках</string>
+  <plurals name="palette_matches">
+    <item quantity="one">%1$d совпадение</item>
+    <item quantity="few">%1$d совпадения</item>
+    <item quantity="many">%1$d совпадений</item>
+    <item quantity="other">%1$d совпадения</item>
+  </plurals>
+  <string name="palette_discover_detail">Найти загрузки в интернете</string>
+</resources>
