@@ -88,6 +88,20 @@ class TableColumnsTest {
   }
 
   @Test
+  fun decode_layoutWithoutFinished_appendsItHidden() {
+    // A layout saved before the Finished column existed.
+    val saved = "size,progress,speed,left,added,status,-connections,-source,-origin,-priority," +
+      "-device"
+
+    val layout = TableLayout.decode(saved)
+
+    val finished = layout.columns.last()
+    assertEquals(TableColumn.Finished, finished.column)
+    assertFalse(finished.visible)
+    assertFalse(layout.shown.any { it.column == TableColumn.Finished })
+  }
+
+  @Test
   fun decode_hiddenFixedColumn_staysVisible() {
     val layout = TableLayout.decode("-progress,-speed")
 

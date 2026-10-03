@@ -5,6 +5,8 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.app.i18n.ByteUnit
 import com.linroid.ketch.app.i18n.UiText
@@ -25,6 +27,9 @@ import com.linroid.ketch.app.state.taskActions
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_today_at
 import ketch.app.shared.generated.resources.date_yesterday
+import ketch.app.shared.generated.resources.queue_position_ahead
+import ketch.app.shared.generated.resources.queue_position_next
+import ketch.app.shared.generated.resources.queue_starting
 import ketch.app.shared.generated.resources.row_canceled
 import ketch.app.shared.generated.resources.row_completed
 import ketch.app.shared.generated.resources.row_connections
@@ -32,6 +37,8 @@ import ketch.app.shared.generated.resources.row_files
 import ketch.app.shared.generated.resources.row_limited_by_slow_lane
 import ketch.app.shared.generated.resources.row_missing_file
 import ketch.app.shared.generated.resources.row_paused
+import ketch.app.shared.generated.resources.row_paused_preempted
+import ketch.app.shared.generated.resources.row_paused_shutdown
 import ketch.app.shared.generated.resources.row_saved_on
 import ketch.app.shared.generated.resources.row_stalled_for
 import ketch.app.shared.generated.resources.row_starts_after
@@ -88,6 +95,8 @@ enum class RowStatus {
  *   retry count; `null` while unknown.
  * @property running requests of the device's downloading tasks, which occupy its slots.
  * @property slowLane whether the device is capped by Slow lane.
+ * @property features what the device reports in [com.linroid.ketch.api.KetchStatus.features],
+ *   such as whether it gives queued tasks positions; empty while unknown.
  */
 data class RowContext(
   val device: DeviceInfo,
@@ -96,6 +105,7 @@ data class RowContext(
   val config: DownloadConfig? = null,
   val running: List<DownloadRequest> = emptyList(),
   val slowLane: Boolean = false,
+  val features: Set<String> = emptySet(),
 )
 
 /**
@@ -110,6 +120,8 @@ data class RowContext(
  * @property time time left while downloading ("–" when unknown), time taken when completed,
  *   otherwise empty.
  * @property added when the task was added: "Today 11:42", "Yesterday" or "Sep 28".
+ * @property finished when a completed task finished, in the same form as [added]; "–" when
+ *   unknown, empty for tasks that have not completed.
  * @property progress fraction downloaded while downloading or paused with a known size.
  * @property limited whether a speed limit caps the running task.
  * @property error the failure explained, for failed tasks; its title leads [detail].
@@ -123,6 +135,7 @@ data class RowContent(
   val speed: UiText = UiText.Empty,
   val time: UiText = UiText.Empty,
   val added: UiText,
+  val finished: UiText = UiText.Empty,
   val progress: Float? = null,
   val limited: Boolean = false,
   val error: ErrorCopy? = null,
@@ -136,6 +149,7 @@ data class RowContent(
  * @param stalledFor how long a downloading task has received no data, or `null` while data
  *   arrives.
  * @param fileMissing whether a completed task's file is gone; only checked on local devices.
+ * @param queuePosition the task's [com.linroid.ketch.api.DownloadTask.queuePosition].
  */
 fun rowContent(
   request: DownloadRequest,
@@ -145,6 +159,7 @@ fun rowContent(
   segments: List<Segment> = emptyList(),
   stalledFor: Duration? = null,
   fileMissing: Boolean = false,
+  queuePosition: Int? = null,
 ): RowContent {
   val stalled = state is DownloadState.Downloading && stalledFor != null &&
     stalledFor > STALL_THRESHOLD
@@ -195,7 +210,12 @@ fun rowContent(
       RowContent(
         status = RowStatus.Paused,
         statusText = Res.string.row_status_paused.text(),
-        detail = listOfNotNull(Res.string.row_paused.text(), percent).joinText(),
+        detail = when (state.reason) {
+          is PauseReason.Preempted -> Res.string.row_paused_preempted.text()
+          PauseReason.Shutdown -> Res.string.row_paused_shutdown.text()
+          PauseReason.WaitingForCondition -> Res.string.row_waiting_for_conditions.text()
+          PauseReason.User -> listOfNotNull(Res.string.row_paused.text(), percent).joinText()
+        },
         size = runningSize(state),
         added = added,
         progress = fraction(progress),
@@ -204,8 +224,7 @@ fun rowContent(
     is DownloadState.Queued -> RowContent(
       status = RowStatus.Queued,
       statusText = Res.string.row_status_queued.text(),
-      detail = (context.config?.let { QueueReason.of(request, it, context.running) }
-        ?: QueueReason.Next).text,
+      detail = queuedDetail(request, context, queuePosition),
       size = knownSize(request),
       added = added,
     )
@@ -216,7 +235,7 @@ fun rowContent(
       size = knownSize(request),
       added = added,
     )
-    is DownloadState.Completed -> completedContent(state, host, context.device, missing, added)
+    is DownloadState.Completed -> completedContent(state, host, context, missing, added)
     is DownloadState.Failed -> {
       val copy = state.error.toCopy(request, retryCount, context.device)
       RowContent(
@@ -256,13 +275,37 @@ fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): UiText {
 /** A downloading task counts as stalled once it has received no data for longer than this. */
 internal val STALL_THRESHOLD: Duration = 5.seconds
 
+/**
+ * Why a queued task waits and, on a device that reports positions, where it is in line: "Waiting
+ * to start · next in line", "Waiting for a free slot (2 of 2 in use) · 2 ahead", or "Starting"
+ * once it holds a slot.
+ */
+private fun queuedDetail(
+  request: DownloadRequest,
+  context: RowContext,
+  queuePosition: Int?,
+): UiText {
+  val reason = (context.config?.let { QueueReason.of(request, it, context.running) }
+    ?: QueueReason.Next).text
+  return when {
+    KetchFeatures.QUEUE_POSITION !in context.features -> reason
+    queuePosition == null -> Res.string.queue_starting.text()
+    queuePosition == 1 -> listOf(reason, Res.string.queue_position_next.text()).joinText()
+    else -> {
+      val ahead = Res.plurals.queue_position_ahead.text(queuePosition - 1)
+      listOf(reason, ahead).joinText()
+    }
+  }
+}
+
 private fun completedContent(
   state: DownloadState.Completed,
   host: String?,
-  device: DeviceInfo,
+  context: RowContext,
   missing: Boolean,
   added: UiText,
 ): RowContent {
+  val device = context.device
   val size = state.totalBytes?.let(::sizeText)
   val detail = when {
     device.capabilities.isRemote -> Res.string.row_saved_on.text(device.name)
@@ -284,6 +327,8 @@ private fun completedContent(
     size = size ?: UNKNOWN,
     time = state.downloadTime?.let { Res.string.row_took.text(durationText(it)) } ?: UiText.Empty,
     added = added,
+    finished = state.completedAt?.let { formatAdded(it, context.now, context.timeZone) }
+      ?: UNKNOWN,
   )
 }
 

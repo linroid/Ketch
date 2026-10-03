@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -149,6 +150,25 @@ class FtpDownloadSourceTest {
   }
 
   @Test
+  fun download_connectionChangeWhilePreparing_isApplied() = runTest {
+    val server = FakeFtpServer(content(1000))
+    val file = MemoryFileAccessor()
+    val connections = MutableStateFlow(2)
+    // The change lands after the segments are sized and before the first batch starts.
+    val accessor = object : FileAccessor by file {
+      override suspend fun preallocate(size: Long) {
+        file.preallocate(size)
+        connections.value = 4
+      }
+    }
+
+    source(server).download(context(accessor, maxConnections = connections))
+
+    assertEquals(listOf(0L, 250L, 500L, 750L), server.retrieveOffsets.sorted())
+    assertContentEquals(server.content, file.bytes)
+  }
+
+  @Test
   fun download_noRestSupport_ignoresLiveConnectionChange() = runTest {
     val server = FakeFtpServer(content(1000), supportsRest = false)
     val file = MemoryFileAccessor()
@@ -174,10 +194,10 @@ class FtpDownloadSourceTest {
   private fun content(size: Int) = ByteArray(size) { (it % 251).toByte() }
 
   private fun context(
-    file: MemoryFileAccessor,
+    file: FileAccessor,
     connections: Int = 0,
     config: DownloadConfig = DownloadConfig.Default,
-    maxConnections: MutableStateFlow<Int> = MutableStateFlow(0),
+    maxConnections: MutableStateFlow<Int> = MutableStateFlow(connections),
     throttle: suspend (Int) -> Unit = {},
   ) = DownloadContext(
     taskId = "ftp",

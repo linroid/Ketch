@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -15,6 +16,8 @@ import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
+import com.linroid.ketch.core.task.savedProgress
+import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,6 +37,7 @@ import kotlinx.coroutines.withContext
  *
  * @param config provides the current global configuration; each start or
  *   resume takes a snapshot of it
+ * @param clock stamps when downloads complete
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -40,12 +45,17 @@ internal class DownloadCoordinator(
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val dispatchers: KetchDispatchers,
+  private val clock: Clock = Clock.System,
 ) {
   private val scope: CoroutineScope = CoroutineScope(dispatchers.network)
   private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
   private val stoppingDownloads = mutableMapOf<String, Job>()
+
+  // Set by close(): executions cancelled from then on pause for PauseReason.Shutdown.
+  @Volatile
+  private var closing = false
 
   private data class ActiveEntry(
     val handle: TaskHandle,
@@ -63,7 +73,12 @@ internal class DownloadCoordinator(
     launchExecution(handle)
   }
 
-  suspend fun pause(taskId: String) {
+  /**
+   * Stops the task's execution, keeping its progress, and shows it paused for [reason].
+   * A task paused for [PauseReason.Preempted] keeps a QUEUED record, so a restart enqueues
+   * it again. A task that already completed, failed or was canceled keeps its state.
+   */
+  suspend fun pause(taskId: String, reason: PauseReason = PauseReason.User) {
     val job = mutex.withLock {
       val entry = activeDownloads[taskId] ?: return@withLock stoppingDownloads[taskId]
       val handle = entry.handle
@@ -77,19 +92,25 @@ internal class DownloadCoordinator(
         currentSegments?.sumOf { it.downloadedBytes } ?: 0L
 
       execution.stopReportingProgress()
-      handle.mutableState.value = DownloadState.Paused(
-        DownloadProgress(pausedDownloaded, execution.totalBytes),
-      )
+      // The execution may have finished just before; its finally has not removed it yet.
+      handle.mutableState.update { state ->
+        if (state.isTerminal) state
+        else DownloadState.Paused(DownloadProgress(pausedDownloaded, execution.totalBytes), reason)
+      }
 
       entry.job.cancel()
 
-      if (currentSegments != null) {
+      if (currentSegments != null && handle.record.value.state !in FINISHED_STATES) {
         log.d { "Saving pause state for taskId=$taskId" }
         // Segments are left to the execution: once its source runs, it saves its final
         // segments while stopping, and this earlier snapshot could land after and replace
         // them. Before that, the record already holds the segments being resumed from.
+        // A preempted task is saved as waiting before the join below, which can take seconds,
+        // so a process death meanwhile does not restore it as paused by the user.
+        val saved = if (reason is PauseReason.Preempted) TaskState.QUEUED else TaskState.PAUSED
         handle.record.update {
-          it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
+          if (it.state in FINISHED_STATES) it
+          else it.copy(state = saved, updatedAt = Clock.System.now())
         }
       }
 
@@ -226,10 +247,26 @@ internal class DownloadCoordinator(
           execution.execute(resumeInfo)
         } catch (e: CancellationException) {
           val s = handle.mutableState.value
-          if (s !is DownloadState.Paused &&
-            s !is DownloadState.Queued
-          ) {
-            handle.mutableState.value = DownloadState.Canceled
+          when {
+            // A download that completed just before the cancellation keeps its state.
+            s.isTerminal || s is DownloadState.Paused -> Unit
+            // Closing keeps the task resumable, also one still starting in its slot: its
+            // record stays DOWNLOADING or QUEUED, so the next start() resumes it.
+            closing -> handle.mutableState.value = DownloadState.Paused(
+              if (s is DownloadState.Queued) {
+                // Not resolved yet: what the record saved from earlier runs.
+                handle.record.value.savedProgress()
+              } else {
+                DownloadProgress(
+                  handle.mutableSegments.value.sumOf { it.downloadedBytes },
+                  execution.totalBytes,
+                )
+              },
+              PauseReason.Shutdown,
+            )
+            // Put back in the queue, it waits for a slot again.
+            s is DownloadState.Queued -> Unit
+            else -> handle.mutableState.value = DownloadState.Canceled
           }
           throw e
         } catch (e: Exception) {
@@ -270,6 +307,8 @@ internal class DownloadCoordinator(
       config = config(),
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
+      clock = clock,
+      shuttingDown = { closing },
     )
   }
 
@@ -342,7 +381,16 @@ internal class DownloadCoordinator(
     }
   }
 
+  /**
+   * Stops every execution. Running tasks pause for [PauseReason.Shutdown] and keep their
+   * partial files and DOWNLOADING records.
+   */
   fun close() {
+    closing = true
     scope.cancel()
+  }
+
+  private companion object {
+    val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
   }
 }

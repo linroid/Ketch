@@ -26,6 +26,7 @@ import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -53,6 +54,9 @@ import okio.Path.Companion.toPath
  *   execution was created; later [com.linroid.ketch.api.KetchApi.updateConfig]
  *   calls apply to the next start or resume
  * @param timeSource measures download speed and the time added to [TaskRecord.downloadTime]
+ * @param clock stamps [TaskRecord.completedAt] when the download completes
+ * @param shuttingDown whether the Ketch instance is closing; a cancelled execution then keeps
+ *   its partial file so the task can resume when the instance starts again
  */
 internal class DownloadExecution(
   private val handle: TaskHandle,
@@ -62,6 +66,8 @@ internal class DownloadExecution(
   private val globalLimiter: SpeedLimiter,
   private val dispatchers: KetchDispatchers,
   private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+  private val clock: Clock = Clock.System,
+  private val shuttingDown: () -> Boolean = { false },
 ) {
   private val log = KetchLogger("Execution")
 
@@ -119,9 +125,10 @@ internal class DownloadExecution(
    * in the task record; a context built later reads the persisted value.
    */
   fun setConnections(connections: Int) {
-    require(connections > 0) { "Connections must be greater than 0" }
+    require(connections >= 0) { "Connections must not be negative" }
     context?.maxConnections?.value = connections
-    log.i { "Task connections updated for taskId=$taskId: $connections" }
+    val label = if (connections == 0) "auto" else connections.toString()
+    log.i { "Task connections updated for taskId=$taskId: $label" }
   }
 
   private suspend fun executeFresh() {
@@ -330,12 +337,14 @@ internal class DownloadExecution(
       }
 
       val finalTime = downloadTime()
+      val finishedAt = finishTime()
       handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
           segments = null,
           downloadTime = finalTime,
-          updatedAt = Clock.System.now(),
+          completedAt = finishedAt,
+          updatedAt = finishedAt,
         )
       }
 
@@ -345,6 +354,7 @@ internal class DownloadExecution(
         outputPath = outputPath,
         totalBytes = total.takeIf { it >= 0 },
         downloadTime = finalTime,
+        completedAt = finishedAt,
       )
     } finally {
       if (!selfManagedIo) {
@@ -373,6 +383,7 @@ internal class DownloadExecution(
         log.w(e) { "Failed to close file for taskId=$taskId" }
       }
     }
+    val finishedAt = finishTime()
     handle.record.update {
       it.copy(
         outputPath = outputPath,
@@ -380,15 +391,24 @@ internal class DownloadExecution(
         totalBytes = 0,
         segments = null,
         sourceType = sourceType,
-        updatedAt = Clock.System.now(),
+        completedAt = finishedAt,
+        updatedAt = finishedAt,
       )
     }
     handle.mutableState.value = DownloadState.Completed(
       outputPath = outputPath,
       totalBytes = 0,
       downloadTime = handle.record.value.downloadTime,
+      completedAt = finishedAt,
     )
   }
+
+  /**
+   * Now, in whole milliseconds: the precision task stores keep, so the finish time a task
+   * reports does not change when it is saved and loaded again.
+   */
+  private fun finishTime(): Instant =
+    Instant.fromEpochMilliseconds(clock.now().toEpochMilliseconds())
 
   private suspend fun cleanupAfterExecution(
     fa: FileAccessor,
@@ -401,7 +421,7 @@ internal class DownloadExecution(
     }
     withContext(NonCancellable) {
       val state = handle.mutableState.value
-      if (!completed && state !is DownloadState.Paused &&
+      if (!completed && !shuttingDown() && state !is DownloadState.Paused &&
         state !is DownloadState.Queued &&
         state !is DownloadState.Canceled
       ) {
@@ -527,9 +547,7 @@ internal class DownloadExecution(
       preResolved = preResolved,
       outputPath = outputPath,
       reportedSpeed = reportedSpeed,
-      maxConnections = MutableStateFlow(
-        request.connections.takeIf { it > 0 } ?: 0,
-      ),
+      maxConnections = MutableStateFlow(request.connections),
       config = config,
     )
   }

@@ -2,6 +2,7 @@ package com.linroid.ketch.endpoints.model
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -41,8 +42,11 @@ sealed class TaskEvent {
   ) : TaskEvent()
 
   /**
-   * A task's state, settings, or segments changed (non-progress update).
+   * A task's state, settings, segments or queue position changed (non-progress update).
    * Null request or segments indicate an older server that omitted those fields.
+   *
+   * @property queuePosition [DownloadTask.queuePosition]; `null` when the task does not wait or
+   *   the server is older
    */
   @Serializable
   @SerialName("state_changed")
@@ -51,6 +55,7 @@ sealed class TaskEvent {
     val state: DownloadState,
     val request: DownloadRequest? = null,
     val segments: List<Segment>? = null,
+    val queuePosition: Int? = null,
   ) : TaskEvent()
 
   /**

@@ -91,6 +91,7 @@
   <string name="inspector_detail_path">保存先</string>
   <string name="inspector_detail_size">サイズ</string>
   <string name="inspector_detail_added">追加日時</string>
+  <string name="inspector_detail_finished">完了日時</string>
   <string name="inspector_detail_time">所要時間</string>
   <string name="inspector_detail_average">平均速度</string>
   <string name="inspector_detail_connections">接続数</string>
@@ -107,6 +108,7 @@
   <string name="inspector_copy_failed_path">保存先をコピーできませんでした</string>
   <string name="inspector_copy_failed_size">サイズをコピーできませんでした</string>
   <string name="inspector_copy_failed_added">追加日時をコピーできませんでした</string>
+  <string name="inspector_copy_failed_finished">完了日時をコピーできませんでした</string>
   <string name="inspector_copy_failed_time">所要時間をコピーできませんでした</string>
   <string name="inspector_copy_failed_average">平均速度をコピーできませんでした</string>
   <string name="inspector_copy_failed_connections">接続数をコピーできませんでした</string>

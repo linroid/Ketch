@@ -3,9 +3,12 @@ package com.linroid.ketch.core.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
+import com.linroid.ketch.core.task.savedProgress
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -21,6 +24,9 @@ internal class DownloadQueue(
   private val activeEntries = mutableMapOf<String, QueueEntry>()
   private val queuedEntries = mutableListOf<QueueEntry>()
   private val hostConnectionCount = mutableMapOf<String, Int>()
+
+  // Handles that last got a position, so a task that leaves the queue is reset to null.
+  private val positioned = mutableMapOf<String, TaskHandle>()
 
   /** Effective max concurrent downloads (0 = unlimited → Int.MAX_VALUE). */
   @Volatile
@@ -40,10 +46,14 @@ internal class DownloadQueue(
    */
   suspend fun updateLimits(maxConcurrentDownloads: Int, maxConnectionsPerHost: Int) {
     mutex.withLock {
-      maxConcurrent = effectiveLimit(maxConcurrentDownloads)
-      maxPerHost = effectiveLimit(maxConnectionsPerHost)
-      log.i { "Limits updated: maxConcurrent=$maxConcurrent, maxPerHost=$maxPerHost" }
-      promoteNext()
+      try {
+        maxConcurrent = effectiveLimit(maxConcurrentDownloads)
+        maxPerHost = effectiveLimit(maxConnectionsPerHost)
+        log.i { "Limits updated: maxConcurrent=$maxConcurrent, maxPerHost=$maxPerHost" }
+        promoteNext()
+      } finally {
+        publishPositions()
+      }
     }
   }
 
@@ -62,44 +72,54 @@ internal class DownloadQueue(
     destination: Destination? = null,
   ) {
     mutex.withLock {
-      if (queuedEntries.any { it.taskId == handle.taskId }) return
-      if (activeEntries.containsKey(handle.taskId)) {
-        if (!handle.mutableState.value.isTerminal) return
-        removeActive(handle.taskId)
-      }
-      markQueued(handle)
-      val entry = QueueEntry(
-        handle = handle,
-        priority = handle.request.priority,
-        preempted = preferResume,
-        destination = destination,
-      )
-      insertSorted(entry)
-      promoteNext()
-      if (entry.priority == DownloadPriority.URGENT && queuedEntries.remove(entry)) {
-        tryPreemptAndStart(entry, extractHost(handle.request.url))
+      try {
+        // A task paused for preemption still waits here, which makes resume() a no-op for it.
+        if (queuedEntries.any { it.taskId == handle.taskId }) return
+        if (activeEntries.containsKey(handle.taskId)) {
+          if (!handle.mutableState.value.isTerminal) return
+          removeActive(handle.taskId)
+        }
+        markQueued(handle)
+        val entry = QueueEntry(
+          handle = handle,
+          priority = handle.request.priority,
+          preempted = preferResume,
+          destination = destination,
+        )
+        insertSorted(entry)
+        promoteNext()
+        if (entry.priority == DownloadPriority.URGENT && queuedEntries.remove(entry)) {
+          tryPreemptAndStart(entry, extractHost(handle.request.url))
+        }
+      } finally {
+        publishPositions()
       }
     }
   }
 
   /**
    * Preempts the lowest-priority active download to make room for
-   * an [DownloadPriority.URGENT] task. The preempted task is paused
-   * and re-queued so it resumes automatically when a slot opens.
+   * an [DownloadPriority.URGENT] task. The preempted task is paused for
+   * [PauseReason.Preempted] and stays in the queue, so it resumes
+   * automatically when a slot opens. Tasks that already finished are
+   * never preempted.
    */
   private suspend fun tryPreemptAndStart(
     entry: QueueEntry,
     host: String?,
   ) {
     val hostIsFull = !hasHostCapacity(host)
+    // A finished task stays active until Ketch reports its completion to the queue; pausing it
+    // in that window would download it again.
     val victim = activeEntries.values
+      .filter { !it.handle.mutableState.value.isTerminal }
       .filter { it.priority < DownloadPriority.URGENT }
       .filter { !hostIsFull || extractHost(it.handle.request.url) == host }
       .minByOrNull { it.priority.ordinal }
 
     if (victim == null) {
       insertSorted(entry)
-      entry.handle.mutableState.value = DownloadState.Queued
+      markWaiting(entry.handle)
       log.i {
         "Cannot preempt: no eligible lower-priority active task. " +
           "Queuing taskId=${entry.taskId}"
@@ -113,12 +133,16 @@ internal class DownloadQueue(
         "taskId=${entry.taskId}"
     }
 
-    coordinator.pause(victim.taskId)
+    coordinator.pause(victim.taskId, PauseReason.Preempted(entry.taskId))
     removeActive(victim.taskId)
-
-    victim.preempted = true
-    markQueued(victim.handle)
-    insertSorted(victim)
+    // A victim that finished while being stopped keeps its terminal state and is not re-queued:
+    // its slot is free and it must not run again. The late onTaskCompleted/Failed/Canceled then
+    // finds no active entry and does nothing.
+    if (!victim.handle.mutableState.value.isTerminal) {
+      victim.preempted = true
+      markPreempted(victim.handle, byTaskId = entry.taskId)
+      insertSorted(victim)
+    }
 
     if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
       log.i {
@@ -129,7 +153,7 @@ internal class DownloadQueue(
       startTask(entry, host)
     } else {
       insertSorted(entry)
-      entry.handle.mutableState.value = DownloadState.Queued
+      markWaiting(entry.handle)
       log.i {
         "URGENT taskId=${entry.taskId} queued " +
           "(host limit still exceeded)"
@@ -139,90 +163,110 @@ internal class DownloadQueue(
 
   suspend fun onTaskCompleted(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
-      if (expectedState != null &&
-        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
-      ) return
-      removeActive(taskId)
-      log.d {
-        "Task completed: taskId=$taskId, " +
-          "active=${activeEntries.size}/" +
-          "$maxConcurrent"
+      try {
+        if (expectedState != null &&
+          activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+        ) return
+        removeActive(taskId)
+        log.d {
+          "Task completed: taskId=$taskId, " +
+            "active=${activeEntries.size}/" +
+            "$maxConcurrent"
+        }
+        promoteNext()
+      } finally {
+        publishPositions()
       }
-      promoteNext()
     }
   }
 
   suspend fun onTaskFailed(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
-      if (expectedState != null &&
-        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
-      ) return
-      removeActive(taskId)
-      log.d {
-        "Task failed: taskId=$taskId, " +
-          "active=${activeEntries.size}/" +
-          "${maxConcurrent}"
+      try {
+        if (expectedState != null &&
+          activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+        ) return
+        removeActive(taskId)
+        log.d {
+          "Task failed: taskId=$taskId, " +
+            "active=${activeEntries.size}/" +
+            "${maxConcurrent}"
+        }
+        promoteNext()
+      } finally {
+        publishPositions()
       }
-      promoteNext()
     }
   }
 
   suspend fun onTaskCanceled(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
-      if (expectedState != null &&
-        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
-      ) return
-      removeActive(taskId)
-      log.d {
-        "Task canceled: taskId=$taskId, " +
-          "active=${activeEntries.size}/" +
-          "${maxConcurrent}"
+      try {
+        if (expectedState != null &&
+          activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+        ) return
+        removeActive(taskId)
+        log.d {
+          "Task canceled: taskId=$taskId, " +
+            "active=${activeEntries.size}/" +
+            "${maxConcurrent}"
+        }
+        promoteNext()
+      } finally {
+        publishPositions()
       }
-      promoteNext()
     }
   }
 
   suspend fun setPriority(taskId: String, priority: DownloadPriority) {
     mutex.withLock {
-      activeEntries[taskId]?.let { entry ->
-        entry.priority = priority
-        promoteNext()
-        val urgentEntries = queuedEntries.filter { it.priority == DownloadPriority.URGENT }
-        for (urgent in urgentEntries) {
-          queuedEntries.remove(urgent)
-          tryPreemptAndStart(urgent, extractHost(urgent.handle.request.url))
+      try {
+        activeEntries[taskId]?.let { entry ->
+          entry.priority = priority
+          promoteNext()
+          val urgentEntries = queuedEntries.filter { it.priority == DownloadPriority.URGENT }
+          for (urgent in urgentEntries) {
+            queuedEntries.remove(urgent)
+            tryPreemptAndStart(urgent, extractHost(urgent.handle.request.url))
+          }
+          return
         }
-        return
+        val index = queuedEntries.indexOfFirst { it.taskId == taskId }
+        if (index < 0) return
+        val entry = queuedEntries.removeAt(index)
+        entry.priority = priority
+        val host = extractHost(entry.handle.request.url)
+        if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
+          startTask(entry, host)
+        } else if (priority == DownloadPriority.URGENT) {
+          tryPreemptAndStart(entry, host)
+        } else {
+          insertSorted(entry)
+        }
+        log.i { "Priority updated: taskId=$taskId, priority=$priority" }
+        promoteNext()
+      } finally {
+        publishPositions()
       }
-      val index = queuedEntries.indexOfFirst { it.taskId == taskId }
-      if (index < 0) return
-      val entry = queuedEntries.removeAt(index)
-      entry.priority = priority
-      val host = extractHost(entry.handle.request.url)
-      if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
-        startTask(entry, host)
-      } else if (priority == DownloadPriority.URGENT) {
-        tryPreemptAndStart(entry, host)
-      } else {
-        insertSorted(entry)
-      }
-      log.i { "Priority updated: taskId=$taskId, priority=$priority" }
-      promoteNext()
     }
   }
 
   suspend fun dequeue(taskId: String) {
     mutex.withLock {
-      val removed = queuedEntries.removeAll { it.taskId == taskId }
-      if (removed) {
-        log.i { "Dequeued: taskId=$taskId" }
-      } else if (activeEntries.containsKey(taskId)) {
-        removeActive(taskId)
-        log.i {
-          "Removed active download from tracking: " +
-            "taskId=$taskId"
+      try {
+        val removed = queuedEntries.removeAll { it.taskId == taskId }
+        if (removed) {
+          log.i { "Dequeued: taskId=$taskId" }
+        } else if (activeEntries.containsKey(taskId)) {
+          removeActive(taskId)
+          log.i {
+            "Removed active download from tracking: " +
+              "taskId=$taskId"
+          }
+          promoteNext()
         }
-        promoteNext()
+      } finally {
+        publishPositions()
       }
     }
   }
@@ -251,6 +295,10 @@ internal class DownloadQueue(
     entry: QueueEntry,
     host: String?,
   ) {
+    // A preempted task waits paused; it becomes Queued again as it takes a slot.
+    if (entry.handle.mutableState.value is DownloadState.Paused) {
+      entry.handle.mutableState.value = DownloadState.Queued
+    }
     activeEntries[entry.taskId] = entry
     if (host != null) {
       hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1
@@ -295,6 +343,51 @@ internal class DownloadQueue(
       it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
     }
     handle.mutableState.value = DownloadState.Queued
+  }
+
+  /**
+   * Shows a task the queue keeps waiting as queued, unless it is paused for preemption, which
+   * it shows until it gets a slot again.
+   */
+  private fun markWaiting(handle: TaskHandle) {
+    handle.mutableState.update { state ->
+      if (state is DownloadState.Paused && state.reason is PauseReason.Preempted) state
+      else DownloadState.Queued
+    }
+  }
+
+  /**
+   * Keeps a task the urgent [byTaskId] pushed out of its slot visibly paused, while its record
+   * stays QUEUED so a restart enqueues it again.
+   */
+  private suspend fun markPreempted(handle: TaskHandle, byTaskId: String) {
+    handle.record.update { it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now()) }
+    val reason = PauseReason.Preempted(byTaskId)
+    handle.mutableState.update { state ->
+      when {
+        state.isTerminal -> state
+        state is DownloadState.Paused -> state.copy(reason = reason)
+        else -> DownloadState.Paused(handle.record.value.savedProgress(), reason)
+      }
+    }
+  }
+
+  /** Gives every waiting entry its 1-based place in [queuedEntries]; everyone else null. */
+  private fun publishPositions() {
+    val waiting = HashSet<String>(queuedEntries.size)
+    queuedEntries.forEachIndexed { index, entry ->
+      waiting += entry.taskId
+      entry.handle.mutableQueuePosition.value = index + 1
+      positioned[entry.taskId] = entry.handle
+    }
+    val iterator = positioned.entries.iterator()
+    while (iterator.hasNext()) {
+      val (taskId, handle) = iterator.next()
+      if (taskId !in waiting) {
+        handle.mutableQueuePosition.value = null
+        iterator.remove()
+      }
+    }
   }
 
   private fun insertSorted(entry: QueueEntry) {

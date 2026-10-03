@@ -26,7 +26,8 @@ private val log = KetchLogger("EventRoutes")
  * Events are sent for:
  * - [TaskEvent.TaskAdded]: a new task appears in the tasks list
  * - [TaskEvent.TaskRemoved]: a task is removed from the tasks list
- * - [TaskEvent.StateChanged]: state, settings, or segments change while not downloading
+ * - [TaskEvent.StateChanged]: state, settings, segments or queue position change while not
+ *   downloading
  * - [TaskEvent.Progress]: download progress update
  */
 internal fun Route.eventRoutes(ketch: KetchApi) {
@@ -88,8 +89,14 @@ private suspend fun ServerSSESession.trackTaskState(
 }
 
 internal fun taskEvents(task: DownloadTask): Flow<TaskEvent> =
-  combine(task.state, task.requestState, task.segments) { state, request, segments ->
+  combine(
+    task.state,
+    task.requestState,
+    task.segments,
+    task.queuePosition,
+  ) { state, request, segments, position ->
     when (state) {
+      // A downloading task never waits in the queue, so Progress carries no position.
       is DownloadState.Downloading -> TaskEvent.Progress(
         taskId = task.taskId,
         state = state,
@@ -102,6 +109,7 @@ internal fun taskEvents(task: DownloadTask): Flow<TaskEvent> =
         state = state,
         request = request,
         segments = segments,
+        queuePosition = position,
       )
     }
   }

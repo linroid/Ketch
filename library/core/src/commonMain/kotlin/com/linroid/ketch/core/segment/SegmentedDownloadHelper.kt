@@ -12,7 +12,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,6 +59,11 @@ class SegmentedDownloadHelper(
    *   byte offsets (HTTP Range, FTP REST). When `false`, changes to
    *   [DownloadContext.maxConnections] are ignored: splitting the single
    *   transfer would need offsets the server cannot serve.
+   * @param requestedConnections the [DownloadContext.maxConnections] value
+   *   [segments] were sized from. Any other value, including one set while
+   *   the source was still preparing, resegments the first batch. Sources
+   *   should read it when they size their segments; it defaults to the
+   *   current value.
    * @param downloadSegment protocol-specific download function for
    *   a single segment. Receives the segment and a progress
    *   callback (bytesDownloaded so far for this segment). Must
@@ -67,12 +74,14 @@ class SegmentedDownloadHelper(
     segments: List<Segment>,
     totalBytes: Long,
     supportsRanges: Boolean = true,
+    requestedConnections: Int = context.maxConnections.value,
     downloadSegment: suspend (
       segment: Segment,
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
     ) -> Segment,
   ) {
     var currentSegments = segments
+    var requested = requestedConnections
 
     while (true) {
       val incomplete = currentSegments.filter { !it.isComplete }
@@ -80,13 +89,17 @@ class SegmentedDownloadHelper(
 
       val batchCompleted = downloadBatch(
         context, currentSegments, incomplete, totalBytes,
-        supportsRanges, downloadSegment,
+        supportsRanges, requested, downloadSegment,
       )
 
       currentSegments = context.segments.value
       if (batchCompleted) break
 
-      val newCount = context.pendingResegment
+      // Read the request again instead of using the watcher's target: it may have changed while
+      // the batch was stopping, when no watcher was listening. The next batch compares against
+      // this value, so a change made after this read restarts it.
+      requested = context.maxConnections.value
+      val newCount = context.effectiveConnections(requested)
       context.pendingResegment = 0
       currentSegments = SegmentCalculator.resegment(
         context.segments.value, newCount,
@@ -106,9 +119,10 @@ class SegmentedDownloadHelper(
    * Downloads one batch of incomplete segments concurrently.
    *
    * When [supportsRanges] is `true`, a watcher coroutine monitors
-   * [DownloadContext.maxConnections] for changes. When the connection
-   * count changes, it sets [DownloadContext.pendingResegment] and cancels
-   * the scope.
+   * [DownloadContext.maxConnections] for values other than
+   * [requestedAtStart]. When the effective connection count of such a
+   * value (0 meaning Auto) differs from the number of segments the batch
+   * runs, it sets [DownloadContext.pendingResegment] and cancels the scope.
    *
    * @return `true` if all segments completed, `false` if
    *   interrupted for resegmentation
@@ -119,12 +133,19 @@ class SegmentedDownloadHelper(
     incompleteSegments: List<Segment>,
     totalBytes: Long,
     supportsRanges: Boolean,
+    requestedAtStart: Int,
     downloadSegment: suspend (
       segment: Segment,
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
     ) -> Segment,
   ): Boolean {
-    val initialConnections = context.maxConnections.value
+    // Connections the batch really runs: fewer than effectiveConnections() when a source capped
+    // them (HttpDownloadSource.applyRateLimit) or segments already finished.
+    val runningConnections = incompleteSegments.size
+    // The watcher reacts to every value other than the one the segments were sized from,
+    // 0 (Auto) included. maxConnections replays its current value on subscription, so a change
+    // made before the watcher subscribes counts too, such as one made during the progress report
+    // below or while the source was preparing.
     val segmentProgress =
       allSegments.map { it.downloadedBytes }.toMutableList()
     val segmentMutex = Mutex()
@@ -165,15 +186,14 @@ class SegmentedDownloadHelper(
         val batchScope = this
         val watcherJob = if (supportsRanges) {
           launch(start = CoroutineStart.UNDISPATCHED) {
-            context.maxConnections.first { count ->
-              count > 0 && count != initialConnections
-            }
-            context.pendingResegment =
-              context.maxConnections.value
+            val target = context.maxConnections
+              .dropWhile { it == requestedAtStart }
+              .map { context.effectiveConnections(it) }
+              .first { it != runningConnections }
+            context.pendingResegment = target
             log.i {
-              "Connection change detected for " +
-                "taskId=${context.taskId}: " +
-                "$initialConnections -> ${context.pendingResegment}"
+              "Connection change detected for taskId=${context.taskId}: " +
+                "$runningConnections -> $target"
             }
             batchScope.cancel(CancellationException("Resegmenting"))
           }

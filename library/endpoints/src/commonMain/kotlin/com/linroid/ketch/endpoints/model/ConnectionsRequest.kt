@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * Request body for setting task connection count.
  *
- * @property connections number of concurrent segments, must be > 0
+ * @property connections number of concurrent segments, or 0 for Auto; must not be negative
  */
 @Serializable
 data class ConnectionsRequest(

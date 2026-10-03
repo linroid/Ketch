@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -102,6 +103,21 @@ class DeviceWorkTest {
     assertEquals("high", nextWaiting(tasks)?.taskId)
     assertEquals("later", nextWaiting(tasks.take(1))?.taskId)
     assertNull(nextWaiting(tasks.takeLast(1)))
+  }
+
+  @Test
+  fun nextWaiting_positions_pickTheDevicesFirstInLine() {
+    // The device put the preempted task back first; the client has not seen it reorder yet.
+    val preempted = DownloadState.Paused(DownloadProgress(4, 10), PauseReason.Preempted("u"))
+    val tasks = listOf(
+      task("high", DownloadState.Queued, minutesAgo = 2, priority = DownloadPriority.HIGH),
+      task("preempted", preempted, minutesAgo = 8),
+      task("later", DownloadState.Scheduled(DownloadSchedule.AtTime(now)), minutesAgo = 9)
+    )
+
+    assertEquals("preempted", nextWaiting(tasks, mapOf("high" to 2, "preempted" to 1))?.taskId)
+    assertEquals("high", nextWaiting(tasks)?.taskId)
+    assertEquals("preempted", nextWaiting(tasks.drop(1))?.taskId)
   }
 
   @Test

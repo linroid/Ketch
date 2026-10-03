@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -287,17 +288,21 @@ class KetchToolSet(
           put("downloadedBytes", p.downloadedBytes)
           put("totalBytes", p.totalBytes)
           put("percent", p.percent.toDouble())
+          put("pauseReason", pauseReasonName(state.reason))
+          (state.reason as? PauseReason.Preempted)?.let { put("preemptedBy", it.byTaskId) }
         }
         is DownloadState.Completed -> {
           put("outputPath", state.outputPath)
           state.totalBytes?.let { put("totalBytes", it) }
           state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
+          state.completedAt?.let { put("completedAt", it.toString()) }
         }
         is DownloadState.Failed -> {
           put("error", state.error.message ?: "Unknown error")
         }
         else -> {}
       }
+      task.queuePosition.value?.let { put("queuePosition", it) }
       if (task.request.priority != DownloadPriority.NORMAL) {
         put("priority", task.request.priority.name)
       }
@@ -318,6 +323,13 @@ class KetchToolSet(
     is DownloadState.Completed -> "completed"
     is DownloadState.Failed -> "failed"
     is DownloadState.Canceled -> "canceled"
+  }
+
+  private fun pauseReasonName(reason: PauseReason): String = when (reason) {
+    PauseReason.User -> "user"
+    is PauseReason.Preempted -> "preempted"
+    PauseReason.WaitingForCondition -> "waiting_for_condition"
+    PauseReason.Shutdown -> "shutdown"
   }
 
   private fun parsePriority(value: String): DownloadPriority =

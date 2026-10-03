@@ -40,6 +40,8 @@
   <string name="row_starts_in">in %1$s</string>
   <string name="row_starts_after">Startet in %1$s</string>
   <string name="row_waiting_for_conditions">Wartet auf Bedingungen</string>
+  <string name="row_paused_preempted">Pausiert für einen dringenden Download · wird automatisch fortgesetzt</string>
+  <string name="row_paused_shutdown">Pausiert, als Ketch beendet wurde · wird beim nächsten Start fortgesetzt</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">Ø %1$s</string>
@@ -51,6 +53,7 @@
   <string name="sort_speed">Geschwindigkeit</string>
   <string name="sort_time_left">Verbleibend</string>
   <string name="sort_added">Hinzugefügt</string>
+  <string name="sort_finished">Abgeschlossen</string>
   <string name="sort_status">Status</string>
   <string name="sort_connections">Verbindungen</string>
   <string name="sort_source">Quelle</string>
@@ -73,6 +76,10 @@
   <string name="group_title_yesterday">Gestern hinzugefügt</string>
   <string name="group_title_week">Diese Woche hinzugefügt</string>
   <string name="group_title_earlier">Früher hinzugefügt</string>
+  <string name="group_title_finished_today">Heute abgeschlossen</string>
+  <string name="group_title_finished_yesterday">Gestern abgeschlossen</string>
+  <string name="group_title_finished_week">Diese Woche abgeschlossen</string>
+  <string name="group_title_finished_earlier">Früher abgeschlossen</string>
   <string name="group_all_done_at">alle fertig ≈ %1$s</string>
   <string name="group_in_start_order">in Startreihenfolge</string>
 
@@ -93,6 +100,12 @@
   <string name="queue_waiting_slot">Wartet auf einen freien Platz (%1$d von %2$d belegt)</string>
   <string name="queue_waiting_host">Wartet auf %1$s (%2$d pro Website)</string>
   <string name="queue_waiting_start">Wartet auf Start</string>
+  <string name="queue_position_next">als Nächstes</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="one">%1$d davor</item>
+    <item quantity="other">%1$d davor</item>
+  </plurals>
+  <string name="queue_starting">Startet</string>
 
   <string name="action_row_pause">Pausieren</string>
   <string name="action_row_resume">Fortsetzen</string>

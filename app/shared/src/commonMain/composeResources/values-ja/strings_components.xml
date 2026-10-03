@@ -40,6 +40,7 @@
 
   <string name="component_stepper_auto">自動</string>
   <string name="component_stepper_auto_count">自動（%1$d）</string>
+  <string name="component_stepper_use_auto">デバイスのデフォルトを使用</string>
   <string name="component_stepper_fewer_connections">接続数を減らす</string>
   <string name="component_stepper_more_connections">接続数を増やす</string>
   <plurals name="component_stepper_connections">

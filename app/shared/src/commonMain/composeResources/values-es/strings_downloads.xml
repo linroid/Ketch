@@ -276,6 +276,10 @@
     <item quantity="one">%2$d conexiones para %1$d descarga</item>
     <item quantity="other">%2$d conexiones para %1$d descargas</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">Conexiones en Auto para %1$d descarga</item>
+    <item quantity="other">Conexiones en Auto para %1$d descargas</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d con error</item>
     <item quantity="other">%1$d con error</item>

@@ -40,6 +40,7 @@
 
   <string name="component_stepper_auto">자동</string>
   <string name="component_stepper_auto_count">자동(%1$d)</string>
+  <string name="component_stepper_use_auto">기기 기본값 사용</string>
   <string name="component_stepper_fewer_connections">연결 줄이기</string>
   <string name="component_stepper_more_connections">연결 늘리기</string>
   <plurals name="component_stepper_connections">

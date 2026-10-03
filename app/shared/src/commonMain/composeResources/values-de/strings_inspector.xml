@@ -96,6 +96,7 @@
   <string name="inspector_detail_path">Gespeichert in</string>
   <string name="inspector_detail_size">Größe</string>
   <string name="inspector_detail_added">Hinzugefügt</string>
+  <string name="inspector_detail_finished">Abgeschlossen</string>
   <string name="inspector_detail_time">Dauer</string>
   <string name="inspector_detail_average">Ø Geschwindigkeit</string>
   <string name="inspector_detail_connections">Verbindungen</string>
@@ -112,6 +113,7 @@
   <string name="inspector_copy_failed_path">Der Speicherort konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_size">Die Größe konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_added">Das Hinzufügedatum konnte nicht kopiert werden</string>
+  <string name="inspector_copy_failed_finished">Die Abschlusszeit konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_time">Die Dauer konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_average">Die Durchschnittsgeschwindigkeit konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_connections">Die Verbindungen konnten nicht kopiert werden</string>

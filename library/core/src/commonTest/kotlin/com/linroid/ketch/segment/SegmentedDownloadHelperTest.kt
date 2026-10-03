@@ -1,19 +1,25 @@
 package com.linroid.ketch.segment
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SegmentedDownloadHelperTest {
@@ -123,19 +129,156 @@ class SegmentedDownloadHelperTest {
     assertEquals(listOf(0L..5L, 6L..11L), requests.map { it.start..it.end })
   }
 
+  @Test
+  fun downloadAll_liveAuto_resegmentsToConfigDefault() = runTest {
+    val context = context(
+      connections = MutableStateFlow(1),
+      config = DownloadConfig(maxConnectionsPerDownload = 3),
+    )
+    val requests = mutableListOf<Segment>()
+    val job = launch { downloadBlockingFirstBatch(context, firstBatch = 1, requests) }
+    try {
+      runCurrent()
+      context.maxConnections.value = 0
+      runCurrent()
+      assertTrue(job.isCompleted, "Auto must restart the batch with the configured default")
+      assertEquals(3, requests.drop(1).size)
+      assertTrue(context.segments.value.all { it.isComplete })
+    } finally {
+      job.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun downloadAll_overrideEqualToAuto_keepsBatch() = runTest {
+    val context = context(
+      connections = MutableStateFlow(0),
+      config = DownloadConfig(maxConnectionsPerDownload = 4),
+      segments = (0..3).map { Segment(index = it, start = it * 3L, end = it * 3L + 2) },
+    )
+    val requests = mutableListOf<Segment>()
+    val job = launch { downloadBlockingFirstBatch(context, firstBatch = 4, requests) }
+    try {
+      runCurrent()
+      assertEquals(4, requests.size)
+      context.maxConnections.value = 4
+      runCurrent()
+      assertFalse(job.isCompleted)
+      assertEquals(4, requests.size, "The same segment count must not restart the batch")
+    } finally {
+      job.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun downloadAll_fewerSegmentsThanAuto_resegmentsWhenSetToAuto() = runTest {
+    // Two segments for four connections, as after HttpDownloadSource capped them.
+    val context = context(
+      connections = MutableStateFlow(4),
+      config = DownloadConfig(maxConnectionsPerDownload = 4),
+      segments = listOf(
+        Segment(index = 0, start = 0, end = 5),
+        Segment(index = 1, start = 6, end = 11),
+      ),
+    )
+    val requests = mutableListOf<Segment>()
+    val job = launch { downloadBlockingFirstBatch(context, firstBatch = 2, requests) }
+    try {
+      runCurrent()
+      context.maxConnections.value = 0
+      runCurrent()
+      assertTrue(job.isCompleted, "Auto must restart a batch running fewer segments")
+      assertEquals(4, requests.drop(2).size)
+    } finally {
+      job.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun downloadAll_connectionChangeWhileBatchStops_isApplied() = runTest {
+    val context = context(
+      connections = MutableStateFlow(4),
+      segments = (0..3).map { Segment(index = it, start = it * 3L, end = it * 3L + 2) },
+    )
+    val requests = mutableListOf<Segment>()
+    val job = launch {
+      val helper = SegmentedDownloadHelper()
+      helper.downloadAll(context, context.segments.value, 12) { segment, report ->
+        requests.add(segment)
+        if (requests.size <= 4) {
+          try {
+            awaitCancellation()
+          } finally {
+            // Closing a connection takes a while, and no watcher listens meanwhile.
+            withContext(NonCancellable) { delay(100) }
+          }
+        }
+        report(segment.totalBytes)
+        segment.copy(downloadedBytes = segment.totalBytes)
+      }
+    }
+    try {
+      runCurrent()
+      context.maxConnections.value = 5
+      runCurrent()
+      context.maxConnections.value = 6
+      advanceUntilIdle()
+      assertTrue(job.isCompleted)
+      assertEquals(6, requests.drop(4).size, "The change made while stopping must be applied")
+    } finally {
+      job.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun downloadAll_connectionChangeAfterSizing_resegmentsFirstBatch() = runTest {
+    // The source sized four segments, then the connections changed before the download began.
+    val context = context(
+      connections = MutableStateFlow(6),
+      segments = (0..3).map { Segment(index = it, start = it * 3L, end = it * 3L + 2) },
+    )
+    val requests = mutableListOf<Segment>()
+    SegmentedDownloadHelper().downloadAll(
+      context, context.segments.value, 12, requestedConnections = 4,
+    ) { segment, report ->
+      requests.add(segment)
+      report(segment.totalBytes)
+      segment.copy(downloadedBytes = segment.totalBytes)
+    }
+    assertEquals(6, requests.size)
+    assertEquals(6, context.segments.value.size)
+  }
+
+  /** Downloads [context]'s segments; the first [firstBatch] requests wait until cancelled. */
+  private suspend fun downloadBlockingFirstBatch(
+    context: DownloadContext,
+    firstBatch: Int,
+    requests: MutableList<Segment>,
+  ) {
+    SegmentedDownloadHelper().downloadAll(context, context.segments.value, 12) { segment, report ->
+      requests.add(segment)
+      if (requests.size <= firstBatch) awaitCancellation()
+      report(segment.totalBytes)
+      segment.copy(downloadedBytes = segment.totalBytes)
+    }
+  }
+
   private fun context(
     connections: MutableStateFlow<Int> = MutableStateFlow(0),
+    config: DownloadConfig = DownloadConfig.Default,
+    segments: List<Segment> = listOf(Segment(index = 0, start = 0, end = 11)),
     onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ): DownloadContext = DownloadContext(
     taskId = "batch-regression",
     url = "https://example.com/file",
     request = DownloadRequest("https://example.com/file"),
     fileAccessor = NoOpFileAccessor,
-    segments = MutableStateFlow(listOf(Segment(index = 0, start = 0, end = 11))),
+    segments = MutableStateFlow(segments),
     onProgress = onProgress,
     throttle = {},
     headers = emptyMap(),
     maxConnections = connections,
+    config = config,
   )
 
 }

@@ -126,7 +126,9 @@ class FtpDownloadSource : DownloadSource {
     }
 
     val supportsRest = resolved.supportsResume
-    val connections = if (supportsRest) context.effectiveConnections() else 1
+    // The segments are sized from this value; downloadSegments resegments for any later change.
+    val requested = context.maxConnections.value
+    val connections = if (supportsRest) context.effectiveConnections(requested) else 1
 
     // A retry after a dropped connection keeps the bytes already written,
     // like HTTP. Without REST the transfer can only restart at byte zero.
@@ -162,7 +164,7 @@ class FtpDownloadSource : DownloadSource {
       }
     }
 
-    downloadSegments(context, segments, totalBytes, supportsRest)
+    downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
   override suspend fun resume(
@@ -204,6 +206,7 @@ class FtpDownloadSource : DownloadSource {
 
     var segments = context.segments.value
     val totalBytes = state.totalBytes
+    val requested = context.maxConnections.value
 
     if (!supportsRest) {
       // Without REST every transfer starts at byte zero, so saved progress cannot be used.
@@ -211,7 +214,7 @@ class FtpDownloadSource : DownloadSource {
       segments = SegmentCalculator.singleSegment(totalBytes)
       context.segments.value = segments
     } else {
-      val connections = context.effectiveConnections()
+      val connections = context.effectiveConnections(requested)
       val incompleteCount = segments.count { !it.isComplete }
       if (incompleteCount > 0 && connections != incompleteCount) {
         log.i {
@@ -230,7 +233,7 @@ class FtpDownloadSource : DownloadSource {
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(context, validatedSegments, totalBytes, supportsRest)
+    downloadSegments(context, validatedSegments, totalBytes, supportsRest, requested)
   }
 
   private suspend fun validateLocalFile(
@@ -284,13 +287,14 @@ class FtpDownloadSource : DownloadSource {
     segments: List<Segment>,
     totalBytes: Long,
     supportsRest: Boolean,
+    requestedConnections: Int,
   ) {
     val segmentHelper = SegmentedDownloadHelper(
       progressIntervalMs = context.config.progressIntervalMs,
       tag = "FtpSource",
     )
     segmentHelper.downloadAll(
-      context, segments, totalBytes, supportsRest,
+      context, segments, totalBytes, supportsRest, requestedConnections,
     ) { segment, onProgress ->
       downloadSegment(context, segment, onProgress)
     }

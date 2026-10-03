@@ -112,6 +112,11 @@ export function describeTaskState(task) {
       };
     }
     case 'paused': {
+      // Paused for an urgent download, it still waits in the queue and starts on its own:
+      // resuming it does nothing, pausing it keeps it paused, as for a queued task.
+      if (state.reason?.type === 'preempted') {
+        return stateWithoutBar(t('task_queued'), 'idle', { canPause: true });
+      }
       const { downloadedBytes = 0, totalBytes = 0 } = state.progress ?? {};
       const fraction = totalBytes > 0 ? Math.min(downloadedBytes / totalBytes, 1) : null;
       const text = fraction === null

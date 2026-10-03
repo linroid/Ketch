@@ -96,6 +96,7 @@
   <string name="inspector_detail_path">Guardado en</string>
   <string name="inspector_detail_size">Tamaño</string>
   <string name="inspector_detail_added">Añadida</string>
+  <string name="inspector_detail_finished">Completada</string>
   <string name="inspector_detail_time">Tiempo empleado</string>
   <string name="inspector_detail_average">Velocidad media</string>
   <string name="inspector_detail_connections">Conexiones</string>
@@ -112,6 +113,7 @@
   <string name="inspector_copy_failed_path">No se pudo copiar la ruta de guardado</string>
   <string name="inspector_copy_failed_size">No se pudo copiar el tamaño</string>
   <string name="inspector_copy_failed_added">No se pudo copiar la fecha en que se añadió</string>
+  <string name="inspector_copy_failed_finished">No se pudo copiar la fecha en que se completó</string>
   <string name="inspector_copy_failed_time">No se pudo copiar el tiempo empleado</string>
   <string name="inspector_copy_failed_average">No se pudo copiar la velocidad media</string>
   <string name="inspector_copy_failed_connections">No se pudieron copiar las conexiones</string>

@@ -253,6 +253,9 @@
   <plurals name="downloads_batch_connections">
     <item quantity="other">已將 %1$d 個下載項目的連線數設為 %2$d</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="other">已將 %1$d 個下載項目的連線數設為自動</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="other">%1$d 個失敗</item>
   </plurals>

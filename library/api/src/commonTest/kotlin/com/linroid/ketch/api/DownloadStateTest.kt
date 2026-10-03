@@ -1,8 +1,12 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class DownloadStateTest {
 
@@ -78,5 +82,73 @@ class DownloadStateTest {
   @Test
   fun canceled_isNotActive() {
     assertFalse(DownloadState.Canceled.isActive)
+  }
+
+  @Test
+  fun paused_jsonWithoutReason_decodesAsUserPause() {
+    // Older servers and records send no reason.
+    val json = """{"type":"paused","progress":{"downloadedBytes":10,"totalBytes":100}}"""
+
+    val state = Json.decodeFromString(DownloadState.serializer(), json)
+
+    assertEquals(DownloadState.Paused(DownloadProgress(10, 100), PauseReason.User), state)
+  }
+
+  @Test
+  fun pauseReason_preempted_encodesTypeAndTaskId() {
+    val json = Json.encodeToString(PauseReason.serializer(), PauseReason.Preempted("b"))
+
+    assertEquals("""{"type":"preempted","byTaskId":"b"}""", json)
+  }
+
+  @Test
+  fun pauseReason_unknownType_decodesAsUser() {
+    // A newer server may send a reason this version does not know.
+    val json = """
+      {"type":"paused","progress":{"downloadedBytes":10,"totalBytes":100},
+       "reason":{"type":"thermal","celsius":90}}
+    """.trimIndent()
+
+    val state = Json { ignoreUnknownKeys = true }
+      .decodeFromString(DownloadState.serializer(), json)
+
+    assertEquals(PauseReason.User, (state as DownloadState.Paused).reason)
+  }
+
+  @Test
+  fun pauseReason_unknownTypeWithItsOwnFields_decodesAsUserWithDefaultJson() {
+    // Json.Default rejects unknown keys; the reason's own fields must not trip it.
+    val reason = Json.decodeFromString(
+      PauseReason.serializer(),
+      """{"type":"thermal","celsius":90}""",
+    )
+    val preempted = Json.decodeFromString(
+      PauseReason.serializer(),
+      """{"type":"preempted","byTaskId":"b","since":"2026-10-03T08:00:00Z"}""",
+    )
+
+    assertEquals(PauseReason.User, reason)
+    assertEquals(PauseReason.Preempted("b"), preempted)
+  }
+
+  @Test
+  fun pauseReason_preemptedWithoutTaskId_decodesAsUser() {
+    val reason = Json.decodeFromString(PauseReason.serializer(), """{"type":"preempted"}""")
+
+    assertEquals(PauseReason.User, reason)
+  }
+
+  @Test
+  fun completed_jsonWithoutCompletedAt_decodesNull() {
+    // Written before finish times were recorded.
+    val json = """
+      {"type":"completed","outputPath":"/d/a.iso","totalBytes":100,"downloadTime":"PT3S"}
+    """.trimIndent()
+
+    val state = Json.decodeFromString(DownloadState.serializer(), json)
+
+    val completed = state as DownloadState.Completed
+    assertEquals(3.seconds, completed.downloadTime)
+    assertNull(completed.completedAt)
   }
 }

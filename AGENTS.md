@@ -159,7 +159,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
-  excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records)
+  excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
+  and `completedAt`, stamped once in whole milliseconds and saved as `TaskRecord.completedAt`
+  (SQLite `completed_at`, `4.sqm`; `null` for tasks completed before it was tracked)
+- `DownloadState.Paused.reason` (`PauseReason`): `User`, `Preempted(byTaskId)`, `Shutdown` or
+  `WaitingForCondition` (defined, not produced yet); unknown wire types decode as `User`. The
+  reason is not persisted: a `PAUSED` record is a user pause
+- `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
+  `DOWNLOADING` records, so the next `start()` resumes them
+- `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`)
 - Retry with exponential backoff for transient errors
 - Persistent task metadata via `TaskStore` interface
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
@@ -174,7 +182,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchApi.updateConfig` applies queue limits immediately: raising one promotes queued
   tasks, lowering one never interrupts running tasks
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
-- URGENT preemption: pauses lowest-priority active download to make room
+- URGENT preemption: pauses lowest-priority active download to make room; the victim stays
+  in the queue as `Paused(Preempted)` with a `QUEUED` record and resumes when a slot frees.
+  Tasks that already finished are never preempted
+- `DownloadTask.queuePosition`: 1-based place of `Queued` and preempted tasks in the queue
+  (priority, then age), published under the queue mutex after every change; `null` otherwise,
+  and never persisted
 
 ### Live Configuration
 - `Ketch` keeps the current `DownloadConfig`; `updateConfig` applies speed and queue limits
@@ -183,6 +196,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Sources read defaults from `DownloadContext.config` and `DownloadContext.effectiveConnections()`
 - Per-task `setSpeedLimit` / `setConnections` / `setPriority` / `reschedule` persist to the
   `TaskRecord` in any non-terminal state and apply live when the task is running
+- `setConnections(0)` is Auto: the run's `DownloadConfig.maxConnectionsPerDownload` (a torrent's
+  own peer default); a running batch resegments when the effective count differs from the
+  segments it runs
 
 ### Speed Limiting
 - Global speed limit via `DownloadConfig.speedLimit`, changed at runtime with
@@ -321,6 +337,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   must run from outside it, such as the macOS menu bar's, go through `AppState.runInShell`
 - Toasts and banners go through `MessageCenter`; removals and other undoable operations wait in
   `PendingOps` for their Undo window
+- Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
+  everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
+  now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
+  waits ("next in line", "2 ahead") and when a finished one finished (Finished column and sort,
+  Smart "Finished today" groups). Auto connections and queue positions only show for devices
+  whose `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
 - Design tokens: feature code reads colors, type, spacing, shapes and motion from `KetchTheme`
   and uses the controls in `components/` and `KetchIcon`. `DesignTokenUsageTest` fails when
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,
@@ -357,9 +379,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
-  per-task speed limit, priority and connections; status, config, network interfaces, and
-  resolving URLs or uploaded file content
-- SSE event stream for real-time state updates
+  per-task speed limit, priority and connections (0 is Auto; older servers answer 400
+  `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
+  status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
+  uploaded file content
+- SSE event stream for real-time state updates; `TaskSnapshot` and `state_changed` carry the
+  task's `queuePosition` (a queue change sends `state_changed` for every waiting task whose
+  position moved), `progress` carries none
 - Optional bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`)
 - Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
   name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`

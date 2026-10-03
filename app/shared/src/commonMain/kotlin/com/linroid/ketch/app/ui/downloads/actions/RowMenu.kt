@@ -28,6 +28,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
+import com.linroid.ketch.app.components.connectionText
 import com.linroid.ketch.app.components.deviceOptionCaption
 import com.linroid.ketch.app.components.startTimeOptions
 import com.linroid.ketch.app.i18n.UiText
@@ -54,6 +55,8 @@ import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
 import com.linroid.ketch.app.ui.inspector.startSchedule
 import com.linroid.ketch.app.ui.inspector.urgentVictim
 import com.linroid.ketch.app.ui.intake.targetSummary
@@ -297,7 +300,16 @@ internal fun KetchMenuScope.rowMenuEntries(
       RowAction.Connections -> {
         val peers = targets.all { it.isTorrent }
         val name = if (single != null && peers) Res.string.row_menu_peer_limit.text() else label
-        submenu(name, action.icon) { connectionEntries(connectionTargets(targets), runner, peers) }
+        val counted = connectionTargets(targets)
+        submenu(name, action.icon) {
+          connectionEntries(
+            rows = counted,
+            runner = runner,
+            peers = peers,
+            auto = if (peers) null else autoConnectionsOf(runner.state, counted),
+            allowAuto = autoConnectionsSupported(runner.state, counted),
+          )
+        }
       }
       RowAction.Priority -> submenu(label, action.icon) {
         priorityEntries(targets, runner, context.urgentVictim)
@@ -376,7 +388,6 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
   }
 }
 
-/** Adds the connection counts, or the peer limits when [peers], for [rows]. */
 /**
  * The rows a connection count applies to: all of them when they are torrents, whose count is
  * their peer limit, and otherwise the others, so a mixed selection leaves its torrents alone.
@@ -384,12 +395,26 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
 internal fun connectionTargets(rows: List<TaskRow>): List<TaskRow> =
   if (rows.all { it.isTorrent }) rows else rows.filterNot { it.isTorrent }
 
+/**
+ * Adds the connection counts, or the peer limits when [peers], for [rows]. When their devices
+ * take Auto ([allowAuto]), it comes first: "Auto ([auto])", or "Auto" when [auto] is unknown.
+ */
 internal fun KetchMenuScope.connectionEntries(
   rows: List<TaskRow>,
   runner: RowActionRunner,
   peers: Boolean,
+  auto: Int?,
+  allowAuto: Boolean,
 ) {
   val current = rows.map { it.request.connections }.distinct().singleOrNull()
+  if (allowAuto) {
+    item(
+      label = connectionText(0, auto),
+      onClick = { runner.setConnections(rows, 0) },
+      checked = current == 0,
+    )
+    divider()
+  }
   for (count in if (peers) PeerLimits else ConnectionCounts) {
     item(
       label = verbatim(count.toString()),

@@ -86,8 +86,13 @@ internal class HttpDownloadSource(
       ?.toLongOrNull()
     val reset = resolved.metadata[META_RATE_LIMIT_RESET]
       ?.toLongOrNull()
+    // The segments are sized from this value; downloadSegments resegments for any later change.
+    val requested = context.maxConnections.value
     val connections = applyRateLimit(
-      context.taskId, rangeLimitedConnections(context, resolved.supportsResume), remaining, reset
+      context.taskId,
+      rangeLimitedConnections(context, requested, resolved.supportsResume),
+      remaining,
+      reset
     )
 
     // Reuse existing segments with progress on retry (e.g., after
@@ -126,7 +131,7 @@ internal class HttpDownloadSource(
       }
     }
 
-    downloadSegments(context, segments, totalBytes, resolved.supportsResume)
+    downloadSegments(context, segments, totalBytes, resolved.supportsResume, requested)
   }
 
   override suspend fun resume(
@@ -170,9 +175,10 @@ internal class HttpDownloadSource(
     var segments = context.segments.value
     val totalBytes = state.totalBytes
 
+    val requested = context.maxConnections.value
     val connections = applyRateLimit(
       context.taskId,
-      rangeLimitedConnections(context, serverInfo.supportsResume),
+      rangeLimitedConnections(context, requested, serverInfo.supportsResume),
       serverInfo.rateLimitRemaining,
       serverInfo.rateLimitReset
     )
@@ -201,7 +207,7 @@ internal class HttpDownloadSource(
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(context, validatedSegments, totalBytes, serverInfo.supportsResume)
+    downloadSegments(context, validatedSegments, totalBytes, serverInfo.supportsResume, requested)
   }
 
   private suspend fun validateLocalFile(
@@ -255,13 +261,14 @@ internal class HttpDownloadSource(
     segments: List<Segment>,
     totalBytes: Long,
     supportsRanges: Boolean,
+    requestedConnections: Int,
   ) {
     val segmentHelper = SegmentedDownloadHelper(
       progressIntervalMs = context.config.progressIntervalMs,
       tag = "HttpSource",
     )
     segmentHelper.downloadAll(
-      context, segments, totalBytes, supportsRanges,
+      context, segments, totalBytes, supportsRanges, requestedConnections,
     ) { segment, onProgress ->
       val throttleLimiter = object : SpeedLimiter {
         override suspend fun acquire(bytes: Int) {
@@ -279,18 +286,19 @@ internal class HttpDownloadSource(
   }
 
   /**
-   * Returns [DownloadContext.effectiveConnections], or 1 when the server
-   * does not advertise byte-range support: extra segments would need
-   * offsets such a server cannot serve.
+   * Returns [DownloadContext.effectiveConnections] for [requested], or 1 when
+   * the server does not advertise byte-range support: extra segments would
+   * need offsets such a server cannot serve.
    */
   private fun rangeLimitedConnections(
     context: DownloadContext,
+    requested: Int,
     supportsRanges: Boolean,
   ): Int {
-    val requested = context.effectiveConnections()
-    if (supportsRanges || requested <= 1) return requested
+    val connections = context.effectiveConnections(requested)
+    if (supportsRanges || connections <= 1) return connections
     log.i {
-      "Server does not support ranges, using 1 of $requested connections " +
+      "Server does not support ranges, using 1 of $connections connections " +
         "for taskId=${context.taskId}"
     }
     return 1

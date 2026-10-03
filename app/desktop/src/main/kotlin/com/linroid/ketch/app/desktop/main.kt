@@ -71,6 +71,7 @@ import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.isPairingLink
+import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.LocalWindowChrome
 import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
@@ -612,11 +613,14 @@ private suspend fun quit(
   if (response != null) response.performQuit() else exit()
 }
 
-/** Downloads on this computer that are downloading or queued, which quitting pauses. */
+/**
+ * Downloads on this computer that are downloading or waiting in the queue, which quitting
+ * pauses.
+ */
 private fun activeDownloads(manager: InstanceManager): Int =
   manager.embedded?.tasks?.value.orEmpty().count {
     val state = it.state.value
-    state is DownloadState.Downloading || state is DownloadState.Queued
+    state is DownloadState.Downloading || state.waitsInQueue
   }
 
 // Windows users expect the close button to quit, so the first hide says where Ketch went.

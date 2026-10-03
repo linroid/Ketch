@@ -38,6 +38,8 @@
   <string name="row_starts_in">%1$s後</string>
   <string name="row_starts_after">%1$s後に開始</string>
   <string name="row_waiting_for_conditions">条件を満たすまで待機中</string>
+  <string name="row_paused_preempted">緊急のダウンロードのため一時停止中 · 自動的に再開します</string>
+  <string name="row_paused_shutdown">Ketchが終了したため一時停止中 · 次回の起動時に再開します</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">平均%1$s</string>
@@ -49,6 +51,7 @@
   <string name="sort_speed">速度</string>
   <string name="sort_time_left">残り時間</string>
   <string name="sort_added">追加日時</string>
+  <string name="sort_finished">完了日時</string>
   <string name="sort_status">状態</string>
   <string name="sort_connections">接続数</string>
   <string name="sort_source">ソース</string>
@@ -71,6 +74,10 @@
   <string name="group_title_yesterday">昨日追加</string>
   <string name="group_title_week">今週追加</string>
   <string name="group_title_earlier">それ以前に追加</string>
+  <string name="group_title_finished_today">今日完了</string>
+  <string name="group_title_finished_yesterday">昨日完了</string>
+  <string name="group_title_finished_week">今週完了</string>
+  <string name="group_title_finished_earlier">それ以前に完了</string>
   <string name="group_all_done_at">%1$sごろにすべて完了</string>
   <string name="group_in_start_order">開始順</string>
 
@@ -91,6 +98,11 @@
   <string name="queue_waiting_slot">空き枠を待機中（%2$d件中%1$d件が使用中）</string>
   <string name="queue_waiting_host">%1$sを待機中（サイトごとに%2$d件）</string>
   <string name="queue_waiting_start">開始を待機中</string>
+  <string name="queue_position_next">次に開始</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="other">前に%1$d件</item>
+  </plurals>
+  <string name="queue_starting">開始中</string>
 
   <string name="action_row_pause">一時停止</string>
   <string name="action_row_resume">再開</string>

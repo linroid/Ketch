@@ -13,6 +13,7 @@ import ketch.app.shared.generated.resources.downloads_density_default
 import ketch.app.shared.generated.resources.downloads_table_connections_short
 import ketch.app.shared.generated.resources.sort_added
 import ketch.app.shared.generated.resources.sort_device
+import ketch.app.shared.generated.resources.sort_finished
 import ketch.app.shared.generated.resources.sort_origin
 import ketch.app.shared.generated.resources.sort_priority
 import ketch.app.shared.generated.resources.sort_progress
@@ -48,6 +49,7 @@ internal enum class TableColumn(
   Speed("speed", Res.string.sort_speed, 92.dp, SortKey.Speed, numeric = true, fixed = true),
   Left("left", Res.string.sort_time_left, 76.dp, SortKey.TimeLeft, numeric = true),
   Added("added", Res.string.sort_added, 104.dp, SortKey.Added),
+  Finished("finished", Res.string.sort_finished, 104.dp, SortKey.Finished, optional = true),
   Status("status", Res.string.sort_status, 120.dp, SortKey.Status),
   Connections(
     "connections",

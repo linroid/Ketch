@@ -21,6 +21,7 @@ import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.autoSegmentsOf
 import com.linroid.ketch.app.ui.inspector.urgentVictim
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
@@ -191,6 +192,16 @@ class RowMenuTest {
     assertEquals(3, autoConnectionsOf(f.state, listOf(opened)))
     assertEquals(4, autoConnectionsOf(f.state, listOf(fresh)))
     assertEquals(4, autoConnectionsOf(f.state, listOf(opened, fresh)))
+  }
+
+  @Test
+  fun autoConnectionsOf_rowWithItsOwnCount_isTheDeviceDefault() = actionsTest { f ->
+    // Eight segments come from the task's own count; Auto would give it the device's four.
+    val task = f.add(downloading, DownloadRequest("https://example.com/file.bin", connections = 8))
+    task.segments.value = List(8) { Segment(it, it * 100L, it * 100L + 99) }
+
+    assertEquals(4, autoConnectionsOf(f.state, listOf(rowOf(task))))
+    assertNull(autoSegmentsOf(rowOf(task)))
   }
 
   @Test
