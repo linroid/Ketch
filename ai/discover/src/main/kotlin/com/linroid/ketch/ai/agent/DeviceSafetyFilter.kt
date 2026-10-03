@@ -175,6 +175,7 @@ internal class DeviceSafetyFilter {
     private val TRUSTED_DOMAINS = setOf(
       "github.com", "gitlab.com", "sourceforge.net",
       "releases.ubuntu.com", "download.mozilla.org",
+      "download.blender.org",
       "dl.google.com", "download.oracle.com",
       "downloads.apache.org", "mirror.apache.org",
       "repo.maven.apache.org", "cdn.kernel.org",
