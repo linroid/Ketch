@@ -25,7 +25,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class KetchToolSetTest {
@@ -46,6 +48,31 @@ class KetchToolSetTest {
     assertEquals(emptyMap(), request.headers)
     assertEquals(Destination("a.iso"), request.destination)
     assertEquals(DownloadPriority.HIGH, request.priority)
+  }
+
+  @Test
+  fun startDownload_headerLines_becomeRequestHeaders() = runTest {
+    val ketch = RecordingKetchApi()
+
+    KetchToolSet(ketch).startDownload(
+      url = "https://example.com/a.iso",
+      headers = "Cookie: sid=1; theme=dark\n\nReferer:https://example.com/downloads\r\n",
+    )
+
+    assertEquals(
+      mapOf("Cookie" to "sid=1; theme=dark", "Referer" to "https://example.com/downloads"),
+      ketch.requests.single().headers,
+    )
+  }
+
+  @Test
+  fun startDownload_headerLineWithoutName_isRejected() = runTest {
+    val ketch = RecordingKetchApi()
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso", headers = "sid=1")
+    }
+    assertTrue(ketch.requests.isEmpty())
   }
 
   @Test

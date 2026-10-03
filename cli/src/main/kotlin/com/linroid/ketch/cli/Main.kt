@@ -97,6 +97,8 @@ private fun runDownload(args: DownloadArgs.Download) {
     println("Priority: ${args.priority}")
   }
   println("Max concurrent: ${args.maxConcurrent}")
+  // Names only: values such as cookies are credentials.
+  if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
   println()
 
   val config = DownloadConfig(
@@ -722,6 +724,11 @@ private fun printUsage() {
   println("                           Values: low, normal, high, urgent")
   println("  --max-concurrent <n>     Max simultaneous downloads")
   println("                           Default: 3")
+  println("  -H, --header <header>    Send a request header, e.g.")
+  println("                           -H 'Cookie: sid=1'; repeatable")
+  println("  --user-agent <value>     Send this User-Agent instead of")
+  println("                           Ketch/<version>")
+  println("  --referer <url>          Send this Referer")
   println()
   println("Server:")
   println("  server [options]         Start Ketch daemon server")

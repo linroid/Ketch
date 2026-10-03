@@ -50,6 +50,35 @@ class DownloadArgsTest {
   }
 
   @Test
+  fun `header options become request headers and later ones win`() {
+    val parsed = parseDownloadArgs(
+      listOf(
+        "-H", "Cookie: sid=1", "--header", "X-Token:abc", "--user-agent", "curl/8",
+        "-H", "user-agent: Browser/1.0", "--referer", "https://example.com/page",
+        "https://example.com/a.zip",
+      )
+    )
+    assertEquals(
+      mapOf(
+        "Cookie" to "sid=1",
+        "X-Token" to "abc",
+        "user-agent" to "Browser/1.0",
+        "Referer" to "https://example.com/page",
+      ),
+      assertIs<DownloadArgs.Download>(parsed).headers,
+    )
+  }
+
+  @Test
+  fun `headers that cannot be sent are rejected`() {
+    val url = "https://example.com/a.zip"
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(url, "-H", "Cookie sid=1")))
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(url, "-H", ": value")))
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(url, "-H", "X Token: abc")))
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(url, "--referer", "https://a\r\nX: 1")))
+  }
+
+  @Test
   fun `invalid option values are rejected`() {
     val url = "https://example.com/a.zip"
     assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(url, "--speed-limit", "fast")))

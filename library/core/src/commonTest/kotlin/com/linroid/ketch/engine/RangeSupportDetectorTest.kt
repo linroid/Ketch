@@ -1,6 +1,7 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RangeSupportDetector
 import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.test.runTest
@@ -66,6 +67,55 @@ class RangeSupportDetectorTest {
     assertFailsWith<KetchError.Http> {
       detector.detect("https://example.com/file")
     }
+  }
+
+  @Test
+  fun detect_headRefused_probesWithGet() = runTest {
+    for (code in listOf(400, 403, 404, 405, 501)) {
+      val engine = FakeHttpEngine(headErrorCode = code)
+      val headers = mapOf("Cookie" to "sid=1")
+
+      val info = RangeSupportDetector(engine).detect("https://example.com/file", headers)
+
+      assertEquals(engine.serverInfo, info, "HEAD $code")
+      assertEquals(1, engine.probeCallCount, "HEAD $code")
+      assertEquals(headers, engine.lastProbeHeaders, "HEAD $code")
+    }
+  }
+
+  @Test
+  fun detect_headFailsWithServerError_doesNotProbe() = runTest {
+    val engine = FakeHttpEngine(headErrorCode = 503)
+
+    val error = assertFailsWith<KetchError.Http> {
+      RangeSupportDetector(engine).detect("https://example.com/file")
+    }
+
+    assertEquals(503, error.code)
+    assertEquals(0, engine.probeCallCount)
+  }
+
+  @Test
+  fun detect_headRefusedByEngineWithoutProbe_throwsHeadError() = runTest {
+    val engine = object : HttpEngine {
+      override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+        throw KetchError.Http(405, "Method Not Allowed")
+
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) = error("Not used")
+
+      override fun close() {}
+    }
+
+    val error = assertFailsWith<KetchError.Http> {
+      RangeSupportDetector(engine).detect("https://example.com/file")
+    }
+
+    assertEquals(405, error.code)
   }
 
   @Test

@@ -84,7 +84,8 @@ interface KetchApi {
 Call `start()` once before use; persisted tasks only appear in `tasks` after it. The library
 version is available as `KetchApi.VERSION` and `KetchApi.REVISION`.
 
-`resolve(url)` probes a URL (for HTTP, a HEAD request) and returns its size, resume support,
+`resolve(url)` probes a URL (for HTTP, a HEAD request, or a `GET` for its first byte when the
+server refuses HEAD) and returns its size, resume support,
 suggested file name and, for multi-file sources such as torrents, the selectable `files`.
 `resolveContent(bytes, fileName)` does the same for file content the caller already holds, such
 as a picked `.torrent` file. Pass the result as `DownloadRequest.resolvedSource` (with its `url`
@@ -151,10 +152,17 @@ The in-process download engine. Depends on an `HttpEngine` interface (no HTTP cl
 ```kotlin
 interface HttpEngine {
   suspend fun head(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
+  // GET with `Range: bytes=0-0`, used when HEAD is refused (400, 403, 404, 405 or 501)
+  suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
   suspend fun download(url: String, range: LongRange?, headers: Map<String, String> = emptyMap(), onData: suspend (ByteArray) -> Unit)
   fun close()
 }
 ```
+
+`probe` has a default that throws `UnsupportedOperationException`; an engine without it fails
+when a server refuses HEAD, as before. `RequestHeaders` holds the header rules engines share:
+`Ketch.download` rejects names that are not tokens and values with line breaks or other control
+characters, and engines ignore `Host`, `Range`, `Content-Length` and hop-by-hop headers.
 
 `Ketch` implements `KetchApi`. Everything except the `HttpEngine` has a default:
 
@@ -186,6 +194,16 @@ Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 | Desktop | CIO |
 
 On JavaScript and WasmWasi, pass your own `HttpEngine` to `Ketch`.
+
+`KtorHttpEngine` sends `User-Agent: Ketch/<version>` (`KtorHttpEngine.DEFAULT_USER_AGENT`) unless
+the request headers name one; pass `userAgent` to change it, or `null` to leave it to the client.
+It follows redirects itself, at most 20, and refuses those from HTTPS to HTTP or to other
+schemes. A redirect to another scheme, host or port keeps only `User-Agent`, `Accept`,
+`Accept-Encoding`, `Accept-Language` and the origin of `Referer`: cookies, `Authorization` and
+any other header, which may hold a credential, stay with the origin they were given for. The
+engine remembers where a request's redirects led, so a download's segments go to the server that
+answered its probe; when that server fails, for example because a signed link expired, the next
+request follows the redirects again.
 
 For downloading across multiple interfaces, wrap network-bound engines in
 `MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;

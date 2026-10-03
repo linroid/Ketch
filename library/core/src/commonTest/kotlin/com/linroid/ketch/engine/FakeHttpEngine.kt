@@ -8,7 +8,8 @@ import kotlinx.coroutines.awaitCancellation
 /**
  * A fake HttpEngine for unit testing. Simulates a server with configurable behavior
  * including range support, ETags, and content delivery. A transfer that reaches
- * [stallAfterBytes] stops sending until it is cancelled.
+ * [stallAfterBytes] stops sending until it is cancelled. [headErrorCode] refuses only
+ * `HEAD`, as a URL presigned for `GET` does, while [probe] still answers.
  */
 class FakeHttpEngine(
   var serverInfo: ServerInfo = ServerInfo(
@@ -22,6 +23,7 @@ class FakeHttpEngine(
   var failAfterBytes: Long = -1,
   var stallAfterBytes: Long = -1,
   var failOnHead: Boolean = false,
+  var headErrorCode: Int = 0,
   var httpErrorCode: Int = 0,
   var retryAfterSeconds: Long? = null,
   var rateLimitRemaining: Long? = null,
@@ -29,9 +31,13 @@ class FakeHttpEngine(
 
   var headCallCount = 0
     private set
+  var probeCallCount = 0
+    private set
   var downloadCallCount = 0
     private set
   var lastHeadHeaders: Map<String, String> = emptyMap()
+    private set
+  var lastProbeHeaders: Map<String, String> = emptyMap()
     private set
   var lastDownloadHeaders: Map<String, String> = emptyMap()
     private set
@@ -46,6 +52,19 @@ class FakeHttpEngine(
     if (failOnHead) {
       throw KetchError.Network(RuntimeException("Simulated network failure"))
     }
+    if (headErrorCode > 0) throw KetchError.Http(headErrorCode, "Simulated HEAD refusal")
+    if (httpErrorCode > 0) {
+      throw KetchError.Http(
+        httpErrorCode, "Simulated HTTP error",
+        retryAfterSeconds, rateLimitRemaining,
+      )
+    }
+    return serverInfo
+  }
+
+  override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo {
+    probeCallCount++
+    lastProbeHeaders = headers
     if (httpErrorCode > 0) {
       throw KetchError.Http(
         httpErrorCode, "Simulated HTTP error",

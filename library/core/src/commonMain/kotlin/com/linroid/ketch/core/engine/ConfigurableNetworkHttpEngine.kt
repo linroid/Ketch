@@ -73,6 +73,9 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
     withEngine { it.head(url, headers) }
 
+  override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
+    withEngine { it.probe(url, headers) }
+
   override suspend fun download(
     url: String,
     range: LongRange?,

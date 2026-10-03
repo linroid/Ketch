@@ -170,8 +170,9 @@ To give AI agents control of a `KetchApi`, run `ketch mcp`
 
 ## How a download works
 
-1. **Resolve** — Ask the source about the download (a HEAD request for HTTP): its size, whether
-   it supports ranges, and its ETag and Last-Modified.
+1. **Resolve** — Ask the source about the download (a HEAD request for HTTP, or a `GET` of its
+   first byte when the server refuses HEAD): its size, whether it supports ranges, and its ETag
+   and Last-Modified.
 2. **Plan** — With range support, split the file into one segment per connection; otherwise use
    a single connection.
 3. **Queue** — Start the download when the concurrency and per-host limits allow, by priority.
