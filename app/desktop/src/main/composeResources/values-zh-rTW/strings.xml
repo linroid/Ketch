@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">檔案</string>
+  <string name="menu_edit">編輯</string>
+  <string name="menu_view">顯示方式</string>
+  <string name="menu_downloads">下載</string>
+  <string name="menu_device">裝置</string>
+  <string name="menu_window">視窗</string>
+  <string name="menu_help">輔助說明</string>
+  <string name="menu_pause">暫停</string>
+  <string name="menu_resume">繼續</string>
+  <string name="menu_add_device">新增裝置…</string>
+  <string name="menu_pair_device">配對裝置…</string>
+  <string name="menu_item_keys">%1$s（%2$s）</string>
+
+
+  <string name="tray_devices">裝置</string>
+  <string name="tray_recent">最近項目</string>
+  <string name="tray_show_ketch">顯示 Ketch</string>
+  <string name="tray_speed">速度</string>
+  <string name="tray_show">顯示</string>
+  <string name="tray_enter_token">輸入權杖…</string>
+  <string name="tray_retry_now">立即重試</string>
+  <string name="tray_stay_connected">保持連線</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="other">重試 %1$d 個失敗項目</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">在此新增剪貼簿中的連結</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">需要權杖</string>
+  <string name="tray_not_connected">未連線</string>
+  <string name="tray_offline">離線</string>
+  <string name="tray_connecting">正在連線</string>
+  <string name="tray_idle">閒置</string>
+  <plurals name="tray_active">
+    <item quantity="other">%1$d 個進行中</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="other">%1$d 個等待中</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="other">%1$d 個已暫停</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="other">↓ %2$s · %1$d 個進行中</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">剪貼簿中沒有連結</string>
+  <string name="message_switch_speed_failed">無法將 %1$s 切換至「%2$s」</string>
+  <string name="message_try_again">再試一次</string>
+  <string name="message_undo">復原</string>
+  <string name="message_slow_lane_on">已為 %1$s 開啟慢車道 · %2$s</string>
+  <string name="message_slow_lane_off">已為 %1$s 關閉慢車道</string>
+  <string name="message_speed_follows_rules">%1$s 的速度將依照你的規則調整</string>
+  <string name="message_speed_limit_failed">無法設定 %1$s 的速度限制</string>
+  <string name="message_reconnect_failed">無法重新連線至 %1$s</string>
+  <string name="message_open_failed">無法開啟 %1$s</string>
+  <string name="message_show_failed">無法顯示 %1$s</string>
+  <string name="message_pause_failed">無法在 %2$s 上暫停 %1$s</string>
+  <string name="message_copy_links_failed">無法複製連結</string>
+  <plurals name="message_links_copied">
+    <item quantity="other">已複製 %1$d 個連結</item>
+  </plurals>
+  <string name="message_window_error">發生錯誤</string>
+  <string name="open_torrent_title">開啟種子檔案</string>
+
+  <string name="close_keep_running_title">要在背景繼續下載嗎？</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="other">Ketch 會留在選單列中，並完成 %1$d 個下載。</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="other">Ketch 會留在通知區域中，並完成 %1$d 個下載。</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="other">Ketch 會留在系統匣中，並完成 %1$d 個下載。</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="other">Ketch 會保持最小化，並完成 %1$d 個下載。</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">你隨時可以從選單列圖示或按 %1$s 結束。</string>
+  <string name="close_quit_from_notification_area">你隨時可以從通知區域圖示或按 %1$s 結束。</string>
+  <string name="close_quit_from_system_tray">你隨時可以從系統匣圖示或按 %1$s 結束。</string>
+  <string name="close_quit_with_keys">你隨時可以按 %1$s 結束。</string>
+  <string name="close_sentences">%1$s%2$s</string>
+  <string name="close_keep_running">繼續執行</string>
+  <string name="close_quit_ketch">結束 Ketch</string>
+  <string name="close_dont_ask_again">不要再詢問</string>
+  <string name="close_quit_title">要結束 Ketch 嗎？</string>
+  <plurals name="close_quit_body">
+    <item quantity="other">%1$d 個下載將會暫停，並在你下次開啟 Ketch 時繼續。</item>
+  </plurals>
+  <string name="close_quit">結束</string>
+  <string name="close_cancel">取消</string>
+
+  <string name="notify_still_running">Ketch 仍在通知區域中執行</string>
+  <plurals name="notify_added">
+    <item quantity="other">已新增 %1$d 個下載</item>
+  </plurals>
+  <string name="notify_on_device">%1$s：%2$s</string>
+  <string name="notify_names_two">%1$s、%2$s</string>
+  <string name="notify_names_three">%1$s、%2$s、%3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="other">%1$s 及另外 %2$d 個</item>
+  </plurals>
+
+  <string name="settings_window_title">設定</string>
+</resources>

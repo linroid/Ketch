@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <plurals name="pulse_downloading">
+    <item quantity="other">正在下載 %1$d 個檔案</item>
+  </plurals>
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="other">正在 %2$d 台裝置上下載 %1$d 個檔案</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="other">%1$d 個下載項目需要處理</item>
+  </plurals>
+  <string name="pulse_all_quiet">一切正常</string>
+  <string name="pulse_all_quiet_free">一切正常 · %2$s 上可用 %1$s</string>
+  <string name="pulse_connecting">正在連線至 %1$s</string>
+  <string name="pulse_needs_token">%1$s 需要權杖</string>
+  <string name="pulse_offline">%1$s 已離線 · 正在重試</string>
+  <string name="pulse_slow_lane">慢車道</string>
+  <string name="pulse_slow_lane_until">慢車道至 %1$s</string>
+  <string name="pulse_disk_tooltip">%2$s 上%1$s · %3$s</string>
+  <string name="pulse_downloading_count">%1$d 個下載中</string>
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <plurals name="pulse_count_downloading">
+    <item quantity="other">%1$d 個下載中</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="other">%1$d 個等待中</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+  <string name="pulse_count_description">%1$s，顯示「%2$s」分頁</string>
+  <string name="pulse_speed_offline">離線時速度不明</string>
+  <string name="pulse_speed_downloading">正在以 %1$s 下載，顯示過去 5 分鐘</string>
+  <string name="pulse_speed_idle">閒置，顯示過去 5 分鐘</string>
+  <string name="pulse_idle">閒置</string>
+  <string name="pulse_disk_short">不足以容納等待中的下載</string>
+  <plurals name="pulse_activity_unread">
+    <item quantity="other">動態，%1$d 則未讀</item>
+  </plurals>
+  <plurals name="pulse_selected">
+    <item quantity="other">已選取 %1$d 個</item>
+  </plurals>
+
+  <string name="pulse_health_sharing">共享中 :%1$d</string>
+  <string name="pulse_health_not_shared">未共享</string>
+  <string name="pulse_health_live">已連線</string>
+  <string name="pulse_health_connecting">正在連線</string>
+  <string name="pulse_health_offline">離線</string>
+  <string name="pulse_health_needs_token">需要權杖</string>
+  <string name="pulse_health_description">%1$s：%2$s</string>
+
+  <string name="pulse_mode_full">全速</string>
+  <string name="pulse_mode_auto_name">自動</string>
+  <string name="pulse_mode_capped">已限速 · %1$s</string>
+  <string name="pulse_mode_slow_lane">慢車道 · %1$s</string>
+  <string name="pulse_mode_auto">自動 · %1$s</string>
+  <string name="pulse_full_speed_until">全速至 %1$s</string>
+  <string name="pulse_mode_full_short">全速</string>
+
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <plurals name="pulse_active">
+    <item quantity="other">%1$d 個進行中</item>
+  </plurals>
+  <string name="pulse_subtitle_description">%1$s，顯示速度</string>
+  <string name="pulse_last_minute">過去 1 分鐘</string>
+
+  <string name="pulse_speed">速度</string>
+  <string name="pulse_last_5_minutes">過去 5 分鐘</string>
+  <string name="pulse_history_empty">過去 5 分鐘內沒有下載任何內容。</string>
+  <string name="pulse_no_limit">無限制</string>
+  <string name="pulse_limit">限制 %1$s</string>
+
+  <string name="pulse_slow_lane_turn_on">開啟慢車道</string>
+  <string name="pulse_slow_lane_turn_off">關閉慢車道</string>
+  <string name="pulse_speed_limit">速度限制</string>
+  <string name="pulse_limited">已限速</string>
+  <string name="pulse_not_limited">未限速</string>
+  <string name="pulse_speed_options">速度選項</string>
+  <string name="pulse_speed_mode">速度模式</string>
+  <string name="pulse_slow_lane_speed">慢車道速度</string>
+  <string name="pulse_use_as_slow_lane">設為慢車道速度</string>
+  <string name="pulse_speed_settings">速度設定…</string>
+  <string name="pulse_update_failed">無法更新 %1$s · %2$s</string>
+  <string name="pulse_caption_full">下載會以網路允許的最快速度進行。</string>
+  <string name="pulse_caption_capped">下載速度上限為 %1$s。</string>
+  <string name="pulse_caption_slow_lane">下載共用 %1$s，將頻寬留給其他用途。</string>
+  <string name="pulse_caption_no_rules">尚無速度規則。請在「速度設定」中新增。</string>
+  <string name="pulse_caption_rule_slow_lane">有規則讓慢車道保持開啟。</string>
+  <string name="pulse_caption_rule_full">全速，直到有規則開啟慢車道。</string>
+  <string name="pulse_caption_slow_lane_until">慢車道持續至 %1$s，之後依你的規則決定。</string>
+  <string name="pulse_caption_full_until">全速持續至 %1$s，之後依你的規則決定。</string>
+  <string name="pulse_limit_for_slow_lane">慢車道開啟時使用。</string>
+  <string name="pulse_limit_for_device">套用至 %1$s 上的所有下載。</string>
+  <string name="pulse_limit_after_slow_lane">慢車道關閉後套用。</string>
+
+  <string name="pulse_slow_lane_on">已開啟慢車道 · %1$s</string>
+  <string name="pulse_slow_lane_off">已關閉慢車道</string>
+  <string name="pulse_speed_follows_rules">速度將依照你的規則調整</string>
+  <string name="pulse_switch_failed">無法切換至「%1$s」</string>
+  <string name="pulse_limit_failed">無法設定速度限制</string>
+
+  <string name="pulse_timeline_added">已新增</string>
+  <string name="pulse_timeline_started">已開始</string>
+  <string name="pulse_timeline_resumed">已繼續</string>
+  <string name="pulse_timeline_retried">已重試</string>
+  <string name="pulse_timeline_paused">已暫停</string>
+  <string name="pulse_timeline_queued">已加入佇列</string>
+  <string name="pulse_timeline_scheduled">已排程</string>
+  <string name="pulse_timeline_completed">已完成</string>
+  <string name="pulse_timeline_failed">失敗</string>
+  <string name="pulse_timeline_canceled">已取消</string>
+  <string name="pulse_timeline_connections">連線數 %1$s → %2$s</string>
+  <string name="pulse_timeline_auto">自動</string>
+  <string name="pulse_timeline_limit">限制 → %1$s</string>
+  <string name="pulse_timeline_limit_removed">已移除限制</string>
+  <string name="pulse_timeline_priority">優先順序 → %1$s</string>
+</resources>

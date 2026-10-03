@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "将下载、链接和磁力链接发送到这台电脑或远程服务器上的 Ketch。"
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "zh-CN"
+  },
+  "menu_download_link": {
+    "message": "使用 Ketch 下载链接"
+  },
+  "menu_download_image": {
+    "message": "使用 Ketch 下载图片"
+  },
+  "menu_download_video": {
+    "message": "使用 Ketch 下载视频"
+  },
+  "menu_download_audio": {
+    "message": "使用 Ketch 下载音频"
+  },
+  "notify_sent_to": {
+    "message": "已发送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "已发送到 Ketch"
+  },
+  "notify_download_added": {
+    "message": "已添加下载"
+  },
+  "notify_fallback_browser": {
+    "message": "改用浏览器下载"
+  },
+  "notify_fallback_magnet": {
+    "message": "改用其他应用打开磁力链接"
+  },
+  "notify_send_failed": {
+    "message": "无法发送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch 无法下载此内容"
+  },
+  "notify_unsupported_stream": {
+    "message": "此媒体由网页自行播放，没有可供下载的链接。"
+  },
+  "notify_unsupported_scheme": {
+    "message": "只能将 http、https、ftp 和磁力链接发送到 Ketch。"
+  },
+  "error_with_hint": {
+    "message": "$ERROR$。$HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "$ADDRESS$ 上的 Ketch 没有响应",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "无法连接 $ADDRESS$ 上的 Ketch",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch 拒绝了访问令牌"
+  },
+  "error_token_required": {
+    "message": "Ketch 需要访问令牌"
+  },
+  "error_http_status": {
+    "message": "Ketch 返回了 HTTP $STATUS$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch 未能及时启动"
+  },
+  "error_app_not_installed": {
+    "message": "这台电脑上尚未设置 Ketch 应用"
+  },
+  "error_app_unreachable": {
+    "message": "无法连接 Ketch 应用"
+  },
+  "error_app_not_running": {
+    "message": "Ketch 未在运行"
+  },
+  "error_app_connect_failed": {
+    "message": "Ketch 应用无法连接"
+  },
+  "error_app_invalid_reply": {
+    "message": "Ketch 应用返回了无效的响应"
+  },
+  "error_unsupported_link": {
+    "message": "Ketch 无法下载这类链接"
+  },
+  "error_torrent_http": {
+    "message": "无法获取种子文件（HTTP $STATUS$）",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "获取种子文件超时"
+  },
+  "error_torrent_too_large": {
+    "message": "种子文件太大"
+  },
+  "error_address_required": {
+    "message": "请输入 Ketch 服务器的地址"
+  },
+  "error_address_invalid": {
+    "message": "“$ADDRESS$”不是有效的地址",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "地址必须以 http:// 或 https:// 开头"
+  },
+  "error_address_credentials": {
+    "message": "请将访问令牌填入令牌栏，而不是地址中"
+  },
+  "error_not_ketch": {
+    "message": "此地址似乎不是 Ketch 服务器"
+  },
+  "hint_app_not_installed": {
+    "message": "请安装 Ketch 桌面应用并打开一次，然后重试。如果使用“ketch server”，或浏览器是以 Flatpak 或 Snap 安装的，请改为将 Ketch 添加为服务器。"
+  },
+  "hint_app_not_running": {
+    "message": "向 Ketch 发送下载时，它会自动打开。"
+  },
+  "hint_open_app": {
+    "message": "请打开 Ketch 后重试。"
+  },
+  "hint_local_server": {
+    "message": "请打开 Ketch 并开启“设置 → 远程访问 → 服务器”，或运行“ketch server”。"
+  },
+  "hint_remote_server": {
+    "message": "请检查服务器是否正在运行，以及从这里能否访问此地址。"
+  },
+  "hint_access_token": {
+    "message": "请输入 Ketch 中“设置 → 远程访问”下显示的访问令牌。"
+  },
+  "task_magnet_link": {
+    "message": "磁力链接"
+  },
+  "task_torrent": {
+    "message": "种子"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ / $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "已暂停"
+  },
+  "task_paused_percent": {
+    "message": "已暂停 · $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "排队中"
+  },
+  "task_scheduled": {
+    "message": "已计划"
+  },
+  "task_completed": {
+    "message": "已完成"
+  },
+  "task_failed": {
+    "message": "失败：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "未知错误"
+  },
+  "task_canceled": {
+    "message": "已取消"
+  },
+  "task_pause": {
+    "message": "暂停"
+  },
+  "task_resume": {
+    "message": "继续"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "已连接 · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "已连接到 $NAME$ · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "已连接 · $OS$ 上的 Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "已连接到 $NAME$ · $OS$ 上的 Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "正在连接…"
+  },
+  "status_opening_app": {
+    "message": "正在打开 Ketch…"
+  },
+  "instance_this_computer": {
+    "message": "这台电脑"
+  },
+  "instance_name_default": {
+    "message": "$NAME$（默认）",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "名称"
+  },
+  "instance_default": {
+    "message": "默认"
+  },
+  "instance_app_detail": {
+    "message": "这台电脑上的 Ketch 应用。需要下载时，扩展会自动打开它。"
+  },
+  "instance_address": {
+    "message": "地址"
+  },
+  "instance_token": {
+    "message": "访问令牌"
+  },
+  "instance_token_placeholder": {
+    "message": "非必填"
+  },
+  "instance_insecure": {
+    "message": "此地址未加密：访问令牌和随下载发送的 Cookie 会以明文在网络上传输。建议使用 https，或仅在可信的网络中使用。"
+  },
+  "instance_test": {
+    "message": "测试连接"
+  },
+  "instance_remove": {
+    "message": "移除"
+  },
+  "instance_enter_address": {
+    "message": "请输入 Ketch 服务器的地址。"
+  },
+  "popup_instance_picker": {
+    "message": "Ketch 实例"
+  },
+  "popup_settings": {
+    "message": "设置"
+  },
+  "popup_open_app": {
+    "message": "打开 Ketch"
+  },
+  "popup_add_placeholder": {
+    "message": "粘贴链接或磁力链接"
+  },
+  "popup_add_label": {
+    "message": "要下载的链接"
+  },
+  "popup_add_button": {
+    "message": "下载"
+  },
+  "popup_added": {
+    "message": "已添加 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "请输入 http、https、ftp 或磁力链接。"
+  },
+  "popup_capture": {
+    "message": "捕获浏览器下载"
+  },
+  "popup_capture_target": {
+    "message": "发送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "最近"
+  },
+  "popup_no_downloads": {
+    "message": "还没有下载。"
+  },
+  "options_title": {
+    "message": "Ketch 扩展设置"
+  },
+  "options_intro": {
+    "message": "将此浏览器中的下载发送到这台电脑或远程服务器上的 Ketch。"
+  },
+  "options_saved": {
+    "message": "已保存"
+  },
+  "options_permission": {
+    "message": "Ketch 需要访问网站，才能捕获网站的下载、发送其 Cookie 并连接 Ketch 服务器。"
+  },
+  "options_allow_access": {
+    "message": "允许访问"
+  },
+  "options_instances": {
+    "message": "Ketch 实例"
+  },
+  "options_instances_detail": {
+    "message": "捕获的下载和磁力链接会发送到默认实例。右键点击链接、图片或视频，可将其发送到任一实例。"
+  },
+  "options_add_app": {
+    "message": "添加这台电脑上的 Ketch"
+  },
+  "options_add_server": {
+    "message": "添加服务器"
+  },
+  "options_browser_downloads": {
+    "message": "浏览器下载"
+  },
+  "options_capture": {
+    "message": "捕获下载"
+  },
+  "options_capture_detail": {
+    "message": "在浏览器中开始的下载会改由 Ketch 下载。如果无法连接 Ketch，浏览器会照常下载。"
+  },
+  "options_min_size": {
+    "message": "小文件交给浏览器"
+  },
+  "options_min_size_detail": {
+    "message": "小于此大小的文件留在浏览器中下载。大小未知的文件始终交给 Ketch。设为 0 则全部发送。"
+  },
+  "options_min_size_unit": {
+    "message": "MB"
+  },
+  "options_excluded": {
+    "message": "交给浏览器的网站"
+  },
+  "options_excluded_detail": {
+    "message": "每行一个。包括其子域名，因此 example.com 也涵盖 downloads.example.com。"
+  },
+  "options_cookies": {
+    "message": "发送 Cookie 和来源页"
+  },
+  "options_cookies_detail": {
+    "message": "让 Ketch 能下载需要登录的文件。Ketch 会将它们与任务一起保存，以便之后继续下载。"
+  },
+  "options_links_notifications": {
+    "message": "链接和通知"
+  },
+  "options_magnet": {
+    "message": "将点击的磁力链接发送到 Ketch"
+  },
+  "options_magnet_detail": {
+    "message": "按住 Alt 键点击磁力链接，可改用其他应用打开。"
+  },
+  "options_notify": {
+    "message": "发送下载时通知"
+  },
+  "options_notify_detail": {
+    "message": "出现问题时始终会通知。"
+  },
+  "options_help": {
+    "message": "设置 Ketch"
+  },
+  "options_help_this_computer": {
+    "message": "在这台电脑上"
+  },
+  "options_help_this_computer_detail": {
+    "message": "安装 Ketch 桌面应用并打开一次，让浏览器能找到它。之后，扩展会在需要下载时自动打开 Ketch，无需开启服务器或复制令牌。"
+  },
+  "options_help_other_device": {
+    "message": "在其他设备上"
+  },
+  "options_help_other_device_detail": {
+    "message": "在该设备上打开“设置 → 远程访问”，开启<b>服务器</b>和<b>允许其他设备</b>，然后生成访问令牌。再在这里通过<b>添加服务器</b>添加该设备，填入其地址（例如 <code>http://192.168.1.20:8642</code>）和令牌。如果使用 <code>ketch server</code>，请在其 config.toml 中设置 <code>apiToken</code>。"
+  },
+  "options_help_command_line": {
+    "message": "命令行或沙盒浏览器"
+  },
+  "options_help_command_line_detail": {
+    "message": "要在这台电脑上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安装的浏览器（无法启动其他应用）中使用 Ketch，请将其添加为服务器，地址为 <code>http://127.0.0.1:8642</code>。"
+  }
+}

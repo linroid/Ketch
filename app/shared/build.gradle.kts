@@ -141,6 +141,29 @@ kotlin {
   }
 }
 
+// Chinese is written once per script, Simplified in values-zh and Traditional in values-zh-rTW.
+// Browsers and Windows report a region without a script, so Traditional is copied for Hong Kong
+// and Macau. Systems that report a script, such as iOS, get a copy of each under its script tag:
+// lookup tries the script before the region, so zh-Hans-HK reads Simplified and zh-Hant reads
+// Traditional, and it never crosses from one script to the other on its own.
+val composeResourcesWithAliases = layout.buildDirectory.dir("generated/composeResourcesWithAliases")
+val aliasComposeResources = tasks.register<Sync>("aliasComposeResources") {
+  val source = layout.projectDirectory.dir("src/commonMain/composeResources")
+  from(source)
+  for (alias in listOf("values-b+zh+Hant", "values-zh-rHK", "values-zh-rMO")) {
+    from(source.dir("values-zh-rTW")) { into(alias) }
+  }
+  from(source.dir("values-zh")) { into("values-b+zh+Hans") }
+  into(composeResourcesWithAliases)
+}
+
+compose.resources {
+  customDirectory(
+    sourceSetName = "commonMain",
+    directoryProvider = aliasComposeResources.map { composeResourcesWithAliases.get() },
+  )
+}
+
 // `-PupdateTokenAllowlist` makes the design token guard rewrite its allowlist instead of failing.
 tasks.named<Test>("jvmTest") {
   val updateTokenAllowlist = providers.gradleProperty("updateTokenAllowlist")
