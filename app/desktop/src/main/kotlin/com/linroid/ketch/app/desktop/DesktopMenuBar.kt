@@ -58,6 +58,7 @@ import com.linroid.ketch.app.util.links
 import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.menu_add_device
+import ketch.app.desktop.generated.resources.menu_check_updates
 import ketch.app.desktop.generated.resources.menu_device
 import ketch.app.desktop.generated.resources.menu_downloads
 import ketch.app.desktop.generated.resources.menu_edit
@@ -106,12 +107,15 @@ import java.io.FilenameFilter
  * @property closeWindow closes the main window; Ketch keeps running.
  * @property quit quits Ketch, asking first while downloads are active.
  * @property openFiles adds the `.torrent` files picked with "Open torrent file…".
+ * @property checkForUpdates looks for a newer release of the app; `null` where the app does not
+ *   update itself, which leaves out "Check for Updates…".
  */
 class DesktopActions(
   val showWindow: () -> Unit,
   val closeWindow: () -> Unit,
   val quit: () -> Unit,
   val openFiles: (List<File>) -> Unit,
+  val checkForUpdates: (() -> Unit)? = null,
 )
 
 /**
@@ -148,7 +152,8 @@ fun FrameWindowScope.KetchMenuBar(
   val selection by remember(selectedKeys, instances) {
     selectionFlow(selectedKeys, instances)
   }.collectAsState(emptyList())
-  val context = menuBarContext(controller, status, speedMode, files, instances, selection)
+  val updates = actions.checkForUpdates != null
+  val context = menuBarContext(controller, status, speedMode, files, instances, selection, updates)
   val menus = menuBar(context)
   MenuBar {
     for (menu in menus) {
@@ -159,7 +164,7 @@ fun FrameWindowScope.KetchMenuBar(
 
 /**
  * What the macOS menu bar reflects of [controller] now, with [instances], the devices, and the
- * [selection].
+ * [selection]; [updates] says whether the app updates itself.
  */
 @Composable
 internal fun menuBarContext(
@@ -169,6 +174,7 @@ internal fun menuBarContext(
   files: FileActions?,
   instances: List<InstanceEntry>,
   selection: List<SelectedTask> = emptyList(),
+  updates: Boolean = false,
 ): MenuBarContext {
   val state = controller.state
   val active by state.activeInstance.collectAsState()
@@ -187,6 +193,7 @@ internal fun menuBarContext(
     allDevices = shown == DeviceScope.All,
     revealLabel = files?.revealLabel,
     platform = KeyboardPlatform.Mac,
+    updates = updates,
   )
 }
 
@@ -266,6 +273,9 @@ internal sealed interface MenuAction {
 
   /** Opens Settings at Sharing, where another device pairs with this one. */
   data object PairDevice : MenuAction
+
+  /** Opens Settings at About and looks for a newer release of the app. */
+  data object CheckForUpdates : MenuAction
 }
 
 /** A menu of the menu bar. */
@@ -315,6 +325,7 @@ internal data class SelectedTask(val phase: TaskPhase, val local: Boolean)
  * @property slowLane whether the slow lane is on; `null` when speed modes are unavailable.
  * @property allDevices whether the window shows every device rather than the active one.
  * @property revealLabel label of Reveal, such as "Show in Finder"; `null` keeps the command's.
+ * @property updates whether the app updates itself, which adds "Check for Updates…" to Help.
  */
 internal data class MenuBarContext(
   val counts: PulseCounts,
@@ -328,6 +339,7 @@ internal data class MenuBarContext(
   val allDevices: Boolean = false,
   val revealLabel: UiText? = null,
   val platform: KeyboardPlatform = KeyboardPlatform.Mac,
+  val updates: Boolean = false,
 )
 
 /** The menus of the menu bar in [context]. */
@@ -439,7 +451,14 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       },
     ),
     MenuBarMenu(Res.string.menu_window.text(), listOf(item(KetchCommands.Minimize))),
-    MenuBarMenu(Res.string.menu_help.text(), listOf(item(KetchCommands.Shortcuts))),
+    MenuBarMenu(
+      Res.string.menu_help.text(),
+      listOfNotNull(
+        item(KetchCommands.Shortcuts),
+        MenuEntry.Item(MenuAction.CheckForUpdates, Res.string.menu_check_updates.text())
+          .takeIf { context.updates },
+      ),
+    ),
   )
 }
 
@@ -619,6 +638,10 @@ internal class DesktopCommands(
       }
       MenuAction.PairDevice -> {
         state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+      }
+      MenuAction.CheckForUpdates -> {
+        state.openSettings(SettingsTarget(SettingsTarget.Page.About))
+        actions.checkForUpdates?.invoke()
       }
     }
   }

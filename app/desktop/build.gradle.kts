@@ -21,6 +21,7 @@ dependencies {
   implementation(projects.library.remote)
   implementation(projects.library.server)
   implementation(projects.library.sqlite)
+  implementation(projects.updater)
   implementation(compose.desktop.currentOs)
   // The menu bar, tray and dialog strings in src/main/composeResources.
   implementation(libs.compose.components.resources)
@@ -224,17 +225,40 @@ compose.desktop {
       }
       windows {
         iconFile.set(rootProject.file("art/icon.ico"))
+        // Windows Installer upgrades the installed app only from a package with the same
+        // UpgradeCode. Releases up to 0.0.1 carry the one jpackage derives from the vendor and the
+        // name; pinned, so setting a vendor or renaming the package can't break upgrades.
+        upgradeUuid = "C26C63A7-2024-313A-B051-DC34FFBA1BF7"
       }
       linux {
         iconFile.set(rootProject.file("art/icon.png"))
       }
-      packageVersion = providers.gradleProperty("VERSION_NAME").get()
-        .substringBefore("-")
-        .let { semver ->
-          // DMG/MSI require MAJOR > 0; default to 1.0.0 for dev builds
-          val parts = semver.split(".")
-          if (parts.first() == "0") "1.0.0" else semver
-        }
+      packageVersion = installerVersion(providers.gradleProperty("VERSION_NAME").get())
     }
   }
+}
+
+/**
+ * The version the installers carry for [version], such as `0.0.1-rc15`. jpackage wants a MAJOR
+ * above 0 on macOS, and Windows Installer only upgrades to a higher MAJOR.MINOR.BUILD (MAJOR and
+ * MINOR at most 255, BUILD at most 65535), which the in-app updater relies on. So the release
+ * MAJOR.MINOR.PATCH-rcN becomes (MAJOR + 1).MINOR.(PATCH * 1000 + N), with 999 for the final
+ * release and 0 for any other build: 0.0.1-rc15 is 1.0.1015 and 0.0.1 is 1.0.1999. Releases up
+ * to 0.0.1 all carried 1.0.0, which every later one upgrades.
+ */
+fun installerVersion(version: String): String {
+  val match = Regex("""(\d+)\.(\d+)\.(\d+)(?:-(.+))?""").matchEntire(version)
+    ?: throw GradleException("VERSION_NAME '$version' is not MAJOR.MINOR.PATCH[-PRERELEASE]")
+  val (major, minor, patch, preRelease) = match.destructured
+  val final = 999
+  val stage = if (preRelease.isEmpty()) {
+    final
+  } else {
+    Regex("""rc(\d+)""").matchEntire(preRelease)?.groupValues?.get(1)?.toInt() ?: 0
+  }
+  val build = patch.toInt() * 1000 + stage
+  val fits = major.toInt() + 1 <= 255 && minor.toInt() <= 255 && build <= 65535 &&
+    (preRelease.isEmpty() || stage < final)
+  if (!fits) throw GradleException("VERSION_NAME '$version' doesn't fit an installer version")
+  return "${major.toInt() + 1}.${minor.toInt()}.$build"
 }

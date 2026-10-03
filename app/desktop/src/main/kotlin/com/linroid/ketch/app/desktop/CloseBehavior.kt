@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -13,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -24,7 +26,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
@@ -302,6 +303,14 @@ internal class CloseBehavior(
     dialog = LifecycleDialog.ConfirmQuit(downloads)
   }
 
+  /**
+   * Quits without asking, for an update the user chose to install now. Downloads pause and pick
+   * up where they left off when the updated app opens.
+   */
+  fun quitWithoutAsking() {
+    quitNow(quitResponse)
+  }
+
   /** Answers the dialog's main button. */
   fun confirm(dontAskAgain: Boolean = false) {
     when (dialog) {
@@ -374,58 +383,69 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
   val darkTheme = settings.themeMode.isDark()
   val copy = dialogCopy(dialog, DesktopOs.current, behavior.traySupported)
   var dontAskAgain by remember(dialog) { mutableStateOf(false) }
-  DialogWindow(
-    onCloseRequest = behavior::cancel,
-    state = rememberDialogState(
-      position = WindowPosition(Alignment.Center),
-      size = DpSize(DIALOG_WIDTH, Dp.Unspecified),
-    ),
-    title = "Ketch",
-    resizable = false,
-    alwaysOnTop = true,
-    onKeyEvent = { event ->
-      if (event.type != KeyEventType.KeyDown) return@DialogWindow false
-      when (event.key) {
-        Key.Enter -> behavior.confirm(dontAskAgain)
-        Key.Escape -> behavior.cancel()
-        else -> return@DialogWindow false
-      }
-      true
-    },
-  ) {
-    // Asked from the tray or the Dock, Ketch is not the active app, so the keys would go elsewhere.
-    LaunchedEffect(Unit) { bringToFront(window) }
-    KetchTheme(darkTheme = darkTheme, accent = settings.accent) {
-      val spacing = KetchTheme.spacing
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .background(KetchTheme.colors.surfaceRaised)
-          .padding(spacing.s6),
-        verticalArrangement = Arrangement.spacedBy(spacing.s4),
-      ) {
-        val colors = KetchTheme.colors
-        val typography = KetchTheme.typography
-        BasicText(copy.title.resolve(), style = typography.titleL.copy(color = colors.textPrimary))
-        BasicText(copy.body.resolve(), style = typography.body.copy(color = colors.textSecondary))
-        if (copy.dontAskAgain) {
-          KetchCheckbox(
-            checked = dontAskAgain,
-            onCheckedChange = { dontAskAgain = it },
-            label = stringResource(Res.string.close_dont_ask_again),
-          )
+  // The window takes the size of its content measured without a width limit, so the content sets
+  // its own width for the text to wrap as it shows, and each question gets a window of its own.
+  key(dialog) {
+    DialogWindow(
+      onCloseRequest = behavior::cancel,
+      state = rememberDialogState(
+        position = WindowPosition(Alignment.Center),
+        size = DpSize.Unspecified,
+      ),
+      title = "Ketch",
+      resizable = false,
+      alwaysOnTop = true,
+      onKeyEvent = { event ->
+        if (event.type != KeyEventType.KeyDown) return@DialogWindow false
+        when (event.key) {
+          Key.Enter -> behavior.confirm(dontAskAgain)
+          Key.Escape -> behavior.cancel()
+          else -> return@DialogWindow false
         }
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(spacing.s2, Alignment.End),
-          verticalAlignment = Alignment.CenterVertically,
+        true
+      },
+    ) {
+      // Asked from the tray or the Dock, Ketch is not the active app, so the keys would go
+      // elsewhere.
+      LaunchedEffect(Unit) { bringToFront(window) }
+      KetchTheme(darkTheme = darkTheme, accent = settings.accent) {
+        val spacing = KetchTheme.spacing
+        Column(
+          modifier = Modifier
+            .width(DIALOG_WIDTH)
+            .background(KetchTheme.colors.surfaceRaised)
+            .padding(spacing.s6),
+          verticalArrangement = Arrangement.spacedBy(spacing.s4),
         ) {
-          KetchButton(
-            text = copy.dismiss.resolve(),
-            onClick = { behavior.dismiss(dontAskAgain) },
-            variant = KetchButtonVariant.Secondary,
+          val colors = KetchTheme.colors
+          val typography = KetchTheme.typography
+          BasicText(
+            copy.title.resolve(),
+            style = typography.titleL.copy(color = colors.textPrimary),
           )
-          KetchButton(text = copy.confirm.resolve(), onClick = { behavior.confirm(dontAskAgain) })
+          BasicText(
+            copy.body.resolve(),
+            style = typography.body.copy(color = colors.textSecondary),
+          )
+          if (copy.dontAskAgain) {
+            KetchCheckbox(
+              checked = dontAskAgain,
+              onCheckedChange = { dontAskAgain = it },
+              label = stringResource(Res.string.close_dont_ask_again),
+            )
+          }
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing.s2, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            KetchButton(
+              text = copy.dismiss.resolve(),
+              onClick = { behavior.dismiss(dontAskAgain) },
+              variant = KetchButtonVariant.Secondary,
+            )
+            KetchButton(text = copy.confirm.resolve(), onClick = { behavior.confirm(dontAskAgain) })
+          }
         }
       }
     }
@@ -587,5 +607,5 @@ private fun KeyChord.toKeyStroke(): KeyStroke {
   return KeyStroke.getKeyStroke(press.key.nativeKeyCode, modifiers)
 }
 
-// Width of the question windows; their height follows the text.
+// Width of the question windows' content; their height follows the text.
 private val DIALOG_WIDTH = 420.dp

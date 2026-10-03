@@ -11,6 +11,7 @@
   <string name="menu_resume">Возобновить</string>
   <string name="menu_add_device">Добавить устройство…</string>
   <string name="menu_pair_device">Сопряжение с устройством…</string>
+  <string name="menu_check_updates">Проверить обновления…</string>
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
 
@@ -71,6 +72,15 @@
   <string name="message_switch_speed_failed">Не удалось включить режим «%2$s» на устройстве «%1$s»</string>
   <string name="message_try_again">Попробовать снова</string>
   <string name="message_undo">Отменить</string>
+  <string name="message_update_available">Доступен Ketch %1$s</string>
+  <string name="message_update_ready">Ketch %1$s готов к установке</string>
+  <string name="message_update_installed">Ketch обновлён до %1$s</string>
+  <string name="message_update_failed">Не удалось обновить Ketch до %1$s</string>
+  <string name="message_update_failed_hint">Причина записана в update.log в папке журналов.</string>
+  <string name="message_update">Обновить</string>
+  <string name="message_restart">Перезапустить</string>
+  <string name="message_open_installer">Открыть установщик</string>
+  <string name="message_whats_new">Что нового</string>
   <string name="message_slow_lane_on">Медленная полоса включена на устройстве «%1$s» · %2$s</string>
   <string name="message_slow_lane_off">Медленная полоса выключена на устройстве «%1$s»</string>
   <string name="message_speed_follows_rules">Скорость на устройстве «%1$s» задаётся вашими правилами</string>

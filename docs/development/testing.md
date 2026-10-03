@@ -7,7 +7,7 @@
 - **Server**: `ktor-server-test-host` (`testApplication` for REST API tests)
 - **Source sets**: write tests in `commonTest` by default; use `jvmTest`, `iosTest` or
   `androidDeviceTest` only for platform-specific behavior. JVM-only modules (`library:server`,
-  `ai:discover`, `app:desktop`) use `src/test`
+  `library:mcp`, `ai:discover`, `app:desktop`, `cli`) use `src/test`, run by their `test` task
 - **No external assertion libraries** — use `kotlin.test` assertions only
 - **No mocking libraries** — write hand-crafted fakes (e.g., `FakeHttpEngine`)
 
@@ -47,6 +47,17 @@ Do **not** write tests for things the Kotlin language or frameworks already guar
 - Use `FakeHttpEngine` and similar test doubles for isolation, but don't test the doubles
 - When a formula or algorithm lives in production code, test it by calling that production
   code — never reimplement the formula locally and assert against the reimplementation
+
+## JVM Tests
+
+```shell
+./gradlew allJvmTests
+```
+
+Runs every module's JVM tests, as the CI JVM job does: `jvmTest` in multiplatform modules and
+`test` in the JVM-only ones, which `./gradlew jvmTest` does not select. `:cli:test` first builds
+the wasm web app that the CLI bundles; pass `-PprebuiltWebDir=<dir>` to bundle prebuilt assets
+instead, or a directory that does not exist to bundle none, as CI does.
 
 ## Public HTTP Download Smoke Tests
 

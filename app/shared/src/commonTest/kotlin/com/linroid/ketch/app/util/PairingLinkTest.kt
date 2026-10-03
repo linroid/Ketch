@@ -130,7 +130,7 @@ class PairingLinkTest {
   }
 
   @Test
-  fun pairingAddresses_mixedInterfaces_listPrivateIpv4First() {
+  fun ipv4Addresses_mixedInterfaces_listPrivateFirst() {
     val interfaces = listOf(
       NetworkInterfaceInfo("lo0", "lo0", listOf("127.0.0.1", "::1")),
       NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
@@ -141,8 +141,46 @@ class PairingLinkTest {
 
     assertEquals(
       listOf("192.168.1.20", "10.0.0.4", "100.101.7.12"),
-      pairingAddresses(interfaces),
+      ipv4Addresses(interfaces),
     )
+  }
+
+  @Test
+  fun pairingAddresses_vmBridgesAndVpns_areLeftOut() {
+    val interfaces = listOf(
+      NetworkInterfaceInfo("bridge100", "bridge100", listOf("192.168.139.3")),
+      NetworkInterfaceInfo("bridge101", "bridge101", listOf("172.18.0.0")),
+      NetworkInterfaceInfo("docker0", "docker0", listOf("172.17.0.1")),
+      NetworkInterfaceInfo("en0", "en0", listOf("192.168.31.11")),
+      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
+      NetworkInterfaceInfo("eth3", "Hyper-V Virtual Ethernet Adapter", listOf("172.24.0.1")),
+      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
+      NetworkInterfaceInfo("wg0", "wg0", listOf("10.8.0.2")),
+    )
+
+    assertEquals(listOf("192.168.31.11", "10.0.0.4"), pairingAddresses(interfaces))
+  }
+
+  @Test
+  fun pairingAddresses_androidMobileDataAndVpn_areLeftOut() {
+    val interfaces = listOf(
+      NetworkInterfaceInfo("100", "Mobile data", listOf("10.64.12.9")),
+      NetworkInterfaceInfo("101", "VPN", listOf("10.8.0.2")),
+      NetworkInterfaceInfo("102", "Wi-Fi", listOf("192.168.1.42")),
+    )
+
+    assertEquals(listOf("192.168.1.42"), pairingAddresses(interfaces))
+  }
+
+  @Test
+  fun pairingAddresses_hyperVExternalSwitch_fallsBackToTheVirtualAdapter() {
+    val interfaces = listOf(
+      NetworkInterfaceInfo("eth1", "Intel(R) Ethernet Connection I219-V", listOf("fe80::1")),
+      NetworkInterfaceInfo("eth4", "Hyper-V Virtual Ethernet Adapter #2", listOf("192.168.1.30")),
+      NetworkInterfaceInfo("eth6", "Wintun Userspace Tunnel", listOf("100.101.7.12")),
+    )
+
+    assertEquals(listOf("192.168.1.30", "100.101.7.12"), pairingAddresses(interfaces))
   }
 
   @Test

@@ -32,6 +32,8 @@ import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.DesktopHooks
+import com.linroid.ketch.app.platform.AppUpdates
+import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberReduceMotion
@@ -145,6 +147,7 @@ internal val MinSettingsWindowSize = 640 to 480
  * @param integration the browsers and default apps the Integration page shows; asked again
  *   whenever the window comes to the front.
  * @param fileLogger the app's log files, which the About page opens.
+ * @param updates the app's updates, which the About page shows; `null` leaves them out.
  * @param onQuit quits Ketch.
  */
 @Composable
@@ -156,6 +159,7 @@ internal fun SettingsWindow(
   hooks: DesktopHooks,
   integration: DesktopIntegrationStatus,
   fileLogger: FileLogger?,
+  updates: AppUpdates?,
   onQuit: () -> Unit,
 ) {
   val target = settings.target ?: return
@@ -213,6 +217,7 @@ internal fun SettingsWindow(
       LocalFileLogger provides fileLogger,
       LocalDesktopHooks provides hooks,
       LocalIntegrationStatus provides integration.status,
+      LocalAppUpdates provides updates,
       LocalDeviceTypes provides rememberDeviceTypes(controller.state),
     ) {
       KetchTheme(
