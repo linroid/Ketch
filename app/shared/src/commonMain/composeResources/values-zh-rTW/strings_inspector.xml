@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="inspector_tab_overview">總覽</string>
+  <string name="inspector_tab_connections">連線</string>
+  <string name="inspector_tab_files">檔案</string>
+  <string name="inspector_tab_activity">動態</string>
+
+  <string name="inspector_stalled_seconds">已停滯 %1$d 秒</string>
+  <string name="inspector_stalled_minutes">已停滯 %1$d 分鐘</string>
+  <string name="inspector_size_of">%1$s / %2$s</string>
+
+  <string name="inspector_metric_left">剩餘 %1$s</string>
+  <string name="inspector_metric_done_at">約 %1$s 完成</string>
+
+  <string name="inspector_reason_reconnect">重新連線</string>
+  <string name="inspector_reason_full_speed">全速</string>
+  <string name="inspector_reason_remove_limit">移除限制</string>
+  <string name="inspector_reason_speed_settings">速度設定</string>
+  <string name="inspector_reason_paused_resumes">已暫停 · 會從中斷處繼續</string>
+  <string name="inspector_reason_paused_restarts">已暫停 · 繼續時將從頭開始</string>
+  <string name="inspector_file_missing">檔案已移動或刪除</string>
+  <string name="inspector_reason_slow_lane">受慢車道限制（%1$s）</string>
+  <string name="inspector_reason_global_limit">受全域限制（%1$s）</string>
+  <string name="inspector_reason_own_limit">限制為 %1$s</string>
+
+  <string name="inspector_source_magnet">BitTorrent · 磁力連結</string>
+  <string name="inspector_source_torrent_file">BitTorrent · 種子檔案</string>
+  <string name="inspector_source_link">連結</string>
+
+  <string name="inspector_origin_browser">來自瀏覽器</string>
+  <string name="inspector_origin_discover">來自「探索」</string>
+  <string name="inspector_origin_agent">來自 AI 代理程式</string>
+  <string name="inspector_origin_app">在 Ketch 中新增</string>
+  <string name="inspector_origin_cli">來自命令列</string>
+  <string name="inspector_with_cookies">附帶 Cookie</string>
+  <string name="inspector_with_referrer">附帶 Referrer</string>
+  <string name="inspector_with_cookies_referrer">附帶 Cookie 和 Referrer</string>
+  <string name="inspector_with_cookies_alone">附帶 Cookie</string>
+  <string name="inspector_with_referrer_alone">附帶 Referrer</string>
+  <string name="inspector_with_cookies_referrer_alone">附帶 Cookie 和 Referrer</string>
+  <string name="inspector_captured">%1$s，%2$s</string>
+
+  <string name="inspector_urgent_note">立即開始；可能會暫停「%1$s」（%2$s）</string>
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="other">立即開始 %1$d 個；可能會暫停「%2$s」（%3$s）</item>
+  </plurals>
+  <string name="inspector_reschedule_note">立即暫停，並%1$s</string>
+
+  <plurals name="inspector_selected">
+    <item quantity="other">已選取 %1$d 個</item>
+  </plurals>
+  <plurals name="inspector_selection_more">
+    <item quantity="other">以及另外 %1$d 個</item>
+  </plurals>
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="other">控制項僅套用於 %2$d 個中的 %1$d 個；其他已結束。</item>
+  </plurals>
+
+  <string name="inspector_close">關閉詳細面板</string>
+  <string name="inspector_copy_name">複製名稱</string>
+  <string name="inspector_copied_name">已複製名稱</string>
+  <string name="inspector_copy_failed_name">無法複製名稱</string>
+  <string name="inspector_share">分享</string>
+  <string name="inspector_share_failed">無法在 %2$s 上分享 %1$s</string>
+  <string name="inspector_more_actions">更多動作</string>
+
+  <string name="inspector_section_controls">控制項</string>
+  <string name="inspector_control_speed">速度</string>
+  <string name="inspector_control_connections">連線數</string>
+  <string name="inspector_control_peer_limit">對等端上限</string>
+  <string name="inspector_control_priority">優先順序</string>
+  <string name="inspector_control_start">開始時間</string>
+  <string name="inspector_global_slow_lane">慢車道</string>
+  <string name="inspector_global_limit">全域限制</string>
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">速度限制</string>
+  <string name="inspector_speed_more">其他速度限制</string>
+  <string name="inspector_mixed_limits">這些下載項目的限制各不相同</string>
+  <string name="inspector_mixed_priorities">這些下載項目的優先順序各不相同</string>
+  <string name="inspector_server_one_connection">此伺服器只允許 1 個連線</string>
+  <string name="inspector_remote_schedule">尚不支援為遠端下載排程</string>
+  <string name="inspector_start_now">立即開始</string>
+  <plurals name="inspector_start_count_now">
+    <item quantity="other">立即開始 %1$d 個</item>
+  </plurals>
+  <string name="inspector_reschedule">重新排程</string>
+
+  <string name="inspector_section_details">詳細資訊</string>
+  <string name="inspector_detail_source">來源</string>
+  <string name="inspector_detail_link">連結</string>
+  <string name="inspector_detail_path">儲存位置</string>
+  <string name="inspector_detail_size">大小</string>
+  <string name="inspector_detail_added">新增時間</string>
+  <string name="inspector_detail_time">花費時間</string>
+  <string name="inspector_detail_average">平均速度</string>
+  <string name="inspector_detail_connections">連線數</string>
+  <string name="inspector_detail_device">裝置</string>
+  <string name="inspector_detail_captured">擷取來源</string>
+  <string name="inspector_section_advanced">進階</string>
+  <string name="inspector_detail_task_id">任務 ID</string>
+  <string name="inspector_detail_headers">標頭</string>
+  <string name="inspector_detail_property">屬性</string>
+  <string name="inspector_copy_detail">複製「%1$s」</string>
+  <string name="inspector_copied">已複製</string>
+  <string name="inspector_copy_failed_source">無法複製來源</string>
+  <string name="inspector_copy_failed_link">無法複製連結</string>
+  <string name="inspector_copy_failed_path">無法複製儲存位置</string>
+  <string name="inspector_copy_failed_size">無法複製大小</string>
+  <string name="inspector_copy_failed_added">無法複製新增時間</string>
+  <string name="inspector_copy_failed_time">無法複製花費時間</string>
+  <string name="inspector_copy_failed_average">無法複製平均速度</string>
+  <string name="inspector_copy_failed_connections">無法複製連線數</string>
+  <string name="inspector_copy_failed_device">無法複製裝置</string>
+  <string name="inspector_copy_failed_captured">無法複製擷取來源</string>
+  <string name="inspector_copy_failed_task_id">無法複製任務 ID</string>
+  <string name="inspector_copy_failed_headers">無法複製標頭</string>
+  <string name="inspector_copy_failed_property">無法複製屬性</string>
+  <string name="inspector_show_full_link">顯示完整連結</string>
+  <string name="inspector_hide_full_link">隱藏完整連結</string>
+  <string name="inspector_hide">隱藏</string>
+
+  <string name="inspector_technical_details">技術細節</string>
+  <string name="inspector_copy_details">複製詳細資料</string>
+  <string name="inspector_open_logs">開啟記錄檔</string>
+  <string name="inspector_share_logs">分享記錄檔</string>
+  <string name="inspector_open_logs_failed">無法開啟記錄檔</string>
+
+  <string name="inspector_activity_empty">下載開始後，速度和事件會顯示在這裡。</string>
+  <string name="inspector_activity_now">現在</string>
+  <string name="inspector_activity_since">自 Ketch 開啟以來</string>
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="other">顯示 %1$d 個較早的項目</item>
+  </plurals>
+  <string name="inspector_limit_task">任務 %1$s</string>
+  <string name="inspector_limit_global">全域</string>
+  <string name="inspector_stat_peak">最高</string>
+  <string name="inspector_stat_average">平均</string>
+  <string name="inspector_stat_connections">連線數</string>
+
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="other">%1$d 個未完成 · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="other">%1$d 個使用中 · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="other">%1$d 個使用中</item>
+  </plurals>
+  <plurals name="inspector_connections_finished">
+    <item quantity="other">%1$d 個已完成 · %2$s</item>
+  </plurals>
+  <string name="inspector_single_connection">單一連線</string>
+  <string name="inspector_connections_live">變更數量後，剩餘的位元組會立即重新分配。</string>
+  <string name="inspector_connections_on_resume">變更的數量會在下載繼續時套用。</string>
+  <string name="inspector_lane_description">連線 %1$d，%2$s，%3$s</string>
+  <string name="inspector_percent_spoken">百分之 %1$d</string>
+
+  <string name="inspector_files_waiting">檔案清單會隨種子的中繼資料一起取得。</string>
+  <plurals name="inspector_files_done_of">
+    <item quantity="other">已完成 %1$d 個檔案，共 %2$d 個</item>
+  </plurals>
+  <string name="inspector_files_one_done">已完成 1 個檔案</string>
+  <plurals name="inspector_files_all_done">
+    <item quantity="other">全部 %1$d 個檔案皆已完成</item>
+  </plurals>
+  <plurals name="inspector_files_not_selected">
+    <item quantity="other">%1$d 個未選取</item>
+  </plurals>
+  <plurals name="inspector_files_map">
+    <item quantity="other">%1$d 個檔案，%2$d 個已完成，百分之 %3$d</item>
+  </plurals>
+  <string name="inspector_files_filter">篩選檔案</string>
+  <string name="inspector_files_no_match">沒有符合「%1$s」的檔案</string>
+  <string name="inspector_files_sort">排序檔案</string>
+  <string name="inspector_sort_incomplete">未完成的優先</string>
+  <string name="inspector_sort_name">名稱</string>
+  <string name="inspector_sort_size">大小</string>
+  <string name="inspector_file_unnamed">檔案 %1$d</string>
+  <string name="inspector_file_description">%1$s，%2$s，%3$s</string>
+  <string name="inspector_file_description_no_share">%1$s，%2$s</string>
+</resources>

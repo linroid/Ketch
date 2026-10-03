@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="intake_space_needed">需要 %1$s</string>
+  <string name="intake_space_free_on">%2$s 上可用 %1$s</string>
+  <string name="intake_space_warning">需要 %1$s · %3$s 上仅剩 %2$s 可用</string>
+  <string name="intake_added_here">已添加 %1$s → %2$s</string>
+  <string name="intake_added_to">已将 %1$s 添加到 %2$s</string>
+  <plurals name="intake_added_failed">
+    <item quantity="other">%1$d 个失败</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="other">%1$d 个未添加</item>
+  </plurals>
+  <string name="intake_add_failed">无法添加 %1$s</string>
+  <string name="intake_restart_failed">无法在 %2$s 上重新开始 %1$s</string>
+  <string name="intake_restarted">已重新开始 %1$s</string>
+  <string name="intake_retry_failed">无法在 %2$s 上重试 %1$s</string>
+  <string name="intake_apply_failed">无法在 %2$s 上更改 %1$s 的选项</string>
+  <string name="intake_file_list_ready">%1$s 的文件列表已就绪</string>
+  <string name="intake_file_list_ready_unnamed">种子的文件列表已就绪</string>
+  <string name="intake_file_list_failed">无法获取 %1$s 的文件列表</string>
+  <string name="intake_file_list_failed_unnamed">无法获取种子的文件列表</string>
+  <string name="intake_choose_files">选择文件</string>
+
+  <string name="intake_title_add">添加下载</string>
+  <string name="intake_title_retry">使用选项重试</string>
+  <string name="intake_title_edit">下载选项</string>
+
+  <string name="intake_drop_to_add">松开以添加</string>
+  <string name="intake_paste_hint_short">粘贴链接或磁力链接</string>
+  <string name="intake_paste_hint">粘贴链接或磁力链接，或拖入 .torrent 文件</string>
+  <string name="intake_curl_command">cURL 命令</string>
+  <string name="intake_paste_clipboard">从剪贴板粘贴</string>
+  <string name="intake_open_torrent">打开 .torrent 文件</string>
+  <string name="intake_from_clipboard">来自剪贴板</string>
+  <string name="intake_clear_clipboard">从剪贴板中清除此文本</string>
+  <string name="intake_offer_paste">粘贴 %1$s</string>
+  <string name="intake_offer_paste_clipboard">从剪贴板粘贴 %1$s</string>
+  <string name="intake_offer_paste_copied">粘贴已复制的链接</string>
+  <string name="intake_discover_offer">这里没有链接。要用“发现”搜索“%1$s”吗？</string>
+  <string name="intake_no_links">这里没有链接。请粘贴链接、磁力链接或 cURL 命令。</string>
+  <string name="intake_discover">发现</string>
+
+  <string name="intake_notice_no_curl">剪贴板中没有 cURL 命令。请在浏览器的网络面板中右键点击该请求，然后选择“复制为 cURL”。</string>
+  <string name="intake_notice_close_first">关闭此面板后才能添加其他下载</string>
+  <string name="intake_notice_unsupported_files">只能添加 .torrent 文件和链接列表</string>
+  <string name="intake_notice_read_failed">无法读取 %1$s</string>
+  <string name="intake_notice_read_failed_reason">无法读取 %1$s：%2$s</string>
+  <string name="intake_notice_no_links">拖入的内容中没有找到链接</string>
+  <plurals name="intake_notice_first_links">
+    <item quantity="other">仅显示前 %1$d 个链接</item>
+  </plurals>
+  <plurals name="intake_range_truncated">
+    <item quantity="other">已展开为前 %1$d 个链接</item>
+  </plurals>
+
+  <plurals name="intake_summary_links">
+    <item quantity="other">%1$d 个链接</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="other">%1$d 个就绪</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="other">%1$d 个检查中</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="other">%1$d 个需要处理</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="other">%1$d 个已在 Ketch 中</item>
+  </plurals>
+
+  <string name="intake_status_waiting">等待检查…</string>
+  <string name="intake_status_fetching">正在从节点获取文件列表… %1$s</string>
+  <string name="intake_status_reading_torrent">正在读取种子文件…</string>
+  <string name="intake_status_checking">正在检查…</string>
+  <string name="intake_status_downloads_again">重新下载 · %1$s</string>
+  <plurals name="intake_status_files_chosen">
+    <item quantity="other">%1$d / %2$d 个文件</item>
+  </plurals>
+  <string name="intake_split">%1$d × %2$s</string>
+  <plurals name="intake_status_expands">
+    <item quantity="other">展开为 %1$d 个链接</item>
+  </plurals>
+  <plurals name="intake_status_expands_first">
+    <item quantity="other">展开为前 %1$d 个链接</item>
+  </plurals>
+  <string name="intake_status_unknown_size">大小未知</string>
+  <string name="intake_scheme_torrent">种子</string>
+  <string name="intake_status_resumable">可续传</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="other">最多 %1$d 个连接</item>
+  </plurals>
+  <string name="intake_badge_duplicate">已在 Ketch 中</string>
+  <string name="intake_badge_no_resume">不可续传</string>
+  <string name="intake_duplicate_finished">%1$s完成</string>
+  <string name="intake_duplicate_downloading">下载中 · %1$s</string>
+  <string name="intake_duplicate_paused">暂停于 %1$s</string>
+  <string name="intake_duplicate_waiting">等待开始</string>
+  <string name="intake_duplicate_failed">失败</string>
+  <string name="intake_duplicate_canceled">已取消</string>
+  <string name="intake_age_just_now">刚刚</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="other">%1$d分钟前</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="other">%1$d小时前</item>
+  </plurals>
+  <string name="intake_age_yesterday">昨天</string>
+  <plurals name="intake_age_days">
+    <item quantity="other">%1$d天前</item>
+  </plurals>
+
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="other">%1$d分钟内没有节点发送文件列表</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketch 无法下载这类链接</string>
+  <string name="intake_problem_unsupported_detail">支持 http(s)、ftp(s)、磁力链接和 .torrent</string>
+  <string name="intake_problem_forbidden">服务器拒绝访问（403）</string>
+  <string name="intake_problem_forbidden_detail">从已登录页面复制的链接通常需要该页面的 Cookie</string>
+  <string name="intake_problem_not_found">未找到</string>
+  <string name="intake_problem_not_found_detail">链接可能已过期</string>
+  <string name="intake_problem_busy">服务器繁忙（%1$d）</string>
+  <string name="intake_problem_busy_detail">Ketch 会自动重试</string>
+  <string name="intake_problem_http">服务器返回 %1$d</string>
+  <string name="intake_problem_no_peers">无法连接任何节点</string>
+  <string name="intake_problem_unreachable">无法连接 %1$s</string>
+  <string name="intake_problem_unreachable_server">无法连接服务器</string>
+  <string name="intake_problem_torrent">无法读取此种子</string>
+  <string name="intake_problem_ftp">FTP 服务器报告了错误</string>
+  <string name="intake_problem_check_failed">无法检查此链接</string>
+  <string name="intake_problem_sign_in">需要登录</string>
+  <string name="intake_action_sign_in">登录</string>
+  <string name="intake_action_paste_curl">粘贴为 cURL</string>
+  <string name="intake_action_add_headers">添加请求头</string>
+  <string name="intake_action_find_mirror">查找可用的镜像</string>
+  <string name="intake_action_keep_waiting">继续等待</string>
+  <string name="intake_action_add_anyway">仍然添加</string>
+
+  <string name="intake_download_all_now">立即下载所有文件</string>
+  <string name="intake_finish_background">在后台完成</string>
+  <string name="intake_rename">重命名</string>
+  <string name="intake_keep_out">不添加</string>
+  <string name="intake_download_again">重新下载</string>
+  <string name="intake_add_all">全部添加</string>
+  <string name="intake_remove_named">移除 %1$s</string>
+  <string name="intake_user_name">用户名</string>
+  <string name="intake_password">密码</string>
+  <string name="intake_connections">连接数</string>
+
+  <string name="intake_options">选项</string>
+  <string name="intake_pill_label">%1$s：</string>
+  <string name="intake_reset_speed">重置速度</string>
+  <string name="intake_reset_priority">重置优先级</string>
+  <string name="intake_reset_start">重置开始时间</string>
+  <string name="intake_reset_connections">重置连接数</string>
+  <plurals name="intake_headers_count">
+    <item quantity="other">%1$d 个请求头</item>
+  </plurals>
+  <string name="intake_advanced_hide">隐藏高级选项</string>
+  <string name="intake_advanced_show">高级选项…</string>
+  <string name="intake_advanced_caption">文件名、Referer、Cookie 和其他请求头</string>
+  <string name="intake_speed_limit">限速</string>
+  <string name="intake_priority">优先级</string>
+  <string name="intake_start">开始时间</string>
+  <string name="intake_peer_limit">节点上限</string>
+  <string name="intake_single_connection">此服务器只允许 1 个连接</string>
+  <string name="intake_auto_device">“自动”由设备决定</string>
+  <string name="intake_auto_setting">“自动”使用设备的设置：%1$d</string>
+  <string name="intake_priority_low_caption">没有其他下载等待时才运行</string>
+  <string name="intake_priority_normal_caption">默认顺序</string>
+  <string name="intake_priority_high_caption">排在普通和低优先级之前</string>
+  <string name="intake_priority_urgent_caption">插队；可能会暂停优先级较低的下载</string>
+  <string name="intake_option_unlimited">不限速</string>
+  <string name="intake_option_max_speed">最高 %1$s</string>
+  <string name="intake_option_urgent">⚡ 紧急</string>
+  <string name="intake_option_priority_low">低优先级</string>
+  <string name="intake_option_priority_high">高优先级</string>
+  <plurals name="intake_option_peers">
+    <item quantity="other">%1$d 个节点</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <string name="intake_option_auto">自动</string>
+
+  <string name="intake_save_to">保存到</string>
+  <string name="intake_folder_downloads">下载</string>
+  <string name="intake_default_folder">默认文件夹</string>
+  <string name="intake_recent">最近</string>
+  <string name="intake_pinned">已固定</string>
+  <string name="intake_unpin">取消固定 %1$s</string>
+  <string name="intake_pin">固定 %1$s</string>
+  <string name="intake_choose_folder">选择文件夹…</string>
+  <string name="intake_folder_on">%1$s 上的文件夹</string>
+  <string name="intake_torrents_app_folder">种子会保存到应用文件夹：在“文件”中选择的文件夹只用于链接下载</string>
+
+  <string name="intake_advanced">高级</string>
+  <string name="intake_hide">隐藏</string>
+  <string name="intake_also_sent">此链接还会一并发送：%1$s</string>
+  <string name="intake_file_name">文件名</string>
+  <string name="intake_server_file_name">使用服务器提供的文件名</string>
+  <string name="intake_user_agent_custom">自定义</string>
+  <string name="intake_add_header">添加请求头</string>
+  <string name="intake_paste_curl">粘贴 cURL</string>
+  <string name="intake_headers_saved">请求头会随任务保存，连接到这台设备的其他设备都能看到。</string>
+  <string name="intake_header_name">请求头</string>
+  <string name="intake_header_value">值</string>
+  <string name="intake_remove_header">移除请求头</string>
+
+  <string name="intake_submit_download_name">下载 %1$s</string>
+  <string name="intake_submit_schedule_name">计划下载 %1$s</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="other">下载 %1$d 个文件</item>
+  </plurals>
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="other">下载 %1$d 个文件 · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_download_items">
+    <item quantity="other">下载 %1$d 项</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="other">下载 %1$d 项 · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="other">计划下载 %1$d 个文件</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="other">计划下载 %1$d 项</item>
+  </plurals>
+  <string name="intake_submit_apply">应用更改</string>
+  <string name="intake_submit_start_over">重新开始</string>
+  <string name="intake_submit_waiting_files">正在等待文件列表</string>
+  <string name="intake_submit_no_files">未选择文件</string>
+  <string name="intake_submit_nothing">没有可添加的内容</string>
+  <string name="intake_hint_download">按 %1$s 下载</string>
+  <string name="intake_hint_schedule">按 %1$s 计划</string>
+  <string name="intake_hint_retry">按 %1$s 重试</string>
+  <string name="intake_hint_start_over">按 %1$s 重新开始</string>
+  <string name="intake_hint_apply">按 %1$s 应用</string>
+  <string name="intake_download_all">全部下载</string>
+  <string name="intake_task_gone">此下载已不在列表中。</string>
+  <string name="intake_confirm_close">关闭并丢弃已输入的内容？</string>
+  <string name="intake_keep_editing">继续编辑</string>
+  <string name="intake_discard">丢弃</string>
+
+  <string name="intake_outcome_starts_now">立即开始</string>
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="other">%2$d 个名额中有 %1$d 个空闲</item>
+  </plurals>
+  <string name="intake_outcome_eta">按当前速度约需%1$s</string>
+  <string name="intake_outcome_eta_soon">按当前速度不到1分钟</string>
+  <string name="intake_outcome_urgent">⚡ 紧急：立即开始并暂停 %1$s（%2$s）</string>
+  <string name="intake_outcome_waits_for_host">等待 %1$s · 每个服务器 %2$d 个</string>
+  <string name="intake_outcome_queued_next">排队中 · 下一个</string>
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="other">排队中 · 前面还有 %1$d 个</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now">
+    <item quantity="other">%1$d 个立即开始</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="other">%1$d 个立即开始（%2$s）</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="other">%1$d 个排队中</item>
+  </plurals>
+  <string name="intake_time_hours">%1$d小时</string>
+  <string name="intake_time_hours_minutes">%1$d小时%2$d分钟</string>
+  <string name="intake_start_over_discard">将重新开始 · 已下载的 %1$s 将被丢弃。</string>
+  <string name="intake_start_over_new">将作为新下载重新开始。</string>
+
+  <string name="intake_stage_back">返回所有链接</string>
+  <plurals name="intake_stage_selection">
+    <item quantity="other">%1$d / %2$d 个文件 · %3$s / %4$s</item>
+  </plurals>
+  <string name="intake_filter_files">筛选文件</string>
+  <string name="intake_largest_file">最大的文件</string>
+  <string name="intake_skip_samples">跳过样片</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="other">已跳过 %1$d 个附加文件</item>
+  </plurals>
+  <string name="intake_kind_subtitles">字幕</string>
+  <string name="intake_sort">排序</string>
+  <string name="intake_sort_files">排序文件</string>
+  <string name="intake_expand">展开</string>
+  <string name="intake_collapse">收起</string>
+
+  <string name="intake_file_unreadable">无法读取该文件</string>
+  <string name="intake_file_empty">该文件为空</string>
+  <string name="intake_file_too_large">该文件大于 %1$d MiB</string>
+
+  <string name="intake_tracker_too_long">太长。</string>
+  <string name="intake_tracker_spaces">包含空格。</string>
+  <string name="intake_tracker_scheme">请以 http://、https:// 或 udp:// 开头。</string>
+  <string name="intake_tracker_no_host">缺少主机名。</string>
+  <string name="intake_tracker_udp_user_info">UDP Tracker 不能包含用户名或密码。</string>
+  <string name="intake_tracker_udp_port">UDP Tracker 需要端口。</string>
+  <string name="intake_tracker_port">请使用 1 到 65535 之间的端口。</string>
+</resources>
