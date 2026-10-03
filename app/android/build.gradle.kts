@@ -99,6 +99,7 @@ dependencies {
   implementation(projects.library.torrent)
   implementation(projects.library.sqlite)
   implementation(projects.library.server)
+  implementation(libs.dnssd)
   implementation(libs.androidx.activity.compose)
   debugImplementation(libs.compose.uiTooling)
 }

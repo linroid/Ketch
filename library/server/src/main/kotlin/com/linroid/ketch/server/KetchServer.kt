@@ -189,7 +189,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *   downloads to and delete files from. Without an [apiToken] callers are always kept to the
  *   download directory and these folders; with one, only when this list is not empty.
  * @param mdnsEnabled whether to advertise the server over mDNS
- * @param mdnsRegistrar mDNS service registrar for LAN discovery
+ * @param mdnsRegistrar mDNS service registrar for LAN discovery; Android callers must supply
+ *   an Android implementation, since the default registrar is compiled for the JVM
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
  */
