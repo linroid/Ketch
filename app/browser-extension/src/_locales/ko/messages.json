@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "다운로드, 링크, 마그넷 링크를 이 컴퓨터나 원격 서버의 Ketch로 보냅니다."
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "ko"
+  },
+  "menu_download_link": {
+    "message": "Ketch로 링크 다운로드"
+  },
+  "menu_download_image": {
+    "message": "Ketch로 이미지 다운로드"
+  },
+  "menu_download_video": {
+    "message": "Ketch로 동영상 다운로드"
+  },
+  "menu_download_audio": {
+    "message": "Ketch로 오디오 다운로드"
+  },
+  "notify_sent_to": {
+    "message": "$NAME$에 보냄",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "Ketch에 보냄"
+  },
+  "notify_download_added": {
+    "message": "다운로드 추가됨"
+  },
+  "notify_fallback_browser": {
+    "message": "대신 브라우저에서 다운로드합니다"
+  },
+  "notify_fallback_magnet": {
+    "message": "다른 앱에서 마그넷 링크를 엽니다"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$에 보낼 수 없음",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch로 다운로드할 수 없음"
+  },
+  "notify_unsupported_stream": {
+    "message": "이 미디어는 페이지가 직접 스트리밍하므로 다운로드할 링크가 없습니다."
+  },
+  "notify_unsupported_scheme": {
+    "message": "http, https, ftp 및 마그넷 링크만 Ketch로 보낼 수 있습니다."
+  },
+  "error_with_hint": {
+    "message": "$ERROR$. $HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "$ADDRESS$의 Ketch가 응답하지 않았습니다",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "$ADDRESS$의 Ketch에 연결할 수 없습니다",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch가 액세스 토큰을 거부했습니다"
+  },
+  "error_token_required": {
+    "message": "Ketch에 액세스 토큰이 필요합니다"
+  },
+  "error_http_status": {
+    "message": "Ketch가 HTTP $STATUS$ 응답을 반환했습니다",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch가 제시간에 시작되지 않았습니다"
+  },
+  "error_app_not_installed": {
+    "message": "이 컴퓨터에 Ketch 앱이 설정되어 있지 않습니다"
+  },
+  "error_app_unreachable": {
+    "message": "Ketch 앱에 연결할 수 없습니다"
+  },
+  "error_app_not_running": {
+    "message": "Ketch가 실행 중이 아닙니다"
+  },
+  "error_app_connect_failed": {
+    "message": "Ketch 앱이 연결하지 못했습니다"
+  },
+  "error_app_invalid_reply": {
+    "message": "Ketch 앱이 잘못된 응답을 보냈습니다"
+  },
+  "error_unsupported_link": {
+    "message": "Ketch는 이런 종류의 링크를 다운로드할 수 없습니다"
+  },
+  "error_torrent_http": {
+    "message": "토렌트 파일을 가져올 수 없습니다(HTTP $STATUS$)",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "토렌트 파일을 가져오는 중 시간이 초과되었습니다"
+  },
+  "error_torrent_too_large": {
+    "message": "토렌트 파일이 너무 큽니다"
+  },
+  "error_address_required": {
+    "message": "Ketch 서버의 주소를 입력하세요"
+  },
+  "error_address_invalid": {
+    "message": "“$ADDRESS$”은(는) 유효한 주소가 아닙니다",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "주소는 http:// 또는 https://로 시작해야 합니다"
+  },
+  "error_address_credentials": {
+    "message": "액세스 토큰은 주소가 아닌 토큰 필드에 입력하세요"
+  },
+  "error_not_ketch": {
+    "message": "이 주소는 Ketch 서버가 아닌 것 같습니다"
+  },
+  "hint_app_not_installed": {
+    "message": "Ketch 데스크톱 앱을 설치하고 한 번 연 다음 다시 시도하세요. “ketch server”를 사용하거나 브라우저를 Flatpak 또는 Snap으로 설치했다면 대신 Ketch를 서버로 추가하세요."
+  },
+  "hint_app_not_running": {
+    "message": "다운로드를 보내면 Ketch가 자동으로 열립니다."
+  },
+  "hint_open_app": {
+    "message": "Ketch를 열고 다시 시도하세요."
+  },
+  "hint_local_server": {
+    "message": "Ketch를 열고 설정 → 원격 액세스 → 서버를 켜거나 “ketch server”를 실행하세요."
+  },
+  "hint_remote_server": {
+    "message": "서버가 실행 중이고 여기에서 이 주소에 접속할 수 있는지 확인하세요."
+  },
+  "hint_access_token": {
+    "message": "Ketch의 설정 → 원격 액세스에 표시된 액세스 토큰을 입력하세요."
+  },
+  "task_magnet_link": {
+    "message": "마그넷 링크"
+  },
+  "task_torrent": {
+    "message": "토렌트"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ / $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "일시정지됨"
+  },
+  "task_paused_percent": {
+    "message": "일시정지됨 · $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "대기열"
+  },
+  "task_scheduled": {
+    "message": "예약됨"
+  },
+  "task_completed": {
+    "message": "완료"
+  },
+  "task_failed": {
+    "message": "실패: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "알 수 없는 오류"
+  },
+  "task_canceled": {
+    "message": "취소됨"
+  },
+  "task_pause": {
+    "message": "일시정지"
+  },
+  "task_resume": {
+    "message": "재개"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "연결됨 · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "$NAME$에 연결됨 · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "연결됨 · $OS$의 Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "$NAME$에 연결됨 · $OS$의 Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "연결 중…"
+  },
+  "status_opening_app": {
+    "message": "Ketch 여는 중…"
+  },
+  "instance_this_computer": {
+    "message": "이 컴퓨터"
+  },
+  "instance_name_default": {
+    "message": "$NAME$ (기본)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "이름"
+  },
+  "instance_default": {
+    "message": "기본"
+  },
+  "instance_app_detail": {
+    "message": "이 컴퓨터의 Ketch 앱입니다. 다운로드가 필요하면 확장 프로그램이 자동으로 엽니다."
+  },
+  "instance_address": {
+    "message": "주소"
+  },
+  "instance_token": {
+    "message": "액세스 토큰"
+  },
+  "instance_token_placeholder": {
+    "message": "선택 사항"
+  },
+  "instance_insecure": {
+    "message": "이 주소는 암호화되지 않습니다. 액세스 토큰과 다운로드와 함께 보내는 쿠키가 네트워크에서 일반 텍스트로 전송됩니다. 가능하면 https를 사용하거나 신뢰할 수 있는 네트워크에서만 사용하세요."
+  },
+  "instance_test": {
+    "message": "연결 테스트"
+  },
+  "instance_remove": {
+    "message": "제거"
+  },
+  "instance_enter_address": {
+    "message": "Ketch 서버의 주소를 입력하세요."
+  },
+  "popup_instance_picker": {
+    "message": "Ketch 인스턴스"
+  },
+  "popup_settings": {
+    "message": "설정"
+  },
+  "popup_open_app": {
+    "message": "Ketch 열기"
+  },
+  "popup_add_placeholder": {
+    "message": "링크 또는 마그넷 링크 붙여넣기"
+  },
+  "popup_add_label": {
+    "message": "다운로드할 링크"
+  },
+  "popup_add_button": {
+    "message": "다운로드"
+  },
+  "popup_added": {
+    "message": "$NAME$ 추가됨",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "http, https, ftp 또는 마그넷 링크를 입력하세요."
+  },
+  "popup_capture": {
+    "message": "브라우저 다운로드 가로채기"
+  },
+  "popup_capture_target": {
+    "message": "보낼 곳: $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "최근 항목"
+  },
+  "popup_no_downloads": {
+    "message": "아직 다운로드가 없습니다."
+  },
+  "options_title": {
+    "message": "Ketch 확장 프로그램 설정"
+  },
+  "options_intro": {
+    "message": "이 브라우저의 다운로드를 이 컴퓨터나 원격 서버의 Ketch로 보냅니다."
+  },
+  "options_saved": {
+    "message": "저장됨"
+  },
+  "options_permission": {
+    "message": "사이트의 다운로드를 가로채고, 쿠키를 보내고, Ketch 서버에 연결하려면 Ketch에 웹사이트 접근 권한이 필요합니다."
+  },
+  "options_allow_access": {
+    "message": "접근 허용"
+  },
+  "options_instances": {
+    "message": "Ketch 인스턴스"
+  },
+  "options_instances_detail": {
+    "message": "가로챈 다운로드와 마그넷 링크는 기본 인스턴스로 보내집니다. 링크, 이미지 또는 동영상을 마우스 오른쪽 버튼으로 클릭하면 원하는 인스턴스로 보낼 수 있습니다."
+  },
+  "options_add_app": {
+    "message": "이 컴퓨터의 Ketch 추가"
+  },
+  "options_add_server": {
+    "message": "서버 추가"
+  },
+  "options_browser_downloads": {
+    "message": "브라우저 다운로드"
+  },
+  "options_capture": {
+    "message": "다운로드 가로채기"
+  },
+  "options_capture_detail": {
+    "message": "브라우저에서 시작한 다운로드를 대신 Ketch로 보냅니다. Ketch에 연결할 수 없으면 브라우저가 평소처럼 다운로드합니다."
+  },
+  "options_min_size": {
+    "message": "작은 파일은 브라우저에 맡기기"
+  },
+  "options_min_size_detail": {
+    "message": "이보다 작은 파일은 브라우저에서 다운로드합니다. 크기를 알 수 없는 파일은 항상 Ketch로 보냅니다. 0이면 모두 보냅니다."
+  },
+  "options_min_size_unit": {
+    "message": "MB"
+  },
+  "options_excluded": {
+    "message": "브라우저에 맡길 사이트"
+  },
+  "options_excluded_detail": {
+    "message": "한 줄에 하나씩 입력합니다. 하위 도메인도 포함되므로 example.com은 downloads.example.com도 포함합니다."
+  },
+  "options_cookies": {
+    "message": "쿠키와 리퍼러 보내기"
+  },
+  "options_cookies_detail": {
+    "message": "로그인이 필요한 파일도 Ketch로 다운로드할 수 있습니다. Ketch는 나중에 재개할 수 있도록 이를 작업과 함께 저장합니다."
+  },
+  "options_links_notifications": {
+    "message": "링크 및 알림"
+  },
+  "options_magnet": {
+    "message": "클릭한 마그넷 링크를 Ketch로 보내기"
+  },
+  "options_magnet_detail": {
+    "message": "다른 앱에서 열려면 Alt 키를 누른 채 마그넷 링크를 클릭하세요."
+  },
+  "options_notify": {
+    "message": "다운로드를 보내면 알림"
+  },
+  "options_notify_detail": {
+    "message": "문제는 항상 표시됩니다."
+  },
+  "options_help": {
+    "message": "Ketch 설정하기"
+  },
+  "options_help_this_computer": {
+    "message": "이 컴퓨터에서"
+  },
+  "options_help_this_computer_detail": {
+    "message": "Ketch 데스크톱 앱을 설치하고 한 번 열어 브라우저가 찾을 수 있게 하세요. 그 후에는 다운로드가 필요할 때마다 확장 프로그램이 Ketch를 엽니다. 서버를 켜거나 토큰을 복사할 필요가 없습니다."
+  },
+  "options_help_other_device": {
+    "message": "다른 기기에서"
+  },
+  "options_help_other_device_detail": {
+    "message": "해당 기기에서 설정 → 원격 액세스를 열고 <b>서버</b>와 <b>다른 기기 허용</b>을 켠 다음 액세스 토큰을 생성하세요. 여기에서 <b>서버 추가</b>를 선택하고 기기의 주소(예: <code>http://192.168.1.20:8642</code>)와 토큰을 입력해 기기를 추가하세요. <code>ketch server</code>의 경우 config.toml에서 <code>apiToken</code>을 설정하세요."
+  },
+  "options_help_command_line": {
+    "message": "명령줄 또는 샌드박스 브라우저"
+  },
+  "options_help_command_line_detail": {
+    "message": "이 컴퓨터에서 <code>ketch server</code>를 사용하거나, 다른 앱을 시작할 수 없는 Flatpak 또는 Snap 브라우저에서 사용하려면 <code>http://127.0.0.1:8642</code>의 서버로 추가하세요."
+  }
+}
