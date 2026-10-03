@@ -149,8 +149,8 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
-    f.state.dropText(f.nas, "  https://example.com/ubuntu.iso\n")
+  fun addDroppedText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
+    f.state.addDroppedText("  https://example.com/ubuntu.iso\n", f.nas)
 
     assertTrue(f.state.showAddDialog)
     assertEquals(
@@ -160,7 +160,7 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun dropFiles_torrentOnTheNasCard_resolvesItOnTheNas() = runTest {
+  fun addDroppedFiles_torrentOnTheNasCard_resolvesItOnTheNas() = runTest {
     val nas = FakeKetchApi().apply {
       resolveContentResult = ResolvedSource(
         url = "magnet:?xt=urn:btih:abc",
@@ -174,7 +174,7 @@ class DeviceActionsTest {
     val f = fixture(nas)
     val file = DroppedFile("ubuntu.torrent") { byteArrayOf(1, 2, 3) }
 
-    f.state.dropFiles(f.nas, listOf(file))
+    f.state.addDroppedFiles(listOf(file), f.nas)
     runCurrent()
 
     assertEquals(f.nas.deviceId, f.state.intakeRequest?.targetDeviceId)

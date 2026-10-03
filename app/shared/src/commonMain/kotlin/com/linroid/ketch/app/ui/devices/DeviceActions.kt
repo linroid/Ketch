@@ -9,11 +9,8 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.MAX_LINK_LIST_BYTES
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
@@ -25,7 +22,6 @@ import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
-import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -164,46 +160,3 @@ internal fun AppState.renameDevice(entry: InstanceEntry, name: String) {
   }
 }
 
-/** Opens the add sheet with [text], such as links dropped on [entry]'s card, adding there. */
-internal fun AppState.dropText(entry: InstanceEntry, text: String) {
-  val trimmed = text.trim()
-  if (trimmed.isEmpty()) return
-  openIntake(IntakeRequest(text = trimmed, targetDeviceId = entry.deviceId))
-}
-
-/**
- * Adds [files] dropped on [entry]'s card there: the first `.torrent` file joins the add sheet,
- * and lists of links fill it.
- */
-internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) {
-  val torrent = files.firstOrNull { it.name.endsWith(".torrent", ignoreCase = true) }
-  if (torrent != null) {
-    openIntake(IntakeRequest(targetDeviceId = entry.deviceId))
-    if (showAddDialog) resolveDroppedFile(torrent, entry)
-    return
-  }
-  val lists = files.filter { LinkParser.isLinkList(it.name) }
-  if (lists.isEmpty()) {
-    messages.post(
-      level = MessageLevel.Error,
-      title = "Only .torrent files and lists of links can be dropped to add downloads",
-    )
-    return
-  }
-  launchCommand {
-    val text = lists.mapNotNull { file ->
-      catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES).decodeToString() }
-        .onFailure { e ->
-          log.w { "Couldn't read a dropped link list: ${e.describeCauses()}" }
-          messages.post(
-            level = MessageLevel.Error,
-            title = "Couldn't read ${file.name}",
-            detail = e.message,
-            cause = e,
-          )
-        }
-        .getOrNull()
-    }.joinToString("\n")
-    dropText(entry, text)
-  }
-}

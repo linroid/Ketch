@@ -23,7 +23,6 @@ import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.LocalWindowDrop
-import com.linroid.ketch.app.ui.devices.dropFiles
 import com.linroid.ketch.app.ui.downloads.actions.draggedTaskKeys
 import com.linroid.ketch.app.ui.pulse.diskLabel
 import kotlinx.coroutines.launch
@@ -99,7 +98,7 @@ internal fun AppState.dropTextOn(target: InstanceEntry, text: String) {
  * and lists of links fill the sheet.
  */
 internal fun AppState.dropFilesOn(target: InstanceEntry, files: List<DroppedFile>) {
-  dropFiles(target, files)
+  addDroppedFiles(files, target)
   if (target in shownInstances.value) showDownloads(statusFilter)
 }
 

@@ -83,8 +83,8 @@ internal fun DeviceCard(
     label = "Drop to download on ${device.name}",
     enabled = problem == null,
     shape = shape,
-    onDropFiles = { state.dropFiles(device.entry, it) },
-    onDropText = { state.dropText(device.entry, it) },
+    onDropFiles = { state.addDroppedFiles(it, device.entry) },
+    onDropText = { state.addDroppedText(it, device.entry) },
     modifier = modifier,
   ) {
     Column(

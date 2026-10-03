@@ -118,12 +118,18 @@ object LinkParser {
    * becomes a single [IntakeItem.Discover] search.
    *
    * @param fileName name of the file [text] was read from, such as a dropped `.txt` or `.csv`
-   *   list. Each cell of a `.csv` file is read on its own, and a file without links yields
-   *   nothing rather than a search.
+   *   list. Each cell of a `.csv` file is read on its own, only the values of a `.webloc`
+   *   property list are read (not its DTD link), and a file without links yields nothing rather
+   *   than a search.
    */
   fun parseIntake(text: String, fileName: String? = null): List<IntakeItem> {
     val csv = fileName?.endsWith(".csv", ignoreCase = true) == true
-    val lines = text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+    val read = if (fileName?.endsWith(".webloc", ignoreCase = true) == true) {
+      PLIST_STRING.findAll(text).joinToString("\n") { it.groupValues[1] }
+    } else {
+      text
+    }
+    val lines = read.replace("\r\n", "\n").replace('\r', '\n').split('\n')
     val collector = Collector()
     var i = 0
     while (i < lines.size) {
@@ -149,9 +155,23 @@ object LinkParser {
     return if (query.isEmpty()) emptyList() else listOf(IntakeItem.Discover(query))
   }
 
-  /** Whether a file named [fileName] is a list of links for [parseIntake]: `.txt` or `.csv`. */
+  /**
+   * Whether a file named [fileName] is a list of links for [parseIntake]: a `.txt` or `.csv`
+   * file, or a `.url` or `.webloc` shortcut.
+   */
   fun isLinkList(fileName: String): Boolean =
-    fileName.endsWith(".txt", ignoreCase = true) || fileName.endsWith(".csv", ignoreCase = true)
+    fileName.substringAfterLast('.', "").lowercase() in LINK_LIST_EXTENSIONS
+
+  /**
+   * The text the add sheet takes for a list of links read from [fileName]: the links of a `.csv`
+   * file or a `.webloc` shortcut one per line, which the sheet could not tell apart from their
+   * other text, and any other list as it is, so its `curl` commands keep their headers.
+   */
+  fun listText(text: String, fileName: String): String =
+    when (fileName.substringAfterLast('.', "").lowercase()) {
+      "csv", "webloc" -> parseIntake(text, fileName).links().joinToString("\n") { it.url }
+      else -> text
+    }
 
   /**
    * The link to add at once, without the add sheet, when [text] holds exactly one HTTP(S) or
@@ -205,8 +225,10 @@ object LinkParser {
 
 // Most lines one curl command may span, so a quote left open does not swallow a long list.
 private const val MAX_CURL_LINES = 200
+private val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
 
 private val WHITESPACE = Regex("\\s+")
+private val PLIST_STRING = Regex("<string>([^<]*)</string>")
 private val TOKEN = Regex("\\S+")
 private val SCHEME_URL = Regex(
   "(?:https?|ftps?)://[^\\s\"'<>`]+|magnet:\\?[^\\s\"'<>`]+",

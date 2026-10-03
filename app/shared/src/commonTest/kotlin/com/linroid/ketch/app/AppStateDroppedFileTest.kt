@@ -116,6 +116,49 @@ class AppStateDroppedFileTest {
   }
 
   @Test
+  fun addDroppedFiles_csvAndWebloc_opensIntakeRequestWithTheirLinks() = runTest {
+    val state = appState(FakeKetchApi())
+    val webloc = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0"><dict>
+        <key>URL</key><string>https://example.com/c.iso</string>
+      </dict></plist>
+    """.trimIndent()
+    val shortcut = "[InternetShortcut]\nURL=https://example.com/b.iso"
+
+    state.addDroppedFiles(
+      listOf(
+        DroppedFile("export.csv") { "name,url\na,https://example.com/a.iso,1".encodeToByteArray() },
+        DroppedFile("c.webloc") { webloc.encodeToByteArray() },
+        DroppedFile("b.url") { shortcut.encodeToByteArray() },
+      ),
+    )
+    runCurrent()
+
+    assertEquals(
+      "https://example.com/a.iso\nhttps://example.com/c.iso\n" +
+        "[InternetShortcut]\nURL=https://example.com/b.iso",
+      state.intakeRequest?.text,
+    )
+  }
+
+  @Test
+  fun addDroppedFiles_listWithoutLinks_reportsItWithoutOpeningDialog() = runTest {
+    val state = appState(FakeKetchApi())
+
+    state.addDroppedFiles(listOf(DroppedFile("empty.csv") { "name,size".encodeToByteArray() }))
+    runCurrent()
+
+    assertFalse(state.showAddDialog)
+    assertEquals(
+      "Found no links in what was dropped",
+      state.messages.history.value.single().title,
+    )
+  }
+
+  @Test
   fun resolveDroppedFile_readFailure_reportsError() = runTest {
     val api = FakeKetchApi().apply { resolveContentResult = resolved }
     val state = appState(api)

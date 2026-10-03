@@ -39,6 +39,7 @@ import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.util.LinkKind
+import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
@@ -616,44 +617,50 @@ class AppState(
   }
 
   /**
-   * Adds dropped files: the first `.torrent` file opens the add dialog, which resolves it on the
-   * active device; link lists such as `.txt` files open the add sheet with their text.
+   * Adds dropped files to [target], by default the active device: the first `.torrent` file opens
+   * the add sheet, which resolves it there, and lists of links (see [LinkParser.isLinkList]) open
+   * it with their links.
    */
-  fun addDroppedFiles(files: List<DroppedFile>) {
-    val torrent = files.firstOrNull {
-      it.name.endsWith(".torrent", ignoreCase = true)
-    }
+  fun addDroppedFiles(files: List<DroppedFile>, target: InstanceEntry? = null) {
+    val torrent = files.firstOrNull { it.name.endsWith(".torrent", ignoreCase = true) }
     if (torrent != null) {
-      openIntake()
-      if (showAddDialog) resolveDroppedFile(torrent)
+      openIntake(IntakeRequest(targetDeviceId = target?.deviceId))
+      if (showAddDialog) resolveDroppedFile(torrent, target)
       return
     }
-    val linkLists = files.filter {
-      it.name.substringAfterLast('.', "").lowercase() in LINK_LIST_EXTENSIONS
-    }
-    if (linkLists.isEmpty()) {
-      postError("Only .torrent files and link lists can be dropped to add downloads")
+    val lists = files.filter { LinkParser.isLinkList(it.name) }
+    if (lists.isEmpty()) {
+      postError("Only .torrent files and lists of links can be dropped to add downloads")
       return
     }
     scope.launch {
-      val text = linkLists.mapNotNull { file ->
-        try {
-          file.readBytes(MAX_LINK_LIST_BYTES).decodeToString()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          postError("Couldn't read ${file.name}", detail = e.message, cause = e)
-          null
-        }
+      var unread = false
+      val text = lists.mapNotNull { file ->
+        catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES).decodeToString() }
+          .onFailure { e ->
+            log.w { "Couldn't read a dropped link list: ${e.describeCauses()}" }
+            postError("Couldn't read ${file.name}", detail = e.message, cause = e)
+            unread = true
+          }
+          .getOrNull()
+          ?.let { LinkParser.listText(it, file.name) }
       }.joinToString("\n").trim()
-      if (text.isNotEmpty()) openIntake(IntakeRequest(text = text))
+      when {
+        text.isNotEmpty() -> addDroppedText(text, target)
+        !unread -> postError("Found no links in what was dropped")
+      }
     }
   }
 
-  /** Opens the add sheet for text dropped on the app, such as a link dragged from a browser. */
-  fun addDroppedText(text: String) {
+  /**
+   * Opens the add sheet aimed at [target], by default the active device, for text dropped on the
+   * app, such as a link dragged from a browser.
+   */
+  fun addDroppedText(text: String, target: InstanceEntry? = null) {
     val trimmed = text.trim()
-    if (trimmed.isNotEmpty()) openIntake(IntakeRequest(text = trimmed))
+    if (trimmed.isNotEmpty()) {
+      openIntake(IntakeRequest(text = trimmed, targetDeviceId = target?.deviceId))
+    }
   }
 
   /**
@@ -1743,9 +1750,6 @@ class AppState(
   }
 
   private companion object {
-    /** Dropped files read as text and handed to the add sheet. */
-    val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
-
     /** How long Start now waits for the task to start before naming what it preempted. */
     val START_TIMEOUT = 2.seconds
 
