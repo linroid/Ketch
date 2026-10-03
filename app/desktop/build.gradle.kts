@@ -33,6 +33,26 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
 }
 
+// Chinese is written once per script and copied for the systems that name it by script or by
+// another region, as app/shared/build.gradle.kts does for the shared strings.
+val composeResourcesWithAliases = layout.buildDirectory.dir("generated/composeResourcesWithAliases")
+val aliasComposeResources = tasks.register<Sync>("aliasComposeResources") {
+  val source = layout.projectDirectory.dir("src/main/composeResources")
+  from(source)
+  for (alias in listOf("values-b+zh+Hant", "values-zh-rHK", "values-zh-rMO")) {
+    from(source.dir("values-zh-rTW")) { into(alias) }
+  }
+  from(source.dir("values-zh")) { into("values-b+zh+Hans") }
+  into(composeResourcesWithAliases)
+}
+
+compose.resources {
+  customDirectory(
+    sourceSetName = "main",
+    directoryProvider = aliasComposeResources.map { composeResourcesWithAliases.get() },
+  )
+}
+
 // The languages of the desktop's strings, as macOS names them: English and one per values-*
 // folder. macOS shows its own parts of an app, such as the app menu's Services, Hide and Quit and
 // the Open and Save dialogs, only in the languages the app's bundle lists; see
