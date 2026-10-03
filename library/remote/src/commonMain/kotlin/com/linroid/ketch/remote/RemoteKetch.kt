@@ -348,7 +348,7 @@ class RemoteKetch internal constructor(
       is TaskEvent.StateChanged -> {
         taskMutex.withLock {
           val task = taskMap[event.taskId] ?: return
-          task.updateState(event.state, event.request, event.segments, event.queuePosition)
+          task.applyEvent(event.state, event.request, event.segments, event.queuePosition)
           taskRevision++
         }
       }
@@ -357,7 +357,7 @@ class RemoteKetch internal constructor(
         taskMutex.withLock {
           val task = taskMap[event.taskId] ?: return
           // A downloading task no longer waits in the queue.
-          task.updateState(event.state, event.request, event.segments, queuePosition = null)
+          task.applyEvent(event.state, event.request, event.segments, queuePosition = null)
           taskRevision++
         }
       }
@@ -380,6 +380,7 @@ class RemoteKetch internal constructor(
       onRemoved = { id ->
         taskMutex.withLock { removeTask(id) }
       },
+      updateLock = taskMutex,
     )
   }
 

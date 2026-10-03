@@ -89,10 +89,12 @@ class RemoteDownloadTaskTest {
       )
     }
     try {
-      val task = task(client)
+      // Not Auto already, so applying Auto despite the error would show.
+      val task = task(client, DownloadRequest(url = "https://example.com/file", connections = 4))
 
       assertFailsWith<UnsupportedOperationException> { task.setConnections(0) }
-      assertEquals(0, task.request.connections)
+      assertEquals(4, task.request.connections)
+      assertEquals(4, task.requestState.value.connections)
     } finally {
       client.close()
     }
@@ -121,6 +123,38 @@ class RemoteDownloadTaskTest {
 
       assertEquals(0, task.request.connections)
       assertEquals(2, task.queuePosition.value)
+    } finally {
+      client.close()
+    }
+  }
+
+  @Test
+  fun setSpeedLimit_eventDuringRequest_keepsEventQueuePosition() = runTest {
+    val request = DownloadRequest(url = "https://example.com/file")
+    // The server read position 3 for its response before a task ahead finished.
+    val snapshot = TaskSnapshot(
+      taskId = "task",
+      request = request.copy(speedLimit = SpeedLimit.of(1024)),
+      state = DownloadState.Queued,
+      createdAt = Instant.fromEpochMilliseconds(0),
+      queuePosition = 3,
+    )
+    lateinit var task: RemoteDownloadTask
+    val client = client {
+      // SSE reports the move to position 2 before the response arrives.
+      task.applyEvent(DownloadState.Queued, request = null, segments = null, queuePosition = 2)
+      respond(
+        content = remoteJson.encodeToString(snapshot),
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    try {
+      task = task(client, request)
+
+      task.setSpeedLimit(SpeedLimit.of(1024))
+
+      assertEquals(2, task.queuePosition.value)
+      assertEquals(SpeedLimit.of(1024), task.request.speedLimit)
     } finally {
       client.close()
     }
