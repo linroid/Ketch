@@ -149,11 +149,15 @@ data class PairingLink(
  * The addresses another device on the network can reach this one at: the [ipv4Addresses] of
  * [interfaces] that join the local network (see [isLocalNetwork]). Virtual machine, container
  * and VPN interfaces and mobile data are left out, since a phone on the same Wi-Fi cannot reach
- * them; so are IPv6 addresses, since that phone reaches IPv4 reliably and a link-local IPv6
- * address needs an interface name.
+ * them, unless no other interface has an address: a Hyper-V external switch moves the LAN
+ * address onto a virtual adapter, and names cannot tell it from a NAT one. IPv6 addresses are
+ * left out, since that phone reaches IPv4 reliably and a link-local IPv6 address needs an
+ * interface name.
  */
-fun pairingAddresses(interfaces: List<NetworkInterfaceInfo>): List<String> =
-  ipv4Addresses(interfaces.filter(::isLocalNetwork))
+fun pairingAddresses(interfaces: List<NetworkInterfaceInfo>): List<String> {
+  val (local, virtual) = interfaces.partition(::isLocalNetwork)
+  return ipv4Addresses(local).ifEmpty { ipv4Addresses(virtual) }
+}
 
 /**
  * The IPv4 addresses of [interfaces], private ones (`10/8`, `172.16/12`, `192.168/16`) first,

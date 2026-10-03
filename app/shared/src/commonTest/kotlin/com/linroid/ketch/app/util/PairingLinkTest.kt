@@ -173,13 +173,14 @@ class PairingLinkTest {
   }
 
   @Test
-  fun pairingAddresses_onlyVirtualInterfaces_isEmpty() {
+  fun pairingAddresses_hyperVExternalSwitch_fallsBackToTheVirtualAdapter() {
     val interfaces = listOf(
-      NetworkInterfaceInfo("bridge100", "bridge100", listOf("192.168.139.3")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
+      NetworkInterfaceInfo("eth1", "Intel(R) Ethernet Connection I219-V", listOf("fe80::1")),
+      NetworkInterfaceInfo("eth4", "Hyper-V Virtual Ethernet Adapter #2", listOf("192.168.1.30")),
+      NetworkInterfaceInfo("eth6", "Wintun Userspace Tunnel", listOf("100.101.7.12")),
     )
 
-    assertEquals(emptyList(), pairingAddresses(interfaces))
+    assertEquals(listOf("192.168.1.30", "100.101.7.12"), pairingAddresses(interfaces))
   }
 
   @Test
