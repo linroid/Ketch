@@ -128,8 +128,12 @@ internal class SampleData(
     const val DEVICE_NAME: String = "MacBook Pro"
     const val DOWNLOAD_DIR: String = "/Users/alex/Downloads"
 
-    /** A NAS on the local network; not watched, so the app never connects to it. */
-    val NAS: RemoteConfig = RemoteConfig(host = "nas.local", port = 8642, watch = false)
+    /**
+     * A NAS on the local network, which ran Linux when the app last reached it; not watched, so
+     * the app never connects to it.
+     */
+    val NAS: RemoteConfig =
+      RemoteConfig(host = "nas.local", port = 8642, watch = false, os = "Linux")
 
     /** Three download slots, all taken by [downloads], so the queued tasks wait for one. */
     val DOWNLOAD_CONFIG: DownloadConfig = DownloadConfig(

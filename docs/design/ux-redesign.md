@@ -397,8 +397,8 @@ device pennant ring, `ConnectionStatusDot` and the Pulse bar badge:
     completion sheen, then the strip is removed).
 - **Device hues** (pennants): a stable hash of `deviceId` picks from these `FileTypeHue` entries:
   `Sky, Teal, Magenta, Lime, Orange, Slate, Jade, Brown`.
-  - The pennant fill is `hue.light` in **both** themes, with a white monogram (every one passes
-    at least 4.9:1).
+  - The pennant fill is `hue.light` in **both** themes, with a white glyph or monogram (every
+    one passes at least 4.9:1).
   - Tints (chips, stacked sparkline bands) are `hue.dark` at 16% in dark and `hue.light` at 13%
     in light.
   - Hues are not user-editable.
@@ -647,7 +647,7 @@ illustration is static.
 | `LaneStrip` | One `Canvas`, `xs` radius. Heights: 4 dp (list row), 6 dp (table progress cell), 10 dp (inspector header), 16 dp (Connections tab). Each segment is drawn at `start/total` to `(end+1)/total` with its downloaded part filled. 1 dp `surface` seams only between unfinished segments, and only when there are 32 segments or fewer. A write head per active segment. Unknown size: a 30%-wide shimmer cycling every 1.2 s. Semantics: "8 connections, 6 active, 42 percent". Replaces `KetchSegmentBar`, `KetchSegmentDetail`, `HealthDot` and `KetchProgressBar` for tasks. |
 | `KetchFileTypeChip` | 20 dp (table), 28 dp (list), 36 dp (phone), 40 dp (inspector, intake preview). Hue at 13% + glyph. |
 | `KetchHueTile` | 32/40/48 dp, r = size × 0.28, hue gradient 18% → 6% top-left to bottom-right, 1 dp `#FFFFFF` at 40% top highlight (light only). Used for settings categories, device types and Discover results. |
-| `DevicePennant` | 16/20/24/32/40 dp circle in the device hue, white monogram (two letters from the name: "NB", "LM"), 2 dp **health ring** (§3.2.4) offset 2 dp. Failed badge: 14 dp `dangerFill` circle with a white `numeralS` count at top-end. The ring encodes **health only**. Aggregate progress is a separate outer arc, shown only on the rail's All-devices avatar. |
+| `DevicePennant` | 16/20/24/32/40 dp circle in the device hue with the white solid glyph of its `DeviceType` (Laptop, Desktop, Server, Phone, Tablet, Browser) at 60% of the circle; a device whose type is not known yet shows a monogram instead (two letters from the name: "NB", "LM"). 2 dp **health ring** (§3.2.4) offset 2 dp. Failed badge: 14 dp `dangerFill` circle with a white `numeralS` count at top-end. The ring encodes **health only**. Aggregate progress is a separate outer arc, shown only on the rail's All-devices avatar. |
 | `SpeedLimitPicker` (shared) | Chips: Unlimited · 512 KB/s · 1 · 2 · 5 · 10 MB/s · Custom…. Custom is an inline field that accepts `500k`, `2m`, `1.5m`, `unlimited` (decimals parsed client-side). It commits on ↩, on blur, or after 600 ms without typing, never per keystroke (`SpeedLimitSlider.kt:145-155,198-202`). The selected state is derived from `requestState`, not remembered flags. The caption names the limit that wins ("Slow lane 1 MB/s applies to all downloads"). Used by Settings, intake, inspector and the Pulse popover. Deletes `presetSpeedOptions` (`SpeedLimitSlider.kt:40-50`). |
 | `StartTimePicker` (shared) | Menu: Start now · In 1 hour · Tonight 01:00 · Tomorrow 08:00 · Off-peak (from Speed → Auto rules, when set) · Pick date & time… (M3 `DatePicker`, then `TimePicker`) · Clear. It always produces `DownloadSchedule.AtTime` (kotlinx-datetime, `TimeZone.currentSystemDefault()`). Label: "Starts 01:00 tonight", "Starts Fri 08:00". |
 | `ConnectionStepper` | `[−] 8 [+]`, 28 dp buttons, `numeral` value, range 1–32 (torrent: "Peer limit" 1–512, step 10). Debounced 400 ms. "Auto (4)" when `request.connections == 0`. |
@@ -670,7 +670,7 @@ illustration is static.
 | Engine | `Lanes`, `Bolt` (Urgent) |
 | File actions | `Open` (arrow up-right), `Reveal` (folder with arrow), `Copy`, `Drop` |
 | Status | `CheckCircle`, `Warning`, `ChevronUp`, `ChevronDown` |
-| Devices | `Laptop`, `Desktop`, `Server`, `Phone`, `Tablet`, `Browser`, `Fleet` (three linked dots) |
+| Devices | `Laptop`, `Desktop`, `Server`, `Phone`, `Tablet`, `Browser`, `Fleet` (three linked dots); solid `Pennant*` glyphs of the same devices, drawn inside a `DevicePennant` |
 | Navigation | `Discover` (sparkle magnifier), `Devices`, `Bell`, `Command` (⌘), `Columns`, `Inspector` (panel-right), `Sidebar` (panel-left), `Undo`, `Pennant`, `QrCode` |
 
 - Sizes: 16 in Compact controls, 18 in nav, 20 in touch controls, 24 in the phone bottom bar

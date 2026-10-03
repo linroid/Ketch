@@ -87,7 +87,7 @@ internal fun StackedPennants(
       .size(width = size + step * (shown.size - 1).coerceAtLeast(0), height = size)
       .clearAndSetSemantics {},
   ) {
-    // The first device stays in front, so its monogram reads whole.
+    // The first device stays in front, so its pennant reads whole.
     shown.withIndex().reversed().forEach { (index, device) ->
       val (id, name) = device
       DevicePennant(
