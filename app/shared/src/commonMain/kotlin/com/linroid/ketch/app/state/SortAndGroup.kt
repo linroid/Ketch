@@ -531,20 +531,25 @@ private val TIEBREAK: Comparator<TaskRow> =
   NEWEST_FIRST.thenBy { it.key.deviceId }.thenBy { it.key.taskId }
 
 /**
- * Queued tasks in the order their device starts them: by the positions it reports, otherwise by
- * priority then age, as the engine orders its queue; then scheduled ones by time.
+ * Queued tasks in the order their device starts them: by priority then age, as the engine orders
+ * its queue, with the positions a device reports only breaking ties between its own tasks; then
+ * scheduled ones by time.
+ *
+ * Positions never override priority and age: a priority change reaches the list before the
+ * positions it causes, and letting a stale position win for some pairs but not others (other
+ * devices, tasks without a position) makes the order cyclic, which the JVM's sort rejects.
  */
 private val WAITING_ORDER: Comparator<TaskRow> = Comparator { a, b ->
   val aScheduled = a.state is DownloadState.Scheduled
   val bScheduled = b.state is DownloadState.Scheduled
-  val aPosition = a.queuePosition
-  val bPosition = b.queuePosition
   when {
     aScheduled != bScheduled -> if (aScheduled) 1 else -1
     aScheduled -> nullsLast(startTime(a), startTime(b), descending = false)
-    aPosition != null && bPosition != null && a.key.deviceId == b.key.deviceId ->
-      aPosition.compareTo(bPosition)
-    else -> compareValuesBy(a, b, { -it.request.priority.ordinal }, { it.createdAt })
+    // One lexicographic key, so the order stays total whatever the positions say.
+    else ->
+      compareValuesBy(a, b, { -it.request.priority.ordinal }, { it.createdAt }, { it.key.deviceId })
+        .takeIf { it != 0 }
+        ?: nullsLast(a.queuePosition, b.queuePosition, descending = false)
   }
 }
 

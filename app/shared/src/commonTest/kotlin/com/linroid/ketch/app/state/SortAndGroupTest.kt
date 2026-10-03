@@ -98,18 +98,40 @@ class SortAndGroupTest {
   }
 
   @Test
-  fun waitingOrder_sameDevicePositions_followQueuePosition() {
-    // Positions win over priority and age, as the device's queue order is the truth.
-    val high = urgent("high", DownloadPriority.HIGH)
+  fun waitingOrder_sameDevicePositions_onlyBreakTies() {
+    // Same priority and age: the device's positions decide, rows without one last.
     val rows = listOf(
-      row("high", DownloadState.Queued, request = high, queuePosition = 2),
-      row("old", DownloadState.Queued, createdAt = START - 1.hours, queuePosition = 3),
-      row("normal", DownloadState.Queued, queuePosition = 1)
+      row("second", DownloadState.Queued, queuePosition = 2),
+      row("starting", DownloadState.Queued),
+      row("first", DownloadState.Queued, queuePosition = 1)
     )
 
     val group = arrangeRows(rows, ListArrangement(), START, utc).single()
 
-    assertEquals(listOf("normal", "high", "old"), group.ids())
+    assertEquals(listOf("first", "second", "starting"), group.ids())
+  }
+
+  @Test
+  fun waitingOrder_stalePositions_sameOrderWhateverTheInputOrder() {
+    // A priority change shows before the positions it causes: "raised" is HIGH but still 2nd.
+    // Letting positions win here made a cycle with the other device's older row.
+    val rows = listOf(
+      row("first", DownloadState.Queued, createdAt = START + 1.minutes, queuePosition = 1),
+      row(
+        "raised",
+        DownloadState.Queued,
+        createdAt = START + 3.minutes,
+        request = urgent("raised", DownloadPriority.HIGH),
+        queuePosition = 2,
+      ),
+      row("other", DownloadState.Queued, deviceId = "other-device")
+    )
+
+    for (input in permutations(rows)) {
+      val group = arrangeRows(input, ListArrangement(), START, utc).single()
+
+      assertEquals(listOf("raised", "other", "first"), group.ids())
+    }
   }
 
   @Test
@@ -447,6 +469,13 @@ class SortAndGroupTest {
 
   private fun completed(size: Long = 100, finishedAt: Instant? = null) =
     DownloadState.Completed("/downloads/file", size, completedAt = finishedAt)
+
+  private fun <T> permutations(items: List<T>): List<List<T>> =
+    if (items.size <= 1) {
+      listOf(items)
+    } else {
+      items.flatMap { item -> permutations(items - item).map { listOf(item) + it } }
+    }
 
   private fun preempted() =
     DownloadState.Paused(DownloadProgress(5, 10), PauseReason.Preempted("urgent"))
