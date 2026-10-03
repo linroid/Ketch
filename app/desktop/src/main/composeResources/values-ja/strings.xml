@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">ファイル</string>
+  <string name="menu_edit">編集</string>
+  <string name="menu_view">表示</string>
+  <string name="menu_downloads">ダウンロード</string>
+  <string name="menu_device">デバイス</string>
+  <string name="menu_window">ウィンドウ</string>
+  <string name="menu_help">ヘルプ</string>
+  <string name="menu_pause">一時停止</string>
+  <string name="menu_resume">再開</string>
+  <string name="menu_add_device">デバイスを追加…</string>
+  <string name="menu_pair_device">デバイスをペアリング…</string>
+  <string name="menu_item_keys">%1$s（%2$s）</string>
+
+
+  <string name="tray_devices">デバイス</string>
+  <string name="tray_recent">最近</string>
+  <string name="tray_show_ketch">Ketchを表示</string>
+  <string name="tray_speed">速度</string>
+  <string name="tray_show">表示</string>
+  <string name="tray_enter_token">トークンを入力…</string>
+  <string name="tray_retry_now">今すぐ再試行</string>
+  <string name="tray_stay_connected">接続を維持</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="other">失敗した%1$d件を再試行</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">クリップボードのリンクをここに追加</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">トークンが必要</string>
+  <string name="tray_not_connected">未接続</string>
+  <string name="tray_offline">オフライン</string>
+  <string name="tray_connecting">接続中</string>
+  <string name="tray_idle">アイドル</string>
+  <plurals name="tray_active">
+    <item quantity="other">%1$d件実行中</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="other">%1$d件待機中</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="other">%1$d件一時停止中</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="other">↓ %2$s · %1$d件実行中</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">クリップボードにリンクがありません</string>
+  <string name="message_switch_speed_failed">%1$sを%2$sに切り替えられませんでした</string>
+  <string name="message_try_again">もう一度試す</string>
+  <string name="message_undo">取り消す</string>
+  <string name="message_slow_lane_on">%1$sのスローレーンをオンにしました · %2$s</string>
+  <string name="message_slow_lane_off">%1$sのスローレーンをオフにしました</string>
+  <string name="message_speed_follows_rules">%1$sの速度はルールに従います</string>
+  <string name="message_speed_limit_failed">%1$sの速度制限を設定できませんでした</string>
+  <string name="message_reconnect_failed">%1$sに再接続できませんでした</string>
+  <string name="message_open_failed">%1$sを開けませんでした</string>
+  <string name="message_show_failed">%1$sを表示できませんでした</string>
+  <string name="message_pause_failed">%2$sで%1$sを一時停止できませんでした</string>
+  <string name="message_copy_links_failed">リンクをコピーできませんでした</string>
+  <plurals name="message_links_copied">
+    <item quantity="other">%1$d件のリンクをコピーしました</item>
+  </plurals>
+  <string name="message_window_error">問題が発生しました</string>
+  <string name="open_torrent_title">トレントファイルを開く</string>
+
+  <string name="close_keep_running_title">バックグラウンドでダウンロードを続けますか？</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="other">Ketchはメニューバーに残り、%1$d件のダウンロードを完了させます。</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="other">Ketchは通知領域に残り、%1$d件のダウンロードを完了させます。</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="other">Ketchはシステムトレイに残り、%1$d件のダウンロードを完了させます。</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="other">Ketchは最小化されたまま、%1$d件のダウンロードを完了させます。</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">メニューバーのアイコンまたは%1$sで、いつでも終了できます。</string>
+  <string name="close_quit_from_notification_area">通知領域のアイコンまたは%1$sで、いつでも終了できます。</string>
+  <string name="close_quit_from_system_tray">システムトレイのアイコンまたは%1$sで、いつでも終了できます。</string>
+  <string name="close_quit_with_keys">%1$sで、いつでも終了できます。</string>
+  <string name="close_sentences">%1$s%2$s</string>
+  <string name="close_keep_running">実行を続ける</string>
+  <string name="close_quit_ketch">Ketchを終了</string>
+  <string name="close_dont_ask_again">今後確認しない</string>
+  <string name="close_quit_title">Ketchを終了しますか？</string>
+  <plurals name="close_quit_body">
+    <item quantity="other">%1$d件のダウンロードは一時停止し、次にKetchを開いたときに再開します。</item>
+  </plurals>
+  <string name="close_quit">終了</string>
+  <string name="close_cancel">キャンセル</string>
+
+  <string name="notify_still_running">Ketchは通知領域で引き続き実行中です</string>
+  <plurals name="notify_added">
+    <item quantity="other">%1$d件のダウンロードを追加しました</item>
+  </plurals>
+  <string name="notify_on_device">%1$s：%2$s</string>
+  <string name="notify_names_two">%1$s、%2$s</string>
+  <string name="notify_names_three">%1$s、%2$s、%3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="other">%1$sほか%2$d件</item>
+  </plurals>
+
+  <string name="settings_window_title">設定</string>
+</resources>

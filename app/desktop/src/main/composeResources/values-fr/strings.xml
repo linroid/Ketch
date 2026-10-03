@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">Fichier</string>
+  <string name="menu_edit">Édition</string>
+  <string name="menu_view">Présentation</string>
+  <string name="menu_downloads">Téléchargements</string>
+  <string name="menu_device">Appareil</string>
+  <string name="menu_window">Fenêtre</string>
+  <string name="menu_help">Aide</string>
+  <string name="menu_pause">Mettre en pause</string>
+  <string name="menu_resume">Reprendre</string>
+  <string name="menu_add_device">Ajouter un appareil…</string>
+  <string name="menu_pair_device">Appairer un appareil…</string>
+  <string name="menu_item_keys">%1$s (%2$s)</string>
+
+
+  <string name="tray_devices">Appareils</string>
+  <string name="tray_recent">Récents</string>
+  <string name="tray_show_ketch">Afficher Ketch</string>
+  <string name="tray_speed">Vitesse</string>
+  <string name="tray_show">Afficher</string>
+  <string name="tray_enter_token">Saisir le jeton…</string>
+  <string name="tray_retry_now">Réessayer maintenant</string>
+  <string name="tray_stay_connected">Rester connecté</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="one">Réessayer %1$d échec</item>
+    <item quantity="other">Réessayer %1$d échecs</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">Ajouter ici le lien du presse-papiers</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">Jeton requis</string>
+  <string name="tray_not_connected">Non connecté</string>
+  <string name="tray_offline">Hors ligne</string>
+  <string name="tray_connecting">Connexion</string>
+  <string name="tray_idle">Inactif</string>
+  <plurals name="tray_active">
+    <item quantity="one">%1$d actif</item>
+    <item quantity="other">%1$d actifs</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="one">%1$d en attente</item>
+    <item quantity="other">%1$d en attente</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="one">%1$d en pause</item>
+    <item quantity="other">%1$d en pause</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="one">%1$d en échec</item>
+    <item quantity="other">%1$d en échec</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="one">↓ %2$s · %1$d actif</item>
+    <item quantity="other">↓ %2$s · %1$d actifs</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">Le presse-papiers ne contient aucun lien</string>
+  <string name="message_switch_speed_failed">Impossible de passer %1$s au mode %2$s</string>
+  <string name="message_try_again">Réessayer</string>
+  <string name="message_undo">Annuler</string>
+  <string name="message_slow_lane_on">Voie lente activée pour %1$s · %2$s</string>
+  <string name="message_slow_lane_off">Voie lente désactivée pour %1$s</string>
+  <string name="message_speed_follows_rules">La vitesse de %1$s suit vos règles</string>
+  <string name="message_speed_limit_failed">Impossible de définir la limite de vitesse sur %1$s</string>
+  <string name="message_reconnect_failed">Impossible de se reconnecter à %1$s</string>
+  <string name="message_open_failed">Impossible d'ouvrir %1$s</string>
+  <string name="message_show_failed">Impossible d'afficher %1$s</string>
+  <string name="message_pause_failed">Impossible de mettre en pause %1$s sur %2$s</string>
+  <string name="message_copy_links_failed">Impossible de copier les liens</string>
+  <plurals name="message_links_copied">
+    <item quantity="one">Lien copié</item>
+    <item quantity="other">%1$d liens copiés</item>
+  </plurals>
+  <string name="message_window_error">Une erreur s'est produite</string>
+  <string name="open_torrent_title">Ouvrir un fichier torrent</string>
+
+  <string name="close_keep_running_title">Continuer à télécharger en arrière-plan ?</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="one">Ketch reste dans la barre des menus et termine %1$d téléchargement.</item>
+    <item quantity="other">Ketch reste dans la barre des menus et termine %1$d téléchargements.</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="one">Ketch reste dans la zone de notification et termine %1$d téléchargement.</item>
+    <item quantity="other">Ketch reste dans la zone de notification et termine %1$d téléchargements.</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="one">Ketch reste dans la barre d'état système et termine %1$d téléchargement.</item>
+    <item quantity="other">Ketch reste dans la barre d'état système et termine %1$d téléchargements.</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="one">Ketch reste réduit et termine %1$d téléchargement.</item>
+    <item quantity="other">Ketch reste réduit et termine %1$d téléchargements.</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">Quittez à tout moment depuis l'icône de la barre des menus ou avec %1$s.</string>
+  <string name="close_quit_from_notification_area">Quittez à tout moment depuis l'icône de la zone de notification ou avec %1$s.</string>
+  <string name="close_quit_from_system_tray">Quittez à tout moment depuis l'icône de la barre d'état système ou avec %1$s.</string>
+  <string name="close_quit_with_keys">Quittez à tout moment avec %1$s.</string>
+  <string name="close_sentences">%1$s %2$s</string>
+  <string name="close_keep_running">Continuer en arrière-plan</string>
+  <string name="close_quit_ketch">Quitter Ketch</string>
+  <string name="close_dont_ask_again">Ne plus demander</string>
+  <string name="close_quit_title">Quitter Ketch ?</string>
+  <plurals name="close_quit_body">
+    <item quantity="one">%1$d téléchargement sera mis en pause et reprendra à la prochaine ouverture de Ketch.</item>
+    <item quantity="other">%1$d téléchargements seront mis en pause et reprendront à la prochaine ouverture de Ketch.</item>
+  </plurals>
+  <string name="close_quit">Quitter</string>
+  <string name="close_cancel">Annuler</string>
+
+  <string name="notify_still_running">Ketch est toujours actif dans la zone de notification</string>
+  <plurals name="notify_added">
+    <item quantity="one">Téléchargement ajouté</item>
+    <item quantity="other">%1$d téléchargements ajoutés</item>
+  </plurals>
+  <string name="notify_on_device">Sur %1$s : %2$s</string>
+  <string name="notify_names_two">%1$s, %2$s</string>
+  <string name="notify_names_three">%1$s, %2$s, %3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="one">%1$s et %2$d autre</item>
+    <item quantity="other">%1$s et %2$d autres</item>
+  </plurals>
+
+  <string name="settings_window_title">Réglages</string>
+</resources>

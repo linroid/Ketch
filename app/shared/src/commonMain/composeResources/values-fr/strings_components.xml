@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="component_chip_remove">Retirer %1$s</string>
+
+  <string name="component_field_paste">Coller</string>
+  <string name="component_field_clear">Effacer le texte</string>
+
+  <string name="component_priority_low">Priorité basse</string>
+  <string name="component_priority_high">Priorité haute</string>
+  <string name="component_priority_urgent">Priorité urgente</string>
+
+  <plurals name="component_pennant_failures">
+    <item quantity="one">%1$d en échec</item>
+    <item quantity="other">%1$d en échec</item>
+  </plurals>
+
+  <string name="component_speed_chart">Vitesse %1$s, maximum %2$s</string>
+
+  <string name="component_add_clip">Ajouter %1$s</string>
+  <string name="component_add_link">Ajouter le lien</string>
+  <string name="component_add_drop">Déposer pour télécharger</string>
+
+  <plurals name="component_lanes_connections">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d actives</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="one">%1$d pour cent</item>
+    <item quantity="other">%1$d pour cent</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">taille inconnue</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="one">%1$d bloquée</item>
+    <item quantity="other">%1$d bloquées</item>
+  </plurals>
+
+  <string name="component_limit_applies">%1$s (%2$s) s'applique à tous les téléchargements</string>
+  <string name="component_limit_custom">Personnalisée…</string>
+  <string name="component_limit_custom_hint">p. ex. 750k ou 1,5m</string>
+  <string name="component_limit_unit_tooltip">Unité d'un nombre sans k ni m</string>
+
+  <string name="component_stepper_auto">Auto</string>
+  <string name="component_stepper_auto_count">Auto (%1$d)</string>
+  <string name="component_stepper_fewer_connections">Moins de connexions</string>
+  <string name="component_stepper_more_connections">Plus de connexions</string>
+  <plurals name="component_stepper_connections">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">Connexions automatiques</string>
+  <string name="component_stepper_connections_auto_count">Connexions automatiques (%1$d)</string>
+  <string name="component_stepper_fewer_peers">Moins de pairs</string>
+  <string name="component_stepper_more_peers">Plus de pairs</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="one">%1$d pair</item>
+    <item quantity="other">%1$d pairs</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">Pairs automatiques</string>
+  <string name="component_stepper_peers_auto_count">Pairs automatiques (%1$d)</string>
+
+  <string name="component_start_now">Démarrer maintenant</string>
+  <string name="component_start_in_hour">Dans 1 heure</string>
+  <string name="component_start_tonight">Ce soir à %1$s</string>
+  <string name="component_start_off_peak">Heures creuses · %1$s</string>
+  <string name="component_start_label_now">Maintenant</string>
+  <string name="component_start_after">Démarre dans %1$s</string>
+  <string name="component_start_tonight_at">Démarre ce soir à %1$s</string>
+  <string name="component_start_today_at">Démarre aujourd'hui à %1$s</string>
+  <string name="component_start_tomorrow_at">Démarre demain à %1$s</string>
+  <string name="component_start_weekday_at">Démarre %1$s à %2$s</string>
+  <string name="component_start_date_at">Démarre le %1$s à %2$s</string>
+  <string name="component_start_follow_now">démarre maintenant</string>
+  <string name="component_start_follow_after">démarre dans %1$s</string>
+  <string name="component_start_follow_tonight">démarre ce soir à %1$s</string>
+  <string name="component_start_follow_today">démarre aujourd'hui à %1$s</string>
+  <string name="component_start_follow_tomorrow">démarre demain à %1$s</string>
+  <string name="component_start_follow_weekday">démarre %1$s à %2$s</string>
+  <string name="component_start_follow_date">démarre le %1$s à %2$s</string>
+  <string name="component_start_menu_title">Démarrage</string>
+  <string name="component_start_pick">Choisir la date et l'heure…</string>
+  <string name="component_start_clear">Effacer</string>
+  <string name="component_start_dialog_title">Démarrer à</string>
+  <string name="component_start_schedule">Planifier</string>
+  <string name="component_start_passed">Cette heure est déjà passée</string>
+</resources>

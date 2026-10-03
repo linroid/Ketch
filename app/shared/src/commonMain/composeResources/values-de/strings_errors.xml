@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">Verbindung unterbrochen</string>
+  <string name="error_network_hint">%1$s ist nicht erreichbar.</string>
+  <string name="error_network_hint_short">%1$s nicht erreichbar</string>
+  <string name="error_network_hint_server">Der Server ist nicht erreichbar.</string>
+  <string name="error_network_hint_server_short">Server nicht erreichbar</string>
+  <string name="error_retried_once">Ketch hat es einmal erneut versucht.</string>
+  <plurals name="error_retried">
+    <item quantity="one">Ketch hat es %1$d-mal erneut versucht.</item>
+    <item quantity="other">Ketch hat es %1$d-mal erneut versucht.</item>
+  </plurals>
+  <string name="error_check_connection">Prüfe die Verbindung und versuche es erneut.</string>
+  <string name="error_check_connection_short">Verbindung prüfen und erneut versuchen</string>
+  <string name="error_not_supported">Auf diesem Gerät nicht unterstützt</string>
+  <string name="error_something_went_wrong">Etwas ist schiefgelaufen</string>
+
+  <string name="error_disk">Die Datei konnte nicht geschrieben werden</string>
+  <string name="error_disk_hint">Prüfe den freien Speicher und die Ordnerberechtigungen.</string>
+  <string name="error_disk_hint_short">freien Speicher und Ordnerberechtigungen prüfen</string>
+  <string name="error_disk_hint_on">Prüfe den freien Speicher und die Ordnerberechtigungen auf %1$s.</string>
+  <string name="error_disk_hint_on_short">freien Speicher und Ordnerberechtigungen auf %1$s prüfen</string>
+  <string name="error_disk_hint_free">%1$s frei auf %2$s. Prüfe Speicher und Ordnerberechtigungen.</string>
+  <string name="error_disk_hint_free_short">%1$s frei auf %2$s</string>
+
+  <string name="error_unsupported">Dieser Server unterstützt diesen Download nicht</string>
+  <string name="error_unsupported_hint">Er meldet keine Größe und unterstützt keine Bereichsanfragen.</string>
+  <string name="error_unsupported_hint_short">keine Größenangabe und keine Bereichsanfragen</string>
+  <string name="error_file_changed">Datei auf dem Server geändert</string>
+  <string name="error_file_changed_hint">Fortsetzen würde sie beschädigen (%1$s).</string>
+  <string name="error_file_changed_hint_short">Fortsetzen würde sie beschädigen (%1$s)</string>
+  <string name="error_corrupt_resume">Gespeicherter Fortschritt ist beschädigt</string>
+  <string name="error_corrupt_resume_hint">Der heruntergeladene Teil kann nicht weiterverwendet werden.</string>
+  <string name="error_corrupt_resume_hint_short">der heruntergeladene Teil ist nicht verwendbar</string>
+  <string name="error_canceled">Abgebrochen</string>
+  <string name="error_wrong_credentials">Falscher Benutzername oder falsches Passwort</string>
+  <string name="error_wrong_credentials_hint">Der %1$s-Server hat die Anmeldung abgelehnt.</string>
+  <string name="error_wrong_credentials_hint_short">der %1$s-Server hat die Anmeldung abgelehnt</string>
+  <string name="error_torrent_stopped">Der Torrent wurde angehalten</string>
+  <string name="error_torrent_stopped_hint">Keine erreichbaren Peers oder Tracker.</string>
+  <string name="error_torrent_stopped_hint_short">keine erreichbaren Peers oder Tracker</string>
+  <string name="error_source">Der %1$s-Server hat einen Fehler gemeldet</string>
+
+  <string name="error_http_sign_in">Anmeldung erforderlich (%1$d)</string>
+  <string name="error_http_sign_in_hint">%1$s verlangt eine Anmeldung. Sende den Download über die Ketch-Browsererweiterung, damit deine Cookies mitgesendet werden.</string>
+  <string name="error_http_sign_in_hint_short">%1$s verlangt eine Anmeldung</string>
+  <string name="error_http_sign_in_hint_server">Der Server verlangt eine Anmeldung. Sende den Download über die Ketch-Browsererweiterung, damit deine Cookies mitgesendet werden.</string>
+  <string name="error_http_sign_in_hint_server_short">der Server verlangt eine Anmeldung</string>
+  <string name="error_http_forbidden">Zugriff verweigert (403)</string>
+  <string name="error_http_forbidden_hint">Der Link ist möglicherweise abgelaufen.</string>
+  <string name="error_http_forbidden_hint_browser">Der Link ist möglicherweise abgelaufen. Aus %1$s abgefangen? Fange ihn auf der Seite erneut ab.</string>
+  <string name="error_http_forbidden_hint_short">der Link ist möglicherweise abgelaufen</string>
+  <string name="error_browser_yours">deinem Browser</string>
+  <string name="error_http_not_found">Datei nicht gefunden (%1$d)</string>
+  <string name="error_http_not_found_hint">Der Server hat diese Datei nicht mehr.</string>
+  <string name="error_http_not_found_hint_short">der Server hat diese Datei nicht mehr</string>
+  <string name="error_http_range">Server verweigert das Fortsetzen</string>
+  <string name="error_http_range_hint">Die gespeicherte Position ist nicht mehr gültig.</string>
+  <string name="error_http_range_hint_short">die gespeicherte Position ist nicht mehr gültig</string>
+  <string name="error_http_rate_limited">Server drosselt Anfragen</string>
+  <string name="error_http_rate_limited_hint_in">Versuche es in %1$d s mit weniger Verbindungen erneut.</string>
+  <string name="error_http_rate_limited_hint_in_short">in %1$d s mit weniger Verbindungen erneut versuchen</string>
+  <string name="error_http_rate_limited_hint">Versuche es später mit weniger Verbindungen erneut.</string>
+  <string name="error_http_rate_limited_hint_short">später mit weniger Verbindungen erneut versuchen</string>
+  <string name="error_http_server">Serverfehler (%1$d)</string>
+  <string name="error_http_server_hint">Meist nur vorübergehend.</string>
+  <string name="error_http_server_hint_short">meist nur vorübergehend</string>
+  <string name="error_http_other">Server antwortete mit %1$d</string>
+</resources>

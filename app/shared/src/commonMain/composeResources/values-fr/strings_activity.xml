@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="notify_on_device">Sur %1$s : %2$s</string>
+  <string name="notify_download_complete">Téléchargement terminé</string>
+  <plurals name="notify_downloads_finished">
+    <item quantity="one">%1$d téléchargement terminé</item>
+    <item quantity="other">%1$d téléchargements terminés</item>
+  </plurals>
+  <string name="notify_download_failed">Échec du téléchargement</string>
+  <string name="notify_failed_body">%1$s : %2$s</string>
+  <string name="notify_all_finished">Tous les téléchargements sont terminés</string>
+  <string name="notify_action_share">Partager</string>
+
+  <string name="notify_channel_active">Téléchargements en cours</string>
+  <string name="notify_channel_done">Téléchargements terminés</string>
+  <string name="notify_channel_failed">Téléchargements en échec</string>
+  <string name="notify_finished_group">Téléchargements terminés</string>
+  <string name="notify_sharing_device">Partage de cet appareil</string>
+  <string name="notify_server_on_port">Serveur sur le port %1$d</string>
+  <string name="notify_slow_lane_on">Voie lente</string>
+  <string name="notify_action_pause_all">Tout mettre en pause</string>
+  <string name="notify_action_slow_lane">Voie lente</string>
+  <string name="notify_action_full_speed">Pleine vitesse</string>
+  <plurals name="notify_more_files">
+    <item quantity="one">+%1$d autre</item>
+    <item quantity="other">+%1$d autres</item>
+  </plurals>
+  <plurals name="notify_paused">
+    <item quantity="one">%1$d téléchargement mis en pause</item>
+    <item quantity="other">%1$d téléchargements mis en pause</item>
+  </plurals>
+  <string name="notify_paused_body">Ouvrez Ketch pour continuer</string>
+  <string name="notify_web_offer">M'avertir</string>
+  <string name="notify_web_on">Notifications activées</string>
+
+  <plurals name="ongoing_downloading">
+    <item quantity="one">Téléchargement de %1$d fichier</item>
+    <item quantity="other">Téléchargement de %1$d fichiers</item>
+  </plurals>
+  <string name="ongoing_downloading_file">Téléchargement de %1$s</string>
+  <plurals name="ongoing_waiting">
+    <item quantity="one">%1$d fichier en attente de téléchargement</item>
+    <item quantity="other">%1$d fichiers en attente de téléchargement</item>
+  </plurals>
+  <string name="ongoing_size_of">%1$s sur %2$s</string>
+  <string name="ongoing_left_under_minute">il reste moins d'une minute</string>
+  <plurals name="ongoing_left_minutes">
+    <item quantity="one">il reste environ %1$d min</item>
+    <item quantity="other">il reste environ %1$d min</item>
+  </plurals>
+  <string name="ongoing_left">il reste environ %1$s</string>
+  <string name="ongoing_line_waiting">En attente</string>
+
+  <string name="feedback_background_pause">Les téléchargements se mettent en pause quand Ketch est en arrière-plan</string>
+  <string name="feedback_background_use_computer">Utilisez plutôt un ordinateur</string>
+  <string name="feedback_file_action_failed">Impossible d'ouvrir le fichier</string>
+
+  <string name="activity_title">Activité</string>
+  <string name="activity_mark_all_read">Tout marquer comme lu</string>
+  <string name="activity_clear">Effacer</string>
+  <string name="activity_unread">Non lu</string>
+  <string name="activity_empty_title">Aucune activité pour l'instant</string>
+  <string name="activity_empty_body">Les téléchargements terminés, les échecs et les appareils qui passent hors ligne s'affichent ici.</string>
+  <string name="activity_earlier">Plus tôt</string>
+
+  <string name="feedback_open_failed">Impossible d'ouvrir %1$s</string>
+  <string name="feedback_drop_unsupported">Seuls les fichiers .torrent et les listes de liens peuvent être déposés pour ajouter des téléchargements</string>
+  <string name="feedback_read_failed">Impossible de lire %1$s</string>
+  <string name="feedback_torrent_invalid">%1$s n'est pas un fichier torrent valide</string>
+  <string name="feedback_file_unsupported">%1$s n'est pas un fichier pris en charge</string>
+  <string name="feedback_file_read_failed">Échec de la lecture de %1$s</string>
+  <string name="feedback_add_failed">Impossible d'ajouter %1$s</string>
+  <plurals name="feedback_add_failed_count">
+    <item quantity="one">Impossible d'ajouter %1$d téléchargement</item>
+    <item quantity="other">Impossible d'ajouter %1$d téléchargements</item>
+  </plurals>
+  <string name="feedback_switch_failed">Impossible de passer à %1$s</string>
+  <string name="feedback_reconnect_failed">Impossible de se reconnecter à %1$s</string>
+  <string name="feedback_remove_device_failed">Impossible de retirer %1$s</string>
+  <string name="feedback_discovery_failed">Échec de la recherche de serveurs sur le réseau local</string>
+
+  <plurals name="feedback_part_failed">
+    <item quantity="one">%1$d en échec</item>
+    <item quantity="other">%1$d en échec</item>
+  </plurals>
+
+  <string name="feedback_nothing_to_pause">Rien à mettre en pause</string>
+  <plurals name="feedback_paused">
+    <item quantity="one">%1$d téléchargement mis en pause</item>
+    <item quantity="other">%1$d téléchargements mis en pause</item>
+  </plurals>
+  <plurals name="feedback_paused_on_devices">
+    <item quantity="one">%1$d téléchargement mis en pause sur %2$d appareils</item>
+    <item quantity="other">%1$d téléchargements mis en pause sur %2$d appareils</item>
+  </plurals>
+  <plurals name="feedback_scheduled_on_time">
+    <item quantity="one">%1$d planifié démarrera quand même à l'heure prévue</item>
+    <item quantity="other">%1$d planifiés démarreront quand même à l'heure prévue</item>
+  </plurals>
+  <plurals name="feedback_scheduled_at">
+    <item quantity="one">%1$d planifié démarrera quand même à %2$s</item>
+    <item quantity="other">%1$d planifiés démarreront quand même à %2$s</item>
+  </plurals>
+  <plurals name="feedback_resumed">
+    <item quantity="one">%1$d téléchargement repris</item>
+    <item quantity="other">%1$d téléchargements repris</item>
+  </plurals>
+  <plurals name="feedback_resumed_on_devices">
+    <item quantity="one">%1$d téléchargement repris sur %2$d appareils</item>
+    <item quantity="other">%1$d téléchargements repris sur %2$d appareils</item>
+  </plurals>
+  <plurals name="feedback_retrying">
+    <item quantity="one">Nouvelle tentative pour %1$d téléchargement</item>
+    <item quantity="other">Nouvelle tentative pour %1$d téléchargements</item>
+  </plurals>
+  <plurals name="feedback_retrying_on_devices">
+    <item quantity="one">Nouvelle tentative pour %1$d téléchargement sur %2$d appareils</item>
+    <item quantity="other">Nouvelle tentative pour %1$d téléchargements sur %2$d appareils</item>
+  </plurals>
+  <plurals name="feedback_cleared">
+    <item quantity="one">%1$d téléchargement terminé effacé</item>
+    <item quantity="other">%1$d téléchargements terminés effacés</item>
+  </plurals>
+  <string name="feedback_nothing_missing">Aucun fichier manquant à effacer</string>
+  <plurals name="feedback_cleared_missing">
+    <item quantity="one">%1$d téléchargement au fichier manquant effacé</item>
+    <item quantity="other">%1$d téléchargements aux fichiers manquants effacés</item>
+  </plurals>
+  <string name="feedback_removed_one">%1$s retiré</string>
+  <plurals name="feedback_removed">
+    <item quantity="one">%1$d téléchargement retiré</item>
+    <item quantity="other">%1$d téléchargements retirés</item>
+  </plurals>
+  <string name="feedback_discarded_one">Progression de %1$s abandonnée</string>
+  <plurals name="feedback_discarded">
+    <item quantity="one">Progression de %1$d téléchargement abandonnée</item>
+    <item quantity="other">Progression de %1$d téléchargements abandonnée</item>
+  </plurals>
+  <string name="feedback_restarted_one">%1$s redémarré</string>
+  <plurals name="feedback_restarted">
+    <item quantity="one">%1$d téléchargement redémarré</item>
+    <item quantity="other">%1$d téléchargements redémarrés</item>
+  </plurals>
+  <string name="feedback_redownload_failed_one">Impossible de retélécharger %1$s sur %2$s</string>
+  <plurals name="feedback_redownload_failed">
+    <item quantity="one">Impossible de retélécharger %1$d téléchargement</item>
+    <item quantity="other">Impossible de retélécharger %1$d téléchargements</item>
+  </plurals>
+  <string name="feedback_started_now_one">%1$s démarré immédiatement</string>
+  <plurals name="feedback_started_now">
+    <item quantity="one">%1$d téléchargement démarré immédiatement</item>
+    <item quantity="other">%1$d téléchargements démarrés immédiatement</item>
+  </plurals>
+  <string name="feedback_started_preempted">%1$s mis en pause pour libérer de la place</string>
+  <string name="feedback_start_now_failed_one">Impossible de démarrer immédiatement %1$s sur %2$s</string>
+  <plurals name="feedback_start_now_failed">
+    <item quantity="one">Impossible de démarrer immédiatement %1$d téléchargement</item>
+    <item quantity="other">Impossible de démarrer immédiatement %1$d téléchargements</item>
+  </plurals>
+  <string name="feedback_send_failed_one">Impossible d'envoyer %1$s à %2$s</string>
+  <plurals name="feedback_send_failed">
+    <item quantity="one">Impossible d'envoyer %1$d téléchargement à %2$s</item>
+    <item quantity="other">Impossible d'envoyer %1$d téléchargements à %2$s</item>
+  </plurals>
+  <string name="feedback_moved_one">%1$s déplacé vers %2$s</string>
+  <plurals name="feedback_moved">
+    <item quantity="one">%1$d téléchargement déplacé vers %2$s</item>
+    <item quantity="other">%1$d téléchargements déplacés vers %2$s</item>
+  </plurals>
+  <string name="feedback_sent_one">%1$s envoyé à %2$s</string>
+  <plurals name="feedback_sent">
+    <item quantity="one">%1$d téléchargement envoyé à %2$s</item>
+    <item quantity="other">%1$d téléchargements envoyés à %2$s</item>
+  </plurals>
+  <string name="feedback_remove_here">Retirer d'ici</string>
+  <string name="feedback_added_here_one">%1$s ajouté → %2$s</string>
+  <plurals name="feedback_added_here">
+    <item quantity="one">%1$d téléchargement ajouté → %2$s</item>
+    <item quantity="other">%1$d téléchargements ajoutés → %2$s</item>
+  </plurals>
+  <string name="feedback_options">Options</string>
+
+  <string name="feedback_pause_failed_one">Impossible de mettre en pause %1$s sur %2$s</string>
+  <plurals name="feedback_pause_failed">
+    <item quantity="one">Impossible de mettre en pause %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible de mettre en pause %1$d téléchargements sur %2$s</item>
+  </plurals>
+  <string name="feedback_resume_failed_one">Impossible de reprendre %1$s sur %2$s</string>
+  <plurals name="feedback_resume_failed">
+    <item quantity="one">Impossible de reprendre %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible de reprendre %1$d téléchargements sur %2$s</item>
+  </plurals>
+  <string name="feedback_retry_failed_one">Impossible de réessayer %1$s sur %2$s</string>
+  <plurals name="feedback_retry_failed">
+    <item quantity="one">Impossible de réessayer %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible de réessayer %1$d téléchargements sur %2$s</item>
+  </plurals>
+  <string name="feedback_discard_failed_one">Impossible d'abandonner la progression de %1$s sur %2$s</string>
+  <plurals name="feedback_discard_failed">
+    <item quantity="one">Impossible d'abandonner la progression de %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible d'abandonner la progression de %1$d téléchargements sur %2$s</item>
+  </plurals>
+  <string name="feedback_undo_start_now_failed_one">Impossible d'annuler le démarrage immédiat de %1$s sur %2$s</string>
+  <plurals name="feedback_undo_start_now_failed">
+    <item quantity="one">Impossible d'annuler le démarrage immédiat de %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible d'annuler le démarrage immédiat de %1$d téléchargements sur %2$s</item>
+  </plurals>
+  <string name="feedback_remove_failed_one">Impossible de retirer %1$s sur %2$s</string>
+  <plurals name="feedback_remove_failed">
+    <item quantity="one">Impossible de retirer %1$d téléchargement sur %2$s</item>
+    <item quantity="other">Impossible de retirer %1$d téléchargements sur %2$s</item>
+  </plurals>
+
+  <string name="feedback_undo_pause_all">Annuler la mise en pause générale</string>
+  <string name="feedback_undo_clear_finished">Annuler l'effacement des terminés</string>
+  <string name="feedback_undo_clear_missing">Annuler l'effacement des manquants</string>
+  <string name="feedback_undo_remove">Annuler le retrait</string>
+  <string name="feedback_undo_discard">Annuler l'abandon de la progression</string>
+  <string name="feedback_undo_start_now">Annuler le démarrage immédiat</string>
+  <string name="feedback_undo_move">Annuler le déplacement</string>
+  <string name="feedback_undo_add">Annuler l'ajout</string>
+
+  <string name="feedback_send_cookies_and_sign_in">Les cookies et les informations de connexion de votre navigateur seront envoyés à %1$s.</string>
+  <string name="feedback_send_cookies">Les cookies de votre navigateur seront envoyés à %1$s.</string>
+  <string name="feedback_send_sign_in">Les informations de connexion seront envoyées à %1$s.</string>
+
+  <string name="feedback_added">%1$s ajouté</string>
+  <plurals name="feedback_recovered">
+    <item quantity="one">Reprise de %1$d téléchargement de votre dernière session</item>
+    <item quantity="other">Reprise de %1$d téléchargements de votre dernière session</item>
+  </plurals>
+  <string name="feedback_device_offline">%1$s est hors ligne</string>
+  <string name="feedback_device_online">Reconnecté à %1$s</string>
+</resources>
