@@ -92,7 +92,7 @@ describe('failureHint', () => {
 
   test('points at the app for a server on this computer', () => {
     const local = { type: 'server', url: 'http://127.0.0.1:8642' };
-    assert.match(failureHint(unreachable, local), /Remote access/);
+    assert.match(failureHint(unreachable, local), /Settings → Sharing/);
   });
 
   test('points at the network for a remote server', () => {

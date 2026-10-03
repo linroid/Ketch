@@ -166,13 +166,13 @@
     "message": "Ouvrez Ketch et réessayez."
   },
   "hint_local_server": {
-    "message": "Ouvrez Ketch et activez Réglages → Accès à distance → Serveur, ou lancez « ketch server »."
+    "message": "Ouvrez Ketch et choisissez Autoriser un autre appareil dans Réglages → Partage, ou lancez « ketch server »."
   },
   "hint_remote_server": {
     "message": "Vérifiez que le serveur fonctionne et que cette adresse est accessible d'ici."
   },
   "hint_access_token": {
-    "message": "Saisissez le jeton d'accès affiché dans Ketch sous Réglages → Accès à distance."
+    "message": "Saisissez le code d'accès affiché dans Ketch sous Réglages → Partage → Avancé."
   },
   "task_magnet_link": {
     "message": "Lien magnet"
@@ -515,7 +515,7 @@
     "message": "Sur un autre appareil"
   },
   "options_help_other_device_detail": {
-    "message": "Sur cet appareil, ouvrez Réglages → Accès à distance, activez <b>Serveur</b> et <b>Autoriser d'autres appareils</b>, puis générez un jeton d'accès. Ajoutez l'appareil ici avec <b>Ajouter un serveur</b>, son adresse, par exemple <code>http://192.168.1.20:8642</code>, et le jeton. Pour <code>ketch server</code>, définissez <code>apiToken</code> dans son config.toml."
+    "message": "Sur cet appareil, ouvrez Réglages → Partage et choisissez <b>Autoriser un autre appareil</b>. Ajoutez l'appareil ici avec <b>Ajouter un serveur</b>, l'adresse affichée par Ketch, par exemple <code>http://192.168.1.20:8642</code>, et le <b>Code d'accès</b> sous <b>Avancé</b> comme jeton d'accès. Pour <code>ketch server</code>, définissez <code>apiToken</code> dans son config.toml."
   },
   "options_help_command_line": {
     "message": "Ligne de commande ou navigateurs isolés"

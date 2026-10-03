@@ -166,13 +166,13 @@
     "message": "Abre Ketch y vuelve a intentarlo."
   },
   "hint_local_server": {
-    "message": "Abre Ketch y activa Ajustes → Acceso remoto → Servidor, o ejecuta «ketch server»."
+    "message": "Abre Ketch y elige Permitir otro dispositivo en Ajustes → Compartir, o ejecuta «ketch server»."
   },
   "hint_remote_server": {
     "message": "Comprueba que el servidor está en marcha y que esta dirección es accesible desde aquí."
   },
   "hint_access_token": {
-    "message": "Introduce el token de acceso que muestra Ketch en Ajustes → Acceso remoto."
+    "message": "Introduce el código de acceso que muestra Ketch en Ajustes → Compartir → Avanzado."
   },
   "task_magnet_link": {
     "message": "Enlace magnet"
@@ -515,7 +515,7 @@
     "message": "En otro dispositivo"
   },
   "options_help_other_device_detail": {
-    "message": "En ese dispositivo, abre Ajustes → Acceso remoto, activa <b>Servidor</b> y <b>Permitir otros dispositivos</b> y genera un token de acceso. Añade aquí el dispositivo con <b>Añadir servidor</b>, su dirección, como <code>http://192.168.1.20:8642</code>, y el token. Para <code>ketch server</code>, define <code>apiToken</code> en su config.toml."
+    "message": "En ese dispositivo, abre Ajustes → Compartir y elige <b>Permitir otro dispositivo</b>. Añade aquí el dispositivo con <b>Añadir servidor</b>, la dirección que muestra Ketch, como <code>http://192.168.1.20:8642</code>, y el <b>Código de acceso</b> de <b>Avanzado</b> como token de acceso. Para <code>ketch server</code>, define <code>apiToken</code> en su config.toml."
   },
   "options_help_command_line": {
     "message": "Línea de comandos o navegadores aislados"

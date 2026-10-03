@@ -47,12 +47,13 @@ extension is in the browser stores:
   download needs it; there is no server to turn on or token to copy. For a browser installed
   after Ketch, open Ketch once more.
 - **CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
-  `ketch server`, or turn on Settings → Remote access → Server in the app, then choose **Add
-  server** in the extension's settings and enter `http://127.0.0.1:8642`.
-- **Another device**: on that device, turn on **Server** and **Allow other devices** and generate
-  an access token (for `ketch server`, set `apiToken` in `config.toml`). In the extension's
-  settings, choose **Add server** and enter its address, such as `http://192.168.1.20:8642`, and
-  the token. A bare host such as `nas.local` gets port 8642.
+  `ketch server`, or choose **Allow another device** under Settings → Sharing in the app, then
+  choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
+- **Another device**: on that device, open Settings → Sharing and choose **Allow another
+  device** (for `ketch server`, set `apiToken` in `config.toml`). In the extension's settings,
+  choose **Add server** and enter the address Ketch shows, such as `http://192.168.1.20:8642`,
+  and as the access token the **Access code** under **Advanced**. A bare host such as
+  `nas.local` gets port 8642.
 
 ## Instances
 
@@ -76,7 +77,7 @@ The Ketch app on this computer is reached through
    a single instance. If Ketch is closed, the host opens it and waits for it, up to 30 seconds.
 3. The app replies with the address and token of a server only for the extension: it listens on
    `127.0.0.1` only, on a port the system picks, with a token made for this run of the app. It is
-   separate from the server in Settings → Remote access, which stays off unless you turn it on.
+   separate from sharing in Settings → Sharing, which stays off unless you turn it on.
 4. The extension keeps that address and token in memory for the browser session and talks to it
    like to any Ketch server. When the app is restarted, it asks the host again.
 

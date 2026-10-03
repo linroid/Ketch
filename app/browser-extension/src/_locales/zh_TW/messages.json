@@ -166,13 +166,13 @@
     "message": "請開啟 Ketch 後再試一次。"
   },
   "hint_local_server": {
-    "message": "請開啟 Ketch 並啟用「設定 → 遠端存取 → 伺服器」，或執行「ketch server」。"
+    "message": "請開啟 Ketch，在「設定 → 共享」中選擇「允許其他裝置」，或執行「ketch server」。"
   },
   "hint_remote_server": {
     "message": "請確認伺服器正在執行，且從這裡可以連到此位址。"
   },
   "hint_access_token": {
-    "message": "請輸入 Ketch 中「設定 → 遠端存取」下顯示的存取權杖。"
+    "message": "請輸入 Ketch 中「設定 → 共享 → 進階」下顯示的存取碼。"
   },
   "task_magnet_link": {
     "message": "磁力連結"
@@ -515,7 +515,7 @@
     "message": "在其他裝置上"
   },
   "options_help_other_device_detail": {
-    "message": "在該裝置上開啟「設定 → 遠端存取」，啟用<b>伺服器</b>和<b>允許其他裝置</b>，然後產生存取權杖。接著在這裡使用<b>新增伺服器</b>新增該裝置，輸入其位址（例如 <code>http://192.168.1.20:8642</code>）和權杖。若使用 <code>ketch server</code>，請在其 config.toml 中設定 <code>apiToken</code>。"
+    "message": "在該裝置上開啟「設定 → 共享」，選擇<b>允許其他裝置</b>。接著在這裡使用<b>新增伺服器</b>新增該裝置，輸入 Ketch 顯示的位址（例如 <code>http://192.168.1.20:8642</code>），並將<b>進階</b>中的<b>存取碼</b>作為存取權杖輸入。若使用 <code>ketch server</code>，請在其 config.toml 中設定 <code>apiToken</code>。"
   },
   "options_help_command_line": {
     "message": "命令列或沙盒瀏覽器"

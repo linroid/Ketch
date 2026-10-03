@@ -216,16 +216,16 @@
     "description": "Hint when the Ketch app on this computer didn't answer."
   },
   "hint_local_server": {
-    "message": "Open Ketch and turn on Settings → Remote access → Server, or run \"ketch server\".",
-    "description": "Hint when a Ketch server on this computer didn't answer. Settings → Remote access → Server names a switch in the Ketch app; \"ketch server\" is a command."
+    "message": "Open Ketch and choose Allow another device under Settings → Sharing, or run \"ketch server\".",
+    "description": "Hint when a Ketch server on this computer didn't answer. Settings → Sharing is a page of the Ketch app and Allow another device the button on it that starts sharing: use the app's words for them. \"ketch server\" is a command."
   },
   "hint_remote_server": {
     "message": "Check that the server is running and this address is reachable from here.",
     "description": "Hint when a Ketch server on another device didn't answer."
   },
   "hint_access_token": {
-    "message": "Enter the access token shown in Ketch under Settings → Remote access.",
-    "description": "Hint when a Ketch server needs an access token or refused the one entered. Settings → Remote access names a page in the Ketch app."
+    "message": "Enter the access code shown in Ketch under Settings → Sharing → Advanced.",
+    "description": "Hint when a Ketch server needs an access token or refused the one entered. Settings → Sharing → Advanced is a page of the Ketch app and a section on it that holds the Access code, the app's name for the access token: use the app's words for them."
   },
   "task_magnet_link": {
     "message": "Magnet link",
@@ -670,8 +670,8 @@
     "description": "Help topic heading."
   },
   "options_help_other_device_detail": {
-    "message": "On that device, open Settings → Remote access, turn on <b>Server</b> and <b>Allow other devices</b>, then generate an access token. Add the device here with <b>Add server</b>, its address, such as <code>http://192.168.1.20:8642</code>, and the token. For <code>ketch server</code>, set <code>apiToken</code> in its config.toml.",
-    "description": "Help text under options_help_other_device. Settings → Remote access, Server and Allow other devices name a page and switches of the Ketch app on that device; Add server is options_add_server; config.toml is a file name. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
+    "message": "On that device, open Settings → Sharing and choose <b>Allow another device</b>. Add the device here with <b>Add server</b>, the address Ketch shows, such as <code>http://192.168.1.20:8642</code>, and the <b>Access code</b> under <b>Advanced</b> as its access token. For <code>ketch server</code>, set <code>apiToken</code> in its config.toml.",
+    "description": "Help text under options_help_other_device. Settings → Sharing is a page of the Ketch app on that device, Allow another device a button on it and Access code a setting in its Advanced section: use the app's words for them. Add server is options_add_server and the access token instance_token; config.toml is a file name. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
   },
   "options_help_command_line": {
     "message": "Command line or sandboxed browsers",
