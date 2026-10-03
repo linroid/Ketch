@@ -1,12 +1,9 @@
 package com.linroid.ketch.app.ui.devices
 
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
@@ -16,14 +13,11 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
-import com.linroid.ketch.app.ui.pulse.activeSpeedMode
-import com.linroid.ketch.app.ui.pulse.slowLaneLimit
-import com.linroid.ketch.app.ui.pulse.speedModeName
+import com.linroid.ketch.app.ui.pulse.speedModeFor
+import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.config.SpeedLimitMode
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 
 private val log = KetchLogger("DevicesPage")
@@ -43,7 +37,7 @@ internal fun AppState.runNextAction(entry: InstanceEntry, action: NextAction): J
 
 /** Speed mode of [device], or `null` when it has none: only the embedded device can. */
 internal fun AppState.speedModeOf(device: DevicePresence): SpeedModeController? =
-  speedMode?.takeIf { device.entry is EmbeddedInstance }
+  speedModeFor(device.entry)
 
 /**
  * Turns [device]'s Slow lane off when it is in effect and on otherwise, like its pill in the
@@ -53,63 +47,8 @@ internal fun AppState.speedModeOf(device: DevicePresence): SpeedModeController? 
  */
 internal fun AppState.toggleSlowLane(device: DevicePresence): Job? {
   val controller = speedModeOf(device) ?: return null
-  if (activeSpeedMode === controller) return toggleSlowLane()
   val next = if (controller.mode.value.isSlowLane) SpeedLimitMode.Full else SpeedLimitMode.SlowLane
   return switchSpeedMode(controller, next)
-}
-
-/**
- * Switches [controller]'s device to [mode] and posts the result, with Undo when [undoable].
- *
- * @return the change, or `null` when the device is already in [mode].
- */
-internal fun AppState.switchSpeedMode(
-  controller: SpeedModeController,
-  mode: SpeedLimitMode,
-  undoable: Boolean = true,
-): Job? {
-  val previous = controller.settings.value.mode
-  if (mode == previous) return null
-  return launchCommand {
-    val name = speedModeName(mode)
-    try {
-      controller.setMode(mode)
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.w { "Couldn't switch to $name: ${e.describeCauses()}" }
-      messages.post(
-        level = MessageLevel.Error,
-        title = "Couldn't switch to $name",
-        actions = listOf(
-          MessageAction("Try again") { switchSpeedMode(controller, mode, undoable) }
-        ),
-        cause = e,
-      )
-      return@launchCommand
-    }
-    val title = when (mode) {
-      SpeedLimitMode.SlowLane -> "Slow lane on · ${formatSpeedLimit(controller.slowLaneLimit)}"
-      SpeedLimitMode.Full -> "Slow lane off"
-      SpeedLimitMode.Auto -> "Speed follows your rules"
-    }
-    val undo = MessageAction("Undo") { switchSpeedMode(controller, previous, undoable = false) }
-    messages.post(
-      level = MessageLevel.Success,
-      title = title,
-      actions = if (undoable) listOf(undo) else emptyList(),
-    )
-  }
-}
-
-/**
- * Sets [entry]'s global speed limit through its download settings, whose controller keeps any
- * error; does nothing until they have loaded.
- */
-internal fun AppState.setSpeedLimit(entry: InstanceEntry, limit: SpeedLimit) {
-  val settings = settingsFor(entry)
-  val download = settings.download ?: return
-  settings.updateDownload(download.copy(speedLimit = limit))
 }
 
 /** Connects to [device] again now, rather than at its next scheduled attempt. */

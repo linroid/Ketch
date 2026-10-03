@@ -119,7 +119,14 @@ fun PulseSheet(state: AppState, onDismissRequest: () -> Unit) {
         },
       )
       Spacer(Modifier.height(KetchTheme.spacing.s6))
-      SpeedModeOptions(state, onOpenSettings = onDismissRequest, fillModes = true)
+      val active by state.activeInstance.collectAsState()
+      SpeedModeOptions(
+        state = state,
+        device = active,
+        view = rememberSpeedModeView(state),
+        onOpenSettings = onDismissRequest,
+        fillModes = true,
+      )
     }
   }
 }

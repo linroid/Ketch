@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.InstanceEntry
@@ -21,6 +22,7 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -129,6 +131,19 @@ class DeviceActionsTest {
     assertEquals(listOf("pause"), waiting.calls)
     assertEquals(LOCAL_DEVICE_ID, f.state.activeInstance.value?.deviceId)
     f.controller.close()
+  }
+
+  @Test
+  fun setSpeedLimit_slowLaneOfThisMacWhileTheNasShows_turnsItOn() = devicesTest { f ->
+    f.state.switchInstance(f.nas)
+    runCurrent()
+    val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
+
+    f.state.setSpeedLimit(local, SpeedLimit.mbps(2), asSlowLane = true)
+    runCurrent()
+
+    assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
+    assertEquals(SpeedLimit.mbps(2), f.speed.slowLaneSpeed)
   }
 
   @Test

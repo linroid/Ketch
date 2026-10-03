@@ -59,6 +59,7 @@ import com.linroid.ketch.app.ui.pulse.SpeedHistoryContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
+import com.linroid.ketch.app.ui.pulse.rememberSpeedModeView
 import com.linroid.ketch.app.ui.pulse.totalHistory
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedSettings
@@ -220,7 +221,10 @@ class PulseUiSnapshots {
                 horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s6),
                 modifier = Modifier.padding(KetchTheme.spacing.s4),
               ) {
-                Panel(280.dp) { SpeedModeOptions(state, onOpenSettings = {}) }
+                Panel(280.dp) {
+                  val view = rememberSpeedModeView(state)
+                  SpeedModeOptions(state, state.activeInstance.value, view, onOpenSettings = {})
+                }
                 Panel(320.dp) {
                   val histories = state.speedHistory.histories.value
                   val chart = totalHistory(histories.values, SampleData.NOW)
@@ -359,7 +363,15 @@ class PulseUiSnapshots {
               ) {
                 PulseSummary(PulseSamples.busy, limit = null, onShowTab = {})
                 Box(Modifier.padding(top = KetchTheme.spacing.s6)) {
-                  Column { SpeedModeOptions(state, onOpenSettings = {}, fillModes = true) }
+                  Column {
+                    SpeedModeOptions(
+                      state = state,
+                      device = state.activeInstance.value,
+                      view = rememberSpeedModeView(state),
+                      onOpenSettings = {},
+                      fillModes = true,
+                    )
+                  }
                 }
               }
             }
