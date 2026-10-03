@@ -52,7 +52,7 @@ home server, and you can watch and control the downloads on all of them from any
 | Platform | Get it |
 |---|---|
 | macOS (Apple silicon, Intel) | `.dmg` from the [latest release][release] |
-| Windows (x64, ARM64) | `.msi` from the [latest release][release] |
+| Windows (x64, ARM64) | `.msi`, or the portable `.zip` that runs without installing, from the [latest release][release] ([about the portable app](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` from the [latest release][release] |
 | Android 8.0+ | `.apk` from the [latest release][release] |
 | iOS 18+ | Build from source with Xcode ([`app/ios`](app/ios/)) |

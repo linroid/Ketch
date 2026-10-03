@@ -54,7 +54,7 @@ The apps register for `.torrent` files, so the system file manager offers Ketch 
 |----------|--------------|----------|
 | Android | `ACTION_VIEW` filters for `application/x-bittorrent`, plus `.torrent` paths with a generic type | `content:` URI to the running activity |
 | macOS | File association in the packaged app | Finder open-file events |
-| Windows, Linux | File association in the MSI/DEB package | Path or `file:` URI argument; a second launch forwards it to the running app and exits |
+| Windows, Linux | File association in the MSI/DEB package; for the portable Windows app, Settings → Integration | Path or `file:` URI argument; a second launch forwards it to the running app and exits |
 | iOS | `org.bittorrent.torrent` document type | `onOpenURL` from Files, AirDrop and share sheets |
 | Web | Manifest `file_handlers` | `launchQueue`, only for the app installed from a Chromium browser over HTTPS or localhost |
 
