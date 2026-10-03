@@ -560,3 +560,6 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
+6. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+   bytes, segment progress, resume state, finished files) between instances, so the destination
+   continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
