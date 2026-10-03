@@ -16,9 +16,11 @@
   <string name="notify_channel_pairing">페어링 요청</string>
   <string name="notify_pairing_title">%1$s에서 %2$s을(를) 제어하려고 합니다</string>
   <string name="notify_pairing_body">%1$s이(가) 표시될 때만 허용하세요.</string>
+  <string name="notify_channel_requests">승인 요청</string>
   <string name="notify_finished_group">완료된 다운로드</string>
   <string name="notify_sharing_device">이 기기 공유 중</string>
   <string name="notify_server_on_port">서버 실행 중(포트 %1$d)</string>
+  <string name="notify_discovering">찾기에서 다운로드 검색 중</string>
   <string name="notify_slow_lane_on">저속 차로</string>
   <string name="notify_action_pause_all">모두 일시정지</string>
   <string name="notify_action_slow_lane">저속 차로</string>

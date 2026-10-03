@@ -15,10 +15,14 @@ import java.io.IOException
  *
  * [message] is a short explanation that can be shown to the user;
  * [cause] is the original error.
+ *
+ * @property brief [message] without the reason the provider gave, which
+ *   may echo a token: what to keep, such as in a saved history
  */
 class DiscoveryException internal constructor(
   override val message: String,
   cause: Throwable,
+  val brief: String = message,
 ) : Exception(message, cause)
 
 /**

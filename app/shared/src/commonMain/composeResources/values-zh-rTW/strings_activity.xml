@@ -16,9 +16,11 @@
   <string name="notify_channel_pairing">配對要求</string>
   <string name="notify_pairing_title">%1$s 想要控制%2$s</string>
   <string name="notify_pairing_body">只有在它顯示 %1$s 時才允許。</string>
+  <string name="notify_channel_requests">等待你確認的要求</string>
   <string name="notify_finished_group">已完成的下載</string>
   <string name="notify_sharing_device">正在共享此裝置</string>
   <string name="notify_server_on_port">伺服器執行於連接埠 %1$d</string>
+  <string name="notify_discovering">「探索」正在搜尋下載</string>
   <string name="notify_slow_lane_on">慢車道</string>
   <string name="notify_action_pause_all">全部暫停</string>
   <string name="notify_action_slow_lane">慢車道</string>

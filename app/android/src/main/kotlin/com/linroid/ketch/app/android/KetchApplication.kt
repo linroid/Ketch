@@ -10,6 +10,8 @@ import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.i18n.initAppLanguage
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.state.DiscoverHistoryStore
+import com.linroid.ketch.app.state.FileDiscoverHistoryStore
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import com.linroid.ketch.config.FileConfigStore
@@ -31,8 +33,9 @@ class KetchApplication : Application() {
   val incoming = IncomingDownloads()
 
   /**
-   * The app's log files, kept for bug reports and shared from Settings → About. Held here so
-   * the process has one writer, even when the service is recreated.
+   * The app's log files, kept for bug reports and shared from Settings → About; backups leave
+   * them out, as they hold Discover searches and links. Held here so the process has one
+   * writer, even when the service is recreated.
    */
   val fileLogger: FileLogger by lazy {
     FileLogger(
@@ -61,12 +64,28 @@ class KetchApplication : Application() {
     }
   }
 
+  /**
+   * The Discover sessions, kept in `discover-history.json`, which backups leave out. Held here
+   * so the process has one writer, as the main screen builds a new controller each time it binds
+   * the service.
+   */
+  val discoverHistory: DiscoverHistoryStore by lazy {
+    FileDiscoverHistoryStore(
+      fileSystem = FileSystem.SYSTEM,
+      path = filesDir.toOkioPath() / DISCOVER_HISTORY_FILE,
+      dispatcher = Dispatchers.IO,
+    )
+  }
+
   // Reads outlive the activity that received the file, so a rotation cannot cancel them.
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
   override fun onCreate() {
     super.onCreate()
     initAppLanguage(this, savedLanguage())
+    // The main screen loads the Discover history on the main thread once it binds the service;
+    // read now, meanwhile, the history is in memory by then.
+    scope.launch { discoverHistory.load() }
     try {
       startForegroundService(Intent(this, KetchService::class.java))
     } catch (e: IllegalStateException) {
@@ -124,3 +143,6 @@ class KetchApplication : Application() {
     }
   }
 }
+
+/** File of the Discover history in `filesDir`; the backup rules in `res/xml` name it too. */
+private const val DISCOVER_HISTORY_FILE = "discover-history.json"

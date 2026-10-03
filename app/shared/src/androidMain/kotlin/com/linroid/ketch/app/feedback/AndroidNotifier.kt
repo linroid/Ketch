@@ -41,6 +41,8 @@ import ketch.app.shared.generated.resources.notify_channel_active
 import ketch.app.shared.generated.resources.notify_channel_done
 import ketch.app.shared.generated.resources.notify_channel_failed
 import ketch.app.shared.generated.resources.notify_channel_pairing
+import ketch.app.shared.generated.resources.notify_channel_requests
+import ketch.app.shared.generated.resources.notify_discovering
 import ketch.app.shared.generated.resources.notify_finished_group
 import ketch.app.shared.generated.resources.notify_more_files
 import ketch.app.shared.generated.resources.notify_server_on_port
@@ -49,6 +51,7 @@ import ketch.app.shared.generated.resources.notify_slow_lane_on
 import ketch.app.shared.generated.resources.pairing_request_allow
 import ketch.app.shared.generated.resources.pairing_request_deny
 import kotlinx.coroutines.runBlocking
+import kotlin.time.Instant
 
 /**
  * Posts Ketch's notifications on Android, in four channels:
@@ -61,8 +64,11 @@ import kotlinx.coroutines.runBlocking
  * - [CHANNEL_FAILED]: failed downloads with Retry.
  * - [CHANNEL_PAIRING]: devices that want this one's access code, with Allow and Don't allow,
  *   which start [service] with [ACTION_PAIRING_ALLOW] and [ACTION_PAIRING_DENY].
+ * - [CHANNEL_REQUESTS]: the app's messages that ask for a notification, such as Discover waiting
+ *   for the user's OK to open a website, as long as the message shows.
  *
- * Tapping a notification opens [activity] with a [NotificationLink], which [linkOf] reads back.
+ * Tapping a notification opens [activity] with a [NotificationLink], which [linkOf] reads back,
+ * or, for a message, with the [MessageTap] that [messageTapOf] reads back.
  * The ongoing notification's buttons start [service] with [ACTION_PAUSE_ALL] and
  * [ACTION_SLOW_LANE], and dismissing it starts it with [ACTION_REPOST_NOTIFICATION].
  *
@@ -79,7 +85,7 @@ class AndroidNotifier(
   private val activity: Class<out Activity>,
   private val service: Class<out Service>,
   @DrawableRes private val smallIcon: Int,
-) : SystemNotifier {
+) : SystemNotifier, MessageNotifier {
   private val log = KetchLogger("AndroidNotifier")
   private val manager = NotificationManagerCompat.from(context)
 
@@ -101,12 +107,15 @@ class AndroidNotifier(
     val done = Res.string.notify_channel_done.text().load()
     val failed = Res.string.notify_channel_failed.text().load()
     val pairing = Res.string.notify_channel_pairing.text().load()
+    val requests = Res.string.notify_channel_requests.text().load()
     system.createNotificationChannels(
       listOf(
         channel(CHANNEL_ACTIVE, active, NotificationManager.IMPORTANCE_LOW),
         channel(CHANNEL_DONE, done, NotificationManager.IMPORTANCE_DEFAULT),
         channel(CHANNEL_FAILED, failed, NotificationManager.IMPORTANCE_HIGH),
-        channel(CHANNEL_PAIRING, pairing, NotificationManager.IMPORTANCE_HIGH)
+        channel(CHANNEL_PAIRING, pairing, NotificationManager.IMPORTANCE_HIGH),
+        // A request holds up what asked for it until the user answers.
+        channel(CHANNEL_REQUESTS, requests, NotificationManager.IMPORTANCE_HIGH)
       )
     )
     system.deleteNotificationChannel(LEGACY_CHANNEL)
@@ -119,11 +128,13 @@ class AndroidNotifier(
    *
    * @param serverPort port of the local server, or `null` when it is not running.
    * @param slowLane whether the slow lane is on, which turns its button into Full speed.
+   * @param discovering whether Discover searches, said when nothing else keeps the service.
    */
   suspend fun ongoingNotification(
     tasks: List<DownloadTask>,
     serverPort: Int?,
     slowLane: Boolean,
+    discovering: Boolean = false,
   ): Notification {
     val downloads = OngoingDownloads.of(tasks)
     val builder = NotificationCompat.Builder(context, CHANNEL_ACTIVE)
@@ -142,6 +153,7 @@ class AndroidNotifier(
       serverPort != null -> builder
         .setContentTitle(Res.string.notify_sharing_device.text().load())
         .setContentText(Res.string.notify_server_on_port.text(serverPort).load())
+      discovering -> builder.setContentTitle(Res.string.notify_discovering.text().load())
       else -> builder.setContentTitle(APP_NAME)
     }
     if (downloads != null) {
@@ -207,6 +219,40 @@ class AndroidNotifier(
       is ActivityEvent.DeviceOffline,
       is ActivityEvent.DeviceOnline -> log.d { "No notification for ${event::class.simpleName}" }
     }
+  }
+
+  override fun post(message: AppMessage, copy: NotificationCopy) {
+    if (!manager.areNotificationsEnabled()) {
+      // A message that notifies holds up what posted it until the user answers.
+      log.i { "Notifications are off, not posting message ${message.id}" }
+      return
+    }
+    val tag = messageTag(message.id)
+    val builder = NotificationCompat.Builder(context, CHANNEL_REQUESTS)
+      .setSmallIcon(smallIcon)
+      .setColor(accentColor())
+      .setContentTitle(copy.title)
+      .setContentIntent(messageIntent(tag, message))
+      .setAutoCancel(true)
+    if (copy.body.isNotEmpty()) {
+      builder.setContentText(copy.body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(copy.body))
+    }
+    post(tag, ID_MESSAGE, builder.build())
+  }
+
+  override fun withdraw(id: Long) {
+    manager.cancel(messageTag(id), ID_MESSAGE)
+  }
+
+  /**
+   * Withdraws the notifications of messages left from an earlier run of the app, whose messages,
+   * and the buttons they led to, are gone.
+   */
+  fun withdrawMessages() {
+    manager.activeNotifications
+      .filter { it.id == ID_MESSAGE && it.tag?.startsWith(MESSAGE_TAG_PREFIX) == true }
+      .forEach { manager.cancel(it.tag, it.id) }
   }
 
   private suspend fun describe(builder: NotificationCompat.Builder, downloads: OngoingDownloads) {
@@ -350,6 +396,15 @@ class AndroidNotifier(
     return PendingIntent.getActivity(context, requestCode(tag, action), intent, FLAGS)
   }
 
+  private fun messageIntent(tag: String, message: AppMessage): PendingIntent {
+    val intent = Intent(context, activity)
+      .setAction(ACTION_MESSAGE)
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      .putExtra(EXTRA_MESSAGE_ID, message.id)
+      .putExtra(EXTRA_MESSAGE_AT, message.at.toEpochMilliseconds())
+    return PendingIntent.getActivity(context, requestCode(tag, ACTION_MESSAGE), intent, FLAGS)
+  }
+
   private fun serviceIntent(action: String): PendingIntent = PendingIntent.getService(
     context,
     requestCode(ONGOING_TAG, action),
@@ -409,6 +464,8 @@ class AndroidNotifier(
 
     /** Asks the service to turn away the device of the pairing request in [pairingIdOf]. */
     const val ACTION_PAIRING_DENY: String = "com.linroid.ketch.app.action.PAIRING_DENY"
+    /** Channel of the app's messages that wait for the user. */
+    const val CHANNEL_REQUESTS: String = "requests"
 
     /** Id of the ongoing notification, which the service shows in the foreground. */
     const val ONGOING_ID: Int = 1
@@ -429,8 +486,12 @@ class AndroidNotifier(
     private const val APP_NAME = "Ketch"
     private const val ACTION_SHOW = "com.linroid.ketch.app.action.SHOW"
     private const val ACTION_RETRY = "com.linroid.ketch.app.action.RETRY"
+    private const val ACTION_MESSAGE = "com.linroid.ketch.app.action.MESSAGE"
     private const val EXTRA_TASK_KEY = "taskKey"
     private const val EXTRA_STATUS_FILTER = "statusFilter"
+    private const val EXTRA_MESSAGE_ID = "messageId"
+    private const val EXTRA_MESSAGE_AT = "messageAt"
+    private const val MESSAGE_TAG_PREFIX = "message:"
     private const val LEGACY_CHANNEL = "ketch_service"
     private const val GROUP_DONE = "downloads_done"
     private const val ONGOING_TAG = "ongoing"
@@ -439,6 +500,7 @@ class AndroidNotifier(
     private const val ID_SUMMARY = 3
     private const val ID_GROUP = 4
     private const val ID_PAIRING = 5
+    private const val ID_MESSAGE = 6
     private const val EXTRA_PAIRING_ID = "pairingId"
 
     // A request expires on the server after two minutes; its notification goes with it.
@@ -462,6 +524,14 @@ class AndroidNotifier(
     /** The pairing request whose Allow or Don't allow started the service with [intent]. */
     fun pairingIdOf(intent: Intent?): Long? =
       intent?.takeIf { it.hasExtra(EXTRA_PAIRING_ID) }?.getLongExtra(EXTRA_PAIRING_ID, 0L)
+    /** The message whose notification was tapped to open [intent], or `null` when it is not one. */
+    fun messageTapOf(intent: Intent?): MessageTap? {
+      if (intent?.action != ACTION_MESSAGE) return null
+      val id = intent.getLongExtra(EXTRA_MESSAGE_ID, 0L)
+      if (id <= 0L || !intent.hasExtra(EXTRA_MESSAGE_AT)) return null
+      val at = Instant.fromEpochMilliseconds(intent.getLongExtra(EXTRA_MESSAGE_AT, 0L))
+      return MessageTap(id, at)
+    }
 
     /** Withdraws the notification about the task [key]. */
     fun cancel(context: Context, key: TaskKey) {
@@ -472,6 +542,7 @@ class AndroidNotifier(
     private fun tagOf(key: TaskKey): String = "task:${key.encode()}"
 
     private fun pairingTag(id: Long): String = "pairing:$id"
+    private fun messageTag(id: Long): String = "$MESSAGE_TAG_PREFIX$id"
 
     // PendingIntents differing only in extras are the same one, so each gets its own code.
     private fun requestCode(tag: String, what: String): Int = "$tag/$what".hashCode()
@@ -489,4 +560,15 @@ data class NotificationLink(
   val taskKey: TaskKey?,
   val filter: StatusFilter?,
   val retry: Boolean,
+)
+
+/**
+ * A tap on the notification of an app message, for [MessageNotifications.open].
+ *
+ * @property id the message's id.
+ * @property postedAt when it was posted, to the millisecond.
+ */
+data class MessageTap(
+  val id: Long,
+  val postedAt: Instant,
 )

@@ -54,6 +54,24 @@ class PulseSheetTest {
   }
 
   @Test
+  fun pulseSubtitleVariants_downloading_dropTheCountThenTheMode() = runTest {
+    val downloading = pulse(downloading = 2, speed = 4_404_019)
+    val variants = pulseSubtitleVariants(downloading, verbatim("Full"))
+
+    assertEquals(
+      listOf("↓ 4.2 MB/s · 2 active · Full", "↓ 4.2 MB/s · Full", "↓ 4.2 MB/s"),
+      variants.map { it.load() },
+    )
+  }
+
+  @Test
+  fun pulseSubtitleVariants_idle_dropsOnlyTheMode() = runTest {
+    val variants = pulseSubtitleVariants(pulse(), verbatim("Full"))
+
+    assertEquals(listOf("Idle · Full", "Idle"), variants.map { it.load() })
+  }
+
+  @Test
   fun pulseSubtitle_offline_namesTheConnection() = runTest {
     val offline = pulse(health = DeviceHealth.Offline(), downloading = 1)
 

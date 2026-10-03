@@ -10,7 +10,7 @@
   <string name="settings_category_integration">集成</string>
   <string name="settings_category_integration_description">浏览器扩展、磁力链接和剪贴板</string>
   <string name="settings_category_discover">发现</string>
-  <string name="settings_category_discover_description">用于查找下载的 AI 模型和网络搜索</string>
+  <string name="settings_category_discover_description">AI 模型、网络搜索和可打开的网站</string>
   <string name="settings_category_about">关于</string>
   <string name="settings_category_about_description">版本、许可证和日志</string>
   <string name="settings_category_downloads">下载</string>
@@ -230,6 +230,20 @@
   <string name="settings_ai_engine_id">搜索引擎 ID</string>
   <string name="settings_ai_engine_id_hint">要查询的 Programmable Search 引擎。</string>
   <string name="settings_ai_engine_id_placeholder">引擎 ID</string>
+  <string name="settings_ai_access_group">网页访问</string>
+  <string name="settings_ai_access_mode">打开网站前</string>
+  <string name="settings_ai_access_allow">自动允许</string>
+  <string name="settings_ai_access_allow_hint">直接打开搜索需要的任何网站，不会询问。</string>
+  <string name="settings_ai_access_ask_site">每个新网站都询问</string>
+  <string name="settings_ai_access_ask_site_hint">对话首次打开某个网站时询问。选择“始终允许”可记住该网站。</string>
+  <string name="settings_ai_access_ask">每次都询问</string>
+  <string name="settings_ai_access_ask_hint">每次打开网页或检查文件前都会询问。</string>
+  <string name="settings_ai_access_trusted">始终允许的网站</string>
+  <string name="settings_ai_access_trusted_hint">“发现”会直接打开这些网站及其子域名，不会询问。</string>
+  <string name="settings_ai_access_trusted_none">暂无。可在“发现”询问时选择“始终允许”，或在此添加网站。</string>
+  <string name="settings_ai_access_add">添加网站，例如 ubuntu.com</string>
+  <string name="settings_ai_access_add_invalid">请输入网站域名，例如 ubuntu.com。</string>
+  <string name="settings_ai_access_footer">限定了网站的搜索不会询问：这些网站是你自己选的。</string>
 
   <string name="settings_about_name_line">Ketch 是一种双桅帆船。Ketch 会把每个下载分成多条通道，就像它的帆。</string>
   <string name="settings_about_discover_elsewhere">“发现”可在桌面版和 Android 应用中使用。</string>
@@ -507,6 +521,10 @@
   <string name="settings_search_test_keywords">检查, 验证, 测试</string>
   <string name="settings_search_web_search">供智能体使用的 Brave 或 Google 搜索</string>
   <string name="settings_search_web_search_keywords">搜索服务, 搜索 API 密钥, 搜索引擎</string>
+  <string name="settings_search_ai_access">“发现”打开网站前是否询问</string>
+  <string name="settings_search_ai_access_keywords">网页访问, 权限, 授权, 确认, 允许, 询问, 隐私</string>
+  <string name="settings_search_ai_trusted">“发现”无需询问即可打开的网站</string>
+  <string name="settings_search_ai_trusted_keywords">信任的网站, 可信网站, 允许列表, 白名单, 域名, 权限</string>
   <string name="settings_search_version_keywords">版本, 构建, 更新</string>
   <string name="settings_search_source_keywords">github, 项目, 开源</string>
   <string name="settings_search_report_keywords">bug, 问题, 反馈, 帮助, issue</string>

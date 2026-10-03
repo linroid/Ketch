@@ -35,6 +35,18 @@ Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidab
 | connection | 连接 | 連線 | 接続 | 연결 | conexión | conexão | Verbindung | connexion | подключение |
 | priority (Low/Normal/High/Urgent) | 优先级（低/普通/高/紧急） | 優先順序（低/一般/高/緊急） | 優先度（低/標準/高/緊急） | 우선순위(낮음/보통/높음/긴급) | prioridad (Baja/Normal/Alta/Urgente) | prioridade (Baixa/Normal/Alta/Urgente) | Priorität (Niedrig/Normal/Hoch/Dringend) | priorité (Basse/Normale/Haute/Urgente) | приоритет (Низкий/Обычный/Высокий/Срочный) |
 | Discover (AI search feature) | 发现 | 探索 | ディスカバー | 찾기 | Descubrir | Descobrir | Entdecken | Découvrir | Поиск |
+| chat (a Discover conversation) | 对话 | 對話 | チャット | 대화 | chat | conversa | Chat | conversation | чат |
+| follow-up (a later message in a chat) | 追问 | 追問 | 追加の質問 | 후속 질문 | pregunta de seguimiento | pergunta de acompanhamento | Folgefrage | question de suivi | уточняющий вопрос |
+| search (one Discover chat, as in "New search") | 搜索 | 搜尋 | 検索 | 검색 | búsqueda | pesquisa | Suche | recherche | запрос |
+| history (Discover's past searches) | 历史记录 | 歷史記錄 | 履歴 | 기록 | historial | histórico | Verlauf | historique | история |
+| summary (the agent's short answer above its results) | 摘要 | 摘要 | 要約 | 요약 | resumen | resumo | Zusammenfassung | résumé | краткий ответ |
+| discard / restore (a result) | 丢弃 / 恢复 | 捨棄 / 還原 | 除外 / 復元 | 제외 / 복원 | descartar / restaurar | descartar / restaurar | verwerfen / wiederherstellen | écarter / restaurer | убрать / вернуть |
+| website / site | 网站 | 網站 | Webサイト / サイト | 웹사이트 / 사이트 | sitio web / sitio | site | Website | site web / site | сайт |
+| page access (whether Discover may open websites) | 网页访问 | 網頁存取 | ページへのアクセス | 페이지 접근 | acceso a páginas | acesso a páginas | Seitenzugriff | accès aux pages | доступ к страницам |
+| allow / allow once / always allow / deny | 允许 / 允许一次 / 始终允许 / 拒绝 | 允許 / 允許一次 / 一律允許 / 拒絕 | 許可 / 1回だけ許可 / 常に許可 / 拒否 | 허용 / 한 번 허용 / 항상 허용 / 거부 | permitir / permitir una vez / permitir siempre / denegar | permitir / permitir uma vez / sempre permitir / negar | erlauben / einmal erlauben / immer erlauben / ablehnen | autoriser / autoriser une fois / toujours autoriser / refuser | разрешить / разрешить один раз / всегда разрешать / отклонить |
+| Always allowed (sites opened without asking; as the title of the list, a noun) | 始终允许的网站 | 一律允許的網站 | 常に許可 | 항상 허용된 사이트 | Siempre permitidos | Sempre permitidos | Immer erlaubt | Toujours autorisés | Всегда разрешены |
+| approval ("Needs your OK"; not the Sharing page's word) | 确认 | 確認 | 承認 | 승인 | aprobación | aprovação | Erlaubnis | autorisation | подтверждение |
+| Sharing (Settings page: other devices control this one) | 共享 | 共享 | 共有 | 공유 | Compartir | Compartilhamento | Freigabe | Partage | Общий доступ |
 | access token | 访问令牌 | 存取權杖 | アクセストークン | 액세스 토큰 | token de acceso | token de acesso | Zugriffstoken | jeton d'accès | токен доступа |
 | pairing code / pairing link | 配对码 / 配对链接 | 配對碼 / 配對連結 | ペアリングコード / ペアリングリンク | 페어링 코드 / 페어링 링크 | código de vinculación / enlace de vinculación | código de pareamento / link de pareamento | Kopplungscode / Kopplungslink | code d'appairage / lien d'appairage | код сопряжения / ссылка для сопряжения |
 | Settings | 设置 | 設定 | 設定 | 설정 | Ajustes | Configurações | Einstellungen | Réglages | Настройки |

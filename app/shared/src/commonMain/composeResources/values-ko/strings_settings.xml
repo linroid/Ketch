@@ -10,7 +10,7 @@
   <string name="settings_category_integration">연동</string>
   <string name="settings_category_integration_description">브라우저 확장 프로그램, 마그넷 링크, 클립보드</string>
   <string name="settings_category_discover">찾기</string>
-  <string name="settings_category_discover_description">다운로드를 찾는 AI 모델과 웹 검색</string>
+  <string name="settings_category_discover_description">AI 모델, 웹 검색, 열 수 있는 웹사이트</string>
   <string name="settings_category_about">정보</string>
   <string name="settings_category_about_description">버전, 라이선스, 로그</string>
   <string name="settings_category_downloads">다운로드</string>
@@ -230,6 +230,20 @@
   <string name="settings_ai_engine_id">검색 엔진 ID</string>
   <string name="settings_ai_engine_id_hint">검색에 사용할 Programmable Search 엔진입니다.</string>
   <string name="settings_ai_engine_id_placeholder">엔진 ID</string>
+  <string name="settings_ai_access_group">페이지 접근</string>
+  <string name="settings_ai_access_mode">웹사이트를 열기 전에</string>
+  <string name="settings_ai_access_allow">자동으로 허용</string>
+  <string name="settings_ai_access_allow_hint">검색에 필요한 웹사이트를 묻지 않고 엽니다.</string>
+  <string name="settings_ai_access_ask_site">새 사이트마다 묻기</string>
+  <string name="settings_ai_access_ask_site_hint">대화에서 사이트를 처음 열 때 묻습니다. ‘항상 허용’을 선택하면 사이트를 기억합니다.</string>
+  <string name="settings_ai_access_ask">매번 묻기</string>
+  <string name="settings_ai_access_ask_hint">페이지를 열거나 파일을 확인할 때마다 묻습니다.</string>
+  <string name="settings_ai_access_trusted">항상 허용된 사이트</string>
+  <string name="settings_ai_access_trusted_hint">찾기는 이 사이트와 하위 도메인을 묻지 않고 엽니다.</string>
+  <string name="settings_ai_access_trusted_none">아직 없습니다. 찾기가 물을 때 ‘항상 허용’을 선택하거나 여기에 사이트를 추가하세요.</string>
+  <string name="settings_ai_access_add">ubuntu.com 같은 사이트 추가</string>
+  <string name="settings_ai_access_add_invalid">ubuntu.com 같은 웹사이트 이름을 입력하세요.</string>
+  <string name="settings_ai_access_footer">특정 웹사이트로 제한한 검색은 묻지 않습니다. 직접 선택한 사이트이기 때문입니다.</string>
 
   <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다. Ketch는 돛처럼 모든 다운로드를 여러 레인으로 나눕니다.</string>
   <string name="settings_about_discover_elsewhere">찾기는 데스크톱 및 Android 앱에서 사용할 수 있습니다.</string>
@@ -507,6 +521,10 @@
   <string name="settings_search_test_keywords">확인, 검증, 테스트</string>
   <string name="settings_search_web_search">에이전트가 사용할 Brave 또는 Google 검색</string>
   <string name="settings_search_web_search_keywords">검색 제공업체, 검색 API 키, 검색 엔진</string>
+  <string name="settings_search_ai_access">찾기가 웹사이트를 열기 전에 물을지 여부</string>
+  <string name="settings_search_ai_access_keywords">페이지 접근, 권한, 승인, 허용, 묻기, 확인, 개인정보</string>
+  <string name="settings_search_ai_trusted">찾기가 묻지 않고 여는 웹사이트</string>
+  <string name="settings_search_ai_trusted_keywords">신뢰할 수 있는 사이트, 항상 허용, 허용 목록, 화이트리스트, 도메인, 권한</string>
   <string name="settings_search_version_keywords">빌드, 리비전, 업데이트, 버전</string>
   <string name="settings_search_source_keywords">github, 깃허브, 프로젝트, 소스</string>
   <string name="settings_search_report_keywords">버그, 이슈, 피드백, 도움말, 신고</string>

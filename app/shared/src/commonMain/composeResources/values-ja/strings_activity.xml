@@ -16,9 +16,11 @@
   <string name="notify_channel_pairing">ペアリングリクエスト</string>
   <string name="notify_pairing_title">%1$sが%2$sの操作を求めています</string>
   <string name="notify_pairing_body">%1$sと表示されている場合のみ許可してください。</string>
+  <string name="notify_channel_requests">承認待ちのリクエスト</string>
   <string name="notify_finished_group">完了したダウンロード</string>
   <string name="notify_sharing_device">このデバイスを共有中</string>
   <string name="notify_server_on_port">ポート%1$dでサーバーを実行中</string>
+  <string name="notify_discovering">ディスカバーでダウンロードを検索中</string>
   <string name="notify_slow_lane_on">スローレーン</string>
   <string name="notify_action_pause_all">すべて一時停止</string>
   <string name="notify_action_slow_lane">スローレーン</string>

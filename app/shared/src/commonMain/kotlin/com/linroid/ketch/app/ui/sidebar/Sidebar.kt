@@ -26,8 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchBadge
+import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchCountBadge
 import com.linroid.ketch.app.components.KetchDot
@@ -48,7 +51,9 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AppearanceToggle
+import com.linroid.ketch.app.ui.shell.NavBadge
 import com.linroid.ketch.app.ui.shell.ShellState
+import com.linroid.ketch.app.ui.shell.navBadges
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.shell_devices
 import ketch.app.shared.generated.resources.shell_hide_sidebar
@@ -76,10 +81,12 @@ internal fun Sidebar(
   val active by state.activeInstance.collectAsState()
   val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
+  val badges = navBadges(state)
   Column(modifier.width(spacing.sidebarWidth).fillMaxHeight()) {
     TitleZone(state, onToggleSidebar = { shell.toggleSidebar() })
     for (entry in destinations) {
       val downloads = entry == AppDestination.Downloads
+      val badge = badges[entry]
       val label = entry.label.resolve()
       KetchTooltip(text = label, shortcut = entry.command.shortcutLabel()) {
         KetchSidebarItem(
@@ -87,10 +94,14 @@ internal fun Sidebar(
           icon = entry.icon,
           selected = entry == shell.destination && !shell.settingsOpen,
           onClick = { shell.show(entry) },
-          trailing = if (downloads) {
-            { DownloadsMarks(pulse.counts.downloading, pulse.failures > 0) }
-          } else {
-            null
+          trailing = when {
+            downloads -> {
+              { DownloadsMarks(pulse.counts.downloading, pulse.failures > 0) }
+            }
+            badge != null -> {
+              { WaitingMark(badge) }
+            }
+            else -> null
           },
         )
       }
@@ -174,6 +185,16 @@ private fun DownloadsMarks(downloading: Int, failed: Boolean) {
     if (failed) KetchDot(KetchTheme.colors.status.failed.color, size = FailedDotSize)
     if (downloading > 0) KetchCountBadge(downloading)
   }
+}
+
+/** The count of a destination's requests that wait for the user, such as Discover's. */
+@Composable
+private fun WaitingMark(badge: NavBadge) {
+  KetchBadge(
+    text = badge.count.toString(),
+    tone = KetchBadgeTone.Accent,
+    modifier = Modifier.clearAndSetSemantics { contentDescription = badge.countDescription },
+  )
 }
 
 /**

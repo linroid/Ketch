@@ -28,16 +28,35 @@ data class AiCandidate(
 /**
  * A search for AI discovery.
  *
- * @property query what to look for, in the user's words.
+ * @property query what to look for, in the user's words; in a conversation, the latest message.
  * @property sites websites to limit the search to; empty searches the whole web.
  * @property maxResults most candidates to return.
  * @property fileTypes file types to prefer, such as `iso`; empty prefers none.
+ * @property history earlier turns of the conversation, oldest first; empty for a first search.
+ * @property excludedUrls links the user discarded, which the search never returns.
  */
 data class AiDiscoverRequest(
   val query: String,
   val sites: List<String> = emptyList(),
   val maxResults: Int = 10,
   val fileTypes: List<String> = emptyList(),
+  val history: List<AiDiscoverTurn> = emptyList(),
+  val excludedUrls: Set<String> = emptySet(),
+)
+
+/**
+ * An earlier turn of a discovery conversation, as the agent reads it.
+ *
+ * @property request what the user asked.
+ * @property sites websites that turn was limited to.
+ * @property completed whether that turn finished; a failed or stopped turn has no [results].
+ * @property results what it found and the user kept, best first.
+ */
+data class AiDiscoverTurn(
+  val request: String,
+  val sites: List<String>,
+  val completed: Boolean,
+  val results: List<AiCandidate>,
 )
 
 /**
@@ -45,10 +64,12 @@ data class AiDiscoverRequest(
  *
  * @property query the search, as the engine read it.
  * @property candidates the downloads it found, best first.
+ * @property summary the agent's short reply in plain text; blank when it gave none.
  */
 data class AiDiscoverResponse(
   val query: String,
   val candidates: List<AiCandidate>,
+  val summary: String = "",
 )
 
 /**
@@ -62,9 +83,51 @@ data class DiscoveryStep(
   val detail: String = "",
 )
 
+/** What the agent wants to do on a website. */
+enum class AiPageKind {
+  /** Read a page's text and links. */
+  Page,
+
+  /** Check a file's type, size and date. */
+  FileInfo,
+}
+
+/**
+ * A request the agent wants to make to a website, which waits for the user's answer unless the
+ * page access settings answer it.
+ *
+ * @property url the URL to request.
+ * @property host the host of [url], lowercase.
+ * @property kind what the request is for.
+ * @property reason why the agent says it needs it, one line; text that fetched pages may have
+ *   shaped, so show it as the agent's words only. Blank when it gave none.
+ * @property redirectFrom the host that redirected here; blank for a request the agent asked for.
+ */
+data class AiPageRequest(
+  val url: String,
+  val host: String,
+  val kind: AiPageKind,
+  val reason: String = "",
+  val redirectFrom: String = "",
+)
+
+/**
+ * A search that failed.
+ *
+ * @property brief [message] without the reason the model provider gave, which may echo a token:
+ *   what is safe to keep, such as in the saved history.
+ */
+class AiDiscoverFailure(
+  message: String,
+  val brief: String,
+  cause: Throwable? = null,
+) : Exception(message, cause)
+
 /**
  * Abstraction for AI resource discovery, allowing platform-specific
  * implementations (e.g., embedded in-process on JVM/Android).
+ *
+ * Searches may run at the same time; each reports to its own callbacks.
  */
 interface AiDiscoveryProvider {
   /**
@@ -72,10 +135,14 @@ interface AiDiscoveryProvider {
    *
    * @param onStep called with each step the agent reports while it works, possibly from another
    *   thread.
+   * @param approve asked before the agent contacts a website, possibly from another thread; it
+   *   may suspend until the user answers, and `false` declines the request.
+   * @throws AiDiscoverFailure when the model provider fails or the agent gives no answer.
    */
   suspend fun discover(
     request: AiDiscoverRequest,
-    onStep: (DiscoveryStep) -> Unit = {},
+    onStep: (DiscoveryStep) -> Unit,
+    approve: suspend (AiPageRequest) -> Boolean,
   ): AiDiscoverResponse
 
   /**
@@ -86,7 +153,7 @@ interface AiDiscoveryProvider {
    */
   suspend fun verify(): String
 
-  /** Releases any resources the implementation holds. */
+  /** Releases any resources the implementation holds, once the searches running now end. */
   fun close() {}
 }
 

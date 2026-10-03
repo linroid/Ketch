@@ -129,9 +129,11 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 ### Find downloads with AI (preview)
 
 - **Discover** — Describe what you want, such as "the latest Ubuntu Server ISO", and an AI agent
-  searches the web, checks the links and ranks the downloads it finds. A failed download can
-  **Find another source** the same way. Bring your own model: OpenAI, Anthropic, Gemini, Ollama
-  or any OpenAI-compatible service. In the desktop and Android apps, and with
+  searches the web, checks the links and ranks the downloads it finds; a failed download can
+  **Find another source** the same way. Narrow a search down with follow-up messages, discard
+  what you don't want and pick up past searches from the history. Discover asks before it opens
+  a website, unless you let it. Bring your own model: OpenAI, Anthropic, Gemini, Ollama or any
+  OpenAI-compatible service. In the desktop and Android apps, and with
   `ketch ai-discover` ([setup](docs/ai-discovery.md)).
 - **MCP server** — `ketch mcp` lets AI assistants start, watch and manage your downloads through
   the [Model Context Protocol](cli/README.md#mcp-server).
@@ -221,7 +223,7 @@ server from Android, iOS, the JVM or the browser, through the same `KetchApi`.
   privacy
 - [BitTorrent](docs/torrent.md) — Torrent and magnet support and its limits
 - [Multiple networks](docs/multiple-networks.md) — Spreading downloads across network interfaces
-- [AI discovery](docs/ai-discovery.md) — Providers, keys, web search and environment variables
+- [AI discovery](docs/ai-discovery.md) — Providers, keys, web search, page access, chats and history
 - [Logging](docs/logging.md) — Where the logs are, and what to attach to a bug report
 
 ## Contributing

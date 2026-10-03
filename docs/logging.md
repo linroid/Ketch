@@ -209,8 +209,9 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
 - Cookie and authorization header values are masked in HTTP debug logs, and request headers
   are never logged
 
-Logs still name the files you downloaded and the hosts and paths they came from, so review them
-before posting them publicly. The app log files stay on the device until the user shares them.
+Logs still name the files you downloaded, the hosts and paths they came from and what you asked
+Discover for, so review them before posting them publicly. The app log files stay on the device
+until the user shares them; Android backups and transfers to a new device leave them out.
 
 When adding log lines, pass URLs through `redactUrl()` and name an error's causes with
 `describeCauses()`. In `library:torrent`, reduce tracker URLs with `trackerLabel()` and describe

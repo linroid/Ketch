@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">前往設定</string>
   <string name="discover_provider_openai_compatible">相容 OpenAI</string>
 
-  <string name="discover_query_placeholder">描述你想下載的內容</string>
+  <string name="discover_query_placeholder">描述你要找的內容…</string>
+  <string name="discover_follow_up_placeholder">繼續追問…</string>
   <string name="discover_find">尋找</string>
+  <string name="discover_send">傳送</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">限定網站</string>
   <plurals name="discover_sites_count">
@@ -32,27 +34,114 @@
   </plurals>
   <string name="discover_step_starting">正在開始搜尋</string>
 
+  <string name="discover_limited_to">僅限 %1$s</string>
+  <string name="discover_queued">正在等待其他搜尋完成</string>
+  <string name="discover_show_more">顯示更多</string>
+  <string name="discover_show_less">顯示較少</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="other">已允許 %1$d 個網站</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="other">已拒絕 %1$d 個網站</item>
+  </plurals>
+  <string name="discover_access_allowed_host">已允許 %1$s</string>
+  <string name="discover_access_denied_host">已拒絕 %1$s</string>
+
+  <string name="discover_approval_page">要開啟 %1$s 嗎？</string>
+  <string name="discover_approval_file">要檢查 %1$s 上的檔案嗎？</string>
+  <string name="discover_approval_redirect">要重新導向至 %1$s 嗎？</string>
+  <string name="discover_approval_redirect_from">從 %1$s 重新導向而來</string>
+  <string name="discover_approval_reason">「探索」表示：%1$s</string>
+  <string name="discover_approval_allow">允許</string>
+  <string name="discover_approval_allow_once">允許一次</string>
+  <string name="discover_approval_deny">拒絕</string>
+  <string name="discover_approval_always">一律允許 %1$s</string>
+  <string name="discover_approval_allow_site">在此對話中允許 %1$s</string>
+  <string name="discover_approval_allow_all">在此對話中允許所有網站</string>
+  <string name="discover_approval_allow_caption">在此對話中允許 %1$s 及其子網域</string>
+  <string name="discover_approval_settings">網頁存取設定</string>
+  <string name="discover_approval_pane">「探索」想要開啟 %1$s</string>
+  <string name="discover_approval_jump">需要你確認</string>
+
   <string name="discover_select_all">全選</string>
   <string name="discover_clear_selection">取消選取</string>
   <plurals name="discover_results">
     <item quantity="other">%1$d 個下載項目</item>
   </plurals>
-  <string name="discover_results_for">符合「%1$s」</string>
   <string name="discover_match">符合度 %1$s</string>
   <string name="discover_match_tooltip">與你的搜尋的符合程度</string>
   <string name="discover_not_encrypted">未加密</string>
   <string name="discover_error_title">「探索」無法完成這次搜尋</string>
   <string name="discover_failed">探索失敗</string>
-  <string name="discover_unavailable">此裝置無法使用 AI 探索。</string>
   <string name="discover_none_title">找不到下載項目</string>
   <string name="discover_none_body">「探索」只會列出來自可信來源的檔案。試著指明版本或平台，或發布它的網站。</string>
   <string name="discover_search_everywhere">搜尋整個網路</string>
+  <string name="discover_stopped">已停止</string>
+  <string name="discover_discard">捨棄</string>
+  <string name="discover_discard_all">全部捨棄</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="other">已捨棄 %1$d 個</item>
+  </plurals>
+  <string name="discover_restore">還原</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="other">已捨棄 %1$d 個結果</item>
+  </plurals>
+  <string name="discover_deleted">已刪除「%1$s」</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="other">已從歷史記錄中清除 %1$d 個搜尋</item>
+  </plurals>
+  <string name="discover_undo_discard">復原捨棄結果</string>
+  <string name="discover_undo_delete">復原刪除搜尋</string>
+  <string name="discover_undo_clear_history">復原清除歷史記錄</string>
+  <string name="discover_needs_ok">「探索」需要你確認才能開啟 %1$s</string>
 
   <string name="discover_select_to_add">選擇要新增的下載項目</string>
   <plurals name="discover_selected">
     <item quantity="other">已選取 %1$d 個</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="other">%1$d 個來自先前的訊息</item>
+  </plurals>
   <string name="discover_add_now">立即新增</string>
+  <string name="discover_add_options">更多新增方式</string>
+  <string name="discover_add_to">新增至</string>
   <string name="discover_review_add">檢視並新增</string>
   <string name="discover_review_add_count">檢視並新增 %1$d 個</string>
+
+  <string name="discover_history">歷史記錄</string>
+  <string name="discover_history_show">顯示歷史記錄</string>
+  <string name="discover_history_hide">隱藏歷史記錄</string>
+  <string name="discover_new_search">新搜尋</string>
+  <string name="discover_delete_search">刪除此搜尋</string>
+  <string name="discover_history_clear">清除歷史記錄</string>
+  <string name="discover_history_filter">搜尋歷史記錄</string>
+  <string name="discover_history_empty">你執行過的搜尋會顯示在這裡。</string>
+  <string name="discover_history_no_match">沒有符合「%1$s」的搜尋</string>
+  <string name="discover_history_earlier">更早</string>
+  <string name="discover_history_searching">正在搜尋…</string>
+  <string name="discover_history_queued">等待開始</string>
+  <string name="discover_history_needs_ok">需要你確認</string>
+  <string name="discover_history_failed">失敗</string>
+  <plurals name="discover_history_results">
+    <item quantity="other">%1$d 個結果</item>
+  </plurals>
+  <string name="discover_history_no_results">沒有結果</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="other">%1$d 個搜尋需要你確認</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="other">%1$d 個要求等待你確認</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="other">%1$s，%2$d 個要求等待你確認</item>
+  </plurals>
+  <string name="discover_setup_to_continue">設定「探索」以繼續</string>
+
+  <string name="command_discover_send">傳送訊息</string>
+  <string name="command_discover_stop">停止搜尋</string>
+  <string name="command_discover_allow">允許此網站</string>
+  <string name="command_discover_deny">拒絕此網站</string>
+  <string name="command_discover_discard">捨棄結果或刪除搜尋</string>
+  <string name="command_discover_history">顯示或隱藏歷史記錄</string>
 </resources>

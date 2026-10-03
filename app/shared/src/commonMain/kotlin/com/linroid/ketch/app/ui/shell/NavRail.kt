@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -50,6 +49,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchGlyphBadge
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
@@ -117,6 +117,7 @@ internal fun NavRail(
   val active by state.activeInstance.collectAsState()
   val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
+  val badges = navBadges(state)
   Column(
     horizontalAlignment = Alignment.CenterHorizontally,
     modifier = modifier
@@ -139,13 +140,27 @@ internal fun NavRail(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(spacing.s1),
     ) {
+      val downloading = pulse.counts.downloading
       for (entry in destinations) {
+        val badge = if (entry == AppDestination.Downloads && downloading > 0) {
+          NavBadge(
+            count = downloading,
+            description = pluralStringResource(
+              Res.plurals.shell_rail_downloading,
+              downloading,
+              entry.label.resolve(),
+              downloading,
+            ),
+          )
+        } else {
+          badges[entry]
+        }
         RailItem(
           label = entry.label.resolve(),
           icon = entry.icon,
           shortcut = entry.command.shortcutLabel(),
           selected = entry == shell.destination && !shell.settingsOpen,
-          badge = if (entry == AppDestination.Downloads) pulse.counts.downloading else 0,
+          badge = badge,
           onClick = { shell.show(entry) },
         )
       }
@@ -183,7 +198,7 @@ internal fun NavRail(
       icon = KetchIcon.Settings,
       shortcut = KetchCommands.Settings.shortcutLabel(),
       selected = shell.settingsOpen,
-      badge = 0,
+      badge = null,
       onClick = { state.openSettings() },
       modifier = Modifier.padding(bottom = spacing.s3),
     )
@@ -200,7 +215,7 @@ private fun RailItem(
   icon: KetchIcon,
   shortcut: String?,
   selected: Boolean,
-  badge: Int,
+  badge: NavBadge?,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -218,11 +233,7 @@ private fun RailItem(
     },
     animationSpec = tween(KetchTheme.motion.micro),
   )
-  val description = if (badge > 0) {
-    pluralStringResource(Res.plurals.shell_rail_downloading, badge, label, badge)
-  } else {
-    label
-  }
+  val description = badge?.description ?: label
   KetchTooltip(text = label, shortcut = shortcut, modifier = modifier) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -253,9 +264,9 @@ private fun RailItem(
             size = RailGlyph,
             tint = if (selected) colors.accentText else colors.textSecondary,
           )
-          if (badge > 0) {
-            RailBadge(
-              count = badge,
+          if (badge != null) {
+            KetchGlyphBadge(
+              count = badge.count,
               modifier = Modifier.align(Alignment.TopEnd).offset(x = BadgeShift, y = -BadgeRise),
             )
           }
@@ -270,22 +281,6 @@ private fun RailItem(
         modifier = Modifier.padding(top = KetchTheme.spacing.s1),
       )
     }
-  }
-}
-
-/** The downloading count over Downloads' glyph. */
-@Composable
-private fun RailBadge(count: Int, modifier: Modifier = Modifier) {
-  val colors = KetchTheme.colors
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier = modifier
-      .heightIn(min = BadgeSize)
-      .widthIn(min = BadgeSize)
-      .background(colors.accent, KetchTheme.shapes.badge)
-      .padding(horizontal = KetchTheme.spacing.s1),
-  ) {
-    Text(text = count.toString(), style = KetchTheme.typography.numeralS, color = colors.onAccent)
   }
 }
 
@@ -512,7 +507,6 @@ private val RailGlyph: Dp = 24.dp
 private val CellWidth: Dp = 56.dp
 private val IndicatorWidth: Dp = 56.dp
 private val IndicatorHeight: Dp = 32.dp
-private val BadgeSize: Dp = 16.dp
 private val BadgeShift: Dp = 10.dp
 private val BadgeRise: Dp = 4.dp
 private val DividerWidth: Dp = 1.dp

@@ -33,8 +33,11 @@ import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.AiPageRequest
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.DiscoveryStep
+import com.linroid.ketch.app.state.InMemoryDiscoverHistoryStore
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.SpeedHistoryStore
@@ -519,6 +522,7 @@ internal fun sampleSystem(
  *   unwatched sample remotes never connect.
  * @param config the saved config, from the one [data] gives.
  * @param speedMode the speed mode of the embedded device, running in the given scope.
+ * @param discoverHistory the saved Discover sessions.
  * @param seedHistory whether [start] fills the speed history before the rows are listed.
  * @param wave how far below or above its speed each second of the seeded history is.
  */
@@ -531,6 +535,7 @@ internal class SampleEnvironment(
   remote: ((RemoteConfig) -> RemoteInstance)? = null,
   config: (KetchConfig) -> KetchConfig = { it },
   speedMode: ((KetchApi, CoroutineScope) -> SpeedModeController)? = null,
+  discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   private val seedHistory: Boolean = true,
   private val wave: (second: Int, random: Random) -> Double = SampleWave,
 ) : SnapshotEnvironment {
@@ -555,6 +560,7 @@ internal class SampleEnvironment(
     context = SnapshotHarness.ui,
     speedMode = speedMode?.invoke(checkNotNull(instanceManager.embedded), speedScope),
     clock = SampleData.CLOCK,
+    discoverHistory = discoverHistory,
   )
 
   /**
@@ -698,8 +704,11 @@ internal val PretendServer: (KetchApi, PairingRequests) -> LocalServerHandle = {
 /** Discovery that can run but is never asked, so the Discover page and tab show. */
 internal object IdleDiscovery : AiDiscoveryProviderFactory {
   override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
-    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
-      AiDiscoverResponse(request.query, emptyList())
+    override suspend fun discover(
+      request: AiDiscoverRequest,
+      onStep: (DiscoveryStep) -> Unit,
+      approve: suspend (AiPageRequest) -> Boolean,
+    ) = AiDiscoverResponse(request.query, emptyList())
 
     override suspend fun verify(): String = "OK"
   }

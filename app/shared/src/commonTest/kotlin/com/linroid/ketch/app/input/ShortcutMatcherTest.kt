@@ -17,6 +17,7 @@ class ShortcutMatcherTest {
   private val listFocused = ShortcutContext(listFocused = true)
   private val typing = ShortcutContext(textFieldFocused = true)
   private val intake = ShortcutContext(overlay = CommandScope.Intake, textFieldFocused = true)
+  private val discover = ShortcutContext(overlay = CommandScope.Discover)
 
   @Test
   fun match_macPrimaryChord_needsMeta() {
@@ -162,6 +163,40 @@ class ShortcutMatcherTest {
     )
     val matcher = ShortcutMatcher(KeyboardPlatform.Mac, listOf(first, duplicate))
     assertSame(first, matcher.match(KeyPress(Key.N, meta = true), idle))
+  }
+
+  @Test
+  fun match_discoverComposer_sendsOnEnterUnlessComposing() {
+    val composer = discover.copy(textFieldFocused = true)
+    assertSame(KetchCommands.DiscoverSend, mac.match(KeyPress(Key.Enter), composer))
+    val newLine = KeyPress(Key.Enter, shift = true)
+    assertSame(KetchCommands.DiscoverNewLine, mac.match(newLine, composer))
+    assertNull(mac.match(KeyPress(Key.Enter), composer.copy(composing = true)))
+  }
+
+  @Test
+  fun match_discoverChordATextFieldKeeps_waitsWhileTyping() {
+    val deny = KeyPress(Key.Backspace, meta = true)
+    assertSame(KetchCommands.DiscoverDeny, mac.match(deny, discover))
+    assertNull(mac.match(deny, discover.copy(textFieldFocused = true)))
+    assertSame(KetchCommands.DiscoverDiscard, pc.match(KeyPress(Key.Delete), discover))
+    assertNull(pc.match(KeyPress(Key.Delete), discover.copy(textFieldFocused = true)))
+    val allow = KeyPress(Key.Enter, meta = true)
+    val inField = discover.copy(textFieldFocused = true)
+    assertSame(KetchCommands.DiscoverAllow, mac.match(allow, inField))
+  }
+
+  @Test
+  fun match_discoverNewSearchAndHistory_runWhileTyping() {
+    val composer = discover.copy(textFieldFocused = true)
+    val newSearch = KeyPress(Key.E, meta = true, shift = true)
+    assertSame(KetchCommands.DiscoverNewSearch, mac.match(newSearch, composer))
+    val history = KeyPress(Key.H, ctrl = true, shift = true)
+    assertSame(KetchCommands.DiscoverHistory, pc.match(history, composer))
+    assertNull(mac.match(newSearch, composer.copy(composing = true)))
+    // Outside Discover, ⌘E alone shows it, and ⇧⌘E does nothing.
+    assertSame(KetchCommands.Discover, mac.match(KeyPress(Key.E, meta = true), idle))
+    assertNull(mac.match(newSearch, idle))
   }
 
   @Test

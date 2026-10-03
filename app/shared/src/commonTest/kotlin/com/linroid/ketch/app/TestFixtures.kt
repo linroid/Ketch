@@ -10,6 +10,7 @@ import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AiDiscoveryProvider
+import com.linroid.ketch.app.state.AiPageRequest
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.config.ConfigStore
@@ -115,19 +116,28 @@ internal class RecordingConfigStore(config: KetchConfig = KetchConfig()) : Confi
 }
 
 /**
- * An AI provider that answers every search with [candidates], or throws [failure], reporting
- * [steps] first and waiting for [gate]; its connection test answers [reply] or throws
- * [verifyFailure].
+ * An AI provider that answers every search with [candidates] and [summary], or throws [failure].
+ * Each search reports [steps], asks to open each of [pages] in turn and, when [gated], waits
+ * until its gate in [gates] opens. Its connection test answers [reply] or throws [verifyFailure].
  */
 internal class FakeAiProvider(
   private val steps: List<DiscoveryStep> = emptyList(),
   private val candidates: List<AiCandidate> = emptyList(),
-  private val gate: CompletableDeferred<Unit>? = null,
-  private val failure: Exception? = null,
+  private val summary: String = "",
+  private val pages: List<AiPageRequest> = emptyList(),
+  private val gated: Boolean = false,
+  private val failure: Throwable? = null,
   private val reply: String = "OK",
   private val verifyFailure: Throwable? = null,
 ) : AiDiscoveryProvider {
+  /** The searches asked for, oldest first. */
   val requests = mutableListOf<AiDiscoverRequest>()
+
+  /** The gate of each search, in the order of [requests]. */
+  val gates = mutableListOf<CompletableDeferred<Unit>>()
+
+  /** Each page a search asked to open, with the answer it got. */
+  val answers = mutableListOf<Pair<AiPageRequest, Boolean>>()
 
   var closed = false
     private set
@@ -135,12 +145,15 @@ internal class FakeAiProvider(
   override suspend fun discover(
     request: AiDiscoverRequest,
     onStep: (DiscoveryStep) -> Unit,
+    approve: suspend (AiPageRequest) -> Boolean,
   ): AiDiscoverResponse {
     requests += request
+    val gate = CompletableDeferred<Unit>().also { gates += it }
     steps.forEach(onStep)
-    gate?.await()
+    for (page in pages) answers += page to approve(page)
+    if (gated) gate.await()
     failure?.let { throw it }
-    return AiDiscoverResponse(request.query, candidates)
+    return AiDiscoverResponse(request.query, candidates, summary)
   }
 
   override suspend fun verify(): String = verifyFailure?.let { throw it } ?: reply

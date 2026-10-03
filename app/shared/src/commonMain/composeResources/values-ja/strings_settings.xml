@@ -10,7 +10,7 @@
   <string name="settings_category_integration">連携</string>
   <string name="settings_category_integration_description">ブラウザ拡張機能、マグネットリンク、クリップボード</string>
   <string name="settings_category_discover">ディスカバー</string>
-  <string name="settings_category_discover_description">ダウンロードを探すAIモデルとWeb検索</string>
+  <string name="settings_category_discover_description">AIモデル、Web検索、ページへのアクセス</string>
   <string name="settings_category_about">情報</string>
   <string name="settings_category_about_description">バージョン、ライセンス、ログ</string>
   <string name="settings_category_downloads">ダウンロード</string>
@@ -230,6 +230,20 @@
   <string name="settings_ai_engine_id">検索エンジンID</string>
   <string name="settings_ai_engine_id_hint">検索に使うProgrammable Searchのエンジン。</string>
   <string name="settings_ai_engine_id_placeholder">エンジンID</string>
+  <string name="settings_ai_access_group">ページへのアクセス</string>
+  <string name="settings_ai_access_mode">Webサイトを開く前</string>
+  <string name="settings_ai_access_allow">自動的に許可</string>
+  <string name="settings_ai_access_allow_hint">検索に必要なWebサイトを確認せずに開きます。</string>
+  <string name="settings_ai_access_ask_site">新しいサイトごとに確認</string>
+  <string name="settings_ai_access_ask_site_hint">チャットで初めてサイトを開くときに確認します。「常に許可」を選ぶと、そのサイトを記憶します。</string>
+  <string name="settings_ai_access_ask">毎回確認</string>
+  <string name="settings_ai_access_ask_hint">ページを開く前とファイルを調べる前に、毎回確認します。</string>
+  <string name="settings_ai_access_trusted">常に許可</string>
+  <string name="settings_ai_access_trusted_hint">ディスカバーは、これらのサイトとそのサブドメインを確認せずに開きます。</string>
+  <string name="settings_ai_access_trusted_none">まだありません。ディスカバーに確認されたときに「常に許可」を選ぶか、ここでサイトを追加してください。</string>
+  <string name="settings_ai_access_add">サイトを追加（例：ubuntu.com）</string>
+  <string name="settings_ai_access_add_invalid">ubuntu.comのように、Webサイトのドメイン名を入力してください。</string>
+  <string name="settings_ai_access_footer">Webサイトを限定した検索では、自分で選んだサイトなので確認しません。</string>
 
   <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。Ketchはその帆のように、すべてのダウンロードをレーンに分けます。</string>
   <string name="settings_about_discover_elsewhere">ディスカバーは、デスクトップ版とAndroid版のアプリで利用できます。</string>
@@ -507,6 +521,10 @@
   <string name="settings_search_test_keywords">確認, 検証, テスト</string>
   <string name="settings_search_web_search">エージェントが使うBraveまたはGoogleの検索</string>
   <string name="settings_search_web_search_keywords">検索プロバイダ, 検索APIキー, 検索エンジン</string>
+  <string name="settings_search_ai_access">ディスカバーがWebサイトを開く前に確認するかどうか</string>
+  <string name="settings_search_ai_access_keywords">ページへのアクセス, アクセス許可, 権限, 承認, 許可, 確認, プライバシー</string>
+  <string name="settings_search_ai_trusted">ディスカバーが確認せずに開くWebサイト</string>
+  <string name="settings_search_ai_trusted_keywords">信頼済みサイト, 許可リスト, ホワイトリスト, ドメイン, 権限, 常に許可</string>
   <string name="settings_search_version_keywords">ビルド, リビジョン, アップデート, 更新</string>
   <string name="settings_search_source_keywords">github, プロジェクト, ソースコード</string>
   <string name="settings_search_report_keywords">バグ, 不具合, 問題, フィードバック, ヘルプ</string>

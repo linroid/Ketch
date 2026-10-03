@@ -79,7 +79,8 @@ internal val AppState.quickAddsLinks: Boolean
  * Runs the global [KetchCommands] in the window: adding, the tabs and destinations, the devices
  * and their switcher, the speed and queue commands, the sidebar, the inspector, Activity, Undo,
  * Settings, the shortcut sheet and the command palette (`⌘K`). While Settings shows, `⌘F` is
- * left to Settings' own search.
+ * left to Settings' own search; `⌘E` also puts the keyboard in Discover's composer. Discover's
+ * page keys, such as `⇧⌘H`, go to the Discover page shown, when the keyboard is not in it.
  *
  * @param clipboard where pasted and added links come from.
  * @param files picks `.torrent` files to open.
@@ -132,7 +133,12 @@ internal class ShellCommands(
         // The shell shows Downloads for it, and the page's field takes the focus.
         state.requestSearchFocus()
       }
-      KetchCommands.Discover -> return shell.show(AppDestination.Discover)
+      KetchCommands.Discover -> {
+        if (!shell.show(AppDestination.Discover)) return false
+        // On Discover already, the key goes to its composer, past the floating history.
+        shell.discover.historyOpen = false
+        shell.discover.focusComposer()
+      }
       KetchCommands.Devices -> return shell.show(AppDestination.Devices)
       KetchCommands.AllDevices -> return state.showAllDevices()
       KetchCommands.SwitchDevice -> state.showInstanceSelector = !state.showInstanceSelector
@@ -146,6 +152,10 @@ internal class ShellCommands(
       KetchCommands.Undo -> return state.pendingOps.undoLast()
       KetchCommands.Settings -> state.openSettings()
       KetchCommands.Shortcuts -> shell.shortcutsOpen = !shell.shortcutsOpen
+      KetchCommands.DiscoverNewSearch,
+      KetchCommands.DiscoverHistory,
+      KetchCommands.DiscoverStop,
+      -> return shell.discover.pageCommand?.invoke(command) ?: false
       else -> return false
     }
     return true
@@ -230,6 +240,9 @@ internal class ShellCommands(
       KetchCommands.Undo,
       KetchCommands.Settings,
       KetchCommands.Shortcuts,
+      KetchCommands.DiscoverNewSearch,
+      KetchCommands.DiscoverHistory,
+      KetchCommands.DiscoverStop,
     )
   }
 }

@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">Настроить в Настройках</string>
   <string name="discover_provider_openai_compatible">Совместимый с OpenAI</string>
 
-  <string name="discover_query_placeholder">Опишите, что хотите скачать</string>
+  <string name="discover_query_placeholder">Опишите, что нужно найти…</string>
+  <string name="discover_follow_up_placeholder">Задайте уточняющий вопрос…</string>
   <string name="discover_find">Найти</string>
+  <string name="discover_send">Отправить</string>
   <string name="discover_stop">Остановить</string>
   <string name="discover_sites_limit">Ограничить сайтами</string>
   <plurals name="discover_sites_count">
@@ -38,6 +40,41 @@
   </plurals>
   <string name="discover_step_starting">Начинаем поиск</string>
 
+  <string name="discover_limited_to">Ограничено сайтами: %1$s</string>
+  <string name="discover_queued">Ожидает завершения другого запроса</string>
+  <string name="discover_show_more">Показать полностью</string>
+  <string name="discover_show_less">Свернуть</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="one">Разрешён %1$d сайт</item>
+    <item quantity="few">Разрешены %1$d сайта</item>
+    <item quantity="many">Разрешено %1$d сайтов</item>
+    <item quantity="other">Разрешено %1$d сайта</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="one">Отклонён %1$d сайт</item>
+    <item quantity="few">Отклонены %1$d сайта</item>
+    <item quantity="many">Отклонено %1$d сайтов</item>
+    <item quantity="other">Отклонено %1$d сайта</item>
+  </plurals>
+  <string name="discover_access_allowed_host">Разрешён: %1$s</string>
+  <string name="discover_access_denied_host">Отклонён: %1$s</string>
+
+  <string name="discover_approval_page">Открыть %1$s?</string>
+  <string name="discover_approval_file">Проверить файл на сайте %1$s?</string>
+  <string name="discover_approval_redirect">Перейти на %1$s по перенаправлению?</string>
+  <string name="discover_approval_redirect_from">Перенаправлено с %1$s</string>
+  <string name="discover_approval_reason">Поиск поясняет: %1$s</string>
+  <string name="discover_approval_allow">Разрешить</string>
+  <string name="discover_approval_allow_once">Разрешить один раз</string>
+  <string name="discover_approval_deny">Отклонить</string>
+  <string name="discover_approval_always">Всегда разрешать %1$s</string>
+  <string name="discover_approval_allow_site">Разрешить %1$s в этом чате</string>
+  <string name="discover_approval_allow_all">Разрешить все сайты в этом чате</string>
+  <string name="discover_approval_allow_caption">Разрешает %1$s и его поддомены в этом чате</string>
+  <string name="discover_approval_settings">Настройки доступа к страницам</string>
+  <string name="discover_approval_pane">Поиск хочет открыть %1$s</string>
+  <string name="discover_approval_jump">Нужно подтверждение</string>
+
   <string name="discover_select_all">Выбрать все</string>
   <string name="discover_clear_selection">Снять выделение</string>
   <plurals name="discover_results">
@@ -46,16 +83,42 @@
     <item quantity="many">%1$d загрузок</item>
     <item quantity="other">%1$d загрузки</item>
   </plurals>
-  <string name="discover_results_for">по запросу «%1$s»</string>
   <string name="discover_match">Совпадение %1$s</string>
   <string name="discover_match_tooltip">Насколько результат соответствует запросу</string>
   <string name="discover_not_encrypted">Без шифрования</string>
   <string name="discover_error_title">Не удалось завершить этот поиск</string>
   <string name="discover_failed">Ошибка поиска</string>
-  <string name="discover_unavailable">ИИ-поиск недоступен на этом устройстве.</string>
   <string name="discover_none_title">Загрузки не найдены</string>
   <string name="discover_none_body">Показываются только файлы из надёжных источников. Попробуйте указать версию, платформу или сайт, который публикует файл.</string>
   <string name="discover_search_everywhere">Искать по всему интернету</string>
+  <string name="discover_stopped">Остановлено</string>
+  <string name="discover_discard">Убрать</string>
+  <string name="discover_discard_all">Убрать все</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="one">Убрано: %1$d</item>
+    <item quantity="few">Убрано: %1$d</item>
+    <item quantity="many">Убрано: %1$d</item>
+    <item quantity="other">Убрано: %1$d</item>
+  </plurals>
+  <string name="discover_restore">Вернуть</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="one">Убран %1$d результат</item>
+    <item quantity="few">Убраны %1$d результата</item>
+    <item quantity="many">Убрано %1$d результатов</item>
+    <item quantity="other">Убрано %1$d результата</item>
+  </plurals>
+  <string name="discover_deleted">Запрос «%1$s» удалён</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="one">Из истории удалён %1$d запрос</item>
+    <item quantity="few">Из истории удалены %1$d запроса</item>
+    <item quantity="many">Из истории удалено %1$d запросов</item>
+    <item quantity="other">Из истории удалено %1$d запроса</item>
+  </plurals>
+  <string name="discover_undo_discard">Вернуть убранные результаты</string>
+  <string name="discover_undo_delete">Отменить удаление запроса</string>
+  <string name="discover_undo_clear_history">Отменить очистку истории</string>
+  <string name="discover_needs_ok">Поиску нужно ваше подтверждение, чтобы открыть %1$s</string>
 
   <string name="discover_select_to_add">Выберите загрузки для добавления</string>
   <plurals name="discover_selected">
@@ -64,7 +127,63 @@
     <item quantity="many">Выбрано: %1$d</item>
     <item quantity="other">Выбрано: %1$d</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="one">%1$d из предыдущих сообщений</item>
+    <item quantity="few">%1$d из предыдущих сообщений</item>
+    <item quantity="many">%1$d из предыдущих сообщений</item>
+    <item quantity="other">%1$d из предыдущих сообщений</item>
+  </plurals>
   <string name="discover_add_now">Добавить сейчас</string>
+  <string name="discover_add_options">Другие способы добавить</string>
+  <string name="discover_add_to">Добавить на устройство</string>
   <string name="discover_review_add">Проверить и добавить</string>
   <string name="discover_review_add_count">Проверить и добавить (%1$d)</string>
+
+  <string name="discover_history">История</string>
+  <string name="discover_history_show">Показать историю</string>
+  <string name="discover_history_hide">Скрыть историю</string>
+  <string name="discover_new_search">Новый запрос</string>
+  <string name="discover_delete_search">Удалить этот запрос</string>
+  <string name="discover_history_clear">Очистить историю</string>
+  <string name="discover_history_filter">Поиск по истории</string>
+  <string name="discover_history_empty">Здесь появятся ваши запросы.</string>
+  <string name="discover_history_no_match">Нет запросов, содержащих «%1$s»</string>
+  <string name="discover_history_earlier">Ранее</string>
+  <string name="discover_history_searching">Идёт поиск…</string>
+  <string name="discover_history_queued">Ожидает запуска</string>
+  <string name="discover_history_needs_ok">Нужно подтверждение</string>
+  <string name="discover_history_failed">Ошибка</string>
+  <plurals name="discover_history_results">
+    <item quantity="one">%1$d результат</item>
+    <item quantity="few">%1$d результата</item>
+    <item quantity="many">%1$d результатов</item>
+    <item quantity="other">%1$d результата</item>
+  </plurals>
+  <string name="discover_history_no_results">Нет результатов</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="one">%1$d запрос ожидает подтверждения</item>
+    <item quantity="few">%1$d запроса ожидают подтверждения</item>
+    <item quantity="many">%1$d запросов ожидают подтверждения</item>
+    <item quantity="other">%1$d запроса ожидают подтверждения</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="one">%1$d ожидает подтверждения</item>
+    <item quantity="few">%1$d ожидают подтверждения</item>
+    <item quantity="many">%1$d ожидают подтверждения</item>
+    <item quantity="other">%1$d ожидают подтверждения</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="one">%1$s, %2$d ожидает подтверждения</item>
+    <item quantity="few">%1$s, %2$d ожидают подтверждения</item>
+    <item quantity="many">%1$s, %2$d ожидают подтверждения</item>
+    <item quantity="other">%1$s, %2$d ожидают подтверждения</item>
+  </plurals>
+  <string name="discover_setup_to_continue">Чтобы продолжить, настройте поиск</string>
+
+  <string name="command_discover_send">Отправить сообщение</string>
+  <string name="command_discover_stop">Остановить поиск</string>
+  <string name="command_discover_allow">Разрешить сайт</string>
+  <string name="command_discover_deny">Отклонить сайт</string>
+  <string name="command_discover_discard">Убрать результат или удалить запрос</string>
+  <string name="command_discover_history">Показать или скрыть историю</string>
 </resources>

@@ -3,78 +3,126 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.DiscoverQuery
+import com.linroid.ketch.ai.DiscoverResult
+import com.linroid.ketch.ai.DiscoveryException
+import com.linroid.ketch.ai.PageAccessApprover
+import com.linroid.ketch.ai.PageAccessKind
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.config.AiSettings
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import com.linroid.ketch.ai.DiscoverTurn as EngineTurn
 
 /**
  * In-process AI discovery using the `ai:discover` module directly.
  * Available on Android and JVM/Desktop, where the AI module can run.
  *
- * Searches run one at a time, so the steps the module reports belong to the search that asked
- * for them.
+ * Searches may run at the same time, each with its own step listener and approver. [close]
+ * releases the module once the searches running then have ended, so replacing the provider after
+ * a settings change never cuts a search short.
  */
 class EmbeddedAiDiscoveryProvider internal constructor(
-  private val module: AiModule,
-  private val steps: StepRelay,
+  private val search: suspend (DiscoverQuery, DiscoveryStepListener, PageAccessApprover) ->
+    DiscoverResult,
+  private val verifyConnection: suspend () -> String,
+  private val release: () -> Unit,
 ) : AiDiscoveryProvider {
-  private val runs = Mutex()
+  private val lock = Any()
+  private var active = 0
+  private var closing = false
+
+  internal constructor(module: AiModule) : this(
+    search = module.discoveryService::discover,
+    verifyConnection = module.discoveryService::verifyConnection,
+    release = module::close,
+  )
 
   override suspend fun discover(
     request: AiDiscoverRequest,
     onStep: (DiscoveryStep) -> Unit,
-  ): AiDiscoverResponse = runs.withLock {
-    steps.target = onStep
+    approve: suspend (AiPageRequest) -> Boolean,
+  ): AiDiscoverResponse {
+    synchronized(lock) {
+      check(!closing) { "The discovery engine was closed" }
+      active++
+    }
     try {
-      search(request)
+      val approver = PageAccessApprover { page ->
+        approve(
+          AiPageRequest(
+            url = page.url,
+            host = page.host,
+            kind = when (page.kind) {
+              PageAccessKind.Page -> AiPageKind.Page
+              PageAccessKind.FileInfo -> AiPageKind.FileInfo
+            },
+            reason = page.reason,
+            redirectFrom = page.redirectFrom,
+          ),
+        )
+      }
+      val result = search(request.toQuery(), RunStepListener(onStep), approver)
+      return AiDiscoverResponse(
+        query = result.query,
+        candidates = result.candidates.map { c ->
+          AiCandidate(
+            url = c.url,
+            title = c.title,
+            fileName = c.fileName,
+            fileSize = c.fileSize,
+            mimeType = c.mimeType,
+            sourceUrl = c.sourceUrl,
+            confidence = c.confidence,
+            description = c.description,
+          )
+        },
+        summary = result.summary,
+      )
+    } catch (e: DiscoveryException) {
+      throw AiDiscoverFailure(e.message, e.brief, e)
     } finally {
-      steps.target = null
+      val last = synchronized(lock) {
+        active--
+        closing && active == 0
+      }
+      if (last) release()
     }
   }
 
-  private suspend fun search(request: AiDiscoverRequest): AiDiscoverResponse {
-    val result = module.discoveryService.discover(
-      DiscoverQuery(
-        query = request.query,
-        sites = request.sites,
-        maxResults = request.maxResults,
-        fileTypes = request.fileTypes,
-      )
-    )
-    return AiDiscoverResponse(
-      query = result.query,
-      candidates = result.candidates.map { c ->
-        AiCandidate(
-          url = c.url,
-          title = c.title,
-          fileName = c.fileName,
-          fileSize = c.fileSize,
-          mimeType = c.mimeType,
-          sourceUrl = c.sourceUrl,
-          confidence = c.confidence,
-          description = c.description,
-        )
-      },
-    )
-  }
-
-  override suspend fun verify(): String =
-    module.discoveryService.verifyConnection()
+  override suspend fun verify(): String = verifyConnection()
 
   override fun close() {
-    module.close()
+    val idle = synchronized(lock) {
+      if (closing) return
+      closing = true
+      active == 0
+    }
+    if (idle) release()
   }
 }
 
-/** Hands the steps the module reports to the search running now, if any. */
-internal class StepRelay : DiscoveryStepListener {
-  @Volatile
-  var target: ((DiscoveryStep) -> Unit)? = null
+/** The engine's query for this request. */
+private fun AiDiscoverRequest.toQuery() = DiscoverQuery(
+  query = query,
+  sites = sites,
+  maxResults = maxResults,
+  fileTypes = fileTypes,
+  history = history.map { turn ->
+    EngineTurn(
+      request = turn.request,
+      sites = turn.sites,
+      completed = turn.completed,
+      results = turn.results.map { EngineTurn.Result(url = it.url, title = it.title) },
+    )
+  },
+  excludedUrls = excludedUrls,
+)
 
+/** Hands the steps of one search to [onStep], trimmed. */
+internal class RunStepListener(
+  private val onStep: (DiscoveryStep) -> Unit,
+) : DiscoveryStepListener {
   override fun onStep(title: String, details: String) {
-    target?.invoke(DiscoveryStep(title = title.trim(), detail = details.trim()))
+    onStep(DiscoveryStep(title = title.trim(), detail = details.trim()))
   }
 }
 
@@ -96,11 +144,7 @@ class EmbeddedAiDiscoveryProviderFactory(
     if (!settings.enabled) return null
     val resolved = withPlatformCredentials(settings)
     if (!resolved.isUsable) return null
-    val steps = StepRelay()
-    return EmbeddedAiDiscoveryProvider(
-      module = AiModule.create(AiConfig(settings = resolved), stepListener = steps),
-      steps = steps,
-    )
+    return EmbeddedAiDiscoveryProvider(AiModule.create(AiConfig(settings = resolved)))
   }
 
   override fun withPlatformCredentials(settings: AiSettings): AiSettings =

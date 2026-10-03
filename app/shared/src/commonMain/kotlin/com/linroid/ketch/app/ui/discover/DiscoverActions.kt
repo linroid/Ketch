@@ -19,7 +19,7 @@ import kotlinx.coroutines.Job
 
 /** The device Discover adds to: the one picked with the On: chip, else the active one. */
 internal fun AppState.discoverTarget(): InstanceEntry? {
-  val picked = aiDiscover.draft.target
+  val picked = aiDiscover.target
   return instances.value.firstOrNull { it.deviceId == picked } ?: activeInstance.value
 }
 
@@ -32,13 +32,12 @@ internal fun AppState.discoverTarget(): InstanceEntry? {
  */
 internal fun AppState.addDiscovered(candidates: List<AiCandidate>): Job? {
   val target = discoverTarget() ?: return null
-  val query = aiDiscover.draft.submittedQuery
+  val query = aiDiscover.current?.title.orEmpty()
   return launchCommand {
     val result = aiDiscover.add(target.instance, candidates, query)
     announceAdded(result.added.map { TaskKey(target.deviceId, it.taskId) })
     val added = candidates - result.failed.map { it.first }.toSet()
-    val draft = aiDiscover.draft
-    draft.selected = draft.selected - added.map { it.url }.toSet()
+    aiDiscover.selected = aiDiscover.selected - added.map { it.url }.toSet()
     reportDiscovered(target, added, result, query)
   }
 }

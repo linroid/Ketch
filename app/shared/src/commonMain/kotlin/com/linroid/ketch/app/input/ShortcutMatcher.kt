@@ -8,8 +8,9 @@ import androidx.compose.ui.input.key.type
 /**
  * What has focus when a key is pressed.
  *
- * @property overlay the open add sheet ([CommandScope.Intake]) or command palette
- *   ([CommandScope.Palette]), whose chords come first; `null` when neither is open.
+ * @property overlay the scope whose chords come first: the open add sheet
+ *   ([CommandScope.Intake]) or command palette ([CommandScope.Palette]), or the Discover page
+ *   ([CommandScope.Discover]) as it handles a key itself; `null` for none.
  * @property listFocused whether the download list has keyboard focus.
  * @property textFieldFocused whether a text field has keyboard focus.
  * @property composing whether an input method is composing text.
@@ -24,8 +25,8 @@ data class ShortcutContext(
   val menuOpen: Boolean = false,
 ) {
   init {
-    val valid = overlay == null || overlay == CommandScope.Intake || overlay == CommandScope.Palette
-    require(valid) { "Only the add sheet and the palette are overlays, not $overlay" }
+    val valid = overlay != CommandScope.Global && overlay != CommandScope.List
+    require(valid) { "Only the add sheet, the palette and Discover are overlays, not $overlay" }
   }
 }
 
@@ -34,9 +35,10 @@ data class ShortcutContext(
  * modifier.
  *
  * The open overlay's chords come first, then the list's, then the global ones. Overlay chords
- * wait while an input method composes or a menu is open, and a global command never runs in
- * their place. List chords need the list to have focus, with no text field, composition or menu
- * active. Global chords always run, except chords a focused text field keeps: those of commands
+ * wait while an input method composes or a menu is open, or while a focused text field keeps
+ * them, and a global command never runs in their place. List chords need the list to have
+ * focus, with no text field, composition or menu active. Global chords always run, except
+ * chords a focused text field keeps: those of commands
  * that [KetchCommand.yieldsToTextField] and those that would type a character, such as the web
  * app's single keys.
  *
@@ -68,8 +70,11 @@ class ShortcutMatcher(
     val overlay = context.overlay
     if (overlay != null) {
       val binding = find(overlay, press)
-      val waits = context.composing || context.menuOpen
-      if (binding != null) return if (waits) null else binding.command
+      if (binding != null) {
+        val fieldKeeps = binding.command.yieldsToTextField && context.textFieldFocused
+        val waits = context.composing || context.menuOpen || fieldKeeps
+        return if (waits) null else binding.command
+      }
     }
     val listActive = overlay == null && context.listFocused && !context.textFieldFocused &&
       !context.composing && !context.menuOpen

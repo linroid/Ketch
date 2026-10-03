@@ -12,7 +12,10 @@ import java.net.UnknownHostException
  * Validates URLs against SSRF attacks by blocking requests to
  * private/local IP ranges and non-HTTP(S) schemes.
  *
- * [validate] checks a URL before it is requested, and
+ * [check] looks at the URL alone and never looks its host up, so it is
+ * safe before the user has agreed to contact the site: a lookup already
+ * sends the name, which the agent chose, to the domain's DNS servers.
+ * [validate] adds the lookup, for a host the run may contact, and
  * [resolvePublicAddresses] applies the same host check again when the
  * HTTP client connects (see [ValidatingDns]). Both look the host up with
  * [resolve], so a name that answers the first lookup with a public
@@ -28,21 +31,18 @@ internal class UrlValidator(
   private val log = KetchLogger("UrlValidator")
 
   /**
-   * Validates the given [url] for safety.
+   * Checks the given [url] without looking its host up.
    *
    * Checks performed:
    * 1. URL must be well-formed
    * 2. Scheme must be `http` or `https`
-   * 3. Hostname must not resolve to a private/local IP
-   * 4. Hostname must not be an internal-looking name
+   * 3. Hostname must not be an internal-looking name
+   * 4. An IP address host must not be private or local
    *
-   * The host is looked up on [Dispatchers.IO], so this is safe to call
-   * from a UI thread; Android refuses lookups on its main thread.
-   *
-   * @return [ValidationResult.Valid] if the URL is safe to fetch,
-   *   or [ValidationResult.Blocked] with a reason otherwise
+   * @return [ValidationResult.Valid] if the URL passes, or
+   *   [ValidationResult.Blocked] with a reason otherwise
    */
-  suspend fun validate(url: String): ValidationResult {
+  fun check(url: String): ValidationResult {
     val uri = try {
       URI(url)
     } catch (_: Exception) {
@@ -59,13 +59,45 @@ internal class UrlValidator(
 
     val host = uri.host
       ?: return ValidationResult.Blocked("Missing host in URL")
+    if (isInternalHostname(host)) {
+      return ValidationResult.Blocked("Blocked internal hostname: $host")
+    }
+    if (isIpLiteral(host)) {
+      // An address is parsed, not looked up; java.net.URI has already checked its form.
+      val address = try {
+        InetAddress.getByName(host)
+      } catch (_: UnknownHostException) {
+        return ValidationResult.Blocked("Malformed IP address: $host")
+      }
+      if (isBlockedAddress(address)) {
+        return ValidationResult.Blocked("Blocked private/local IP: ${address.hostAddress}")
+      }
+    }
+    return ValidationResult.Valid(uri)
+  }
 
+  /**
+   * Validates the given [url] for safety: [check], then a lookup of its
+   * host, whose addresses must not be private or local.
+   *
+   * The host is looked up on [Dispatchers.IO], so this is safe to call
+   * from a UI thread; Android refuses lookups on its main thread.
+   *
+   * @return [ValidationResult.Valid] if the URL is safe to fetch,
+   *   or [ValidationResult.Blocked] with a reason otherwise
+   */
+  suspend fun validate(url: String): ValidationResult {
+    val checked = check(url)
+    if (checked !is ValidationResult.Valid) return checked
+    val host = checked.uri.host
+    // An IP literal was checked whole; there is nothing to look up.
+    if (isIpLiteral(host)) return checked
     try {
       withContext(Dispatchers.IO) { resolvePublicAddresses(host) }
     } catch (e: BlockedHostException) {
       return ValidationResult.Blocked(e.reason)
     }
-    return ValidationResult.Valid(uri)
+    return checked
   }
 
   /**
@@ -106,6 +138,14 @@ internal class UrlValidator(
       lower.endsWith(".localhost") ||
       lower == "localhost"
   }
+
+  /**
+   * Whether [host], as java.net.URI reports it, is an IP address: IPv6 in
+   * brackets, or IPv4 in digits and dots, the only host of that form the
+   * URI parser accepts.
+   */
+  private fun isIpLiteral(host: String): Boolean =
+    host.startsWith('[') || host.all { it.isDigit() || it == '.' }
 
   private fun isBlockedAddress(addr: InetAddress): Boolean {
     return addr.isLoopbackAddress ||

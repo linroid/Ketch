@@ -15,6 +15,12 @@ import ketch.app.shared.generated.resources.command_device_all
 import ketch.app.shared.generated.resources.command_device_switcher
 import ketch.app.shared.generated.resources.command_devices
 import ketch.app.shared.generated.resources.command_discover
+import ketch.app.shared.generated.resources.command_discover_allow
+import ketch.app.shared.generated.resources.command_discover_deny
+import ketch.app.shared.generated.resources.command_discover_discard
+import ketch.app.shared.generated.resources.command_discover_history
+import ketch.app.shared.generated.resources.command_discover_send
+import ketch.app.shared.generated.resources.command_discover_stop
 import ketch.app.shared.generated.resources.command_inspector_show
 import ketch.app.shared.generated.resources.command_intake_add
 import ketch.app.shared.generated.resources.command_intake_close
@@ -65,6 +71,7 @@ import ketch.app.shared.generated.resources.command_switch_to_device
 import ketch.app.shared.generated.resources.command_undo
 import ketch.app.shared.generated.resources.command_window_close
 import ketch.app.shared.generated.resources.command_window_minimize
+import ketch.app.shared.generated.resources.discover_new_search
 
 /**
  * Every command of the app, the one source for shortcuts, the menu bar, the tray, the command
@@ -664,6 +671,81 @@ object KetchCommands {
     mac = KeyChord(Key.Escape),
   )
 
+  /** Sends the message in Discover's composer; on touch the keyboard's Enter starts a line. */
+  val DiscoverSend: KetchCommand = KetchCommand(
+    id = "discover.send",
+    label = Res.string.command_discover_send.text(),
+    icon = KetchIcon.Send,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Enter),
+  )
+
+  /** Starts a new line in Discover's composer. */
+  val DiscoverNewLine: KetchCommand = KetchCommand(
+    id = "discover.newLine",
+    label = Res.string.command_intake_new_line.text(),
+    icon = null,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Enter, shift = true),
+  )
+
+  /** Shows an empty Discover chat, ready for a new search; the one shown stays in the history. */
+  val DiscoverNewSearch: KetchCommand = KetchCommand(
+    id = "discover.newSearch",
+    label = Res.string.discover_new_search.text(),
+    icon = KetchIcon.Compose,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.E, primary = true, shift = true),
+  )
+
+  /** Shows or hides Discover's history. */
+  val DiscoverHistory: KetchCommand = KetchCommand(
+    id = "discover.history",
+    label = Res.string.command_discover_history.text(),
+    icon = KetchIcon.History,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.H, primary = true, shift = true),
+  )
+
+  /** Stops the search of the session Discover shows. */
+  val DiscoverStop: KetchCommand = KetchCommand(
+    id = "discover.stop",
+    label = Res.string.command_discover_stop.text(),
+    icon = KetchIcon.Stop,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Escape),
+  )
+
+  /** Answers the request to open a website that Discover shows with its first Allow button. */
+  val DiscoverAllow: KetchCommand = KetchCommand(
+    id = "discover.allow",
+    label = Res.string.command_discover_allow.text(),
+    icon = KetchIcon.Shield,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Enter, primary = true),
+  )
+
+  /** Denies the request to open a website that Discover shows. */
+  val DiscoverDeny: KetchCommand = KetchCommand(
+    id = "discover.deny",
+    label = Res.string.command_discover_deny.text(),
+    icon = KetchIcon.Close,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Backspace, primary = true),
+    yieldsToTextField = true,
+  )
+
+  /** Discards the focused Discover result, or deletes the focused search of the history. */
+  val DiscoverDiscard: KetchCommand = KetchCommand(
+    id = "discover.discard",
+    label = Res.string.command_discover_discard.text(),
+    icon = KetchIcon.Close,
+    scope = CommandScope.Discover,
+    mac = KeyChord(Key.Backspace),
+    pc = KeyChord(Key.Delete),
+    yieldsToTextField = true,
+  )
+
   /** Every command, grouped by scope in the order the shortcut sheet lists them. */
   val all: List<KetchCommand> = buildList {
     addAll(listOf(Add, PasteLinks, AddClipboardLink, OpenTorrent, Palette, Search))
@@ -682,6 +764,8 @@ object KetchCommands {
     addAll(intakeTargets)
     addAll(listOf(PaletteUp, PaletteDown, PaletteRun, PaletteAlternate, PaletteDiscover))
     add(PaletteClose)
+    addAll(listOf(DiscoverSend, DiscoverNewLine, DiscoverNewSearch, DiscoverHistory))
+    addAll(listOf(DiscoverStop, DiscoverAllow, DiscoverDeny, DiscoverDiscard))
   }
 
   /** The command that shows the [filter] tab: ⌘1 for All through ⌘6 for Failed. */

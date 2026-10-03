@@ -19,9 +19,11 @@
   <string name="notify_channel_pairing">Запросы на сопряжение</string>
   <string name="notify_pairing_title">%1$s хочет управлять загрузками %2$s</string>
   <string name="notify_pairing_body">Разрешайте, только если на нём показан код %1$s.</string>
+  <string name="notify_channel_requests">Запросы подтверждения</string>
   <string name="notify_finished_group">Завершённые загрузки</string>
   <string name="notify_sharing_device">Общий доступ к этому устройству</string>
   <string name="notify_server_on_port">Сервер на порту %1$d</string>
+  <string name="notify_discovering">Идёт поиск загрузок</string>
   <string name="notify_slow_lane_on">Медленная полоса</string>
   <string name="notify_action_pause_all">Приостановить все</string>
   <string name="notify_action_slow_lane">Медленная полоса</string>

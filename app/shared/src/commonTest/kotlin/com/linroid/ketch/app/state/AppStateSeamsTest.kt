@@ -210,6 +210,21 @@ class AppStateSeamsTest {
   }
 
   @Test
+  fun report_finishedDownload_leavesTheNotificationToTheMonitor() = runTest {
+    val state = appState()
+
+    state.report(
+      ActivityEvent.Completed(
+        taskKey = TaskKey(LOCAL_DEVICE_ID, "t1"),
+        request = DownloadRequest(url = "https://example.com/files/ubuntu.iso"),
+        state = DownloadState.Completed(outputPath = "/downloads/ubuntu.iso", totalBytes = 1024),
+      )
+    )
+
+    assertFalse(state.messages.active.value.single().notify)
+  }
+
+  @Test
   fun report_addFromElsewhere_recordsItInTheHistory() = runTest {
     val state = appState()
     val key = TaskKey(LOCAL_DEVICE_ID, "t1")

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Discover, the AI search for downloads: its setup page, the search, the agent's steps and the
-  results. What the agent writes (names, descriptions, steps) shows as it is. See
-  docs/development/localization.md.
+  Discover, the AI search for downloads: its setup page, the search, the agent's steps, the
+  results and what its toasts say. What the agent writes (names, descriptions, steps) shows as it
+  is. See docs/development/localization.md.
 -->
 <resources>
   <!-- The page's title. -->
@@ -32,9 +32,12 @@
   <!-- A model server that speaks OpenAI's API, set up in Settings; OpenAI is a name. -->
   <string name="discover_provider_openai_compatible">OpenAI-compatible</string>
 
-  <!-- The search. -->
-  <string name="discover_query_placeholder">Describe what you want to download</string>
+  <!-- The composer at the bottom of a chat. Its placeholder in a new chat, then in one with messages. -->
+  <string name="discover_query_placeholder">Describe what to find…</string>
+  <string name="discover_follow_up_placeholder">Ask a follow-up…</string>
+  <!-- The composer's button: Find sends a chat's first message, Send its follow-ups. -->
   <string name="discover_find">Find</string>
+  <string name="discover_send">Send</string>
   <string name="discover_stop">Stop</string>
   <string name="discover_sites_limit">Limit to websites</string>
   <!-- The website chip while two or more websites limit the search. -->
@@ -52,6 +55,51 @@
   </plurals>
   <string name="discover_step_starting">Starting the search</string>
 
+  <!-- The chat. Under a message limited to websites; %1$s lists them, such as "blender.org, github.com". -->
+  <string name="discover_limited_to">Limited to %1$s</string>
+  <!-- A message that waits while other chats search. -->
+  <string name="discover_queued">Waiting for another search to finish</string>
+  <!-- Folds the agent's reply open or closed when it is long. -->
+  <string name="discover_show_more">Show more</string>
+  <string name="discover_show_less">Show less</string>
+  <!-- How the user answered the agent's requests to open websites during a message, joined by " · ". -->
+  <plurals name="discover_access_allowed">
+    <item quantity="one">Allowed %1$d site</item>
+    <item quantity="other">Allowed %1$d sites</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="one">Denied %1$d site</item>
+    <item quantity="other">Denied %1$d sites</item>
+  </plurals>
+  <!-- One line each under the answers above. %1$s is a website, such as download.blender.org. -->
+  <string name="discover_access_allowed_host">Allowed %1$s</string>
+  <string name="discover_access_denied_host">Denied %1$s</string>
+
+  <!-- The card that asks before the agent opens a website. %1$s is the website, such as download.blender.org. -->
+  <string name="discover_approval_page">Open %1$s?</string>
+  <!-- The agent wants to check a file's type and size on the website. -->
+  <string name="discover_approval_file">Check a file on %1$s?</string>
+  <!-- A website the agent opened sends it on to this one. -->
+  <string name="discover_approval_redirect">Follow a redirect to %1$s?</string>
+  <!-- Under the link on a redirect's card. %1$s is the website that sent the agent on, such as github.com. -->
+  <string name="discover_approval_redirect_from">Redirected from %1$s</string>
+  <!-- Why the agent says it needs the website, in its own words. %1$s is that reason. -->
+  <string name="discover_approval_reason">Discover says: %1$s</string>
+  <string name="discover_approval_allow">Allow</string>
+  <string name="discover_approval_allow_once">Allow once</string>
+  <string name="discover_approval_deny">Deny</string>
+  <!-- %1$s is a site, such as blender.org, which covers its subdomains. -->
+  <string name="discover_approval_always">Always allow %1$s</string>
+  <string name="discover_approval_allow_site">Allow %1$s in this chat</string>
+  <string name="discover_approval_allow_all">Allow all sites in this chat</string>
+  <!-- Under the buttons, says what Allow does. %1$s is a site, such as blender.org. -->
+  <string name="discover_approval_allow_caption">Allows %1$s and its subdomains in this chat</string>
+  <string name="discover_approval_settings">Page access settings</string>
+  <!-- Read by screen readers as the card appears. %1$s is the website, such as download.blender.org. -->
+  <string name="discover_approval_pane">Discover wants to open %1$s</string>
+  <!-- A button over the chat that scrolls to the card waiting for an answer. -->
+  <string name="discover_approval_jump">Needs your OK</string>
+
   <!-- The results. -->
   <string name="discover_select_all">Select all</string>
   <string name="discover_clear_selection">Clear selection</string>
@@ -60,8 +108,6 @@
     <item quantity="one">%1$d download</item>
     <item quantity="other">%1$d downloads</item>
   </plurals>
-  <!-- Follows discover_results after a space, in a lighter color. %1$s is the search. -->
-  <string name="discover_results_for">for “%1$s”</string>
   <!-- How well a result matches the search. %1$s is a percentage, such as 92%. -->
   <string name="discover_match">%1$s match</string>
   <string name="discover_match_tooltip">How well it matches your search</string>
@@ -69,10 +115,38 @@
   <string name="discover_not_encrypted">Not encrypted</string>
   <string name="discover_error_title">Discover couldn't finish this search</string>
   <string name="discover_failed">Discovery failed</string>
-  <string name="discover_unavailable">AI discovery is not available on this device.</string>
   <string name="discover_none_title">No downloads found</string>
   <string name="discover_none_body">Discover lists only files from sources it trusts. Try naming the version or platform, or the website that publishes it.</string>
   <string name="discover_search_everywhere">Search the whole web</string>
+  <!-- A search the user stopped, or that was running when the app closed. -->
+  <string name="discover_stopped">Stopped</string>
+  <!-- Removes a result from the chat, or every result of a message. -->
+  <string name="discover_discard">Discard</string>
+  <string name="discover_discard_all">Discard all</string>
+  <!-- Under a message's results, followed by " · Restore", which shows them again. -->
+  <plurals name="discover_discarded_count">
+    <item quantity="one">%1$d discarded</item>
+    <item quantity="other">%1$d discarded</item>
+  </plurals>
+  <string name="discover_restore">Restore</string>
+
+  <!-- Toasts after discarding results and deleting searches, which offer Undo. -->
+  <plurals name="discover_discarded">
+    <item quantity="one">Discarded %1$d result</item>
+    <item quantity="other">Discarded %1$d results</item>
+  </plurals>
+  <!-- %1$s is the deleted search's first message. -->
+  <string name="discover_deleted">Deleted “%1$s”</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="one">Cleared %1$d search from the history</item>
+    <item quantity="other">Cleared %1$d searches from the history</item>
+  </plurals>
+  <!-- What the command palette's Undo says it undoes. -->
+  <string name="discover_undo_discard">Undo discard results</string>
+  <string name="discover_undo_delete">Undo delete search</string>
+  <string name="discover_undo_clear_history">Undo clear history</string>
+  <!-- A toast, and a system notification while the window is in the background, when a search waits for the user to allow a website. %1$s is the website, such as download.blender.org. -->
+  <string name="discover_needs_ok">Discover needs your OK to open %1$s</string>
 
   <!-- The bar under the results. -->
   <string name="discover_select_to_add">Select downloads to add</string>
@@ -81,8 +155,71 @@
     <item quantity="one">%1$d selected</item>
     <item quantity="other">%1$d selected</item>
   </plurals>
+  <!-- Follows discover_selected after " · " when some selected results belong to earlier messages. -->
+  <plurals name="discover_selected_earlier">
+    <item quantity="one">%1$d from earlier</item>
+    <item quantity="other">%1$d from earlier</item>
+  </plurals>
   <string name="discover_add_now">Add now</string>
+  <!-- A phone's button by Add now, which opens a menu with Review & add and the devices to add to. -->
+  <string name="discover_add_options">More ways to add</string>
+  <!-- Heads the devices in that menu. -->
+  <string name="discover_add_to">Add to</string>
   <string name="discover_review_add">Review &amp; add</string>
   <!-- %1$d is how many downloads are selected. -->
   <string name="discover_review_add_count">Review &amp; add %1$d</string>
+
+  <!-- The history of searches, beside the chat or in a sheet, and the page header's buttons. -->
+  <string name="discover_history">History</string>
+  <!-- The history button's tooltip, by whether the history shows. -->
+  <string name="discover_history_show">Show history</string>
+  <string name="discover_history_hide">Hide history</string>
+  <!-- Starts an empty chat; the search shown stays in the history. -->
+  <string name="discover_new_search">New search</string>
+  <!-- The header's ⋯ menu, and a search's trash in the history. -->
+  <string name="discover_delete_search">Delete this search</string>
+  <string name="discover_history_clear">Clear history</string>
+  <!-- The filter over the history, which matches the searches' messages. -->
+  <string name="discover_history_filter">Search history</string>
+  <string name="discover_history_empty">Searches you run show here.</string>
+  <!-- %1$s is what was typed in the filter. -->
+  <string name="discover_history_no_match">No searches match “%1$s”</string>
+  <!-- Groups searches that last ran before yesterday; Today and Yesterday head the others. -->
+  <string name="discover_history_earlier">Earlier</string>
+  <!-- Under a search's title: what it is doing. -->
+  <string name="discover_history_searching">Searching…</string>
+  <string name="discover_history_queued">Waiting to start</string>
+  <string name="discover_history_needs_ok">Needs your OK</string>
+  <string name="discover_history_failed">Failed</string>
+  <!-- Under a finished search's title, followed by " · " and when it last ran, such as 14:02. -->
+  <plurals name="discover_history_results">
+    <item quantity="one">%1$d result</item>
+    <item quantity="other">%1$d results</item>
+  </plurals>
+  <string name="discover_history_no_results">No results</string>
+  <!-- Read with the history button's count: other searches waiting for the user to allow a website. -->
+  <plurals name="discover_history_waiting">
+    <item quantity="one">%1$d search needs your OK</item>
+    <item quantity="other">%1$d searches need your OK</item>
+  </plurals>
+  <!-- Read for the count on Discover in the navigation: how many requests to open a website wait. -->
+  <plurals name="discover_waiting">
+    <item quantity="one">%1$d waiting for your OK</item>
+    <item quantity="other">%1$d waiting for your OK</item>
+  </plurals>
+  <!-- The same, with the destination's name. %1$s is "Discover", %2$d how many requests wait. -->
+  <plurals name="discover_nav_waiting">
+    <item quantity="one">%1$s, %2$d waiting for your OK</item>
+    <item quantity="other">%1$s, %2$d waiting for your OK</item>
+  </plurals>
+  <!-- In place of the composer while a search from the history shows and Discover is switched off or not set up. -->
+  <string name="discover_setup_to_continue">Set up Discover to continue</string>
+
+  <!-- Commands, as the shortcut sheet and tooltips name them. -->
+  <string name="command_discover_send">Send message</string>
+  <string name="command_discover_stop">Stop the search</string>
+  <string name="command_discover_allow">Allow the website</string>
+  <string name="command_discover_deny">Deny the website</string>
+  <string name="command_discover_discard">Discard result or delete search</string>
+  <string name="command_discover_history">Toggle history</string>
 </resources>

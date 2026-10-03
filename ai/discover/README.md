@@ -7,7 +7,9 @@ using an LLM agent with tool-calling capabilities.
 
 Given a query like *"latest Ubuntu 24.04 desktop ISO"*, the agent autonomously
 searches the web, fetches relevant pages, extracts download links, validates
-them for safety, and returns a ranked list of candidates.
+them for safety, and returns a short summary and a ranked list of candidates.
+Follow-up requests refine a search as a conversation, and an approver chosen by
+the caller decides which websites the agent may open.
 
 The module depends on `library:api` and `config` (for the persisted
 `AiSettings`) — it is independent from the server and remote modules.
@@ -22,14 +24,16 @@ ai/discover/
 ├── AiConfig.kt                  # Configuration + env credential fallbacks
 ├── LlmClientFactory.kt          # Provider → Koog client and model
 ├── ResourceDiscoveryService.kt  # Koog AIAgent orchestrator
-├── DiscoverQuery.kt             # Input model
+├── DiscoverQuery.kt             # Input model, earlier turns of a conversation
 ├── DiscoverResult.kt            # Output model
 ├── RankedCandidate.kt           # Single discovery result
+├── PageAccess.kt                # Approver asked before the agent opens a website
 │
 ├── agent/                       # Agent-driven discovery
 │   ├── DiscoveryToolSet.kt      # 7 @Tool methods for the LLM agent
 │   ├── DeclaredTools.kt         # Koog tools with optional parameters and plain text results
-│   ├── AgentOutputParser.kt     # Parse + validate agent JSON output
+│   ├── AgentOutputParser.kt     # Parse + validate the agent's summary and candidates
+│   ├── AgentText.kt             # Model text made safe to show as one line
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
 │   ├── SiteAllowlist.kt         # Websites a run is limited to
@@ -47,12 +51,11 @@ ai/discover/
 │   ├── SearchProvider.kt        # Interface
 │   ├── BraveSearchProvider.kt   # Brave Search API
 │   ├── GoogleSearchProvider.kt  # Google Custom Search JSON API
+│   ├── PacedSearchProvider.kt   # Spaces searches across runs
 │   └── DummySearchProvider.kt   # No-op fallback
 │
-└── site/                        # Site profiling
-    ├── SiteProfiler.kt          # robots.txt, sitemap, RSS discovery
-    ├── SiteProfile.kt           # Profile data model
-    ├── SiteProfileStore.kt      # In-memory cache
+└── site/                        # robots.txt
+    ├── SiteProfiler.kt          # Reads a site's robots.txt rules
     └── RobotsTxtParser.kt       # robots.txt parser
 ```
 
@@ -79,9 +82,15 @@ that follows a structured 5-phase workflow:
 │     Block: shorteners, aggregators, piracy      │
 ├─────────────────────────────────────────────────┤
 │  5. OUTPUT                                      │
-│     JSON array of ranked candidates             │
+│     JSON object: summary + ranked candidates    │
 └─────────────────────────────────────────────────┘
 ```
+
+The system prompt also covers follow-ups (return the complete list for the
+latest request, re-check only links not yet checked, treat earlier results as
+data), page access (give `fetchPage` and `headUrl` a reason, never retry a
+declined host), and an anti-piracy guardrail that explains itself in the
+summary with no candidates.
 
 ### Agent Tools
 
@@ -89,45 +98,74 @@ that follows a structured 5-phase workflow:
 |------|-------------|---------|
 | `searchWeb(query, maxResults = 5)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
 | `searchSites(sites, query, maxResults = 5)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
-| `fetchPage(url)` | Fetch + extract text and links (allowed sites only; honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
-| `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only) | `SafeFetcher.head()` |
+| `fetchPage(url, reason = "")` | Fetch + extract text and links (allowed sites only; asks the approver; honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
+| `headUrl(url, reason = "")` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only; asks the approver) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
-| `validateUrl(url)` | SSRF + allowed-site check | `UrlValidator` + `SiteAllowlist` |
-| `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
+| `validateUrl(url)` | Checks the URL's form and allowed sites; never looks the host up | `UrlValidator.check()` + `SiteAllowlist` |
+| `emitStep(title, details)` | Report progress to the user, as one line each | `DiscoveryStepListener` |
 
 The tools are registered through `asDeclaredTools()` rather than Koog's `tools(toolSet)`, which
-(as of Koog 1.2.0) tells the model that `maxResults` is required and sends each result as a
-quoted, escaped JSON string instead of the JSON the tool returned.
+(as of Koog 1.2.0) tells the model that `maxResults` and `reason` are required and sends each
+result as a quoted, escaped JSON string instead of the JSON the tool returned.
 
 ## Data Flow
 
 ```
-DiscoverQuery (query, sites, maxResults, fileTypes)
+DiscoverQuery (query, sites, maxResults, fileTypes, history, excludedUrls)
          │
          ▼
-ResourceDiscoveryService.discover()
+ResourceDiscoveryService.discover(query, stepListener, approver)
          │
          ├── SiteAllowlist.forRun(allowedDomains, query.sites)
-         ├── Build DiscoveryToolSet (with the allowlist)
-         ├── Create Koog AIAgent (system prompt + tools)
+         ├── Build DiscoveryToolSet (allowlist, step listener, approver)
+         ├── Create Koog AIAgent: system prompt, then the replayed earlier turns
          ├── agent.run(userMessage)
          │       │
          │       ├── [Agent calls tools iteratively]
          │       │   searchWeb → fetchPage → extractDownloads → headUrl
          │       │   (each tool wraps existing utilities)
          │       │
-         │       └── Returns JSON array of candidates
+         │       └── Returns {"summary": ..., "candidates": [...]}
          │
-         ├── AgentOutputParser.parse(agentOutput, allowlist)
-         │       ├── Extract JSON from markdown/raw text
-         │       ├── Drop candidates outside the allowed sites
-         │       ├── UrlValidator.validate() each URL
+         ├── AgentOutputParser.parse(agentOutput, allowlist, excludedUrls)
+         │       ├── Find the first balanced JSON answer, in a code fence or the
+         │       │   output; brackets in prose around it are skipped; text alone
+         │       │   is the summary
+         │       ├── Decode each candidate on its own, skipping malformed ones
+         │       ├── Drop discarded links and candidates outside the allowed sites
+         │       ├── UrlValidator.check() each URL; validate() (DNS) only hosts
+         │       │   the run was allowed to contact, or all when it asks no one
+         │       ├── Title, description and file name made one line of text
          │       ├── DeviceSafetyFilter.evaluate() each URL
          │       ├── Adjust confidence by safety score
-         │       └── Deduplicate by URL
+         │       └── Deduplicate by canonical URL
          │
-         └── DiscoverResult (candidates + sources)
+         └── DiscoverResult (candidates + sources + summary)
 ```
+
+### Follow-ups
+
+`DiscoverQuery.history` holds the earlier turns of a conversation, oldest first: each turn's
+request, the sites it was limited to, whether it finished and the links it returned. Each run is
+a new agent with full budgets; its prompt replays the first turn and the latest five as pairs
+of messages:
+
+- the user's request, numbered (`Request 3: …`), with `That request was limited to: …` when it
+  had sites
+- a reply written in code, never the model's earlier output, which fetched pages may have
+  shaped: `I returned 2 results; they are listed in your next message.`, `I found no results.`
+  or `This request did not finish.`
+
+The new request then starts `Follow-up request: …`; its sites line reads `Allowed sites for this
+request`. Below it, delimited as data, come the earlier results (`[{"turn":1,"url":…,"title":…}]`,
+titles cut to 120 characters) and up to 100 discarded links (`DiscoverQuery.excludedUrls`). The
+parser drops every discarded link from the answer, compared by `SiteNames.canonicalUrl`, so one
+that comes back with a different host case, default port or fragment stays out.
+
+The agent answers with a `summary` for the user, one or two sentences of plain text. The parser
+keeps it as one line of at most 600 characters without control, bidirectional or zero-width
+characters; when the agent answers with text only, as it does when it refuses to find pirated
+content, that text becomes the summary.
 
 ## Security
 
@@ -139,6 +177,16 @@ ResourceDiscoveryService.discover()
   Ktor client has `followRedirects = false`, and `SafeFetcher` follows
   up to 10 redirects itself, validating each target before requesting it,
   so a public URL cannot redirect to a private or loopback address
+- Split in two: `check()` looks at the URL alone (scheme, host, internal
+  names, IP literals) and `validate()` adds the DNS lookup. A host is only
+  looked up once the run may contact it: `fetchPage` and `headUrl` check
+  before they ask the approver, `SafeFetcher` runs `checkHop` before it
+  validates a hop, and `validateUrl` never resolves. A lookup alone sends
+  the name, which the agent chose, to that domain's DNS servers, so a page
+  could otherwise have the agent leak the conversation in a host name the
+  user then declines. The output parser does resolve every candidate's
+  host, to drop links to private or local addresses: a page must not get
+  the agent to offer a link into the user's network
 - Applied again when connecting, against DNS rebinding. Validation
   resolves the host and the HTTP client resolves it again to connect, so
   a host could otherwise answer the check with a public address and the
@@ -168,6 +216,34 @@ ResourceDiscoveryService.discover()
   resolve. `headUrl` returns the requested `url` plus `finalUrl`, and the
   agent is told to report the requested URL
 
+### Page access (`PageAccessApprover`)
+- `discover(query, stepListener, approver)` takes a `PageAccessApprover` per run. It is asked,
+  with a `PageAccessRequest` (URL, lowercase host, `PageAccessKind.Page` or `FileInfo`, the
+  agent's reason and, for a redirect, the host it came from), before `fetchPage` or `headUrl`
+  contacts a host, and before a redirect leads one of them to a host the request has not
+  reached. It may suspend until the user answers
+- The check comes after the allowlist and URL checks and before any budget is spent, so a URL
+  that would be refused anyway never asks, and a declined request costs only its tool call. A
+  request the spent budget would refuse is refused without asking. The host is looked up in DNS
+  only once it is approved
+- Declining returns `{"error": "The user declined access to <host>. …", "declined": true}`
+  (prefixed `Redirect refused:` when a redirect led there), and the host's site
+  (`SiteNames.normalize`) is refused for the rest of the run without asking, redirect hops
+  included. The site keeps its `www.` when dropping it would leave a suffix unrelated sites
+  share (`www.com`, `www.github.io`), so no answer ever covers a whole suffix. An approver
+  that throws declines; a `CancellationException` while the run is still active declines too,
+  rather than ending the run
+- The reason is the agent's text, so it reaches the approver as one line of at most 160
+  characters without control, bidirectional or zero-width characters. Show it as the agent's,
+  never as a title or a button label
+- Runs limited with `DiscoverQuery.sites` never ask: every host they may request is one the
+  user named. A limit set only by `DiscoveryConfig.allowedDomains` still asks
+- An approved page covers its origin's robots.txt, whose redirects are followed only within
+  the same site; a robots.txt elsewhere counts as missing
+- Searches never ask: they go to the search provider, not to the sites
+- The default, `PageAccessApprover.AllowAll`, ignores `[ai.access]`. The apps and the CLI pass
+  approvers that follow it (`PageAccessSettings.allowsWithoutAsking`) and ask the user
+
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
   - HTTPS → +0.1; HTTP → -0.2
@@ -181,7 +257,9 @@ ResourceDiscoveryService.discover()
 ### Other Protections
 - Rate limiting (`RateLimiter`, shared by all runs of an `AiModule`):
   at least 1 s between requests to the same host, and at most
-  `maxConcurrentRequests` requests in flight at once
+  `maxConcurrentRequests` requests in flight at once. Brave and Google
+  searches start at least 1.1 s apart across all runs
+  (`PacedSearchProvider`), since several conversations can search at once
 - Per-run budget (`FetchBudget`): `fetchPage` and `headUrl` share
   `maxFetchesPerRequest` requests, and page bodies share
   `maxTotalBytesPerRequest` bytes; once either is spent the tools return
@@ -197,7 +275,8 @@ ResourceDiscoveryService.discover()
   run of characters and a trailing `$` anchors the end of the path; the
   longest matching rule wins. Only the first 500 KiB of a larger file
   are parsed, without the line the cut falls in. A missing or unreadable
-  robots.txt allows everything, and `Crawl-delay` is not applied.
+  robots.txt allows everything, and `Crawl-delay` is not applied. A
+  robots.txt that redirects to another site counts as missing.
   `headUrl` checks of candidate links are not subject to robots.txt
 - The system prompt also asks for at most 6 searches; that limit is
   advisory, since search calls are not counted on their own.
@@ -206,7 +285,9 @@ ResourceDiscoveryService.discover()
   asking for the results (`emitStep` still shows its step). Koog's
   iteration cap is derived from it, since Koog counts two iterations per
   round of tool calls, with room for three more rounds to answer
-- Prompt injection defense: fetched content treated as untrusted data
+- Prompt injection defense: fetched content treated as untrusted data;
+  earlier turns are replayed without the model's own words, and text the
+  model wrote (reasons, the summary) is sanitized before anyone sees it
 
 ## Usage
 
@@ -242,28 +323,55 @@ aiModule.close() // releases the module's HTTP clients
 LLM provider fails or the agent does not answer within its step limit.
 Its message is a short explanation for the user, such as
 `The AI provider rejected the API token (HTTP 401): Incorrect API key provided.`;
-the original error is its `cause`. A search that finds nothing returns
-an empty result instead.
+the original error is its `cause`, and `brief` is the message without the
+provider's reason, which may echo a token: the part to keep, such as in a
+saved history. A search that finds nothing returns an empty result instead.
 
-### With Progress Listener
+### Progress, page access and follow-ups
+
+Each run can have its own step listener and approver; `AiModule.create(stepListener = …)` only
+sets the listener for runs that pass none.
 
 ```kotlin
-val listener = object : DiscoveryStepListener {
+val steps = object : DiscoveryStepListener {
   override fun onStep(title: String, details: String) {
     println("[$title] $details")
   }
 }
+val access = PageAccessSettings(mode = PageAccessMode.AskPerSite)
+val allowed = mutableSetOf<String>()
+// askTheUser is your own prompt; it may suspend until the user answers.
+val approver = PageAccessApprover { request ->
+  access.allowsWithoutAsking(request.host, allowed) || askTheUser(request).also { yes ->
+    if (yes) allowed += SiteNames.normalize(request.host)
+  }
+}
 
-val aiModule = AiModule.create(
-  config = AiConfig(
-    settings = AiSettings(
-      enabled = true,
-      llm = LlmSettings(provider = LlmProvider.Anthropic, apiKey = "sk-ant-..."),
+val first = aiModule.discoveryService.discover(
+  DiscoverQuery(query = "Blender 4.2"),
+  stepListener = steps,
+  approver = approver,
+)
+println(first.summary)
+
+val followUp = aiModule.discoveryService.discover(
+  DiscoverQuery(
+    query = "only the macOS arm64 build",
+    history = listOf(
+      DiscoverTurn(
+        request = "Blender 4.2",
+        results = first.candidates.map { DiscoverTurn.Result(it.url, it.title) },
+      ),
     ),
+    excludedUrls = setOf(first.candidates.first().url), // discarded by the user
   ),
-  stepListener = listener,
+  stepListener = steps,
+  approver = approver,
 )
 ```
+
+The step listener and the approver are called from the agent's threads, one request at a time
+per run.
 
 ### Apps
 
@@ -279,7 +387,11 @@ See [docs/ai-discovery.md](../../docs/ai-discovery.md).
 # Uses [ai] from config.toml; blank credentials fall back to the env.
 ketch ai-discover "latest Ubuntu 24.04 ISO"
 OPENAI_API_KEY=sk-... ketch ai-discover "ffmpeg release" --sites ffmpeg.org
+ketch ai-discover --yes "blender 4.2 macOS" > results.txt
 ```
+
+The CLI follows `[ai.access]` and asks on the terminal before opening a website; see
+[cli/README.md](../../cli/README.md#ai-discovery).
 
 ## Configuration
 
@@ -297,6 +409,8 @@ sections are engine tuning knobs.
 | `SearchSettings` | `provider` | `None` | `None`, `Brave`, `Google` |
 | | `apiKey` | `""` | Brave subscription token or Google API key |
 | | `cx` | `""` | Google Programmable Search engine id |
+| `PageAccessSettings` (`AiSettings.access`) | `mode` | `AskPerSite` | `Allow`, `AskPerSite`, `AskEveryTime`; read by the apps' and the CLI's approvers, never by the engine |
+| | `trustedSites` | `[]` | Sites opened without asking, subdomains included |
 | `AgentConfig` | `maxToolCalls` | `40` | Tool calls per discovery run, progress steps included |
 | | `temperature` | `0.2` | LLM sampling temperature |
 | `FetcherConfig` | `maxContentBytes` | `2 MB` | Max page body per fetch |
@@ -316,22 +430,35 @@ sections are engine tuning knobs.
 Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
+- `ResourceDiscoveryServiceTest` — LLM client lifecycle, step limits,
+  provider errors, replayed history (code-built replies, unfinished turns,
+  first plus latest five), discarded links, summaries, per-run listener and
+  approver, runs limited with `sites` never asking
+- `NativeImageConfigTest` — reflection metadata for Koog's content-polymorphic
+  types and for every Ketch class in `DiscoveryToolSet`'s signatures
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
-  and truncation, and no connection when a host rebinds to loopback after
-  validation
+- `SafeFetcherTest` — validated redirect hops (GET and HEAD), hop limit, final
+  URL, size caps and truncation, and no connection when a host rebinds to
+  loopback after validation
 - `ValidatingDnsTest` — connect-time lookups refuse rebound and mixed hosts
 - `RateLimiterTest` — per-host spacing and the concurrency cap
+- `PacedSearchProviderTest` — searches from several runs start spaced
 - `FetchBudgetTest` — per-run request and byte allowance
 - `SiteAllowlistTest` — site normalization, subdomain matching, config/query overlap (10 tests)
-- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects, allowlist enforcement
+- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects, allowlist
+  enforcement, page access (declines spend no budget and are remembered, redirect hops ask
+  with the host they came from, sanitized reasons, failing approvers decline, a stopped run
+  ends while asking)
 - `BraveSearchProviderTest` — request shape and response parsing
 - `RobotsTxtParserTest` — robots.txt groups, longest match, `*` and `$` wildcards
-- `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit
+- `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit; redirects are
+  followed within the site only
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
-- `AgentOutputParserTest` — agent output parsing, validation + allowlist (10 tests)
+- `AgentOutputParserTest` — object and array answers, fences, text-only answers, unreadable
+  JSON, brackets in the summary, malformed candidates, discarded links, validation + allowlist
+- `AgentTextTest` — sanitizing model text
 - `GoogleSearchProviderTest` — query building; `GoogleSearchProviderIntegrationTest`
   parses responses from a mock engine
 
@@ -351,9 +478,11 @@ Tests that need DNS answers resolve hosts through the `fakeDns` helper
   `KetchApi.download()`
 - [ ] **Caching** — cache fetched page content and HEAD results to avoid
   redundant requests across similar queries
-- [ ] **Site-aware discovery** — leverage `SiteProfiler` data (sitemaps, RSS feeds)
-  to improve discovery on allowlisted sites
+- [ ] **Site-aware discovery** — use the sitemaps and RSS feeds of allowlisted
+  sites to improve discovery on them
 - [ ] **Checksum verification** — when the agent finds checksums on the source page,
   attach them to candidates for post-download verification
-- [ ] **Agent memory** — persist discovery history so the agent can learn from
-  previous queries and avoid re-fetching known sources
+- [x] **Conversations** — follow-ups replay earlier turns (`DiscoverQuery.history`),
+  and the apps keep a history of searches
+- [ ] **Agent memory** — learn across conversations and avoid re-fetching known
+  sources

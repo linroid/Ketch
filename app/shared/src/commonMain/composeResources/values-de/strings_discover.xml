@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">In den Einstellungen einrichten</string>
   <string name="discover_provider_openai_compatible">OpenAI-kompatibel</string>
 
-  <string name="discover_query_placeholder">Beschreib, was du herunterladen möchtest</string>
+  <string name="discover_query_placeholder">Beschreib, was du suchst…</string>
+  <string name="discover_follow_up_placeholder">Stell eine Folgefrage…</string>
   <string name="discover_find">Suchen</string>
+  <string name="discover_send">Senden</string>
   <string name="discover_stop">Stopp</string>
   <string name="discover_sites_limit">Auf Websites beschränken</string>
   <plurals name="discover_sites_count">
@@ -34,29 +36,126 @@
   </plurals>
   <string name="discover_step_starting">Suche wird gestartet</string>
 
+  <string name="discover_limited_to">Beschränkt auf %1$s</string>
+  <string name="discover_queued">Wartet, bis eine andere Suche fertig ist</string>
+  <string name="discover_show_more">Mehr anzeigen</string>
+  <string name="discover_show_less">Weniger anzeigen</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="one">%1$d Website erlaubt</item>
+    <item quantity="other">%1$d Websites erlaubt</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="one">%1$d Website abgelehnt</item>
+    <item quantity="other">%1$d Websites abgelehnt</item>
+  </plurals>
+  <string name="discover_access_allowed_host">%1$s erlaubt</string>
+  <string name="discover_access_denied_host">%1$s abgelehnt</string>
+
+  <string name="discover_approval_page">%1$s öffnen?</string>
+  <string name="discover_approval_file">Eine Datei auf %1$s prüfen?</string>
+  <string name="discover_approval_redirect">Weiterleitung zu %1$s folgen?</string>
+  <string name="discover_approval_redirect_from">Weitergeleitet von %1$s</string>
+  <string name="discover_approval_reason">Entdecken sagt: %1$s</string>
+  <string name="discover_approval_allow">Erlauben</string>
+  <string name="discover_approval_allow_once">Einmal erlauben</string>
+  <string name="discover_approval_deny">Ablehnen</string>
+  <string name="discover_approval_always">%1$s immer erlauben</string>
+  <string name="discover_approval_allow_site">%1$s in diesem Chat erlauben</string>
+  <string name="discover_approval_allow_all">Alle Websites in diesem Chat erlauben</string>
+  <string name="discover_approval_allow_caption">Erlaubt %1$s samt Subdomains in diesem Chat</string>
+  <string name="discover_approval_settings">Einstellungen für Seitenzugriff</string>
+  <string name="discover_approval_pane">Entdecken möchte %1$s öffnen</string>
+  <string name="discover_approval_jump">Braucht deine Erlaubnis</string>
+
   <string name="discover_select_all">Alle auswählen</string>
   <string name="discover_clear_selection">Auswahl aufheben</string>
   <plurals name="discover_results">
     <item quantity="one">%1$d Download</item>
     <item quantity="other">%1$d Downloads</item>
   </plurals>
-  <string name="discover_results_for">für „%1$s“</string>
   <string name="discover_match">%1$s Übereinstimmung</string>
   <string name="discover_match_tooltip">Wie gut es zu deiner Suche passt</string>
   <string name="discover_not_encrypted">Nicht verschlüsselt</string>
   <string name="discover_error_title">Entdecken konnte diese Suche nicht abschließen</string>
   <string name="discover_failed">Suche fehlgeschlagen</string>
-  <string name="discover_unavailable">KI-Suche ist auf diesem Gerät nicht verfügbar.</string>
   <string name="discover_none_title">Keine Downloads gefunden</string>
   <string name="discover_none_body">Entdecken listet nur Dateien aus Quellen auf, denen es vertraut. Nenne die Version oder Plattform oder die Website, die sie veröffentlicht.</string>
   <string name="discover_search_everywhere">Im ganzen Web suchen</string>
+  <string name="discover_stopped">Gestoppt</string>
+  <string name="discover_discard">Verwerfen</string>
+  <string name="discover_discard_all">Alle verwerfen</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="one">%1$d verworfen</item>
+    <item quantity="other">%1$d verworfen</item>
+  </plurals>
+  <string name="discover_restore">Wiederherstellen</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="one">%1$d Ergebnis verworfen</item>
+    <item quantity="other">%1$d Ergebnisse verworfen</item>
+  </plurals>
+  <string name="discover_deleted">„%1$s“ gelöscht</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="one">%1$d Suche aus dem Verlauf gelöscht</item>
+    <item quantity="other">%1$d Suchen aus dem Verlauf gelöscht</item>
+  </plurals>
+  <string name="discover_undo_discard">Rückgängig: Ergebnisse verwerfen</string>
+  <string name="discover_undo_delete">Rückgängig: Suche löschen</string>
+  <string name="discover_undo_clear_history">Rückgängig: Verlauf löschen</string>
+  <string name="discover_needs_ok">Entdecken braucht deine Erlaubnis, um %1$s zu öffnen</string>
 
   <string name="discover_select_to_add">Downloads zum Hinzufügen auswählen</string>
   <plurals name="discover_selected">
     <item quantity="one">%1$d ausgewählt</item>
     <item quantity="other">%1$d ausgewählt</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="one">%1$d von früher</item>
+    <item quantity="other">%1$d von früher</item>
+  </plurals>
   <string name="discover_add_now">Jetzt hinzufügen</string>
+  <string name="discover_add_options">Weitere Optionen zum Hinzufügen</string>
+  <string name="discover_add_to">Hinzufügen zu</string>
   <string name="discover_review_add">Prüfen und hinzufügen</string>
   <string name="discover_review_add_count">%1$d prüfen und hinzufügen</string>
+
+  <string name="discover_history">Verlauf</string>
+  <string name="discover_history_show">Verlauf einblenden</string>
+  <string name="discover_history_hide">Verlauf ausblenden</string>
+  <string name="discover_new_search">Neue Suche</string>
+  <string name="discover_delete_search">Diese Suche löschen</string>
+  <string name="discover_history_clear">Verlauf löschen</string>
+  <string name="discover_history_filter">Verlauf durchsuchen</string>
+  <string name="discover_history_empty">Deine Suchen erscheinen hier.</string>
+  <string name="discover_history_no_match">Keine Suchen passen zu „%1$s“</string>
+  <string name="discover_history_earlier">Früher</string>
+  <string name="discover_history_searching">Suche läuft…</string>
+  <string name="discover_history_queued">Wartet auf Start</string>
+  <string name="discover_history_needs_ok">Braucht deine Erlaubnis</string>
+  <string name="discover_history_failed">Fehlgeschlagen</string>
+  <plurals name="discover_history_results">
+    <item quantity="one">%1$d Ergebnis</item>
+    <item quantity="other">%1$d Ergebnisse</item>
+  </plurals>
+  <string name="discover_history_no_results">Keine Ergebnisse</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="one">%1$d Suche braucht deine Erlaubnis</item>
+    <item quantity="other">%1$d Suchen brauchen deine Erlaubnis</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="one">%1$d wartet auf deine Erlaubnis</item>
+    <item quantity="other">%1$d warten auf deine Erlaubnis</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="one">%1$s, %2$d wartet auf deine Erlaubnis</item>
+    <item quantity="other">%1$s, %2$d warten auf deine Erlaubnis</item>
+  </plurals>
+  <string name="discover_setup_to_continue">Richte Entdecken ein, um fortzufahren</string>
+
+  <string name="command_discover_send">Nachricht senden</string>
+  <string name="command_discover_stop">Suche stoppen</string>
+  <string name="command_discover_allow">Website erlauben</string>
+  <string name="command_discover_deny">Website ablehnen</string>
+  <string name="command_discover_discard">Ergebnis verwerfen oder Suche löschen</string>
+  <string name="command_discover_history">Verlauf ein-/ausblenden</string>
 </resources>

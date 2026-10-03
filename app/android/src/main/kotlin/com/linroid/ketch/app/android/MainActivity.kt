@@ -34,9 +34,12 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.AndroidNotifier
+import com.linroid.ketch.app.feedback.MessageNotifications
+import com.linroid.ketch.app.feedback.MessageTap
 import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -46,8 +49,11 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
@@ -57,6 +63,7 @@ class MainActivity : ComponentActivity() {
 
   private val model: MainModel by viewModels()
   private var notificationLink: NotificationLink? by mutableStateOf(null)
+  private var messageTap: MessageTap? by mutableStateOf(null)
   private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
@@ -83,7 +90,8 @@ class MainActivity : ComponentActivity() {
         notificationOffer?.cancel()
         if (connected == null) return@collect
         connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
-        offerNotificationsAfterFirstAdd(connected.instanceManager)
+        // The controller is set before the service.
+        offerNotifications(connected.instanceManager, model.controller?.state?.aiDiscover)
       }
     }
     // Skip intents already handled: a recreated activity carries its old intent (the file is
@@ -106,6 +114,12 @@ class MainActivity : ComponentActivity() {
         if (link == null) return@LaunchedEffect
         controller.state.open(link)
         notificationLink = null
+      }
+      val tap = messageTap
+      LaunchedEffect(controller, tap) {
+        if (tap == null) return@LaunchedEffect
+        MessageNotifications.open(controller.messages, tap.id, tap.postedAt)
+        messageTap = null
       }
       App(
         controller,
@@ -132,10 +146,16 @@ class MainActivity : ComponentActivity() {
   }
 
   /**
-   * Shows what a tapped notification is about, or hands what Ketch was opened with to the app,
-   * which keeps it until handled: a `.torrent` file, a `magnet:` link or a `ketch://pair` link.
+   * Shows what a tapped notification is about, such as a task or a message whose first action,
+   * like Review, it runs, or hands what Ketch was opened with to the app, which keeps it until
+   * handled: a `.torrent` file, a `magnet:` link or a `ketch://pair` link.
    */
   private fun handleIntent(intent: Intent?) {
+    val tap = AndroidNotifier.messageTapOf(intent)
+    if (tap != null) {
+      messageTap = tap
+      return
+    }
     val link = AndroidNotifier.linkOf(intent)
     if (link != null) {
       // Buttons do not dismiss their notification.
@@ -158,20 +178,28 @@ class MainActivity : ComponentActivity() {
   }
 
   /**
-   * Offers notifications once, when the first task is added to this device, instead of at
-   * launch. Tasks restored from the previous run do not count. The offer stays due until it is
-   * answered, so a rotation or a restart while it shows brings it back.
+   * Offers notifications once, instead of at launch: when the first task is added to this device
+   * or Discover first waits for the user's OK to open a website, which the user may only learn
+   * of from a notification. Tasks restored from the previous run do not count. The offer stays
+   * due until it is answered, so a rotation or a restart while it shows brings it back.
    */
-  private fun offerNotificationsAfterFirstAdd(manager: InstanceManager) {
+  private fun offerNotifications(manager: InstanceManager, discover: AiDiscoverController?) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !shouldOfferNotifications()) {
       return
     }
-    val tasks = manager.embedded?.tasks ?: return
     val since = Clock.System.now()
+    val added = manager.embedded?.tasks
+      ?.filter { list -> list.any { it.createdAt >= since } }
+      ?.map {}
+    val asked = discover?.let { controller ->
+      snapshotFlow { controller.approvals.isNotEmpty() }.filter { waiting -> waiting }.map {}
+    }
+    val due = listOfNotNull(added, asked)
+    if (due.isEmpty()) return
     notificationOffer?.cancel()
     notificationOffer = lifecycleScope.launch {
       if (!permissionPrefs.getBoolean(KEY_NOTIFICATIONS_DUE, false)) {
-        tasks.first { list -> list.any { it.createdAt >= since } }
+        due.merge().first()
         permissionPrefs.edit { putBoolean(KEY_NOTIFICATIONS_DUE, true) }
       }
       withStarted { showNotificationRationale() }
@@ -272,7 +300,8 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
         incoming = app.incoming,
         speedMode = connected.speedMode,
         unreadableFiles = app.unreadableFiles,
-      )
+        discoverHistory = app.discoverHistory,
+      ).also(connected::follow)
       service = connected
     }
 

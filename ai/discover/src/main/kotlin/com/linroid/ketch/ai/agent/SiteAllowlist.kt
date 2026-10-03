@@ -1,5 +1,6 @@
 package com.linroid.ketch.ai.agent
 
+import com.linroid.ketch.config.SiteNames
 import java.net.URI
 
 /**
@@ -23,11 +24,8 @@ internal class SiteAllowlist private constructor(
   val isRestricted: Boolean get() = domains.isNotEmpty()
 
   /** Whether [host] is one of [domains] or a subdomain of one. */
-  fun allowsHost(host: String): Boolean {
-    if (!isRestricted) return true
-    val normalized = host.lowercase().trimEnd('.')
-    return domains.any { normalized == it || normalized.endsWith(".$it") }
-  }
+  fun allowsHost(host: String): Boolean =
+    !isRestricted || domains.any { SiteNames.covers(it, host) }
 
   /**
    * Whether the host of [url] is allowed. While restricted, a URL
@@ -50,14 +48,15 @@ internal class SiteAllowlist private constructor(
     val Unrestricted: SiteAllowlist = SiteAllowlist(emptyList())
 
     /**
-     * Builds an allowlist from user-typed [sites].
+     * Builds an allowlist from user-typed [sites], each reduced to a bare domain by
+     * [SiteNames.normalize].
      *
      * @throws IllegalArgumentException if [sites] has non-blank entries
      *   but none of them names a domain
      */
     fun of(sites: List<String>): SiteAllowlist {
       val entries = sites.filter { it.isNotBlank() }
-      val domains = entries.map(::normalize).filter { it.isNotEmpty() }.distinct()
+      val domains = entries.map(SiteNames::normalize).filter { it.isNotEmpty() }.distinct()
       require(entries.isEmpty() || domains.isNotEmpty()) {
         "No website domain in: ${entries.joinToString()}"
       }
@@ -89,22 +88,6 @@ internal class SiteAllowlist private constructor(
         "None of the requested websites ($wanted) are within the allowed domains ($cap)"
       }
       return SiteAllowlist(overlap)
-    }
-
-    /**
-     * Reduces a user-typed site to a bare lowercase domain, dropping the
-     * scheme, credentials, port, path, a `*.` wildcard and a leading
-     * `www.`.
-     */
-    internal fun normalize(site: String): String {
-      return site.trim().lowercase()
-        .substringAfter("://")
-        .substringBefore('/').substringBefore('?').substringBefore('#')
-        .substringAfterLast('@')
-        .substringBefore(':')
-        .removePrefix("*.")
-        .trim('.')
-        .removePrefix("www.")
     }
   }
 }

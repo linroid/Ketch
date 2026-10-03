@@ -81,6 +81,8 @@ kotlin {
 
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.datetime)
+      // The Discover history file.
+      implementation(libs.kotlinx.serialization.json)
       implementation(libs.qrose)
       implementation(libs.compose.runtime)
       implementation(libs.compose.foundation)

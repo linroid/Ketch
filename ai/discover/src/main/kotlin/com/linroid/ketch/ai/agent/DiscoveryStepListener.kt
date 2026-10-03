@@ -6,7 +6,10 @@ package com.linroid.ketch.ai.agent
  */
 interface DiscoveryStepListener {
 
-  /** Called when the agent completes a notable step. */
+  /**
+   * Called when the agent completes a notable step. [title] and [details] are the agent's own
+   * words, each reduced to one line of plain text (see [sanitizeAgentText]).
+   */
   fun onStep(title: String, details: String)
 
   companion object {

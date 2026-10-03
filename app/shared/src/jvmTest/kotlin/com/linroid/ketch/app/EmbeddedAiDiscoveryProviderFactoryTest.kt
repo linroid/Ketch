@@ -1,21 +1,38 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.ai.DiscoverQuery
+import com.linroid.ketch.ai.DiscoverResult
+import com.linroid.ketch.ai.DiscoverTurn
+import com.linroid.ketch.ai.PageAccessApprover
+import com.linroid.ketch.ai.PageAccessKind
+import com.linroid.ketch.ai.PageAccessRequest
+import com.linroid.ketch.ai.agent.DiscoveryStepListener
+import com.linroid.ketch.app.state.AiCandidate
+import com.linroid.ketch.app.state.AiDiscoverRequest
+import com.linroid.ketch.app.state.AiDiscoverTurn
+import com.linroid.ketch.app.state.AiPageKind
+import com.linroid.ketch.app.state.AiPageRequest
 import com.linroid.ketch.app.state.DiscoveryStep
+import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
-import com.linroid.ketch.app.state.StepRelay
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
  * Wiring check for the desktop/Android factory: settings in, a live
- * discovery engine out. No network calls are made.
+ * discovery engine out, and how a provider hands each search to the
+ * engine. No network calls are made.
  */
 class EmbeddedAiDiscoveryProviderFactoryTest {
 
@@ -94,26 +111,150 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
     provider.close()
   }
 
-  @Test
-  fun stepRelay_searchRunning_handsItTheTrimmedSteps() {
-    val relay = StepRelay()
-    val steps = mutableListOf<DiscoveryStep>()
-    relay.target = { steps += it }
-
-    relay.onStep(" Plan ", "Search blender.org first\n")
-
-    assertEquals(listOf(DiscoveryStep("Plan", "Search blender.org first")), steps)
+  /** A provider over an engine that runs [search], counting how often it is [released]. */
+  private class Engine(
+    val search: suspend (DiscoverQuery, DiscoveryStepListener, PageAccessApprover) ->
+      DiscoverResult = { query, _, _ -> result(query) },
+  ) {
+    var released = 0
+    val provider = EmbeddedAiDiscoveryProvider(search, verifyConnection = { "OK" }) { released++ }
   }
 
   @Test
-  fun stepRelay_noSearchRunning_dropsTheStep() {
-    val relay = StepRelay()
-    val steps = mutableListOf<DiscoveryStep>()
-    relay.target = { steps += it }
-    relay.target = null
+  fun `searches running at once each get their own trimmed steps`() = runTest {
+    val gates = mapOf("a" to CompletableDeferred<Unit>(), "b" to CompletableDeferred())
+    val engine = Engine { query, steps, _ ->
+      gates.getValue(query.query).await()
+      steps.onStep(" Plan ", "Search for ${query.query}\n")
+      result(query)
+    }
+    val stepsOfA = mutableListOf<DiscoveryStep>()
+    val stepsOfB = mutableListOf<DiscoveryStep>()
+    val a = async { engine.provider.discover(AiDiscoverRequest("a"), { stepsOfA += it }, { true }) }
+    val b = async { engine.provider.discover(AiDiscoverRequest("b"), { stepsOfB += it }, { true }) }
+    runCurrent()
 
-    relay.onStep("Plan", "")
+    gates.getValue("b").complete(Unit)
+    gates.getValue("a").complete(Unit)
+    a.await()
+    b.await()
 
-    assertTrue(steps.isEmpty())
+    assertEquals(listOf(DiscoveryStep("Plan", "Search for a")), stepsOfA)
+    assertEquals(listOf(DiscoveryStep("Plan", "Search for b")), stepsOfB)
+  }
+
+  @Test
+  fun `the engine's page requests reach the search's approver with its answer`() = runTest {
+    val engine = Engine { query, _, approver ->
+      val request = PageAccessRequest(
+        url = "https://objects.githubusercontent.com/f",
+        host = "objects.githubusercontent.com",
+        kind = PageAccessKind.FileInfo,
+        reason = "Check the size",
+        redirectFrom = "github.com",
+      )
+      result(query, summary = if (approver.approve(request)) "allowed" else "declined")
+    }
+    val asked = mutableListOf<AiPageRequest>()
+
+    val response = engine.provider.discover(AiDiscoverRequest("ffmpeg"), {}, { asked += it; false })
+
+    val expected = AiPageRequest(
+      url = "https://objects.githubusercontent.com/f",
+      host = "objects.githubusercontent.com",
+      kind = AiPageKind.FileInfo,
+      reason = "Check the size",
+      redirectFrom = "github.com",
+    )
+    assertEquals(listOf(expected), asked)
+    assertEquals("declined", response.summary)
+  }
+
+  @Test
+  fun `a follow-up reaches the engine with its history and discarded links`() = runTest {
+    var seen: DiscoverQuery? = null
+    val engine = Engine { query, _, _ -> result(query).also { seen = query } }
+    val earlier = AiCandidate(
+      url = "https://download.blender.org/a.dmg",
+      title = "Blender 4.2",
+      confidence = 0.9f,
+      description = "The installer",
+    )
+
+    engine.provider.discover(
+      AiDiscoverRequest(
+        query = "only arm64",
+        sites = listOf("blender.org"),
+        history = listOf(AiDiscoverTurn("blender", emptyList(), true, listOf(earlier))),
+        excludedUrls = setOf("https://download.blender.org/b.dmg"),
+      ),
+      onStep = {},
+      approve = { true },
+    )
+
+    val turn = DiscoverTurn(
+      request = "blender",
+      sites = emptyList(),
+      completed = true,
+      results = listOf(DiscoverTurn.Result(earlier.url, earlier.title)),
+    )
+    assertEquals(
+      DiscoverQuery(
+        query = "only arm64",
+        sites = listOf("blender.org"),
+        history = listOf(turn),
+        excludedUrls = setOf("https://download.blender.org/b.dmg"),
+      ),
+      seen,
+    )
+  }
+
+  @Test
+  fun `closing during a search releases the engine once the search ends`() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    val engine = Engine { query, _, _ ->
+      gate.await()
+      result(query)
+    }
+    val search = async { engine.provider.discover(AiDiscoverRequest("a"), {}, { true }) }
+    runCurrent()
+
+    engine.provider.close()
+    assertEquals(0, engine.released, "a search running on the engine should go on")
+    gate.complete(Unit)
+    search.await()
+
+    assertEquals(1, engine.released)
+    engine.provider.close()
+    assertEquals(1, engine.released)
+  }
+
+  @Test
+  fun `closing an idle provider releases the engine at once`() {
+    val engine = Engine()
+
+    engine.provider.close()
+
+    assertEquals(1, engine.released)
+  }
+
+  @Test
+  fun `a search after closing never reaches the released engine`() = runTest {
+    var searched = false
+    val engine = Engine { query, _, _ ->
+      searched = true
+      result(query)
+    }
+    engine.provider.close()
+
+    assertFailsWith<IllegalStateException> {
+      engine.provider.discover(AiDiscoverRequest("a"), {}, { true })
+    }
+
+    assertFalse(searched)
+    assertEquals(1, engine.released)
   }
 }
+
+private fun result(query: DiscoverQuery, summary: String = "") =
+  DiscoverResult(query.query, candidates = emptyList(), sources = emptyList(), summary = summary)

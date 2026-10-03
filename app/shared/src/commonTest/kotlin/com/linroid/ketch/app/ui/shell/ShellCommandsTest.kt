@@ -254,6 +254,23 @@ class ShellCommandsTest {
     }
 
   @Test
+  fun run_discoverPageKey_goesToTheDiscoverPageShown() = shellTest { fixture ->
+    val ran = mutableListOf<String>()
+    assertFalse(fixture.commands.run(KetchCommands.DiscoverHistory), "No Discover page shows")
+
+    fixture.shell.discover.pageCommand = { command ->
+      ran += command.id
+      command == KetchCommands.DiscoverHistory
+    }
+
+    assertTrue(fixture.commands.binds(KetchCommands.DiscoverHistory))
+    assertTrue(fixture.commands.run(KetchCommands.DiscoverHistory))
+    assertFalse(fixture.commands.run(KetchCommands.DiscoverStop), "The page left Esc alone")
+    assertFalse(fixture.commands.run(KetchCommands.DiscoverSend), "Not a key of the page")
+    assertEquals(listOf("discover.history", "discover.stop"), ran)
+  }
+
+  @Test
   fun run_shortcuts_opensAndClosesTheSheet() = shellTest { fixture ->
     fixture.commands.run(KetchCommands.Shortcuts)
     assertTrue(fixture.shell.shortcutsOpen)

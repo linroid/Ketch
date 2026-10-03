@@ -38,6 +38,7 @@ import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
 import com.linroid.ketch.app.feedback.UnreadableFile
@@ -63,7 +64,9 @@ import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.FileDiscoverHistoryStore
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
@@ -194,9 +197,23 @@ fun main(args: Array<String>) {
     dispatcher = Dispatchers.IO,
     minLevel = logLevel,
   )
-  // application() ends with exitProcess, which still runs shutdown hooks.
-  val closeLog = Thread { runBlocking { withTimeoutOrNull(2.seconds) { fileLogger.close() } } }
-  Runtime.getRuntime().addShutdownHook(closeLog)
+  val discoverHistory = FileDiscoverHistoryStore(
+    fileSystem = FileSystem.SYSTEM,
+    path = configDir.toOkioPath() / DISCOVER_HISTORY_FILE,
+    dispatcher = Dispatchers.IO,
+  )
+  // The window loads the history on the UI thread as it first composes; read now, meanwhile,
+  // the history is in memory by then.
+  thread(isDaemon = true, name = "ketch-discover-history") { discoverHistory.load() }
+  // application() ends with exitProcess, which still runs shutdown hooks. The Discover history
+  // goes first, so what it logs on the way reaches the log file.
+  val closeFiles = Thread {
+    runBlocking {
+      withTimeoutOrNull(QUIT_COMMIT_TIMEOUT) { discoverHistory.close() }
+      withTimeoutOrNull(2.seconds) { fileLogger.close() }
+    }
+  }
+  Runtime.getRuntime().addShutdownHook(closeFiles)
   val logger = Logger.combine(Logger.console(logLevel), fileLogger)
   // Ketch installs it too, but the host name below is resolved before Ketch exists.
   KetchLogger.setLogger(logger)
@@ -235,6 +252,7 @@ fun main(args: Array<String>) {
     integration = integration,
     logger = logger,
     fileLogger = fileLogger,
+    discoverHistory = discoverHistory,
     openFiles = { files -> open(OpenedArguments(files = files), LinkSource.Arguments) },
   )
   // The UI shows the language of the JVM's default locale, which the JDK takes from the system:
@@ -256,6 +274,7 @@ fun main(args: Array<String>) {
  * @property windowRequests emits when the window should come forward.
  * @property background whether the app starts hidden ([BACKGROUND_FLAG]).
  * @property integration how Ketch is wired into the browsers and the system, for Settings.
+ * @property discoverHistory the Discover sessions, kept in `discover-history.json`.
  * @property openFiles adds `.torrent` files, as if opened from the file manager.
  */
 private class LaunchContext(
@@ -269,6 +288,7 @@ private class LaunchContext(
   val integration: DesktopIntegrationStatus,
   val logger: Logger,
   val fileLogger: FileLogger,
+  val discoverHistory: DiscoverHistoryStore,
   val openFiles: (List<File>) -> Unit,
 )
 
@@ -314,6 +334,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       incoming = launch.incoming,
       speedMode = localSpeed.attach(manager),
       unreadableFiles = unreadableFiles,
+      discoverHistory = launch.discoverHistory,
     ).also { localSpeed.follow(it.pulse) }
   }
   val resources = remember { AppResources(controller, localSpeed, launch) }
@@ -347,7 +368,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       },
       onFirstHide = { scope.launch { announceBackground(trayState) } },
       quit = { response ->
-        scope.launch { quit(controller, resources, response) { exitApplication() } }
+        scope.launch {
+          quit(controller, resources, launch.discoverHistory, response) { exitApplication() }
+        }
       },
     )
   }
@@ -433,6 +456,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   // Pairing requests ask in the main window; from the tray while it is not in front.
   remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
+  LaunchedEffect(controller, notifier) {
+    // Such as Discover waiting for an OK, which would wait unseen while the window is away.
+    MessageNotifications.follow(
+      messages = controller.messages,
+      notifier = notifier,
+      settings = { controller.appSettings.config.notifications },
+      inFront = snapshotFlow { inFront() },
+    )
+  }
   KetchTray(controller, status, actions, speedMode, trayState)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
@@ -629,11 +661,13 @@ private class AppResources(
 
 /**
  * Quits on the main thread: waits for the pending operations behind Undo, such as removals, to
- * commit, closes the engine, then exits, through [response] when macOS asked to quit.
+ * commit, closes the engine, waits for [history] to save the Discover sessions the controller
+ * stopped, then exits, through [response] when macOS asked to quit.
  */
 private suspend fun quit(
   controller: AppController,
   resources: AppResources,
+  history: DiscoverHistoryStore,
   response: QuitResponse?,
   exit: () -> Unit,
 ) {
@@ -642,6 +676,8 @@ private suspend fun quit(
   }
   if (committed == null) log.w { "Quitting before every pending operation committed" }
   resources.close()
+  val saved = withTimeoutOrNull(QUIT_COMMIT_TIMEOUT) { history.close() }
+  if (saved == null) log.w { "Quitting before the Discover history was saved" }
   if (response != null) response.performQuit() else exit()
 }
 
@@ -931,6 +967,7 @@ private const val APP_NAME = "Ketch"
 private const val LOGS_DIR = "logs"
 private const val UPDATES_DIR = "updates"
 private const val UPDATE_LOG = "update.log"
+private const val DISCOVER_HISTORY_FILE = "discover-history.json"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds

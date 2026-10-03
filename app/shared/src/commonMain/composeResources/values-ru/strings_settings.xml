@@ -10,7 +10,7 @@
   <string name="settings_category_integration">Интеграция</string>
   <string name="settings_category_integration_description">Расширение браузера, magnet-ссылки и буфер обмена</string>
   <string name="settings_category_discover">Поиск</string>
-  <string name="settings_category_discover_description">ИИ-модель и веб-поиск, которые находят загрузки</string>
+  <string name="settings_category_discover_description">ИИ-модель, веб-поиск и сайты, которые можно открывать</string>
   <string name="settings_category_about">О программе</string>
   <string name="settings_category_about_description">Версия, лицензии и журналы</string>
   <string name="settings_category_downloads">Загрузки</string>
@@ -242,6 +242,20 @@
   <string name="settings_ai_engine_id">ID поисковой системы</string>
   <string name="settings_ai_engine_id_hint">Система Programmable Search, к которой отправляются запросы.</string>
   <string name="settings_ai_engine_id_placeholder">ID системы</string>
+  <string name="settings_ai_access_group">Доступ к страницам</string>
+  <string name="settings_ai_access_mode">Перед открытием сайта</string>
+  <string name="settings_ai_access_allow">Разрешать автоматически</string>
+  <string name="settings_ai_access_allow_hint">Открывает любой сайт, нужный для поиска, не спрашивая.</string>
+  <string name="settings_ai_access_ask_site">Спрашивать для каждого нового сайта</string>
+  <string name="settings_ai_access_ask_site_hint">Спрашивает, когда чат впервые открывает сайт. «Всегда разрешать» запоминает сайт.</string>
+  <string name="settings_ai_access_ask">Спрашивать каждый раз</string>
+  <string name="settings_ai_access_ask_hint">Спрашивает перед открытием каждой страницы и проверкой каждого файла.</string>
+  <string name="settings_ai_access_trusted">Всегда разрешены</string>
+  <string name="settings_ai_access_trusted_hint">Поиск открывает эти сайты и их поддомены, не спрашивая.</string>
+  <string name="settings_ai_access_trusted_none">Пока нет. Выберите «Всегда разрешать», когда Поиск спросит, или добавьте сайт здесь.</string>
+  <string name="settings_ai_access_add">Добавьте сайт, например ubuntu.com</string>
+  <string name="settings_ai_access_add_invalid">Введите адрес сайта, например ubuntu.com.</string>
+  <string name="settings_ai_access_footer">Если ограничить запрос сайтами, Поиск не спрашивает разрешения: эти сайты вы выбрали сами.</string>
 
   <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно. Ketch делит каждую загрузку на дорожки, как его паруса.</string>
   <string name="settings_about_discover_elsewhere">Поиск работает в настольном приложении и в приложении для Android.</string>
@@ -540,6 +554,10 @@
   <string name="settings_search_test_keywords">проверить, проверка, тест</string>
   <string name="settings_search_web_search">Поиск Brave или Google для агента</string>
   <string name="settings_search_web_search_keywords">поисковый провайдер, ключ api поиска, поисковик</string>
+  <string name="settings_search_ai_access">Спрашивает ли Поиск перед открытием сайта</string>
+  <string name="settings_search_ai_access_keywords">доступ к страницам, разрешение, подтверждение, разрешить, спрашивать, конфиденциальность</string>
+  <string name="settings_search_ai_trusted">Сайты, которые Поиск открывает, не спрашивая</string>
+  <string name="settings_search_ai_trusted_keywords">доверенные сайты, белый список, разрешённые сайты, домены, разрешение</string>
   <string name="settings_search_version_keywords">сборка, ревизия, обновление</string>
   <string name="settings_search_source_keywords">github, проект, исходники</string>
   <string name="settings_search_report_keywords">ошибка, баг, проблема, отзыв, помощь</string>

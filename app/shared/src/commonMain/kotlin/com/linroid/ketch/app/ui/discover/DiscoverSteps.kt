@@ -14,8 +14,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchDot
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.OptionalTooltip
 import com.linroid.ketch.app.icons.KetchIcon
@@ -32,12 +31,17 @@ import org.jetbrains.compose.resources.stringResource
  * The steps the agent reported, as a line of "✓ Plan  ✓ Searching  ◌ Filtering…". While
  * [running], the newest step spins and what the agent said about it shows below; hovering a
  * step shows what it said too. Only the last few steps show, after a count of the earlier ones.
+ * While [running], screen readers hear each new step.
+ *
+ * @param interrupted whether the search stopped or failed during its newest step, which then
+ *   shows a quiet dot instead of a check.
  */
 @Composable
 internal fun DiscoverSteps(
   steps: List<DiscoveryStep>,
   running: Boolean,
   modifier: Modifier = Modifier,
+  interrupted: Boolean = false,
 ) {
   if (steps.isEmpty() && !running) return
   val spacing = KetchTheme.spacing
@@ -46,7 +50,8 @@ internal fun DiscoverSteps(
   val hidden = steps.size - shown.size
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s1),
-    modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    // Only a search at work reports its steps as they come; finished ones stay quiet.
+    modifier = modifier.semantics { if (running) liveRegion = LiveRegionMode.Polite },
   ) {
     FlowRow(
       horizontalArrangement = Arrangement.spacedBy(spacing.s3),
@@ -61,11 +66,17 @@ internal fun DiscoverSteps(
         )
       }
       shown.forEachIndexed { index, step ->
-        val current = running && index == shown.lastIndex
-        StepItem(step.title, step.detail, current)
+        val last = index == shown.lastIndex
+        val mark = when {
+          !last -> StepMark.Done
+          running -> StepMark.Current
+          interrupted -> StepMark.Unfinished
+          else -> StepMark.Done
+        }
+        StepItem(step.title, step.detail, mark)
       }
       if (shown.isEmpty()) {
-        StepItem(stringResource(Res.string.discover_step_starting), detail = "", current = true)
+        StepItem(stringResource(Res.string.discover_step_starting), detail = "", StepMark.Current)
       }
     }
     val detail = shown.lastOrNull()?.detail.orEmpty()
@@ -81,19 +92,27 @@ internal fun DiscoverSteps(
   }
 }
 
+/** What leads a step: a check once done, a spinner while it runs, a dot if it never finished. */
+private enum class StepMark { Done, Current, Unfinished }
+
 @Composable
-private fun StepItem(title: String, detail: String, current: Boolean) {
+private fun StepItem(title: String, detail: String, mark: StepMark) {
   val colors = KetchTheme.colors
+  val current = mark == StepMark.Current
   val item = @Composable {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
     ) {
       Box(Modifier.size(MarkSize), contentAlignment = Alignment.Center) {
-        if (current) {
-          KetchSpinner(size = MarkSize, color = colors.accent)
-        } else {
-          KetchIconImage(KetchIcon.Check, size = MarkSize, tint = colors.status.completed.color)
+        when (mark) {
+          StepMark.Current -> KetchSpinner(size = MarkSize, color = colors.accent)
+          StepMark.Done -> KetchIconImage(
+            icon = KetchIcon.Check,
+            size = MarkSize,
+            tint = colors.status.completed.color,
+          )
+          StepMark.Unfinished -> KetchDot(colors.textTertiary, size = MarkSize / 2)
         }
       }
       Text(
@@ -114,7 +133,6 @@ private fun String.shortTitle(): String =
 private fun String.oneLine(): String = trim().replace(Whitespace, " ")
 
 private val Whitespace = Regex("\\s+")
-private val MarkSize: Dp = 12.dp
 private const val MAX_SHOWN = 6
 private const val MAX_TITLE = 40
 private const val MAX_TOOLTIP = 240

@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.os.Binder
 import android.os.IBinder
+import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.ServiceCompat
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
@@ -21,6 +22,7 @@ import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.ActivitySource
 import com.linroid.ketch.app.feedback.AndroidNotifier
+import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
@@ -28,6 +30,7 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.ForegroundStatus
@@ -98,14 +101,16 @@ class KetchService : Service() {
   private val binder = LocalBinder()
   private val toasts = Channel<ActivityEvent>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
   private val speed = MutableStateFlow(0L)
+  private val discovering = MutableStateFlow(0)
   private lateinit var notifier: AndroidNotifier
   private var isForeground = false
   private var isBound = false
   private var isStarted = false
-  private var inFront = false
+  private val inFront = MutableStateFlow(false)
   private var heldRecovery: ActivityEvent.Recovered? = null
   private var heldUntil: TimeMark? = null
   private var lastStartId = 0
+  private var followed: AppController? = null
   private var latestStatus = ForegroundStatus()
 
   /**
@@ -130,6 +135,8 @@ class KetchService : Service() {
       notifier.ongoingNotification(emptyList(), serverPort = null, slowLane = false)
     }
     enterForeground(first)
+    // No app controller runs yet, so the messages a stopped one notified about are gone.
+    notifier.withdrawMessages()
 
     val app = application as KetchApplication
     val configStore = app.configStore
@@ -244,7 +251,7 @@ class KetchService : Service() {
    * shown stay connected only while it is.
    */
   fun setInFront(inFront: Boolean) {
-    this.inFront = inFront
+    this.inFront.value = inFront
     instanceManager.setInForeground(inFront)
     if (!inFront) return
     val held = heldRecovery ?: return
@@ -252,6 +259,35 @@ class KetchService : Service() {
     // Hours later, such as after Android restarted the service in the background, the downloads
     // it resumed are old news.
     if (heldUntil?.hasNotPassedNow() == true) toasts.trySend(held)
+  }
+
+  /**
+   * Follows [controller] until it closes. It notifies about the messages the controller posts
+   * with `notify`, such as Discover waiting for the user's OK to open a website, while the app is
+   * not in front; each notification goes once its message leaves the screen, and tapping it
+   * opens [MainActivity], which runs the message's first action. It also keeps the service in
+   * the foreground while Discover searches, so the search keeps going, and can ask, once the
+   * user leaves the app.
+   */
+  fun follow(controller: AppController) {
+    followed = controller
+    controller.scope.launch {
+      MessageNotifications.follow(
+        messages = controller.messages,
+        notifier = notifier,
+        settings = { controller.appSettings.config.notifications },
+        inFront = inFront,
+      )
+    }
+    controller.scope.launch {
+      // A controller that closes after the next one started leaves the count to that one.
+      try {
+        snapshotFlow { controller.state.aiDiscover.sessions.count { it.running } }
+          .collect { if (followed === controller) discovering.value = it }
+      } finally {
+        if (followed === controller) discovering.value = 0
+      }
+    }
   }
 
   override fun onBind(intent: Intent?): IBinder {
@@ -286,11 +322,12 @@ class KetchService : Service() {
 
   /**
    * Keeps the service in the foreground while the embedded device downloads or shares itself,
-   * whichever device the app shows, and refreshes the ongoing notification once a second while
-   * it downloads.
+   * whichever device the app shows, or while Discover searches, and refreshes the ongoing
+   * notification once a second while it downloads.
    */
   private fun startForegroundMonitor(embedded: KetchApi) {
-    val statuses = ForegroundPolicy.observe(embedded.tasks, instanceManager.serverState)
+    val statuses = ForegroundPolicy
+      .observe(embedded.tasks, instanceManager.serverState, discovering)
       .flowOn(Dispatchers.Default)
     scope.launch {
       // A new speed mode only relabels the Slow lane button.
@@ -347,7 +384,7 @@ class KetchService : Service() {
     scope.launch {
       instanceManager.pairingRequests.watch(
         onArrived = { ask ->
-          if (!inFront) notifier.showPairing(ask, pairingNotificationCopy(ask))
+          if (!inFront.value) notifier.showPairing(ask, pairingNotificationCopy(ask))
         },
         onLeft = notifier::cancelPairing,
       )
@@ -359,7 +396,7 @@ class KetchService : Service() {
     val config = loadConfig()
     notifier.accent = config.appearance.accent.toKetchAccent()
     val settings = config.notifications
-    val delivery = ActivityRouting.deliveryOf(event, settings, inFront)
+    val delivery = ActivityRouting.deliveryOf(event, settings, inFront.value)
     if (delivery.toast) {
       toasts.trySend(event)
     } else if (event is ActivityEvent.Recovered &&
@@ -440,6 +477,7 @@ class KetchService : Service() {
       tasks = instanceManager.embedded?.tasks?.value.orEmpty(),
       serverPort = status.serverPort,
       slowLane = speedMode.mode.value.isSlowLane,
+      discovering = status.discovering > 0,
     )
 
   private fun totalSpeed(tasks: List<DownloadTask>): Long =

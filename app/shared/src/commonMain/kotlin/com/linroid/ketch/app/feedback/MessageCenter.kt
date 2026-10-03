@@ -57,7 +57,11 @@ class MessageAction(
  * @property actions at most two buttons.
  * @property at when it was posted.
  * @property toast how long it stays on screen.
- * @property notify whether the host may also post it as a system notification.
+ * @property notify whether it is a request that waits for the user, which the host also posts as
+ *   a system notification while the app is not in front, whatever the download notification
+ *   settings say (see [MessageNotifications]); tapping the notification runs the first of
+ *   [actions] where the platform can. Messages about activity events leave it off: the host's
+ *   activity monitor notifies those itself.
  * @property placement where it shows while active.
  * @property cause the failure behind an [MessageLevel.Error] message, for the error catalog.
  */

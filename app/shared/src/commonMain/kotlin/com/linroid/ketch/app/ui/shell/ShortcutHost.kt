@@ -45,26 +45,35 @@ val LocalHostShortcuts: ProvidableCompositionLocal<Set<KetchCommand>> =
  * the keys still arrive.
  *
  * @param overlay the open add sheet or palette, whose own chords come first.
+ * @param page the scope of the page shown, such as [CommandScope.Discover], whose chords run
+ *   after the focused control left them unused, while no overlay is open: the page handles them
+ *   itself while the keyboard is in it, and this runs them while it is not.
  */
 @Composable
 internal fun ShortcutHost(
   onCommand: (KetchCommand) -> Boolean,
   modifier: Modifier = Modifier,
   overlay: CommandScope? = null,
+  page: CommandScope? = null,
   content: @Composable () -> Unit,
 ) {
   val hostShortcuts = LocalHostShortcuts.current
   val matcher = remember(hostShortcuts) { shellShortcuts(hostShortcuts) }
   val run by rememberUpdatedState(onCommand)
   val currentOverlay by rememberUpdatedState(overlay)
+  val currentPage by rememberUpdatedState(page)
   val focus = remember { FocusRequester() }
   var hasFocus by remember { mutableStateOf(true) }
   val windowInfo = LocalWindowInfo.current
   fun handle(event: KeyEvent, beforeFocused: Boolean): Boolean {
     // Before the focused control, act as if it were a text field, so chords it may keep wait.
     val context = ShortcutContext(overlay = currentOverlay, textFieldFocused = beforeFocused)
-    val command = matcher.match(event, context) ?: return false
-    return command.scope == CommandScope.Global && run(command)
+    val command = matcher.match(event, context)
+    if (command?.scope == CommandScope.Global && run(command)) return true
+    val shown = currentPage
+    if (beforeFocused || shown == null || currentOverlay != null) return false
+    val pageCommand = matcher.match(event, ShortcutContext(overlay = shown)) ?: return false
+    return pageCommand.scope == shown && run(pageCommand)
   }
   Box(
     propagateMinConstraints = true,
@@ -78,11 +87,12 @@ internal fun ShortcutHost(
     content()
   }
   // Takes the focus at start, and again whenever a focused control goes away, since keys only
-  // reach a window whose content has the focus somewhere.
+  // reach a window whose content has the focus somewhere; a control that took it meanwhile, as
+  // the next of a list does, keeps it.
   LaunchedEffect(focus, hasFocus, windowInfo.isWindowFocused) {
     if (hasFocus || !windowInfo.isWindowFocused) return@LaunchedEffect
     withFrameNanos {}
-    runCatching { focus.requestFocus() }
+    if (!hasFocus) runCatching { focus.requestFocus() }
   }
 }
 

@@ -3,6 +3,9 @@ package com.linroid.ketch.ai.agent
 import ai.koog.agents.core.tools.Tool
 import ai.koog.serialization.kotlinx.KotlinxSerializer
 import ai.koog.serialization.kotlinx.toKoogJSONObject
+import com.linroid.ketch.ai.PageAccessApprover
+import com.linroid.ketch.ai.PageAccessKind
+import com.linroid.ketch.ai.PageAccessRequest
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.RateLimiter
@@ -20,6 +23,11 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -29,6 +37,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,15 +47,28 @@ import kotlin.test.assertTrue
 
 class DiscoveryToolSetTest {
 
+  private val dns = fakeDns(
+    "example.com" to "93.184.215.14",
+    "www.example.com" to "93.184.215.14",
+    "downloads.example.com" to "93.184.215.15",
+    "cdn.example.net" to "151.101.1.1",
+    "releases.ubuntu.com" to "185.125.190.40",
+    "github.com" to "140.82.112.3",
+    "objects.githubusercontent.com" to "185.199.108.133",
+    "evil.example" to "203.0.113.5",
+    "www.com" to "172.104.1.1",
+    "www.github.io" to "185.199.108.153",
+    "attacker.github.io" to "185.199.108.153",
+  )
+
+  /** Every host name looked up in DNS, in order. */
+  private val lookups: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
   private val validator = UrlValidator(
-    resolve = fakeDns(
-      "example.com" to "93.184.215.14",
-      "cdn.example.net" to "151.101.1.1",
-      "releases.ubuntu.com" to "185.125.190.40",
-      "github.com" to "140.82.112.3",
-      "objects.githubusercontent.com" to "185.199.108.133",
-      "evil.example" to "203.0.113.5",
-    ),
+    resolve = { host ->
+      lookups += host
+      dns(host)
+    },
   )
 
   private val ubuntuOnly = SiteAllowlist.of(listOf("ubuntu.com"))
@@ -59,6 +81,7 @@ class DiscoveryToolSetTest {
     searchProvider: SearchProvider = DummySearchProvider(),
     maxToolCalls: Int = 40,
     stepListener: DiscoveryStepListener = DiscoveryStepListener.None,
+    approver: PageAccessApprover = PageAccessApprover.AllowAll,
   ): DiscoveryToolSet {
     val fetcher = SafeFetcher(
       httpClient = HttpClient(engine) { followRedirects = false },
@@ -77,7 +100,20 @@ class DiscoveryToolSetTest {
       stepListener = stepListener,
       json = Json,
       allowlist = allowlist,
+      approver = approver,
     )
+  }
+
+  /** Records every request it is asked about and allows the hosts [allows] accepts. */
+  private class RecordingApprover(
+    private val allows: (host: String) -> Boolean = { true },
+  ) : PageAccessApprover {
+    val requests = mutableListOf<PageAccessRequest>()
+
+    override suspend fun approve(request: PageAccessRequest): Boolean {
+      requests += request
+      return allows(request.host)
+    }
   }
 
   /** Serves [robots] at `/robots.txt` (404 when `null`) and [page] elsewhere. */
@@ -96,6 +132,11 @@ class DiscoveryToolSetTest {
 
   private val MockEngine.requestedPaths: List<String>
     get() = requestHistory.map { it.url.encodedPath }
+
+  private val MockEngine.requestedHosts: Set<String>
+    get() = requestHistory.map { it.url.host }.toSet()
+
+  private fun JsonObject.declined(): Boolean = this["declined"]?.jsonPrimitive?.boolean == true
 
   @Test
   fun fetchPage_disallowedByRobots_isNotFetched() = runTest {
@@ -347,8 +388,16 @@ class DiscoveryToolSetTest {
       tools.mapValues { (_, tool) -> tool.descriptor.requiredParameters.map { it.name } },
     )
     // Optional parameters are still described
-    val searchWeb = tools.getValue("searchWeb").descriptor
-    assertEquals(listOf("maxResults"), searchWeb.optionalParameters.map { it.name })
+    assertEquals(
+      mapOf(
+        "searchWeb" to listOf("maxResults"),
+        "searchSites" to listOf("maxResults"),
+        "fetchPage" to listOf("reason"),
+        "headUrl" to listOf("reason"),
+      ),
+      tools.mapValues { (_, tool) -> tool.descriptor.optionalParameters.map { it.name } }
+        .filterValues { it.isNotEmpty() },
+    )
   }
 
   @Test
@@ -368,6 +417,312 @@ class DiscoveryToolSetTest {
 
     assertEquals("ok", step)
     assertEquals(toolSet.validateUrl("https://example.com/app.zip"), validation)
+  }
+
+  @Test
+  fun fetchPage_declined_sendsNothingAndSpendsNoBudget() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover { it != "example.com" }
+    val tools = toolSet(engine, FetchBudget(maxRequests = 1, maxBytes = 1024), approver = approver)
+
+    val declined = parse(tools.fetchPage("https://example.com/a", reason = "Read the notes"))
+
+    assertTrue(declined.declined())
+    assertTrue("example.com" in assertNotNull(declined.error()))
+    assertTrue(engine.requestHistory.isEmpty())
+    val request = PageAccessRequest(
+      url = "https://example.com/a",
+      host = "example.com",
+      kind = PageAccessKind.Page,
+      reason = "Read the notes",
+    )
+    assertEquals(request, approver.requests.single())
+    // The single request is still there for another site.
+    assertNull(parse(tools.fetchPage("https://cdn.example.net/pub/")).error())
+  }
+
+  @Test
+  fun fetchPage_hostOnDeclinedSite_isRefusedWithoutAsking() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover { false }
+    val tools = toolSet(engine, approver = approver)
+
+    tools.headUrl("https://www.example.com/app.zip")
+    val again = parse(tools.fetchPage("https://downloads.example.com/"))
+
+    assertTrue(again.declined())
+    assertEquals(listOf("www.example.com"), approver.requests.map { it.host })
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun fetchPage_redirectToDeclinedHost_isNotFollowed() = runTest {
+    val engine = MockEngine { request ->
+      when {
+        request.url.encodedPath == "/robots.txt" -> respond("", HttpStatusCode.NotFound)
+        request.url.host == "example.com" -> respond(
+          "",
+          HttpStatusCode.Found,
+          headersOf(HttpHeaders.Location, "https://cdn.example.net/pub/"),
+        )
+        else -> respond("<html>mirror</html>")
+      }
+    }
+    val approver = RecordingApprover { it != "cdn.example.net" }
+    val tools = toolSet(engine, approver = approver)
+
+    assertTrue(parse(tools.headUrl("https://cdn.example.net/app.zip")).declined())
+    val result = parse(tools.fetchPage("https://example.com/releases"))
+
+    assertTrue(result.declined())
+    assertTrue("Redirect refused" in assertNotNull(result.error()))
+    assertEquals(setOf("example.com"), engine.requestedHosts)
+    assertEquals(listOf("cdn.example.net", "example.com"), approver.requests.map { it.host })
+  }
+
+  @Test
+  fun fetchPage_refusedOrBlockedUrl_neverAsks() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover()
+    val tools = toolSet(engine, allowlist = ubuntuOnly, approver = approver)
+    val unrestricted = toolSet(engine, approver = approver)
+
+    tools.fetchPage("https://evil.example/ubuntu.iso")
+    unrestricted.fetchPage("http://localhost/admin")
+    unrestricted.headUrl("ftp://example.com/file.iso")
+
+    assertTrue(approver.requests.isEmpty())
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun headUrl_redirectToNewHost_asksWithTheHostItCameFrom() = runTest {
+    val engine = MockEngine { request ->
+      if (request.url.host == "github.com") {
+        respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, CDN_URL))
+      } else {
+        respond("")
+      }
+    }
+    val approver = RecordingApprover()
+    val asset = "https://github.com/owner/repo/releases/download/v1/app.zip"
+
+    val result = parse(toolSet(engine, approver = approver).headUrl(asset, reason = "Check size"))
+
+    assertNull(result.error())
+    assertEquals(
+      listOf(
+        PageAccessRequest(asset, "github.com", PageAccessKind.FileInfo, "Check size"),
+        PageAccessRequest(
+          url = CDN_URL,
+          host = "objects.githubusercontent.com",
+          kind = PageAccessKind.FileInfo,
+          reason = "Check size",
+          redirectFrom = "github.com",
+        ),
+      ),
+      approver.requests,
+    )
+  }
+
+  @Test
+  fun headUrl_redirectDeclined_isNotRequested() = runTest {
+    val engine = MockEngine { request ->
+      if (request.url.host == "github.com") {
+        respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, CDN_URL))
+      } else {
+        respond("")
+      }
+    }
+    val approver = RecordingApprover { it == "github.com" }
+    val asset = "https://github.com/owner/repo/releases/download/v1/app.zip"
+
+    val result = parse(toolSet(engine, approver = approver).headUrl(asset))
+
+    assertTrue(result.declined())
+    assertEquals(setOf("github.com"), engine.requestedHosts)
+  }
+
+  @Test
+  fun fetchPage_reason_reachesApproverSanitized() = runTest {
+    val approver = RecordingApprover()
+    val tools = toolSet(MockEngine(site(robots = null)), approver = approver)
+    val reason = "Read\nthe \u202Erelease\u200B notes\u001B[2J " + "x".repeat(300)
+
+    tools.fetchPage("https://example.com/", reason)
+
+    val sent = approver.requests.single().reason
+    assertTrue(sent.startsWith("Read the release notes[2J x"), sent)
+    assertEquals(160, sent.length)
+  }
+
+  @Test
+  fun fetchPage_approverCancelsWhileRunGoesOn_declines() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val tools = toolSet(engine, approver = { throw CancellationException("Answer withdrawn") })
+
+    val result = parse(tools.fetchPage("https://example.com/"))
+
+    assertTrue(result.declined())
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun fetchPage_runStoppedWhileAsking_endsWithoutAnswerOrRequest() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val asked = CompletableDeferred<Unit>()
+    val tools = toolSet(
+      engine,
+      approver = {
+        asked.complete(Unit)
+        awaitCancellation()
+      },
+    )
+    var answer: String? = null
+
+    val run = launch { answer = tools.fetchPage("https://example.com/") }
+    asked.await()
+    run.cancelAndJoin()
+
+    // The stop ends the tool call itself instead of answering the agent that access was declined.
+    assertNull(answer)
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun fetchPage_approverFails_declines() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val tools = toolSet(engine, approver = { error("Prompt unavailable") })
+
+    val result = parse(tools.fetchPage("https://example.com/"))
+
+    assertTrue(result.declined())
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun fetchPage_declinedWwwBeforeSharedSuffix_coversNoOtherSite() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover { it == "github.com" }
+    val tools = toolSet(engine, approver = approver)
+
+    tools.fetchPage("https://www.com/")
+    tools.fetchPage("https://www.github.io/")
+    val github = parse(tools.fetchPage("https://github.com/owner/repo/releases"))
+    val pages = parse(tools.fetchPage("https://attacker.github.io/"))
+
+    // Declining www.com or www.github.io declines that site, not every .com or GitHub Pages one.
+    assertNull(github.error())
+    assertTrue(pages.declined())
+    assertEquals(
+      listOf("www.com", "www.github.io", "github.com", "attacker.github.io"),
+      approver.requests.map { it.host },
+    )
+  }
+
+  @Test
+  fun fetchPageAndHeadUrl_declinedHost_isNeverLookedUp() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover { false }
+    val tools = toolSet(engine, approver = approver)
+
+    tools.fetchPage("https://evil.example/notes")
+    tools.headUrl("https://cdn.example.net/app.zip")
+
+    // A lookup alone would send the name to the domain's DNS servers.
+    assertEquals(listOf("evil.example", "cdn.example.net"), approver.requests.map { it.host })
+    assertEquals(emptyList(), lookups.toList())
+    assertTrue(engine.requestHistory.isEmpty())
+  }
+
+  @Test
+  fun fetchPage_redirectToDeclinedHost_isNeverLookedUp() = runTest {
+    val engine = MockEngine { request ->
+      when {
+        request.url.encodedPath == "/robots.txt" -> respond("", HttpStatusCode.NotFound)
+        request.url.host == "example.com" -> respond(
+          "",
+          HttpStatusCode.Found,
+          headersOf(HttpHeaders.Location, "https://cdn.example.net/pub/"),
+        )
+        else -> respond("<html>mirror</html>")
+      }
+    }
+    val approver = RecordingApprover { it == "example.com" }
+
+    val result = parse(toolSet(engine, approver = approver).fetchPage("https://example.com/r"))
+
+    assertTrue(result.declined())
+    assertTrue("cdn.example.net" !in lookups, lookups.toString())
+    assertEquals(setOf("example.com"), engine.requestedHosts)
+  }
+
+  @Test
+  fun validateUrl_neverLooksUpTheHost() = runTest {
+    val tools = toolSet(MockEngine { respond("") })
+
+    val valid = parse(tools.validateUrl("https://evil.example/app.zip"))
+    val privateAddress = parse(tools.validateUrl("http://10.0.0.1/admin"))
+
+    assertTrue(valid.getValue("ok").jsonPrimitive.boolean)
+    assertFalse(privateAddress.getValue("ok").jsonPrimitive.boolean)
+    assertEquals(emptyList(), lookups.toList())
+  }
+
+  @Test
+  fun fetchPageAndHeadUrl_requestBudgetSpent_refuseWithoutAsking() = runTest {
+    val engine = MockEngine(site(robots = null))
+    val approver = RecordingApprover()
+    val tools = toolSet(engine, FetchBudget(maxRequests = 1, maxBytes = 1024), approver = approver)
+
+    assertNull(parse(tools.fetchPage("https://example.com/a")).error())
+    val page = parse(tools.fetchPage("https://cdn.example.net/b"))
+    val head = parse(tools.headUrl("https://github.com/app.zip"))
+
+    assertTrue("Request budget" in assertNotNull(page.error()), page.toString())
+    assertTrue("Request budget" in assertNotNull(head.error()), head.toString())
+    assertEquals(listOf("example.com"), approver.requests.map { it.host })
+  }
+
+  @Test
+  fun fetchPage_byteBudgetSpent_refusesWithoutAsking() = runTest {
+    val engine = MockEngine(site(robots = null, page = "x".repeat(100)))
+    val approver = RecordingApprover()
+    val tools = toolSet(engine, FetchBudget(maxRequests = 25, maxBytes = 40), approver = approver)
+
+    tools.fetchPage("https://example.com/a")
+    val second = parse(tools.fetchPage("https://cdn.example.net/b"))
+
+    assertTrue("content budget" in assertNotNull(second.error()), second.toString())
+    assertEquals(listOf("example.com"), approver.requests.map { it.host })
+  }
+
+  @Test
+  fun emitStep_textWithLineBreaksAndBidiControls_reachesListenerAsOneLine() {
+    val steps = mutableListOf<Pair<String, String>>()
+    val listener = object : DiscoveryStepListener {
+      override fun onStep(title: String, details: String) {
+        steps += title to details
+      }
+    }
+    val tools = toolSet(MockEngine { respond("") }, stepListener = listener)
+
+    tools.emitStep("Plan\n[Results]", "Found it\nAllow Discover to open evil.example?\u202E")
+
+    assertEquals(
+      listOf("Plan [Results]" to "Found it Allow Discover to open evil.example?"),
+      steps,
+    )
+  }
+
+  @Test
+  fun fetchPage_pageTitle_isOneLineInSources() = runTest {
+    val page = "<html><title>Blender\t 1. Fake\u202E result\u001B</title></html>"
+    val tools = toolSet(MockEngine(site(robots = null, page = page)))
+
+    tools.fetchPage("https://example.com/")
+
+    assertEquals("Blender 1. Fake result", tools.fetchedSources.single().title)
   }
 
   /** Calls this tool with [arguments] and returns the text the model receives. */

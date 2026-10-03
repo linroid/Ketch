@@ -119,19 +119,22 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
   `UnreadableConfig`, `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`,
   `AiSettings`, `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`,
-  `TorrentSettings`, `AppearanceConfig`, `AccentColor`, `ThemeMode`, `SpeedSettings`,
-  `SpeedRule`, `UiPreferences`, `DesktopSettings`, `NotificationSettings`, `IntegrationSettings`
+  `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
+  `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
+  `NotificationSettings`, `IntegrationSettings`
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
-  `IntakeState`, `SpeedModeController`, `PendingOps`), `instance` (`InstanceManager`,
-  `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme` tokens),
-  `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
-  `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`, `UnreadableFiles`) and
-  `util`
-- `ui` -- `AppShell` and `shell` (layout, navigation, device switcher, drop berths), `sidebar`,
-  `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake` (add sheet),
-  `palette`, `devices`, `connect`, `discover`, `settings`, `pulse`, `feedback`, `onboarding`
+  `IntakeState`, `SpeedModeController`, `PendingOps`, `AiDiscoverController`, `DiscoverSession`,
+  `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
+  (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
+  tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
+  `CommandScope`, `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`,
+  `UnreadableFiles`) and `util`
+- `ui` -- `AppShell` and `shell` (layout, navigation and its badges, device switcher, drop
+  berths), `sidebar`, `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake`
+  (add sheet), `palette`, `devices`, `connect`, `discover` (chat, history, approval cards),
+  `settings`, `pulse`, `feedback`, `onboarding`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
@@ -145,16 +148,17 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `ai:discover` (JVM/Android only)
 - `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
-  `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
-  `RankedCandidate`
+  `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverTurn`, `DiscoverResult`,
+  `RankedCandidate`, `DiscoveryException`, `PageAccessApprover`, `PageAccessRequest`,
+  `PageAccessKind`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `asDeclaredTools()`, `AgentOutputParser`,
-  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
+  `sanitizeAgentText()`, `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`,
+  `SiteAllowlist`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
   `ContentExtractor`, `RateLimiter`, `FetchBudget`
 - `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
-  `GoogleSearchProvider`, `DummySearchProvider`
-- `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
-  `RobotsTxtParser`
+  `GoogleSearchProvider`, `PacedSearchProvider`, `DummySearchProvider`
+- `com.linroid.ketch.ai.site` -- `SiteProfiler` (robots.txt), `RobotsTxtParser`
 
 ## Implemented Features
 
@@ -301,11 +305,48 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
 - Configured under Settings → Discover and persisted under `[ai]` in
   `config.toml`; blank credentials fall back to environment variables
-- The Discover destination shows wherever discovery is supported; until it
-  is set up it shows a setup page, where searches from the add sheet, the
-  palette and Find another source wait. In the apps the Enable switch is
-  authoritative (an env key fills a blank token but never enables the
-  feature — only the CLI auto-enables)
+- The Discover destination shows wherever discovery is supported; until it is set up it shows
+  a setup page, where searches from the add sheet, the palette, the phone's search and Find
+  another source wait, and saved sessions open read-only. In the apps the Enable switch is
+  authoritative (an env key fills a blank token but never enables the feature — only the CLI
+  auto-enables; `[ai.access]` alone never counts as configured)
+- Discover is a chat (`AiDiscoverController`, `DiscoverSession` of `DiscoverTurn`s): every
+  entry point with a query starts a new session; a follow-up sends `DiscoverQuery.history`
+  (each earlier request and its sites, results only from finished turns, the first turn plus
+  the latest five, replayed with code-written replies) and the discarded links as
+  `excludedUrls`. The agent answers `{summary, candidates}`; reasons, summaries, steps,
+  candidate titles, descriptions and file names and source titles pass through
+  `sanitizeAgentText` (one line of plain text), which the CLI applies again when it prints
+- Discarding is per session, by `SiteNames.canonicalUrl`; discard, session delete and Clear
+  history go through `PendingOps` (Undo). At most 3 turns run at once across sessions (the
+  rest `Queued`), one per session; switching discovery off (provider `null`) stops them all,
+  a new model lets them finish. Brave and Google searches start 1.1 s apart across runs
+  (`PacedSearchProvider`)
+- History: `DiscoverHistoryStore`; `FileDiscoverHistoryStore` writes `discover-history.json`
+  (desktop: next to `config.toml`; Android: `filesDir`, excluded from backup and device
+  transfer), newest 50 sessions, the last 30 steps per turn with URLs redacted, failures as
+  `AiDiscoverFailure.brief` (no provider reason). Running turns load as `Stopped`
+- Page access (`[ai.access]`: `allow`, `ask-site` default, `ask`, `trustedSites`;
+  `PageAccessSettings.allowsWithoutAsking` is the one policy): `fetchPage`, `headUrl` and
+  redirects to new hosts ask the run's `PageAccessApprover` after the allowlist and
+  `UrlValidator.check` (no DNS: a host is looked up only once approved; `validateUrl` never
+  resolves; result candidates are resolved to drop private addresses) and while budget is
+  left, before spending any; a declined site is refused for the rest of the run. Sites are
+  `SiteNames.normalize`d, which keeps `www.` before a shared suffix (`www.github.io`) so no
+  answer covers a whole suffix. Only
+  `DiscoverQuery.sites` skips asking (not `allowedDomains`); an approved page covers its
+  robots.txt. Apps keep answers per session in memory, save Always allow with
+  `AiSettingsController.saveAccess` (keeps the provider: `AiSettings.engineSettings` leaves
+  `access` out) and show a toast and nav badge (`AppState.discoverWaitingCount`) while a request
+  waits elsewhere. The CLI (`CliPageAccess`) asks on `/dev/tty` (Windows: `System.console()`,
+  so not with redirected streams); `--yes` allows all; with no terminal a run that may ask
+  exits 1, as does a failed run; invalid arguments exit 2
+- The app page (`ui/discover`) renders a session as `threadItems()`, with approval cards inline
+  (`approvalChoices(mode)`) and a "Needs your OK" jump button while one is out of view. Its
+  history docks beside the chat on pages from 780 dp (`historyPlacement`, toggled by
+  `UiPreferences.discoverHistory`), floats over narrower ones and is a sheet on phones;
+  `DiscoverChrome` in `ShellState` holds the floating state and the composer focus requests
+  (`⌘E`, New search). Its chords are `CommandScope.Discover`
 - Provider defaults track current models; unknown ids resolve as custom
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
@@ -328,7 +369,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
   desktop, notifications and integration sections
-- `AiSettings`: AI discovery provider, token, model, endpoint and search keys
+- `AiSettings`: AI discovery provider, token, model, endpoint, search keys and page access
+  (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
   Settings (app-only; CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`),
@@ -336,9 +378,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   start or resume; a remote instance's trackers are only editable on that device
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
-  state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults
-  and onboarding; `DesktopSettings`: close action, open at login, Dock badge, daily update
-  checks; `NotificationSettings` and `IntegrationSettings` (magnet and `.torrent` handlers)
+  state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
+  Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
+  open at login, Dock badge, daily update checks; `NotificationSettings` and
+  `IntegrationSettings` (magnet and `.torrent` handlers)
 - Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
   Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
   BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
@@ -381,11 +424,20 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `RemotePairing`): both devices show the same four digits, and the shared device asks its
   owner in `PairingApprovalHost`, from the tray (desktop) or with Allow and Don't allow
   notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
-- Every keyboard command lives in `KetchCommands`; `ShortcutHost` runs the global chords,
-  `⌘K` opens the command palette and `⌘/` the shortcut sheet. Commands the window's shell
-  must run from outside it, such as the macOS menu bar's, go through `AppState.runInShell`
+- Every keyboard command lives in `KetchCommands`, each in a `CommandScope` (Global, List,
+  Intake, Palette, Discover): `ShortcutHost` runs the global chords, and the list, the add
+  sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`
+  opens the command palette and `⌘/` the shortcut sheet, grouped by scope (Discover's only where
+  Discover is offered). Commands the window's shell must run from outside it, such as the macOS
+  menu bar's, go through `AppState.runInShell`
 - Toasts and banners go through `MessageCenter`; removals and other undoable operations wait in
-  `PendingOps` for their Undo window
+  `PendingOps` for their Undo window. A message posted with `notify = true` (Discover's page
+  access questions) also becomes a system notification, once, while the app is not in front or
+  when it leaves the front while the message shows, whatever the download notification settings
+  say (`MessageNotifications`, posted by the desktop `TrayNotifier` and Android
+  `AndroidNotifier`); download events are notified by the hosts' `ActivityMonitor` routing
+  instead. On Android, `ForegroundPolicy` keeps the service in the foreground while Discover
+  searches, so a search keeps running and can ask once the app is in the background
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
@@ -489,9 +541,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
   so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
 - `NativeImageConfigTest` (in `cli`, `library:mcp` and `ai:discover`) checks that the metadata
-  names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
-  content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
-  and `ketch ai-discover` with each LLM provider to verify changes
+  names existing classes and covers every serializable MCP SDK type, every subtype of Koog's
+  content-polymorphic types and every Ketch type in `DiscoveryToolSet`'s constructor, fields and
+  method signatures (such as `PageAccessApprover` and `SearchResult`); build with
+  `./gradlew :cli:nativeCompile` and exercise `ketch mcp` and `ketch ai-discover` with each LLM
+  provider to verify changes
 
 ### Self-update (`updater`)
 - Shared by the desktop app and the CLI: `GitHubReleases` reads the latest (or a tagged) release

@@ -61,7 +61,7 @@ fun resolveAiSettingsFromEnv(
   val llm = resolveLlmFromEnv(base, getenv)
   val search = resolveSearchFromEnv(base, getenv)
   val enabled = base.enabled ||
-    (base == AiSettings() && llm.apiKey.isNotBlank())
+    (base.engineSettings == AiSettings() && llm.apiKey.isNotBlank())
   return base.copy(enabled = enabled, llm = llm, search = search)
 }
 
@@ -74,7 +74,7 @@ private fun resolveLlmFromEnv(
   val configured = envKeyFor(llm.provider, getenv)
   if (configured != null) return llm.copy(apiKey = configured)
   // Untouched settings: let any provider key pick the provider.
-  if (base != AiSettings()) return llm
+  if (base.engineSettings != AiSettings()) return llm
   for (provider in ENV_PROVIDER_ORDER) {
     val key = envKeyFor(provider, getenv) ?: continue
     return llm.copy(provider = provider, apiKey = key)
@@ -114,7 +114,7 @@ private fun resolveSearchFromEnv(
     // "None" is also the default, so it only yields to the environment
     // while nothing has been configured — the CLI's "export and go".
     SearchProvider.None -> {
-      if (base != AiSettings()) return search
+      if (base.engineSettings != AiSettings()) return search
       val brave = env(BRAVE_KEY)
       val googleKey = env(GOOGLE_KEY)
       val googleCx = env(GOOGLE_CX)

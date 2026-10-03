@@ -311,8 +311,10 @@ example in Claude Desktop's `claude_desktop_config.json`:
 
 ### AI discovery
 
-Ask an LLM agent to find download links for a natural-language query. It prints the candidates it
-found with their URL, file name, size and confidence.
+Ask an LLM agent to find download links for a natural-language query. It prints the agent's
+summary and the candidates it found with their URL, file name, size and confidence. The version
+banner, the model and query it uses, the agent's steps as they happen, the questions and errors
+go to stderr, so stdout holds only the results.
 
 ```bash
 ketch ai-discover <query> [options]
@@ -322,6 +324,10 @@ ketch ai-discover <query> [options]
 |---|---|
 | `--sites <domains>` | Comma-separated domains to limit discovery to, subdomains included; redirects to download hosts are followed (see [AI discovery](../docs/ai-discovery.md#limiting-discovery-to-websites)) |
 | `--max-results <n>` | Max candidates to return (default: 5) |
+| `-y`, `--yes` | Open websites without asking |
+| `-h`, `--help` | Show the command's usage |
+
+Unknown options are an error rather than part of the query.
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
 the apps edit under Settings → Discover. Blank API keys are filled from `OPENAI_API_KEY`,
@@ -329,11 +335,43 @@ the apps edit under Settings → Discover. Blank API keys are filled from `OPENA
 enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
 settings and environment variables combine.
 
+#### Page access
+
+The command follows `[ai.access]`, which the apps edit under Settings → Discover. Unless its
+`mode` is `"allow"` or the site is in `trustedSites`, it asks before the agent opens a website
+(reads a page or checks a file, redirects to a new host included):
+
+```text
+Allow Discover to open www.blender.org? https://www.blender.org/download/
+  Discover says: Read the Blender download page
+[y] allow  [s] allow blender.org for this run  [a] allow all  [n] deny:
+```
+
+- `y` allows the site for the rest of the run in the default `"ask-site"` mode, and only this
+  request in `"ask"` mode
+- `s` allows the site and its subdomains for the rest of the run, `a` every website
+- `n`, an empty or unknown answer, or the end of input denies; after the end of input (Ctrl+D)
+  every later request is denied without asking. A denied site is not asked about again
+
+Answers last for the run; the CLI never writes `config.toml`. It asks on the controlling
+terminal (`/dev/tty`), so questions still reach you when stdout or stdin is redirected. On
+Windows it asks on the console, and only while stdin and stdout are both the console: a
+redirected run there needs `--yes` or `--sites`. Searches through the search provider never ask,
+and neither does a run limited with `--sites`: every host it may open is one you named.
+
+Without a terminal, such as under cron or in CI, a run that may ask stops at once with exit
+status 1. Pass `--yes`, limit it with `--sites`, or set `mode = "allow"` to run it there.
+
+The exit status is 0 when the search ran, whether or not it found candidates; 1 when it could
+not run (AI discovery not configured, no terminal to ask on) or failed (a provider or agent
+error); and 2 for invalid arguments.
+
 **Examples:**
 
 ```bash
 ketch ai-discover "latest Ubuntu 24.04 ISO"
 ketch ai-discover "ffmpeg release" --sites ffmpeg.org
+ketch ai-discover --yes "blender 4.2 macOS" > results.txt
 ```
 
 ### Update

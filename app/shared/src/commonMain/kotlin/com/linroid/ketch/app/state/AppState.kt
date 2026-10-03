@@ -34,6 +34,7 @@ import com.linroid.ketch.app.i18n.sizeText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
+import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -59,11 +60,19 @@ import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_review
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.device_any_in_sentence
+import ketch.app.shared.generated.resources.discover_deleted
+import ketch.app.shared.generated.resources.discover_discarded
+import ketch.app.shared.generated.resources.discover_history_cleared
+import ketch.app.shared.generated.resources.discover_needs_ok
+import ketch.app.shared.generated.resources.discover_undo_clear_history
+import ketch.app.shared.generated.resources.discover_undo_delete
+import ketch.app.shared.generated.resources.discover_undo_discard
 import ketch.app.shared.generated.resources.feedback_add_failed
 import ketch.app.shared.generated.resources.feedback_add_failed_count
 import ketch.app.shared.generated.resources.feedback_added
@@ -220,6 +229,7 @@ val InstanceEntry.deviceId: String
  *   notification switches it; `null` when the host keeps none.
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`; each is reported to the user once.
+ * @param discoverHistory keeps the Discover sessions between runs of the app.
  * @property incoming downloads and pairing links opened from outside the app; the shell asks
  *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
@@ -235,6 +245,7 @@ class AppState(
   val speedMode: SpeedModeController? = null,
   val clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
+  discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -242,8 +253,12 @@ class AppState(
   /** Undo for removals, clearing, discarding progress, moves and bulk pauses. */
   val pendingOps: PendingOps = PendingOps(scope)
 
-  /** AI discovery searches and their results. */
-  val aiDiscover: AiDiscoverController = AiDiscoverController(aiSettings, scope)
+  /** AI discovery sessions, their searches and the requests to open websites they wait on. */
+  val aiDiscover: AiDiscoverController =
+    AiDiscoverController(aiSettings, scope, discoverHistory, clock)
+
+  /** How many requests to open a website wait for the user's answer, for Discover's badge. */
+  val discoverWaitingCount: Int get() = aiDiscover.approvals.size
 
   val activeApi: StateFlow<KetchApi> =
     instanceManager.activeApi
@@ -529,6 +544,7 @@ class AppState(
         }
       }
     }
+    scope.launch { announceApprovals() }
     scope.launch {
       incoming.failures.collect {
         postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
@@ -679,6 +695,111 @@ class AppState(
   /** Marks [discoverRequest] as shown. */
   fun discoverRequestHandled() {
     discoverRequest = null
+  }
+
+  /** Shows the Discover session with [sessionId]. */
+  fun showDiscover(sessionId: String) {
+    aiDiscover.open(sessionId)
+    runInShell(KetchCommands.Discover)
+  }
+
+  /**
+   * Discards [urls] from the shown Discover session's results, with Undo in a toast and in the
+   * command palette.
+   */
+  fun discardDiscovered(urls: Collection<String>) {
+    val sessionId = aiDiscover.currentId ?: return
+    val discarded = aiDiscover.discard(urls, sessionId)
+    if (discarded.isEmpty()) return
+    val op = pendingOps.register(Res.string.discover_undo_discard.text(), undo = {
+      aiDiscover.restore(discarded, sessionId)
+    })
+    messages.postFeedback(
+      level = MessageLevel.Info,
+      title = Res.plurals.discover_discarded.text(discarded.size),
+      actions = listOf(undoAction(op)),
+    )
+  }
+
+  /** Shows [urls] again in the shown Discover session's results. */
+  fun restoreDiscovered(urls: Collection<String>) {
+    aiDiscover.restore(urls)
+  }
+
+  /** Deletes the Discover session with [sessionId], with Undo, which puts it back unopened. */
+  fun deleteDiscoverSession(sessionId: String) {
+    val removed = aiDiscover.delete(sessionId) ?: return
+    val op = pendingOps.register(Res.string.discover_undo_delete.text(), undo = {
+      aiDiscover.reinsert(removed)
+    })
+    messages.postFeedback(
+      level = MessageLevel.Info,
+      title = Res.string.discover_deleted.text(removed.title),
+      actions = listOf(undoAction(op)),
+    )
+  }
+
+  /** Deletes every Discover session that is not running, with Undo. */
+  fun clearDiscoverHistory() {
+    val removed = aiDiscover.clearHistory()
+    if (removed.isEmpty()) return
+    val op = pendingOps.register(Res.string.discover_undo_clear_history.text(), undo = {
+      removed.forEach(aiDiscover::reinsert)
+    })
+    messages.postFeedback(
+      level = MessageLevel.Info,
+      title = Res.plurals.discover_history_cleared.text(removed.size),
+      actions = listOf(undoAction(op)),
+    )
+  }
+
+  /**
+   * Posts a toast for each request to open a website that waits while Discover does not show its
+   * session in a window in front, with Review, which shows it; the host may also raise a system
+   * notification. Once the request is answered or ends, or its session shows with the request's
+   * card, the toast leaves the screen and the activity history, where Review would show a
+   * session with nothing to answer.
+   *
+   * A request whose card showed gets no toast while only its window is out of front, as when the
+   * user switches to another app or the Settings window, so looking away from a card the user
+   * read never posts it again; another page or chat does post it. Only a request's first toast
+   * asks for a system notification, so each request raises one at most.
+   */
+  private suspend fun announceApprovals() {
+    val toasts = mutableMapOf<String, Long>()
+    // Requests that still wait whose card showed in a window in front.
+    val seen = mutableSetOf<String>()
+    // Requests that still wait whose toast asked for a system notification.
+    val notified = mutableSetOf<String>()
+    snapshotFlow {
+      val shownId = aiDiscover.currentId.takeIf { aiDiscover.shown }
+      Triple(aiDiscover.approvals, shownId, aiDiscover.inFront)
+    }.collect { (approvals, shownId, inFront) ->
+      val waiting = approvals.mapTo(mutableSetOf()) { it.id }
+      seen.retainAll(waiting)
+      notified.retainAll(waiting)
+      toasts.keys.filter { it !in waiting }.forEach { id ->
+        toasts.remove(id)?.let(messages::withdraw)
+      }
+      for (approval in approvals) {
+        val sessionShown = shownId != null && approval.sessionId == shownId
+        if (sessionShown && inFront) {
+          seen += approval.id
+          toasts.remove(approval.id)?.let(messages::withdraw)
+          continue
+        }
+        if (approval.id in toasts || sessionShown && approval.id in seen) continue
+        toasts[approval.id] = messages.post(
+          level = MessageLevel.Info,
+          title = Res.string.discover_needs_ok.text(approval.request.host),
+          actions = listOf(
+            MessageAction(Res.string.action_review.text()) { showDiscover(approval.sessionId) },
+          ),
+          toast = ToastMode.Sticky,
+          notify = notified.add(approval.id),
+        ).id
+      }
+    }
   }
 
   /** Shows [key] in the inspector, or clears it with `null`. */
@@ -1442,7 +1563,10 @@ class AppState(
     task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
   }
 
-  /** Reports [event] from the host's activity monitor as a message. */
+  /**
+   * Reports [event] from the host's activity monitor as a message. The monitor posts the
+   * system notifications for its events itself, so these messages never ask for one.
+   */
   fun report(event: ActivityEvent) {
     when (event) {
       is ActivityEvent.Added -> {
@@ -1467,7 +1591,6 @@ class AppState(
           transferSummary(event.state)).joinText(),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
-        notify = true,
       )
       is ActivityEvent.CompletedBatch -> {
         val bytes = event.completions.sumOf { it.state.totalBytes ?: 0L }
@@ -1475,7 +1598,6 @@ class AppState(
           level = MessageLevel.Success,
           title = Res.plurals.notify_downloads_finished.text(event.completions.size),
           detail = sizeText(bytes).takeIf { bytes > 0 },
-          notify = true,
         )
       }
       is ActivityEvent.Failed -> messages.post(
@@ -1485,7 +1607,6 @@ class AppState(
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
         actions = listOf(MessageAction(Res.string.action_retry.text()) { retry(event.taskKey) }),
-        notify = true,
         cause = event.state.error,
       )
       is ActivityEvent.Recovered -> messages.post(
@@ -1501,7 +1622,6 @@ class AppState(
           sizeText(event.bytes).takeIf { event.bytes > 0 },
         ).joinText(),
         deviceId = event.deviceId,
-        notify = true,
       )
       is ActivityEvent.DeviceOffline -> messages.post(
         level = MessageLevel.Warning,
@@ -1516,9 +1636,10 @@ class AppState(
     }
   }
 
-  /** Commits the pending operations; call it when the app closes. */
+  /** Commits the pending operations and stops Discover's searches; call it when the app closes. */
   fun close() {
     pendingOps.flush()
+    aiDiscover.close()
   }
 
   /** The device that runs [task]: the one whose task list holds it, else the active one. */

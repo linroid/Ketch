@@ -9,6 +9,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.ActivityEvent
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
@@ -713,6 +714,14 @@ class DesktopTrayModelTest {
     assertEquals(Notification.Type.Error, notificationType(failed))
     assertEquals(Notification.Type.Warning, notificationType(ActivityEvent.DeviceOffline("nas")))
     assertEquals(Notification.Type.Info, notificationType(ActivityEvent.QueueDrained("nas", 2, 0)))
+  }
+
+  @Test
+  fun notificationType_messageLevel_raisesErrorsAndWarnings() {
+    assertEquals(Notification.Type.Error, notificationType(MessageLevel.Error))
+    assertEquals(Notification.Type.Warning, notificationType(MessageLevel.Warning))
+    assertEquals(Notification.Type.Info, notificationType(MessageLevel.Info))
+    assertEquals(Notification.Type.Info, notificationType(MessageLevel.Success))
   }
 
   private fun tray(

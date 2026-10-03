@@ -53,7 +53,7 @@ class DiscoverActionsTest {
     val controller = controller(api)
     runCurrent()
     val picked = listOf(candidate("a.iso"), candidate("broken.iso"), candidate("b.iso"))
-    controller.state.aiDiscover.draft.selected = picked.map { it.url }.toSet()
+    controller.state.aiDiscover.selected = picked.map { it.url }.toSet()
 
     controller.state.addDiscovered(picked)
     runCurrent()
@@ -67,7 +67,7 @@ class DiscoverActionsTest {
       message.title.load(),
     )
     assertEquals(listOf("Review", "Undo"), message.actions.map { it.label }.load())
-    val stillSelected = controller.state.aiDiscover.draft.selected
+    val stillSelected = controller.state.aiDiscover.selected
     assertEquals(setOf("https://example.com/broken.iso"), stillSelected)
     controller.close()
   }
@@ -119,7 +119,7 @@ class DiscoverActionsTest {
   fun reviewDiscovered_unknownTarget_opensTheSheetForTheActiveDevice() =
     discoverTest { _, controller ->
       runCurrent()
-      controller.state.aiDiscover.draft.target = "gone.local:8642"
+      controller.state.aiDiscover.target = "gone.local:8642"
 
       controller.state.reviewDiscovered(listOf(candidate("a.iso"), candidate("b.iso")))
 

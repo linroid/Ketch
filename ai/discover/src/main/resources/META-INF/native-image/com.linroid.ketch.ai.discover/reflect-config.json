@@ -15,10 +15,22 @@
     "name": "com.linroid.ketch.ai.agent.LinkExtractor"
   },
   {
+    "name": "com.linroid.ketch.ai.agent.SiteAllowlist"
+  },
+  {
     "name": "com.linroid.ketch.ai.DiscoverResult"
   },
   {
     "name": "com.linroid.ketch.ai.DiscoverResult$Source"
+  },
+  {
+    "name": "com.linroid.ketch.ai.PageAccessApprover"
+  },
+  {
+    "name": "com.linroid.ketch.ai.PageAccessKind"
+  },
+  {
+    "name": "com.linroid.ketch.ai.PageAccessRequest"
   },
   {
     "name": "com.linroid.ketch.ai.fetch.ContentExtractor"
@@ -34,6 +46,9 @@
   },
   {
     "name": "com.linroid.ketch.ai.search.SearchProvider"
+  },
+  {
+    "name": "com.linroid.ketch.ai.search.SearchResult"
   },
   {
     "name": "com.linroid.ketch.ai.site.RobotsTxtRules"

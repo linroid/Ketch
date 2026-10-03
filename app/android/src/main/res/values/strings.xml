@@ -11,9 +11,10 @@
   <!-- Shown when text shared with Ketch holds no link. -->
   <string name="quick_add_no_link">No link to download</string>
 
-  <!-- Asked once, after the first download is added, before the system asks for the permission. -->
-  <string name="notifications_offer_title">Get notified when downloads finish</string>
-  <string name="notifications_offer_message">Ketch can tell you when a download finishes or fails while you use other apps.</string>
+  <!-- Asked once, after the first download is added or Discover first asks to open a website,
+       before the system asks for the permission. -->
+  <string name="notifications_offer_title">Get notified about downloads and Discover</string>
+  <string name="notifications_offer_message">Ketch can tell you when a download finishes or fails, or when Discover needs your OK to open a website, while you use other apps.</string>
   <string name="notifications_offer_allow">Allow</string>
   <string name="notifications_offer_not_now">Not now</string>
 </resources>

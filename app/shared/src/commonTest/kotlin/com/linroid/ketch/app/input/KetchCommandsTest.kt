@@ -52,6 +52,15 @@ class KetchCommandsTest {
   }
 
   @Test
+  fun all_discoverChordsOnEachPlatform_neverHideGlobalChords() {
+    for (platform in KeyboardPlatform.entries) {
+      val hidden = presses(CommandScope.Discover, platform) intersect
+        presses(CommandScope.Global, platform)
+      assertTrue(hidden.isEmpty(), "$platform Discover chords hide global ones: $hidden")
+    }
+  }
+
+  @Test
   fun all_everyCommand_hasLabel() = runTest {
     KetchCommands.all.forEach { command ->
       assertTrue(command.label.load().isNotBlank(), "${command.id} has no label")
@@ -94,6 +103,14 @@ class KetchCommandsTest {
     assertLabels(KetchCommands.FewerConnections, "−", "-", "−", "-")
     assertLabels(KetchCommands.TogglePause, "Space", "Space", "Space", "Space")
     assertLabels(KetchCommands.Retry, "⌘R", "Ctrl+R", "r", "r")
+  }
+
+  @Test
+  fun shortcutLabel_discoverCommands_followEachKeymap() {
+    assertLabels(KetchCommands.DiscoverNewSearch, "⇧⌘E", "Ctrl+Shift+E", "⇧⌘E", "Ctrl+Shift+E")
+    assertLabels(KetchCommands.DiscoverHistory, "⇧⌘H", "Ctrl+Shift+H", "⇧⌘H", "Ctrl+Shift+H")
+    assertLabels(KetchCommands.DiscoverAllow, "⌘↩", "Ctrl+Enter", "⌘↩", "Ctrl+Enter")
+    assertLabels(KetchCommands.DiscoverStop, "Esc", "Esc", "Esc", "Esc")
   }
 
   @Test

@@ -8,8 +8,8 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.search.BraveSearchProvider
 import com.linroid.ketch.ai.search.DummySearchProvider
 import com.linroid.ketch.ai.search.GoogleSearchProvider
+import com.linroid.ketch.ai.search.PacedSearchProvider
 import com.linroid.ketch.ai.search.SearchProvider
-import com.linroid.ketch.ai.site.SiteProfileStore
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.config.SearchProvider as SearchProviderKind
@@ -33,8 +33,6 @@ private val log = KetchLogger("AiModule")
  */
 class AiModule(
   val discoveryService: ResourceDiscoveryService,
-  val siteProfiler: SiteProfiler,
-  val siteProfileStore: SiteProfileStore,
   private val httpClients: List<HttpClient> = emptyList(),
 ) {
 
@@ -55,9 +53,12 @@ class AiModule(
      * Creates a fully wired AI module from [config].
      *
      * @param config AI configuration settings
-     * @param searchProvider custom search provider, or `null` to use
-     *   the default no-op provider
-     * @param stepListener optional listener for agent progress steps
+     * @param searchProvider custom search provider, or `null` for the
+     *   one [AiConfig.search] configures. The Brave and Google providers
+     *   start their searches at least 1.1 s apart across all runs; a
+     *   custom one is used as it is
+     * @param stepListener listener for the agent progress steps of runs
+     *   that pass none to [ResourceDiscoveryService.discover]
      */
     fun create(
       config: AiConfig,
@@ -79,7 +80,6 @@ class AiModule(
         userAgent = config.discovery.userAgent,
       )
       val contentExtractor = ContentExtractor()
-      val siteProfileStore = SiteProfileStore()
       val siteProfiler = SiteProfiler(
         fetcher = fetcher,
         robotsUserAgent = config.discovery.userAgent.substringBefore('/'),
@@ -101,8 +101,6 @@ class AiModule(
 
       return AiModule(
         discoveryService = discoveryService,
-        siteProfiler = siteProfiler,
-        siteProfileStore = siteProfileStore,
         httpClients = listOf(fetcherClient, searchClient),
       )
     }
@@ -129,9 +127,9 @@ class AiModule(
         DummySearchProvider()
       }
       settings.provider == SearchProviderKind.Brave ->
-        BraveSearchProvider(httpClient, settings.apiKey)
+        PacedSearchProvider(BraveSearchProvider(httpClient, settings.apiKey))
       settings.provider == SearchProviderKind.Google ->
-        GoogleSearchProvider(httpClient, settings.apiKey, settings.cx)
+        PacedSearchProvider(GoogleSearchProvider(httpClient, settings.apiKey, settings.cx))
       else -> DummySearchProvider()
     }
   }

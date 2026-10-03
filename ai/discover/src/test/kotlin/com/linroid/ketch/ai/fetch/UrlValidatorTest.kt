@@ -1,7 +1,9 @@
 package com.linroid.ketch.ai.fetch
 
 import kotlinx.coroutines.test.runTest
+import java.net.UnknownHostException
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class UrlValidatorTest {
@@ -155,5 +157,42 @@ class UrlValidatorTest {
     })
 
     assertIs<ValidationResult.Valid>(validator.validate("https://example.com/file.iso"))
+  }
+
+  // -- Checking without a lookup --
+
+  @Test
+  fun check_neverLooksUpTheHost() {
+    val lookups = mutableListOf<String>()
+    val validator = UrlValidator(resolve = { host ->
+      lookups += host
+      fakeDns("10.example" to "10.0.0.1")(host)
+    })
+
+    assertIs<ValidationResult.Valid>(validator.check("https://words.attacker.example/x"))
+    // A name that resolves to a private address passes; only validate() can tell.
+    assertIs<ValidationResult.Valid>(validator.check("https://10.example/"))
+    assertIs<ValidationResult.Blocked>(validator.check("http://localhost/"))
+    assertEquals(emptyList(), lookups)
+  }
+
+  @Test
+  fun check_privateIpLiterals_areBlocked() {
+    assertIs<ValidationResult.Blocked>(validator.check("http://192.168.1.1/"))
+    assertIs<ValidationResult.Blocked>(validator.check("http://100.64.0.1/"))
+    assertIs<ValidationResult.Blocked>(validator.check("http://[::ffff:127.0.0.1]/"))
+    assertIs<ValidationResult.Valid>(validator.check("http://93.184.215.14/"))
+  }
+
+  @Test
+  fun validate_ipLiteral_isNotLookedUp() = runTest {
+    val lookups = mutableListOf<String>()
+    val validator = UrlValidator(resolve = { host ->
+      lookups += host
+      throw UnknownHostException(host)
+    })
+
+    assertIs<ValidationResult.Valid>(validator.validate("http://93.184.215.14/file.iso"))
+    assertEquals(emptyList(), lookups)
   }
 }

@@ -16,10 +16,13 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
@@ -284,9 +287,13 @@ internal class SnapshotScene(
     }
   }
 
-  /** Presses and releases [key], with Shift held when [shift] is set. */
-  suspend fun pressKey(key: Key, shift: Boolean = false) {
-    scene.sendKey(key, shift = shift)
+  /**
+   * Presses and releases [key], with Shift held when [shift] is set and the platform's primary
+   * modifier, ⌘ or Ctrl, when [primary] is.
+   */
+  suspend fun pressKey(key: Key, shift: Boolean = false, primary: Boolean = false) {
+    val apple = KeyboardPlatform.current.isApple
+    scene.sendKey(key, meta = primary && apple, ctrl = primary && !apple, shift = shift)
     settle(minimum = INTERACTION_SETTLE)
   }
 
@@ -294,6 +301,32 @@ internal class SnapshotScene(
   suspend fun hover(x: Dp, y: Dp) {
     scene.sendPointerEvent(PointerEventType.Move, offset(x, y))
     settle(minimum = INTERACTION_SETTLE)
+  }
+
+  /**
+   * Turns the mouse wheel over [x], [y] by [ticks]: negative scrolls toward the top, as a
+   * desktop list scrolls by the wheel and never by a drag.
+   */
+  suspend fun scroll(x: Dp, y: Dp, ticks: Float) {
+    scene.sendPointerEvent(
+      eventType = PointerEventType.Scroll,
+      position = offset(x, y),
+      scrollDelta = Offset(0f, ticks),
+    )
+    settle(minimum = INTERACTION_SETTLE)
+  }
+
+  /**
+   * Clicks the middle of the first control whose content description, such as a button's
+   * tooltip, is [description].
+   */
+  suspend fun clickOn(description: String) {
+    val node = scene.nodes().firstOrNull {
+      it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(description) == true
+    }
+    val center = checkNotNull(node) { "Nothing on screen is described as $description" }
+      .boundsInRoot.center
+    click((center.x / scale).dp, (center.y / scale).dp)
   }
 
   /** Clicks the primary button at [x], [y] from the top left. */
@@ -528,7 +561,10 @@ internal fun <T> withSample(
   data: SampleData = SampleData.downloads(),
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   block: (SampleEnvironment) -> T,
-): T = withEnvironment({ SampleEnvironment(data, theme, density, aiProviderFactory) }, block = block)
+): T = withEnvironment(
+  create = { SampleEnvironment(data, theme, density, aiProviderFactory) },
+  block = block,
+)
 
 /**
  * Renders the real [App] root of [environment] to `<name>-<theme>-<width>x<height>.png` and

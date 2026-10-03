@@ -103,6 +103,8 @@ data class IntakePreferences(
  * @property reduceMotion whether to reduce motion; `false` follows the system.
  * @property settingsPage name of the Settings page shown last, which Settings reopens on;
  *   `null` until Settings has been opened.
+ * @property discoverHistory whether Discover shows its history beside the chat on windows wide
+ *   enough to dock it.
  */
 @Serializable
 data class UiPreferences(
@@ -127,6 +129,7 @@ data class UiPreferences(
   val density: DensityMode = DensityMode.Auto,
   val reduceMotion: Boolean = false,
   val settingsPage: String? = null,
+  val discoverHistory: Boolean = true,
 ) {
   companion object {
     /** Docked inspector width until the user resizes it, in dp. */

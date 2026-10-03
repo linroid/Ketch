@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -172,13 +173,19 @@ internal fun CollapsingBar(chrome: PhoneChromeState, content: @Composable () -> 
 /**
  * The phone's top bar: the active device's pennant (tap for the devices, long-press to go back
  * to the one before), the page title with the Pulse subtitle (tap for the Pulse sheet), search
- * and the overflow menu. Search turns the bar into a field that filters the downloads, adds a
- * pasted link, or searches Discover for plain text.
+ * or the page's own [actions], and the overflow menu. Search turns the bar into a field that
+ * filters the downloads, adds a pasted link, or searches Discover for plain text.
  *
  * @param showsBottomBar whether the bottom bar shows; without it the overflow lists Devices.
+ * @param actions the page's buttons in place of search, such as Discover's History and New
+ *   search; `null` shows search.
  */
 @Composable
-internal fun PhoneTopBar(shell: ShellState, showsBottomBar: Boolean) {
+internal fun PhoneTopBar(
+  shell: ShellState,
+  showsBottomBar: Boolean,
+  actions: (@Composable RowScope.() -> Unit)? = null,
+) {
   val state = shell.app
   if (shell.searchOpen) {
     Box {
@@ -212,11 +219,15 @@ internal fun PhoneTopBar(shell: ShellState, showsBottomBar: Boolean) {
       )
       PulseSubtitle(state, onClick = { shell.pulseSheetOpen = true })
     }
-    KetchIconButton(
-      icon = KetchIcon.Search,
-      onClick = { shell.focusSearch() },
-      contentDescription = KetchCommands.Search.label.resolve(),
-    )
+    if (actions != null) {
+      actions()
+    } else {
+      KetchIconButton(
+        icon = KetchIcon.Search,
+        onClick = { shell.focusSearch() },
+        contentDescription = KetchCommands.Search.label.resolve(),
+      )
+    }
     Overflow(shell, showsBottomBar)
   }
 }
