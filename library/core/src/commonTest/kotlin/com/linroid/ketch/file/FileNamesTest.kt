@@ -38,7 +38,7 @@ class FileNamesTest {
   @Test
   fun sanitizeFileName_controlAndBidiCharacters_removed() {
     assertEquals("abc.txt", sanitizeFileName("a\u0000b\tc\u007F\u0085.txt"))
-    assertEquals("invoicegpj.exe", sanitizeFileName("invoice\u202Egpj.exe"))
+    assertEquals("invoicegpj.exe", sanitizeFileName("invoice\u202Egpj\u061C.exe"))
   }
 
   @Test
@@ -56,6 +56,14 @@ class FileNamesTest {
     assertEquals("_LPT9", sanitizeFileName("LPT9"))
     assertEquals("CONSOLE.txt", sanitizeFileName("CONSOLE.txt"))
     assertEquals("COM10", sanitizeFileName("COM10"))
+  }
+
+  @Test
+  fun sanitizeFileName_cutIntoDeviceName_prefixedWithinLimit() {
+    val name = sanitizeFileName("CONX." + "a".repeat(251))!!
+
+    assertEquals("_CO." + "a".repeat(251), name)
+    assertEquals(MAX_FILE_NAME_BYTES, name.encodeToByteArray().size)
   }
 
   @Test

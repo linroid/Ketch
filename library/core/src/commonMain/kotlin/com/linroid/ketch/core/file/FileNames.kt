@@ -8,9 +8,9 @@ internal const val MAX_FILE_NAME_BYTES = 255
 /** Characters Windows does not allow in a file name; the separators are removed before. */
 private const val WINDOWS_RESERVED_CHARS = "<>:\"|?*"
 
-/** Bidirectional controls, which can make `exe.txt` read as `txt.exe`. */
+/** Unicode `Bidi_Control` characters, which can make `exe.txt` read as `txt.exe`. */
 private const val BIDI_CONTROLS =
-  "\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069"
+  "\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069"
 
 /**
  * Makes [name], a file name that a server or a link suggests, safe to create inside a download
@@ -42,8 +42,10 @@ fun sanitizeFileName(name: String): String? {
     }
   }.trimFileName()
   if (cleaned.isEmpty()) return null
-  val safe = if (isWindowsDeviceName(cleaned)) "_$cleaned" else cleaned
-  return fitFileName(safe).trimFileName().ifEmpty { null }
+  // Checked once cut: cutting `CONX.<long extension>` leaves `CON.<long extension>`.
+  val fitted = fitFileName(cleaned).trimFileName()
+  val safe = if (isWindowsDeviceName(fitted)) fitFileName("_$fitted").trimFileName() else fitted
+  return safe.ifEmpty { null }
 }
 
 /**
