@@ -6,12 +6,16 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -188,6 +192,61 @@ class SegmentedDownloadHelperTest {
     } finally {
       job.cancelAndJoin()
     }
+  }
+
+  @Test
+  fun downloadAll_connectionChangeWhileBatchStops_isApplied() = runTest {
+    val context = context(
+      connections = MutableStateFlow(4),
+      segments = (0..3).map { Segment(index = it, start = it * 3L, end = it * 3L + 2) },
+    )
+    val requests = mutableListOf<Segment>()
+    val job = launch {
+      val helper = SegmentedDownloadHelper()
+      helper.downloadAll(context, context.segments.value, 12) { segment, report ->
+        requests.add(segment)
+        if (requests.size <= 4) {
+          try {
+            awaitCancellation()
+          } finally {
+            // Closing a connection takes a while, and no watcher listens meanwhile.
+            withContext(NonCancellable) { delay(100) }
+          }
+        }
+        report(segment.totalBytes)
+        segment.copy(downloadedBytes = segment.totalBytes)
+      }
+    }
+    try {
+      runCurrent()
+      context.maxConnections.value = 5
+      runCurrent()
+      context.maxConnections.value = 6
+      advanceUntilIdle()
+      assertTrue(job.isCompleted)
+      assertEquals(6, requests.drop(4).size, "The change made while stopping must be applied")
+    } finally {
+      job.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun downloadAll_connectionChangeAfterSizing_resegmentsFirstBatch() = runTest {
+    // The source sized four segments, then the connections changed before the download began.
+    val context = context(
+      connections = MutableStateFlow(6),
+      segments = (0..3).map { Segment(index = it, start = it * 3L, end = it * 3L + 2) },
+    )
+    val requests = mutableListOf<Segment>()
+    SegmentedDownloadHelper().downloadAll(
+      context, context.segments.value, 12, requestedConnections = 4,
+    ) { segment, report ->
+      requests.add(segment)
+      report(segment.totalBytes)
+      segment.copy(downloadedBytes = segment.totalBytes)
+    }
+    assertEquals(6, requests.size)
+    assertEquals(6, context.segments.value.size)
   }
 
   /** Downloads [context]'s segments; the first [firstBatch] requests wait until cancelled. */

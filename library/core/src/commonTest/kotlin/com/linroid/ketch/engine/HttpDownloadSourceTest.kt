@@ -6,6 +6,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -25,6 +26,25 @@ class HttpDownloadSourceTest {
 
     assertEquals(3, engine.downloadCallCount)
     assertEquals(3, context.segments.value.size)
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
+  fun download_connectionChangeWhilePreparing_isApplied() = runTest {
+    val engine = FakeHttpEngine()
+    val connections = MutableStateFlow(4)
+    // The change lands after the segments are sized and before the first batch starts.
+    val accessor = object : FileAccessor by NoOpFileAccessor {
+      override suspend fun preallocate(size: Long) {
+        connections.value = 6
+      }
+    }
+    val context = context(connections = connections, fileAccessor = accessor)
+
+    HttpDownloadSource(engine).download(context)
+
+    assertEquals(6, engine.downloadCallCount)
+    assertEquals(6, context.segments.value.size)
     assertTrue(context.segments.value.all { it.isComplete })
   }
 
@@ -77,11 +97,12 @@ class HttpDownloadSourceTest {
     config: DownloadConfig = DownloadConfig.Default,
     connections: MutableStateFlow<Int> = MutableStateFlow(0),
     throttle: suspend (Int) -> Unit = {},
+    fileAccessor: FileAccessor = NoOpFileAccessor,
   ): DownloadContext = DownloadContext(
     taskId = "http-source",
     url = "https://example.com/file",
     request = DownloadRequest("https://example.com/file"),
-    fileAccessor = NoOpFileAccessor,
+    fileAccessor = fileAccessor,
     segments = MutableStateFlow(emptyList()),
     onProgress = { _, _ -> },
     throttle = throttle,
