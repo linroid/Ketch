@@ -11,8 +11,10 @@
   <header class="bar">
     <img src="../icons/icon-32.png" alt="" width="20" height="20">
     <span id="instance-name" class="instance-name">Ketch</span>
-    <select id="instance-picker" aria-label="Ketch instance" hidden></select>
-    <button id="open-options" class="icon" type="button" title="Settings" aria-label="Settings">
+    <select id="instance-picker" aria-label="Ketch instance"
+            data-i18n-aria-label="popup_instance_picker" hidden></select>
+    <button id="open-options" class="icon" type="button" title="Settings" aria-label="Settings"
+            data-i18n-title="popup_settings" data-i18n-aria-label="popup_settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/>
@@ -26,31 +28,35 @@
   <section class="connection" aria-live="polite">
     <div class="connection-line">
       <span id="status-dot" class="status-dot"></span>
-      <span id="status-text" class="muted">Connecting…</span>
+      <span id="status-text" class="muted" data-i18n="status_connecting">Connecting…</span>
     </div>
     <p id="status-hint" class="hint" hidden></p>
-    <button id="open-app" class="primary open-app" type="button" hidden>Open Ketch</button>
+    <button id="open-app" class="primary open-app" type="button" data-i18n="popup_open_app"
+            hidden>Open Ketch</button>
   </section>
 
   <form id="add-form" class="add">
     <input id="add-url" type="text" placeholder="Paste a link or magnet link" autocomplete="off"
-           spellcheck="false" aria-label="Link to download">
-    <button id="add-button" class="primary" type="submit">Download</button>
+           spellcheck="false" aria-label="Link to download"
+           data-i18n-placeholder="popup_add_placeholder" data-i18n-aria-label="popup_add_label">
+    <button id="add-button" class="primary" type="submit"
+            data-i18n="popup_add_button">Download</button>
   </form>
   <p id="add-message" class="add-message" role="status" hidden></p>
 
   <label class="capture">
     <span class="capture-text">
-      Capture browser downloads
+      <span data-i18n="popup_capture">Capture browser downloads</span>
       <small id="capture-target" class="muted" hidden></small>
     </span>
     <input id="capture" class="switch" type="checkbox" role="switch">
   </label>
 
   <section id="recent" class="recent" hidden>
-    <h2>Recent</h2>
+    <h2 data-i18n="popup_recent">Recent</h2>
     <ul id="tasks" class="tasks"></ul>
-    <p id="tasks-empty" class="muted empty" hidden>No downloads yet.</p>
+    <p id="tasks-empty" class="muted empty" data-i18n="popup_no_downloads" hidden>No downloads
+      yet.</p>
   </section>
 </body>
 </html>

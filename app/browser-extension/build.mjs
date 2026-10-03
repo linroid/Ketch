@@ -88,19 +88,33 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({
     options: { version: { type: 'string' }, build: { type: 'string' } },
   });
-  const versions = releaseVersion(values.version ?? version, values.build);
-  for (const [browser, browserManifest] of Object.entries(targetManifests(versions))) {
-    const dir = join(out, browser);
-    const zip = join(out, `ketch-extension-${versions.versionName}-${browser}.zip`);
+  for (const { dir, zip } of build({ release: values.version, buildNumber: values.build })) {
+    console.log(`Built ${relative(root, dir)} and ${relative(root, zip)}`);
+  }
+}
+
+/**
+ * Builds a directory and a zip for each browser.
+ *
+ * @param {{ outDir?: string, release?: string, buildNumber?: string }} [options] `outDir`
+ *   defaults to `build/`; `release` to the version in package.json
+ * @returns {{ browser: string, dir: string, zip: string }[]}
+ */
+export function build({ outDir = out, release = version, buildNumber } = {}) {
+  const versions = releaseVersion(release, buildNumber);
+  return Object.entries(targetManifests(versions)).map(([browser, browserManifest]) => {
+    const dir = join(outDir, browser);
+    const zip = join(outDir, `ketch-extension-${versions.versionName}-${browser}.zip`);
     // Only this build's own outputs, so test reports in build/ survive.
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
     cpSync(src, dir, { recursive: true, filter: (path) => !path.endsWith('.DS_Store') });
     writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify(browserManifest, null, 2)}\n`);
     checkReferencedFiles(dir, browserManifest);
+    checkLocales(dir, browserManifest);
     writeFileSync(zip, zipDirectory(dir));
-    console.log(`Built ${relative(root, dir)} and ${relative(root, zip)}`);
-  }
+    return { browser, dir, zip };
+  });
 }
 
 /** Fails the build when the manifest points at a file that does not exist. */
@@ -116,6 +130,21 @@ function checkReferencedFiles(dir, browserManifest) {
   ].filter(Boolean);
   const missing = files.filter((file) => !existsSync(join(dir, file)));
   if (missing.length > 0) throw new Error(`Missing files: ${missing.join(', ')}`);
+}
+
+/**
+ * Fails the build when the manifest's messages can't be found: browsers refuse to load an
+ * extension whose `default_locale` has no `messages.json`, or that names a missing message.
+ */
+function checkLocales(dir, browserManifest) {
+  const locale = browserManifest.default_locale;
+  const file = join(dir, '_locales', locale ?? '', 'messages.json');
+  if (!locale || !existsSync(file)) throw new Error(`Missing messages for locale "${locale}"`);
+  const messages = JSON.parse(readFileSync(file, 'utf8'));
+  const names = [...JSON.stringify(browserManifest).matchAll(/__MSG_(\w+)__/g)]
+    .map((match) => match[1]);
+  const missing = names.filter((name) => !Object.hasOwn(messages, name));
+  if (missing.length > 0) throw new Error(`Missing messages: ${missing.join(', ')}`);
 }
 
 /** Writes a deflated zip with fixed timestamps, so identical sources give identical packages. */
