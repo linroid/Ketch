@@ -22,6 +22,9 @@
   <string name="error_check_connection_short">check the connection and try again</string>
   <string name="error_not_supported">Not supported on this device</string>
   <string name="error_something_went_wrong">Something went wrong</string>
+  <!-- A device refused a folder outside its download folder and the folders its owner allows, to save a download to or delete files from. -->
+  <string name="error_path_rejected">Folder not allowed on that device</string>
+  <string name="error_path_rejected_hint">It only uses its download folder and the folders its owner allows.</string>
 
   <string name="error_disk">Couldn't write the file</string>
   <string name="error_disk_hint">Check free space and folder permissions.</string>

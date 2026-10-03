@@ -6,6 +6,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.remote.RemoteApiException
 import kotlinx.coroutines.test.runTest
 import okio.IOException
 import kotlin.test.Test
@@ -59,6 +60,27 @@ class ToastHostTest {
 
     assertEquals(
       "Destination must not be blank",
+      toastDetail(message(detail = cause.message, cause = cause)).load()
+    )
+  }
+
+  @Test
+  fun toastDetail_deviceRefusedFolder_readsAsTheCatalogCopy() = runTest {
+    val message = "/srv/a.iso is outside the folders this device saves downloads to"
+    val cause = RemoteApiException(403, "path_rejected", message)
+
+    assertEquals(
+      "Folder not allowed on that device",
+      toastDetail(message(detail = cause.message, cause = cause)).load()
+    )
+  }
+
+  @Test
+  fun toastDetail_deviceRefusedOtherwise_readsAsTheDevicesReason() = runTest {
+    val cause = RemoteApiException(413, "payload_too_large", "Request body exceeds 65536 bytes")
+
+    assertEquals(
+      "Request body exceeds 65536 bytes",
       toastDetail(message(detail = cause.message, cause = cause)).load()
     )
   }

@@ -12,7 +12,6 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
-import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TaskSnapshot
@@ -23,6 +22,7 @@ import io.ktor.client.plugins.resources.post
 import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -183,10 +183,11 @@ internal class RemoteDownloadTask(
     }
     // Servers that predate Auto reject 0 like any other invalid count.
     if (connections == 0 && response.status == HttpStatusCode.BadRequest) {
-      val code = runCatching { response.body<ErrorResponse>().error }.getOrNull()
-      if (code == "invalid_connections") {
-        throw UnsupportedOperationException("This server does not support Auto connections")
+      val error = response.toRemoteApiException()
+      if (error.errorCode == "invalid_connections") {
+        throw UnsupportedOperationException("This server does not support Auto connections", error)
       }
+      fail(error)
     }
     checkSuccess(response)
     update(response.body(), events)
@@ -217,17 +218,14 @@ internal class RemoteDownloadTask(
     }
   }
 
-  private fun checkSuccess(
-    response: io.ktor.client.statement.HttpResponse,
-  ) {
-    if (!response.status.isSuccess()) {
-      log.e {
-        "HTTP error ${response.status.value} for taskId=$taskId"
-      }
-      throw IllegalStateException(
-        "HTTP ${response.status.value}: " +
-          response.status.description,
-      )
+  private suspend fun checkSuccess(response: HttpResponse) {
+    if (!response.status.isSuccess()) fail(response.toRemoteApiException())
+  }
+
+  private fun fail(error: RemoteApiException): Nothing {
+    log.w {
+      "HTTP error ${error.status} for taskId=$taskId: ${error.errorCode ?: "no error code"}"
     }
+    throw error
   }
 }

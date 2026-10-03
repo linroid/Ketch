@@ -34,4 +34,25 @@ class RemoteUpdateConfigTest {
       remote.close()
     }
   }
+
+  @Test
+  fun updateConfig_folderOutsideAllowed_reportsServerCodeAndMessage() = runTest {
+    val message = "/srv is outside the folders this device saves downloads to"
+    val remote = RemoteKetch("remote.example", 8642, null, false, MockEngine {
+      respond(
+        Json.encodeToString(ErrorResponse("path_rejected", message)),
+        HttpStatusCode.Forbidden,
+        headersOf(HttpHeaders.ContentType, "application/json")
+      )
+    })
+    try {
+      val error = assertFailsWith<RemoteApiException> {
+        remote.updateConfig(DownloadConfig(defaultDirectory = "/srv"))
+      }
+      assertEquals("path_rejected", error.errorCode)
+      assertEquals(message, error.message)
+    } finally {
+      remote.close()
+    }
+  }
 }

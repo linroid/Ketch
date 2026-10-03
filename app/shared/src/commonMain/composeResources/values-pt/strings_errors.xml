@@ -15,6 +15,8 @@
   <string name="error_check_connection_short">verifique a conexão e tente novamente</string>
   <string name="error_not_supported">Não disponível neste dispositivo</string>
   <string name="error_something_went_wrong">Algo deu errado</string>
+  <string name="error_path_rejected">Pasta não permitida nesse dispositivo</string>
+  <string name="error_path_rejected_hint">Ele só usa a pasta de downloads dele e as pastas que o proprietário permite.</string>
 
   <string name="error_disk">Não foi possível gravar o arquivo</string>
   <string name="error_disk_hint">Verifique o espaço livre e as permissões da pasta.</string>

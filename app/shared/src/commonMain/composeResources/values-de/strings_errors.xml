@@ -15,6 +15,8 @@
   <string name="error_check_connection_short">Verbindung prüfen und erneut versuchen</string>
   <string name="error_not_supported">Auf diesem Gerät nicht unterstützt</string>
   <string name="error_something_went_wrong">Etwas ist schiefgelaufen</string>
+  <string name="error_path_rejected">Ordner auf dem Gerät nicht erlaubt</string>
+  <string name="error_path_rejected_hint">Es verwendet nur seinen Downloadordner und die Ordner, die sein Besitzer erlaubt.</string>
 
   <string name="error_disk">Die Datei konnte nicht geschrieben werden</string>
   <string name="error_disk_hint">Prüfe den freien Speicher und die Ordnerberechtigungen.</string>

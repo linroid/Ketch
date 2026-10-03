@@ -14,6 +14,8 @@
   <string name="error_check_connection_short">請檢查網路連線後再試一次</string>
   <string name="error_not_supported">此裝置不支援</string>
   <string name="error_something_went_wrong">發生錯誤</string>
+  <string name="error_path_rejected">該裝置不允許使用此資料夾</string>
+  <string name="error_path_rejected_hint">只能使用其下載資料夾和擁有者允許的資料夾。</string>
 
   <string name="error_disk">無法寫入檔案</string>
   <string name="error_disk_hint">請檢查可用空間和資料夾權限。</string>

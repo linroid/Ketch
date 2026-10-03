@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -104,6 +105,16 @@ class RemotePairingTest {
   fun anotherRequestWaiting_isBusy() = runTest {
     pairing { _, _ -> respond("", HttpStatusCode.TooManyRequests) }.use {
       assertEquals(PairingResult.Busy, it.request(request))
+    }
+  }
+
+  @Test
+  fun refused_throwsServerCodeAndMessage() = runTest {
+    val body = """{"error":"origin_not_allowed","message":"Web pages cannot pair"}"""
+    pairing { _, _ -> json(body, HttpStatusCode.Forbidden) }.use {
+      val error = assertFailsWith<RemoteApiException> { it.request(request) }
+      assertEquals("origin_not_allowed", error.errorCode)
+      assertEquals("Web pages cannot pair", error.message)
     }
   }
 

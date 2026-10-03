@@ -17,6 +17,8 @@
   <string name="error_check_connection_short">проверьте подключение и попробуйте снова</string>
   <string name="error_not_supported">Не поддерживается на этом устройстве</string>
   <string name="error_something_went_wrong">Что-то пошло не так</string>
+  <string name="error_path_rejected">Папка не разрешена на устройстве</string>
+  <string name="error_path_rejected_hint">Устройство использует только свою папку для загрузок и папки, разрешённые его владельцем.</string>
 
   <string name="error_disk">Не удалось записать файл</string>
   <string name="error_disk_hint">Проверьте свободное место и права доступа к папке.</string>

@@ -15,6 +15,8 @@
   <string name="error_check_connection_short">comprueba la conexión y vuelve a intentarlo</string>
   <string name="error_not_supported">No disponible en este dispositivo</string>
   <string name="error_something_went_wrong">Algo salió mal</string>
+  <string name="error_path_rejected">Carpeta no permitida en ese dispositivo</string>
+  <string name="error_path_rejected_hint">Solo usa su carpeta de descargas y las carpetas que permite su propietario.</string>
 
   <string name="error_disk">No se pudo escribir el archivo</string>
   <string name="error_disk_hint">Comprueba el espacio libre y los permisos de la carpeta.</string>
