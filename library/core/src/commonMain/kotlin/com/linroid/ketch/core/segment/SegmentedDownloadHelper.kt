@@ -12,7 +12,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -106,9 +108,10 @@ class SegmentedDownloadHelper(
    * Downloads one batch of incomplete segments concurrently.
    *
    * When [supportsRanges] is `true`, a watcher coroutine monitors
-   * [DownloadContext.maxConnections] for changes. When the connection
-   * count changes, it sets [DownloadContext.pendingResegment] and cancels
-   * the scope.
+   * [DownloadContext.maxConnections] for changes. When the effective
+   * connection count of a new value (0 meaning Auto) differs from the
+   * number of segments the batch runs, it sets
+   * [DownloadContext.pendingResegment] and cancels the scope.
    *
    * @return `true` if all segments completed, `false` if
    *   interrupted for resegmentation
@@ -124,7 +127,12 @@ class SegmentedDownloadHelper(
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
     ) -> Segment,
   ): Boolean {
-    val initialConnections = context.maxConnections.value
+    // Connections the batch really runs: fewer than effectiveConnections() when a source capped
+    // them (HttpDownloadSource.applyRateLimit) or segments already finished.
+    val runningConnections = incompleteSegments.size
+    // The watcher reacts to every change after this value, 0 (Auto) included, even one made
+    // before it subscribes, such as from the progress report below.
+    val requestedAtStart = context.maxConnections.value
     val segmentProgress =
       allSegments.map { it.downloadedBytes }.toMutableList()
     val segmentMutex = Mutex()
@@ -165,15 +173,14 @@ class SegmentedDownloadHelper(
         val batchScope = this
         val watcherJob = if (supportsRanges) {
           launch(start = CoroutineStart.UNDISPATCHED) {
-            context.maxConnections.first { count ->
-              count > 0 && count != initialConnections
-            }
-            context.pendingResegment =
-              context.maxConnections.value
+            val target = context.maxConnections
+              .dropWhile { it == requestedAtStart }
+              .map { context.effectiveConnections(it) }
+              .first { it != runningConnections }
+            context.pendingResegment = target
             log.i {
-              "Connection change detected for " +
-                "taskId=${context.taskId}: " +
-                "$initialConnections -> ${context.pendingResegment}"
+              "Connection change detected for taskId=${context.taskId}: " +
+                "$runningConnections -> $target"
             }
             batchScope.cancel(CancellationException("Resegmenting"))
           }

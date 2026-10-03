@@ -177,7 +177,7 @@ class FtpDownloadSourceTest {
     file: MemoryFileAccessor,
     connections: Int = 0,
     config: DownloadConfig = DownloadConfig.Default,
-    maxConnections: MutableStateFlow<Int> = MutableStateFlow(0),
+    maxConnections: MutableStateFlow<Int> = MutableStateFlow(connections),
     throttle: suspend (Int) -> Unit = {},
   ) = DownloadContext(
     taskId = "ftp",

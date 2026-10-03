@@ -30,6 +30,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -195,9 +196,13 @@ class HttpDownloadIntegrationTest {
       assertEquals(saved, paused.progress.downloadedBytes)
       restored.resume()
       val state = restored.state.first { it.isTerminal }
-      assertContentEquals(fixture.content, File(assertIs<DownloadState.Completed>(state).outputPath)
-        .readBytes())
+      val completed = assertIs<DownloadState.Completed>(state)
+      assertContentEquals(fixture.content, File(completed.outputPath).readBytes())
       assertEquals("bytes=$saved-65538", fixture.requests.last())
+      // SQLite keeps milliseconds, so only a finish time stamped at that precision survives.
+      val completedAt = assertNotNull(completed.completedAt)
+      val reloaded = fixture.restart()
+      assertEquals(completedAt, assertIs<DownloadState.Completed>(reloaded.state.value).completedAt)
     }
   }
 

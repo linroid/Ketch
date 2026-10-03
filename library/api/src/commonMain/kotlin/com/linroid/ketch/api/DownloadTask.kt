@@ -1,6 +1,8 @@
 package com.linroid.ketch.api
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
@@ -23,14 +25,34 @@ interface DownloadTask {
   val segments: StateFlow<List<Segment>>
 
   /**
+   * Where this task waits in its Ketch instance's download queue: 1 for the task the queue
+   * starts next, 2 for the one after it, and so on. Tasks that wait are
+   * [DownloadState.Queued], or [DownloadState.Paused] for [PauseReason.Preempted].
+   *
+   * `null` when the task does not wait for a slot: it runs, is scheduled, paused by the user,
+   * finished, or holds a slot and is still starting (it is then [DownloadState.Queued] with a
+   * `null` position). Also `null` from implementations that do not report positions, such as a
+   * client of an older server; their [KetchStatus.features] lacks
+   * [KetchFeatures.QUEUE_POSITION].
+   *
+   * Positions follow the queue's order, priority first, then age. A task whose site is at
+   * [DownloadConfig.maxConnectionsPerHost] keeps its position while tasks behind it may start
+   * first. Updated whenever the queue changes; it is a separate flow from [state], so an
+   * observer can briefly see a new state with the previous position.
+   */
+  val queuePosition: StateFlow<Int?> get() = NoQueuePosition
+
+  /**
    * Pauses the download, preserving segment progress for later resume.
-   * Works while downloading or queued; a queued task leaves the queue
-   * until [resume] is called.
+   * Works while downloading, queued, or paused for [PauseReason.Preempted]; the task
+   * then leaves the queue until [resume] is called.
    */
   suspend fun pause()
 
   /**
    * Resumes a paused or failed download from where it left off.
+   * A task paused for [PauseReason.Preempted] already waits in the queue and is
+   * left as it is.
    *
    * @param destination optionally override the download destination.
    *   This can be useful if the destination is obtained through
@@ -75,7 +97,12 @@ interface DownloadTask {
    * HTTP Range or FTP REST support keep a single connection; BitTorrent
    * sources apply it as their peer connection limit.
    *
-   * @param connections the new connection count, must be greater than 0
+   * @param connections the new connection count, or 0 for Auto: the default of the
+   *   configuration the current run started with ([DownloadConfig.maxConnectionsPerDownload],
+   *   or a BitTorrent source's own default peer limit). Must not be negative.
+   * @throws IllegalArgumentException if [connections] is negative.
+   * @throws UnsupportedOperationException if the implementation cannot set Auto, such as a
+   *   task of an older server; check [KetchFeatures.AUTO_CONNECTIONS].
    */
   suspend fun setConnections(connections: Int)
 
@@ -123,3 +150,5 @@ interface DownloadTask {
     }
   }
 }
+
+private val NoQueuePosition: StateFlow<Int?> = MutableStateFlow<Int?>(null).asStateFlow()

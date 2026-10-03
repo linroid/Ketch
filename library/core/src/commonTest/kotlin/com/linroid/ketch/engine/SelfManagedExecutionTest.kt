@@ -80,6 +80,7 @@ class SelfManagedExecutionTest {
       override val createdAt = now
       override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
       override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
         createdAt = now, updatedAt = now)) {}
     }
@@ -143,6 +144,7 @@ class SelfManagedExecutionTest {
       override val createdAt = now
       override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
       override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
         createdAt = now, updatedAt = now)) {}
     }

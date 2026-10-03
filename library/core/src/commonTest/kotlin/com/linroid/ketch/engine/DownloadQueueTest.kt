@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.core.KetchDispatchers
@@ -77,6 +78,7 @@ class DownloadQueueTest {
         MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
       override val record = AtomicSaver(record) {}
     }
   }
@@ -452,50 +454,6 @@ class DownloadQueueTest {
   // ---- Preemption tests ----
 
   @Test
-  fun urgent_preemptsLowestPriorityActive() = runTest {
-    withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        // maxConcurrent=1 so the URGENT task will try to preempt
-        val scheduler = createScheduler(maxConcurrent = 1)
-
-        // Start a LOW priority task
-        val low = createHandle(
-          "task-low",
-          createRequest(priority = DownloadPriority.LOW),
-        )
-        scheduler.enqueue(low)
-
-        // Wait for it to start
-        withTimeout(2.seconds) {
-          low.mutableState.first { it != DownloadState.Queued }
-        }
-
-        // Enqueue URGENT — should preempt the LOW task
-        val urgent = createHandle(
-          "task-urgent",
-          createRequest(priority = DownloadPriority.URGENT),
-        )
-        scheduler.enqueue(urgent)
-
-        // The LOW task should be re-queued
-        withTimeout(2.seconds) {
-          low.mutableState.first { it is DownloadState.Queued }
-        }
-
-        // The URGENT task should have started
-        withTimeout(2.seconds) {
-          urgent.mutableState.first {
-            it != DownloadState.Queued && it !is DownloadState.Queued
-          }
-        }
-      } finally {
-        scope.cancel()
-      }
-    }
-  }
-
-  @Test
   fun urgent_cannotPreemptOtherUrgent() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -576,28 +534,6 @@ class DownloadQueueTest {
   }
 
   @Test
-  fun setPriority_urgent_preemptsAndResumesVictim() = runTest {
-    withContext(Dispatchers.Default) {
-      val scheduler = createScheduler(maxConcurrent = 1)
-      val active = createHandle("active")
-      val queued = createHandle("queued")
-      scheduler.enqueue(active)
-      scheduler.enqueue(queued)
-
-      scheduler.setPriority("queued", DownloadPriority.URGENT)
-
-      assertIs<DownloadState.Queued>(active.mutableState.value)
-      withTimeout(2.seconds) {
-        queued.mutableState.first { it != DownloadState.Queued }
-      }
-      scheduler.onTaskCompleted("queued")
-      withTimeout(2.seconds) {
-        active.mutableState.first { it != DownloadState.Queued }
-      }
-    }
-  }
-
-  @Test
   fun setPriority_activeUrgent_isProtectedFromPreemption() = runTest {
     withContext(Dispatchers.Default) {
       val scheduler = createScheduler(maxConcurrent = 1)
@@ -612,84 +548,6 @@ class DownloadQueueTest {
       assertIs<DownloadState.Queued>(queued.mutableState.value)
       withTimeout(2.seconds) {
         active.mutableState.first { it != DownloadState.Queued }
-      }
-    }
-  }
-
-  @Test
-  fun setPriority_activeUrgentLowered_startsWaitingUrgentAndResumesVictim() = runTest {
-    withContext(Dispatchers.Default) {
-      for (priority in listOf(DownloadPriority.LOW, DownloadPriority.NORMAL, DownloadPriority.HIGH)) {
-        val scheduler = createScheduler(maxConcurrent = 1)
-        val active = createHandle("active", createRequest(priority = DownloadPriority.URGENT))
-        val queued = createHandle("queued", createRequest(priority = DownloadPriority.URGENT))
-        scheduler.enqueue(active)
-        scheduler.enqueue(queued)
-        assertIs<DownloadState.Queued>(queued.mutableState.value)
-
-        scheduler.setPriority("active", priority)
-
-        assertIs<DownloadState.Queued>(active.mutableState.value)
-        withTimeout(2.seconds) {
-          queued.mutableState.first { it != DownloadState.Queued }
-        }
-        scheduler.onTaskCompleted("queued")
-        withTimeout(2.seconds) {
-          active.mutableState.first { it != DownloadState.Queued }
-        }
-      }
-    }
-  }
-
-  @Test
-  fun setPriority_activeUrgentLowered_skipsHostBlockedUrgent() = runTest {
-    withContext(Dispatchers.Default) {
-      val scheduler = createScheduler(maxConcurrent = 2, maxPerHost = 1)
-      val firstHost = createRequest(priority = DownloadPriority.URGENT)
-      val secondHost = createRequest(
-        url = "https://other.com/file",
-        priority = DownloadPriority.URGENT,
-      )
-      val protected = createHandle("protected", firstHost)
-      val active = createHandle("active", secondHost)
-      val blocked = createHandle("blocked", firstHost, Instant.fromEpochMilliseconds(0))
-      val eligible = createHandle("eligible", secondHost, Instant.fromEpochMilliseconds(1))
-      scheduler.enqueue(protected)
-      scheduler.enqueue(active)
-      scheduler.enqueue(blocked)
-      scheduler.enqueue(eligible)
-
-      scheduler.setPriority("active", DownloadPriority.LOW)
-
-      assertIs<DownloadState.Queued>(blocked.mutableState.value)
-      assertIs<DownloadState.Queued>(active.mutableState.value)
-      withTimeout(2.seconds) {
-        protected.mutableState.first { it != DownloadState.Queued }
-        eligible.mutableState.first { it != DownloadState.Queued }
-      }
-    }
-  }
-
-  @Test
-  fun setPriority_urgent_preemptsSameHostWhenHostLimitIsFull() = runTest {
-    withContext(Dispatchers.Default) {
-      val scheduler = createScheduler(maxConcurrent = 2, maxPerHost = 1)
-      val unrelated = createHandle(
-        "unrelated",
-        createRequest(url = "https://other.com/file", priority = DownloadPriority.LOW)
-      )
-      val sameHost = createHandle("same-host")
-      val queued = createHandle("queued")
-      scheduler.enqueue(unrelated)
-      scheduler.enqueue(sameHost)
-      scheduler.enqueue(queued)
-
-      scheduler.setPriority("queued", DownloadPriority.URGENT)
-
-      assertIs<DownloadState.Queued>(sameHost.mutableState.value)
-      withTimeout(2.seconds) {
-        queued.mutableState.first { it != DownloadState.Queued }
-        unrelated.mutableState.first { it != DownloadState.Queued }
       }
     }
   }
@@ -997,6 +855,356 @@ class DownloadQueueTest {
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
+  }
+
+  // ---- Queue positions and preemption, with downloads that never finish on their own ----
+
+  @Test
+  fun enqueue_slotsFull_givesWaitingTasksPositionsInStartOrder() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b, c) = listOf("a", "b", "c").map { createHandle(it, httpRequest(it)) }
+      queue.enqueue(a)
+      queue.enqueue(b)
+      queue.enqueue(c)
+      runCurrent()
+
+      assertEquals(listOf(null, 1, 2), listOf(a, b, c).map { it.mutableQueuePosition.value })
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun onTaskCompleted_promotesHeadAndShiftsPositions() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b, c) = listOf("a", "b", "c").map { createHandle(it, httpRequest(it)) }
+      listOf(a, b, c).forEach { queue.enqueue(it) }
+      runCurrent()
+
+      queue.onTaskCompleted("a")
+      runCurrent()
+
+      assertNull(b.mutableQueuePosition.value)
+      assertEquals(1, c.mutableQueuePosition.value)
+      assertEquals(httpRequest("b").url, engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun setPriority_high_movesTaskToFront() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b, c) = listOf("a", "b", "c").map { createHandle(it, httpRequest(it)) }
+      listOf(a, b, c).forEach { queue.enqueue(it) }
+
+      queue.setPriority("c", DownloadPriority.HIGH)
+
+      assertEquals(1, c.mutableQueuePosition.value)
+      assertEquals(2, b.mutableQueuePosition.value)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun dequeue_clearsPositionAndShiftsOthers() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b, c) = listOf("a", "b", "c").map { createHandle(it, httpRequest(it)) }
+      listOf(a, b, c).forEach { queue.enqueue(it) }
+
+      queue.dequeue("b")
+
+      assertNull(b.mutableQueuePosition.value)
+      assertEquals(1, c.mutableQueuePosition.value)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun updateLimits_raised_clearsPositionsOfStartedTasks() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b, c) = listOf("a", "b", "c").map { createHandle(it, httpRequest(it)) }
+      listOf(a, b, c).forEach { queue.enqueue(it) }
+
+      queue.updateLimits(maxConcurrentDownloads = 3, maxConnectionsPerHost = 0)
+      runCurrent()
+
+      assertEquals(listOf(null, null), listOf(b, c).map { it.mutableQueuePosition.value })
+      assertEquals(3, engine.probed.size)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun enqueue_headHostFull_keepsPositionWhileLaterTaskOfOtherHostStarts() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(2, 1, coordinator)
+    try {
+      val first = createHandle("first", createRequest(url = "https://example.com/1"))
+      val second = createHandle("second", createRequest(url = "https://example.com/2"))
+      val other = createHandle("other", createRequest(url = "https://other.com/3"))
+      listOf(first, second, other).forEach { queue.enqueue(it) }
+      runCurrent()
+
+      // Positions follow the queue order; a full site does not move its task back.
+      assertEquals(1, second.mutableQueuePosition.value)
+      assertNull(other.mutableQueuePosition.value)
+      assertEquals(listOf("https://example.com/1", "https://other.com/3"), engine.probed)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun enqueue_urgent_preemptsVictimAsPausedWithItsReason() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val low = createHandle("task-low", httpRequest("low", DownloadPriority.LOW))
+      queue.enqueue(low)
+      runCurrent()
+
+      val urgent = createHandle("task-urgent", httpRequest("urgent", DownloadPriority.URGENT))
+      queue.enqueue(urgent)
+      runCurrent()
+
+      assertPreempted(low, byTaskId = "task-urgent", position = 1)
+      assertNull(urgent.mutableQueuePosition.value)
+      assertEquals(httpRequest("urgent").url, engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun onTaskCompleted_urgentDone_resumesPreemptedVictimAndClearsPosition() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val low = createHandle("task-low", httpRequest("low", DownloadPriority.LOW))
+      queue.enqueue(low)
+      runCurrent()
+      queue.enqueue(createHandle("task-urgent", httpRequest("urgent", DownloadPriority.URGENT)))
+      runCurrent()
+
+      queue.onTaskCompleted("task-urgent")
+      runCurrent()
+
+      assertEquals(DownloadState.Queued, low.mutableState.value)
+      assertNull(low.mutableQueuePosition.value)
+      assertEquals(
+        listOf(httpRequest("low").url, httpRequest("urgent").url, httpRequest("low").url),
+        engine.probed,
+      )
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun enqueue_urgent_doesNotPreemptTaskThatAlreadyCompleted() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val low = createHandle("task-low", httpRequest("low", DownloadPriority.LOW))
+      queue.enqueue(low)
+      runCurrent()
+      // Finished, but Ketch has not reported the completion to the queue yet.
+      val completed = DownloadState.Completed("/tmp/low", 4)
+      low.record.update { it.copy(state = TaskState.COMPLETED) }
+      low.mutableState.value = completed
+
+      val urgent = createHandle("task-urgent", httpRequest("urgent", DownloadPriority.URGENT))
+      queue.enqueue(urgent)
+      runCurrent()
+
+      assertEquals(completed, low.mutableState.value)
+      assertEquals(TaskState.COMPLETED, low.record.value.state)
+      assertNull(low.mutableQueuePosition.value)
+      assertEquals(1, urgent.mutableQueuePosition.value)
+      // The urgent task takes the slot the completion frees, and the finished task stays done.
+      queue.onTaskCompleted("task-low", completed)
+      runCurrent()
+      assertEquals(completed, low.mutableState.value)
+      assertNull(low.mutableQueuePosition.value)
+      assertNull(urgent.mutableQueuePosition.value)
+      assertEquals(listOf(httpRequest("low").url, httpRequest("urgent").url), engine.probed)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun setPriority_urgentOnPreemptedTaskWithoutVictim_keepsItPausedForPreemption() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val low = createHandle("task-low", httpRequest("low", DownloadPriority.LOW))
+      queue.enqueue(low)
+      runCurrent()
+      queue.enqueue(createHandle("task-urgent", httpRequest("urgent", DownloadPriority.URGENT)))
+      runCurrent()
+
+      queue.setPriority("task-low", DownloadPriority.URGENT)
+      runCurrent()
+
+      assertPreempted(low, byTaskId = "task-urgent", position = 1)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun setPriority_urgent_preemptsAndResumesVictim() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val active = createHandle("active", httpRequest("active"))
+      val queued = createHandle("queued", httpRequest("queued"))
+      queue.enqueue(active)
+      queue.enqueue(queued)
+      runCurrent()
+
+      queue.setPriority("queued", DownloadPriority.URGENT)
+      runCurrent()
+
+      assertPreempted(active, byTaskId = "queued", position = 1)
+      assertEquals(httpRequest("queued").url, engine.probed.last())
+      queue.onTaskCompleted("queued")
+      runCurrent()
+      assertNull(active.mutableQueuePosition.value)
+      assertEquals(httpRequest("active").url, engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun setPriority_activeUrgentLowered_startsWaitingUrgentAndResumesVictim() = runTest {
+    for (priority in listOf(DownloadPriority.LOW, DownloadPriority.NORMAL, DownloadPriority.HIGH)) {
+      val engine = BlockingHeadEngine()
+      val coordinator = blockingCoordinator(engine)
+      val queue = DownloadQueue(1, 0, coordinator)
+      try {
+        val active = createHandle("active", httpRequest("active", DownloadPriority.URGENT))
+        val queued = createHandle("queued", httpRequest("queued", DownloadPriority.URGENT))
+        queue.enqueue(active)
+        queue.enqueue(queued)
+        runCurrent()
+        assertIs<DownloadState.Queued>(queued.mutableState.value)
+
+        queue.setPriority("active", priority)
+        runCurrent()
+
+        assertPreempted(active, byTaskId = "queued", position = 1)
+        assertEquals(httpRequest("queued").url, engine.probed.last())
+        queue.onTaskCompleted("queued")
+        runCurrent()
+        assertNull(active.mutableQueuePosition.value)
+        assertEquals(httpRequest("active").url, engine.probed.last())
+      } finally {
+        coordinator.close()
+      }
+    }
+  }
+
+  @Test
+  fun setPriority_activeUrgentLowered_skipsHostBlockedUrgent() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(2, 1, coordinator)
+    try {
+      val urgent = DownloadPriority.URGENT
+      val protected = createHandle("protected", hostRequest("example.com", "protected", urgent))
+      val active = createHandle("active", hostRequest("other.com", "active", urgent))
+      val blocked = createHandle(
+        "blocked", hostRequest("example.com", "blocked", urgent), Instant.fromEpochMilliseconds(0)
+      )
+      val eligible = createHandle(
+        "eligible", hostRequest("other.com", "eligible", urgent), Instant.fromEpochMilliseconds(1)
+      )
+      listOf(protected, active, blocked, eligible).forEach { queue.enqueue(it) }
+      runCurrent()
+
+      queue.setPriority("active", DownloadPriority.LOW)
+      runCurrent()
+
+      assertEquals(DownloadState.Queued, blocked.mutableState.value)
+      assertEquals(1, blocked.mutableQueuePosition.value)
+      assertPreempted(active, byTaskId = "eligible", position = 2)
+      assertEquals("https://other.com/eligible", engine.probed.last())
+      assertTrue(protected.mutableState.value !is DownloadState.Paused)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun setPriority_urgent_preemptsSameHostWhenHostLimitIsFull() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(2, 1, coordinator)
+    try {
+      val unrelated = createHandle(
+        "unrelated", hostRequest("other.com", "unrelated", DownloadPriority.LOW)
+      )
+      val sameHost = createHandle("same-host", hostRequest("example.com", "same-host"))
+      val queued = createHandle("queued", hostRequest("example.com", "queued"))
+      listOf(unrelated, sameHost, queued).forEach { queue.enqueue(it) }
+      runCurrent()
+
+      queue.setPriority("queued", DownloadPriority.URGENT)
+      runCurrent()
+
+      assertPreempted(sameHost, byTaskId = "queued", position = 1)
+      assertTrue(unrelated.mutableState.value !is DownloadState.Paused)
+      assertEquals("https://example.com/queued", engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  private fun httpRequest(
+    name: String,
+    priority: DownloadPriority = DownloadPriority.NORMAL,
+  ) = hostRequest("example.com", name, priority)
+
+  private fun hostRequest(
+    host: String,
+    name: String,
+    priority: DownloadPriority = DownloadPriority.NORMAL,
+  ) = createRequest(url = "https://$host/$name", priority = priority)
+
+  /** [handle] waits in the queue, paused for the urgent [byTaskId], with a QUEUED record. */
+  private fun assertPreempted(handle: TaskHandle, byTaskId: String, position: Int) {
+    val state = assertIs<DownloadState.Paused>(handle.mutableState.value)
+    assertEquals(PauseReason.Preempted(byTaskId), state.reason)
+    assertEquals(TaskState.QUEUED, handle.record.value.state)
+    assertEquals(position, handle.mutableQueuePosition.value)
   }
 
   // ---- Multiple promotions after completion ----

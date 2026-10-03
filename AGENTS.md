@@ -152,7 +152,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
-  excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records)
+  excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
+  and `completedAt`, stamped once in whole milliseconds and saved as `TaskRecord.completedAt`
+  (SQLite `completed_at`, `4.sqm`; `null` for tasks completed before it was tracked)
+- `DownloadState.Paused.reason` (`PauseReason`): `User`, `Preempted(byTaskId)`, `Shutdown` or
+  `WaitingForCondition` (defined, not produced yet); unknown wire types decode as `User`. The
+  reason is not persisted: a `PAUSED` record is a user pause
+- `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
+  `DOWNLOADING` records, so the next `start()` resumes them
+- `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`)
 - Retry with exponential backoff for transient errors
 - Persistent task metadata via `TaskStore` interface
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
@@ -167,7 +175,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchApi.updateConfig` applies queue limits immediately: raising one promotes queued
   tasks, lowering one never interrupts running tasks
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
-- URGENT preemption: pauses lowest-priority active download to make room
+- URGENT preemption: pauses lowest-priority active download to make room; the victim stays
+  in the queue as `Paused(Preempted)` with a `QUEUED` record and resumes when a slot frees.
+  Tasks that already finished are never preempted
+- `DownloadTask.queuePosition`: 1-based place of `Queued` and preempted tasks in the queue
+  (priority, then age), published under the queue mutex after every change; `null` otherwise,
+  and never persisted
 
 ### Live Configuration
 - `Ketch` keeps the current `DownloadConfig`; `updateConfig` applies speed and queue limits
@@ -176,6 +189,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Sources read defaults from `DownloadContext.config` and `DownloadContext.effectiveConnections()`
 - Per-task `setSpeedLimit` / `setConnections` / `setPriority` / `reschedule` persist to the
   `TaskRecord` in any non-terminal state and apply live when the task is running
+- `setConnections(0)` is Auto: the run's `DownloadConfig.maxConnectionsPerDownload` (a torrent's
+  own peer default); a running batch resegments when the effective count differs from the
+  segments it runs
 
 ### Speed Limiting
 - Global speed limit via `DownloadConfig.speedLimit`, changed at runtime with

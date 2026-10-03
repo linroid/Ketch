@@ -3,6 +3,7 @@ package com.linroid.ketch.api
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 /**
  * Represents the lifecycle state of a download task.
@@ -12,11 +13,13 @@ import kotlin.time.Duration
  * Scheduled -> Queued -> Downloading -> Completed
  *                |            |
  *                v            v
- *             Canceled      Paused -> Downloading
+ *             Canceled      Paused(User | Preempted | Shutdown) -> Downloading
  *                             |
  *                             v
  *                           Failed
  * ```
+ *
+ * A task paused for [PauseReason.Preempted] still waits in the queue.
  *
  * @see DownloadTask.state
  */
@@ -37,10 +40,17 @@ sealed class DownloadState {
   @SerialName("downloading")
   data class Downloading(val progress: DownloadProgress) : DownloadState()
 
-  /** Download paused by the user or preempted by the scheduler. */
+  /**
+   * Download paused. [reason] says why: by the user, or by the engine, which then resumes it on
+   * its own (see [PauseReason]). Instances and servers that do not report a reason give
+   * [PauseReason.User].
+   */
   @Serializable
   @SerialName("paused")
-  data class Paused(val progress: DownloadProgress) : DownloadState()
+  data class Paused(
+    val progress: DownloadProgress,
+    val reason: PauseReason = PauseReason.User,
+  ) : DownloadState()
 
   /**
    * Download finished successfully.
@@ -50,6 +60,9 @@ sealed class DownloadState {
    * @property downloadTime time spent downloading, summed over every run of the task and
    *   excluding time it was scheduled, queued or paused; `null` if unknown, such as for a
    *   task started by a version of Ketch that did not track it
+   * @property completedAt when the download finished, set once when it completes; `null` if
+   *   unknown, such as for a task that finished in a version of Ketch that did not record it,
+   *   or one reported by an older server
    */
   @Serializable
   @SerialName("completed")
@@ -57,6 +70,7 @@ sealed class DownloadState {
     val outputPath: String,
     val totalBytes: Long? = null,
     val downloadTime: Duration? = null,
+    val completedAt: Instant? = null,
   ) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */

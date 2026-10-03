@@ -15,8 +15,27 @@ class DownloadContextTest {
   }
 
   @Test
-  fun effectiveConnections_requestSet_overridesConfigDefault() {
-    assertEquals(2, context(requested = 2, live = 0).effectiveConnections())
+  fun effectiveConnections_liveAuto_usesConfigDefaultEvenWhenRequestSetACount() {
+    // setConnections(0) while running means Auto, not "keep the request's count".
+    assertEquals(6, context(requested = 2, live = 0).effectiveConnections())
+  }
+
+  @Test
+  fun constructor_withoutMaxConnections_startsFromRequest() {
+    val context = DownloadContext(
+      taskId = "context",
+      url = "https://example.com/file",
+      request = DownloadRequest("https://example.com/file", connections = 3),
+      fileAccessor = NoOpFileAccessor,
+      segments = MutableStateFlow(emptyList()),
+      onProgress = { _, _ -> },
+      throttle = {},
+      headers = emptyMap(),
+      config = DownloadConfig(maxConnectionsPerDownload = 6),
+    )
+
+    assertEquals(3, context.maxConnections.value)
+    assertEquals(3, context.effectiveConnections())
   }
 
   @Test

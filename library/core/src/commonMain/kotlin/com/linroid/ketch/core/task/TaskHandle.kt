@@ -20,4 +20,7 @@ internal interface TaskHandle {
   val mutableState: MutableStateFlow<DownloadState>
   val mutableSegments: MutableStateFlow<List<Segment>>
   val record: AtomicSaver<TaskRecord>
+
+  /** Written by [com.linroid.ketch.core.engine.DownloadQueue] only. */
+  val mutableQueuePosition: MutableStateFlow<Int?>
 }

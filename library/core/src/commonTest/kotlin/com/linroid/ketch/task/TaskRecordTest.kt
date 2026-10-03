@@ -107,4 +107,24 @@ class TaskRecordTest {
     assertNull(record.sourceResumeState)
   }
 
+  @Test
+  fun decode_jsonWithoutCompletedAt_keepsItNull() {
+    // Saved before finish times were recorded.
+    val epoch = Instant.fromEpochMilliseconds(0)
+    val jsonStr = """
+      {
+        "taskId": "t1",
+        "request": {"url": "https://example.com/f"},
+        "outputPath": "/tmp/f",
+        "state": "COMPLETED",
+        "totalBytes": 1000,
+        "downloadTime": "PT3S",
+        "createdAt": "$epoch",
+        "updatedAt": "$epoch"
+      }
+    """.trimIndent()
+    val record = json.decodeFromString<TaskRecord>(jsonStr)
+    assertEquals(TaskState.COMPLETED, record.state)
+    assertNull(record.completedAt)
+  }
 }
