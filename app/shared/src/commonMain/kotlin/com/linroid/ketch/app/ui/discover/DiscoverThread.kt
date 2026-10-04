@@ -96,6 +96,7 @@ private fun LazyItemScope.ThreadItemView(
       modifier = content.padding(top = if (item.first) spacing.s2 else spacing.s8),
     )
     is ThreadItem.Steps -> DiscoverSteps(
+      turnId = turn.id,
       steps = turn.steps,
       running = turn.status == TurnStatus.Running,
       interrupted = turn.status == TurnStatus.Stopped || turn.status == TurnStatus.Failed,

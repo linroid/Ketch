@@ -33,7 +33,7 @@ ai/discover/
 │   ├── DiscoveryToolSet.kt      # 7 @Tool methods for the LLM agent
 │   ├── DeclaredTools.kt         # Koog tools with optional parameters and plain text results
 │   ├── AgentOutputParser.kt     # Parse + validate the agent's summary and candidates
-│   ├── AgentText.kt             # Model text made safe to show as one line
+│   ├── AgentText.kt             # Model text made safe to show as plain text
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
 │   ├── SiteAllowlist.kt         # Websites a run is limited to
@@ -102,7 +102,7 @@ summary with no candidates.
 | `headUrl(url, reason = "")` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only; asks the approver) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
 | `validateUrl(url)` | Checks the URL's form and allowed sites; never looks the host up | `UrlValidator.check()` + `SiteAllowlist` |
-| `emitStep(title, details)` | Report progress to the user, as one line each | `DiscoveryStepListener` |
+| `emitStep(title, details)` | Report progress to the user: a one-line title, details of up to 12 lines | `DiscoveryStepListener` |
 
 The tools are registered through `asDeclaredTools()` rather than Koog's `tools(toolSet)`, which
 (as of Koog 1.2.0) tells the model that `maxResults` and `reason` are required and sends each

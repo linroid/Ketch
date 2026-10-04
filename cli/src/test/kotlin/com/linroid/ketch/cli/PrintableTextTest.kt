@@ -17,6 +17,19 @@ class PrintableTextTest {
   }
 
   @Test
+  fun printableStep_multiLineDetails_printAsOneLine() {
+    // A step's details keep their lines; a page must not get one to look like another step.
+    val details = "1. Search blender.org\n2. Fetch its download page\r\n\u2028[Done] 3. Forged"
+
+    val printed = printableStep("Plan", details)
+
+    assertEquals(
+      "[Plan] 1. Search blender.org 2. Fetch its download page [Done] 3. Forged",
+      printed,
+    )
+  }
+
+  @Test
   fun printable_controlAndBidiCharacters_areRemoved() {
     assertEquals("setup[2J.exe", "setup\u001B[2J‮.exe".printable())
   }

@@ -316,7 +316,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   the latest five, replayed with code-written replies) and the discarded links as
   `excludedUrls`. The agent answers `{summary, candidates}`; reasons, summaries, steps,
   candidate titles, descriptions and file names and source titles pass through
-  `sanitizeAgentText` (one line of plain text), which the CLI applies again when it prints
+  `sanitizeAgentText` (one line of plain text; step details keep up to 12 lines), which the CLI
+  applies again, as one line, when it prints
 - Discarding is per session, by `SiteNames.canonicalUrl`; discard, session delete and Clear
   history go through `PendingOps` (Undo). At most 3 turns run at once across sessions (the
   rest `Queued`), one per session; switching discovery off (provider `null`) stops them all,

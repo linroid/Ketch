@@ -347,6 +347,15 @@ internal class SnapshotScene(
     click((center.x / scale).dp, (center.y / scale).dp)
   }
 
+  /** Clicks the middle of the first text on screen that reads [text], such as a link's. */
+  suspend fun clickOnText(text: String) {
+    val node = scene.nodes().firstOrNull { node ->
+      node.config.getOrNull(SemanticsProperties.Text)?.any { it.text == text } == true
+    }
+    val center = checkNotNull(node) { "Nothing on screen reads $text" }.boundsInRoot.center
+    click((center.x / scale).dp, (center.y / scale).dp)
+  }
+
   /** Clicks the primary button at [x], [y] from the top left. */
   suspend fun click(x: Dp, y: Dp) {
     val position = offset(x, y)

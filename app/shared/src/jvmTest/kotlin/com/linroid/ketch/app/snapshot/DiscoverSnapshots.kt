@@ -52,11 +52,12 @@ import kotlin.time.Instant
 
 /**
  * The Discover destination: the setup page before a model is chosen, the chat before its first
- * message, the agent's steps while it runs, the results with the add bar, a follow-up with the
- * agent's reply and a discarded result, a request to open a website waiting for an answer (also
- * asking every time, for a redirect to a long host, and in another search than the one shown),
- * what a failed, stopped, waiting or empty search says, and the history of searches, also while
- * Discover is not set up; see [SnapshotHarness] for how to run it.
+ * message, the agent's steps while it runs, its plan folded with Show more and every step's
+ * details unfolded, the results with the add bar, a follow-up with the agent's reply and a
+ * discarded result, a request to open a website waiting for an answer (also asking every time,
+ * for a redirect to a long host, and in another search than the one shown), what a failed,
+ * stopped, waiting or empty search says, and the history of searches, also while Discover is
+ * not set up; see [SnapshotHarness] for how to run it.
  */
 class DiscoverSnapshots {
   @BeforeTest
@@ -104,6 +105,30 @@ class DiscoverSnapshots {
         discoverSnapshot("discover-running", size, theme, DiscoverScript.Running) {
           state.openDiscover(DiscoverRequest(QUERY))
         }
+      }
+    }
+  }
+
+  @Test
+  fun steps_planAndDetails_foldTheRunningStepAndListEveryStep() {
+    val cases = listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )
+    for ((size, theme) in cases) {
+      // The plan the agent works on, folded to four lines with Show more.
+      discoverSnapshot("discover-steps-running", size, theme, DiscoverScript.Planning) {
+        state.openDiscover(DiscoverRequest(QUERY))
+      }
+      // A finished search with Details open: every step with all the agent said.
+      discoverSnapshot("discover-steps-details", size, theme, DiscoverScript.Results) {
+        state.openDiscover(DiscoverRequest(QUERY))
+        scene.settle()
+        // Back to the top of the thread, where the steps are.
+        scene.scroll(x = size.width / 2, y = size.height / 2, ticks = -SCROLL_TICKS)
+        scene.clickOnText(DETAILS)
+        // Off the toggle, so it shows without its hover.
+        scene.hover(x = size.width - 24.dp, y = 140.dp)
       }
     }
   }
@@ -451,6 +476,7 @@ class DiscoverSnapshots {
     const val SCROLL_TICKS = 40f
     const val NAS_ID = "nas.local:8642"
     const val SHOW_HISTORY = "Show history"
+    const val DETAILS = "Details"
     val AppSizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
 
     // The content card of the default window, of a medium window beside the rail, and the
@@ -474,6 +500,9 @@ internal enum class DiscoverScript {
 
   /** Reports its steps and keeps working. */
   Running,
+
+  /** Reports its steps up to its plan, [BlenderPlan] for Blender, and keeps working on it. */
+  Planning,
 
   /** Reports its steps and finds nothing it trusts. */
   Nothing,
@@ -555,9 +584,15 @@ private class SampleDiscovery(
         approve: suspend (AiPageRequest) -> Boolean,
       ): AiDiscoverResponse {
         val first = request.history.isEmpty()
+        val current = if (first) script else followUp
         // A follow-up keeps to what the chat's first message asked for.
-        stepsFor(request.history.firstOrNull()?.request ?: request.query).forEach(onStep)
-        return when (if (first) script else followUp) {
+        val steps = stepsFor(request.history.firstOrNull()?.request ?: request.query)
+        val reported = when (current) {
+          DiscoverScript.Planning -> steps.take(steps.indexOf(BlenderPlan) + 1)
+          else -> steps
+        }
+        reported.forEach(onStep)
+        return when (current) {
           DiscoverScript.Results -> if (first) {
             AiDiscoverResponse(request.query, Candidates)
           } else {
@@ -568,6 +603,7 @@ private class SampleDiscovery(
             onStep(DiscoveryStep("Checking mirrors", "Comparing mirrors with the checksums"))
             awaitCancellation()
           }
+          DiscoverScript.Planning -> awaitCancellation()
           DiscoverScript.Failure -> error(
             "Anthropic rejected the API key (401). Check it in Settings › Discover.",
           )
@@ -626,9 +662,21 @@ private val RedirectApproval = AiPageRequest(
   redirectFrom = "github.com",
 )
 
+/** The plan the agent reports for Blender, one numbered line per thing it will do. */
+internal val BlenderPlan = DiscoveryStep(
+  title = "Plan",
+  detail = "1. Search blender.org for the macOS Apple silicon downloads, the current and LTS " +
+    "releases.\n" +
+    "2. Open the Blender download pages and extract the direct .dmg links.\n" +
+    "3. Check each link with a HEAD request for its size and type.\n" +
+    "4. Compare the mirrors with the checksums blender.org publishes.\n" +
+    "5. Rank the official arm64 build first, then the builds for other platforms.",
+)
+
 /** What the agent reports while it looks for Blender, the sample's main search. */
-private val BlenderSteps = listOf(
+internal val BlenderSteps = listOf(
   DiscoveryStep("Understanding", "Blender 4.2 for macOS on Apple silicon: an arm64 .dmg"),
+  BlenderPlan,
   DiscoveryStep("Searched the web", "3 results from blender.org"),
   DiscoveryStep("Opened blender.org/download", "Found 6 download links"),
 )

@@ -74,7 +74,9 @@ import kotlin.time.Instant
  * before asking, and `validateUrl` never looks a host up.
  *
  * Text the agent writes for the user, its steps and the titles of the
- * pages it reads, is reduced to one line of plain text first.
+ * pages it reads, is reduced to plain text first: one line each, except
+ * a step's details, which keep their line breaks, such as a numbered
+ * plan's (see [sanitizeAgentText]).
  */
 @LLMDescription("Resource discovery tools for finding downloadable files")
 internal class DiscoveryToolSet(
@@ -348,7 +350,7 @@ internal class DiscoveryToolSet(
   ): String {
     stepListener.onStep(
       sanitizeAgentText(title, MAX_STEP_TITLE_LENGTH),
-      sanitizeAgentText(details, MAX_STEP_DETAILS_LENGTH),
+      sanitizeAgentText(details, MAX_STEP_DETAILS_LENGTH, keepLineBreaks = true),
     )
     return if (takeToolCall("emitStep")) "ok" else toolBudgetSpent()
   }

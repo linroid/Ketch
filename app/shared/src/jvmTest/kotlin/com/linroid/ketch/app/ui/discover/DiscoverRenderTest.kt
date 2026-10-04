@@ -19,6 +19,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.snapshot.BlenderPlan
+import com.linroid.ketch.app.snapshot.BlenderSteps
 import com.linroid.ketch.app.snapshot.Candidates
 import com.linroid.ketch.app.snapshot.DiscoverScript
 import com.linroid.ketch.app.snapshot.SavedSessions
@@ -36,6 +38,8 @@ import com.linroid.ketch.app.state.AccessNote
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.DiscoverSession
+import com.linroid.ketch.app.state.DiscoverTurn
+import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.TurnStatus
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.PageAccessSettings
@@ -45,6 +49,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 /** The Discover page of the desktop app, driven through what it renders. */
 class DiscoverRenderTest {
@@ -85,6 +90,61 @@ class DiscoverRenderTest {
 
       assertEquals(TurnStatus.Stopped, state.shown().turns.single().status)
       assertTrue("Try again" in texts(), "The stopped search offers to run again: ${texts()}")
+    }
+  }
+
+  @Test
+  fun steps_details_listsEveryStepInOrderWithAllItSaid() {
+    // More steps than the line of steps shows, so the first ones hide behind "3 earlier".
+    val steps = BlenderSteps + (1..5).map {
+      DiscoveryStep("Opened mirror $it", "Mirror $it serves the same file")
+    }
+    val session = savedSession(steps)
+    runDiscover(history = listOf(session)) { state ->
+      state.aiDiscover.open(session.id)
+      frames(FRAMES)
+      assertTrue("3 earlier" in texts(), "The first steps hide: ${texts()}")
+      assertFalse(BlenderPlan.detail in texts(), "Details starts folded")
+      // Screen readers hear it collapsed, then expanded.
+      assertTrue(SemanticsActions.Expand in detailsToggle().config)
+
+      detailsToggle().click()
+      frames(FRAMES)
+      assertTrue(SemanticsActions.Collapse in detailsToggle().config)
+
+      // The plan among them, with its lines.
+      val details = nodes().mapNotNull { it.ownText() }.filter { text ->
+        steps.any { it.detail == text }
+      }
+      assertEquals(steps.map { it.detail }, details)
+      assertTrue(steps.all { it.title in texts() }, "Every title shows: ${texts()}")
+    }
+  }
+
+  @Test
+  fun steps_runningPlan_showMoreUnfoldsItAndDetailsListsTheStepsBefore() {
+    runDiscover(DiscoverScript.Planning) { state ->
+      state.openDiscover(DiscoverRequest(QUERY))
+      frames(FRAMES)
+      val folded = planNodes().single().boundsInRoot.height
+      assertTrue(SHOW_MORE in texts(), "A plan longer than four lines folds: ${texts()}")
+
+      nodes().first { it.ownText() == SHOW_MORE }.click()
+      frames(FRAMES)
+
+      assertTrue(planNodes().single().boundsInRoot.height > folded, "Show more unfolds it")
+      assertTrue(SHOW_LESS in texts())
+      assertEquals(TurnStatus.Running, state.shown().turns.single().status)
+
+      // Details lists the steps before the running one, which stays where it is.
+      val toggle = nodes().first { it.ownText() == DETAILS }
+      val top = toggle.boundsInRoot.top
+      toggle.click()
+      frames(FRAMES)
+      assertTrue(BlenderSteps.first().detail in texts(), "The step before shows: ${texts()}")
+      assertEquals(1, planNodes().size, "The plan shows once")
+      assertTrue(SHOW_LESS in texts(), "The running step keeps its fold")
+      assertEquals(top, nodes().first { it.ownText() == DETAILS }.boundsInRoot.top)
     }
   }
 
@@ -459,6 +519,28 @@ class DiscoverRenderTest {
     frames(FRAMES)
   }
 
+  /** The button that folds Details open or closed. */
+  private fun ImageComposeScene.detailsToggle(): SemanticsNode =
+    checkNotNull(nodes().first { it.ownText() == DETAILS }.clickableAround())
+
+  /** The texts that show the running plan of [BlenderPlan]. */
+  private fun ImageComposeScene.planNodes(): List<SemanticsNode> =
+    nodes().filter { it.ownText() == BlenderPlan.detail }
+
+  /** A finished search for [QUERY] that reported [steps] and found nothing. */
+  private fun savedSession(steps: List<DiscoveryStep>): DiscoverSession {
+    val at = Instant.parse("2026-10-01T13:06:00Z")
+    val turn = DiscoverTurn(
+      id = "turn-steps",
+      message = QUERY,
+      sites = emptyList(),
+      startedAt = at,
+      status = TurnStatus.Done,
+      steps = steps,
+    )
+    return DiscoverSession("saved-steps", QUERY, createdAt = at, updatedAt = at, listOf(turn))
+  }
+
   /** The first screen-reader action labelled [label]. */
   private fun ImageComposeScene.customAction(label: String): () -> Boolean {
     val action = nodes().firstNotNullOfOrNull { node ->
@@ -547,6 +629,9 @@ class DiscoverRenderTest {
     const val DELETE_SEARCH = "Delete this search"
     const val STOP = "Stop"
     const val SITES_CHIP = "Limit to websites"
+    const val DETAILS = "Details"
+    const val SHOW_MORE = "Show more"
+    const val SHOW_LESS = "Show less"
   }
 }
 

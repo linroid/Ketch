@@ -35,6 +35,7 @@
     <item quantity="other">%1$d frühere</item>
   </plurals>
   <string name="discover_step_starting">Suche wird gestartet</string>
+  <string name="discover_steps_details">Details</string>
 
   <string name="discover_limited_to">Beschränkt auf %1$s</string>
   <string name="discover_queued">Wartet, bis eine andere Suche fertig ist</string>

@@ -39,6 +39,7 @@
     <item quantity="other">%1$d предыдущего шага</item>
   </plurals>
   <string name="discover_step_starting">Начинаем поиск</string>
+  <string name="discover_steps_details">Подробности</string>
 
   <string name="discover_limited_to">Ограничено сайтами: %1$s</string>
   <string name="discover_queued">Ожидает завершения другого запроса</string>

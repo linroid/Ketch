@@ -8,7 +8,8 @@ interface DiscoveryStepListener {
 
   /**
    * Called when the agent completes a notable step. [title] and [details] are the agent's own
-   * words, each reduced to one line of plain text (see [sanitizeAgentText]).
+   * words as plain text (see [sanitizeAgentText]): [title] is one line, while [details] keeps
+   * up to 12 lines, joined with `\n`, such as the items of a numbered plan.
    */
   fun onStep(title: String, details: String)
 

@@ -33,6 +33,7 @@
     <item quantity="other">之前的 %1$d 步</item>
   </plurals>
   <string name="discover_step_starting">正在开始搜索</string>
+  <string name="discover_steps_details">详情</string>
 
   <string name="discover_limited_to">仅限 %1$s</string>
   <string name="discover_queued">正在等待其他搜索完成</string>

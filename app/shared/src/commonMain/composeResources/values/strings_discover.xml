@@ -54,6 +54,8 @@
     <item quantity="other">%1$d earlier</item>
   </plurals>
   <string name="discover_step_starting">Starting the search</string>
+  <!-- Folds open, under the steps, a list of every step with all the agent said about it. -->
+  <string name="discover_steps_details">Details</string>
 
   <!-- The chat. Under a message limited to websites; %1$s lists them, such as "blender.org, github.com". -->
   <string name="discover_limited_to">Limited to %1$s</string>

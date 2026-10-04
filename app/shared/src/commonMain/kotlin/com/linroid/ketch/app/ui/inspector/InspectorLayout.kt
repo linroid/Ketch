@@ -26,6 +26,9 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.expand
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -132,12 +135,16 @@ internal fun TextLink(text: String, onClick: () -> Unit) {
   )
 }
 
-/** A quiet toggle that folds [text]'s content away, with a chevron that turns when [open]. */
+/**
+ * A quiet toggle that folds [text]'s content away, with a chevron that turns when [open]. Screen
+ * readers hear it as a button that is expanded or collapsed.
+ */
 @Composable
 internal fun Disclosure(text: String, open: Boolean, onToggle: () -> Unit) {
   val colors = KetchTheme.colors
   val shape = KetchTheme.shapes.xs
   val focus = rememberFocusVisibility()
+  val action = stringResource(if (open) Res.string.inspector_hide else Res.string.action_show)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
@@ -145,13 +152,15 @@ internal fun Disclosure(text: String, open: Boolean, onToggle: () -> Unit) {
       .focusRing(focus.visible, shape, colors.focusRing)
       .clip(shape)
       .trackFocusVisibility(focus)
-      .clickable(
-        role = Role.Button,
-        onClickLabel = stringResource(
-          if (open) Res.string.inspector_hide else Res.string.action_show,
-        ),
-        onClick = onToggle,
-      )
+      .clickable(role = Role.Button, onClickLabel = action, onClick = onToggle)
+      .semantics {
+        // Offering Collapse says it is expanded, and Expand that it is collapsed.
+        val toggle = {
+          onToggle()
+          true
+        }
+        if (open) collapse(action, toggle) else expand(action, toggle)
+      }
       .padding(vertical = KetchTheme.spacing.s1),
   ) {
     KetchIconImage(

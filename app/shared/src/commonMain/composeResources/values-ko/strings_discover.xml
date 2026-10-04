@@ -33,6 +33,7 @@
     <item quantity="other">이전 단계 %1$d개</item>
   </plurals>
   <string name="discover_step_starting">검색 시작 중</string>
+  <string name="discover_steps_details">세부 정보</string>
 
   <string name="discover_limited_to">%1$s에서만 검색</string>
   <string name="discover_queued">다른 검색이 끝날 때까지 대기 중</string>

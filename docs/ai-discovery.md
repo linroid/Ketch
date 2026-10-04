@@ -442,7 +442,9 @@ An empty chat shows what Discover does and example searches, which run
 when clicked. Each message becomes a turn in the thread:
 
 1. your message, with the websites it was limited to;
-2. the agent's steps, as it reports them;
+2. the agent's steps, as it reports them, the running one with what the
+   agent says about it (four lines, then **Show more**), and **Details**,
+   which lists every step with all it said, such as the agent's plan;
 3. page access questions ([answering](#answering-in-the-apps)), and a
    line summing up your answers;
 4. the agent's short summary, folded to six lines with **Show more**;
@@ -592,8 +594,9 @@ new line.
 `ketch ai-discover "<request>"` runs one search with the `[ai]` settings
 of the default config file. It has no follow-ups or history. Only the
 summary and the results go to stdout; the version banner, the model and
-query it uses, the agent's steps as they happen, the questions and
-errors go to stderr, so `> results.txt` keeps just the results.
+query it uses, the agent's steps as they happen (one line each), the
+questions and errors go to stderr, so `> results.txt` keeps just the
+results.
 
 It follows `[ai.access]`: when that says to ask, it asks on the terminal
 before the agent opens a website:

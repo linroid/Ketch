@@ -33,6 +33,7 @@
     <item quantity="other">以前のステップ%1$d件</item>
   </plurals>
   <string name="discover_step_starting">検索を開始しています</string>
+  <string name="discover_steps_details">詳細</string>
 
   <string name="discover_limited_to">%1$sに限定</string>
   <string name="discover_queued">ほかの検索の完了を待っています</string>

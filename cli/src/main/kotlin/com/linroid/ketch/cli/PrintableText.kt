@@ -19,6 +19,13 @@ private const val MAX_URL_LENGTH = 4096
 internal fun String.printable(): String = sanitizeAgentText(this, MAX_TEXT_LENGTH)
 
 /**
+ * An agent's step as one line, `[title] details`: details may keep line breaks, such as a
+ * numbered plan's, which are joined into one line here like any [printable] text.
+ */
+internal fun printableStep(title: String, details: String): String =
+  "[${title.printable()}] ${details.printable()}"
+
+/**
  * [url] in its ASCII form, every character that is not ASCII percent-encoded, so it can be
  * copied as it is and hides nothing: a right-to-left override in its path would otherwise show
  * the end of the URL reversed. Text that is no URL is printed as [printable] text.

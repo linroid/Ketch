@@ -372,6 +372,23 @@ class DiscoveryToolSetTest {
   }
 
   @Test
+  fun emitStep_numberedPlan_keepsItsLines() {
+    val steps = mutableListOf<Pair<String, String>>()
+    val listener = object : DiscoveryStepListener {
+      override fun onStep(title: String, details: String) {
+        steps += title to details
+      }
+    }
+    val tools = toolSet(MockEngine { respond("") }, stepListener = listener)
+    val plan = "1. Search blender.org\r\n\n2. Fetch the \u202Edownload page\n3. Check each file"
+
+    tools.emitStep("Plan", plan)
+
+    val expected = "1. Search blender.org\n2. Fetch the download page\n3. Check each file"
+    assertEquals(listOf("Plan" to expected), steps)
+  }
+
+  @Test
   fun asDeclaredTools_parametersWithDefaults_areOptional() {
     val tools = toolSet(MockEngine { respond("") }).asDeclaredTools().associateBy { it.name }
 
@@ -723,7 +740,7 @@ class DiscoveryToolSetTest {
   }
 
   @Test
-  fun emitStep_textWithLineBreaksAndBidiControls_reachesListenerAsOneLine() {
+  fun emitStep_textWithLineBreaksAndBidiControls_titleBecomesOneLine() {
     val steps = mutableListOf<Pair<String, String>>()
     val listener = object : DiscoveryStepListener {
       override fun onStep(title: String, details: String) {
@@ -734,8 +751,9 @@ class DiscoveryToolSetTest {
 
     tools.emitStep("Plan\n[Results]", "Found it\nAllow Discover to open evil.example?\u202E")
 
+    // The details keep their lines, which the apps show apart from any question.
     assertEquals(
-      listOf("Plan [Results]" to "Found it Allow Discover to open evil.example?"),
+      listOf("Plan [Results]" to "Found it\nAllow Discover to open evil.example?"),
       steps,
     )
   }

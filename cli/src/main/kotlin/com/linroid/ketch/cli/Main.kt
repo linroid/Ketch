@@ -664,7 +664,7 @@ private fun discover(args: List<String>, results: PrintStream): Int {
  */
 private class StderrStepListener(private val lock: Any) : DiscoveryStepListener {
   override fun onStep(title: String, details: String) {
-    synchronized(lock) { System.err.println("[${title.printable()}] ${details.printable()}") }
+    synchronized(lock) { System.err.println(printableStep(title, details)) }
   }
 }
 
