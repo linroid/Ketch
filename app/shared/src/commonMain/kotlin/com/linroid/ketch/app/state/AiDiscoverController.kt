@@ -394,6 +394,11 @@ class AiDiscoverController(
     selected = selected + visibleIn(turnId).map { it.url }
   }
 
+  /** Deselects every result of the shown session, earlier turns' included. */
+  fun clearSelection() {
+    selected = emptySet()
+  }
+
   /** Deselects every result of the shown session's turn with [turnId]. */
   fun clearSelection(turnId: String) {
     selected = selected - visibleIn(turnId).mapTo(mutableSetOf()) { it.url }

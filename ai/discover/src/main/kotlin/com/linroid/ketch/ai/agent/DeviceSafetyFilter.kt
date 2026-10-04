@@ -56,17 +56,32 @@ internal class DeviceSafetyFilter {
         reason = "Piracy signal detected",
       )
     }
-    if (isHighRiskExtension(ext) && !isTrustedDomain(host)) {
+    if (impersonatesTrustedDomain(host) || hasWebUserInfo(url)) {
       return SafetyEvaluation(
         score = 0f,
         blocked = true,
-        reason = "High-risk extension .$ext from untrusted source",
+        reason = "Looks like a trusted domain: $host",
+      )
+    }
+    // Vendors publish installers on their own sites, which no list covers, so an installer from
+    // an unlisted host is only scored down; over plain HTTP anyone on the way could swap it.
+    val untrustedInstaller = isHighRiskExtension(ext) && !isTrustedDomain(host)
+    if (untrustedInstaller && !lowerUrl.startsWith("https://")) {
+      return SafetyEvaluation(
+        score = 0f,
+        blocked = true,
+        reason = "High-risk extension .$ext without HTTPS from untrusted source",
       )
     }
 
     // Scoring
     var score = BASE_SCORE
     val notes = mutableListOf<String>()
+
+    if (untrustedInstaller) {
+      score -= UNTRUSTED_INSTALLER_PENALTY
+      notes.add("High-risk extension .$ext from unlisted domain")
+    }
 
     if (lowerUrl.startsWith("https://")) {
       score += 0.1f
@@ -131,6 +146,36 @@ internal class DeviceSafetyFilter {
     return TRUSTED_DOMAINS.any { host == it || host.endsWith(".$it") }
   }
 
+  /**
+   * Whether [host] holds a trusted domain but lies outside the site that registered it, such as
+   * `fake-github.com` or `github.com.example.net`. Other hosts of that site, such as
+   * `archive-downloads.apache.org` beside `downloads.apache.org`, are the vendor's own.
+   */
+  private fun impersonatesTrustedDomain(host: String): Boolean {
+    return TRUSTED_DOMAINS.any { trusted ->
+      trusted in host && !isUnder(host, registrableDomain(trusted))
+    }
+  }
+
+  private fun isUnder(host: String, domain: String): Boolean {
+    return host == domain || host.endsWith(".$domain")
+  }
+
+  /** The site [domain] belongs to: its last two labels, as every trusted domain is a gTLD's. */
+  private fun registrableDomain(domain: String): String {
+    return domain.split('.').takeLast(2).joinToString(".")
+  }
+
+  /** Whether the HTTP(S) [url] carries user info, which can pose as the host before an `@`. */
+  private fun hasWebUserInfo(url: String): Boolean {
+    return try {
+      val uri = URI(url)
+      uri.scheme?.lowercase() in WEB_SCHEMES && uri.rawUserInfo != null
+    } catch (_: Exception) {
+      false
+    }
+  }
+
   private fun hasPiracySignal(text: String): Boolean {
     return PIRACY_SIGNALS.any { text.contains(it) }
   }
@@ -161,6 +206,9 @@ internal class DeviceSafetyFilter {
   companion object {
     private const val BASE_SCORE = 0.7f
     private const val BLOCK_THRESHOLD = 0.3f
+    private const val UNTRUSTED_INSTALLER_PENALTY = 0.2f
+
+    private val WEB_SCHEMES = setOf("http", "https")
 
     private val URL_SHORTENERS = setOf(
       "bit.ly", "t.co", "tinyurl.com", "goo.gl", "ow.ly",

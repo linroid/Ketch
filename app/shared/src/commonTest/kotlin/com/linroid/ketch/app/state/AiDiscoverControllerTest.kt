@@ -493,6 +493,23 @@ class AiDiscoverControllerTest {
   }
 
   @Test
+  fun clearSelection_resultsOfSeveralTurns_deselectsThemAll() = runTest {
+    val (first, later) = candidate("a.dmg") to candidate("b.dmg")
+    val saved = savedSession("blender", ListFixtures.START, found = listOf(first)).let {
+      it.copy(turns = it.turns + it.turns.single().copy(id = "later", candidates = listOf(later)))
+    }
+    val history = InMemoryDiscoverHistoryStore(listOf(saved))
+    val controller = controller(FakeAiProvider(), history = history)
+    controller.open(saved.id)
+    controller.toggle(first)
+    controller.toggle(later)
+
+    controller.clearSelection()
+
+    assertEquals(emptyList(), controller.selectedCandidates())
+  }
+
+  @Test
   fun found_onlyTurnsThatEndWithResults() = runTest {
     val found = mutableListOf<DiscoverFound>()
     val finding = controller(FakeAiProvider(candidates = listOf(candidate("a"), candidate("b"))))

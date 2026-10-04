@@ -42,6 +42,7 @@ import ketch.app.shared.generated.resources.device_free_space
 import ketch.app.shared.generated.resources.discover_add_now
 import ketch.app.shared.generated.resources.discover_add_options
 import ketch.app.shared.generated.resources.discover_add_to
+import ketch.app.shared.generated.resources.discover_clear_selection
 import ketch.app.shared.generated.resources.discover_review_add
 import ketch.app.shared.generated.resources.discover_review_add_count
 import ketch.app.shared.generated.resources.discover_select_to_add
@@ -51,9 +52,10 @@ import kotlinx.coroutines.Job
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The add bar over the composer: how much of [session] is selected, saying how much of it comes
- * from messages before the newest, the device it goes to (with two devices or more), Add now,
- * and Review & add, which opens the add sheet with the selection.
+ * The add bar over the composer: a button that clears the selection, how much of [session] is
+ * selected, saying how much of it comes from messages before the newest, the device it goes to
+ * (with two devices or more), Add now, and Review & add, which opens the add sheet with the
+ * selection.
  *
  * On a phone it is one row, "2 selected" with Add now and a button for a menu that holds Review
  * & add and the devices to add to.
@@ -106,6 +108,15 @@ internal fun DiscoverAddBar(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       modifier = Modifier.fillMaxWidth().heightIn(min = KetchTheme.density.buttonMedium),
     ) {
+      if (selected.isNotEmpty()) {
+        // Earlier messages' results may be far up the chat; this lets go of them all at once.
+        KetchIconButton(
+          icon = KetchIcon.Close,
+          onClick = state.aiDiscover::clearSelection,
+          enabled = !busy,
+          contentDescription = stringResource(Res.string.discover_clear_selection),
+        )
+      }
       if (phone) {
         // A phone's row leaves the summary little room beside the buttons, so the size and how
         // many come from earlier go under the count.
