@@ -51,11 +51,36 @@ class DeviceSafetyFilterTest {
   }
 
   @Test
-  fun evaluate_highRiskExtFromUntrusted_blocked() {
+  fun evaluate_highRiskExtFromUnlistedHttps_penalized() {
+    val unlisted = filter.evaluate(
+      url = "https://kuromi.drakeet.cn/PureWriter2-4.4.2-macOS-aarch64.dmg",
+      sourcePageUrl = "https://writer.drakeet.com/desktop2",
+    )
+    val trusted = filter.evaluate(
+      url = "https://github.com/app/releases/PureWriter2-4.4.2-macOS-aarch64.dmg",
+    )
+    assertFalse(unlisted.blocked)
+    assertTrue(unlisted.score < trusted.score)
+  }
+
+  @Test
+  fun evaluate_highRiskExtFromUnlistedHttp_blocked() {
     val result = filter.evaluate(
-      url = "https://random-site.xyz/setup.exe",
+      url = "http://random-site.xyz/setup.exe",
     )
     assertTrue(result.blocked)
+  }
+
+  @Test
+  fun evaluate_trustedDomainLookalike_blocked() {
+    val urls = listOf(
+      "https://fake-github.com/app/releases/v1.0.zip",
+      "https://github.com.example.net/app/v1.0.zip",
+      "https://github.com@evil.example/app/v1.0.zip",
+    )
+    for (url in urls) {
+      assertTrue(filter.evaluate(url = url).blocked, url)
+    }
   }
 
   @Test

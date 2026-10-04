@@ -56,17 +56,32 @@ internal class DeviceSafetyFilter {
         reason = "Piracy signal detected",
       )
     }
-    if (isHighRiskExtension(ext) && !isTrustedDomain(host)) {
+    if (impersonatesTrustedDomain(host) || hasWebUserInfo(url)) {
       return SafetyEvaluation(
         score = 0f,
         blocked = true,
-        reason = "High-risk extension .$ext from untrusted source",
+        reason = "Looks like a trusted domain: $host",
+      )
+    }
+    // Vendors publish installers on their own sites, which no list covers, so an installer from
+    // an unlisted host is only scored down; over plain HTTP anyone on the way could swap it.
+    val untrustedInstaller = isHighRiskExtension(ext) && !isTrustedDomain(host)
+    if (untrustedInstaller && !lowerUrl.startsWith("https://")) {
+      return SafetyEvaluation(
+        score = 0f,
+        blocked = true,
+        reason = "High-risk extension .$ext without HTTPS from untrusted source",
       )
     }
 
     // Scoring
     var score = BASE_SCORE
     val notes = mutableListOf<String>()
+
+    if (untrustedInstaller) {
+      score -= UNTRUSTED_INSTALLER_PENALTY
+      notes.add("High-risk extension .$ext from unlisted domain")
+    }
 
     if (lowerUrl.startsWith("https://")) {
       score += 0.1f
@@ -131,6 +146,21 @@ internal class DeviceSafetyFilter {
     return TRUSTED_DOMAINS.any { host == it || host.endsWith(".$it") }
   }
 
+  /** Whether [host] holds a trusted domain without being it or under it: `fake-github.com`. */
+  private fun impersonatesTrustedDomain(host: String): Boolean {
+    return TRUSTED_DOMAINS.any { it in host } && !isTrustedDomain(host)
+  }
+
+  /** Whether the HTTP(S) [url] carries user info, which can pose as the host before an `@`. */
+  private fun hasWebUserInfo(url: String): Boolean {
+    return try {
+      val uri = URI(url)
+      uri.scheme?.lowercase() in WEB_SCHEMES && uri.rawUserInfo != null
+    } catch (_: Exception) {
+      false
+    }
+  }
+
   private fun hasPiracySignal(text: String): Boolean {
     return PIRACY_SIGNALS.any { text.contains(it) }
   }
@@ -161,6 +191,9 @@ internal class DeviceSafetyFilter {
   companion object {
     private const val BASE_SCORE = 0.7f
     private const val BLOCK_THRESHOLD = 0.3f
+    private const val UNTRUSTED_INSTALLER_PENALTY = 0.2f
+
+    private val WEB_SCHEMES = setOf("http", "https")
 
     private val URL_SHORTENERS = setOf(
       "bit.ly", "t.co", "tinyurl.com", "goo.gl", "ow.ly",
