@@ -15,6 +15,12 @@ permissions:
   checks: write
   pull-requests: write
 
+env:
+  # KetchApi.REVISION is a constant every module compiles against, so the real Git revision would
+  # make each commit rebuild and retest everything. A fixed one lets unchanged modules come from
+  # the Gradle build cache. Packaging and publishing leave it out.
+  ORG_GRADLE_PROJECT_testBuildRevision: ci-test
+
 jobs:
   jvm-tests:
     name: JVM Tests
@@ -28,6 +34,8 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Install fixture build prerequisites
         run: |
@@ -47,16 +55,15 @@ jobs:
         run: python3 -m unittest discover -s tools/torrent -p 'test_*.py'
 
       # allJvmTests also runs `test` in the JVM-only modules. The CLI tests do not read the web app
-      # the CLI bundles, so a prebuiltWebDir that does not exist skips its wasm build.
-      - name: Run JVM tests
+      # the CLI bundles, so a prebuiltWebDir that does not exist skips its wasm build. The
+      # publication metadata compiles in the same build to share its configuration.
+      - name: Run JVM tests and compile publication metadata
         env:
           TRANSMISSION_DAEMON: ${{ runner.temp }}/ketch-transmission/build/daemon/transmission-daemon
         run: |
           ./gradlew allJvmTests :library:torrent:verifyNoNativeTorrentRuntime \
+            compileCommonMainKotlinMetadata \
             -PtorrentConformance=true -PprebuiltWebDir=build/no-web-app
-
-      - name: Compile publication metadata
-        run: ./gradlew compileCommonMainKotlinMetadata
 
       - name: Require executed interoperability scenarios
         run: |
@@ -91,6 +98,8 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run Android unit tests
         run: ./gradlew testDebugUnitTest :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
@@ -117,6 +126,8 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Read Xcode build version
         id: xcode
@@ -140,9 +151,7 @@ jobs:
                 hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
 
       - name: Run iOS simulator tests
-        run: >-
-          ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
-          -PtestBuildRevision=ci-test
+        run: ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
 
       - name: Upload test results
         if: always()
@@ -163,6 +172,8 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run JS tests
         run: ./gradlew jsNodeTest
@@ -225,6 +236,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       - name: Run torrent tests on the host filesystem
         run: ./gradlew :library:torrent:jvmTest
       - uses: actions/upload-artifact@v7
@@ -243,6 +256,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       # The portable app's PowerShell update script only runs on Windows, so its tests skip
       # elsewhere.
       - name: Run the portable app's update script tests
@@ -263,6 +278,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

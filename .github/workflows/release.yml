@@ -83,17 +83,19 @@ jobs:
           -PprebuiltWebDir=build/prebuilt-web
           -PnativeImageJdk=${{ matrix.jdk || '21' }}
 
+      # UPX's default level: --best took 20-25 minutes per Linux binary, and the archive is
+      # compressed again anyway.
       - name: Compress with UPX (Linux)
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update && sudo apt-get install -y upx-ucl
-          upx --best cli/build/native/nativeCompile/ketch
+          upx cli/build/native/nativeCompile/ketch
 
       - name: Compress with UPX (Windows)
         if: matrix.os == 'windows'
         run: |
           choco install upx -y
-          upx --best cli/build/native/nativeCompile/ketch.exe
+          upx cli/build/native/nativeCompile/ketch.exe
 
       - name: Package (Unix)
         if: matrix.os != 'windows'
