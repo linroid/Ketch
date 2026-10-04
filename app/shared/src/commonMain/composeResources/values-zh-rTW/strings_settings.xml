@@ -145,6 +145,13 @@
   <string name="settings_notifications_devices">通知我這些裝置的狀況</string>
   <string name="settings_notifications_devices_footer">Ketch 會與它要回報的裝置保持連線。</string>
   <string name="settings_notifications_this_device">此裝置</string>
+  <string name="settings_notifications_success">成功回饋</string>
+  <string name="settings_notifications_success_sound">聲音</string>
+  <string name="settings_notifications_success_sound_hint">一聲輕柔的提示音。</string>
+  <string name="settings_notifications_success_vibration">震動</string>
+  <string name="settings_notifications_success_vibration_hint">短震一下，震動模式下也會。</string>
+  <string name="settings_notifications_success_footer">下載完成或探索找到下載時。</string>
+  <string name="settings_notifications_success_footer_phone">下載完成或探索找到下載時。靜音模式和勿擾模式下不會觸發，背景通知使用自己的提示音。</string>
   <string name="settings_notifications_browser">瀏覽器通知</string>
   <string name="settings_notifications_allowed">已允許通知</string>
   <string name="settings_notifications_allowed_hint">在 Ketch 分頁位於背景時顯示。</string>

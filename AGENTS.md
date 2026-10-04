@@ -439,6 +439,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `AndroidNotifier`); download events are notified by the hosts' `ActivityMonitor` routing
   instead. On Android, `ForegroundPolicy` keeps the service in the foreground while Discover
   searches, so a search keeps running and can ask once the app is in the background
+- Success feedback (`SuccessFeedback`, `[notifications] successSound` / `successVibration`): a
+  synthesized soft `Chime` and, on Android, a short vibration when a download finishes and is
+  reported, or a Discover turn ends with results (`AiDiscoverController.found`), at most once per
+  1.5 s. Hosts play it through a `SuccessFeedbackPlayer` (`DesktopFeedbackPlayer`,
+  `AndroidFeedbackPlayer`, which follows silent mode and Do Not Disturb); on Android a finished
+  download posted as a notification leaves the alert to its channel. iOS and the web play none
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one

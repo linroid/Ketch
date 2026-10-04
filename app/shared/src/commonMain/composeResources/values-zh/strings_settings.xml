@@ -145,6 +145,13 @@
   <string name="settings_notifications_devices">通知这些设备的情况</string>
   <string name="settings_notifications_devices_footer">Ketch 会与需要通知的设备保持连接。</string>
   <string name="settings_notifications_this_device">这台设备</string>
+  <string name="settings_notifications_success">成功反馈</string>
+  <string name="settings_notifications_success_sound">声音</string>
+  <string name="settings_notifications_success_sound_hint">一声轻柔的提示音。</string>
+  <string name="settings_notifications_success_vibration">振动</string>
+  <string name="settings_notifications_success_vibration_hint">短振一下，振动模式下也会。</string>
+  <string name="settings_notifications_success_footer">下载完成或发现找到下载时。</string>
+  <string name="settings_notifications_success_footer_phone">下载完成或发现找到下载时。静音模式和勿扰模式下不会触发，后台通知使用自己的提示音。</string>
   <string name="settings_notifications_browser">浏览器通知</string>
   <string name="settings_notifications_allowed">已允许通知</string>
   <string name="settings_notifications_allowed_hint">Ketch 标签页位于后台时显示。</string>

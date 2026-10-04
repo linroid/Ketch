@@ -195,6 +195,15 @@
   <string name="settings_notifications_devices_footer">Ketch stays connected to the devices it reports on.</string>
   <!-- Under the name of the device the app runs on, in the list of devices. -->
   <string name="settings_notifications_this_device">This device</string>
+  <!-- A chime and, on phones, a vibration the user turns on separately when something succeeds. -->
+  <string name="settings_notifications_success">Success feedback</string>
+  <string name="settings_notifications_success_sound">Sound</string>
+  <string name="settings_notifications_success_sound_hint">A soft chime.</string>
+  <string name="settings_notifications_success_vibration">Vibration</string>
+  <string name="settings_notifications_success_vibration_hint">A short buzz, also in vibrate mode.</string>
+  <string name="settings_notifications_success_footer">When a download finishes or Discover finds downloads.</string>
+  <!-- The footer on phones; Do Not Disturb as the system names it. -->
+  <string name="settings_notifications_success_footer_phone">When a download finishes or Discover finds downloads. Silent mode and Do Not Disturb mute it, and notifications in the background use their own sound.</string>
   <!-- The web app: whether the browser lets Ketch notify. -->
   <string name="settings_notifications_browser">Browser notifications</string>
   <string name="settings_notifications_allowed">Notifications are allowed</string>

@@ -14,6 +14,7 @@ import com.linroid.ketch.config.SiteNames
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -489,6 +490,26 @@ class AiDiscoverControllerTest {
     controller.toggle(again)
 
     assertEquals(listOf(again), controller.selectedCandidates())
+  }
+
+  @Test
+  fun found_onlyTurnsThatEndWithResults() = runTest {
+    val found = mutableListOf<DiscoverFound>()
+    val finding = controller(FakeAiProvider(candidates = listOf(candidate("a"), candidate("b"))))
+    val empty = controller(FakeAiProvider())
+    val failing = controller(FakeAiProvider(failure = IllegalStateException("Rate limited")))
+    for (controller in listOf(finding, empty, failing)) {
+      backgroundScope.launch { controller.found.collect { found += it } }
+    }
+    runCurrent()
+
+    finding.say("archives")
+    empty.say("nothing")
+    failing.say("broken")
+    runCurrent()
+
+    val session = assertNotNull(finding.current)
+    assertEquals(listOf(DiscoverFound(session.id, session.turns.single().id, 2)), found)
   }
 
   @Test
