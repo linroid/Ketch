@@ -227,6 +227,33 @@ jobs:
           ${{ matrix.portable && ':app:desktop:packageReleasePortableZip' || '' }}
           -PVERSION_NAME=${KETCH_VERSION#v}
 
+      # jpackage marks every MSI as x64, yet the ARM64 one carries jpackage's ARM64 custom action
+      # DLL. Windows Installer runs it in an x64 host, which can't load it, so installing fails
+      # with error 1723. Marking the package Arm64 (Windows Installer 5.0) runs it natively.
+      - name: Mark the MSI as Arm64
+        if: matrix.os == 'windows' && matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem app/desktop/build/compose/binaries/main-release -Recurse -Filter *.msi).FullName
+          function Call($target, $name, $flags, $arguments) {
+            $target.GetType().InvokeMember($name, $flags, $null, $target, $arguments)
+          }
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $database = Call $installer OpenDatabase InvokeMethod @($msi, 1) # msiOpenDatabaseModeTransact
+          $summary = Call $database SummaryInformation GetProperty @(2)
+          $template = Call $summary Property GetProperty @(7)
+          if (-not $template.StartsWith('x64;')) { throw "Unexpected MSI platform: $template" }
+          Call $summary Property SetProperty @(7, ($template -replace '^x64;', 'Arm64;'))
+          Call $summary Property SetProperty @(14, 500) # Minimum installer version
+          Call $summary Persist InvokeMethod @()
+          Call $database Commit InvokeMethod @()
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($summary)
+          [void][Runtime.InteropServices.Marshal]::ReleaseComObject($database)
+          $saved = Call $installer OpenDatabase InvokeMethod @($msi, 0) # msiOpenDatabaseModeReadOnly
+          $check = Call (Call $saved SummaryInformation GetProperty @(0)) Property GetProperty @(7)
+          if (-not $check.StartsWith('Arm64;')) { throw "MSI platform is still $check" }
+          Write-Output "$msi now targets $check"
+
       - name: Rename artifact
         run: |
           SRC=$(find app/desktop/build/compose/binaries/main-release -name "*.${{ matrix.ext }}")
