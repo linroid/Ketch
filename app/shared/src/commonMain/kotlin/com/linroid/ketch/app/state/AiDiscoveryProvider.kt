@@ -65,11 +65,15 @@ data class AiDiscoverTurn(
  * @property query the search, as the engine read it.
  * @property candidates the downloads it found, best first.
  * @property summary the agent's short reply in plain text; blank when it gave none.
+ * @property title the agent's short name for the search, which names a new conversation: one
+ *   line of plain text that fetched pages may have shaped, so show it as text only. Blank when
+ *   it gave none, as it may for a follow-up.
  */
 data class AiDiscoverResponse(
   val query: String,
   val candidates: List<AiCandidate>,
   val summary: String = "",
+  val title: String = "",
 )
 
 /**

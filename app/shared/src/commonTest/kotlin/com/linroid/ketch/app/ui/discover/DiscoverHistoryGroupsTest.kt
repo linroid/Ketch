@@ -118,6 +118,15 @@ class DiscoverHistoryGroupsTest {
   }
 
   @Test
+  fun matchesHistory_namedByTheAgent_matchesTheTitleAndTheFirstMessage() {
+    val chat = session(id = "a", turns = listOf(turn(TurnStatus.Done, message = "blender m2 mac")))
+      .copy(title = "Blender 4.2 for Apple silicon")
+
+    assertTrue(matchesHistory(chat, "apple silicon"))
+    assertTrue(matchesHistory(chat, "m2 mac"))
+  }
+
+  @Test
   fun historyStatus_waitingComesFirstThenWhatRunsThenTheNewestTurn() {
     val running = session("a", turns = listOf(turn(TurnStatus.Done), turn(TurnStatus.Running)))
     val queued = session("b", turns = listOf(turn(TurnStatus.Queued)))

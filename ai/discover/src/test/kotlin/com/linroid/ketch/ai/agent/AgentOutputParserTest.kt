@@ -243,6 +243,60 @@ class AgentOutputParserTest {
   }
 
   @Test
+  fun parse_objectWithTitle_returnsItAsOneLineOfText() = runTest {
+    val output = """{"title": "Blender 4.2\n for   Apple silicon\u202E",
+      "summary": "One build.", "candidates": []}"""
+
+    val result = parser.parse(output)
+
+    assertEquals("Blender 4.2 for Apple silicon", result.title)
+    assertEquals("One build.", result.summary)
+  }
+
+  @Test
+  fun parse_quotedTitleWithAPeriod_losesThem() = runTest {
+    val titles = listOf(
+      // JSON escapes, as the model writes them.
+      "\\\"Ubuntu Server ISO.\\\"" to "Ubuntu Server ISO",
+      "\u201CUbuntu Server ISO\u201D" to "Ubuntu Server ISO",
+      "Ubuntu 24.04." to "Ubuntu 24.04",
+      "Ubuntu-Server-Abbild\u3002" to "Ubuntu-Server-Abbild",
+      "\\\"\\\"" to "",
+    )
+
+    for ((title, expected) in titles) {
+      val output = """{"title": "$title", "summary": "Found it.", "candidates": []}"""
+
+      assertEquals(expected, parser.parse(output).title, title)
+    }
+  }
+
+  @Test
+  fun parse_longTitle_isCut() = runTest {
+    val output = """{"title": "${"word ".repeat(30)}", "summary": "Found it."}"""
+
+    val title = parser.parse(output).title
+
+    assertEquals(AgentOutputParser.MAX_SEARCH_TITLE_LENGTH, title.length)
+    assertTrue(title.endsWith("…"))
+  }
+
+  @Test
+  fun parse_answerWithoutATitle_hasABlankTitle() = runTest {
+    val outputs = listOf(
+      """{"summary": "Found it.", "candidates": []}""",
+      """{"title": 42, "summary": "Found it."}""",
+      """{"title": ["Blender"], "summary": "Found it."}""",
+      """[{"name":"Test","url":"https://example.com/file.zip","confidence":0.9}]""",
+      "I can't help with cracked software.",
+    )
+
+    for (output in outputs) {
+      assertEquals("", parser.parse(output).title, output)
+    }
+  }
+
+  @Test
   fun parse_jsonThatCannotBeRead_isNeverShownAsSummary() = runTest {
     val cutOff = """```json
       {"summary": "Two builds.", "candidates": [{"name":"Test","url":"https://exa"""

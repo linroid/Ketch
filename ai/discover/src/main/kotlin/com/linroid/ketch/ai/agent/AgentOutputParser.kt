@@ -16,8 +16,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * Parses the agent's final text output into its summary and validated, safety-filtered
- * [RankedCandidate] instances.
+ * Parses the agent's final text output into its summary, its title for the search and
+ * validated, safety-filtered [RankedCandidate] instances.
  */
 internal class AgentOutputParser(
   private val urlValidator: UrlValidator,
@@ -31,11 +31,12 @@ internal class AgentOutputParser(
    * Parses the agent output text, validates URLs, applies the
    * device safety filter, and deduplicates by URL.
    *
-   * The agent answers with `{"summary": ..., "candidates": [...]}`, where an answer without
-   * candidates may leave them out; a bare candidate array is read too, without a summary. A
-   * candidate that does not decode is skipped on its own. Output that holds no such JSON is
-   * taken as a plain-text answer and becomes the summary, unless it starts as JSON, such as an
-   * answer cut off half-way: that gives neither a summary nor candidates.
+   * The agent answers with `{"title": ..., "summary": ..., "candidates": [...]}`, where the
+   * title is optional and an answer without candidates may leave them out; a bare candidate
+   * array is read too, without a title or summary. A candidate that does not decode is skipped
+   * on its own. Output that holds no such JSON is taken as a plain-text answer and becomes the
+   * summary, unless it starts as JSON, such as an answer cut off half-way: that gives neither a
+   * summary nor candidates.
    *
    * Candidates whose URL lies outside [allowlist] are dropped; the page
    * they were found on is not checked. So are [excludedUrls], compared by
@@ -46,9 +47,9 @@ internal class AgentOutputParser(
    * offer a link into the user's network. The lookup reaches only DNS,
    * never the site.
    *
-   * A candidate's title, description and file name are reduced to one line
-   * of plain text: the model wrote them, and fetched pages may have shaped
-   * them.
+   * The answer's title, and a candidate's title, description and file
+   * name, are reduced to one line of plain text: the model wrote them, and
+   * fetched pages may have shaped them.
    */
   suspend fun parse(
     agentOutput: String,
@@ -62,7 +63,28 @@ internal class AgentOutputParser(
       .mapNotNull { c -> validateAndFilter(c, allowlist) }
       .distinctBy { SiteNames.canonicalUrl(it.url) }
       .sortedByDescending { it.confidence }
-    return ParsedOutput(sanitizeAgentText(decoded.summary, MAX_SUMMARY_LENGTH), candidates)
+    return ParsedOutput(
+      summary = sanitizeAgentText(decoded.summary, MAX_SUMMARY_LENGTH),
+      candidates = candidates,
+      title = searchTitle(decoded.title),
+    )
+  }
+
+  /**
+   * The agent's [title] for the search as one line of plain text of at most
+   * [MAX_SEARCH_TITLE_LENGTH] characters, without the quotes around it or a period at its end.
+   */
+  private fun searchTitle(title: String): String {
+    val line = sanitizeAgentText(title, title.length.coerceAtLeast(1))
+    val unquoted = if (
+      line.length >= 2 && line.first() in OPENING_QUOTES && line.last() in CLOSING_QUOTES
+    ) {
+      line.substring(1, line.length - 1).trim()
+    } else {
+      line
+    }
+    val bare = if (unquoted.endsWith("...")) unquoted else unquoted.removeSuffix(".")
+    return sanitizeAgentText(bare.removeSuffix("。").trimEnd(), MAX_SEARCH_TITLE_LENGTH)
   }
 
   /**
@@ -130,7 +152,7 @@ internal class AgentOutputParser(
     return when (element) {
       // Prose such as "[3]" reads as an array too; only an array of objects lists candidates.
       is JsonArray -> if (element.all { it is JsonObject }) {
-        AgentAnswer(summary = "", candidates = decodeCandidates(element))
+        AgentAnswer(title = "", summary = "", candidates = decodeCandidates(element))
       } else {
         null
       }
@@ -138,7 +160,13 @@ internal class AgentOutputParser(
         val summary = (element["summary"] as? JsonPrimitive)?.contentOrNull
         val candidates = element["candidates"] as? JsonArray
         if (summary == null && candidates == null) return null
-        AgentAnswer(summary.orEmpty(), candidates?.let(::decodeCandidates).orEmpty())
+        // Only a string names the search; a title is no answer on its own.
+        val title = (element["title"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        AgentAnswer(
+          title = title.orEmpty(),
+          summary = summary.orEmpty(),
+          candidates = candidates?.let(::decodeCandidates).orEmpty(),
+        )
       }
       else -> null
     }
@@ -221,17 +249,28 @@ internal class AgentOutputParser(
     }
   }
 
-  /** The agent's answer before its candidates are checked. */
-  private class AgentAnswer(val summary: String, val candidates: List<AgentCandidate>)
+  /** The agent's answer before its candidates are checked and its text is made safe. */
+  private class AgentAnswer(
+    val title: String,
+    val summary: String,
+    val candidates: List<AgentCandidate>,
+  )
 
   companion object {
     /** Longest summary kept, in characters. */
     internal const val MAX_SUMMARY_LENGTH = 600
+
+    /** Longest title for the search kept, in characters. */
+    internal const val MAX_SEARCH_TITLE_LENGTH = 60
     private const val MAX_TITLE_LENGTH = 200
     private const val MAX_DESCRIPTION_LENGTH = 600
     private const val MAX_FILE_NAME_LENGTH = 255
 
     private val OPENING_BRACKETS = charArrayOf('[', '{')
+
+    // Quotes the model may wrap a title in, despite being told not to.
+    private const val OPENING_QUOTES = "\"'`\u201C\u2018\u00AB\u300C"
+    private const val CLOSING_QUOTES = "\"'`\u201D\u2019\u00BB\u300D"
 
     private val CODE_BLOCK_PATTERN = Regex(
       "```(?:json)?\\s*\\n?([\\s\\S]*?)\\n?```",
@@ -245,10 +284,13 @@ internal class AgentOutputParser(
  * @param summary its short reply to the user, sanitized to one line of plain text; blank when
  *   it gave none
  * @param candidates its candidates that passed every check, most confident first
+ * @param title its short name for the search, sanitized to one line of plain text; blank when
+ *   it gave none, as a follow-up may, or answered with a bare array or text alone
  */
 internal data class ParsedOutput(
   val summary: String,
   val candidates: List<RankedCandidate>,
+  val title: String = "",
 )
 
 /**

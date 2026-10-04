@@ -32,7 +32,7 @@ internal fun AppState.discoverTarget(): InstanceEntry? {
  */
 internal fun AppState.addDiscovered(candidates: List<AiCandidate>): Job? {
   val target = discoverTarget() ?: return null
-  val query = aiDiscover.current?.title.orEmpty()
+  val query = aiDiscover.current?.query.orEmpty()
   return launchCommand {
     val result = aiDiscover.add(target.instance, candidates, query)
     announceAdded(result.added.map { TaskKey(target.deviceId, it.taskId) })

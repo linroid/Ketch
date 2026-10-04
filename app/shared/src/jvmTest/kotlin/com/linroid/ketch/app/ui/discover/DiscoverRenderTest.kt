@@ -60,7 +60,7 @@ class DiscoverRenderTest {
       sendKey(Key.Enter)
       frames(FRAMES)
 
-      assertEquals(listOf(QUERY), state.aiDiscover.sessions.map { it.title })
+      assertEquals(listOf(QUERY), state.aiDiscover.sessions.map { it.query })
       assertEquals("", state.aiDiscover.draft.text.text, "Sending empties the composer")
     }
   }

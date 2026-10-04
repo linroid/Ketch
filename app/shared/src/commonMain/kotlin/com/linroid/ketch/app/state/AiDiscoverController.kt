@@ -45,7 +45,8 @@ data class CandidateAddResult(
  * only while it is still that turn's run, so a stopped run that ends late never touches a turn
  * that was run again or deleted. The sessions are saved to the history when a turn starts or
  * ends and when results are discarded or restored or sessions deleted; the history keeps the
- * newest [MAX_SESSIONS].
+ * newest [MAX_SESSIONS]. A session is called by its first message until the agent's answer to it
+ * gives a name, which later turns never change.
  *
  * A request to open a website is answered by the page access settings when they cover it, and
  * by what the user allowed or denied earlier in the session; otherwise it waits in [approvals]
@@ -386,12 +387,13 @@ class AiDiscoverController(
   /**
    * Adds each of [candidates] to [api] on its own, so one that fails never stops the others.
    *
-   * @param query search that found them, recorded in the request properties.
+   * @param query search that found them, recorded in the request properties; by default the
+   *   shown session's [DiscoverSession.query].
    */
   suspend fun add(
     api: KetchApi,
     candidates: List<AiCandidate>,
-    query: String = current?.title.orEmpty(),
+    query: String = current?.query.orEmpty(),
   ): CandidateAddResult {
     val added = mutableListOf<DownloadTask>()
     val failed = mutableListOf<Pair<AiCandidate, Throwable>>()
@@ -409,12 +411,13 @@ class AiDiscoverController(
   /**
    * The add sheet's request for reviewing [candidates] before adding them to [targetDeviceId].
    *
-   * @param query search that found them, recorded in the request properties.
+   * @param query search that found them, recorded in the request properties; by default the
+   *   shown session's [DiscoverSession.query].
    */
   fun reviewRequest(
     candidates: List<AiCandidate>,
     targetDeviceId: String?,
-    query: String = current?.title.orEmpty(),
+    query: String = current?.query.orEmpty(),
   ): IntakeRequest = IntakeRequest(
     seeds = candidates.map { it.toSeed(query) },
     targetDeviceId = targetDeviceId,
@@ -434,7 +437,8 @@ class AiDiscoverController(
     val turn = queuedTurn(newId(), message, sites, now)
     val session = DiscoverSession(
       id = newId(),
-      title = titleOf(message),
+      // Shown at once; the agent's answer may name it better.
+      title = firstLine(message),
       createdAt = now,
       updatedAt = now,
       turns = listOf(turn),
@@ -561,13 +565,19 @@ class AiDiscoverController(
     if (runs[run.turnId] !== run) return
     val now = clock.now()
     result.onSuccess { response ->
+      val session = sessions.firstOrNull { it.id == run.sessionId }
       // Links discarded while the search ran never show.
-      val discarded = sessions.firstOrNull { it.id == run.sessionId }?.discarded.orEmpty()
-      val found = response.candidates.filterNot { SiteNames.canonicalUrl(it.url) in discarded }
+      val discarded = session?.discarded.orEmpty()
+      val earlier = session?.turns.orEmpty().takeWhile { it.id != run.turnId }
+      val found = carryOver(
+        found = response.candidates.filterNot { SiteNames.canonicalUrl(it.url) in discarded },
+        earlier = earlier.flatMap { it.candidates },
+      )
       log.i { "Found ${found.size} candidates, session=${run.sessionId}" }
       editTurn(run, touched = now) {
         it.copy(status = TurnStatus.Done, candidates = found, summary = response.summary)
       }
+      if (session != null) name(session, run.turnId, response.title)
     }.onFailure { e ->
       // A provider failure's message and causes quote the provider's reply, which may echo a
       // token; its brief leaves that out.
@@ -580,6 +590,19 @@ class AiDiscoverController(
     runs.remove(run.turnId)
     startQueued()
     save()
+  }
+
+  /**
+   * Calls [session] by [title], the agent's name for it, when [turnId] is its first turn and it
+   * is still called by its first message: a later turn, or a first turn run again after it was
+   * named, never renames it. A blank [title] keeps the name.
+   */
+  private fun name(session: DiscoverSession, turnId: String, title: String) {
+    val named = firstLine(title)
+    if (named.isEmpty() || session.turns.firstOrNull()?.id != turnId) return
+    if (session.title != session.query) return
+    log.d { "The agent named session=${session.id}" }
+    editSession(session.id) { it.copy(title = named) }
   }
 
   /**
@@ -758,11 +781,28 @@ class AiDiscoverController(
   }
 }
 
-/** A session's title: the first line of its first [message], its spaces collapsed. */
-private fun titleOf(message: String): String =
-  message.lineSequence().first { it.isNotBlank() }.trim().replace(Whitespace, " ")
-
-private val Whitespace = Regex("\\s+")
+/**
+ * [found] with what the [earlier] results of the session, oldest first, knew of the same links.
+ * A candidate whose link an earlier turn returned, compared by [SiteNames.canonicalUrl], gets the
+ * file name, size, content type, source page and description it lacks from the latest such
+ * result: a follow-up answered from the earlier results may leave them out. What the agent
+ * returned now wins.
+ */
+internal fun carryOver(found: List<AiCandidate>, earlier: List<AiCandidate>): List<AiCandidate> {
+  if (earlier.isEmpty()) return found
+  val latest = HashMap<String, AiCandidate>()
+  for (candidate in earlier) latest[SiteNames.canonicalUrl(candidate.url)] = candidate
+  return found.map { candidate ->
+    val known = latest[SiteNames.canonicalUrl(candidate.url)] ?: return@map candidate
+    candidate.copy(
+      fileName = candidate.fileName?.takeIf { it.isNotBlank() } ?: known.fileName,
+      fileSize = candidate.fileSize ?: known.fileSize,
+      mimeType = candidate.mimeType?.takeIf { it.isNotBlank() } ?: known.mimeType,
+      sourceUrl = candidate.sourceUrl.ifBlank { known.sourceUrl },
+      description = candidate.description.ifBlank { known.description },
+    )
+  }
+}
 
 /** Builds the request that adds this candidate, remembering where it came from. */
 internal fun AiCandidate.toRequest(query: String): DownloadRequest = DownloadRequest(

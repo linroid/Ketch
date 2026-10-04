@@ -457,11 +457,17 @@ and it stays where you are; scroll back down and it follows again.
 - **Follow-ups.** Later messages refine the search, such as "only the
   LTS release". Each runs the agent again, with its own budgets, and
   sends it the conversation: the earlier requests and the sites they
-  were limited to, the results of the turns that finished, without the
+  were limited to, the results of the turns that finished with their
+  details (file name, size, source page, description), without the
   ones you discarded, and which turns failed or were stopped. A long
-  chat sends its first turn and the latest five. The agent answers with
-  the complete list for the latest request and re-checks only links it
-  has not checked in the chat.
+  chat sends its first turn and the latest five. A follow-up that only
+  narrows, picks from or explains the earlier results, such as "just the
+  latest version", is answered from them in a *Refining* step, without
+  searching or opening pages again. Others search only for what the
+  earlier results lack. Either way the agent answers with the complete
+  list for the latest request and re-checks only links it has not
+  checked in the chat; a result it returns again keeps the size, type
+  and source page shown before.
 - **Summary.** The agent writes one or two plain sentences above its
   results. When it finds nothing it can recommend, such as for a request
   for pirated copies, the summary says why.
@@ -499,7 +505,11 @@ and it stays where you are; scroll back down and it follows again.
 
 Every chat is saved to the history, newest first by when it last ran,
 under *Today*, *Yesterday* and *Earlier*. A row names the chat by its
-first message, and says under it what the chat is doing:
+first message until the agent answers it with a short title, such as
+"Blender 4.2 LTS for Apple silicon", in the language you wrote in;
+follow-ups never rename it, and downloads added from the chat still
+record the first message as their search. Under the name, the row says
+what the chat is doing:
 
 - *Needs your OK*, *Searching…*, *Waiting to start*, *Failed* or
   *Stopped*;
@@ -507,7 +517,7 @@ first message, and says under it what the chat is doing:
   as "4 results · 14:02" (a date under *Earlier*), or "No results".
 
 From six chats on, a **Search history** field above them filters them by
-their messages.
+their titles and messages.
 
 - **Open** a row to read the chat or continue it with a follow-up.
 - **New search** (⇧⌘E) shows an empty chat; the one shown stays in the

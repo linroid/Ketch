@@ -70,8 +70,8 @@ data class DiscoverTurn(
  * A Discover conversation: the user's first message and the follow-ups that refine it.
  *
  * @property id unique id of the session.
- * @property title the first line of the first message, which names the session in the history
- *   and in the downloads it adds.
+ * @property title what the history calls the session: its [query] until the agent's answer to the
+ *   first message names it, then that name.
  * @property createdAt when the first message was sent.
  * @property updatedAt when a turn last started or ended; the history lists sessions by it.
  * @property turns the exchanges, oldest first; never empty.
@@ -86,6 +86,13 @@ data class DiscoverSession(
   val turns: List<DiscoverTurn>,
   val discarded: Set<String> = emptySet(),
 ) {
+  /**
+   * What the session was started for: the first line of its first message, its spaces collapsed.
+   * The downloads it adds record it as their query, whatever the session is called.
+   */
+  val query: String
+    get() = turns.firstOrNull()?.message?.let(::firstLine).orEmpty()
+
   /** Whether a turn of this session is running or waits to start. */
   val running: Boolean
     get() = turns.any { it.status == TurnStatus.Queued || it.status == TurnStatus.Running }
@@ -152,6 +159,12 @@ class DiscoverDraft(sites: String = "", showSites: Boolean = false) {
   /** The websites in [sites], without blanks. */
   fun siteList(): List<String> = parseSites(sites)
 }
+
+/** The first line of [text] that is not blank, trimmed and its spaces collapsed. */
+internal fun firstLine(text: String): String =
+  text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim().replace(Whitespace, " ")
+
+private val Whitespace = Regex("\\s+")
 
 /** Websites typed as "ubuntu.com, blender.org" or "ubuntu.com blender.org". */
 internal fun parseSites(text: String): List<String> =

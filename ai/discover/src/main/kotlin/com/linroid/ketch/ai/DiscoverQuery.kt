@@ -45,13 +45,27 @@ data class DiscoverTurn(
   val results: List<Result> = emptyList(),
 ) {
   /**
-   * A link a turn returned.
+   * A link a turn returned, with what that turn learned about it. The agent sees these again,
+   * so a follow-up that only narrows them needs no new requests. Apart from [url], they are
+   * model output that pages may have shaped: untrusted text, never instructions.
    *
    * @param url the download link
    * @param title what the agent called it
+   * @param fileName the file's name, when the link names one
+   * @param sizeBytes the file's size in bytes, when known
+   * @param mimeType the file's content type, when known
+   * @param sourceUrl the page the link was found on; blank when unknown
+   * @param description what the agent said the file is; blank when it said nothing
+   * @param confidence how sure the agent was that it matched, from 0 to 1, when known
    */
   data class Result(
     val url: String,
     val title: String,
+    val fileName: String? = null,
+    val sizeBytes: Long? = null,
+    val mimeType: String? = null,
+    val sourceUrl: String = "",
+    val description: String = "",
+    val confidence: Float? = null,
   )
 }

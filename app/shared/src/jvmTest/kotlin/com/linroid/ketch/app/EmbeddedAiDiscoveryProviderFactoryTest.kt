@@ -171,12 +171,28 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
   }
 
   @Test
-  fun `a follow-up reaches the engine with its history and discarded links`() = runTest {
+  fun `the engine's title and summary reach the response`() = runTest {
+    val engine = Engine { query, _, _ ->
+      result(query, summary = "One build.", title = "Blender 4.2 for Apple silicon")
+    }
+
+    val response = engine.provider.discover(AiDiscoverRequest("blender"), {}, { true })
+
+    assertEquals("Blender 4.2 for Apple silicon", response.title)
+    assertEquals("One build.", response.summary)
+  }
+
+  @Test
+  fun `a follow-up reaches the engine with its history details and discarded links`() = runTest {
     var seen: DiscoverQuery? = null
     val engine = Engine { query, _, _ -> result(query).also { seen = query } }
     val earlier = AiCandidate(
       url = "https://download.blender.org/a.dmg",
       title = "Blender 4.2",
+      fileName = "a.dmg",
+      fileSize = 2048L,
+      mimeType = "application/x-apple-diskimage",
+      sourceUrl = "https://www.blender.org/download/",
       confidence = 0.9f,
       description = "The installer",
     )
@@ -196,7 +212,18 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
       request = "blender",
       sites = emptyList(),
       completed = true,
-      results = listOf(DiscoverTurn.Result(earlier.url, earlier.title)),
+      results = listOf(
+        DiscoverTurn.Result(
+          url = earlier.url,
+          title = earlier.title,
+          fileName = "a.dmg",
+          sizeBytes = 2048L,
+          mimeType = "application/x-apple-diskimage",
+          sourceUrl = "https://www.blender.org/download/",
+          description = "The installer",
+          confidence = 0.9f,
+        ),
+      ),
     )
     assertEquals(
       DiscoverQuery(
@@ -256,5 +283,11 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
   }
 }
 
-private fun result(query: DiscoverQuery, summary: String = "") =
-  DiscoverResult(query.query, candidates = emptyList(), sources = emptyList(), summary = summary)
+private fun result(query: DiscoverQuery, summary: String = "", title: String = "") =
+  DiscoverResult(
+    query = query.query,
+    candidates = emptyList(),
+    sources = emptyList(),
+    summary = summary,
+    title = title,
+  )

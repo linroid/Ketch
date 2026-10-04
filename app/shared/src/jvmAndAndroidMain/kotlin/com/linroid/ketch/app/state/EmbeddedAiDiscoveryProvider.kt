@@ -76,6 +76,7 @@ class EmbeddedAiDiscoveryProvider internal constructor(
           )
         },
         summary = result.summary,
+        title = result.title,
       )
     } catch (e: DiscoveryException) {
       throw AiDiscoverFailure(e.message, e.brief, e)
@@ -100,7 +101,7 @@ class EmbeddedAiDiscoveryProvider internal constructor(
   }
 }
 
-/** The engine's query for this request. */
+/** The engine's query for this request, with what the earlier turns learned of their links. */
 private fun AiDiscoverRequest.toQuery() = DiscoverQuery(
   query = query,
   sites = sites,
@@ -111,7 +112,18 @@ private fun AiDiscoverRequest.toQuery() = DiscoverQuery(
       request = turn.request,
       sites = turn.sites,
       completed = turn.completed,
-      results = turn.results.map { EngineTurn.Result(url = it.url, title = it.title) },
+      results = turn.results.map {
+        EngineTurn.Result(
+          url = it.url,
+          title = it.title,
+          fileName = it.fileName,
+          sizeBytes = it.fileSize,
+          mimeType = it.mimeType,
+          sourceUrl = it.sourceUrl,
+          description = it.description,
+          confidence = it.confidence,
+        )
+      },
     )
   },
   excludedUrls = excludedUrls,

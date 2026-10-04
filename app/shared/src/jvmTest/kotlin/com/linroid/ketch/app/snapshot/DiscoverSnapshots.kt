@@ -568,8 +568,9 @@ internal fun discovery(
 
 /**
  * Discovery that follows [script] for a chat's first message and [followUp] for the others,
- * once settings are usable. A follow-up that finds results answers with [FollowUpCandidates] and
- * a reply.
+ * once settings are usable. A first message that finds results answers with [Candidates] and
+ * names the chat [FIRST_TITLE]; a follow-up that finds results answers with [FollowUpCandidates]
+ * and a reply.
  */
 private class SampleDiscovery(
   private val script: DiscoverScript,
@@ -594,7 +595,7 @@ private class SampleDiscovery(
         reported.forEach(onStep)
         return when (current) {
           DiscoverScript.Results -> if (first) {
-            AiDiscoverResponse(request.query, Candidates)
+            AiDiscoverResponse(request.query, Candidates, title = FIRST_TITLE)
           } else {
             AiDiscoverResponse(request.query, FollowUpCandidates, FOLLOW_UP_SUMMARY)
           }
@@ -741,6 +742,9 @@ private fun stepsFor(subject: String): List<DiscoveryStep> {
 private const val MIRROR_URL =
   "http://mirror.example.edu/blender/release/Blender4.2/blender-4.2.1-macos-arm64.dmg"
 
+/** What the agent calls a chat whose first message finds [Candidates]. */
+private const val FIRST_TITLE = "Blender 4.2 LTS for Apple silicon"
+
 private const val FOLLOW_UP_SUMMARY = "The 4.2.1 LTS installer for Apple silicon comes " +
   "straight from blender.org over HTTPS. I left out the university mirror: it serves the same " +
   "file without TLS."
@@ -796,6 +800,7 @@ internal val SavedSessions: List<DiscoverSession> by lazy {
     saved(
       id = UBUNTU_ID,
       at = "2026-10-01T13:12:00Z",
+      title = "Ubuntu Server 24.04 install image",
       turns = listOf(
         savedTurn("Ubuntu 24.04 server ISO", "2026-10-01T13:06:00Z", UbuntuCandidates),
         savedTurn(
@@ -819,6 +824,7 @@ internal val SavedSessions: List<DiscoverSession> by lazy {
     saved(
       id = "saved-footage",
       at = "2026-09-30T18:20:00Z",
+      title = "Public-domain 4K nature clips",
       turns = listOf(
         savedTurn("Public-domain 4K nature footage", "2026-09-30T18:16:00Z", FootageCandidates),
       ),
@@ -834,6 +840,7 @@ internal val SavedSessions: List<DiscoverSession> by lazy {
     saved(
       id = "saved-fedora",
       at = "2026-09-24T16:02:00Z",
+      title = "Fedora Workstation 41 live image",
       turns = listOf(savedTurn("Fedora Workstation 41 live ISO", "2026-09-24T16:00:00Z")),
     ),
     saved(
@@ -846,10 +853,19 @@ internal val SavedSessions: List<DiscoverSession> by lazy {
   )
 }
 
-private fun saved(id: String, at: String, turns: List<DiscoverTurn>): DiscoverSession =
+/**
+ * A saved chat of [turns], last run [at]: called [title], the agent's name for it, or by its first
+ * message when the agent gave none, as when its first turn failed.
+ */
+private fun saved(
+  id: String,
+  at: String,
+  turns: List<DiscoverTurn>,
+  title: String = turns.first().message,
+): DiscoverSession =
   DiscoverSession(
     id = id,
-    title = turns.first().message,
+    title = title,
     createdAt = turns.first().startedAt,
     updatedAt = Instant.parse(at),
     turns = turns,

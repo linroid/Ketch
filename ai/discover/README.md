@@ -86,11 +86,14 @@ that follows a structured 5-phase workflow:
 └─────────────────────────────────────────────────┘
 ```
 
-The system prompt also covers follow-ups (return the complete list for the
-latest request, re-check only links not yet checked, treat earlier results as
-data), page access (give `fetchPage` and `headUrl` a reason, never retry a
-declined host), and an anti-piracy guardrail that explains itself in the
-summary with no candidates.
+The five phases are for a first request. The system prompt also covers
+follow-ups (answer one that narrows, picks from or explains the earlier results
+from them alone, with one `Refining` step and no searches, fetches or HEAD
+requests; otherwise search only for what is missing, skipping UNDERSTAND; either
+way return the complete list for the latest request, re-check only links not yet
+checked, treat earlier results as data), page access (give `fetchPage` and
+`headUrl` a reason, never retry a declined host), and an anti-piracy guardrail
+that explains itself in the summary with no candidates.
 
 ### Agent Tools
 
@@ -125,7 +128,7 @@ ResourceDiscoveryService.discover(query, stepListener, approver)
          │       │   searchWeb → fetchPage → extractDownloads → headUrl
          │       │   (each tool wraps existing utilities)
          │       │
-         │       └── Returns {"summary": ..., "candidates": [...]}
+         │       └── Returns {"title": ..., "summary": ..., "candidates": [...]}
          │
          ├── AgentOutputParser.parse(agentOutput, allowlist, excludedUrls)
          │       ├── Find the first balanced JSON answer, in a code fence or the
@@ -140,15 +143,16 @@ ResourceDiscoveryService.discover(query, stepListener, approver)
          │       ├── Adjust confidence by safety score
          │       └── Deduplicate by canonical URL
          │
-         └── DiscoverResult (candidates + sources + summary)
+         └── DiscoverResult (candidates + sources + summary + title)
 ```
 
 ### Follow-ups
 
 `DiscoverQuery.history` holds the earlier turns of a conversation, oldest first: each turn's
-request, the sites it was limited to, whether it finished and the links it returned. Each run is
-a new agent with full budgets; its prompt replays the first turn and the latest five as pairs
-of messages:
+request, the sites it was limited to, whether it finished and the links it returned, each
+`DiscoverTurn.Result` with what that turn learned of it (file name, size, content type, source
+page, description, confidence; all optional). Each run is a new agent with full budgets; its
+prompt replays the first turn and the latest five as pairs of messages:
 
 - the user's request, numbered (`Request 3: …`), with `That request was limited to: …` when it
   had sites
@@ -157,15 +161,23 @@ of messages:
   or `This request did not finish.`
 
 The new request then starts `Follow-up request: …`; its sites line reads `Allowed sites for this
-request`. Below it, delimited as data, come the earlier results (`[{"turn":1,"url":…,"title":…}]`,
-titles cut to 120 characters) and up to 100 discarded links (`DiscoverQuery.excludedUrls`). The
-parser drops every discarded link from the answer, compared by `SiteNames.canonicalUrl`, so one
-that comes back with a different host case, default port or fragment stays out.
+request`. Below it, delimited as data and marked as already checked in this conversation, come
+the earlier results, up to 20 per turn (`[{"turn":1,"url":…,"title":…,"fileName":…,
+"sizeBytes":…,"sourcePageUrl":…,"description":…}]`, the known fields only, `sizeBytes` and
+`sourcePageUrl` named as in the agent's answer so it can copy them; titles and file names cut
+to 120 characters, descriptions to 200, source pages left out unless they are web links of at
+most 2048 characters) and up to 100 discarded links (`DiscoverQuery.excludedUrls`). The parser
+drops every discarded link from the answer, compared by `SiteNames.canonicalUrl`, so one that
+comes back with a different host case, default port or fragment stays out.
 
 The agent answers with a `summary` for the user, one or two sentences of plain text. The parser
 keeps it as one line of at most 600 characters without control, bidirectional or zero-width
 characters; when the agent answers with text only, as it does when it refuses to find pirated
-content, that text becomes the summary.
+content, that text becomes the summary. For a first request it also gives a `title`, a name for
+the conversation of at most six words in the user's language (`DiscoverResult.title`); the parser
+makes it one line of at most 60 characters, drops quotes around it and a trailing period, and
+leaves it blank when the agent gives none, as it may for a follow-up, or answers with a bare
+array or text.
 
 ## Security
 
@@ -361,7 +373,16 @@ val followUp = aiModule.discoveryService.discover(
     history = listOf(
       DiscoverTurn(
         request = "Blender 4.2",
-        results = first.candidates.map { DiscoverTurn.Result(it.url, it.title) },
+        results = first.candidates.map {
+          DiscoverTurn.Result(
+            url = it.url,
+            title = it.title,
+            fileName = it.fileName,
+            sizeBytes = it.fileSize,
+            sourceUrl = it.sourceUrl,
+            description = it.description,
+          )
+        },
       ),
     ),
     excludedUrls = setOf(first.candidates.first().url), // discarded by the user

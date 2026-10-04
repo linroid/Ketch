@@ -139,17 +139,24 @@ class AiDiscoverControllerTest {
   }
 
   @Test
-  fun add_withoutAQuery_recordsTheSessionTitle() = runTest {
+  fun add_withoutAQuery_recordsTheFirstMessageNotTheAgentsTitle() = runTest {
     val api = RecordingKetchApi()
-    val controller = controller(FakeAiProvider(candidates = listOf(candidate("a.iso"))))
+    val provider = FakeAiProvider(
+      candidates = listOf(candidate("a.iso")),
+      title = "Ubuntu Server 24.04 LTS",
+    )
+    val controller = controller(provider)
     controller.say("Ubuntu server\nthe LTS one")
     runCurrent()
     controller.say("only arm64")
     runCurrent()
 
     controller.add(api, listOf(candidate("a.iso")))
+    val seed = controller.reviewRequest(listOf(candidate("a.iso")), null).seeds.single()
 
+    assertEquals("Ubuntu Server 24.04 LTS", assertNotNull(controller.current).title)
     assertEquals("Ubuntu server", api.requests.single().properties["ketch.query"])
+    assertEquals("Ubuntu server", seed.properties["ketch.query"])
   }
 
   @Test
@@ -185,6 +192,96 @@ class AiDiscoverControllerTest {
     assertEquals("", controller.draft.text.text)
     assertEquals("blender.org", controller.draft.sites)
     assertEquals(controller.sessions, history.load())
+  }
+
+  @Test
+  fun send_firstTurnEnds_takesTheAgentsTitle() = runTest {
+    val provider = FakeAiProvider(title = "Blender 4.2 for Apple silicon", gated = true)
+    val history = InMemoryDiscoverHistoryStore()
+    val controller = controller(provider, history = history)
+
+    controller.say("blender for my  m2 mac\nthe newest one")
+    runCurrent()
+    // The message names the session while the agent works.
+    assertEquals("blender for my m2 mac", assertNotNull(controller.current).title)
+    provider.gates.single().complete(Unit)
+    runCurrent()
+
+    assertEquals("Blender 4.2 for Apple silicon", assertNotNull(controller.current).title)
+    assertEquals("Blender 4.2 for Apple silicon", history.load().single().title)
+  }
+
+  @Test
+  fun send_followUp_neverRenamesTheSession() = runTest {
+    val provider = FakeAiProvider(title = "Blender 4.2 for Apple silicon")
+    val controller = controller(provider)
+    controller.say("blender for my m2 mac")
+    runCurrent()
+
+    provider.title = "Blender arm64 builds"
+    controller.say("only arm64")
+    runCurrent()
+
+    assertEquals("Blender 4.2 for Apple silicon", assertNotNull(controller.current).title)
+  }
+
+  @Test
+  fun send_firstTurnWithoutATitle_keepsTheMessageAfterFollowUps() = runTest {
+    val provider = FakeAiProvider(title = "  ")
+    val controller = controller(provider)
+    controller.say("blender for my m2 mac")
+    runCurrent()
+    assertEquals("blender for my m2 mac", assertNotNull(controller.current).title)
+
+    provider.title = "Blender arm64 builds"
+    controller.say("only arm64")
+    runCurrent()
+
+    assertEquals("blender for my m2 mac", assertNotNull(controller.current).title)
+  }
+
+  @Test
+  fun retry_stoppedFirstTurn_takesTheAgentsTitle() = runTest {
+    val provider = FakeAiProvider(title = "Blender 4.2 for Apple silicon", gated = true)
+    val controller = controller(provider)
+    controller.say("blender for my m2 mac")
+    runCurrent()
+    controller.stop()
+
+    controller.retry()
+    runCurrent()
+    provider.gates[1].complete(Unit)
+    runCurrent()
+
+    assertEquals("Blender 4.2 for Apple silicon", assertNotNull(controller.current).title)
+  }
+
+  @Test
+  fun searchEverywhere_namedFirstTurn_keepsItsTitle() = runTest {
+    val provider = FakeAiProvider(title = "Blender 4.2 for Apple silicon")
+    val controller = controller(provider)
+    controller.say("blender for my m2 mac", sites = "blender.org")
+    runCurrent()
+
+    provider.title = "Blender from anywhere"
+    controller.searchEverywhere()
+    runCurrent()
+
+    assertEquals(2, provider.requests.size)
+    assertEquals("Blender 4.2 for Apple silicon", assertNotNull(controller.current).title)
+  }
+
+  @Test
+  fun init_savedNamedSession_keepsItsTitle() = runTest {
+    val saved = savedSession("s1", Instant.parse("2026-10-01T10:00:00Z"))
+      .copy(title = "Blender 4.2 for Apple silicon")
+    val history = InMemoryDiscoverHistoryStore(listOf(saved))
+
+    val controller = controller(FakeAiProvider(), history = history)
+
+    val session = controller.sessions.single()
+    assertEquals("Blender 4.2 for Apple silicon", session.title)
+    assertEquals("s1", session.query)
   }
 
   @Test
@@ -281,6 +378,82 @@ class AiDiscoverControllerTest {
     runCurrent()
 
     assertEquals(listOf(b), controller.turn.candidates)
+  }
+
+  @Test
+  fun send_followUpReturnsAnEarlierLink_keepsWhatTheEarlierTurnKnew() = runTest {
+    val checked = candidate("a.dmg").copy(
+      fileName = "a.dmg",
+      fileSize = 2048L,
+      mimeType = "application/x-apple-diskimage",
+      description = "The arm64 installer",
+    )
+    val bare = AiCandidate(url = checked.url, title = "Latest", confidence = 0.8f, description = "")
+    val replies = ArrayDeque(listOf(listOf(checked, candidate("b.dmg")), listOf(bare)))
+    val provider = object : AiDiscoveryProvider {
+      override suspend fun discover(
+        request: AiDiscoverRequest,
+        onStep: (DiscoveryStep) -> Unit,
+        approve: suspend (AiPageRequest) -> Boolean,
+      ) = AiDiscoverResponse(request.query, replies.removeFirst())
+
+      override suspend fun verify() = "OK"
+    }
+    val controller = controller(provider)
+    controller.say("blender")
+    runCurrent()
+
+    controller.say("just the latest version")
+    runCurrent()
+
+    val expected = checked.copy(title = "Latest", confidence = 0.8f)
+    assertEquals(listOf(expected), controller.turn.candidates)
+  }
+
+  @Test
+  fun carryOver_earlierLink_fillsOnlyWhatTheNewCandidateLacks() {
+    val earlier = candidate("a.dmg").copy(
+      fileName = "a.dmg",
+      fileSize = 2048L,
+      mimeType = "application/x-apple-diskimage",
+      description = "Old description",
+    )
+    val found = AiCandidate(
+      url = earlier.url,
+      title = "Blender",
+      fileName = "renamed.dmg",
+      fileSize = 4096L,
+      sourceUrl = "https://example.com/new",
+      confidence = 0.5f,
+      description = "New description",
+    )
+
+    val result = carryOver(listOf(found), listOf(earlier))
+
+    assertEquals(listOf(found.copy(mimeType = "application/x-apple-diskimage")), result)
+  }
+
+  @Test
+  fun carryOver_differentSpellingOfTheSameLink_matchesTheLatestEarlierResult() {
+    val older = candidate("a.dmg").copy(fileSize = 1L, description = "Older")
+    val newer = AiCandidate(
+      url = "HTTPS://Example.com:443/a.dmg#download",
+      title = "Newer",
+      fileSize = 2L,
+      confidence = 0.9f,
+      description = "",
+    )
+    val found = AiCandidate(
+      url = "https://example.com/a.dmg",
+      title = "A",
+      confidence = 0.7f,
+      description = "",
+    )
+    val other = candidate("b.dmg")
+
+    val result = carryOver(listOf(found, other), listOf(older, newer))
+
+    assertEquals(listOf(found.copy(fileSize = 2L), other), result)
   }
 
   @Test

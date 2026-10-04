@@ -116,14 +116,19 @@ internal class RecordingConfigStore(config: KetchConfig = KetchConfig()) : Confi
 }
 
 /**
- * An AI provider that answers every search with [candidates] and [summary], or throws [failure].
- * Each search reports [steps], asks to open each of [pages] in turn and, when [gated], waits
- * until its gate in [gates] opens. Its connection test answers [reply] or throws [verifyFailure].
+ * An AI provider that answers every search with [candidates], [summary] and [title], or throws
+ * [failure]. Each search reports [steps], asks to open each of [pages] in turn and, when [gated],
+ * waits until its gate in [gates] opens. Its connection test answers [reply] or throws
+ * [verifyFailure].
+ *
+ * @param title the agent's name for the search, as it is when the search ends; change it to
+ *   answer later searches with another
  */
 internal class FakeAiProvider(
   private val steps: List<DiscoveryStep> = emptyList(),
   private val candidates: List<AiCandidate> = emptyList(),
   private val summary: String = "",
+  var title: String = "",
   private val pages: List<AiPageRequest> = emptyList(),
   private val gated: Boolean = false,
   private val failure: Throwable? = null,
@@ -153,7 +158,7 @@ internal class FakeAiProvider(
     for (page in pages) answers += page to approve(page)
     if (gated) gate.await()
     failure?.let { throw it }
-    return AiDiscoverResponse(request.query, candidates, summary)
+    return AiDiscoverResponse(request.query, candidates, summary, title)
   }
 
   override suspend fun verify(): String = verifyFailure?.let { throw it } ?: reply
