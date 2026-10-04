@@ -34,9 +34,11 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -45,7 +47,6 @@ import org.junit.Assume.assumeTrue
 import java.io.File
 import java.util.TimeZone
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -81,10 +82,18 @@ internal object SnapshotHarness {
   /** Pixels per dp of the PNGs. */
   const val SCALE: Float = 2f
 
-  /** The one thread that composes, renders and runs the app's commands. */
-  val ui: CoroutineDispatcher = Executors.newSingleThreadScheduledExecutor { task ->
-    Thread(task, "snapshot-ui").apply { isDaemon = true }
-  }.asCoroutineDispatcher()
+  /**
+   * The one thread that composes, renders and runs the app's commands: the AWT event thread, as
+   * in the desktop app.
+   *
+   * Compose posts work to that thread whichever thread drives the scene: a frame that lays out
+   * nodes asks for its `RectManager` to dispatch, 16 ms later, the callbacks of node bounds and
+   * compact its list of them, and the frame's end cancels that. A frame slower than 16 ms, as on
+   * a busy machine, lets it run in the middle of the frame, and from another thread the two
+   * change the list at once: a node's bounds go missing, and a later layout or disposal fails
+   * with "LayoutNode … not found in RectList".
+   */
+  val ui: CoroutineDispatcher = Dispatchers.Swing
 
   init {
     if (enabled) {
@@ -152,6 +161,13 @@ internal object SnapshotHarness {
 }
 
 /**
+ * Runs [block] on [SnapshotHarness.ui] and waits for it, for a test that creates, drives and
+ * closes an [ImageComposeScene] of its own.
+ */
+internal fun <T> onUiThread(block: suspend CoroutineScope.() -> T): T =
+  runBlocking(SnapshotHarness.ui, block)
+
+/**
  * Composes [content] in a [width] by [height] pixel scene at [density] on [SnapshotHarness.ui],
  * runs [test] on it and closes it.
  */
@@ -174,31 +190,13 @@ internal fun <T> withScene(
     content = content,
   )
   try {
-    val result = scene.test()
-    // Disposing a scene with work still pending, such as a node a coroutine added after the last
-    // frame, can trip Compose over a node it never placed, as a slower machine showed.
-    scene.renderUntilIdle()
-    errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
-    result
+    scene.test().also {
+      errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+    }
   } finally {
     scene.close()
   }
 }
-
-/**
- * Renders frames 16 ms apart until nothing waits to recompose, lay out or draw, or for at most
- * [limit] frames, which an endless animation such as a spinner uses up.
- */
-internal suspend fun ImageComposeScene.renderUntilIdle(limit: Int = IDLE_FRAME_LIMIT) {
-  repeat(limit) {
-    Snapshot.sendApplyNotifications()
-    if (!hasInvalidations()) return
-    render(System.nanoTime())
-    delay(16.milliseconds)
-  }
-}
-
-private const val IDLE_FRAME_LIMIT = 30
 
 /** Renders [count] frames 16 ms apart, each at the time [clock] gives for its index. */
 internal suspend fun ImageComposeScene.frames(

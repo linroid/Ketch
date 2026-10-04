@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import com.linroid.ketch.app.snapshot.nodes
+import com.linroid.ketch.app.snapshot.onUiThread
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
@@ -26,7 +27,7 @@ import kotlin.test.assertEquals
 class DiscoverSwipeTest {
   @OptIn(ExperimentalComposeUiApi::class)
   @Test
-  fun swipedAwayRow_restoredByUndo_staysWithoutBeingDiscardedAgain() {
+  fun swipedAwayRow_restoredByUndo_staysWithoutBeingDiscardedAgain() = onUiThread {
     val dispatcher = QueueDispatcher()
     val shown = mutableStateListOf(*Rows.toTypedArray())
     val discarded = mutableListOf<String>()

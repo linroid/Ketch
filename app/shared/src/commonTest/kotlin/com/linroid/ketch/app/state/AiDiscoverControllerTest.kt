@@ -1,10 +1,10 @@
 package com.linroid.ketch.app.state
 
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.FakeAiProvider
+import com.linroid.ketch.app.applySnapshotChanges
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -844,7 +844,7 @@ class AiDiscoverControllerTest {
     assertEquals(3, controller.approvals.size)
 
     settings.save(settings.settings.copy(enabled = false))
-    Snapshot.sendApplyNotifications()
+    applySnapshotChanges()
     runCurrent()
 
     assertTrue(controller.approvals.isEmpty(), "no request is left waiting")
@@ -868,7 +868,7 @@ class AiDiscoverControllerTest {
     runCurrent()
 
     settings.save(settings.settings.copy(llm = LlmSettings(model = NEXT_MODEL)))
-    Snapshot.sendApplyNotifications()
+    applySnapshotChanges()
     runCurrent()
     assertSame(next, settings.provider)
     assertEquals(TurnStatus.Running, controller.turn.status)
@@ -1042,7 +1042,7 @@ class AiDiscoverControllerTest {
       runCurrent()
 
       settings.saveAccess(allowing)
-      Snapshot.sendApplyNotifications()
+      applySnapshotChanges()
       controller.say("again")
       runCurrent()
 
@@ -1145,7 +1145,7 @@ class AiDiscoverControllerTest {
     assertEquals(1, controller.approvals.size)
 
     settings.saveAccess { it.copy(mode = PageAccessMode.Allow) }
-    Snapshot.sendApplyNotifications()
+    applySnapshotChanges()
     runCurrent()
 
     assertTrue(controller.approvals.isEmpty())

@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.ui.settings
 
-import androidx.compose.runtime.snapshots.Snapshot
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
@@ -13,6 +12,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.settleSnapshots
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedModeController
@@ -106,20 +106,14 @@ class SpeedSettingsModelTest {
     return Fixture(engine, state, speedMode, model)
   }
 
-  private fun TestScope.settle() {
-    runCurrent()
-    Snapshot.sendApplyNotifications()
-    runCurrent()
-  }
-
   @Test
   fun setSlowLane_inSlowLane_updatesThePulseCap() = runTest {
     val fixture = fixture(SpeedLimitMode.SlowLane)
-    settle()
+    settleSnapshots()
     assertEquals(SpeedLimit.mbps(1), fixture.state.pulse.state.value.cap)
 
     fixture.model.setSlowLane(SpeedLimit.mbps(2))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(2), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(2), fixture.state.pulse.state.value.cap)
@@ -130,12 +124,12 @@ class SpeedSettingsModelTest {
     val fixture = fixture(SpeedLimitMode.SlowLane)
 
     fixture.model.setFullSpeedCap(SpeedLimit.mbps(10))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(1), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(10), fixture.speedMode.settings.value.standard)
     fixture.model.setMode(SpeedLimitMode.Full)
-    settle()
+    settleSnapshots()
     assertEquals(SpeedLimit.mbps(10), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(10), fixture.state.pulse.state.value.cap)
   }
@@ -145,7 +139,7 @@ class SpeedSettingsModelTest {
     val fixture = fixture(SpeedLimitMode.Full)
 
     fixture.model.setFullSpeedCap(SpeedLimit.mbps(10))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(10), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(10), fixture.state.appSettings.config.download.speedLimit)
@@ -155,10 +149,10 @@ class SpeedSettingsModelTest {
   fun setRules_atFullSpeedAfterSettingTheCap_keepsTheCap() = runTest {
     val fixture = fixture(SpeedLimitMode.Full)
     fixture.model.setFullSpeedCap(SpeedLimit.mbps(10))
-    settle()
+    settleSnapshots()
 
     fixture.model.setRules(listOf(SpeedRule(start = "14:00", end = "15:00")))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(10), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(10), fixture.speedMode.settings.value.standard)
@@ -170,13 +164,13 @@ class SpeedSettingsModelTest {
     fixture.engine.config = fixture.engine.config.copy(speedLimit = SpeedLimit.mbps(5))
 
     fixture.model.setSlowLane(SpeedLimit.mbps(2))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(5), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(2), fixture.speedMode.settings.value.slowLane)
     fixture.model.setMode(SpeedLimitMode.SlowLane)
     fixture.model.setMode(SpeedLimitMode.Full)
-    settle()
+    settleSnapshots()
     assertEquals(SpeedLimit.mbps(5), fixture.engine.config.speedLimit)
   }
 
@@ -185,7 +179,7 @@ class SpeedSettingsModelTest {
     val fixture = fixture(SpeedLimitMode.Auto)
 
     fixture.model.setRules(listOf(SpeedRule(start = "14:00", end = "15:00")))
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimit.mbps(1), fixture.engine.config.speedLimit)
     assertEquals(SpeedLimit.mbps(1), fixture.state.pulse.state.value.cap)
@@ -197,7 +191,7 @@ class SpeedSettingsModelTest {
     fixture.engine.refuse = true
 
     fixture.model.setMode(SpeedLimitMode.SlowLane)
-    settle()
+    settleSnapshots()
 
     assertEquals(SpeedLimitMode.Full, fixture.speedMode.settings.value.mode)
     val error = fixture.state.messages.active.value.single { it.level == MessageLevel.Error }

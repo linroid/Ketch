@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.state
 
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import com.linroid.ketch.app.FakeAiProvider
 import com.linroid.ketch.app.FakeKetchApi
@@ -12,6 +11,7 @@ import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.settleSnapshots
 import com.linroid.ketch.config.AiSettings
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -70,13 +70,6 @@ class AppStateDiscoverTest {
     aiDiscover.inFront = false
   }
 
-  /** Lets the app's state collectors see what changed, as a frame would. */
-  private fun TestScope.settle() {
-    runCurrent()
-    Snapshot.sendApplyNotifications()
-    runCurrent()
-  }
-
   private suspend fun AppState.toast(title: String): AppMessage? =
     messages.active.value.firstOrNull { it.title.load() == title }
 
@@ -92,7 +85,7 @@ class AppStateDiscoverTest {
   fun approvalWaiting_sessionNotOnScreen_postsAToastThatReviewsIt() = runTest {
     val state = appState(asksToOpen("download.blender.org"))
     state.say("blender")
-    settle()
+    settleSnapshots()
     val sessionId = assertNotNull(state.aiDiscover.currentId)
     state.aiDiscover.newSession()
 
@@ -105,7 +98,7 @@ class AppStateDiscoverTest {
     assertEquals(sessionId, state.aiDiscover.currentId)
     assertEquals(KetchCommands.Discover, state.shellCommand)
     state.aiDiscover.answer(state.aiDiscover.approvals.single().id, PageAccessChoice.AllowOnce)
-    settle()
+    settleSnapshots()
     assertNull(state.toast("Discover needs your OK to open download.blender.org"))
     assertEquals(0, state.discoverWaitingCount)
   }
@@ -114,12 +107,12 @@ class AppStateDiscoverTest {
   fun approvalWaiting_searchStopped_withdrawsTheToast() = runTest {
     val state = appState(asksToOpen("download.blender.org"))
     state.say("blender")
-    settle()
+    settleSnapshots()
     val title = "Discover needs your OK to open download.blender.org"
     assertNotNull(state.toast(title))
 
     state.aiDiscover.stop()
-    settle()
+    settleSnapshots()
 
     assertNull(state.toast(title))
     assertTrue(state.messages.history.value.none { it.title.load() == title })
@@ -131,17 +124,17 @@ class AppStateDiscoverTest {
     val state = appState(asksToOpen("download.blender.org"))
     state.showDiscoverPage()
     state.say("blender")
-    settle()
+    settleSnapshots()
     assertTrue(state.messages.active.value.isEmpty())
 
     // Looking away from the card the user read, at another app or the Settings window.
     state.aiDiscover.inFront = false
-    settle()
+    settleSnapshots()
     assertTrue(state.messages.active.value.isEmpty())
     assertTrue(state.messages.history.value.isEmpty())
 
     state.leaveDiscoverPage()
-    settle()
+    settleSnapshots()
     assertNotNull(state.toast("Discover needs your OK to open download.blender.org"))
   }
 
@@ -152,12 +145,12 @@ class AppStateDiscoverTest {
     state.say("blender")
     // The window goes to the tray before the search asks.
     state.aiDiscover.inFront = false
-    settle()
+    settleSnapshots()
 
     val title = "Discover needs your OK to open download.blender.org"
     assertTrue(assertNotNull(state.toast(title)).notify)
     state.aiDiscover.inFront = true
-    settle()
+    settleSnapshots()
     assertNull(state.toast(title))
   }
 
@@ -165,15 +158,15 @@ class AppStateDiscoverTest {
   fun approvalWaiting_shownAndLeftAgain_asksForOneNotificationOnly() = runTest {
     val state = appState(asksToOpen("download.blender.org"))
     state.say("blender")
-    settle()
+    settleSnapshots()
     val title = "Discover needs your OK to open download.blender.org"
     assertTrue(assertNotNull(state.toast(title)).notify)
 
     state.showDiscoverPage()
-    settle()
+    settleSnapshots()
     assertNull(state.toast(title))
     state.leaveDiscoverPage()
-    settle()
+    settleSnapshots()
 
     val again = assertNotNull(state.toast(title), "Another page shows, so the toast is back")
     assertFalse(again.notify, "The request raised its notification already")
@@ -183,13 +176,13 @@ class AppStateDiscoverTest {
   fun approvalWaiting_sessionComesOnScreen_withdrawsTheToast() = runTest {
     val state = appState(asksToOpen("download.blender.org"))
     state.say("blender")
-    settle()
+    settleSnapshots()
     val title = "Discover needs your OK to open download.blender.org"
     assertNotNull(state.toast(title))
 
     // The user opens Discover on the session without Review, so its card shows.
     state.showDiscoverPage()
-    settle()
+    settleSnapshots()
 
     assertNull(state.toast(title))
     assertEquals(1, state.discoverWaitingCount)
@@ -199,7 +192,7 @@ class AppStateDiscoverTest {
   fun discardDiscovered_undo_showsTheResultsAgain() = runTest {
     val state = appState(FakeAiProvider(candidates = listOf(blender)))
     state.say("blender")
-    settle()
+    settleSnapshots()
 
     state.discardDiscovered(listOf(blender.url))
     val session = assertNotNull(state.aiDiscover.current)
@@ -217,7 +210,7 @@ class AppStateDiscoverTest {
   fun deleteDiscoverSession_undo_putsItBackWithoutShowingIt() = runTest {
     val state = appState(FakeAiProvider())
     state.say("blender")
-    settle()
+    settleSnapshots()
     val id = assertNotNull(state.aiDiscover.currentId)
 
     state.deleteDiscoverSession(id)
@@ -235,7 +228,7 @@ class AppStateDiscoverTest {
     state.say("blender")
     state.aiDiscover.newSession()
     state.say("ubuntu")
-    settle()
+    settleSnapshots()
 
     state.clearDiscoverHistory()
     assertTrue(state.aiDiscover.sessions.isEmpty())
