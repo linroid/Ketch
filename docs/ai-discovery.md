@@ -364,8 +364,9 @@ Rules:
 The settings page judges the form the way the engine will: a blank API
 key that the environment supplies is noted under the **API key** field
 and counts as filled in the status line, and **Test** works with the
-token left empty. It also works with the switch off, so you can check a
-key before turning discovery on.
+token left empty. While the switch is off, everything under it is
+disabled and the status line just says so; what you entered is kept for
+when you switch it back on.
 
 When the provider fails during a search or a **Test**, such as a rejected
 API key, an unknown model or an unreachable endpoint, Discover shows why

@@ -108,13 +108,16 @@ import kotlin.time.TimeSource
  * [state]'s AI settings. Every change is saved as it is made. Changes to the model or search
  * rebuild the discovery engine; page access and content filter changes keep it, so running
  * searches carry on, asking by the new rules, and the next search filters by the new setting.
- * Test calls the provider with the saved settings.
+ * Test calls the provider with the saved settings. While discovery is switched off, everything
+ * but its switch is disabled, keeping what was entered for when it is switched back on.
  */
 @Composable
 fun AiDiscoverySettings(state: AppState) {
   val ai = state.aiSettings
   val settings = ai.settings
   val supported = ai.supported
+  // Everything under the switch follows it.
+  val editable = supported && settings.enabled
   val connectionTest = ai.connectionTest
   val onChange = { changed: AiSettings -> ai.save(changed) }
   val focusManager = LocalFocusManager.current
@@ -141,18 +144,18 @@ fun AiDiscoverySettings(state: AppState) {
       title = stringResource(Res.string.settings_ai_content_filter),
       description = stringResource(Res.string.settings_ai_content_filter_hint),
       checked = settings.contentFilter,
-      enabled = supported,
+      enabled = editable,
       onCheckedChange = { onChange(settings.copy(contentFilter = it)) },
     )
   }
 
-  PageAccessGroup(access = settings.access, enabled = supported, onChange = ai::saveAccess)
+  PageAccessGroup(access = settings.access, enabled = editable, onChange = ai::saveAccess)
 
   SettingsGroup(title = stringResource(Res.string.settings_ai_model_group)) {
     SettingsRow(
       title = stringResource(Res.string.settings_ai_provider),
       description = providerHint(llm.provider).resolve(),
-      enabled = supported,
+      enabled = editable,
     ) {
       FlowRow(
         modifier = Modifier.fillMaxWidth(),
@@ -163,7 +166,7 @@ fun AiDiscoverySettings(state: AppState) {
           KetchChip(
             label = provider.buttonLabel.resolve(),
             selected = provider == llm.provider,
-            enabled = supported,
+            enabled = editable,
             // Model and endpoint are provider-specific, so switching falls back to the new
             // provider's defaults. The token is kept: clearing a secret on a stray tap is
             // worse than a token the connection test will reject.
@@ -186,7 +189,7 @@ fun AiDiscoverySettings(state: AppState) {
         } else {
           stringResource(Res.string.settings_ai_api_key_plain)
         },
-        enabled = supported,
+        enabled = editable,
       ) {
         SettingsTextInput(
           value = llm.apiKey,
@@ -194,7 +197,7 @@ fun AiDiscoverySettings(state: AppState) {
           placeholder = tokenPlaceholder(llm.provider),
           secret = true,
           mono = true,
-          enabled = supported,
+          enabled = editable,
         )
       }
     }
@@ -205,7 +208,7 @@ fun AiDiscoverySettings(state: AppState) {
       } else {
         stringResource(Res.string.settings_ai_model_any)
       },
-      enabled = supported,
+      enabled = editable,
     ) {
       SettingsTextInput(
         value = llm.model,
@@ -213,7 +216,7 @@ fun AiDiscoverySettings(state: AppState) {
         placeholder = llm.provider.defaultModel
           .ifBlank { stringResource(Res.string.settings_ai_model_placeholder) },
         mono = true,
-        enabled = supported,
+        enabled = editable,
       )
       val suggestions = modelSuggestions(llm.provider)
       if (suggestions.isNotEmpty()) {
@@ -232,7 +235,7 @@ fun AiDiscoverySettings(state: AppState) {
                 KetchButtonVariant.Ghost
               },
               size = KetchButtonSize.Small,
-              enabled = supported,
+              enabled = editable,
             )
           }
         }
@@ -250,14 +253,14 @@ fun AiDiscoverySettings(state: AppState) {
       } else {
         null
       },
-      enabled = supported,
+      enabled = editable,
     ) {
       SettingsTextInput(
         value = llm.baseUrl,
         onCommit = { onChange(settings.copy(llm = llm.copy(baseUrl = it))) },
         placeholder = llm.provider.defaultBaseUrl.ifBlank { "https://openrouter.ai/api/v1" },
         mono = true,
-        enabled = supported,
+        enabled = editable,
       )
     }
     // How long the last test took, measured from the click.
@@ -275,7 +278,7 @@ fun AiDiscoverySettings(state: AppState) {
       title = stringResource(Res.string.settings_ai_test),
       description = testMessage.resolve(),
       descriptionColor = testColor,
-      enabled = supported,
+      enabled = editable,
       trailing = {
         KetchButton(
           text = if (testing) {
@@ -292,7 +295,7 @@ fun AiDiscoverySettings(state: AppState) {
           },
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
-          enabled = supported && effective.llm.isComplete && !testing,
+          enabled = editable && effective.llm.isComplete && !testing,
         )
       },
     )
@@ -308,13 +311,13 @@ fun AiDiscoverySettings(state: AppState) {
       value = search.provider,
       options = SearchProvider.entries,
       label = { it.displayName },
-      enabled = supported,
+      enabled = editable,
       onSelect = { onChange(settings.copy(search = search.copy(provider = it))) },
     )
     if (search.provider.requiresApiKey) {
       SettingsRow(
         title = stringResource(Res.string.settings_ai_search_api_key),
-        enabled = supported,
+        enabled = editable,
       ) {
         SettingsTextInput(
           value = search.apiKey,
@@ -322,7 +325,7 @@ fun AiDiscoverySettings(state: AppState) {
           placeholder = stringResource(Res.string.settings_ai_api_key),
           secret = true,
           mono = true,
-          enabled = supported,
+          enabled = editable,
         )
       }
     }
@@ -330,14 +333,14 @@ fun AiDiscoverySettings(state: AppState) {
       SettingsRow(
         title = stringResource(Res.string.settings_ai_engine_id),
         description = stringResource(Res.string.settings_ai_engine_id_hint),
-        enabled = supported,
+        enabled = editable,
       ) {
         SettingsTextInput(
           value = search.cx,
           onCommit = { onChange(settings.copy(search = search.copy(cx = it))) },
           placeholder = stringResource(Res.string.settings_ai_engine_id_placeholder),
           mono = true,
-          enabled = supported,
+          enabled = editable,
         )
       }
     }
@@ -506,11 +509,12 @@ private fun discoveryStatus(
   val colors = KetchTheme.colors
   return when {
     !supported -> Res.string.settings_ai_status_unsupported.text() to colors.textTertiary
+    // Switched off, nothing below can be changed, so it says nothing of what is missing.
+    !settings.enabled -> Res.string.settings_ai_status_off.text() to colors.textSecondary
     !effective.llm.isComplete ->
       Res.string.settings_ai_status_needs_provider.text() to colors.status.paused.color
     !effective.search.isComplete ->
       Res.string.settings_ai_status_needs_search.text() to colors.status.paused.color
-    !settings.enabled -> Res.string.settings_ai_status_off.text() to colors.textSecondary
     else -> Res.string.settings_ai_status_ready.text(
       effective.llm.provider.displayName,
       effective.llm.effectiveModel,

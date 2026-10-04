@@ -154,6 +154,16 @@ class SettingsSnapshots {
   }
 
   @Test
+  fun discoverPage_switchedOff_disablesEverythingButTheSwitch() {
+    withSettings(SnapshotTheme.Light, PhoneTall.density) {
+      captureApp("settings-discover-off", PhoneTall, SnapshotTheme.Light, it) {
+        state.aiSettings.setEnabled(false)
+        openSettings(SettingsTarget.Page.Discover)
+      }
+    }
+  }
+
+  @Test
   fun app_mediumWindow_showsSettingsAsTwoPanes() {
     for (theme in SnapshotTheme.entries) {
       appSettingsSnapshot("app-settings-medium", SnapshotSize.Medium, theme) {

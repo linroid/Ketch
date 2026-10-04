@@ -859,9 +859,9 @@ internal fun integrationSummary(
  * @param effective [settings] with the credentials the platform supplies.
  */
 internal fun discoverSummary(settings: AiSettings, effective: AiSettings): UiText = when {
+  !settings.enabled -> Res.string.settings_summary_off.text()
   !effective.llm.isComplete || !effective.search.isComplete ->
     Res.string.settings_summary_not_set_up.text()
-  !settings.enabled -> Res.string.settings_summary_off.text()
   effective.search.provider == SearchProvider.None -> effective.llm.provider.displayName
   else -> Res.string.settings_summary_discover_search.text(
     effective.llm.provider.displayName,
