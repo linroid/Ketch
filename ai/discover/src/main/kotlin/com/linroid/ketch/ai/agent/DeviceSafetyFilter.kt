@@ -146,9 +146,24 @@ internal class DeviceSafetyFilter {
     return TRUSTED_DOMAINS.any { host == it || host.endsWith(".$it") }
   }
 
-  /** Whether [host] holds a trusted domain without being it or under it: `fake-github.com`. */
+  /**
+   * Whether [host] holds a trusted domain but lies outside the site that registered it, such as
+   * `fake-github.com` or `github.com.example.net`. Other hosts of that site, such as
+   * `archive-downloads.apache.org` beside `downloads.apache.org`, are the vendor's own.
+   */
   private fun impersonatesTrustedDomain(host: String): Boolean {
-    return TRUSTED_DOMAINS.any { it in host } && !isTrustedDomain(host)
+    return TRUSTED_DOMAINS.any { trusted ->
+      trusted in host && !isUnder(host, registrableDomain(trusted))
+    }
+  }
+
+  private fun isUnder(host: String, domain: String): Boolean {
+    return host == domain || host.endsWith(".$domain")
+  }
+
+  /** The site [domain] belongs to: its last two labels, as every trusted domain is a gTLD's. */
+  private fun registrableDomain(domain: String): String {
+    return domain.split('.').takeLast(2).joinToString(".")
   }
 
   /** Whether the HTTP(S) [url] carries user info, which can pose as the host before an `@`. */

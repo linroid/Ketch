@@ -96,7 +96,7 @@ class DeviceSafetyFilterTest {
   fun evaluate_blenderLookalikes_blocked() {
     val urls = listOf(
       "https://download.blender.org.example.com/blender.dmg",
-      "https://fake-download.blender.org/blender.dmg",
+      "https://download.blender.org-mirror.example/blender.dmg",
       "https://download.blender.org@evil.example/blender.dmg"
     )
     for (url in urls) {
@@ -106,6 +106,17 @@ class DeviceSafetyFilterTest {
         context = "Official Blender download",
       )
       assertTrue(result.blocked, url)
+    }
+  }
+
+  @Test
+  fun evaluate_siblingHostOfATrustedSite_allowed() {
+    val urls = listOf(
+      "https://archive-downloads.apache.org/dist/app-1.0.zip",
+      "https://fake-download.blender.org/blender.dmg",
+    )
+    for (url in urls) {
+      assertFalse(filter.evaluate(url = url).blocked, url)
     }
   }
 
