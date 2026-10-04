@@ -174,13 +174,31 @@ internal fun <T> withScene(
     content = content,
   )
   try {
-    scene.test().also {
-      errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
-    }
+    val result = scene.test()
+    // Disposing a scene with work still pending, such as a node a coroutine added after the last
+    // frame, can trip Compose over a node it never placed, as a slower machine showed.
+    scene.renderUntilIdle()
+    errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+    result
   } finally {
     scene.close()
   }
 }
+
+/**
+ * Renders frames 16 ms apart until nothing waits to recompose, lay out or draw, or for at most
+ * [limit] frames, which an endless animation such as a spinner uses up.
+ */
+internal suspend fun ImageComposeScene.renderUntilIdle(limit: Int = IDLE_FRAME_LIMIT) {
+  repeat(limit) {
+    Snapshot.sendApplyNotifications()
+    if (!hasInvalidations()) return
+    render(System.nanoTime())
+    delay(16.milliseconds)
+  }
+}
+
+private const val IDLE_FRAME_LIMIT = 30
 
 /** Renders [count] frames 16 ms apart, each at the time [clock] gives for its index. */
 internal suspend fun ImageComposeScene.frames(
