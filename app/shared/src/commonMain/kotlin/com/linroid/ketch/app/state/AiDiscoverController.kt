@@ -19,6 +19,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
@@ -35,6 +38,13 @@ data class CandidateAddResult(
   val added: List<DownloadTask>,
   val failed: List<Pair<AiCandidate, Throwable>>,
 )
+
+/**
+ * A Discover turn that ended with results.
+ *
+ * @property count how many results it shows.
+ */
+data class DiscoverFound(val sessionId: String, val turnId: String, val count: Int)
 
 /**
  * Runs Discover: sessions of messages the agent answers with downloads, the agent's requests to
@@ -138,6 +148,11 @@ class AiDiscoverController(
 
   /** Whether the window that shows the Discover page is in front, as the page reports it. */
   var inFront by mutableStateOf(false)
+
+  private val foundEvents = MutableSharedFlow<DiscoverFound>(extraBufferCapacity = MAX_RUNNING)
+
+  /** Emits when a turn ends with results, for the cue that plays then; never replays. */
+  val found: SharedFlow<DiscoverFound> = foundEvents.asSharedFlow()
 
   /** Whether Discover is on screen: its page shows in a window in front. */
   val visible: Boolean
@@ -583,6 +598,9 @@ class AiDiscoverController(
         it.copy(status = TurnStatus.Done, candidates = found, summary = response.summary)
       }
       if (session != null) name(session, run.turnId, response.title)
+      if (found.isNotEmpty()) {
+        foundEvents.tryEmit(DiscoverFound(run.sessionId, run.turnId, found.size))
+      }
     }.onFailure { e ->
       // A provider failure's message and causes quote the provider's reply, which may echo a
       // token; its brief leaves that out.

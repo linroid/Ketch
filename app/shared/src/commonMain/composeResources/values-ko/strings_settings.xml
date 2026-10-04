@@ -145,6 +145,13 @@
   <string name="settings_notifications_devices">다음 기기에 대해 알림 받기</string>
   <string name="settings_notifications_devices_footer">Ketch는 알림 대상 기기와 연결을 유지합니다.</string>
   <string name="settings_notifications_this_device">이 기기</string>
+  <string name="settings_notifications_success">완료 피드백</string>
+  <string name="settings_notifications_success_sound">소리</string>
+  <string name="settings_notifications_success_sound_hint">부드러운 알림음.</string>
+  <string name="settings_notifications_success_vibration">진동</string>
+  <string name="settings_notifications_success_vibration_hint">짧은 진동. 진동 모드에서도 울립니다.</string>
+  <string name="settings_notifications_success_footer">다운로드가 끝나거나 찾기에서 다운로드를 찾았을 때.</string>
+  <string name="settings_notifications_success_footer_phone">다운로드가 끝나거나 찾기에서 다운로드를 찾았을 때. 무음 모드와 방해 금지 모드에서는 꺼지며, 백그라운드 알림은 자체 소리를 사용합니다.</string>
   <string name="settings_notifications_browser">브라우저 알림</string>
   <string name="settings_notifications_allowed">알림이 허용됨</string>
   <string name="settings_notifications_allowed_hint">Ketch 탭이 백그라운드에 있을 때 표시됩니다.</string>

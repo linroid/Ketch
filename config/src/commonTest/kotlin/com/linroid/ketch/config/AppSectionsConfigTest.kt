@@ -137,6 +137,8 @@ internal val populatedAppSections = KetchConfig(
     deviceOffline = false,
     onlyInBackground = false,
     mutedDevices = listOf("192.168.1.20:8642"),
+    successSound = false,
+    successVibration = false,
   ),
   integration = IntegrationSettings(magnetHandler = true, torrentFileHandler = true),
 )

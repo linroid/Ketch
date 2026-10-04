@@ -149,6 +149,13 @@
   <string name="settings_notifications_devices">Notificar sobre estes dispositivos</string>
   <string name="settings_notifications_devices_footer">O Ketch fica conectado aos dispositivos sobre os quais avisa.</string>
   <string name="settings_notifications_this_device">Este dispositivo</string>
+  <string name="settings_notifications_success">Aviso de sucesso</string>
+  <string name="settings_notifications_success_sound">Som</string>
+  <string name="settings_notifications_success_sound_hint">Um toque suave.</string>
+  <string name="settings_notifications_success_vibration">Vibração</string>
+  <string name="settings_notifications_success_vibration_hint">Uma vibração curta, também no modo vibrar.</string>
+  <string name="settings_notifications_success_footer">Quando um download termina ou o Descobrir encontra downloads.</string>
+  <string name="settings_notifications_success_footer_phone">Quando um download termina ou o Descobrir encontra downloads. O modo silencioso e o Não perturbe o silenciam, e as notificações em segundo plano usam o próprio som.</string>
   <string name="settings_notifications_browser">Notificações do navegador</string>
   <string name="settings_notifications_allowed">As notificações estão permitidas</string>
   <string name="settings_notifications_allowed_hint">Mostradas enquanto a aba do Ketch está em segundo plano.</string>

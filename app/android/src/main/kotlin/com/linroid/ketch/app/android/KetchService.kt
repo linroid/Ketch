@@ -21,6 +21,8 @@ import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.ActivitySource
+import com.linroid.ketch.app.feedback.SuccessFeedback
+import com.linroid.ketch.app.feedback.AndroidFeedbackPlayer
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
@@ -103,6 +105,7 @@ class KetchService : Service() {
   private val speed = MutableStateFlow(0L)
   private val discovering = MutableStateFlow(0)
   private lateinit var notifier: AndroidNotifier
+  private val successFeedback by lazy { SuccessFeedback(AndroidFeedbackPlayer(this)) }
   private var isForeground = false
   private var isBound = false
   private var isStarted = false
@@ -265,9 +268,9 @@ class KetchService : Service() {
    * Follows [controller] until it closes. It notifies about the messages the controller posts
    * with `notify`, such as Discover waiting for the user's OK to open a website, while the app is
    * not in front; each notification goes once its message leaves the screen, and tapping it
-   * opens [MainActivity], which runs the message's first action. It also keeps the service in
-   * the foreground while Discover searches, so the search keeps going, and can ask, once the
-   * user leaves the app.
+   * opens [MainActivity], which runs the message's first action. It gives success feedback when a
+   * search finds downloads, and keeps the service in the foreground while Discover searches, so
+   * the search keeps going, and can ask, once the user leaves the app.
    */
   fun follow(controller: AppController) {
     followed = controller
@@ -278,6 +281,11 @@ class KetchService : Service() {
         settings = { controller.appSettings.config.notifications },
         inFront = inFront,
       )
+    }
+    controller.scope.launch {
+      successFeedback.follow(controller.state.aiDiscover) {
+        controller.appSettings.config.notifications
+      }
     }
     controller.scope.launch {
       // A controller that closes after the next one started leaves the count to that one.
@@ -391,12 +399,17 @@ class KetchService : Service() {
     }
   }
 
-  /** Sends [event] to the app if it shows as a toast, and returns its notification, if any. */
+  /**
+   * Sends [event] to the app if it shows as a toast, gives success feedback for it as the settings allow, and
+   * returns its notification, if any.
+   */
   private suspend fun route(event: ActivityEvent): NotificationCopy? {
     val config = loadConfig()
     notifier.accent = config.appearance.accent.toKetchAccent()
     val settings = config.notifications
     val delivery = ActivityRouting.deliveryOf(event, settings, inFront.value)
+    // A finished download notified in the background alerts as its channel does.
+    successFeedback.reported(event, delivery, settings, notificationsAlert = true)
     if (delivery.toast) {
       toasts.trySend(event)
     } else if (event is ActivityEvent.Recovered &&

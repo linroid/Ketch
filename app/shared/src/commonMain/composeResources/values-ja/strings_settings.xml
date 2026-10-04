@@ -145,6 +145,13 @@
   <string name="settings_notifications_devices">これらのデバイスについて通知</string>
   <string name="settings_notifications_devices_footer">Ketchは、通知対象のデバイスとの接続を維持します。</string>
   <string name="settings_notifications_this_device">このデバイス</string>
+  <string name="settings_notifications_success">完了フィードバック</string>
+  <string name="settings_notifications_success_sound">サウンド</string>
+  <string name="settings_notifications_success_sound_hint">控えめなチャイム。</string>
+  <string name="settings_notifications_success_vibration">バイブレーション</string>
+  <string name="settings_notifications_success_vibration_hint">短い振動。マナーモード中も振動します。</string>
+  <string name="settings_notifications_success_footer">ダウンロードが完了したときや、ディスカバーでダウンロードが見つかったとき。</string>
+  <string name="settings_notifications_success_footer_phone">ダウンロードが完了したときや、ディスカバーでダウンロードが見つかったとき。マナーモードやサイレントモード中は鳴らず、バックグラウンドの通知は通知自体の音で知らせます。</string>
   <string name="settings_notifications_browser">ブラウザの通知</string>
   <string name="settings_notifications_allowed">通知は許可されています</string>
   <string name="settings_notifications_allowed_hint">Ketchのタブがバックグラウンドにあるときに表示されます。</string>

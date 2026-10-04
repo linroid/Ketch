@@ -149,6 +149,13 @@
   <string name="settings_notifications_devices">M'avertir pour ces appareils</string>
   <string name="settings_notifications_devices_footer">Ketch reste connecté aux appareils qu'il surveille.</string>
   <string name="settings_notifications_this_device">Cet appareil</string>
+  <string name="settings_notifications_success">Retour de réussite</string>
+  <string name="settings_notifications_success_sound">Son</string>
+  <string name="settings_notifications_success_sound_hint">Un carillon discret.</string>
+  <string name="settings_notifications_success_vibration">Vibration</string>
+  <string name="settings_notifications_success_vibration_hint">Une brève vibration, même en mode vibreur.</string>
+  <string name="settings_notifications_success_footer">Quand un téléchargement se termine ou que Découvrir trouve des téléchargements.</string>
+  <string name="settings_notifications_success_footer_phone">Quand un téléchargement se termine ou que Découvrir trouve des téléchargements. Le mode silencieux et Ne pas déranger le coupent, et les notifications en arrière-plan ont leur propre son.</string>
   <string name="settings_notifications_browser">Notifications du navigateur</string>
   <string name="settings_notifications_allowed">Les notifications sont autorisées</string>
   <string name="settings_notifications_allowed_hint">Affichées quand l'onglet Ketch est en arrière-plan.</string>

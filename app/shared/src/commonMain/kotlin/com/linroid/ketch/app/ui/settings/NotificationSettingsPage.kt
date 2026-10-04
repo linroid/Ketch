@@ -17,6 +17,8 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.detail
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.platform.SuccessFeedbackSupport
+import com.linroid.ketch.app.platform.successFeedbackSupport
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
@@ -50,6 +52,13 @@ import ketch.app.shared.generated.resources.settings_notifications_mode_notify
 import ketch.app.shared.generated.resources.settings_notifications_mode_off
 import ketch.app.shared.generated.resources.settings_notifications_offline
 import ketch.app.shared.generated.resources.settings_notifications_offline_hint
+import ketch.app.shared.generated.resources.settings_notifications_success
+import ketch.app.shared.generated.resources.settings_notifications_success_footer
+import ketch.app.shared.generated.resources.settings_notifications_success_footer_phone
+import ketch.app.shared.generated.resources.settings_notifications_success_sound
+import ketch.app.shared.generated.resources.settings_notifications_success_sound_hint
+import ketch.app.shared.generated.resources.settings_notifications_success_vibration
+import ketch.app.shared.generated.resources.settings_notifications_success_vibration_hint
 import ketch.app.shared.generated.resources.settings_notifications_this_device
 import org.jetbrains.compose.resources.stringResource
 
@@ -83,8 +92,8 @@ internal expect fun rememberNotificationPermission(): NotificationPermission?
 
 /**
  * Which events Ketch reports and how: as a notification, only inside the app, or not at all,
- * and for which devices. In the web app the browser's permission is asked from here, when a
- * report is turned on, never on load.
+ * for which devices, and the success feedback. In the web app the browser's permission is asked
+ * from here, when a report is turned on, never on load.
  */
 @Composable
 fun NotificationSettingsPage(state: AppState) {
@@ -164,10 +173,55 @@ fun NotificationSettingsPage(state: AppState) {
     )
   }
 
+  if (successFeedbackSupport != SuccessFeedbackSupport.None) {
+    SuccessFeedbackGroup(
+      settings = settings,
+      vibrates = successFeedbackSupport == SuccessFeedbackSupport.SoundAndVibration,
+      save = save,
+    )
+  }
+
   DeviceMutesGroup(state, settings.mutedDevices) { deviceId, notify ->
     save {
       val muted = if (notify) it.mutedDevices - deviceId else it.mutedDevices + deviceId
       it.copy(mutedDevices = muted.distinct())
+    }
+  }
+}
+
+/**
+ * Which success feedback plays when a download finishes or Discover finds downloads: a chime,
+ * and on phones a vibration, each turned on by itself.
+ */
+@Composable
+private fun SuccessFeedbackGroup(
+  settings: NotificationSettings,
+  vibrates: Boolean,
+  save: ((NotificationSettings) -> NotificationSettings) -> Unit,
+) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_notifications_success),
+    footer = stringResource(
+      if (vibrates) {
+        Res.string.settings_notifications_success_footer_phone
+      } else {
+        Res.string.settings_notifications_success_footer
+      },
+    ),
+  ) {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_notifications_success_sound),
+      description = stringResource(Res.string.settings_notifications_success_sound_hint),
+      checked = settings.successSound,
+      onCheckedChange = { on -> save { it.copy(successSound = on) } },
+    )
+    if (vibrates) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_notifications_success_vibration),
+        description = stringResource(Res.string.settings_notifications_success_vibration_hint),
+        checked = settings.successVibration,
+        onCheckedChange = { on -> save { it.copy(successVibration = on) } },
+      )
     }
   }
 }
