@@ -52,7 +52,8 @@ class SuccessFeedback(
   }
 
   /**
-   * Plays when [event] is a download finishing that the host reports, as its [delivery] says.
+   * Plays when [event] is a download finishing that the host reports, as its [delivery] says. A
+   * [ActivityEvent.QueueDrained] counts: it replaces the completion that emptied the queue.
    *
    * @param notificationsAlert whether the host's system notifications sound or vibrate on their
    *   own, as Android's channels do; a finished download posted as one then leaves it to them.
@@ -63,7 +64,9 @@ class SuccessFeedback(
     settings: NotificationSettings,
     notificationsAlert: Boolean,
   ) {
-    if (event !is ActivityEvent.Completed && event !is ActivityEvent.CompletedBatch) return
+    val finished = event is ActivityEvent.Completed || event is ActivityEvent.CompletedBatch ||
+      event is ActivityEvent.QueueDrained
+    if (!finished) return
     val alerted = delivery.notify && notificationsAlert
     if ((delivery.toast || delivery.notify) && !alerted) play(settings)
   }

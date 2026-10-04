@@ -134,6 +134,15 @@ class SuccessFeedbackTest {
   }
 
   @Test
+  fun reported_queueDrainedInsteadOfTheLastCompletion_plays() {
+    val drained = ActivityEvent.QueueDrained(LOCAL_DEVICE_ID, files = 3, bytes = 4096)
+
+    feedback.reported(drained, toast, NotificationSettings(), notificationsAlert = true)
+
+    assertEquals(listOf(true to true), player.plays)
+  }
+
+  @Test
   fun reported_notReportedFeedbackOffOrNotAFinish_staysQuiet() {
     val quiet = Delivery(toast = false, notify = false)
     val off = NotificationSettings(successSound = false, successVibration = false)
