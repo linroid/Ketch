@@ -1,8 +1,6 @@
 package com.linroid.ketch.ai.agent
 
-import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.core.tools.annotations.Tool
-import ai.koog.agents.core.tools.reflect.ToolSet
+import ai.koog.agents.core.tools.Tool
 import com.linroid.ketch.ai.DiscoverResult
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.PageAccessKind
@@ -39,9 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Instant
 
 /**
- * Koog [ToolSet] exposing discovery capabilities to the AI agent.
+ * Discovery capabilities exposed to the AI agent as the [tools].
  *
- * Each `@Tool` method wraps an existing utility (search, fetch,
+ * Each tool method wraps an existing utility (search, fetch,
  * validate, etc.) and returns a JSON-encoded string the LLM can
  * reason over.
  *
@@ -78,7 +76,6 @@ import kotlin.time.Instant
  * a step's details, which keep their line breaks, such as a numbered
  * plan's (see [sanitizeAgentText]).
  */
-@LLMDescription("Resource discovery tools for finding downloadable files")
 internal class DiscoveryToolSet(
   private val searchProvider: SearchProvider,
   private val fetcher: SafeFetcher,
@@ -92,7 +89,7 @@ internal class DiscoveryToolSet(
   private val json: Json,
   private val allowlist: SiteAllowlist,
   private val approver: PageAccessApprover = PageAccessApprover.AllowAll,
-) : ToolSet {
+) {
 
   private val log = KetchLogger("DiscoveryToolSet")
 
@@ -108,17 +105,86 @@ internal class DiscoveryToolSet(
   val fetchedSources: MutableList<DiscoverResult.Source> =
     mutableListOf()
 
-  @Tool
-  @LLMDescription(
-    "Search the web for pages matching a query. When the run is " +
-      "limited to allowed sites, only those sites are searched. " +
-      "Returns JSON array of {url, title, snippet}.",
+  /** The tool methods as tools, with the names, descriptions and parameters the agent sees. */
+  fun tools(): List<Tool<*, *>> = listOf(
+    TextTool(
+      name = "searchWeb",
+      description = "Search the web for pages matching a query. When the run is limited to " +
+        "allowed sites, only those sites are searched. Returns JSON array of " +
+        "{url, title, snippet}.",
+      parameters = listOf(
+        stringParameter("query", "Search query text"),
+        integerParameter("maxResults", "Maximum number of results (1-10)", required = false),
+      ),
+    ) { searchWeb(string("query"), int("maxResults", DEFAULT_MAX_RESULTS)) },
+    TextTool(
+      name = "searchSites",
+      description = "Search within specific sites for pages matching a query. When the run " +
+        "is limited to allowed sites, the sites must be among them. Returns JSON array of " +
+        "{url, title, snippet}.",
+      parameters = listOf(
+        stringParameter("sites", "Comma-separated list of domains to search within"),
+        stringParameter("query", "Search query text"),
+        integerParameter("maxResults", "Maximum number of results (1-10)", required = false),
+      ),
+    ) { searchSites(string("sites"), string("query"), int("maxResults", DEFAULT_MAX_RESULTS)) },
+    TextTool(
+      name = "fetchPage",
+      description = "Fetch a web page, extract its text content and download links. " +
+        "Returns JSON with text and links fields.",
+      parameters = listOf(
+        stringParameter("url", "URL to fetch"),
+        stringParameter(
+          "reason",
+          "One short sentence telling the user why you need this page",
+          required = false,
+        ),
+      ),
+    ) { fetchPage(string("url"), string("reason", "")) },
+    TextTool(
+      name = "headUrl",
+      description = "Perform an HTTP HEAD request to get metadata (content-type, size, " +
+        "last-modified) without downloading. Follows redirects; after one, finalUrl is " +
+        "where the file is served from, but report url as the candidate.",
+      parameters = listOf(
+        stringParameter("url", "URL to check"),
+        stringParameter(
+          "reason",
+          "One short sentence telling the user why you need to check this file",
+          required = false,
+        ),
+      ),
+    ) { headUrl(string("url"), string("reason", "")) },
+    TextTool(
+      name = "extractDownloads",
+      description = "Extract download links from page text content. " +
+        "Returns JSON array of {url, anchorText, surroundingText}.",
+      parameters = listOf(
+        stringParameter("pageText", "HTML or text content of a page"),
+        stringParameter("baseUrl", "Base URL for resolving relative links"),
+      ),
+    ) { extractDownloads(string("pageText"), string("baseUrl")) },
+    TextTool(
+      name = "validateUrl",
+      description = "Check a URL's form for safety (scheme, internal hosts and addresses, " +
+        "allowed sites) without contacting or looking up its host. " +
+        "Returns JSON with ok boolean and reason.",
+      parameters = listOf(stringParameter("url", "URL to validate")),
+    ) { validateUrl(string("url")) },
+    TextTool(
+      name = "emitStep",
+      description = "Emit a progress step visible to the user. " +
+        "Use to report what you're doing.",
+      parameters = listOf(
+        stringParameter("title", "Short step title"),
+        stringParameter("details", "Step details or explanation"),
+      ),
+    ) { emitStep(string("title"), string("details")) },
   )
+
   suspend fun searchWeb(
-    @LLMDescription("Search query text")
     query: String,
-    @LLMDescription("Maximum number of results (1-10)")
-    maxResults: Int = 5,
+    maxResults: Int = DEFAULT_MAX_RESULTS,
   ): String {
     if (!takeToolCall("searchWeb")) return errorJson(toolBudgetSpent())
     log.d { "searchWeb: query=\"$query\", max=$maxResults" }
@@ -130,19 +196,10 @@ internal class DiscoveryToolSet(
     return encodeResults(results)
   }
 
-  @Tool
-  @LLMDescription(
-    "Search within specific sites for pages matching a query. " +
-      "When the run is limited to allowed sites, the sites must be " +
-      "among them. Returns JSON array of {url, title, snippet}.",
-  )
   suspend fun searchSites(
-    @LLMDescription("Comma-separated list of domains to search within")
     sites: String,
-    @LLMDescription("Search query text")
     query: String,
-    @LLMDescription("Maximum number of results (1-10)")
-    maxResults: Int = 5,
+    maxResults: Int = DEFAULT_MAX_RESULTS,
   ): String {
     if (!takeToolCall("searchSites")) return errorJson(toolBudgetSpent())
     val siteList = sites.split(",").map(SiteNames::normalize)
@@ -161,15 +218,8 @@ internal class DiscoveryToolSet(
     return encodeResults(results)
   }
 
-  @Tool
-  @LLMDescription(
-    "Fetch a web page, extract its text content and download " +
-      "links. Returns JSON with text and links fields.",
-  )
   suspend fun fetchPage(
-    @LLMDescription("URL to fetch")
     url: String,
-    @LLMDescription("One short sentence telling the user why you need this page")
     reason: String = "",
   ): String {
     if (!takeToolCall("fetchPage")) return errorJson(toolBudgetSpent())
@@ -241,17 +291,8 @@ internal class DiscoveryToolSet(
     }
   }
 
-  @Tool
-  @LLMDescription(
-    "Perform an HTTP HEAD request to get metadata " +
-      "(content-type, size, last-modified) without downloading. " +
-      "Follows redirects; after one, finalUrl is where the file is " +
-      "served from, but report url as the candidate.",
-  )
   suspend fun headUrl(
-    @LLMDescription("URL to check")
     url: String,
-    @LLMDescription("One short sentence telling the user why you need to check this file")
     reason: String = "",
   ): String {
     if (!takeToolCall("headUrl")) return errorJson(toolBudgetSpent())
@@ -287,15 +328,8 @@ internal class DiscoveryToolSet(
     }
   }
 
-  @Tool
-  @LLMDescription(
-    "Extract download links from page text content. " +
-      "Returns JSON array of {url, anchorText, surroundingText}.",
-  )
   fun extractDownloads(
-    @LLMDescription("HTML or text content of a page")
     pageText: String,
-    @LLMDescription("Base URL for resolving relative links")
     baseUrl: String,
   ): String {
     if (!takeToolCall("extractDownloads")) return errorJson(toolBudgetSpent())
@@ -314,14 +348,7 @@ internal class DiscoveryToolSet(
     }.toString()
   }
 
-  @Tool
-  @LLMDescription(
-    "Check a URL's form for safety (scheme, internal hosts and addresses, " +
-      "allowed sites) without contacting or looking up its host. " +
-      "Returns JSON with ok boolean and reason.",
-  )
   fun validateUrl(
-    @LLMDescription("URL to validate")
     url: String,
   ): String {
     if (!takeToolCall("validateUrl")) return errorJson(toolBudgetSpent())
@@ -337,15 +364,8 @@ internal class DiscoveryToolSet(
     }.toString()
   }
 
-  @Tool
-  @LLMDescription(
-    "Emit a progress step visible to the user. " +
-      "Use to report what you're doing.",
-  )
   fun emitStep(
-    @LLMDescription("Short step title")
     title: String,
-    @LLMDescription("Step details or explanation")
     details: String,
   ): String {
     stepListener.onStep(
@@ -536,6 +556,7 @@ internal class DiscoveryToolSet(
   }
 
   companion object {
+    private const val DEFAULT_MAX_RESULTS = 5
     private const val MAX_REASON_LENGTH = 160
     private const val MAX_STEP_TITLE_LENGTH = 120
     private const val MAX_STEP_DETAILS_LENGTH = 600

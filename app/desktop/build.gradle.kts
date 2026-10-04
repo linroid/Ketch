@@ -87,30 +87,43 @@ tasks.test {
   }
 }
 
-// sqlite-jdbc bundles its native library for ~30 OS/arch pairs (~25 MB). A desktop package only
-// runs where it was built, so keep the build host's library and drop the rest.
-abstract class StripForeignSqliteNatives : TransformAction<StripForeignSqliteNatives.Params> {
+// Some runtime jars bundle native libraries for systems other than the one they are named for. A
+// desktop package only runs where it was built, so keep the build host's libraries and drop the
+// rest:
+// - sqlite-jdbc bundles its library for ~30 OS/arch pairs (~25 MB).
+// - Skiko's runtime jar for macOS arm64 also carries the x64 library (22 MB). Compose unpacks the
+//   host's library from the jar but ships the jar, so the other one would be dead weight.
+// - JNA bundles its native library for ~30 OS/arch pairs.
+abstract class StripForeignNatives : TransformAction<StripForeignNatives.Params> {
   interface Params : TransformParameters {
     // Folder under org/sqlite/native/ to keep, e.g. "Mac/aarch64".
-    @get:Input val keep: Property<String>
+    @get:Input val sqlite: Property<String>
+
+    // Skiko's name for the host, e.g. "macos-arm64".
+    @get:Input val skiko: Property<String>
+
+    // JNA's folder for the host under com/sun/jna/, e.g. "darwin-aarch64".
+    @get:Input val jna: Property<String>
   }
 
   @get:InputArtifact abstract val input: Provider<FileSystemLocation>
 
   override fun transform(outputs: TransformOutputs) {
     val jar = input.get().asFile
-    if (!jar.name.startsWith("sqlite-jdbc-")) {
-      outputs.file(input)
-      return
+    val keep = when {
+      jar.name.startsWith("sqlite-jdbc-") -> keepSqlite(parameters.sqlite.get())
+      jar.name.startsWith("skiko-awt-runtime-") -> keepSkiko(parameters.skiko.get())
+      jar.name.startsWith("jna-") -> keepJna(parameters.jna.get())
+      else -> {
+        outputs.file(input)
+        return
+      }
     }
-    val native = "org/sqlite/native/"
-    val keep = "$native${parameters.keep.get()}/"
     ZipFile(jar).use { zip ->
       ZipOutputStream(outputs.file(jar.name).outputStream()).use { out ->
         for (entry in zip.entries()) {
           val name = entry.name
-          // Keep the kept folder, its parent folders and everything outside native/.
-          if (name.startsWith(native) && !name.startsWith(keep) && !keep.startsWith(name)) continue
+          if (!keep(name)) continue
           out.putNextEntry(ZipEntry(name).apply { time = entry.time })
           zip.getInputStream(entry).use { it.copyTo(out) }
           out.closeEntry()
@@ -118,15 +131,41 @@ abstract class StripForeignSqliteNatives : TransformAction<StripForeignSqliteNat
       }
     }
   }
+
+  // The kept folder, its parent folders and everything outside native/.
+  private fun keepSqlite(folder: String): (String) -> Boolean {
+    val native = "org/sqlite/native/"
+    val kept = "$native$folder/"
+    return { name -> !name.startsWith(native) || name.startsWith(kept) || kept.startsWith(name) }
+  }
+
+  // Everything but the native folders of other systems: one per OS/arch under com/sun/jna/.
+  private fun keepJna(host: String): (String) -> Boolean {
+    val native = Regex("""com/sun/jna/([^/]+-[^/]+)/.+""")
+    return { name -> native.matchEntire(name)?.let { it.groupValues[1] == host } ?: true }
+  }
+
+  // Everything but the libraries (and their checksums) of other systems.
+  private fun keepSkiko(host: String): (String) -> Boolean {
+    val library = Regex("""(lib)?skiko-(\w+-\w+)\.(dylib|so|dll)(\.sha256)?""")
+    return { name -> library.matchEntire(name)?.let { it.groupValues[2] == host } ?: true }
+  }
 }
 
+val hostOs = providers.systemProperty("os.name").map { os ->
+  when {
+    os.startsWith("Mac") -> "mac"
+    os.startsWith("Windows") -> "windows"
+    else -> "linux"
+  }
+}
+val hostArm = providers.systemProperty("os.arch").map { it == "aarch64" || it == "arm64" }
+
 // Folder names match sqlite-jdbc's OSInfo.
-val hostSqliteNatives = providers.systemProperty("os.name").zip(
-  providers.systemProperty("os.arch"),
-) { os, arch ->
-  val osDir = when {
-    os.startsWith("Mac") -> "Mac"
-    os.startsWith("Windows") -> "Windows"
+val hostSqliteNatives = hostOs.zip(providers.systemProperty("os.arch")) { os, arch ->
+  val osDir = when (os) {
+    "mac" -> "Mac"
+    "windows" -> "Windows"
     else -> "Linux"
   }
   val archDir = when (arch) {
@@ -137,23 +176,76 @@ val hostSqliteNatives = providers.systemProperty("os.name").zip(
   "$osDir/$archDir"
 }
 
-val sqliteNativesStripped =
-  Attribute.of("ketch.sqliteNativesStripped", Boolean::class.javaObjectType)
+// Names match JNA's Platform.RESOURCE_PREFIX.
+val hostJnaNatives = hostOs.zip(hostArm) { os, arm ->
+  "${if (os == "mac") "darwin" else if (os == "windows") "win32" else os}-" +
+    if (arm) "aarch64" else "x86-64"
+}
+
+// Names match Skiko's hostOs and hostArch ids.
+val hostSkikoNatives = hostOs.zip(hostArm) { os, arm ->
+  "${if (os == "mac") "macos" else os}-${if (arm) "arm64" else "x64"}"
+}
+
+val foreignNativesStripped =
+  Attribute.of("ketch.foreignNativesStripped", Boolean::class.javaObjectType)
 
 dependencies {
-  attributesSchema { attribute(sqliteNativesStripped) }
-  artifactTypes.getByName("jar") { attributes.attribute(sqliteNativesStripped, false) }
-  registerTransform(StripForeignSqliteNatives::class) {
-    from.attribute(sqliteNativesStripped, false)
+  attributesSchema { attribute(foreignNativesStripped) }
+  artifactTypes.getByName("jar") { attributes.attribute(foreignNativesStripped, false) }
+  registerTransform(StripForeignNatives::class) {
+    from.attribute(foreignNativesStripped, false)
       .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-    to.attribute(sqliteNativesStripped, true)
+    to.attribute(foreignNativesStripped, true)
       .attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "jar")
-    parameters.keep.set(hostSqliteNatives)
+    parameters.sqlite.set(hostSqliteNatives)
+    parameters.skiko.set(hostSkikoNatives)
+    parameters.jna.set(hostJnaNatives)
   }
 }
 
 configurations.runtimeClasspath {
-  attributes.attribute(sqliteNativesStripped, true)
+  attributes.attribute(foreignNativesStripped, true)
+  // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the app does not
+  // use (reflective tool sets and schemas, loading server modules by name), and Compose's ProGuard
+  // rules keep all of kotlin.**, so it would ship whole (3.4 MB).
+  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+}
+
+// Rules for the release's ProGuard run, beside the files listed below:
+// - ProGuard renames classes and methods, so stack traces from a release can only be read with
+//   the mapping of that build. It is written to build/outputs/proguard/mapping.txt, which the
+//   release workflow publishes beside the packages.
+// - The rules libraries ship in META-INF/proguard, which R8 applies on Android but Compose's
+//   ProGuard task does not, such as Ktor's and kotlinx.coroutines' for their atomic fields.
+// - The names of the services in META-INF/services: ServiceLoader finds a service's providers by
+//   the name of its interface. proguard-rules.pro keeps the providers the app uses.
+val proguardRules by tasks.registering {
+  val libraries = objects.fileCollection().from(configurations.runtimeClasspath)
+  val mapping = layout.buildDirectory.file("outputs/proguard/mapping.txt")
+  val rules = layout.buildDirectory.file("generated/proguard/rules.pro")
+  inputs.files(libraries).withPropertyName("libraries")
+  inputs.property("mapping", mapping.map { it.asFile.invariantSeparatorsPath })
+  outputs.file(rules)
+  doLast {
+    val mappingFile = mapping.get().asFile
+    mappingFile.parentFile.mkdirs()
+    val text = StringBuilder("-printmapping '${mappingFile.invariantSeparatorsPath}'\n")
+    for (jar in libraries.files.filter { it.name.endsWith(".jar") }.sortedBy { it.name }) {
+      ZipFile(jar).use { zip ->
+        val entries = zip.entries().asSequence().filter { !it.isDirectory }.sortedBy { it.name }
+        for (entry in entries) {
+          if (entry.name.startsWith("META-INF/proguard/")) {
+            text.append("\n# ${jar.name}: ${entry.name}\n")
+            text.append(zip.getInputStream(entry).reader().readText()).append('\n')
+          } else if (entry.name.startsWith("META-INF/services/")) {
+            text.append("-keepnames class ${entry.name.removePrefix("META-INF/services/")}\n")
+          }
+        }
+      }
+    }
+    rules.get().asFile.writeText(text.toString())
+  }
 }
 
 compose.desktop {
@@ -162,7 +254,9 @@ compose.desktop {
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {
+      obfuscate.set(true)
       configurationFiles.from(
+        proguardRules,
         rootDir.resolve("app/proguard-rules.pro"),
         project.file("proguard-rules.pro"),
         project(":library:api").file("consumer-rules.pro"),

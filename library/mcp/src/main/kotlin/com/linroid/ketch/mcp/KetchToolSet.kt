@@ -1,8 +1,6 @@
 package com.linroid.ketch.mcp
 
-import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.core.tools.annotations.Tool
-import ai.koog.agents.core.tools.reflect.ToolSet
+import ai.koog.agents.core.tools.Tool
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -27,28 +25,161 @@ private const val ORIGIN_PROPERTY = "ketch.origin"
 private const val AGENT_ORIGIN = "agent"
 
 /**
- * Koog [ToolSet] exposing [KetchApi] download management capabilities
- * as MCP tools for AI agents.
+ * Download management tools for AI agents, served as MCP tools by [KetchMcpServer].
  *
- * Each `@Tool` method wraps a [KetchApi] or `DownloadTask` operation
- * and returns a JSON-encoded string.
+ * Each method wraps a [KetchApi] or `DownloadTask` operation and returns a JSON-encoded
+ * string; [tools] describes them to the agent.
  */
-@LLMDescription(
-  "Download manager tools for starting, managing, and monitoring file downloads",
-)
 class KetchToolSet(
   private val ketch: KetchApi,
   private val json: Json = Json {
     encodeDefaults = true
     ignoreUnknownKeys = true
   },
-) : ToolSet {
+) {
 
-  @Tool
-  @LLMDescription(
-    "List all download tasks with their current state and progress. " +
-      "Returns JSON array of task snapshots.",
+  /** The methods as tools, with the names, descriptions and parameters agents see. */
+  internal fun tools(): List<Tool<*, *>> = listOf(
+    TextTool(
+      name = "listDownloads",
+      description = "List all download tasks with their current state and progress. " +
+        "Returns JSON array of task snapshots.",
+      parameters = emptyList(),
+    ) { listDownloads() },
+    TextTool(
+      name = "getDownload",
+      description = "Get details of a specific download task by its ID. " +
+        "Returns JSON object with task state, progress, and segments.",
+      parameters = listOf(stringParameter("taskId", "The unique task ID")),
+    ) { getDownload(string("taskId")) },
+    TextTool(
+      name = "startDownload",
+      description = "Start a new download from a URL. Returns the created task snapshot.",
+      parameters = listOf(
+        stringParameter("url", "The URL to download from"),
+        stringParameter(
+          "destination",
+          "Where to save the file. Can be a directory path (ending with /), a filename, " +
+            "or a full file path. Omit to use the default directory.",
+          required = false,
+        ),
+        integerParameter(
+          "connections",
+          "Number of concurrent connections (segments). 0 uses the default from config.",
+          required = false,
+        ),
+        stringParameter(
+          "priority",
+          "Download priority: LOW, NORMAL, HIGH, or URGENT",
+          required = false,
+        ),
+        stringParameter(
+          "speedLimit",
+          "Speed limit, e.g. '1m' for 1 MB/s, '500k' for 500 KB/s, or 'unlimited'",
+          required = false,
+        ),
+        stringParameter(
+          "headers",
+          "HTTP request headers the site needs, such as Cookie or Referer, one " +
+            "'Name: value' per line. Omit for none. Ketch sends its own User-Agent unless " +
+            "one is given.",
+          required = false,
+        ),
+      ),
+    ) {
+      startDownload(
+        url = string("url"),
+        destination = string("destination", ""),
+        connections = int("connections", 0),
+        priority = string("priority", "NORMAL"),
+        speedLimit = string("speedLimit", "unlimited"),
+        headers = string("headers", ""),
+      )
+    },
+    TextTool(
+      name = "pauseDownload",
+      description = "Pause a running download. Preserves progress for later resume.",
+      parameters = listOf(stringParameter("taskId", "The unique task ID to pause")),
+    ) { pauseDownload(string("taskId")) },
+    TextTool(
+      name = "resumeDownload",
+      description = "Resume a paused or failed download from where it left off.",
+      parameters = listOf(stringParameter("taskId", "The unique task ID to resume")),
+    ) { resumeDownload(string("taskId")) },
+    TextTool(
+      name = "cancelDownload",
+      description = "Cancel a download. This is a terminal action and cannot be undone.",
+      parameters = listOf(stringParameter("taskId", "The unique task ID to cancel")),
+    ) { cancelDownload(string("taskId")) },
+    TextTool(
+      name = "removeDownload",
+      description = "Remove a download task from the task list. " +
+        "Cancels the download if still active.",
+      parameters = listOf(stringParameter("taskId", "The unique task ID to remove")),
+    ) { removeDownload(string("taskId")) },
+    TextTool(
+      name = "resolveUrl",
+      description = "Resolve URL metadata without downloading. Returns file size, " +
+        "resume support, suggested filename, and source type.",
+      parameters = listOf(stringParameter("url", "The URL to resolve")),
+    ) { resolveUrl(string("url")) },
+    TextTool(
+      name = "getStatus",
+      description = "Get server status including version, uptime, configuration, " +
+        "and system information.",
+      parameters = emptyList(),
+    ) { getStatus() },
+    TextTool(
+      name = "setSpeedLimit",
+      description = "Set the speed limit for a specific download task.",
+      parameters = listOf(
+        stringParameter("taskId", "The unique task ID"),
+        stringParameter(
+          "speedLimit",
+          "Speed limit, e.g. '1m' for 1 MB/s, '500k' for 500 KB/s, or 'unlimited' to " +
+            "remove the limit",
+        ),
+      ),
+    ) { setSpeedLimit(string("taskId"), string("speedLimit")) },
+    TextTool(
+      name = "setPriority",
+      description = "Set the priority of a download task in the queue.",
+      parameters = listOf(
+        stringParameter("taskId", "The unique task ID"),
+        stringParameter("priority", "Priority level: LOW, NORMAL, HIGH, or URGENT"),
+      ),
+    ) { setPriority(string("taskId"), string("priority")) },
+    TextTool(
+      name = "updateConfig",
+      description = "Update global download configuration such as speed limit " +
+        "and concurrency settings.",
+      parameters = listOf(
+        stringParameter(
+          "speedLimit",
+          "Global speed limit, e.g. '10m' for 10 MB/s, 'unlimited' to remove. " +
+            "Empty string to keep current.",
+          required = false,
+        ),
+        integerParameter(
+          "maxConcurrentDownloads",
+          "Maximum concurrent downloads. 0 to keep current.",
+          required = false,
+        ),
+        integerParameter(
+          "maxConnectionsPerDownload",
+          "Maximum connections per download. 0 to keep current.",
+          required = false,
+        ),
+      ),
+    ) {
+      updateConfig(
+        speedLimit = string("speedLimit", ""),
+        maxConcurrentDownloads = int("maxConcurrentDownloads", 0),
+        maxConnectionsPerDownload = int("maxConnectionsPerDownload", 0),
+      )
+    },
   )
+
   fun listDownloads(): String {
     val tasks = ketch.tasks.value
     return json.encodeToString(
@@ -58,51 +189,19 @@ class KetchToolSet(
     )
   }
 
-  @Tool
-  @LLMDescription(
-    "Get details of a specific download task by its ID. " +
-      "Returns JSON object with task state, progress, and segments.",
-  )
   fun getDownload(
-    @LLMDescription("The unique task ID")
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription(
-    "Start a new download from a URL. Returns the created task snapshot.",
-  )
   suspend fun startDownload(
-    @LLMDescription("The URL to download from")
     url: String,
-    @LLMDescription(
-      "Where to save the file. Can be a directory path " +
-        "(ending with /), a filename, or a full file path. " +
-        "Omit to use the default directory.",
-    )
     destination: String = "",
-    @LLMDescription(
-      "Number of concurrent connections (segments). " +
-        "0 uses the default from config.",
-    )
     connections: Int = 0,
-    @LLMDescription(
-      "Download priority: LOW, NORMAL, HIGH, or URGENT",
-    )
     priority: String = "NORMAL",
-    @LLMDescription(
-      "Speed limit, e.g. '1m' for 1 MB/s, '500k' for 500 KB/s, " +
-        "or 'unlimited'",
-    )
     speedLimit: String = "unlimited",
-    @LLMDescription(
-      "HTTP request headers the site needs, such as Cookie or Referer, " +
-        "one 'Name: value' per line. Omit for none. Ketch sends its own " +
-        "User-Agent unless one is given.",
-    )
     headers: String = "",
   ): String {
     val request = DownloadRequest(
@@ -118,10 +217,7 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription("Pause a running download. Preserves progress for later resume.")
   suspend fun pauseDownload(
-    @LLMDescription("The unique task ID to pause")
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -129,10 +225,7 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription("Resume a paused or failed download from where it left off.")
   suspend fun resumeDownload(
-    @LLMDescription("The unique task ID to resume")
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -140,10 +233,7 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription("Cancel a download. This is a terminal action and cannot be undone.")
   suspend fun cancelDownload(
-    @LLMDescription("The unique task ID to cancel")
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -151,13 +241,7 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription(
-    "Remove a download task from the task list. " +
-      "Cancels the download if still active.",
-  )
   suspend fun removeDownload(
-    @LLMDescription("The unique task ID to remove")
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -165,13 +249,7 @@ class KetchToolSet(
     return buildJsonObject { put("removed", taskId) }.toString()
   }
 
-  @Tool
-  @LLMDescription(
-    "Resolve URL metadata without downloading. Returns file size, " +
-      "resume support, suggested filename, and source type.",
-  )
   suspend fun resolveUrl(
-    @LLMDescription("The URL to resolve")
     url: String,
   ): String {
     val resolved = ketch.resolve(url)
@@ -180,11 +258,6 @@ class KetchToolSet(
     )
   }
 
-  @Tool
-  @LLMDescription(
-    "Get server status including version, uptime, configuration, " +
-      "and system information.",
-  )
   suspend fun getStatus(): String {
     val status = ketch.status()
     return json.encodeToString(
@@ -192,15 +265,8 @@ class KetchToolSet(
     )
   }
 
-  @Tool
-  @LLMDescription("Set the speed limit for a specific download task.")
   suspend fun setSpeedLimit(
-    @LLMDescription("The unique task ID")
     taskId: String,
-    @LLMDescription(
-      "Speed limit, e.g. '1m' for 1 MB/s, '500k' for 500 KB/s, " +
-        "or 'unlimited' to remove the limit",
-    )
     speedLimit: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -208,12 +274,8 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription("Set the priority of a download task in the queue.")
   suspend fun setPriority(
-    @LLMDescription("The unique task ID")
     taskId: String,
-    @LLMDescription("Priority level: LOW, NORMAL, HIGH, or URGENT")
     priority: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -221,24 +283,9 @@ class KetchToolSet(
     return json.encodeToString(taskToJson(task))
   }
 
-  @Tool
-  @LLMDescription(
-    "Update global download configuration such as speed limit " +
-      "and concurrency settings.",
-  )
   suspend fun updateConfig(
-    @LLMDescription(
-      "Global speed limit, e.g. '10m' for 10 MB/s, " +
-        "'unlimited' to remove. Empty string to keep current.",
-    )
     speedLimit: String = "",
-    @LLMDescription(
-      "Maximum concurrent downloads. 0 to keep current.",
-    )
     maxConcurrentDownloads: Int = 0,
-    @LLMDescription(
-      "Maximum connections per download. 0 to keep current.",
-    )
     maxConnectionsPerDownload: Int = 0,
   ): String {
     val current = ketch.status().config

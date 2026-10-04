@@ -1,67 +1,11 @@
 [
   {
-    "name": "com.linroid.ketch.mcp.KetchToolSet",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "com.linroid.ketch.api.KetchApi"
-  },
-  {
-    "name": "com.linroid.ketch.api.DownloadTask"
-  },
-  {
-    "name": "com.linroid.ketch.api.DownloadState"
-  },
-  {
-    "name": "com.linroid.ketch.api.DownloadPriority"
-  },
-  {
-    "name": "com.linroid.ketch.api.SpeedLimit",
-    "methods": [
-      {"name": "box-impl", "parameterTypes": ["long"]},
-      {"name": "unbox-impl", "parameterTypes": []}
-    ]
-  },
-  {
-    "name": "ai.koog.agents.core.tools.reflect.ToolSet",
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "ai.koog.agents.core.tools.reflect.ToolFromCallable"
-  },
-  {
-    "name": "ai.koog.agents.core.tools.annotations.Tool",
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "ai.koog.agents.core.tools.annotations.LLMDescription",
-    "allDeclaredMethods": true
-  },
-  {
     "name": "ai.koog.serialization.JSONElement",
     "fields": [{"name": "Companion"}]
   },
   {
     "name": "ai.koog.serialization.JSONElement$Companion",
     "allDeclaredMethods": true
-  },
-  {
-    "name": "kotlin.Metadata",
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "kotlin.coroutines.Continuation"
-  },
-  {
-    "name": "kotlin.jvm.internal.DefaultConstructorMarker"
-  },
-  {
-    "name": "kotlinx.serialization.json.Json"
-  },
-  {
-    "name": "kotlinx.serialization.json.JsonObject"
   },
   {
     "name": "io.modelcontextprotocol.kotlin.sdk.types.Annotations",

@@ -1,4 +1,6 @@
 import org.apache.tools.ant.taskdefs.condition.Os
+import java.util.zip.Deflater
+import java.util.zip.GZIPOutputStream
 
 plugins {
   alias(libs.plugins.kotlinJvm)
@@ -29,7 +31,6 @@ graalvmNative {
       )
       buildArgs.addAll(
         "--no-fallback",
-        "-Ob",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         "--initialize-at-build-time=ch.qos.logback",
@@ -43,6 +44,9 @@ graalvmNative {
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
       )
+      // Optimizing for size needs GraalVM for JDK 23 or later. Older ones build with -Ob, which
+      // optimizes less than the default -O2 and so makes a smaller binary.
+      buildArgs.add(if (nativeImageJdk >= 23) "-Os" else "-Ob")
       if (!Os.isFamily(Os.FAMILY_MAC)) {
         buildArgs.add("-H:+StripDebugInfo")
       }
@@ -63,7 +67,7 @@ val webSourceDir = if (prebuiltWebDir.isPresent) {
     .dir("dist/wasmJs/productionExecutable").get()
 }
 
-val bundleWebApp by tasks.registering(Copy::class) {
+val bundleWebApp by tasks.registering(Sync::class) {
   if (!prebuiltWebDir.isPresent) {
     dependsOn(":app:web:wasmJsBrowserDistribution")
   }
@@ -79,6 +83,22 @@ val bundleWebApp by tasks.registering(Copy::class) {
         "<head>\n    <meta name=\"ketch-auto-connect\" content=\"true\">",
       )
     }
+  }
+  // The wasm and JS (about 20 MB) go in gzipped: the native binary stores resources as they are,
+  // and the server sends them compressed to browsers (KetchServer's webResources).
+  val webDir = destinationDir
+  doLast {
+    webDir.walkTopDown()
+      .filter { it.isFile && it.extension in setOf("wasm", "js") }
+      .forEach { file ->
+        val gzipped = File(file.parentFile, "${file.name}.gz")
+        object : GZIPOutputStream(gzipped.outputStream()) {
+          init {
+            def.setLevel(Deflater.BEST_COMPRESSION)
+          }
+        }.use { out -> file.inputStream().use { it.copyTo(out) } }
+        file.delete()
+      }
   }
 }
 
@@ -108,6 +128,13 @@ val prepareNativeLicenses by tasks.registering(Sync::class) {
 // Restore the sidecar notices after compilation, including when the image is up to date.
 tasks.named("nativeCompile") {
   finalizedBy(prepareNativeLicenses)
+}
+
+// Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the CLI does not
+// use (reflective tool sets and schemas, loading server modules by name). The stdlib looks it up
+// by name, so native-image would compile much of it in.
+configurations.runtimeClasspath {
+  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
 dependencies {

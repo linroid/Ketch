@@ -12,7 +12,6 @@ import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.agent.DiscoveryToolSet
 import com.linroid.ketch.ai.agent.LinkExtractor
 import com.linroid.ketch.ai.agent.SiteAllowlist
-import com.linroid.ketch.ai.agent.asDeclaredTools
 import com.linroid.ketch.ai.agent.sanitizeAgentText
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
@@ -173,7 +172,7 @@ class ResourceDiscoveryService internal constructor(
         model = llm.model,
         maxAgentIterations = agentIterations(config.agent.maxToolCalls),
       ),
-      toolRegistry = ToolRegistry { tools(toolSet.asDeclaredTools()) },
+      toolRegistry = ToolRegistry { tools(toolSet.tools()) },
     )
 
     val userMessage = buildUserMessage(query, allowlist, replayed)

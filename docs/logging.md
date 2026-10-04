@@ -174,8 +174,10 @@ To attach them to a bug report, open **Settings → About → Troubleshooting**:
 R8 renames the classes and methods of the Android release, so its stack traces show short
 placeholder names. Each GitHub release carries the matching `ketch-android-<version>-mapping.zip`;
 unzip it and run `retrace mapping.txt ketch-logs.txt` (in the Android SDK's
-`cmdline-tools/latest/bin/`) to restore them. The desktop apps are shrunk but not renamed, so
-their stack traces need no mapping.
+`cmdline-tools/latest/bin/`) to restore them. ProGuard renames the desktop apps the same way:
+their mapping is `ketch-desktop-<version>-<os>-<arch>-mapping.zip`, read with ProGuard's
+`retrace` (`bin/retrace.sh` in a [ProGuard release](https://github.com/Guardsquare/proguard)).
+Log messages keep the names of Ketch's API types and of exceptions, and the CLI is not renamed.
 
 Logging never waits for the disk: a log call only formats and queues its record, and one
 background writer appends the records in order, flushing whenever its queue runs empty. A

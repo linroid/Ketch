@@ -34,7 +34,9 @@ import io.ktor.server.plugins.cors.CORSConfig
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.acceptEncodingItems
 import io.ktor.server.resources.Resources
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
@@ -49,8 +51,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.net.InetAddress
+import java.net.URL
 import java.net.UnknownHostException
 import java.util.concurrent.CountDownLatch
+import java.util.zip.GZIPInputStream
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -474,23 +478,37 @@ private fun isLoopback(host: String): Boolean {
  * Uses [ClassLoader.getResource] directly for GraalVM native image
  * compatibility, since Ktor's `staticResources` relies on classpath
  * scanning that doesn't work in native images.
+ *
+ * A file bundled only as `<name>.gz` (the CLI gzips its largest ones) is sent as it is to clients
+ * that accept gzip and unpacked for the others.
  */
-private fun Route.webResources() {
-  val loader = KetchServer::class.java.classLoader
+internal fun Route.webResources(
+  resource: (String) -> URL? = KetchServer::class.java.classLoader::getResource,
+) {
   get("{path...}") {
     val path = call.parameters.getAll("path")
       ?.joinToString("/")
       ?.ifEmpty { "index.html" }
       ?: "index.html"
-    val resource = loader.getResource("web/$path")
-    if (resource != null) {
-      val ext = path.substringAfterLast('.', "")
-      val contentType =
-        ContentType.defaultForFileExtension(ext)
-      call.respondBytes(
-        resource.readBytes(),
-        contentType,
-      )
+    val ext = path.substringAfterLast('.', "")
+    val contentType = ContentType.defaultForFileExtension(ext)
+    val plain = resource("web/$path")
+    if (plain != null) {
+      call.respondBytes(plain.readBytes(), contentType)
+      return@get
+    }
+    val gzipped = resource("web/$path.gz") ?: return@get
+    call.response.header(HttpHeaders.Vary, HttpHeaders.AcceptEncoding)
+    // An explicit gzip entry decides, so "gzip;q=0, *" refuses gzip; "*" counts only without one.
+    val encodings = call.request.acceptEncodingItems()
+    val gzip = encodings.find { it.value.equals("gzip", ignoreCase = true) }
+      ?: encodings.find { it.value == "*" }
+    val acceptsGzip = gzip != null && gzip.quality > 0.0
+    if (acceptsGzip) {
+      call.response.header(HttpHeaders.ContentEncoding, "gzip")
+      call.respondBytes(gzipped.readBytes(), contentType)
+    } else {
+      call.respondBytes(GZIPInputStream(gzipped.openStream()).use { it.readBytes() }, contentType)
     }
   }
 }

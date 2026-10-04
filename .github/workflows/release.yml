@@ -270,12 +270,22 @@ jobs:
               "app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}-portable.zip"
           fi
 
+      # ProGuard renames classes and methods, so stack traces from these packages can only be
+      # read with the mapping of this exact build. jar writes the zip on every runner.
+      - name: Package ProGuard mapping
+        run: >
+          jar --create --no-manifest
+          --file "app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}-mapping.zip"
+          -C app/desktop/build/outputs/proguard mapping.txt
+
       - uses: actions/upload-artifact@v7
         with:
           name: ketch-desktop-${{ matrix.name }}
           path: |
             app/desktop/build/ketch-desktop-*.${{ matrix.ext }}
             app/desktop/build/ketch-desktop-*-portable.zip
+            app/desktop/build/ketch-desktop-*-mapping.zip
+          if-no-files-found: error
 
   build-web:
     name: Web (WasmJs)

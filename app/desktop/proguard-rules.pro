@@ -24,3 +24,36 @@
   public static **[] values();
   public static ** valueOf(java.lang.String);
 }
+
+# Atomic field updaters (atomicfu, Ktor's network selectors, coroutines) find their fields by
+# name. R8 rewrites those names when it obfuscates; ProGuard does not.
+-keepclassmembers class * {
+  volatile <fields>;
+}
+
+# Line numbers, so the stack traces in a release's logs can be decoded with its mapping.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Attributes ProGuard only drops when it obfuscates. Without InnerClasses, a nested class's
+# simpleName becomes "Outer$Inner", as the logs' state names would; reflection on generic
+# signatures and local classes needs the others.
+-keepattributes InnerClasses,EnclosingMethod,Signature
+
+# OkHttp reads its public suffix list from its own package (META-INF/proguard rules ship only in
+# OkHttp's Android artifact).
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
+
+# JNA (the torrent engine's file system calls) binds its Java classes to native code by name.
+-keep class com.sun.jna.** { *; }
+
+# Logs name states, errors and exceptions by their class names (DownloadState.logLabel,
+# describeCauses), which obfuscation would turn into single letters.
+-keepnames class com.linroid.ketch.api.**
+-keepnames class * extends java.lang.Throwable
+
+# kotlin-reflect is left out of the app (see build.gradle.kts). Koog's reflective tool sets,
+# kotlinx-schema's reflective generator, Jackson's Kotlin module and Ktor's loading of server
+# modules by name refer to it; the app reaches none of them.
+-dontwarn kotlin.reflect.full.**
+-dontwarn kotlin.reflect.jvm.**

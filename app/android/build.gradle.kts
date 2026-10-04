@@ -69,10 +69,7 @@ android {
 
   packaging {
     resources {
-      // AI discovery reads two resources at runtime, so neither "kotlin/**" nor every
-      // "*.properties" can be excluded: kotlin-reflect, which Koog calls the tools through,
-      // loads kotlin/**/*.kotlin_builtins, and kotlinx-schema, which writes the tool schemas,
-      // loads kotlinx-schema.properties.
+      // kotlin/**/*.kotlin_builtins are read only by kotlin-reflect, which the app leaves out.
       excludes += setOf(
         "META-INF/DEPENDENCIES",
         "META-INF/{INDEX.LIST,io.netty.versions.properties}",
@@ -82,11 +79,20 @@ android {
         "META-INF/com/android/build/gradle/app-metadata.properties",
         "META-INF/androidx/**",
         "META-INF/**/*.properties",
+        "kotlin/**",
+        "kotlinx-schema.properties",
         "DebugProbesKt.bin",
         "org/fusesource/**",
       )
     }
   }
+}
+
+// Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the app does not
+// use (reflective tool sets and schemas, loading server modules by name). Its R8 rules keep most
+// of it, so release builds leave it out.
+configurations.matching { it.name == "releaseRuntimeClasspath" }.configureEach {
+  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
 dependencies {

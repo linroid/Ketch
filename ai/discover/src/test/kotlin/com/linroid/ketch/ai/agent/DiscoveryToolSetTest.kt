@@ -47,6 +47,7 @@ import kotlin.test.assertTrue
 
 class DiscoveryToolSetTest {
 
+
   private val dns = fakeDns(
     "example.com" to "93.184.215.14",
     "www.example.com" to "93.184.215.14",
@@ -389,8 +390,8 @@ class DiscoveryToolSetTest {
   }
 
   @Test
-  fun asDeclaredTools_parametersWithDefaults_areOptional() {
-    val tools = toolSet(MockEngine { respond("") }).asDeclaredTools().associateBy { it.name }
+  fun tools_parametersWithDefaults_areOptional() {
+    val tools = toolSet(MockEngine { respond("") }).tools().associateBy { it.name }
 
     assertEquals(
       mapOf(
@@ -418,9 +419,9 @@ class DiscoveryToolSetTest {
   }
 
   @Test
-  fun asDeclaredTools_toolResult_isNotEncodedAgain() = runTest {
+  fun tools_toolResult_isNotEncodedAgain() = runTest {
     val toolSet = toolSet(MockEngine { respond("") })
-    val tools = toolSet.asDeclaredTools().associateBy { it.name }
+    val tools = toolSet.tools().associateBy { it.name }
 
     val step = tools.getValue("emitStep").call(
       buildJsonObject {

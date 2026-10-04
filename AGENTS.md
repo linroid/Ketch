@@ -144,14 +144,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`,
   `DestinationGuard`, `AuthThrottle`; `server.api` holds the routes and `receiveJson`, and
   `server.mdns` the `MdnsRegistrar` implementations
-- `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `asDeclaredTools()`
+- `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `TextTool`
 
 ### `ai:discover` (JVM/Android only)
 - `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverTurn`, `DiscoverResult`,
   `RankedCandidate`, `DiscoveryException`, `PageAccessApprover`, `PageAccessRequest`,
   `PageAccessKind`
-- `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `asDeclaredTools()`, `AgentOutputParser`,
+- `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `TextTool`, `AgentOutputParser`,
   `sanitizeAgentText()`, `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`,
   `SiteAllowlist`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
@@ -371,11 +371,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   subdomains included, capped by `DiscoveryConfig.allowedDomains`: the tools refuse
   other hosts and the output parser drops their candidates, but redirects a listed
   site answers with (e.g. github.com to its CDN) are followed
-- JVM/Android only (uses Koog + Ktor CIO and OkHttp clients)
-- Shrunk app releases keep what Koog reaches by reflection: `app/proguard-rules.pro` (Android
-  R8 and desktop ProGuard) keeps `ToolSet` classes and `@LLMDescription`. The Android app also
+- JVM/Android only (uses Koog + Ktor's OkHttp client; the search and LLM clients take the app's
+  default engine)
+- The tools are `TextTool`s, described by hand rather than through Koog's reflective `ToolSet`,
+  so the apps and the CLI leave kotlin-reflect out (see [app size](#app-size)). The Android app
   registers Koog's HTTP client factory under `META-INF/services` (Koog's Android AAR omits it)
-  and must package `kotlin/**/*.kotlin_builtins` and `kotlinx-schema.properties`
 - See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)
@@ -555,15 +555,16 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
   `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
-  SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
-  so new tool methods may need the types in their signatures registered
+  SDK, `ai:discover` for Koog's clients). The binary has no kotlin-reflect. It is built with
+  `-Os` on GraalVM for JDK 23 and later and `-Ob` before (smaller than the default `-O2`), and
+  bundles the web UI with its wasm and JS gzipped, which `KetchServer` sends compressed to
+  browsers that accept gzip
 - Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
   serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
   so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
 - `NativeImageConfigTest` (in `cli`, `library:mcp` and `ai:discover`) checks that the metadata
-  names existing classes and covers every serializable MCP SDK type, every subtype of Koog's
-  content-polymorphic types and every Ketch type in `DiscoveryToolSet`'s constructor, fields and
-  method signatures (such as `PageAccessApprover` and `SearchResult`); build with
+  names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
+  content-polymorphic types; build with
   `./gradlew :cli:nativeCompile` and exercise `ketch mcp` and `ketch ai-discover` with each LLM
   provider to verify changes
 
@@ -583,10 +584,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`; downloads it starts
   carry `DownloadRequest.properties["ketch.origin"] = "agent"`
-- Register Koog tool sets with `asDeclaredTools()` (`library:mcp` and `ai:discover` each have a
-  copy), not `tools(toolSet)`: Koog 1.2.0 describes every parameter of a `@Tool` method as
-  required and JSON-encodes a `String` result again. The adapter makes parameters with default
-  values optional and passes `String` results on as they are, so tools return their JSON as text
+- Agent tools are `TextTool`s (`library:mcp` and `ai:discover` each have a copy): a name, a
+  description and string or integer parameters, required unless the tool has a default, written
+  out by hand and called with the arguments by name. They need no kotlin-reflect, unlike Koog's
+  `ToolSet`, and pass `String` results on as they are, so tools return their JSON as text. A
+  missing or malformed argument is a `ToolException.ValidationFailure`
 - `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
   `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
   Logback never corrupt the JSON-RPC stream
@@ -646,6 +648,21 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `FileChanged`, `CorruptResumeState`, `Canceled`, `SourceError`,
   `AuthenticationFailed`, `Unknown`
 - I/O exceptions from `FileAccessor` classified as `KetchError.Disk`
+
+### App Size
+- Release apps and the CLI leave out kotlin-reflect (`exclude` on the runtime classpath of
+  `app:android` release builds, `app:desktop` and `cli`): Koog, kotlinx-schema and Ktor's server
+  depend on it only for reflective tool sets and schemas and loading server modules by name.
+  Code they ship must not need it, so tools are `TextTool`s
+- Desktop packages keep only the build host's native libraries of sqlite-jdbc, Skiko and JNA
+  (`StripForeignNatives` in `app/desktop/build.gradle.kts`)
+- Desktop release builds are obfuscated by ProGuard. A generated rules file (`proguardRules`) adds
+  the rules libraries ship in `META-INF/proguard`, keeps the names of `META-INF/services`
+  interfaces and writes `build/outputs/proguard/mapping.txt`, which the release workflow
+  publishes as `ketch-desktop-<version>-<os>-<arch>-mapping.zip`. `app/desktop/proguard-rules.pro`
+  keeps volatile fields (atomic field updaters find them by name), line numbers, the
+  `InnerClasses` attribute (`simpleName` of nested classes) and the names of `api` classes and
+  exceptions, which the logs print
 
 ## Architecture Patterns
 
