@@ -137,11 +137,13 @@ commit.
 - iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless
   `-PenableIosSimulatorTests=true` is passed to `iosSimulatorArm64Test`; JS tests run on Node.js
   with `jsNodeTest`
-- iOS test CI preserves `~/.konan` across compatible Kotlin and Xcode toolchains and passes
-  `-PtestBuildRevision=ci-test`. This keeps the generated API revision stable between commits,
-  allowing unchanged native compilations to reuse cached outputs. The override is only for
+- Test CI sets `testBuildRevision=ci-test` in every job (`ORG_GRADLE_PROJECT_testBuildRevision`).
+  This keeps the generated API revision stable between commits, so unchanged modules reuse
+  their compilations and test results from the Gradle build cache. The override is only for
   test builds: omit it when packaging or publishing so `KetchApi.REVISION` identifies the real
-  Git revision.
+  Git revision. The iOS job also preserves `~/.konan` across compatible Kotlin and Xcode
+  toolchains, and with a `GRADLE_ENCRYPTION_KEY` secret every job keeps its configuration
+  cache between runs.
 - The browser extension has its own unit tests: `npm test` (`node --test`, Node 22.3+) in
   `app/browser-extension`
 - Torrent interoperability (Transmission, libtorrent), the opt-in public swarm test
