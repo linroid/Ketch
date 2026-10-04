@@ -38,6 +38,7 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.LlmSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.discover_example_blender
 import ketch.app.shared.generated.resources.discover_example_footage
@@ -52,20 +53,23 @@ import ketch.app.shared.generated.resources.discover_setup_in_settings
 import ketch.app.shared.generated.resources.discover_setup_local_provider
 import ketch.app.shared.generated.resources.discover_setup_pending
 import ketch.app.shared.generated.resources.discover_setup_unsupported
+import ketch.app.shared.generated.resources.discover_turn_off
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * Discover before it is set up: what it does, searches it could run, and a button per model
  * provider that switches discovery on with that provider and opens its settings for the key.
- * Once one is picked, its button stands out and the settings link says to finish it. Where
- * discovery cannot run, it says so instead.
+ * Once one is picked, its button stands out and the settings link says to finish it. Beside it,
+ * Turn off Discover hides the destination for users who do not want it. Where discovery cannot
+ * run, it says so instead.
  */
 @Composable
 internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier = Modifier) {
   val supported = state.aiSettings.supported
   val pending = state.aiDiscover.pending
-  // Switched on but not usable yet: the provider picked here still needs its key.
-  val chosen = state.aiSettings.settings.takeIf { it.enabled }?.llm?.provider
+  // Picked but not usable yet: the provider still needs its key. Discovery is on by default, so
+  // only a provider other than the untouched default counts as picked.
+  val chosen = state.aiSettings.settings.llm.takeIf { it != LlmSettings() }?.provider
   val spacing = KetchTheme.spacing
   val colors = KetchTheme.colors
   DiscoverHero(
@@ -116,16 +120,27 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
       }
     }
     Spacer(Modifier.height(spacing.s2))
-    KetchButton(
-      text = if (chosen != null) {
-        stringResource(Res.string.discover_setup_finish, chosen.shortLabel.resolve())
-      } else {
-        stringResource(Res.string.discover_setup_in_settings)
-      },
-      onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
-      variant = KetchButtonVariant.Ghost,
-      leadingIcon = KetchIcon.Settings,
-    )
+    FlowRow(
+      horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.CenterHorizontally),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      KetchButton(
+        text = if (chosen != null) {
+          stringResource(Res.string.discover_setup_finish, chosen.shortLabel.resolve())
+        } else {
+          stringResource(Res.string.discover_setup_in_settings)
+        },
+        onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
+        variant = KetchButtonVariant.Ghost,
+        leadingIcon = KetchIcon.Settings,
+      )
+      KetchButton(
+        text = stringResource(Res.string.discover_turn_off),
+        onClick = { state.turnOffDiscover() },
+        variant = KetchButtonVariant.Ghost,
+        leadingIcon = KetchIcon.Close,
+      )
+    }
   }
 }
 

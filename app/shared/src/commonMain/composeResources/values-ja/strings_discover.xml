@@ -116,6 +116,9 @@
   <string name="discover_new_search">新しい検索</string>
   <string name="discover_delete_search">この検索を削除</string>
   <string name="discover_history_clear">履歴を消去</string>
+  <string name="discover_turn_off">ディスカバーをオフにする</string>
+  <string name="discover_turned_off">ディスカバーをオフにしました</string>
+  <string name="discover_turned_off_detail">「設定」の「ディスカバー」でもう一度オンにできます。</string>
   <string name="discover_history_filter">履歴を検索</string>
   <string name="discover_history_empty">実行した検索がここに表示されます。</string>
   <string name="discover_history_no_match">「%1$s」に一致する検索はありません</string>

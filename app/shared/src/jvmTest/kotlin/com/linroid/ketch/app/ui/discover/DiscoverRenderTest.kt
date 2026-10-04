@@ -457,6 +457,43 @@ class DiscoverRenderTest {
     }
   }
 
+  @Test
+  fun menu_turnOff_hidesDiscoverUntilUndo() {
+    runDiscover { state ->
+      val more = nodes().filter {
+        it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(MORE) == true
+      }
+      more.single().click()
+      frames(FRAMES)
+      nodes().first { it.ownText() == TURN_OFF }.click()
+      frames(FRAMES)
+
+      assertFalse(state.aiSettings.offered)
+      assertFalse(state.aiDiscover.shown, "The shell leaves Discover")
+      assertTrue(TURNED_OFF in texts(), "A toast says so: ${texts()}")
+
+      nodes().first { it.ownText() == UNDO }.click()
+      frames(FRAMES)
+
+      assertTrue(state.aiSettings.offered)
+      assertTrue(state.aiDiscover.shown, "Undo shows Discover again")
+    }
+  }
+
+  @Test
+  fun notSetUp_turnOff_hidesDiscover() {
+    runDiscover(configured = false) { state ->
+      assertTrue(state.aiDiscover.shown, "Discover shows before it is set up")
+
+      nodes().first { it.ownText() == TURN_OFF }.click()
+      frames(FRAMES)
+
+      assertFalse(state.aiSettings.settings.enabled)
+      assertFalse(state.aiDiscover.shown, "The shell leaves Discover")
+      assertFalse(texts().any { it == "Discover" }, "Discover leaves the sidebar: ${texts()}")
+    }
+  }
+
   /**
    * Renders the desktop app on Discover, set up with Anthropic unless not [configured], with
    * the sample discovery running [script] for a chat's first message and [followUp] for the
@@ -630,6 +667,10 @@ class DiscoverRenderTest {
     const val STOP = "Stop"
     const val SITES_CHIP = "Limit to websites"
     const val DETAILS = "Details"
+    const val MORE = "More"
+    const val TURN_OFF = "Turn off Discover"
+    const val TURNED_OFF = "Discover is off"
+    const val UNDO = "Undo"
     const val SHOW_MORE = "Show more"
     const val SHOW_LESS = "Show less"
   }

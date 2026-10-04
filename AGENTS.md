@@ -305,11 +305,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
 - Configured under Settings → Discover and persisted under `[ai]` in
   `config.toml`; blank credentials fall back to environment variables
-- The Discover destination shows wherever discovery is supported; until it is set up it shows
-  a setup page, where searches from the add sheet, the palette, the phone's search and Find
-  another source wait, and saved sessions open read-only. In the apps the Enable switch is
-  authoritative (an env key fills a blank token but never enables the feature — only the CLI
-  auto-enables; `[ai.access]` alone never counts as configured)
+- `AiSettings.enabled` defaults to on. The Discover destination, and every way into it (add
+  sheet, palette, phone search, Find another source, launchpad), shows wherever discovery is
+  supported while it is switched on (`AiSettingsController.offered`); until it is set up it shows
+  a setup page, where searches wait, saved sessions open read-only, and Turn off Discover
+  (`AppState.turnOffDiscover`, with Undo; also in the page's ⋯ menu) hides it. In the apps the
+  switch is authoritative and env keys only fill blank credentials of the provider the settings
+  name (`resolveAiSettingsFromEnv` with `autoConfigure = false`); only the CLI lets untouched
+  settings take their providers from the environment (`[ai.access]` alone never counts as
+  configured)
 - Discover is a chat (`AiDiscoverController`, `DiscoverSession` of `DiscoverTurn`s): every
   entry point with a query starts a new session; a follow-up sends `DiscoverQuery.history`
   (each earlier request and its sites, results only from finished turns, the first turn plus

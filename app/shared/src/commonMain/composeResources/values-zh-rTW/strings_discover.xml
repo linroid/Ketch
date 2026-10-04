@@ -116,6 +116,9 @@
   <string name="discover_new_search">新搜尋</string>
   <string name="discover_delete_search">刪除此搜尋</string>
   <string name="discover_history_clear">清除歷史記錄</string>
+  <string name="discover_turn_off">關閉探索</string>
+  <string name="discover_turned_off">探索已關閉</string>
+  <string name="discover_turned_off_detail">可在「設定」的「探索」中重新開啟。</string>
   <string name="discover_history_filter">搜尋歷史記錄</string>
   <string name="discover_history_empty">你執行過的搜尋會顯示在這裡。</string>
   <string name="discover_history_no_match">沒有符合「%1$s」的搜尋</string>

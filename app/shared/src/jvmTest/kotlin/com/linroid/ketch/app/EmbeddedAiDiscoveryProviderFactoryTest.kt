@@ -70,21 +70,20 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
   }
 
   @Test
-  fun `a blank token is filled from the environment once enabled`() {
-    val provider = envFactory.create(AiSettings(enabled = true))
+  fun `a blank token is filled from the environment`() {
+    val provider = envFactory.create(AiSettings())
     assertNotNull(provider, "an environment key should supply the token")
     provider.close()
   }
 
   @Test
-  fun `an environment key does not switch discovery on`() {
-    // The apps show an Enable switch; only the CLI auto-enables.
-    assertNull(envFactory.create(AiSettings()))
+  fun `an environment key does not switch discovery back on`() {
+    assertNull(envFactory.create(AiSettings(enabled = false)))
   }
 
   @Test
   fun `platform credentials fill the selected provider's blank token`() {
-    val resolved = envFactory.withPlatformCredentials(AiSettings())
+    val resolved = envFactory.withPlatformCredentials(AiSettings(enabled = false))
     assertEquals("sk-from-env", resolved.llm.apiKey)
     assertFalse(resolved.enabled, "resolving must not switch the feature on")
   }

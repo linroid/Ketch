@@ -64,8 +64,19 @@ class AiSettingsController(
   /** Whether this platform can run AI discovery at all. */
   val supported: Boolean get() = factory != null
 
-  /** Whether discovery is ready to use. */
+  /** Whether discovery is ready to use: switched on, with the keys it needs. */
   val available: Boolean get() = provider != null
+
+  /**
+   * Whether the apps offer Discover: this platform can run it and it is switched on, which it is
+   * by default. Until its keys are set, Discover shows how to set it up, or to turn it off.
+   */
+  val offered: Boolean get() = supported && settings.enabled
+
+  /** Switches discovery off, or back [on], keeping everything else. */
+  fun setEnabled(on: Boolean) {
+    if (settings.enabled != on) save(settings.copy(enabled = on))
+  }
 
   /**
    * [settings] as the engine would see them, with the blank credentials
@@ -174,9 +185,8 @@ class AiSettingsController(
    * settings page instead of taking the app down with them.
    */
   private fun build(settings: AiSettings): AiDiscoveryProvider? {
-    // The switch is authoritative in the apps: an API key in the
-    // environment may fill a blank token, but never turns the feature
-    // (and its tab) on by itself.
+    // The switch is authoritative: an API key in the environment may fill a blank token, but
+    // never turns the feature (and its tab) back on.
     if (!settings.enabled) return null
     return runCatching { factory?.create(settings) }
       .onFailure { e ->

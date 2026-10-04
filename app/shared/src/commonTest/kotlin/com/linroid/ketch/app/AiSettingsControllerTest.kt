@@ -284,6 +284,53 @@ class AiSettingsControllerTest {
   }
 
   @Test
+  fun untouchedSettingsWithAnEnvironmentToken_makeDiscoveryAvailable() {
+    // Discovery is on by default: a key is all it waits for.
+    val controller = AiSettingsController(RecordingConfigStore(), FakeFactory(platform = envToken))
+    assertTrue(controller.available)
+  }
+
+  @Test
+  fun setEnabled_off_releasesTheProviderAndPersistsTheSwitch() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
+    val controller = AiSettingsController(store, FakeFactory())
+    val running = controller.provider as FakeAiProvider
+
+    controller.setEnabled(false)
+
+    assertFalse(controller.available)
+    assertTrue(running.closed)
+    assertEquals(usableSettings().copy(enabled = false), store.load().ai)
+  }
+
+  @Test
+  fun setEnabled_backOn_buildsAProviderAgain() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings().copy(enabled = false)))
+    val controller = AiSettingsController(store, FakeFactory())
+
+    controller.setEnabled(true)
+
+    assertTrue(controller.available)
+    assertTrue(store.load().ai.enabled)
+  }
+
+  @Test
+  fun offered_switchedOnWithoutKeys_offersDiscoverToSetUp() {
+    val controller = AiSettingsController(RecordingConfigStore(), FakeFactory())
+    assertTrue(controller.offered)
+    assertFalse(controller.available)
+
+    controller.setEnabled(false)
+
+    assertFalse(controller.offered)
+  }
+
+  @Test
+  fun offered_unsupported_neverOffersDiscover() {
+    assertFalse(AiSettingsController(RecordingConfigStore()).offered)
+  }
+
+  @Test
   fun chooseProvider_newProvider_switchesDiscoveryOnWithItsDefaults() {
     val store = RecordingConfigStore(
       KetchConfig(

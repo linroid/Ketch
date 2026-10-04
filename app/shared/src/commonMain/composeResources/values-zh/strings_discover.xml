@@ -116,6 +116,9 @@
   <string name="discover_new_search">新建搜索</string>
   <string name="discover_delete_search">删除此搜索</string>
   <string name="discover_history_clear">清除历史记录</string>
+  <string name="discover_turn_off">关闭发现</string>
+  <string name="discover_turned_off">发现已关闭</string>
+  <string name="discover_turned_off_detail">可在“设置”的“发现”中重新开启。</string>
   <string name="discover_history_filter">搜索历史记录</string>
   <string name="discover_history_empty">你进行的搜索会显示在这里。</string>
   <string name="discover_history_no_match">没有与“%1$s”匹配的搜索</string>

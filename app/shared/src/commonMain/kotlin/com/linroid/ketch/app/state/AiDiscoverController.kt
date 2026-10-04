@@ -190,10 +190,10 @@ class AiDiscoverController(
    * Starts a new session for [request], limited to its websites, and shows it. While discovery
    * is not set up, the request waits in [pending] instead and a new, empty session shows, so the
    * setup page says the search waits rather than a saved one hiding it; where discovery cannot
-   * run, nothing happens.
+   * run or is switched off, nothing happens.
    */
   fun discover(request: DiscoverRequest) {
-    if (!aiSettings.supported) return
+    if (!aiSettings.offered) return
     if (aiSettings.provider == null) {
       pending = request.takeIf { it.query.isNotBlank() }
       newSession()

@@ -126,6 +126,9 @@
   <string name="discover_new_search">Nova pesquisa</string>
   <string name="discover_delete_search">Apagar esta pesquisa</string>
   <string name="discover_history_clear">Limpar histórico</string>
+  <string name="discover_turn_off">Desativar o Descobrir</string>
+  <string name="discover_turned_off">O Descobrir está desativado</string>
+  <string name="discover_turned_off_detail">Ative-o novamente em Configurações, em Descobrir.</string>
   <string name="discover_history_filter">Pesquisar no histórico</string>
   <string name="discover_history_empty">As pesquisas que você fizer aparecem aqui.</string>
   <string name="discover_history_no_match">Nenhuma pesquisa corresponde a “%1$s”</string>

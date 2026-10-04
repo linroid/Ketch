@@ -171,7 +171,7 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
           tiles(Modifier.weight(1f).fillMaxHeight())
         }
       }
-      if (state.aiSettings.supported) {
+      if (state.aiSettings.offered) {
         DiscoverLine(state, phone, Modifier.padding(top = spacing.s4))
       }
       if (!phone) SetupChecklist(state, hooks, Modifier.padding(top = spacing.s6))

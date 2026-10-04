@@ -126,6 +126,9 @@
   <string name="discover_new_search">Neue Suche</string>
   <string name="discover_delete_search">Diese Suche löschen</string>
   <string name="discover_history_clear">Verlauf löschen</string>
+  <string name="discover_turn_off">Entdecken ausschalten</string>
+  <string name="discover_turned_off">Entdecken ist aus</string>
+  <string name="discover_turned_off_detail">Du kannst es in den Einstellungen unter Entdecken wieder einschalten.</string>
   <string name="discover_history_filter">Verlauf durchsuchen</string>
   <string name="discover_history_empty">Deine Suchen erscheinen hier.</string>
   <string name="discover_history_no_match">Keine Suchen passen zu „%1$s“</string>

@@ -54,6 +54,7 @@ import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.i18n.UiText
@@ -179,12 +180,14 @@ internal fun CollapsingBar(chrome: PhoneChromeState, content: @Composable () -> 
  * @param showsBottomBar whether the bottom bar shows; without it the overflow lists Devices.
  * @param actions the page's buttons in place of search, such as Discover's History and New
  *   search; `null` shows search.
+ * @param menu the page's own items, which lead the overflow menu.
  */
 @Composable
 internal fun PhoneTopBar(
   shell: ShellState,
   showsBottomBar: Boolean,
   actions: (@Composable RowScope.() -> Unit)? = null,
+  menu: (KetchMenuScope.() -> Unit)? = null,
 ) {
   val state = shell.app
   if (shell.searchOpen) {
@@ -228,7 +231,7 @@ internal fun PhoneTopBar(
         contentDescription = KetchCommands.Search.label.resolve(),
       )
     }
-    Overflow(shell, showsBottomBar)
+    Overflow(shell, showsBottomBar, menu)
   }
 }
 
@@ -284,11 +287,15 @@ private fun DeviceButton(shell: ShellState) {
 }
 
 /**
- * The ⋮ menu: queue commands, clearing finished downloads or those whose files are gone,
- * Activity, Devices without a bottom bar, and Settings.
+ * The ⋮ menu: the page's own [menu], queue commands, clearing finished downloads or those whose
+ * files are gone, Activity, Devices without a bottom bar, and Settings.
  */
 @Composable
-private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
+private fun Overflow(
+  shell: ShellState,
+  showsBottomBar: Boolean,
+  menu: (KetchMenuScope.() -> Unit)?,
+) {
   val state = shell.app
   val pulse by state.pulse.state.collectAsState()
   val unread by state.messages.unreadCount.collectAsState()
@@ -302,6 +309,10 @@ private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
       contentDescription = stringResource(Res.string.shell_more),
     )
     KetchMenu(expanded = open, onDismissRequest = { open = false }) {
+      if (menu != null) {
+        menu()
+        divider()
+      }
       item(
         command = KetchCommands.PauseAll,
         onClick = { state.pauseAll() },
