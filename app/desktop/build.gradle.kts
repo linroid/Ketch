@@ -229,6 +229,11 @@ compose.desktop {
         // UpgradeCode. Releases up to 0.0.1 carry the one jpackage derives from the vendor and the
         // name; pinned, so setting a vendor or renaming the package can't break upgrades.
         upgradeUuid = "C26C63A7-2024-313A-B051-DC34FFBA1BF7"
+        // The plugin adds neither by default, which leaves the installed app nowhere to open
+        // from but its folder in Program Files. The group names the Start menu folder, which
+        // jpackage otherwise calls "Unknown".
+        menuGroup = "Ketch"
+        shortcut = true
       }
       linux {
         iconFile.set(rootProject.file("art/icon.png"))
