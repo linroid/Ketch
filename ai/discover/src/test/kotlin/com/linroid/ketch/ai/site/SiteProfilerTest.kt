@@ -98,6 +98,37 @@ class SiteProfilerTest {
   }
 
   @Test
+  fun fetchRobotsRules_redirectToAnotherHostOfTheSite_asksFirst() = runTest {
+    val engine = MockEngine(redirectingRobots("https://www.example.com/robots.txt"))
+    val asked = mutableListOf<String>()
+
+    val rules = profiler(engine).fetchRobotsRules("https://example.com") { hop ->
+      asked += hop.host
+      "declined"
+    }
+
+    assertNull(rules)
+    assertEquals(listOf("www.example.com"), asked)
+    assertEquals(listOf("example.com"), engine.requestHistory.map { it.url.host })
+  }
+
+  @Test
+  fun fetchRobotsRules_redirectToAnotherHostOfTheSite_allowed_isFollowed() = runTest {
+    val engine = MockEngine(redirectingRobots("https://www.example.com/robots.txt"))
+    val asked = mutableListOf<String>()
+    val profiler = profiler(engine)
+
+    val rules = profiler.fetchRobotsRules("https://example.com") { hop ->
+      asked += hop.host
+      null
+    }
+
+    assertFalse(profiler.isAllowed("/downloads/", assertNotNull(rules)))
+    // The origin's own host is never asked about: the page's approval covers it.
+    assertEquals(listOf("www.example.com"), asked)
+  }
+
+  @Test
   fun fetchRobotsRules_redirectWithinSite_isFollowed() = runTest {
     val engine = MockEngine(redirectingRobots("https://www.example.com/robots.txt"))
     val profiler = profiler(engine)

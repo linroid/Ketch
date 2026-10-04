@@ -4,6 +4,7 @@ import com.linroid.ketch.ai.fetch.FetchResult
 import com.linroid.ketch.ai.fetch.SafeFetcher
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.config.SiteNames
+import java.net.URI
 
 /**
  * Reads the robots.txt rules of the sites discovery fetches pages from.
@@ -30,21 +31,35 @@ internal class SiteProfiler(
   /**
    * Fetches and parses `robots.txt` at [origin] (`scheme://host[:port]`).
    *
-   * Redirects are followed within the origin's site only, its subdomains included: the user
-   * allowed discovery to contact this site, not the one a redirect hands off to. A robots.txt
-   * that redirects to another site counts as missing.
+   * The origin's own host was allowed with the page, so it is read without asking. Redirects
+   * are followed within the origin's site only, its subdomains included, and a redirect to
+   * another host of that site goes through [checkRedirect] first, as `www.example.com` for
+   * `example.com` must when the user is asked about every host. A robots.txt that redirects to
+   * another site, or that [checkRedirect] refuses, counts as missing.
    *
+   * @param checkRedirect why the read must not follow a redirect to that URI, or `null` when it
+   *   may; it may ask the user
    * @return the rules for our user agent, or `null` when there is no
    *   readable robots.txt, which allows every path
    */
-  suspend fun fetchRobotsRules(origin: String): RobotsTxtRules? {
+  suspend fun fetchRobotsRules(
+    origin: String,
+    checkRedirect: suspend (URI) -> String? = { null },
+  ): RobotsTxtRules? {
     val url = "$origin/robots.txt"
     val site = SiteNames.normalize(origin)
+    val host = URI(origin).host.lowercase()
     val result = fetcher.fetch(
       url = url,
       maxBytes = MAX_ROBOTS_BYTES,
       truncate = true,
-      checkHop = { hop -> if (SiteNames.covers(site, hop.host)) null else "on another site" },
+      checkHop = { hop ->
+        when {
+          !SiteNames.covers(site, hop.host) -> "on another site"
+          hop.host.equals(host, ignoreCase = true) -> null
+          else -> checkRedirect(hop)
+        }
+      },
     )
     return when (result) {
       is FetchResult.Success -> {

@@ -146,7 +146,9 @@ What asks:
   budget, is refused without asking.
 - A redirect to another host asks too, unless that host is covered the
   same way; the question names the host it came from.
-- Allowing a page also allows reading its site's `robots.txt`.
+- Allowing a page also allows reading `robots.txt` on its host. When
+  that `robots.txt` redirects to another host of the same site, such as
+  `www.`, that host asks like any redirect.
 - Searches never ask: they go to the search provider, not to the sites.
 - A search limited to websites never asks
   ([below](#limiting-discovery-to-websites)).

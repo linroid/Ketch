@@ -333,9 +333,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   resolves; result candidates are resolved to drop private addresses) and while budget is
   left, before spending any; a declined site is refused for the rest of the run. Sites are
   `SiteNames.normalize`d, which keeps `www.` before a shared suffix (`www.github.io`) so no
-  answer covers a whole suffix. Only
-  `DiscoverQuery.sites` skips asking (not `allowedDomains`); an approved page covers its
-  robots.txt. Apps keep answers per session in memory, save Always allow with
+  answer covers a whole suffix. Only `DiscoverQuery.sites` skips asking (not `allowedDomains`);
+  an approved page covers robots.txt on its host, and a robots.txt redirect to another host
+  asks. Apps keep answers per session in memory, save Always allow with
   `AiSettingsController.saveAccess` (keeps the provider: `AiSettings.engineSettings` leaves
   `access` out) and show a toast and nav badge (`AppState.discoverWaitingCount`) while a request
   waits elsewhere. The CLI (`CliPageAccess`) asks on `/dev/tty` (Windows: `System.console()`,

@@ -238,8 +238,9 @@ content, that text becomes the summary.
   never as a title or a button label
 - Runs limited with `DiscoverQuery.sites` never ask: every host they may request is one the
   user named. A limit set only by `DiscoveryConfig.allowedDomains` still asks
-- An approved page covers its origin's robots.txt, whose redirects are followed only within
-  the same site; a robots.txt elsewhere counts as missing
+- An approved page covers robots.txt on its origin. A redirect from there to another host of
+  the same site asks like any redirect of the request; a robots.txt it may not read, or one
+  on another site, counts as missing
 - Searches never ask: they go to the search provider, not to the sites
 - The default, `PageAccessApprover.AllowAll`, ignores `[ai.access]`. The apps and the CLI pass
   approvers that follow it (`PageAccessSettings.allowsWithoutAsking`) and ask the user
@@ -452,7 +453,7 @@ Tests cover:
 - `BraveSearchProviderTest` — request shape and response parsing
 - `RobotsTxtParserTest` — robots.txt groups, longest match, `*` and `$` wildcards
 - `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit; redirects are
-  followed within the site only
+  followed within the site only, and to another host of it only once allowed
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)

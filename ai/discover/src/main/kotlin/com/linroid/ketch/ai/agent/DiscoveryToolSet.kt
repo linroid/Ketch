@@ -200,7 +200,7 @@ internal class DiscoveryToolSet(
     val result = fetcher.fetch(
       url = url,
       maxBytes = allowance,
-      checkHop = { hop -> access.refusal(hop) ?: robotsRefusal(hop) },
+      checkHop = { hop -> access.refusal(hop) ?: robotsRefusal(hop, access::sideRefusal) },
     )
     budget.returnBytes(allowance - ((result as? FetchResult.Success)?.byteCount ?: 0))
     return when (result) {
@@ -441,8 +441,15 @@ internal class DiscoveryToolSet(
     "Tool call budget of $maxToolCalls for this discovery is spent. " +
       "Call no more tools, except one last emitStep, and return your results."
 
-  /** Why robots.txt forbids fetching [uri], or `null` when it allows it. */
-  private suspend fun robotsRefusal(uri: URI): String? {
+  /**
+   * Why robots.txt forbids fetching [uri], or `null` when it allows it. A redirect that reading
+   * robots.txt meets to another host goes through [checkRedirect], the page access of the
+   * request [uri] belongs to.
+   */
+  private suspend fun robotsRefusal(
+    uri: URI,
+    checkRedirect: suspend (URI) -> String?,
+  ): String? {
     val port = if (uri.port == -1) "" else ":${uri.port}"
     val origin = "${uri.scheme.lowercase()}://${uri.host.lowercase()}$port"
     val rules = robotsMutex.withLock {
@@ -450,7 +457,7 @@ internal class DiscoveryToolSet(
       if (origin in robotsByOrigin) {
         robotsByOrigin[origin]
       } else {
-        siteProfiler.fetchRobotsRules(origin).also { robotsByOrigin[origin] = it }
+        siteProfiler.fetchRobotsRules(origin, checkRedirect).also { robotsByOrigin[origin] = it }
       }
     }
     val path = uri.rawPath.ifEmpty { "/" } + uri.rawQuery?.let { "?$it" }.orEmpty()
@@ -489,17 +496,40 @@ internal class DiscoveryToolSet(
     suspend fun allows(url: String, host: String): Boolean {
       val from = previousHost
       previousHost = host
-      if (host in allowedHosts) return true
-      val request = PageAccessRequest(url, host, kind, reason, redirectFrom = from)
-      val allowed = mayContact(request)
-      if (allowed) allowedHosts += host else declined = true
-      return allowed
+      return mayReach(url, host, from)
     }
 
     /** Why the request must not go on to [hop], or `null` when it may; for `checkHop`. */
     suspend fun refusal(hop: URI): String? {
       val host = hop.host.lowercase()
       return if (allows(hop.toString(), host)) null else declinedMessage(host)
+    }
+
+    /**
+     * Why a read the request makes on the side, such as robots.txt, must not follow a redirect
+     * to [hop], or `null` when it may. It asks as [refusal] does, without moving the request's
+     * own hops on, and a refusal leaves the request itself going.
+     */
+    suspend fun sideRefusal(hop: URI): String? {
+      val host = hop.host.lowercase()
+      return if (mayReach(hop.toString(), host, previousHost, declines = false)) {
+        null
+      } else {
+        declinedMessage(host)
+      }
+    }
+
+    private suspend fun mayReach(
+      url: String,
+      host: String,
+      from: String,
+      declines: Boolean = true,
+    ): Boolean {
+      if (host in allowedHosts) return true
+      val request = PageAccessRequest(url, host, kind, reason, redirectFrom = from)
+      val allowed = mayContact(request)
+      if (allowed) allowedHosts += host else if (declines) declined = true
+      return allowed
     }
   }
 

@@ -456,6 +456,31 @@ class DiscoveryToolSetTest {
   }
 
   @Test
+  fun fetchPage_robotsRedirectToAnotherHost_asksBeforeReadingIt() = runTest {
+    val engine = MockEngine { request ->
+      when {
+        request.url.encodedPath != "/robots.txt" -> respond("<html>page</html>")
+        request.url.host == "example.com" -> respond(
+          "",
+          HttpStatusCode.MovedPermanently,
+          headersOf(HttpHeaders.Location, "https://www.example.com/robots.txt"),
+        )
+        else -> respond("User-agent: *\nDisallow: /\n")
+      }
+    }
+    val approver = RecordingApprover { it == "example.com" }
+
+    val result = parse(toolSet(engine, approver = approver).fetchPage("https://example.com/page"))
+
+    assertNull(result.error())
+    assertEquals(
+      listOf("example.com" to "", "www.example.com" to "example.com"),
+      approver.requests.map { it.host to it.redirectFrom },
+    )
+    assertFalse("www.example.com" in engine.requestedHosts)
+  }
+
+  @Test
   fun fetchPage_redirectToDeclinedHost_isNotFollowed() = runTest {
     val engine = MockEngine { request ->
       when {
