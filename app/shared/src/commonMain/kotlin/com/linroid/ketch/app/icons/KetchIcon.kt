@@ -189,6 +189,24 @@ enum class KetchIcon(internal val data: IconData) {
     "M15.5 2v5", "M13 4.5h5"
   )),
   Speed(IconData.strokes("M3 14a7 7 0 0 1 14 0", "M10 14l3-4")),
+  // A paper plane flying to the top right: sends a message.
+  Send(IconData.strokes("M17 3l-5 14-3-6-6-3z", "M17 3L9 11")),
+  // A clock whose rim turns back on itself: earlier sessions.
+  History(IconData.strokes(
+    "M3 10a7 7 0 1 0 7-7 7.6 7.6 0 0 0 -5.24 2.13L3 6.9",
+    "M3 3v3.9h3.9",
+    "M10 6.1V10l3.1 1.6"
+  )),
+  // A shield with a check: what a website may be asked to allow.
+  Shield(IconData.strokes(
+    "M10 2.5l6 2.5v4.5c0 4-2.6 6.5-6 8-3.4-1.5-6-4-6-8V5z",
+    "M7.5 10l1.8 1.8 3.2-3.3"
+  )),
+  // A pencil over an open square: starts something new to write.
+  Compose(IconData.strokes(
+    "M9.5 3.5H5A1.5 1.5 0 0 0 3.5 5v10A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5v-4.5",
+    "M15.2 3.3a1.63 1.63 0 0 1 2.3 2.3L10.5 12.5 7.5 13l0.5-3z"
+  )),
   Server(IconData.paths(
     stroke = listOf(
       "M3 4h14a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1H3a1 1 0 0 1 -1-1V5a1 1 0 0 1 1-1z",

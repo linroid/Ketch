@@ -35,6 +35,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_done
+import ketch.app.shared.generated.resources.discover_title
 import ketch.app.shared.generated.resources.shortcut_add_to_devices
 import ketch.app.shared.generated.resources.shortcut_group_general
 import ketch.app.shared.generated.resources.shortcut_group_intake
@@ -57,8 +58,9 @@ internal data class ShortcutGroup(val title: UiText, val lines: List<ShortcutLin
 
 /**
  * The shortcut sheet's groups on [platform], from [KetchCommands]: the global commands the
- * window runs ([runs]), the Downloads list's keys and the add sheet's. A command without a chord
- * here is left out, and the nine device chords of a group read as one line.
+ * window runs ([runs]), the Downloads list's keys, the add sheet's and, where the window offers
+ * Discover, its keys. A command without a chord here is left out, and the nine device chords of
+ * a group read as one line.
  *
  * @param runs whether a global command does something in this window.
  */
@@ -83,6 +85,9 @@ internal fun shortcutGroups(
   val global = KetchCommands.all.filter { it.scope == CommandScope.Global && runs(it) }
   val list = KetchCommands.all.filter { it.scope == CommandScope.List }
   val intake = KetchCommands.all.filter { it.scope == CommandScope.Intake }
+  val discover = KetchCommands.all.filter { it.scope == CommandScope.Discover }
+    .takeIf { runs(KetchCommands.Discover) }
+    .orEmpty()
   val numbered = KetchCommands.NUMBERED_DEVICES
   val deviceCommands = (1..numbered).map(KetchCommands::device)
   val targetCommands = (1..numbered).map(KetchCommands::intakeTarget)
@@ -96,6 +101,7 @@ internal fun shortcutGroups(
       Res.string.shortcut_group_intake.text(),
       lines(intake, targetCommands, Res.string.shortcut_add_to_devices.text(numbered)),
     ),
+    ShortcutGroup(Res.string.discover_title.text(), lines(discover, emptyList(), null)),
   ).filter { it.lines.isNotEmpty() }
 }
 

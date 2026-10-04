@@ -17,9 +17,11 @@
   <string name="notify_channel_pairing">Pedidos de pareamento</string>
   <string name="notify_pairing_title">%1$s quer controlar %2$s</string>
   <string name="notify_pairing_body">Permita só se ele mostrar %1$s.</string>
+  <string name="notify_channel_requests">Solicitações de aprovação</string>
   <string name="notify_finished_group">Downloads concluídos</string>
   <string name="notify_sharing_device">Compartilhando este dispositivo</string>
   <string name="notify_server_on_port">Servidor na porta %1$d</string>
+  <string name="notify_discovering">O Descobrir está pesquisando downloads</string>
   <string name="notify_slow_lane_on">Faixa lenta</string>
   <string name="notify_action_pause_all">Pausar tudo</string>
   <string name="notify_action_slow_lane">Faixa lenta</string>

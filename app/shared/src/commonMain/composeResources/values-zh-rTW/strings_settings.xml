@@ -10,7 +10,7 @@
   <string name="settings_category_integration">整合</string>
   <string name="settings_category_integration_description">瀏覽器擴充功能、磁力連結和剪貼簿</string>
   <string name="settings_category_discover">探索</string>
-  <string name="settings_category_discover_description">用來尋找下載的 AI 模型和網頁搜尋</string>
+  <string name="settings_category_discover_description">AI 模型、網頁搜尋和可開啟的網站</string>
   <string name="settings_category_about">關於</string>
   <string name="settings_category_about_description">版本、授權和記錄檔</string>
   <string name="settings_category_downloads">下載</string>
@@ -230,6 +230,20 @@
   <string name="settings_ai_engine_id">搜尋引擎 ID</string>
   <string name="settings_ai_engine_id_hint">要查詢的 Programmable Search 引擎。</string>
   <string name="settings_ai_engine_id_placeholder">引擎 ID</string>
+  <string name="settings_ai_access_group">網頁存取</string>
+  <string name="settings_ai_access_mode">開啟網站前</string>
+  <string name="settings_ai_access_allow">自動允許</string>
+  <string name="settings_ai_access_allow_hint">直接開啟搜尋所需的任何網站，不會詢問。</string>
+  <string name="settings_ai_access_ask_site">每個新網站都詢問</string>
+  <string name="settings_ai_access_ask_site_hint">對話第一次開啟某個網站時會詢問。選擇「一律允許」即可記住該網站。</string>
+  <string name="settings_ai_access_ask">每次都詢問</string>
+  <string name="settings_ai_access_ask_hint">每次開啟網頁或檢查檔案前都會詢問。</string>
+  <string name="settings_ai_access_trusted">一律允許的網站</string>
+  <string name="settings_ai_access_trusted_hint">「探索」會直接開啟這些網站及其子網域，不會詢問。</string>
+  <string name="settings_ai_access_trusted_none">尚無網站。可在「探索」詢問時選擇「一律允許」，或在這裡新增網站。</string>
+  <string name="settings_ai_access_add">新增網站，例如 ubuntu.com</string>
+  <string name="settings_ai_access_add_invalid">請輸入網域名稱，例如 ubuntu.com。</string>
+  <string name="settings_ai_access_footer">限定網站的搜尋一律不會詢問，因為那些網站是你自己選的。</string>
 
   <string name="settings_about_name_line">Ketch 是一種雙桅帆船。Ketch 會把每個下載分成多條通道，就像它的船帆一樣。</string>
   <string name="settings_about_discover_elsewhere">「探索」可在桌面版和 Android 應用程式中使用。</string>
@@ -507,6 +521,10 @@
   <string name="settings_search_test_keywords">檢查, 驗證</string>
   <string name="settings_search_web_search">供代理程式使用的 Brave 或 Google 搜尋</string>
   <string name="settings_search_web_search_keywords">搜尋供應商, 搜尋 API 金鑰, 搜尋引擎</string>
+  <string name="settings_search_ai_access">「探索」開啟網站前是否詢問</string>
+  <string name="settings_search_ai_access_keywords">網頁存取, 權限, 確認, 允許, 詢問, 隱私</string>
+  <string name="settings_search_ai_trusted">「探索」不經詢問即可開啟的網站</string>
+  <string name="settings_search_ai_trusted_keywords">信任的網站, 允許清單, 白名單, 網域, 權限</string>
   <string name="settings_search_version_keywords">組建, 修訂版本, 更新</string>
   <string name="settings_search_source_keywords">github, 專案</string>
   <string name="settings_search_report_keywords">bug, 錯誤, 問題, 意見回饋, 說明</string>

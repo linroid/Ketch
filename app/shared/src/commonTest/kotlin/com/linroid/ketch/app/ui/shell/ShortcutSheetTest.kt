@@ -43,7 +43,29 @@ class ShortcutSheetTest {
     val labels = groups.flatMap { it.lines }.map { it.label }
 
     assertFalse(KetchCommands.SwitchDevice.label in labels)
+    val titles = groups.map { it.title }.load()
+    assertEquals(listOf("General", "Downloads list", "Add sheet", "Discover"), titles)
+  }
+
+  @Test
+  fun shortcutGroups_windowWithoutDiscover_leavesOutItsKeys() = runTest {
+    val groups = shortcutGroups(KeyboardPlatform.Mac) { it != KetchCommands.Discover }
+
     assertEquals(listOf("General", "Downloads list", "Add sheet"), groups.map { it.title }.load())
+  }
+
+  @Test
+  fun shortcutGroups_discover_listsItsKeys() = runTest {
+    val discover = shortcutGroups(KeyboardPlatform.Mac) { true }.single {
+      it.title.load() == "Discover"
+    }
+    suspend fun keys(label: String) = discover.lines.single { it.label.load() == label }.keys
+
+    assertEquals(listOf("↩"), keys("Send message"))
+    assertEquals(listOf("⇧↩"), keys("New line"))
+    assertEquals(listOf("⇧⌘E"), keys("New search"))
+    assertEquals(listOf("⇧⌘H"), keys("Toggle history"))
+    assertEquals(listOf("Esc"), keys("Stop the search"))
   }
 
   @Test

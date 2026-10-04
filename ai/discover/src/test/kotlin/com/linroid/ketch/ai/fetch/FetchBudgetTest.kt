@@ -35,4 +35,16 @@ class FetchBudgetTest {
 
     assertEquals(30L, budget.reserveBytes(50))
   }
+
+  @Test
+  fun hasRequestLeftAndHasBytesLeft_takeNothing() = runTest {
+    val budget = FetchBudget(maxRequests = 1, maxBytes = 10)
+
+    assertTrue(budget.hasRequestLeft())
+    assertTrue(budget.hasBytesLeft())
+    assertTrue(budget.tryTakeRequest())
+    assertEquals(10L, budget.reserveBytes(10))
+    assertFalse(budget.hasRequestLeft())
+    assertFalse(budget.hasBytesLeft())
+  }
 }

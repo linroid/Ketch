@@ -16,7 +16,7 @@
   <string name="settings_category_integration">Integration</string>
   <string name="settings_category_integration_description">Browser extension, magnet links and the clipboard</string>
   <string name="settings_category_discover">Discover</string>
-  <string name="settings_category_discover_description">The AI model and web search that find downloads</string>
+  <string name="settings_category_discover_description">The AI model, web search and the websites it may open</string>
   <string name="settings_category_about">About</string>
   <string name="settings_category_about_description">Version, licenses and logs</string>
   <string name="settings_category_downloads">Downloads</string>
@@ -238,7 +238,7 @@
   <string name="settings_integration_quick_add_key_hint">Pasting one link with %1$s adds it at once, with Undo.</string>
   <string name="settings_integration_quick_add_hint">Pasting one link adds it at once, with Undo.</string>
 
-  <!-- Discover: AI discovery's model and web search. -->
+  <!-- Discover: AI discovery's model, web search and page access. -->
   <string name="settings_ai_discovery">AI discovery</string>
   <string name="settings_ai_provider">Provider</string>
   <string name="settings_ai_api_key">API key</string>
@@ -305,6 +305,26 @@
   <string name="settings_ai_engine_id">Search engine ID</string>
   <string name="settings_ai_engine_id_hint">The Programmable Search engine to query.</string>
   <string name="settings_ai_engine_id_placeholder">Engine ID</string>
+  <!-- The group of whether Discover asks before it opens a website, to read a page or check a file's details. -->
+  <string name="settings_ai_access_group">Page access</string>
+  <string name="settings_ai_access_mode">Before opening a website</string>
+  <!-- The choices of settings_ai_access_mode, each with the hint shown under it while chosen. -->
+  <string name="settings_ai_access_allow">Allow automatically</string>
+  <string name="settings_ai_access_allow_hint">Opens any website a search needs without asking.</string>
+  <string name="settings_ai_access_ask_site">Ask for each new site</string>
+  <!-- A chat is one Discover search with its follow-ups. Always allow is a choice Discover offers when it asks. -->
+  <string name="settings_ai_access_ask_site_hint">Asks the first time a chat opens a site. Always allow remembers a site.</string>
+  <string name="settings_ai_access_ask">Ask every time</string>
+  <string name="settings_ai_access_ask_hint">Asks before every page and file check.</string>
+  <!-- The row listing the websites Discover opens without asking, each with its subdomains. -->
+  <string name="settings_ai_access_trusted">Always allowed</string>
+  <string name="settings_ai_access_trusted_hint">Discover opens these sites and their subdomains without asking.</string>
+  <string name="settings_ai_access_trusted_none">None yet. Choose Always allow when Discover asks, or add a site here.</string>
+  <!-- In the empty field that adds sites to Always allowed. -->
+  <string name="settings_ai_access_add">Add a site, such as ubuntu.com</string>
+  <!-- Under that field when what was typed is not a website's name, such as a word without a dot. -->
+  <string name="settings_ai_access_add_invalid">Enter a website's name, such as ubuntu.com.</string>
+  <string name="settings_ai_access_footer">Searches you limit to websites never ask: you chose those sites yourself.</string>
 
   <!-- About. -->
   <!-- Under the app's name: what the name means. -->
@@ -680,6 +700,10 @@
   <string name="settings_search_test_keywords">check, verify</string>
   <string name="settings_search_web_search">Brave or Google search for the agent</string>
   <string name="settings_search_web_search_keywords">search provider, search api key, engine</string>
+  <string name="settings_search_ai_access">Whether Discover asks before it opens a website</string>
+  <string name="settings_search_ai_access_keywords">page access, permission, approval, allow, ask, privacy</string>
+  <string name="settings_search_ai_trusted">Websites Discover opens without asking</string>
+  <string name="settings_search_ai_trusted_keywords">trusted sites, allowlist, whitelist, domains, permission</string>
   <string name="settings_search_version_keywords">build, revision, update</string>
   <string name="settings_search_source_keywords">github, project</string>
   <string name="settings_search_report_keywords">bug, issue, feedback, help</string>

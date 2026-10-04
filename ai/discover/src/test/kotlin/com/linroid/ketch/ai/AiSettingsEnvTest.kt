@@ -3,6 +3,8 @@ package com.linroid.ketch.ai
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import com.linroid.ketch.config.PageAccessMode
+import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.SearchSettings
 import kotlin.test.Test
@@ -25,6 +27,18 @@ class AiSettingsEnvTest {
     assertTrue(settings.enabled)
     assertEquals(LlmProvider.OpenAi, settings.llm.provider)
     assertEquals("sk-test", settings.llm.apiKey)
+  }
+
+  @Test
+  fun `a page access choice alone still lets an environment key enable discovery`() {
+    val settings = resolveAiSettingsFromEnv(
+      base = AiSettings(access = PageAccessSettings(mode = PageAccessMode.Allow)),
+      getenv = env("ANTHROPIC_API_KEY" to "sk-ant", "BRAVE_SEARCH_API_KEY" to "brave-key"),
+    )
+    assertTrue(settings.enabled)
+    assertEquals(LlmProvider.Anthropic, settings.llm.provider)
+    assertEquals(SearchProvider.Brave, settings.search.provider)
+    assertEquals(PageAccessMode.Allow, settings.access.mode)
   }
 
   @Test

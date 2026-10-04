@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">「設定」でセットアップ</string>
   <string name="discover_provider_openai_compatible">OpenAI互換</string>
 
-  <string name="discover_query_placeholder">ダウンロードしたいものを説明してください</string>
+  <string name="discover_query_placeholder">探したいものを説明してください</string>
+  <string name="discover_follow_up_placeholder">追加の質問を入力してください</string>
   <string name="discover_find">検索</string>
+  <string name="discover_send">送信</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">Webサイトを限定</string>
   <plurals name="discover_sites_count">
@@ -31,28 +33,116 @@
     <item quantity="other">以前のステップ%1$d件</item>
   </plurals>
   <string name="discover_step_starting">検索を開始しています</string>
+  <string name="discover_steps_details">詳細</string>
+
+  <string name="discover_limited_to">%1$sに限定</string>
+  <string name="discover_queued">ほかの検索の完了を待っています</string>
+  <string name="discover_show_more">もっと見る</string>
+  <string name="discover_show_less">折りたたむ</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="other">%1$d件のサイトを許可済み</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="other">%1$d件のサイトを拒否済み</item>
+  </plurals>
+  <string name="discover_access_allowed_host">%1$sを許可済み</string>
+  <string name="discover_access_denied_host">%1$sを拒否済み</string>
+
+  <string name="discover_approval_page">%1$sを開きますか？</string>
+  <string name="discover_approval_file">%1$sのファイルを調べますか？</string>
+  <string name="discover_approval_redirect">%1$sへのリダイレクトをたどりますか？</string>
+  <string name="discover_approval_redirect_from">%1$sからのリダイレクト</string>
+  <string name="discover_approval_reason">ディスカバーの説明：%1$s</string>
+  <string name="discover_approval_allow">許可</string>
+  <string name="discover_approval_allow_once">1回だけ許可</string>
+  <string name="discover_approval_deny">拒否</string>
+  <string name="discover_approval_always">%1$sを常に許可</string>
+  <string name="discover_approval_allow_site">このチャットで%1$sを許可</string>
+  <string name="discover_approval_allow_all">このチャットですべてのサイトを許可</string>
+  <string name="discover_approval_allow_caption">このチャットで%1$sとそのサブドメインを許可します</string>
+  <string name="discover_approval_settings">ページへのアクセス設定</string>
+  <string name="discover_approval_pane">ディスカバーが%1$sを開こうとしています</string>
+  <string name="discover_approval_jump">承認が必要です</string>
 
   <string name="discover_select_all">すべて選択</string>
   <string name="discover_clear_selection">選択を解除</string>
   <plurals name="discover_results">
     <item quantity="other">%1$d件のダウンロード</item>
   </plurals>
-  <string name="discover_results_for">（「%1$s」の検索結果）</string>
   <string name="discover_match">一致度%1$s</string>
   <string name="discover_match_tooltip">検索内容との一致度</string>
   <string name="discover_not_encrypted">暗号化されていません</string>
   <string name="discover_error_title">ディスカバーはこの検索を完了できませんでした</string>
   <string name="discover_failed">ディスカバーに失敗しました</string>
-  <string name="discover_unavailable">このデバイスではAIディスカバーを利用できません。</string>
   <string name="discover_none_title">ダウンロードが見つかりません</string>
   <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
   <string name="discover_search_everywhere">Web全体を検索</string>
+  <string name="discover_stopped">停止しました</string>
+  <string name="discover_discard">除外</string>
+  <string name="discover_discard_all">すべて除外</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="other">%1$d件を除外済み</item>
+  </plurals>
+  <string name="discover_restore">復元</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="other">%1$d件の結果を除外しました</item>
+  </plurals>
+  <string name="discover_deleted">「%1$s」を削除しました</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="other">履歴から%1$d件の検索を消去しました</item>
+  </plurals>
+  <string name="discover_undo_discard">結果の除外を取り消す</string>
+  <string name="discover_undo_delete">検索の削除を取り消す</string>
+  <string name="discover_undo_clear_history">履歴の消去を取り消す</string>
+  <string name="discover_needs_ok">ディスカバーが%1$sを開くには承認が必要です</string>
 
   <string name="discover_select_to_add">追加するダウンロードを選択</string>
   <plurals name="discover_selected">
     <item quantity="other">%1$d件を選択中</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="other">以前の結果から%1$d件</item>
+  </plurals>
   <string name="discover_add_now">今すぐ追加</string>
+  <string name="discover_add_options">その他の追加方法</string>
+  <string name="discover_add_to">追加先</string>
   <string name="discover_review_add">確認して追加</string>
   <string name="discover_review_add_count">確認して%1$d件を追加</string>
+
+  <string name="discover_history">履歴</string>
+  <string name="discover_history_show">履歴を表示</string>
+  <string name="discover_history_hide">履歴を非表示</string>
+  <string name="discover_new_search">新しい検索</string>
+  <string name="discover_delete_search">この検索を削除</string>
+  <string name="discover_history_clear">履歴を消去</string>
+  <string name="discover_history_filter">履歴を検索</string>
+  <string name="discover_history_empty">実行した検索がここに表示されます。</string>
+  <string name="discover_history_no_match">「%1$s」に一致する検索はありません</string>
+  <string name="discover_history_earlier">それ以前</string>
+  <string name="discover_history_searching">検索中…</string>
+  <string name="discover_history_queued">開始を待機中</string>
+  <string name="discover_history_needs_ok">承認待ち</string>
+  <string name="discover_history_failed">失敗</string>
+  <plurals name="discover_history_results">
+    <item quantity="other">%1$d件の結果</item>
+  </plurals>
+  <string name="discover_history_no_results">結果なし</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="other">%1$d件の検索が承認を待っています</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="other">%1$d件が承認待ち</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="other">%1$s、%2$d件が承認待ち</item>
+  </plurals>
+  <string name="discover_setup_to_continue">続けるにはディスカバーを設定してください</string>
+
+  <string name="command_discover_send">メッセージを送信</string>
+  <string name="command_discover_stop">検索を停止</string>
+  <string name="command_discover_allow">Webサイトを許可</string>
+  <string name="command_discover_deny">Webサイトを拒否</string>
+  <string name="command_discover_discard">結果を除外または検索を削除</string>
+  <string name="command_discover_history">履歴の表示を切り替え</string>
 </resources>

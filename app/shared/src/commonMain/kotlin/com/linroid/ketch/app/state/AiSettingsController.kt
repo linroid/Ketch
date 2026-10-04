@@ -9,6 +9,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.PageAccessSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_ai_engine_failed
 import ketch.app.shared.generated.resources.settings_ai_test_connection_failed
@@ -88,16 +89,30 @@ class AiSettingsController(
     save(settings.copy(enabled = true, llm = chosen))
   }
 
-  /** Persists [settings] and rebuilds the provider. */
+  /**
+   * Persists [settings] and rebuilds the provider when they change what the engine runs with.
+   * Saving the same engine settings, or a change to [AiSettings.access] alone, keeps the provider
+   * and the last connection test, so searches that are running go on: discovery reads page
+   * access when it asks.
+   */
   fun save(settings: AiSettings) {
+    val sameEngine = settings.engineSettings == this.settings.engineSettings &&
+      (provider != null || !settings.enabled)
     this.settings = settings
     configStore?.let { store ->
       store.save(store.load().copy(ai = settings))
     }
+    if (sameEngine) return
     connectionTest = AiConnectionTest.Idle
     val previous = provider
     provider = build(settings)
     if (previous !== provider) previous?.close()
+  }
+
+  /** Persists the page access [transform] makes of the current one, keeping the provider. */
+  fun saveAccess(transform: (PageAccessSettings) -> PageAccessSettings) {
+    val access = transform(settings.access)
+    if (access != settings.access) save(settings.copy(access = access))
   }
 
   /**

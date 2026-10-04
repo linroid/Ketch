@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
@@ -58,6 +59,8 @@ import com.linroid.ketch.app.ui.connect.ConnectLanding
 import com.linroid.ketch.app.ui.devices.DevicesScreen
 import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
+import com.linroid.ketch.app.ui.discover.DiscoverTopBarActions
+import com.linroid.ketch.app.ui.discover.LocalDiscoverChrome
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
 import com.linroid.ketch.app.ui.downloads.LayoutTier
 import com.linroid.ketch.app.ui.downloads.actions.compactSelectionBarHeight
@@ -72,10 +75,12 @@ import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import com.linroid.ketch.app.ui.shell.AddFab
 import com.linroid.ketch.app.ui.shell.BOTTOM_BAR_MIN_DESTINATIONS
+import com.linroid.ketch.app.ui.shell.BottomChrome
 import com.linroid.ketch.app.ui.shell.DeviceSheet
 import com.linroid.ketch.app.ui.shell.DeviceSwitcherPopover
 import com.linroid.ketch.app.ui.shell.DropBerths
 import com.linroid.ketch.app.ui.shell.KetchLayout
+import com.linroid.ketch.app.ui.shell.LocalBottomChrome
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.LocalPhoneChrome
@@ -91,6 +96,7 @@ import com.linroid.ketch.app.ui.shell.ShortcutHost
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
 import com.linroid.ketch.app.ui.shell.dropFilesOn
 import com.linroid.ketch.app.ui.shell.dropTextOn
+import com.linroid.ketch.app.ui.shell.navBadges
 import com.linroid.ketch.app.ui.shell.shortcutGroups
 import com.linroid.ketch.app.ui.shell.switcherOffset
 import com.linroid.ketch.app.ui.sidebar.Sidebar
@@ -177,6 +183,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
       .collect { appState.onWindowFocused() }
   }
 
+  val bottomChrome = remember { BottomChrome() }
   val scope = rememberCoroutineScope()
   val clipboard = rememberSystemClipboard()
   val files = rememberFilePicker()
@@ -220,6 +227,10 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
         shell.paletteOpen -> CommandScope.Palette
         else -> null
       },
+      // Discover's page keys, such as ⇧⌘H, work while nothing on the page has the keyboard.
+      page = CommandScope.Discover.takeIf {
+        shell.destination == AppDestination.Discover && !shell.settingsOpen
+      },
       modifier = Modifier.fillMaxSize(),
     ) {
       CompositionLocalProvider(
@@ -228,6 +239,8 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
           layout.navigation == ShellNavigation.Phone
         },
         LocalWindowDrop provides windowDrop,
+        LocalBottomChrome provides bottomChrome,
+        LocalDiscoverChrome provides shell.discover,
       ) {
         if (activeInstance == null) {
           // No device to show yet, as in the web app before one is connected.
@@ -254,8 +267,11 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   }
   if (shell.shortcutsOpen) {
     val hostShortcuts = LocalHostShortcuts.current
-    val groups = remember(commands, hostShortcuts) {
+    val discover = AppDestination.Discover in destinations
+    val groups = remember(commands, hostShortcuts, discover) {
       shortcutGroups(KeyboardPlatform.current) { command ->
+        // Discover's keys show only where the window offers Discover.
+        if (command == KetchCommands.Discover && !discover) return@shortcutGroups false
         commands.binds(command) || command in hostShortcuts || command.isWindowCommand()
       }
     }
@@ -370,12 +386,14 @@ private fun WideShell(
     top = { BannerHost(appState) },
     bottom = { PulseBar(appState, barState = shell.pulseBar) },
     overlay = {
+      // Above the controls a page keeps at the bottom, such as Discover's composer.
+      val clearance = LocalBottomChrome.current?.height ?: 0.dp
       ToastHost(
         messages = appState.messages,
         modifier = Modifier
           .align(Alignment.BottomCenter)
           .padding(horizontal = spacing.s4)
-          .padding(bottom = spacing.s2),
+          .padding(bottom = clearance + spacing.s2),
       )
       if (appState.showInstanceSelector) {
         // Under the page header, by the device chip.
@@ -460,7 +478,17 @@ private fun PhoneShell(
   PhoneScaffold(
     chrome = shell.chrome,
     topBar = {
-      PhoneTopBar(shell, showsBottomBar)
+      // Discover's own buttons take the place of search there.
+      val discover = shell.destination == AppDestination.Discover
+      PhoneTopBar(
+        shell = shell,
+        showsBottomBar = showsBottomBar,
+        actions = if (discover) {
+          { DiscoverTopBarActions(appState, shell.discover) }
+        } else {
+          null
+        },
+      )
     },
     banners = { BannerHost(appState) },
     bottomBar = if (showsBottomBar) {
@@ -469,12 +497,14 @@ private fun PhoneShell(
           destinations = destinations,
           selected = shell.destination,
           onSelect = { shell.show(it) },
+          badges = navBadges(appState),
         )
       }
     } else {
       null
     },
     floating = {
+      val clearance = LocalBottomChrome.current?.height ?: 0.dp
       ToastHost(
         messages = appState.messages,
         modifier = Modifier
@@ -482,7 +512,7 @@ private fun PhoneShell(
           .padding(horizontal = spacing.s4)
           .padding(
             bottom = when {
-              !downloads -> spacing.s2
+              !downloads -> clearance + spacing.s2
               selecting -> compactSelectionBarHeight + spacing.s2
               else -> KetchLayout.FabClearance
             },

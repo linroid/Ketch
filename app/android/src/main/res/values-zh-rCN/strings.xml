@@ -3,8 +3,8 @@
   <string name="process_text_label">使用 Ketch 下载</string>
   <string name="quick_add_no_link">没有可下载的链接</string>
 
-  <string name="notifications_offer_title">下载完成时收到通知</string>
-  <string name="notifications_offer_message">在你使用其他应用时，Ketch 可以在下载完成或失败时通知你。</string>
+  <string name="notifications_offer_title">接收下载和“发现”的通知</string>
+  <string name="notifications_offer_message">在你使用其他应用时，Ketch 可以在下载完成或失败，或“发现”需要你确认才能打开网站时通知你。</string>
   <string name="notifications_offer_allow">允许</string>
   <string name="notifications_offer_not_now">以后再说</string>
 </resources>

@@ -114,6 +114,30 @@ fun KetchCountBadge(
   )
 }
 
+/**
+ * Count over a glyph, such as the requests waiting on a destination or a button: numerals on
+ * the accent in a 16 dp pill that widens with the count. Place it at the glyph's top end.
+ */
+@Composable
+fun KetchGlyphBadge(count: Int, modifier: Modifier = Modifier) {
+  val colors = KetchTheme.colors
+  Box(
+    contentAlignment = Alignment.Center,
+    modifier = modifier
+      .heightIn(min = GlyphBadgeHeight)
+      .widthIn(min = GlyphBadgeHeight)
+      .background(colors.accent, KetchTheme.shapes.badge)
+      .padding(horizontal = KetchTheme.spacing.s1),
+  ) {
+    Text(
+      text = count.toString(),
+      style = KetchTheme.typography.numeralS,
+      color = colors.onAccent,
+      maxLines = 1,
+    )
+  }
+}
+
 @Composable
 private fun BadgePill(text: String, fill: Color, ink: Color, modifier: Modifier) {
   Box(
@@ -402,4 +426,5 @@ private val FocusRingGap = 2.dp
 private val FocusRingWidth = 2.dp
 private val SpinnerStroke = 1.5.dp
 private val BadgeHeight = 20.dp
+private val GlyphBadgeHeight = 16.dp
 private val ProgressHeight = 4.dp

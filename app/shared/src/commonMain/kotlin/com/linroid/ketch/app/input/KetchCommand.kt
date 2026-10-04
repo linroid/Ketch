@@ -17,6 +17,9 @@ enum class CommandScope {
 
   /** The command palette while it is open. */
   Palette,
+
+  /** The Discover page while it has keyboard focus: its composer, results and approvals. */
+  Discover,
 }
 
 /**

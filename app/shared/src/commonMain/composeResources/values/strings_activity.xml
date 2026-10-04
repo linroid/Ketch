@@ -30,12 +30,17 @@
   <string name="notify_pairing_title">%1$s wants to control %2$s</string>
   <!-- %1$s is four digits the other device shows too. -->
   <string name="notify_pairing_body">Allow it only if it shows %1$s.</string>
+  <!-- The channel of messages that wait for the user, such as Discover asking before it opens a
+       website. -->
+  <string name="notify_channel_requests">Requests for your OK</string>
   <!-- Title of the Android notification that bundles several finished downloads. -->
   <string name="notify_finished_group">Finished downloads</string>
   <!-- The Android download service's notification while it only shares this device. %1$d is a
        port number, such as 8642. -->
   <string name="notify_sharing_device">Sharing this device</string>
   <string name="notify_server_on_port">Server on port %1$d</string>
+  <!-- The Android download service's notification while only Discover keeps it running. -->
+  <string name="notify_discovering">Discover is searching for downloads</string>
   <!-- Next to the app's name while the slow lane is on. -->
   <string name="notify_slow_lane_on">Slow lane</string>
   <!-- Buttons of the Android download service's notification. -->

@@ -47,6 +47,24 @@ class SettingsSearchTest {
   }
 
   @Test
+  fun searchSettings_permission_findsDiscoverPageAccess() = runTest {
+    val hits = searchSettings("permission", every, allFeatures, loadSettingsSearchIndex())
+
+    assertEquals(
+      listOf("Before opening a website", "Always allowed"),
+      hits.filter { it.entry.category == SettingsCategory.Discover }.map { it.entry.title }
+    )
+  }
+
+  @Test
+  fun searchSettings_trustedSites_findsTheAlwaysAllowedRow() = runTest {
+    val hits = searchSettings("trusted sites", every, allFeatures, loadSettingsSearchIndex())
+
+    assertEquals("Always allowed", hits.first().entry.title)
+    assertEquals("Discover", hits.first().entry.page)
+  }
+
+  @Test
   fun searchSettings_pageNotOffered_leavesItsSettingsOut() = runTest {
     val withoutTorrents = every - SettingsCategory.BitTorrent
 

@@ -127,4 +127,5 @@ dependencies {
   implementation(libs.logback)
 
   testImplementation(libs.kotlin.test)
+  testImplementation(libs.kotlinx.coroutines.test)
 }

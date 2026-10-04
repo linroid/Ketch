@@ -3,8 +3,8 @@
   <string name="process_text_label">Baixar com o Ketch</string>
   <string name="quick_add_no_link">Nenhum link para baixar</string>
 
-  <string name="notifications_offer_title">Receba avisos quando os downloads terminarem</string>
-  <string name="notifications_offer_message">O Ketch pode avisar quando um download terminar ou falhar enquanto você usa outros apps.</string>
+  <string name="notifications_offer_title">Receba avisos de downloads e do Descobrir</string>
+  <string name="notifications_offer_message">O Ketch pode avisar quando um download terminar ou falhar, ou quando o Descobrir precisar da sua aprovação para abrir um site, enquanto você usa outros apps.</string>
   <string name="notifications_offer_allow">Permitir</string>
   <string name="notifications_offer_not_now">Agora não</string>
 </resources>

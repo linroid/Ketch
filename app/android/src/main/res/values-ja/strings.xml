@@ -3,8 +3,8 @@
   <string name="process_text_label">Ketchでダウンロード</string>
   <string name="quick_add_no_link">ダウンロードできるリンクがありません</string>
 
-  <string name="notifications_offer_title">ダウンロードの完了を通知</string>
-  <string name="notifications_offer_message">他のアプリを使っている間にダウンロードが完了または失敗すると、Ketchがお知らせします。</string>
+  <string name="notifications_offer_title">ダウンロードとディスカバーの通知</string>
+  <string name="notifications_offer_message">他のアプリを使っている間に、ダウンロードが完了または失敗したときや、ディスカバーがウェブサイトを開くのに承認が必要なときに、Ketchがお知らせします。</string>
   <string name="notifications_offer_allow">許可</string>
   <string name="notifications_offer_not_now">今はしない</string>
 </resources>

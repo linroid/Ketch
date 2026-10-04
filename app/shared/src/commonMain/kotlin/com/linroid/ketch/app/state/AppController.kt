@@ -33,6 +33,8 @@ import kotlin.time.Clock
  * @param clock current time of the task list and the speed history.
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`, which the app reports to the user once.
+ * @param discoverHistory keeps the Discover sessions between runs; the host owns it, one per
+ *   process, and closes it after this controller.
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -42,6 +44,7 @@ class AppController(
   speedMode: SpeedModeController? = null,
   clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
+  discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -70,6 +73,7 @@ class AppController(
     speedMode = speedMode,
     clock = clock,
     unreadableFiles = unreadableFiles,
+    discoverHistory = discoverHistory,
   )
 
   init {
@@ -92,8 +96,9 @@ class AppController(
   val speedMode: SpeedModeController? get() = state.speedMode
 
   /**
-   * Commits pending operations, releases the discovery engine and stops the scope. Commits
-   * already started keep running. Does not close [instanceManager].
+   * Commits pending operations, stops the Discover searches, releases the discovery engine and
+   * stops the scope. Commits already started keep running. Does not close [instanceManager] or
+   * the Discover history.
    */
   fun close() {
     if (closed) return
@@ -117,9 +122,15 @@ fun rememberAppController(
   incoming: IncomingDownloads? = null,
   speedMode: SpeedModeController? = null,
   unreadableFiles: UnreadableFiles? = null,
+  discoverHistory: DiscoverHistoryStore? = null,
 ): AppController {
   val controller = remember(
-    instanceManager, aiProviderFactory, incoming, speedMode, unreadableFiles
+    instanceManager,
+    aiProviderFactory,
+    incoming,
+    speedMode,
+    unreadableFiles,
+    discoverHistory
   ) {
     AppController(
       instanceManager = instanceManager,
@@ -127,6 +138,7 @@ fun rememberAppController(
       incoming = incoming ?: IncomingDownloads(),
       speedMode = speedMode,
       unreadableFiles = unreadableFiles ?: UnreadableFiles(),
+      discoverHistory = discoverHistory ?: InMemoryDiscoverHistoryStore(),
     )
   }
   DisposableEffect(controller) {

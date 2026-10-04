@@ -32,6 +32,7 @@ import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.SearchSettings
 import com.linroid.ketch.config.ServerConfig
@@ -136,6 +137,23 @@ class SettingsSnapshots {
   }
 
   @Test
+  fun discoverPage_trustedSites_listsThemAsChipsOverTheAddField() {
+    val access = PageAccessSettings(trustedSites = TrustedSites)
+    windowSnapshot(
+      name = "settings-discover-access",
+      size = WindowSize,
+      theme = SnapshotTheme.Light,
+      target = SettingsTarget(SettingsTarget.Page.Discover),
+      access = access,
+    )
+    withSettings(SnapshotTheme.Dark, PhoneTall.density, access = access) {
+      captureApp("settings-discover-access", PhoneTall, SnapshotTheme.Dark, it) {
+        openSettings(SettingsTarget.Page.Discover)
+      }
+    }
+  }
+
+  @Test
   fun app_mediumWindow_showsSettingsAsTwoPanes() {
     for (theme in SnapshotTheme.entries) {
       appSettingsSnapshot("app-settings-medium", SnapshotSize.Medium, theme) {
@@ -184,9 +202,10 @@ class SettingsSnapshots {
     target: SettingsTarget? = null,
     query: String = "",
     lastPage: SettingsTarget.Page? = null,
+    access: PageAccessSettings = PageAccessSettings(),
     interact: suspend SnapshotScene.() -> Unit = {},
   ) {
-    withSettings(theme, size.density, lastPage) { environment ->
+    withSettings(theme, size.density, lastPage, access) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
         SettingsFrame(environment, theme, size.density, desktop = true) {
           SettingsContent(environment.controller.state, target, onClose = {}, initialQuery = query)
@@ -242,6 +261,15 @@ class SettingsSnapshots {
     val DeviceChipY = 298.dp
 
     const val NAS_ID = "nas.local:8642"
+
+    /** Sites Discover opens without asking, enough to wrap onto a second line on a phone. */
+    val TrustedSites = listOf(
+      "ubuntu.com",
+      "blender.org",
+      "github.com",
+      "download.documentfoundation.org",
+      "videolan.org"
+    )
   }
 }
 
@@ -278,11 +306,13 @@ internal fun SettingsFrame(
  * failures reported only in the app, and the NAS connected.
  *
  * @param lastPage the Settings page shown last, which a generic open reopens.
+ * @param access when Discover may open websites.
  */
 internal class SettingsEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   lastPage: SettingsTarget.Page? = null,
+  access: PageAccessSettings = PageAccessSettings(),
 ) : SnapshotEnvironment {
   private val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = true)
   override val data = SampleData(
@@ -321,6 +351,7 @@ internal class SettingsEnvironment(
           enabled = true,
           llm = LlmSettings(provider = LlmProvider.Anthropic, apiKey = "sk-ant-sample"),
           search = SearchSettings(provider = SearchProvider.Brave, apiKey = "brave-sample"),
+          access = access,
         ),
         notifications = NotificationSettings(failed = NotificationMode.InApp),
       ),
@@ -361,12 +392,16 @@ internal class SettingsEnvironment(
 
 /**
  * Runs [block] over a [SettingsEnvironment] in [theme] at [density] that shows [lastPage] when
- * Settings opens without a page.
+ * Settings opens without a page, with Discover's [access].
  */
 internal fun <T> withSettings(
   theme: SnapshotTheme,
   density: KetchDensity,
   lastPage: SettingsTarget.Page? = null,
+  access: PageAccessSettings = PageAccessSettings(),
   block: (SettingsEnvironment) -> T,
-): T = withEnvironment({ SettingsEnvironment(theme, density.toMode(), lastPage) }, block = block)
+): T = withEnvironment(
+  { SettingsEnvironment(theme, density.toMode(), lastPage, access) },
+  block = block,
+)
 

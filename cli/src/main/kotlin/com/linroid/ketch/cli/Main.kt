@@ -13,8 +13,11 @@ import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
+import com.linroid.ketch.ai.PageAccessApprover
+import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.defaultConfigDir
@@ -36,6 +39,7 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
+import java.io.PrintStream
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -49,10 +53,18 @@ fun main(args: Array<String>) {
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
 
-  // The MCP server owns stdout, so it prints the banner to stderr itself
-  if (remaining.firstOrNull() == "mcp") {
-    runMcp(remaining.drop(1))
-    return
+  // The MCP server owns stdout, and ai-discover keeps it for its results, so each prints the
+  // banner to stderr itself
+  when (remaining.firstOrNull()) {
+    "mcp" -> {
+      runMcp(remaining.drop(1))
+      return
+    }
+    "ai-discover" -> {
+      val status = runAiDiscover(remaining.drop(1))
+      if (status != AiDiscoverExit.OK) exitProcess(status)
+      return
+    }
   }
 
   printBanner()
@@ -60,7 +72,6 @@ fun main(args: Array<String>) {
   when (remaining.firstOrNull()) {
     null -> printUsage()
     "server" -> runServer(remaining.drop(1).toTypedArray())
-    "ai-discover" -> runAiDiscover(remaining.drop(1))
     "update" -> {
       // The engine that downloads the release only logs warnings unless -v or --debug asks for
       // more, so the progress line stays readable.
@@ -494,129 +505,196 @@ internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
   server.awaitStop()
 }
 
-private fun runAiDiscover(args: List<String>) {
-  if (args.isEmpty()) {
-    println("Usage: ketch ai-discover <query> [--sites domain1,domain2]")
-    println()
-    println("  --sites <domains>    Only search, read and return links from")
-    println("                       these sites and their subdomains;")
-    println("                       redirects to download hosts are followed")
-    println("  --max-results <n>    Max results (default: 5)")
-    println()
-    println("Examples:")
-    println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
-    println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
-    println()
-    println("Configure a provider and token on the app's Settings")
-    println("page, or export OPENAI_API_KEY / ANTHROPIC_API_KEY /")
-    println("GEMINI_API_KEY for the same effect.")
-    return
+/** Exit statuses of `ketch ai-discover`, for scripts that run it. */
+internal object AiDiscoverExit {
+  /** The search ran, whether or not it found anything. */
+  const val OK = 0
+
+  /** The search could not run or failed: not configured, no terminal to ask on, an error. */
+  const val FAILED = 1
+
+  /** The arguments cannot be used. */
+  const val USAGE = 2
+}
+
+/**
+ * Runs `ketch ai-discover` with [args], the arguments after `ai-discover`, and returns its exit
+ * status, one of [AiDiscoverExit]. Only the results, or the usage asked for, go to [results];
+ * everything else goes to stderr: the banner, what it searches for, the steps, the questions
+ * and the errors.
+ *
+ * @param results where the results go; stdout by default.
+ */
+internal fun runAiDiscover(args: List<String>, results: PrintStream = System.out): Int {
+  // Logback's console appender, the agent's libraries and any println go to stdout, so it
+  // points at stderr while the command runs; see runMcp.
+  val stdout = System.out
+  System.setOut(System.err)
+  try {
+    printBanner()
+    return discover(args, results)
+  } finally {
+    System.setOut(stdout)
   }
+}
 
-  var query = ""
-  var sites = emptyList<String>()
-  var maxResults = 5
-
-  var i = 0
-  while (i < args.size) {
-    when (args[i]) {
-      "--sites" -> {
-        if (i + 1 < args.size) {
-          sites = args[++i].split(",").map { it.trim() }
-        }
-      }
-      "--max-results" -> {
-        if (i + 1 < args.size) {
-          maxResults = args[++i].toIntOrNull() ?: 5
-        }
-      }
-      else -> {
-        query = if (query.isEmpty()) args[i]
-        else "$query ${args[i]}"
-      }
+private fun discover(args: List<String>, results: PrintStream): Int {
+  val options = when (val parsed = parseAiDiscoverArgs(args)) {
+    AiDiscoverArgs.Help -> {
+      printAiDiscoverUsage(results)
+      return AiDiscoverExit.OK
     }
-    i++
-  }
-
-  if (query.isBlank()) {
-    println("Error: query is required")
-    return
+    is AiDiscoverArgs.Invalid -> {
+      System.err.println("Error: ${parsed.message}")
+      System.err.println()
+      printAiDiscoverUsage(System.err)
+      return AiDiscoverExit.USAGE
+    }
+    is AiDiscoverArgs.Discover -> parsed
   }
 
   val settings = resolveAiSettingsFromEnv(readDefaultConfig().ai)
   if (!settings.isUsable) {
-    println("AI discovery is not configured.")
-    println("Set a provider and API token on the app's Settings page,")
-    println("or export a provider API key for this shell.")
-    return
+    System.err.println("AI discovery is not configured.")
+    System.err.println("Set a provider and API token on the app's Settings page,")
+    System.err.println("or export a provider API key for this shell.")
+    return AiDiscoverExit.FAILED
   }
 
+  val terminal = if (options.mayAsk(settings.access)) {
+    openTerminal() ?: run {
+      System.err.println(noTerminalMessage(settings.access.mode))
+      return AiDiscoverExit.FAILED
+    }
+  } else {
+    null
+  }
+  val outputLock = Any()
+  // Nothing to ask: --yes or the allow mode lets every request through.
+  val approver = if (options.allowAll || settings.access.mode == PageAccessMode.Allow) {
+    PageAccessApprover.AllowAll
+  } else {
+    CliPageAccess(
+      settings = settings.access,
+      allowAll = false,
+      terminal = terminal,
+      outputLock = outputLock,
+    )
+  }
   val aiModule = AiModule.create(AiConfig(settings = settings))
 
-  println(
+  System.err.println(
     "Using ${settings.llm.provider.label}" +
       " · ${settings.llm.effectiveModel}"
   )
-  println("Discovering resources for: \"$query\"")
-  if (sites.isNotEmpty()) {
-    println("Limited to: ${sites.joinToString(", ")}")
+  System.err.println("Discovering resources for: \"${options.query}\"")
+  if (options.sites.isNotEmpty()) {
+    System.err.println("Limited to: ${options.sites.joinToString(", ")}")
   }
-  println()
+  System.err.println()
 
-  runBlocking {
+  return runBlocking {
     val discoverQuery = DiscoverQuery(
-      query = query,
-      sites = sites,
-      maxResults = maxResults,
+      query = options.query,
+      sites = options.sites,
+      maxResults = options.maxResults,
     )
     val response = try {
-      aiModule.discoveryService.discover(discoverQuery)
+      aiModule.discoveryService.discover(
+        query = discoverQuery,
+        stepListener = StderrStepListener(outputLock),
+        approver = approver,
+      )
     } catch (e: IllegalArgumentException) {
-      println("Error: ${e.message}")
-      return@runBlocking
+      System.err.println("Error: ${e.message}")
+      return@runBlocking AiDiscoverExit.FAILED
     } catch (e: DiscoveryException) {
-      println("Error: ${e.message}")
-      return@runBlocking
+      System.err.println("Error: ${e.message}")
+      return@runBlocking AiDiscoverExit.FAILED
     } finally {
       // The fetcher's OkHttp engine keeps an idle non-daemon thread for a minute after its
       // last request, which would hold the process open that long
       aiModule.close()
+      terminal?.close()
     }
 
+    if (response.summary.isNotEmpty()) {
+      results.println(response.summary.printable())
+      results.println()
+    }
     if (response.candidates.isEmpty()) {
-      println("No candidates found.")
+      results.println("No candidates found.")
       if (settings.search.provider == SearchProvider.None) {
-        println("(Configure a web search provider for broader results)")
+        results.println("(Configure a web search provider for broader results)")
       }
-      return@runBlocking
+      return@runBlocking AiDiscoverExit.OK
     }
 
-    println("Found ${response.candidates.size} candidate(s):")
-    println()
+    results.println("Found ${response.candidates.size} candidate(s):")
+    results.println()
     response.candidates.forEachIndexed { idx, candidate ->
-      println("  ${idx + 1}. ${candidate.title}")
-      println("     URL: ${candidate.url}")
-      if (candidate.fileName != null) {
-        println("     File: ${candidate.fileName}")
-      }
+      results.println("  ${idx + 1}. ${candidate.title.printable()}")
+      results.println("     URL: ${printableUrl(candidate.url)}")
+      candidate.fileName?.let { results.println("     File: ${it.printable()}") }
       val fileSize = candidate.fileSize
       if (fileSize != null) {
-        println("     Size: ${formatBytes(fileSize)}")
+        results.println("     Size: ${formatBytes(fileSize)}")
       }
-      println("     Confidence: ${"%.0f".format(candidate.confidence * 100)}%")
+      results.println("     Confidence: ${"%.0f".format(candidate.confidence * 100)}%")
       if (candidate.description.isNotEmpty()) {
-        println("     ${candidate.description}")
+        results.println("     ${candidate.description.printable()}")
       }
-      println()
+      results.println()
     }
 
     if (response.sources.isNotEmpty()) {
-      println("Sources analyzed:")
+      results.println("Sources analyzed:")
       response.sources.forEach { src ->
-        println("  - ${src.title} (${src.url})")
+        results.println("  - ${src.title.printable()} (${printableUrl(src.url)})")
       }
     }
+    AiDiscoverExit.OK
   }
+}
+
+/**
+ * Prints the agent's steps to stderr as they arrive, keeping stdout for the results. A step
+ * waits for [lock] while a page access question is open; Koog runs one tool at a time, so the
+ * two rarely meet.
+ */
+private class StderrStepListener(private val lock: Any) : DiscoveryStepListener {
+  override fun onStep(title: String, details: String) {
+    synchronized(lock) { System.err.println(printableStep(title, details)) }
+  }
+}
+
+private fun printAiDiscoverUsage(out: PrintStream) {
+  out.println("Usage: ketch ai-discover <query> [options]")
+  out.println()
+  out.println("  --sites <domains>    Only search, read and return links from")
+  out.println("                       these sites and their subdomains;")
+  out.println("                       redirects to download hosts are followed")
+  out.println("  --max-results <n>    Max results (default: 5)")
+  out.println("  -y, --yes            Open websites without asking")
+  out.println("  -h, --help           Show this help message")
+  out.println()
+  out.println("Discover asks before it opens a website unless [ai.access] in")
+  out.println("config.toml says mode = \"allow\". It asks on the terminal, and")
+  out.println("answers last for this run. Without a terminal, pass --yes or")
+  out.println("--sites. On Windows it asks only while its input and output")
+  out.println("are both the console: pass --yes or --sites to redirect them.")
+  out.println()
+  out.println("Exit status: 0 when the search ran, even if it found nothing;")
+  out.println("1 when it could not run or failed; 2 for invalid arguments.")
+  out.println()
+  out.println("Examples:")
+  out.println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
+  out.println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
+  out.println("  ketch ai-discover --yes \"blender 4.2 macOS\" > results.txt")
+  out.println()
+  out.println("Configure a provider and token on the app's Settings")
+  out.println("page, or export OPENAI_API_KEY / ANTHROPIC_API_KEY /")
+  out.println("GEMINI_API_KEY for the same effect.")
 }
 
 private fun runMcp(args: List<String>) {
@@ -818,12 +896,15 @@ private fun printUsage() {
   println()
   println("AI Discovery:")
   println("  ai-discover <query>      Discover downloadable resources")
-  println("    --sites <domains>      Only use these comma-separated sites")
-  println("                           (subdomains included)")
-  println("    --max-results <n>      Max results (default: 5)")
   println("                           Configure the provider in the")
   println("                           app's Settings page, or export a")
   println("                           provider API key")
+  println("                           Run `ketch ai-discover --help`")
+  println("                           for all discover options")
+  println("    --sites <domains>      Only use these comma-separated sites")
+  println("                           (subdomains included)")
+  println("    --max-results <n>      Max results (default: 5)")
+  println("    -y, --yes              Open websites without asking")
   println()
   println("  Provider env vars (fill blank settings):")
   println("    OPENAI_API_KEY         OpenAI or compatible endpoints")

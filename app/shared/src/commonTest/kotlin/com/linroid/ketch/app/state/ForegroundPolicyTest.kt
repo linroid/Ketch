@@ -138,6 +138,35 @@ class ForegroundPolicyTest {
   }
 
   @Test
+  fun evaluate_discoveringWithoutTasksOrServer_isRequired() {
+    val status = ForegroundPolicy.evaluate(emptyList(), stopped, discovering = 1)
+    assertTrue(status.isRequired)
+    assertEquals(ForegroundStatus(discovering = 1), status)
+  }
+
+  @Test
+  fun observe_discoverySearchesStartAndEnd_followsThem() = runTest {
+    val discovering = MutableStateFlow(0)
+    val tasks = MutableStateFlow(emptyList<DownloadTask>())
+    val emitted = mutableListOf<ForegroundStatus>()
+    backgroundScope.launch {
+      ForegroundPolicy.observe(tasks, MutableStateFlow(stopped), discovering)
+        .collect { emitted += it }
+    }
+    runCurrent()
+
+    discovering.value = 2
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertEquals(ForegroundStatus(discovering = 2), emitted.last())
+
+    discovering.value = 0
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertFalse(emitted.last().isRequired)
+  }
+
+  @Test
   fun observe_rapidStateChanges_emitsAtMostOncePerPeriod() = runTest {
     val task = fakeTask(DownloadState.Queued)
     val emitted = observe(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))

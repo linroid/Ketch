@@ -17,9 +17,11 @@
   <string name="notify_channel_pairing">Kopplungsanfragen</string>
   <string name="notify_pairing_title">%1$s möchte %2$s steuern</string>
   <string name="notify_pairing_body">Erlaube es nur, wenn %1$s angezeigt wird.</string>
+  <string name="notify_channel_requests">Anfragen, die deine Erlaubnis brauchen</string>
   <string name="notify_finished_group">Abgeschlossene Downloads</string>
   <string name="notify_sharing_device">Dieses Gerät wird freigegeben</string>
   <string name="notify_server_on_port">Server auf Port %1$d</string>
+  <string name="notify_discovering">Entdecken sucht nach Downloads</string>
   <string name="notify_slow_lane_on">Kriechspur</string>
   <string name="notify_action_pause_all">Alle pausieren</string>
   <string name="notify_action_slow_lane">Kriechspur</string>

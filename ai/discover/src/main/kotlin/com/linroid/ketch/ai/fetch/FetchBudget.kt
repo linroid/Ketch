@@ -24,6 +24,12 @@ internal class FetchBudget(
   private var requestsUsed = 0
   private var bytesLeft = maxBytes
 
+  /** Whether a request is left, without taking it. */
+  suspend fun hasRequestLeft(): Boolean = mutex.withLock { requestsUsed < maxRequests }
+
+  /** Whether any body bytes are left, without reserving them. */
+  suspend fun hasBytesLeft(): Boolean = mutex.withLock { bytesLeft > 0 }
+
   /** Takes one request, or returns `false` when none are left. */
   suspend fun tryTakeRequest(): Boolean = mutex.withLock {
     if (requestsUsed >= maxRequests) return@withLock false

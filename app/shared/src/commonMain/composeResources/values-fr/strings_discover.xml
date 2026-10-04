@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">Configurer dans les Réglages</string>
   <string name="discover_provider_openai_compatible">Compatible OpenAI</string>
 
-  <string name="discover_query_placeholder">Décrivez ce que vous voulez télécharger</string>
+  <string name="discover_query_placeholder">Décrivez ce que vous cherchez…</string>
+  <string name="discover_follow_up_placeholder">Posez une question de suivi…</string>
   <string name="discover_find">Rechercher</string>
+  <string name="discover_send">Envoyer</string>
   <string name="discover_stop">Arrêter</string>
   <string name="discover_sites_limit">Limiter à des sites web</string>
   <plurals name="discover_sites_count">
@@ -33,6 +35,38 @@
     <item quantity="other">%1$d étapes précédentes</item>
   </plurals>
   <string name="discover_step_starting">Lancement de la recherche</string>
+  <string name="discover_steps_details">Détails</string>
+
+  <string name="discover_limited_to">Limité à %1$s</string>
+  <string name="discover_queued">En attente de la fin d'une autre recherche</string>
+  <string name="discover_show_more">Afficher plus</string>
+  <string name="discover_show_less">Afficher moins</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="one">%1$d site autorisé</item>
+    <item quantity="other">%1$d sites autorisés</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="one">%1$d site refusé</item>
+    <item quantity="other">%1$d sites refusés</item>
+  </plurals>
+  <string name="discover_access_allowed_host">Autorisé : %1$s</string>
+  <string name="discover_access_denied_host">Refusé : %1$s</string>
+
+  <string name="discover_approval_page">Ouvrir %1$s ?</string>
+  <string name="discover_approval_file">Vérifier un fichier sur %1$s ?</string>
+  <string name="discover_approval_redirect">Suivre une redirection vers %1$s ?</string>
+  <string name="discover_approval_redirect_from">Redirigé depuis %1$s</string>
+  <string name="discover_approval_reason">Découvrir explique : %1$s</string>
+  <string name="discover_approval_allow">Autoriser</string>
+  <string name="discover_approval_allow_once">Autoriser une fois</string>
+  <string name="discover_approval_deny">Refuser</string>
+  <string name="discover_approval_always">Toujours autoriser %1$s</string>
+  <string name="discover_approval_allow_site">Autoriser %1$s dans cette conversation</string>
+  <string name="discover_approval_allow_all">Autoriser tous les sites dans cette conversation</string>
+  <string name="discover_approval_allow_caption">Autorise %1$s et ses sous-domaines dans cette conversation</string>
+  <string name="discover_approval_settings">Réglages de l'accès aux pages</string>
+  <string name="discover_approval_pane">Découvrir souhaite ouvrir %1$s</string>
+  <string name="discover_approval_jump">Autorisation requise</string>
 
   <string name="discover_select_all">Tout sélectionner</string>
   <string name="discover_clear_selection">Tout désélectionner</string>
@@ -40,23 +74,89 @@
     <item quantity="one">%1$d téléchargement</item>
     <item quantity="other">%1$d téléchargements</item>
   </plurals>
-  <string name="discover_results_for">pour « %1$s »</string>
   <string name="discover_match">%1$s de correspondance</string>
   <string name="discover_match_tooltip">Degré de correspondance avec votre recherche</string>
   <string name="discover_not_encrypted">Non chiffré</string>
   <string name="discover_error_title">Découvrir n'a pas pu terminer cette recherche</string>
   <string name="discover_failed">La recherche a échoué</string>
-  <string name="discover_unavailable">La découverte par IA n'est pas disponible sur cet appareil.</string>
   <string name="discover_none_title">Aucun téléchargement trouvé</string>
   <string name="discover_none_body">Découvrir ne liste que les fichiers de sources fiables. Essayez de préciser la version ou la plateforme, ou le site qui le publie.</string>
   <string name="discover_search_everywhere">Rechercher sur tout le web</string>
+  <string name="discover_stopped">Arrêtée</string>
+  <string name="discover_discard">Écarter</string>
+  <string name="discover_discard_all">Tout écarter</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="one">%1$d écarté</item>
+    <item quantity="other">%1$d écartés</item>
+  </plurals>
+  <string name="discover_restore">Restaurer</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="one">%1$d résultat écarté</item>
+    <item quantity="other">%1$d résultats écartés</item>
+  </plurals>
+  <string name="discover_deleted">Recherche « %1$s » supprimée</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="one">%1$d recherche effacée de l'historique</item>
+    <item quantity="other">%1$d recherches effacées de l'historique</item>
+  </plurals>
+  <string name="discover_undo_discard">Annuler la mise à l'écart des résultats</string>
+  <string name="discover_undo_delete">Annuler la suppression de la recherche</string>
+  <string name="discover_undo_clear_history">Annuler l'effacement de l'historique</string>
+  <string name="discover_needs_ok">Découvrir a besoin de votre autorisation pour ouvrir %1$s</string>
 
   <string name="discover_select_to_add">Sélectionnez les téléchargements à ajouter</string>
   <plurals name="discover_selected">
     <item quantity="one">%1$d sélectionné</item>
     <item quantity="other">%1$d sélectionnés</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="one">%1$d d'un message précédent</item>
+    <item quantity="other">%1$d de messages précédents</item>
+  </plurals>
   <string name="discover_add_now">Ajouter maintenant</string>
+  <string name="discover_add_options">Autres façons d'ajouter</string>
+  <string name="discover_add_to">Ajouter à</string>
   <string name="discover_review_add">Vérifier et ajouter</string>
   <string name="discover_review_add_count">Vérifier et ajouter %1$d</string>
+
+  <string name="discover_history">Historique</string>
+  <string name="discover_history_show">Afficher l'historique</string>
+  <string name="discover_history_hide">Masquer l'historique</string>
+  <string name="discover_new_search">Nouvelle recherche</string>
+  <string name="discover_delete_search">Supprimer cette recherche</string>
+  <string name="discover_history_clear">Effacer l'historique</string>
+  <string name="discover_history_filter">Rechercher dans l'historique</string>
+  <string name="discover_history_empty">Vos recherches s'affichent ici.</string>
+  <string name="discover_history_no_match">Aucune recherche ne correspond à « %1$s »</string>
+  <string name="discover_history_earlier">Plus tôt</string>
+  <string name="discover_history_searching">Recherche en cours…</string>
+  <string name="discover_history_queued">En attente de lancement</string>
+  <string name="discover_history_needs_ok">Autorisation requise</string>
+  <string name="discover_history_failed">Échec</string>
+  <plurals name="discover_history_results">
+    <item quantity="one">%1$d résultat</item>
+    <item quantity="other">%1$d résultats</item>
+  </plurals>
+  <string name="discover_history_no_results">Aucun résultat</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="one">%1$d recherche attend votre autorisation</item>
+    <item quantity="other">%1$d recherches attendent votre autorisation</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="one">%1$d en attente de votre autorisation</item>
+    <item quantity="other">%1$d en attente de votre autorisation</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="one">%1$s, %2$d en attente de votre autorisation</item>
+    <item quantity="other">%1$s, %2$d en attente de votre autorisation</item>
+  </plurals>
+  <string name="discover_setup_to_continue">Configurez Découvrir pour continuer</string>
+
+  <string name="command_discover_send">Envoyer le message</string>
+  <string name="command_discover_stop">Arrêter la recherche</string>
+  <string name="command_discover_allow">Autoriser le site web</string>
+  <string name="command_discover_deny">Refuser le site web</string>
+  <string name="command_discover_discard">Écarter le résultat ou supprimer la recherche</string>
+  <string name="command_discover_history">Afficher/masquer l'historique</string>
 </resources>

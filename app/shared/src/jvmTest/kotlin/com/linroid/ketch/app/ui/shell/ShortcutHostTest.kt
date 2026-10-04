@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -72,6 +73,52 @@ class ShortcutHostTest {
     val ran = shortcutTest(runs = false) { press(KetchCommands.Discover) }
 
     assertEquals(listOf(KetchCommands.Discover, KetchCommands.Discover), ran)
+  }
+
+  @Test
+  fun shortcutHost_pageKeyWithNothingOnThePageFocused_runsIt() {
+    val ran = shortcutTest(
+      runs = true,
+      content = { run ->
+        ShortcutHost(onCommand = run, page = CommandScope.Discover) { Box(Modifier.size(Side)) }
+      },
+    ) {
+      press(KetchCommands.DiscoverHistory)
+    }
+
+    assertEquals(listOf(KetchCommands.DiscoverHistory), ran)
+  }
+
+  @Test
+  fun shortcutHost_pageKeyWhileAnOverlayIsOpen_leavesIt() {
+    val ran = shortcutTest(
+      runs = true,
+      content = { run ->
+        ShortcutHost(
+          onCommand = run,
+          overlay = CommandScope.Palette,
+          page = CommandScope.Discover,
+        ) { Box(Modifier.size(Side)) }
+      },
+    ) {
+      press(KetchCommands.DiscoverHistory)
+    }
+
+    assertEquals(emptyList(), ran)
+  }
+
+  @Test
+  fun shortcutHost_pageKeyTheFocusedControlKeeps_leavesItToTheControl() {
+    val ran = shortcutTest(
+      runs = true,
+      content = { run ->
+        ShortcutHost(onCommand = run, page = CommandScope.Discover) { KeyKeepingBox() }
+      },
+    ) {
+      press(KetchCommands.DiscoverHistory)
+    }
+
+    assertEquals(emptyList(), ran)
   }
 
   @Test

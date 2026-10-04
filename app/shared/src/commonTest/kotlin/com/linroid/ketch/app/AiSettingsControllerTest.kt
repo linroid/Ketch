@@ -10,12 +10,14 @@ import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import com.linroid.ketch.config.PageAccessMode
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -107,6 +109,41 @@ class AiSettingsControllerTest {
     controller.save(usableSettings(apiKey = "sk-other"))
     assertTrue(first.closed, "the superseded provider should be closed")
     assertFalse((controller.provider as FakeAiProvider).closed)
+  }
+
+  @Test
+  fun saveAccess_keepsTheProviderAndPersistsTheAccess() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
+    val factory = FakeFactory()
+    val controller = AiSettingsController(store, factory)
+    val first = controller.provider as FakeAiProvider
+    controller.saveAccess { it.copy(mode = PageAccessMode.AskEveryTime).trusting("ubuntu.com") }
+    assertSame(first, controller.provider)
+    assertFalse(first.closed, "a search running on the provider should go on")
+    assertEquals(1, factory.created.size)
+    val saved = store.load().ai.access
+    assertEquals(PageAccessMode.AskEveryTime, saved.mode)
+    assertEquals(listOf("ubuntu.com"), saved.trustedSites)
+  }
+
+  @Test
+  fun save_sameEngineSettings_keepsTheProvider() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
+    val factory = FakeFactory()
+    val controller = AiSettingsController(store, factory)
+    val first = controller.provider as FakeAiProvider
+    controller.save(usableSettings())
+    assertSame(first, controller.provider)
+    assertFalse(first.closed)
+    assertEquals(1, factory.created.size)
+  }
+
+  @Test
+  fun saveAccess_unchanged_savesNothing() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
+    val controller = AiSettingsController(store, FakeFactory())
+    controller.saveAccess { it }
+    assertEquals(0, store.saves)
   }
 
   @Test

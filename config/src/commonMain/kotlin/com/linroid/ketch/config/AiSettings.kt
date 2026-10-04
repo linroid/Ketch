@@ -175,14 +175,23 @@ data class SearchSettings(
  * @property enabled master switch for the feature.
  * @property llm LLM connection settings.
  * @property search web search settings.
+ * @property access when discovery may open websites, under `[ai.access]`.
  */
 @Serializable
 data class AiSettings(
   val enabled: Boolean = false,
   val llm: LlmSettings = LlmSettings(),
   val search: SearchSettings = SearchSettings(),
+  val access: PageAccessSettings = PageAccessSettings(),
 ) {
   /** `true` when discovery is switched on and fully configured. */
   val isUsable: Boolean
     get() = enabled && llm.isComplete && search.isComplete
+
+  /**
+   * These settings without [access], which the discovery engine never reads: two settings that
+   * differ only in [access] build the same engine.
+   */
+  val engineSettings: AiSettings
+    get() = if (access == PageAccessSettings()) this else copy(access = PageAccessSettings())
 }

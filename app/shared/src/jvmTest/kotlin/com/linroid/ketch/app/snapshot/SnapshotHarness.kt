@@ -16,10 +16,13 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
@@ -31,9 +34,11 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -42,7 +47,6 @@ import org.junit.Assume.assumeTrue
 import java.io.File
 import java.util.TimeZone
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -78,10 +82,18 @@ internal object SnapshotHarness {
   /** Pixels per dp of the PNGs. */
   const val SCALE: Float = 2f
 
-  /** The one thread that composes, renders and runs the app's commands. */
-  val ui: CoroutineDispatcher = Executors.newSingleThreadScheduledExecutor { task ->
-    Thread(task, "snapshot-ui").apply { isDaemon = true }
-  }.asCoroutineDispatcher()
+  /**
+   * The one thread that composes, renders and runs the app's commands: the AWT event thread, as
+   * in the desktop app.
+   *
+   * Compose posts work to that thread whichever thread drives the scene: a frame that lays out
+   * nodes asks for its `RectManager` to dispatch, 16 ms later, the callbacks of node bounds and
+   * compact its list of them, and the frame's end cancels that. A frame slower than 16 ms, as on
+   * a busy machine, lets it run in the middle of the frame, and from another thread the two
+   * change the list at once: a node's bounds go missing, and a later layout or disposal fails
+   * with "LayoutNode … not found in RectList".
+   */
+  val ui: CoroutineDispatcher = Dispatchers.Swing
 
   init {
     if (enabled) {
@@ -147,6 +159,13 @@ internal object SnapshotHarness {
 
   private const val FLAT_GRID = 16
 }
+
+/**
+ * Runs [block] on [SnapshotHarness.ui] and waits for it, for a test that creates, drives and
+ * closes an [ImageComposeScene] of its own.
+ */
+internal fun <T> onUiThread(block: suspend CoroutineScope.() -> T): T =
+  runBlocking(SnapshotHarness.ui, block)
 
 /**
  * Composes [content] in a [width] by [height] pixel scene at [density] on [SnapshotHarness.ui],
@@ -284,9 +303,13 @@ internal class SnapshotScene(
     }
   }
 
-  /** Presses and releases [key], with Shift held when [shift] is set. */
-  suspend fun pressKey(key: Key, shift: Boolean = false) {
-    scene.sendKey(key, shift = shift)
+  /**
+   * Presses and releases [key], with Shift held when [shift] is set and the platform's primary
+   * modifier, ⌘ or Ctrl, when [primary] is.
+   */
+  suspend fun pressKey(key: Key, shift: Boolean = false, primary: Boolean = false) {
+    val apple = KeyboardPlatform.current.isApple
+    scene.sendKey(key, meta = primary && apple, ctrl = primary && !apple, shift = shift)
     settle(minimum = INTERACTION_SETTLE)
   }
 
@@ -294,6 +317,41 @@ internal class SnapshotScene(
   suspend fun hover(x: Dp, y: Dp) {
     scene.sendPointerEvent(PointerEventType.Move, offset(x, y))
     settle(minimum = INTERACTION_SETTLE)
+  }
+
+  /**
+   * Turns the mouse wheel over [x], [y] by [ticks]: negative scrolls toward the top, as a
+   * desktop list scrolls by the wheel and never by a drag.
+   */
+  suspend fun scroll(x: Dp, y: Dp, ticks: Float) {
+    scene.sendPointerEvent(
+      eventType = PointerEventType.Scroll,
+      position = offset(x, y),
+      scrollDelta = Offset(0f, ticks),
+    )
+    settle(minimum = INTERACTION_SETTLE)
+  }
+
+  /**
+   * Clicks the middle of the first control whose content description, such as a button's
+   * tooltip, is [description].
+   */
+  suspend fun clickOn(description: String) {
+    val node = scene.nodes().firstOrNull {
+      it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(description) == true
+    }
+    val center = checkNotNull(node) { "Nothing on screen is described as $description" }
+      .boundsInRoot.center
+    click((center.x / scale).dp, (center.y / scale).dp)
+  }
+
+  /** Clicks the middle of the first text on screen that reads [text], such as a link's. */
+  suspend fun clickOnText(text: String) {
+    val node = scene.nodes().firstOrNull { node ->
+      node.config.getOrNull(SemanticsProperties.Text)?.any { it.text == text } == true
+    }
+    val center = checkNotNull(node) { "Nothing on screen reads $text" }.boundsInRoot.center
+    click((center.x / scale).dp, (center.y / scale).dp)
   }
 
   /** Clicks the primary button at [x], [y] from the top left. */
@@ -528,7 +586,10 @@ internal fun <T> withSample(
   data: SampleData = SampleData.downloads(),
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   block: (SampleEnvironment) -> T,
-): T = withEnvironment({ SampleEnvironment(data, theme, density, aiProviderFactory) }, block = block)
+): T = withEnvironment(
+  create = { SampleEnvironment(data, theme, density, aiProviderFactory) },
+  block = block,
+)
 
 /**
  * Renders the real [App] root of [environment] to `<name>-<theme>-<width>x<height>.png` and

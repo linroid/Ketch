@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -9,9 +10,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.KeyboardType
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -23,11 +26,30 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AiConnectionTest
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.PageAccessMode
+import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
+import com.linroid.ketch.config.SiteNames
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_add
+import ketch.app.shared.generated.resources.settings_ai_access_add
+import ketch.app.shared.generated.resources.settings_ai_access_add_invalid
+import ketch.app.shared.generated.resources.settings_ai_access_allow
+import ketch.app.shared.generated.resources.settings_ai_access_allow_hint
+import ketch.app.shared.generated.resources.settings_ai_access_ask
+import ketch.app.shared.generated.resources.settings_ai_access_ask_hint
+import ketch.app.shared.generated.resources.settings_ai_access_ask_site
+import ketch.app.shared.generated.resources.settings_ai_access_ask_site_hint
+import ketch.app.shared.generated.resources.settings_ai_access_footer
+import ketch.app.shared.generated.resources.settings_ai_access_group
+import ketch.app.shared.generated.resources.settings_ai_access_mode
+import ketch.app.shared.generated.resources.settings_ai_access_trusted
+import ketch.app.shared.generated.resources.settings_ai_access_trusted_hint
+import ketch.app.shared.generated.resources.settings_ai_access_trusted_none
 import ketch.app.shared.generated.resources.settings_ai_api_key
 import ketch.app.shared.generated.resources.settings_ai_api_key_env
 import ketch.app.shared.generated.resources.settings_ai_api_key_plain
@@ -73,15 +95,17 @@ import ketch.app.shared.generated.resources.settings_ai_test_running
 import ketch.app.shared.generated.resources.settings_ai_test_waiting
 import ketch.app.shared.generated.resources.settings_ai_the_model
 import ketch.app.shared.generated.resources.settings_ai_web_search
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
- * Provider, credentials and web search for AI discovery, from [state]'s AI settings. Every
- * change is saved as it is made and rebuilds the discovery engine; Test calls the provider with
- * the saved settings.
+ * Page access, provider, credentials and web search for AI discovery, from [state]'s AI
+ * settings. Every change is saved as it is made. Changes to the model or search rebuild the
+ * discovery engine; page access changes keep it, so running searches carry on and ask by the new
+ * rules. Test calls the provider with the saved settings.
  */
 @Composable
 fun AiDiscoverySettings(state: AppState) {
@@ -110,6 +134,8 @@ fun AiDiscoverySettings(state: AppState) {
       onCheckedChange = { onChange(settings.copy(enabled = it)) },
     )
   }
+
+  PageAccessGroup(access = settings.access, enabled = supported, onChange = ai::saveAccess)
 
   SettingsGroup(title = stringResource(Res.string.settings_ai_model_group)) {
     SettingsRow(
@@ -306,6 +332,155 @@ fun AiDiscoverySettings(state: AppState) {
     }
   }
 }
+
+/**
+ * Whether discovery asks before it opens a website, and the sites it opens without asking.
+ *
+ * @param onChange saves what the transform it is given makes of the current page access, as
+ *   `AiSettingsController.saveAccess` does, without rebuilding the discovery engine.
+ */
+@Composable
+private fun PageAccessGroup(
+  access: PageAccessSettings,
+  enabled: Boolean,
+  onChange: ((PageAccessSettings) -> PageAccessSettings) -> Unit,
+) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_ai_access_group),
+    footer = stringResource(Res.string.settings_ai_access_footer),
+  ) {
+    SettingsSelectRow(
+      title = stringResource(Res.string.settings_ai_access_mode),
+      description = stringResource(access.mode.hint),
+      value = access.mode,
+      options = PageAccessMode.entries,
+      label = { it.label },
+      enabled = enabled,
+      onSelect = { mode -> onChange { it.copy(mode = mode) } },
+    )
+    TrustedSitesRow(sites = access.trustedSites, enabled = enabled, onChange = onChange)
+  }
+}
+
+/**
+ * The sites discovery opens without asking, as chips that remove them, over a field that adds
+ * the sites typed in it. What does not name a site stays in the field, marked as an error.
+ */
+@Composable
+private fun TrustedSitesRow(
+  sites: List<String>,
+  enabled: Boolean,
+  onChange: ((PageAccessSettings) -> PageAccessSettings) -> Unit,
+) {
+  val spacing = KetchTheme.spacing
+  var text by remember { mutableStateOf("") }
+  var rejected by remember { mutableStateOf(false) }
+  val add = {
+    val typed = typedSites(text)
+    if (typed.sites.isNotEmpty()) {
+      onChange { access -> typed.sites.fold(access, PageAccessSettings::trusting) }
+    }
+    text = typed.rejected.joinToString(" ")
+    rejected = typed.rejected.isNotEmpty()
+  }
+  SettingsRow(
+    title = stringResource(Res.string.settings_ai_access_trusted),
+    description = if (sites.isEmpty()) {
+      stringResource(Res.string.settings_ai_access_trusted_none)
+    } else {
+      stringResource(Res.string.settings_ai_access_trusted_hint)
+    },
+    enabled = enabled,
+  ) {
+    if (sites.isNotEmpty()) {
+      FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+        verticalArrangement = Arrangement.spacedBy(spacing.s2),
+      ) {
+        sites.forEach { site ->
+          val remove = { onChange { it.distrusting(site) } }
+          // A listed site reads as checked: unchecking it, like its ✕, stops trusting it.
+          KetchChip(
+            label = site,
+            selected = true,
+            onClick = remove,
+            enabled = enabled,
+            onRemove = remove,
+          )
+        }
+      }
+    }
+    Row(
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    ) {
+      SettingsTextField(
+        value = text,
+        onValueChange = {
+          text = it
+          rejected = false
+        },
+        modifier = Modifier.weight(1f),
+        placeholder = stringResource(Res.string.settings_ai_access_add),
+        error = if (rejected) stringResource(Res.string.settings_ai_access_add_invalid) else null,
+        onDone = add,
+        keyboardType = KeyboardType.Uri,
+        enabled = enabled,
+      )
+      KetchButton(
+        text = stringResource(Res.string.action_add),
+        onClick = add,
+        variant = KetchButtonVariant.Secondary,
+        enabled = enabled && text.isNotBlank(),
+      )
+    }
+  }
+}
+
+/**
+ * Sites typed in the Always allowed field.
+ *
+ * @property sites the ones that name a website, as [SiteNames.normalize] stores them, each once.
+ * @property rejected the others, as they were typed.
+ */
+internal data class TypedSites(val sites: List<String>, val rejected: List<String>)
+
+/**
+ * Reads sites typed as "ubuntu.com, blender.org", as URLs or as `*.ubuntu.com`. A site is a
+ * domain with a dot, such as ubuntu.com, or an IP address, so a stray word or number is rejected
+ * rather than trusted.
+ */
+internal fun typedSites(text: String): TypedSites {
+  val (sites, rejected) = parseHostList(text)
+    .partition { SiteNames.normalize(it).matches(SiteName) }
+  return TypedSites(sites.map(SiteNames::normalize).distinct(), rejected)
+}
+
+/**
+ * A domain of two labels or more whose last label starts with a letter, such as ubuntu.com, an
+ * IPv4 address, or an IPv6 address in brackets. Labels neither start nor end with a hyphen.
+ */
+private val SiteName = Regex(
+  """([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]([a-z0-9-]*[a-z0-9])?""" +
+    """|\d{1,3}(\.\d{1,3}){3}|\[[0-9a-f.]*:[0-9a-f:.]*\]"""
+)
+
+/** How a page access mode reads in its menu. */
+private val PageAccessMode.label: UiText
+  get() = when (this) {
+    PageAccessMode.Allow -> Res.string.settings_ai_access_allow
+    PageAccessMode.AskPerSite -> Res.string.settings_ai_access_ask_site
+    PageAccessMode.AskEveryTime -> Res.string.settings_ai_access_ask
+  }.text()
+
+/** What a page access mode does, under its row while it is chosen. */
+private val PageAccessMode.hint: StringResource
+  get() = when (this) {
+    PageAccessMode.Allow -> Res.string.settings_ai_access_allow_hint
+    PageAccessMode.AskPerSite -> Res.string.settings_ai_access_ask_site_hint
+    PageAccessMode.AskEveryTime -> Res.string.settings_ai_access_ask_hint
+  }
 
 /**
  * @param settings the saved settings.

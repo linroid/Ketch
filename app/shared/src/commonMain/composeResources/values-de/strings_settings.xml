@@ -10,7 +10,7 @@
   <string name="settings_category_integration">Integration</string>
   <string name="settings_category_integration_description">Browsererweiterung, Magnet-Links und Zwischenablage</string>
   <string name="settings_category_discover">Entdecken</string>
-  <string name="settings_category_discover_description">Das KI-Modell und die Websuche, die Downloads finden</string>
+  <string name="settings_category_discover_description">Das KI-Modell, die Websuche und die Websites, die Entdecken öffnen darf</string>
   <string name="settings_category_about">Über</string>
   <string name="settings_category_about_description">Version, Lizenzen und Protokolle</string>
   <string name="settings_category_downloads">Downloads</string>
@@ -234,6 +234,20 @@
   <string name="settings_ai_engine_id">Suchmaschinen-ID</string>
   <string name="settings_ai_engine_id_hint">Die Programmable-Search-Suchmaschine, die abgefragt wird.</string>
   <string name="settings_ai_engine_id_placeholder">Suchmaschinen-ID</string>
+  <string name="settings_ai_access_group">Seitenzugriff</string>
+  <string name="settings_ai_access_mode">Vor dem Öffnen einer Website</string>
+  <string name="settings_ai_access_allow">Automatisch erlauben</string>
+  <string name="settings_ai_access_allow_hint">Öffnet jede Website, die eine Suche braucht, ohne zu fragen.</string>
+  <string name="settings_ai_access_ask_site">Bei jeder neuen Website fragen</string>
+  <string name="settings_ai_access_ask_site_hint">Fragt, wenn ein Chat eine Website zum ersten Mal öffnet. „Immer erlauben“ merkt sich die Website.</string>
+  <string name="settings_ai_access_ask">Jedes Mal fragen</string>
+  <string name="settings_ai_access_ask_hint">Fragt vor jeder Seite und jeder Dateiprüfung.</string>
+  <string name="settings_ai_access_trusted">Immer erlaubt</string>
+  <string name="settings_ai_access_trusted_hint">Entdecken öffnet diese Websites und ihre Subdomains, ohne zu fragen.</string>
+  <string name="settings_ai_access_trusted_none">Noch keine. Wähle „Immer erlauben“, wenn Entdecken fragt, oder füge hier eine Website hinzu.</string>
+  <string name="settings_ai_access_add">Website hinzufügen, z. B. ubuntu.com</string>
+  <string name="settings_ai_access_add_invalid">Gib den Namen einer Website ein, z. B. ubuntu.com.</string>
+  <string name="settings_ai_access_footer">Suchen, die du auf Websites beschränkst, fragen nie: Diese Websites hast du selbst gewählt.</string>
 
   <string name="settings_about_name_line">Eine Ketsch ist ein Segelboot mit zwei Masten. Wie ihre Segel teilt Ketch jeden Download in Spuren auf.</string>
   <string name="settings_about_discover_elsewhere">Entdecken läuft in der Desktop- und der Android-App.</string>
@@ -518,6 +532,10 @@
   <string name="settings_search_test_keywords">prüfen, testen, überprüfen</string>
   <string name="settings_search_web_search">Brave- oder Google-Suche für den Agenten</string>
   <string name="settings_search_web_search_keywords">Suchanbieter, Such-API-Schlüssel, Suchmaschine</string>
+  <string name="settings_search_ai_access">Ob Entdecken fragt, bevor es eine Website öffnet</string>
+  <string name="settings_search_ai_access_keywords">Seitenzugriff, Berechtigung, Erlaubnis, erlauben, zulassen, fragen, Datenschutz, Privatsphäre</string>
+  <string name="settings_search_ai_trusted">Websites, die Entdecken ohne Nachfrage öffnet</string>
+  <string name="settings_search_ai_trusted_keywords">vertrauenswürdige Websites, Positivliste, Whitelist, Allowlist, Domains, Berechtigung</string>
   <string name="settings_search_version_keywords">Build, Revision, Update, Aktualisierung</string>
   <string name="settings_search_source_keywords">GitHub, Projekt, Quelltext</string>
   <string name="settings_search_report_keywords">Bug, Fehler, Issue, Feedback, Hilfe</string>

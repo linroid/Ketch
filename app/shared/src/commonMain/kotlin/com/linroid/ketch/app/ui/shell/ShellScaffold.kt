@@ -18,11 +18,18 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.theme.KetchColors
@@ -100,7 +107,7 @@ internal fun ShellScaffold(
  *
  * [chrome] collapses the top bar while the content scrolls down and brings it back as soon as
  * it scrolls up. The window's safe-area insets pad the bars, and the content no longer sees
- * them.
+ * them; it reads the bottom bar's height from [LocalPhoneBottomBarHeight].
  */
 @Composable
 internal fun PhoneScaffold(
@@ -115,6 +122,8 @@ internal fun PhoneScaffold(
   val colors = KetchTheme.colors
   val safe = WindowInsets.safeDrawing
   val topInsets = safe.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+  val density = LocalDensity.current
+  var barHeight by remember { mutableStateOf(0.dp) }
   Column(modifier.fillMaxSize().background(colors.surface)) {
     // The wash fades out by the bar's bottom edge, so the list below meets it without a seam.
     Box(Modifier.phoneWash(colors).windowInsetsPadding(topInsets)) {
@@ -136,10 +145,18 @@ internal fun PhoneScaffold(
         )
         .nestedScroll(chrome.nestedScrollConnection),
     ) {
-      content()
-      floating()
+      // The content tells the soft keyboard's height apart from the bar it covers, if any.
+      val bar = if (bottomBar != null) barHeight else 0.dp
+      CompositionLocalProvider(LocalPhoneBottomBarHeight provides bar) {
+        content()
+        floating()
+      }
     }
-    bottomBar?.invoke()
+    if (bottomBar != null) {
+      Box(Modifier.onSizeChanged { barHeight = with(density) { it.height.toDp() } }) {
+        bottomBar()
+      }
+    }
   }
 }
 

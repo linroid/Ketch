@@ -7,13 +7,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.ui.discover.DiscoverChrome
 import com.linroid.ketch.app.ui.downloads.KetchLayoutInfo
 import com.linroid.ketch.app.ui.downloads.LayoutTier
 import com.linroid.ketch.app.ui.pulse.PulseBarState
 
 /**
  * What the shell shows around the screens of [app]: the destination, Settings, the shortcut
- * sheet, the command palette, the phone's search and Pulse sheet, and the Pulse bar's popovers.
+ * sheet, the command palette, the phone's search and Pulse sheet, the Pulse bar's popovers and
+ * what it shares with Discover.
  *
  * @param destination destination shown first.
  * @param settingsOpen whether Settings shows first.
@@ -56,6 +58,9 @@ internal class ShellState(
   /** The phone's collapsing top bar. */
   val chrome: PhoneChromeState = PhoneChromeState()
 
+  /** Discover's floating history and composer requests, which the shell's controls reach. */
+  val discover: DiscoverChrome = DiscoverChrome()
+
   /** Id of the device that was active before the current one, which a long press goes back to. */
   var previousDeviceId: String? by mutableStateOf(null)
 
@@ -64,8 +69,9 @@ internal class ShellState(
     private set
 
   /**
-   * Shows [destination] and closes Settings, and the phone's search when it leaves Downloads;
-   * returns whether the navigation offers it.
+   * Shows [destination] and closes Settings, the phone's search when it leaves Downloads and
+   * Discover's floating history when it leaves Discover; returns whether the navigation offers
+   * it.
    */
   fun show(destination: AppDestination): Boolean {
     if (destination !in destinations) return false
@@ -73,6 +79,7 @@ internal class ShellState(
     this.destination = destination
     closeSettings()
     if (destination != AppDestination.Downloads) closeSearch()
+    if (destination != AppDestination.Discover) discover.historyOpen = false
     return true
   }
 

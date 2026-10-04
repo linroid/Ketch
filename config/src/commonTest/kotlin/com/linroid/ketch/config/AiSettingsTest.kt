@@ -160,4 +160,67 @@ class AiSettingsTest {
     )
     assertEquals(AiSettings(), decoded.ai)
   }
+  @Test
+  fun `page access is stored under its own section`() {
+    val config = KetchConfig(
+      ai = AiSettings(
+        enabled = true,
+        access = PageAccessSettings(
+          mode = PageAccessMode.AskEveryTime,
+          trustedSites = listOf("ubuntu.com", "blender.org"),
+        ),
+      ),
+    )
+    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), config)
+    assertTrue(
+      encoded.contains("[ai.access]") && encoded.contains("mode = \"ask\""),
+      "expected the access section and mode id in TOML, got:\n$encoded",
+    )
+    val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals(config.ai, decoded.ai)
+  }
+
+  @Test
+  fun `an unknown page access mode loads as ask once per site`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[ai]
+      |enabled = true
+      |
+      |[ai.access]
+      |mode = "ask-the-moon"
+      |trustedSites = ["ubuntu.com"]
+      """.trimMargin(),
+    )
+    assertEquals(PageAccessMode.AskPerSite, decoded.ai.access.mode)
+    assertEquals(listOf("ubuntu.com"), decoded.ai.access.trustedSites)
+  }
+
+  @Test
+  fun `an ai section without access asks once per site`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[ai]
+      |enabled = true
+      """.trimMargin(),
+    )
+    assertEquals(PageAccessSettings(), decoded.ai.access)
+    assertEquals(PageAccessMode.AskPerSite, decoded.ai.access.mode)
+  }
+
+  @Test
+  fun `engine settings leave page access out`() {
+    val settings = AiSettings(
+      enabled = true,
+      llm = LlmSettings(provider = LlmProvider.Ollama),
+      access = PageAccessSettings(mode = PageAccessMode.Allow, trustedSites = listOf("a.org")),
+    )
+    assertEquals(settings.copy(access = PageAccessSettings()), settings.engineSettings)
+    assertEquals(
+      settings.engineSettings,
+      settings.copy(access = PageAccessSettings(mode = PageAccessMode.AskEveryTime)).engineSettings,
+    )
+  }
 }

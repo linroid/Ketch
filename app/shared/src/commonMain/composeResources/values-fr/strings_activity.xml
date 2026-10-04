@@ -17,9 +17,11 @@
   <string name="notify_channel_pairing">Demandes d'appairage</string>
   <string name="notify_pairing_title">%1$s veut contrôler %2$s</string>
   <string name="notify_pairing_body">N'autorisez que s'il affiche %1$s.</string>
+  <string name="notify_channel_requests">Demandes d'autorisation</string>
   <string name="notify_finished_group">Téléchargements terminés</string>
   <string name="notify_sharing_device">Partage de cet appareil</string>
   <string name="notify_server_on_port">Serveur sur le port %1$d</string>
+  <string name="notify_discovering">Découvrir recherche des téléchargements</string>
   <string name="notify_slow_lane_on">Voie lente</string>
   <string name="notify_action_pause_all">Tout mettre en pause</string>
   <string name="notify_action_slow_lane">Voie lente</string>

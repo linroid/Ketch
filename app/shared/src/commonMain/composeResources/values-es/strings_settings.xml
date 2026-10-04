@@ -10,7 +10,7 @@
   <string name="settings_category_integration">Integración</string>
   <string name="settings_category_integration_description">Extensión del navegador, enlaces magnet y el portapapeles</string>
   <string name="settings_category_discover">Descubrir</string>
-  <string name="settings_category_discover_description">El modelo de IA y la búsqueda web que encuentran descargas</string>
+  <string name="settings_category_discover_description">El modelo de IA, la búsqueda web y los sitios web que puede abrir</string>
   <string name="settings_category_about">Acerca de</string>
   <string name="settings_category_about_description">Versión, licencias y registros</string>
   <string name="settings_category_downloads">Descargas</string>
@@ -234,6 +234,20 @@
   <string name="settings_ai_engine_id">ID del motor de búsqueda</string>
   <string name="settings_ai_engine_id_hint">El motor de Programmable Search que se consulta.</string>
   <string name="settings_ai_engine_id_placeholder">ID del motor</string>
+  <string name="settings_ai_access_group">Acceso a páginas</string>
+  <string name="settings_ai_access_mode">Antes de abrir un sitio web</string>
+  <string name="settings_ai_access_allow">Permitir automáticamente</string>
+  <string name="settings_ai_access_allow_hint">Abre sin preguntar cualquier sitio web que necesite una búsqueda.</string>
+  <string name="settings_ai_access_ask_site">Preguntar por cada sitio nuevo</string>
+  <string name="settings_ai_access_ask_site_hint">Pregunta la primera vez que un chat abre un sitio. Si eliges Permitir siempre, se recuerda el sitio.</string>
+  <string name="settings_ai_access_ask">Preguntar siempre</string>
+  <string name="settings_ai_access_ask_hint">Pregunta antes de cada página y de cada comprobación de archivo.</string>
+  <string name="settings_ai_access_trusted">Siempre permitidos</string>
+  <string name="settings_ai_access_trusted_hint">Descubrir abre estos sitios y sus subdominios sin preguntar.</string>
+  <string name="settings_ai_access_trusted_none">Ninguno todavía. Elige Permitir siempre cuando Descubrir pregunte, o añade un sitio aquí.</string>
+  <string name="settings_ai_access_add">Añade un sitio, como ubuntu.com</string>
+  <string name="settings_ai_access_add_invalid">Escribe el nombre de un sitio web, como ubuntu.com.</string>
+  <string name="settings_ai_access_footer">Las búsquedas que limitas a sitios web nunca preguntan: esos sitios los elegiste tú.</string>
 
   <string name="settings_about_name_line">Un ketch es un velero de dos mástiles. Ketch divide cada descarga en carriles, como sus velas.</string>
   <string name="settings_about_discover_elsewhere">Descubrir funciona en las apps de escritorio y Android.</string>
@@ -518,6 +532,10 @@
   <string name="settings_search_test_keywords">comprobar, verificar, probar</string>
   <string name="settings_search_web_search">Búsqueda de Brave o Google para el agente</string>
   <string name="settings_search_web_search_keywords">proveedor de búsqueda, clave de api de búsqueda, motor, buscador</string>
+  <string name="settings_search_ai_access">Si Descubrir pregunta antes de abrir un sitio web</string>
+  <string name="settings_search_ai_access_keywords">acceso a páginas, permiso, aprobación, permitir, preguntar, privacidad</string>
+  <string name="settings_search_ai_trusted">Sitios web que Descubrir abre sin preguntar</string>
+  <string name="settings_search_ai_trusted_keywords">sitios de confianza, lista de permitidos, lista blanca, dominios, permiso</string>
   <string name="settings_search_version_keywords">compilación, revisión, actualización, versión</string>
   <string name="settings_search_source_keywords">github, proyecto, código</string>
   <string name="settings_search_report_keywords">error, fallo, incidencia, bug, comentarios, ayuda</string>

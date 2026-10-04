@@ -4,6 +4,9 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.agents.core.tools.annotations.Tool
 import ai.koog.agents.core.tools.reflect.ToolSet
 import com.linroid.ketch.ai.DiscoverResult
+import com.linroid.ketch.ai.PageAccessApprover
+import com.linroid.ketch.ai.PageAccessKind
+import com.linroid.ketch.ai.PageAccessRequest
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.FetchResult
@@ -17,6 +20,10 @@ import com.linroid.ketch.ai.site.RobotsTxtRules
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.config.SiteNames
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
@@ -27,6 +34,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Instant
 
@@ -49,7 +57,26 @@ import kotlin.time.Instant
  * While [allowlist] is restricted, searches only cover the allowed
  * sites and `fetchPage`/`headUrl` refuse URLs on other hosts with an
  * error JSON, before spending any budget. Redirects those requests
- * receive are still followed.
+ * receive may still lead to other hosts.
+ *
+ * [approver] decides, before any budget is spent, whether `fetchPage`
+ * and `headUrl` may contact the host they ask for, and whether a
+ * redirect may lead them to a host the request has not reached yet. A
+ * declined request gets an error JSON marked `"declined": true`, and the
+ * host's site is refused for the rest of the run without asking again.
+ * A page's approval covers its origin's robots.txt. Searches never ask:
+ * they go to the search provider, not to the sites. Nor does a request
+ * the spent budget would refuse anyway.
+ *
+ * A host is not even looked up in DNS before it is approved: the lookup
+ * would already send the name, which the agent chose, to that domain's
+ * DNS servers. So `fetchPage` and `headUrl` only check a URL's form
+ * before asking, and `validateUrl` never looks a host up.
+ *
+ * Text the agent writes for the user, its steps and the titles of the
+ * pages it reads, is reduced to plain text first: one line each, except
+ * a step's details, which keep their line breaks, such as a numbered
+ * plan's (see [sanitizeAgentText]).
  */
 @LLMDescription("Resource discovery tools for finding downloadable files")
 internal class DiscoveryToolSet(
@@ -64,6 +91,7 @@ internal class DiscoveryToolSet(
   private val stepListener: DiscoveryStepListener,
   private val json: Json,
   private val allowlist: SiteAllowlist,
+  private val approver: PageAccessApprover = PageAccessApprover.AllowAll,
 ) : ToolSet {
 
   private val log = KetchLogger("DiscoveryToolSet")
@@ -72,6 +100,9 @@ internal class DiscoveryToolSet(
 
   private val robotsMutex = Mutex()
   private val robotsByOrigin = mutableMapOf<String, RobotsTxtRules?>()
+
+  /** Sites the user declined in this run, as [SiteNames.normalize] leaves them. */
+  private val declinedSites: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
   /** Sources fetched during this discovery run. */
   val fetchedSources: MutableList<DiscoverResult.Source> =
@@ -114,7 +145,7 @@ internal class DiscoveryToolSet(
     maxResults: Int = 5,
   ): String {
     if (!takeToolCall("searchSites")) return errorJson(toolBudgetSpent())
-    val siteList = sites.split(",").map { SiteAllowlist.normalize(it) }
+    val siteList = sites.split(",").map(SiteNames::normalize)
       .filter { it.isNotEmpty() }
     log.d { "searchSites: sites=$siteList, query=\"$query\"" }
     val outside = siteList.filterNot(allowlist::allowsHost)
@@ -138,6 +169,8 @@ internal class DiscoveryToolSet(
   suspend fun fetchPage(
     @LLMDescription("URL to fetch")
     url: String,
+    @LLMDescription("One short sentence telling the user why you need this page")
+    reason: String = "",
   ): String {
     if (!takeToolCall("fetchPage")) return errorJson(toolBudgetSpent())
     log.d { "fetchPage: ${redactUrl(url)}" }
@@ -145,26 +178,32 @@ internal class DiscoveryToolSet(
       log.d { "fetchPage refused: ${redactUrl(url)} outside allowed sites" }
       return outsideAllowlistJson(url)
     }
-    when (val v = urlValidator.validate(url)) {
+    // The host is looked up once the user allows it, in the fetcher.
+    val host = when (val v = urlValidator.check(url)) {
       is ValidationResult.Blocked -> return errorJson(v.reason)
-      is ValidationResult.Valid -> { /* ok */ }
+      is ValidationResult.Valid -> v.uri.host.lowercase()
     }
+    // A spent budget refuses without asking; a declined request spends nothing.
+    if (!budget.hasBytesLeft()) return errorJson(byteBudgetSpent())
+    if (!budget.hasRequestLeft()) return errorJson(requestBudgetSpent())
+    val access = RequestAccess(PageAccessKind.Page, reason)
+    if (!access.allows(url, host)) return declinedJson(declinedMessage(host))
 
     val allowance = budget.reserveBytes(fetcher.maxContentBytes)
-    if (allowance == 0L) {
-      return errorJson(
-        "Page content budget of ${budget.maxBytes} bytes for this discovery is spent. " +
-          "Stop fetching and return your results.",
-      )
-    }
+    if (allowance == 0L) return errorJson(byteBudgetSpent())
     if (!budget.tryTakeRequest()) {
       budget.returnBytes(allowance)
       return errorJson(requestBudgetSpent())
     }
 
-    // robots.txt is checked on every hop: an allowed URL may redirect
-    // to a disallowed one.
-    val result = fetcher.fetch(url, allowance, checkHop = ::robotsRefusal)
+    // Every hop is checked: a redirect to another host needs the user's
+    // approval before its robots.txt is read, and an allowed URL may
+    // redirect to a path robots.txt disallows.
+    val result = fetcher.fetch(
+      url = url,
+      maxBytes = allowance,
+      checkHop = { hop -> access.refusal(hop) ?: robotsRefusal(hop, access::sideRefusal) },
+    )
     budget.returnBytes(allowance - ((result as? FetchResult.Success)?.byteCount ?: 0))
     return when (result) {
       is FetchResult.Success -> {
@@ -177,7 +216,7 @@ internal class DiscoveryToolSet(
         fetchedSources.add(
           DiscoverResult.Source(
             url = pageUrl,
-            title = title.ifEmpty { pageUrl },
+            title = sanitizeAgentText(title, MAX_SOURCE_TITLE_LENGTH).ifEmpty { pageUrl },
             fetchedAt = Instant.fromEpochMilliseconds(
               System.currentTimeMillis()
             ),
@@ -198,7 +237,7 @@ internal class DiscoveryToolSet(
           })
         }.toString()
       }
-      is FetchResult.Failed -> errorJson(result.reason)
+      is FetchResult.Failed -> failureJson(result.reason, access.declined)
     }
   }
 
@@ -212,6 +251,8 @@ internal class DiscoveryToolSet(
   suspend fun headUrl(
     @LLMDescription("URL to check")
     url: String,
+    @LLMDescription("One short sentence telling the user why you need to check this file")
+    reason: String = "",
   ): String {
     if (!takeToolCall("headUrl")) return errorJson(toolBudgetSpent())
     log.d { "headUrl: ${redactUrl(url)}" }
@@ -219,12 +260,16 @@ internal class DiscoveryToolSet(
       log.d { "headUrl refused: ${redactUrl(url)} outside allowed sites" }
       return outsideAllowlistJson(url)
     }
-    when (val v = urlValidator.validate(url)) {
+    // The host is looked up once the user allows it, in the fetcher.
+    val host = when (val v = urlValidator.check(url)) {
       is ValidationResult.Blocked -> return errorJson(v.reason)
-      is ValidationResult.Valid -> { /* ok */ }
+      is ValidationResult.Valid -> v.uri.host.lowercase()
     }
+    if (!budget.hasRequestLeft()) return errorJson(requestBudgetSpent())
+    val access = RequestAccess(PageAccessKind.FileInfo, reason)
+    if (!access.allows(url, host)) return declinedJson(declinedMessage(host))
     if (!budget.tryTakeRequest()) return errorJson(requestBudgetSpent())
-    return when (val result = fetcher.head(url)) {
+    return when (val result = fetcher.head(url, checkHop = access::refusal)) {
       is HeadResult.Success -> buildJsonObject {
         // The requested URL stays the candidate: a CDN a listed site
         // redirects to is outside the allowlist, and its URLs often expire.
@@ -238,7 +283,7 @@ internal class DiscoveryToolSet(
         result.lastModified?.let { put("lastModified", it) }
         result.etag?.let { put("etag", it) }
       }.toString()
-      is HeadResult.Failed -> errorJson(result.reason)
+      is HeadResult.Failed -> failureJson(result.reason, access.declined)
     }
   }
 
@@ -271,18 +316,20 @@ internal class DiscoveryToolSet(
 
   @Tool
   @LLMDescription(
-    "Validate a URL for safety (SSRF, scheme, allowed sites). " +
+    "Check a URL's form for safety (scheme, internal hosts and addresses, " +
+      "allowed sites) without contacting or looking up its host. " +
       "Returns JSON with ok boolean and reason.",
   )
-  suspend fun validateUrl(
+  fun validateUrl(
     @LLMDescription("URL to validate")
     url: String,
   ): String {
     if (!takeToolCall("validateUrl")) return errorJson(toolBudgetSpent())
+    // No DNS lookup: it would reach the domain's servers before the user allowed the site.
     val reason = if (!allowlist.allows(url)) {
       outsideAllowlistMessage(url)
     } else {
-      (urlValidator.validate(url) as? ValidationResult.Blocked)?.reason
+      (urlValidator.check(url) as? ValidationResult.Blocked)?.reason
     }
     return buildJsonObject {
       put("ok", reason == null)
@@ -301,8 +348,35 @@ internal class DiscoveryToolSet(
     @LLMDescription("Step details or explanation")
     details: String,
   ): String {
-    stepListener.onStep(title, details)
+    stepListener.onStep(
+      sanitizeAgentText(title, MAX_STEP_TITLE_LENGTH),
+      sanitizeAgentText(details, MAX_STEP_DETAILS_LENGTH, keepLineBreaks = true),
+    )
     return if (takeToolCall("emitStep")) "ok" else toolBudgetSpent()
+  }
+
+  /**
+   * Whether the user lets this run make [request]. A host on a site the user declined is
+   * refused without asking; a site declined now is remembered for the rest of the run.
+   */
+  private suspend fun mayContact(request: PageAccessRequest): Boolean {
+    if (declinedSites.any { SiteNames.covers(it, request.host) }) return false
+    val allowed = try {
+      approver.approve(request)
+    } catch (_: CancellationException) {
+      // A stopped run ends here; an approver that gives up while the run goes on declines.
+      currentCoroutineContext().ensureActive()
+      false
+    } catch (e: Exception) {
+      log.w(e) { "Page access check failed for ${request.host}; declining it" }
+      false
+    }
+    if (!allowed) {
+      // A site, so www.example.com covers download.example.com; www.github.io stays itself.
+      declinedSites += SiteNames.normalize(request.host)
+      log.i { "Page access declined: ${request.host}" }
+    }
+    return allowed
   }
 
   /** Takes one tool call from [maxToolCalls], or returns `false` once they are spent. */
@@ -327,6 +401,24 @@ internal class DiscoveryToolSet(
     return buildJsonObject { put("error", reason) }.toString()
   }
 
+  private fun declinedJson(reason: String): String {
+    return buildJsonObject {
+      put("error", reason)
+      put("declined", true)
+    }.toString()
+  }
+
+  /**
+   * The error JSON of a request that failed for [reason]; [declined] when it ended at a host
+   * the user declined, such as one a redirect led to.
+   */
+  private fun failureJson(reason: String, declined: Boolean): String =
+    if (declined) declinedJson(reason) else errorJson(reason)
+
+  private fun declinedMessage(host: String): String =
+    "The user declined access to $host. Do not request $host again in this search; " +
+      "use other sources or return your results."
+
   private fun outsideAllowlistJson(subject: String): String {
     return buildJsonObject {
       put("error", outsideAllowlistMessage(subject))
@@ -339,6 +431,10 @@ internal class DiscoveryToolSet(
       "${allowlist.domains.joinToString()} (subdomains included)."
   }
 
+  private fun byteBudgetSpent(): String =
+    "Page content budget of ${budget.maxBytes} bytes for this discovery is spent. " +
+      "Stop fetching and return your results."
+
   private fun requestBudgetSpent(): String =
     "Request budget of ${budget.maxRequests} page fetches and HEAD requests for this " +
       "discovery is spent. Stop fetching and return your results."
@@ -347,8 +443,15 @@ internal class DiscoveryToolSet(
     "Tool call budget of $maxToolCalls for this discovery is spent. " +
       "Call no more tools, except one last emitStep, and return your results."
 
-  /** Why robots.txt forbids fetching [uri], or `null` when it allows it. */
-  private suspend fun robotsRefusal(uri: URI): String? {
+  /**
+   * Why robots.txt forbids fetching [uri], or `null` when it allows it. A redirect that reading
+   * robots.txt meets to another host goes through [checkRedirect], the page access of the
+   * request [uri] belongs to.
+   */
+  private suspend fun robotsRefusal(
+    uri: URI,
+    checkRedirect: suspend (URI) -> String?,
+  ): String? {
     val port = if (uri.port == -1) "" else ":${uri.port}"
     val origin = "${uri.scheme.lowercase()}://${uri.host.lowercase()}$port"
     val rules = robotsMutex.withLock {
@@ -356,7 +459,7 @@ internal class DiscoveryToolSet(
       if (origin in robotsByOrigin) {
         robotsByOrigin[origin]
       } else {
-        siteProfiler.fetchRobotsRules(origin).also { robotsByOrigin[origin] = it }
+        siteProfiler.fetchRobotsRules(origin, checkRedirect).also { robotsByOrigin[origin] = it }
       }
     }
     val path = uri.rawPath.ifEmpty { "/" } + uri.rawQuery?.let { "?$it" }.orEmpty()
@@ -368,7 +471,75 @@ internal class DiscoveryToolSet(
     }
   }
 
+  /**
+   * The page access checks of one request: every host it reaches, the requested one first,
+   * needs the user's approval.
+   *
+   * @param kind what the request is for
+   * @param reason why the agent says it needs the request, as it wrote it
+   */
+  private inner class RequestAccess(
+    private val kind: PageAccessKind,
+    reason: String,
+  ) {
+    private val reason = sanitizeAgentText(reason, MAX_REASON_LENGTH)
+
+    /** Hosts this request has been allowed to reach. */
+    private val allowedHosts = mutableSetOf<String>()
+
+    /** The host of the latest hop, which a redirect comes from. */
+    private var previousHost = ""
+
+    /** Whether the request ended at a host the user declined. */
+    var declined = false
+      private set
+
+    /** Whether the request may go on to [url] on [host], asking the user when it has to. */
+    suspend fun allows(url: String, host: String): Boolean {
+      val from = previousHost
+      previousHost = host
+      return mayReach(url, host, from)
+    }
+
+    /** Why the request must not go on to [hop], or `null` when it may; for `checkHop`. */
+    suspend fun refusal(hop: URI): String? {
+      val host = hop.host.lowercase()
+      return if (allows(hop.toString(), host)) null else declinedMessage(host)
+    }
+
+    /**
+     * Why a read the request makes on the side, such as robots.txt, must not follow a redirect
+     * to [hop], or `null` when it may. It asks as [refusal] does, without moving the request's
+     * own hops on, and a refusal leaves the request itself going.
+     */
+    suspend fun sideRefusal(hop: URI): String? {
+      val host = hop.host.lowercase()
+      return if (mayReach(hop.toString(), host, previousHost, declines = false)) {
+        null
+      } else {
+        declinedMessage(host)
+      }
+    }
+
+    private suspend fun mayReach(
+      url: String,
+      host: String,
+      from: String,
+      declines: Boolean = true,
+    ): Boolean {
+      if (host in allowedHosts) return true
+      val request = PageAccessRequest(url, host, kind, reason, redirectFrom = from)
+      val allowed = mayContact(request)
+      if (allowed) allowedHosts += host else if (declines) declined = true
+      return allowed
+    }
+  }
+
   companion object {
+    private const val MAX_REASON_LENGTH = 160
+    private const val MAX_STEP_TITLE_LENGTH = 120
+    private const val MAX_STEP_DETAILS_LENGTH = 600
+    private const val MAX_SOURCE_TITLE_LENGTH = 200
     private const val MAX_TEXT_LENGTH = 30_000
     private const val MAX_LINKS = 50
     private const val SURROUNDING_TEXT_LIMIT = 100

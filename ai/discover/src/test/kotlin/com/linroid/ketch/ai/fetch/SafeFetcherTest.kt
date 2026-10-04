@@ -107,6 +107,54 @@ class SafeFetcherTest {
   }
 
   @Test
+  fun head_refusedRedirectHop_isNotRequested() = runTest {
+    val engine = engine { request ->
+      if (request.url.host == "example.com") {
+        respond("", HttpStatusCode.Found, redirectTo("https://cdn.example.net/file.iso"))
+      } else {
+        respond("")
+      }
+    }
+
+    val result = fetcher(engine).head("https://example.com/download") { hop ->
+      if (hop.host == "cdn.example.net") "not allowed" else null
+    }
+
+    val failed = assertIs<HeadResult.Failed>(result)
+    assertEquals("Redirect refused: not allowed", failed.reason)
+    assertEquals(listOf("https://example.com/download"), engine.requestedUrls)
+  }
+
+  @Test
+  fun fetch_refusedHop_isNeverLookedUp() = runTest {
+    val lookups = mutableListOf<String>()
+    val validator = UrlValidator(resolve = { host ->
+      lookups += host
+      fakeDns("example.com" to "93.184.215.14", "cdn.example.net" to "151.101.1.1")(host)
+    })
+    val engine = engine { request ->
+      if (request.url.host == "example.com") {
+        respond("", HttpStatusCode.Found, redirectTo("https://cdn.example.net/file.iso"))
+      } else {
+        respond("")
+      }
+    }
+    val fetcher = SafeFetcher(
+      httpClient = HttpClient(engine) { followRedirects = false },
+      urlValidator = validator,
+      rateLimiter = RateLimiter(delayMs = 0),
+    )
+
+    val result = fetcher.fetch("https://example.com/download") { hop ->
+      if (hop.host == "cdn.example.net") "not allowed" else null
+    }
+
+    // checkHop runs before the lookup, which would already reach the domain's DNS servers.
+    assertEquals("Redirect refused: not allowed", assertIs<FetchResult.Failed>(result).reason)
+    assertEquals(listOf("example.com"), lookups)
+  }
+
+  @Test
   fun fetch_redirectLoop_stopsAtHopLimit() = runTest {
     val engine = engine { respond("", HttpStatusCode.Found, redirectTo("/loop")) }
 

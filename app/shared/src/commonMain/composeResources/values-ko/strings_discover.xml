@@ -18,8 +18,10 @@
   <string name="discover_setup_in_settings">설정에서 구성하기</string>
   <string name="discover_provider_openai_compatible">OpenAI 호환</string>
 
-  <string name="discover_query_placeholder">다운로드할 항목을 설명하세요</string>
+  <string name="discover_query_placeholder">찾을 항목을 설명하세요…</string>
+  <string name="discover_follow_up_placeholder">후속 질문을 입력하세요…</string>
   <string name="discover_find">검색</string>
+  <string name="discover_send">보내기</string>
   <string name="discover_stop">중지</string>
   <string name="discover_sites_limit">특정 웹사이트로 제한</string>
   <plurals name="discover_sites_count">
@@ -31,28 +33,116 @@
     <item quantity="other">이전 단계 %1$d개</item>
   </plurals>
   <string name="discover_step_starting">검색 시작 중</string>
+  <string name="discover_steps_details">세부 정보</string>
+
+  <string name="discover_limited_to">%1$s에서만 검색</string>
+  <string name="discover_queued">다른 검색이 끝날 때까지 대기 중</string>
+  <string name="discover_show_more">더 보기</string>
+  <string name="discover_show_less">접기</string>
+  <plurals name="discover_access_allowed">
+    <item quantity="other">사이트 %1$d개 허용됨</item>
+  </plurals>
+  <plurals name="discover_access_denied">
+    <item quantity="other">사이트 %1$d개 거부됨</item>
+  </plurals>
+  <string name="discover_access_allowed_host">%1$s 허용됨</string>
+  <string name="discover_access_denied_host">%1$s 거부됨</string>
+
+  <string name="discover_approval_page">%1$s을(를) 열까요?</string>
+  <string name="discover_approval_file">%1$s에서 파일을 확인할까요?</string>
+  <string name="discover_approval_redirect">%1$s(으)로 리디렉션을 따라갈까요?</string>
+  <string name="discover_approval_redirect_from">%1$s에서 리디렉션됨</string>
+  <string name="discover_approval_reason">찾기가 밝힌 이유: %1$s</string>
+  <string name="discover_approval_allow">허용</string>
+  <string name="discover_approval_allow_once">한 번 허용</string>
+  <string name="discover_approval_deny">거부</string>
+  <string name="discover_approval_always">%1$s 항상 허용</string>
+  <string name="discover_approval_allow_site">이 대화에서 %1$s 허용</string>
+  <string name="discover_approval_allow_all">이 대화에서 모든 사이트 허용</string>
+  <string name="discover_approval_allow_caption">이 대화에서 %1$s 및 하위 도메인을 허용합니다</string>
+  <string name="discover_approval_settings">페이지 접근 설정</string>
+  <string name="discover_approval_pane">찾기에서 %1$s을(를) 열려고 합니다</string>
+  <string name="discover_approval_jump">승인 필요</string>
 
   <string name="discover_select_all">모두 선택</string>
   <string name="discover_clear_selection">선택 해제</string>
   <plurals name="discover_results">
     <item quantity="other">다운로드 %1$d개</item>
   </plurals>
-  <string name="discover_results_for">“%1$s” 검색 결과</string>
   <string name="discover_match">%1$s 일치</string>
   <string name="discover_match_tooltip">검색어와 일치하는 정도</string>
   <string name="discover_not_encrypted">암호화되지 않음</string>
   <string name="discover_error_title">찾기에서 이 검색을 완료하지 못했습니다</string>
   <string name="discover_failed">찾기 실패</string>
-  <string name="discover_unavailable">이 기기에서는 AI 찾기를 사용할 수 없습니다.</string>
   <string name="discover_none_title">다운로드를 찾지 못했습니다</string>
   <string name="discover_none_body">찾기는 신뢰할 수 있는 출처의 파일만 보여 줍니다. 버전이나 플랫폼, 또는 배포하는 웹사이트를 함께 입력해 보세요.</string>
   <string name="discover_search_everywhere">웹 전체 검색</string>
+  <string name="discover_stopped">중지됨</string>
+  <string name="discover_discard">제외</string>
+  <string name="discover_discard_all">모두 제외</string>
+  <plurals name="discover_discarded_count">
+    <item quantity="other">%1$d개 제외됨</item>
+  </plurals>
+  <string name="discover_restore">복원</string>
+
+  <plurals name="discover_discarded">
+    <item quantity="other">결과 %1$d개 제외됨</item>
+  </plurals>
+  <string name="discover_deleted">“%1$s” 삭제됨</string>
+  <plurals name="discover_history_cleared">
+    <item quantity="other">기록에서 검색 %1$d개를 지움</item>
+  </plurals>
+  <string name="discover_undo_discard">결과 제외 실행 취소</string>
+  <string name="discover_undo_delete">검색 삭제 실행 취소</string>
+  <string name="discover_undo_clear_history">기록 지우기 실행 취소</string>
+  <string name="discover_needs_ok">찾기에서 %1$s을(를) 열려면 승인이 필요합니다</string>
 
   <string name="discover_select_to_add">추가할 다운로드 선택</string>
   <plurals name="discover_selected">
     <item quantity="other">%1$d개 선택됨</item>
   </plurals>
+  <plurals name="discover_selected_earlier">
+    <item quantity="other">이전 결과 %1$d개 포함</item>
+  </plurals>
   <string name="discover_add_now">지금 추가</string>
+  <string name="discover_add_options">다른 추가 방법</string>
+  <string name="discover_add_to">추가할 기기</string>
   <string name="discover_review_add">검토 후 추가</string>
   <string name="discover_review_add_count">%1$d개 검토 후 추가</string>
+
+  <string name="discover_history">기록</string>
+  <string name="discover_history_show">기록 보기</string>
+  <string name="discover_history_hide">기록 숨기기</string>
+  <string name="discover_new_search">새 검색</string>
+  <string name="discover_delete_search">이 검색 삭제</string>
+  <string name="discover_history_clear">기록 지우기</string>
+  <string name="discover_history_filter">기록 검색</string>
+  <string name="discover_history_empty">실행한 검색이 여기에 표시됩니다.</string>
+  <string name="discover_history_no_match">“%1$s”에 해당하는 검색이 없습니다</string>
+  <string name="discover_history_earlier">이전</string>
+  <string name="discover_history_searching">검색 중…</string>
+  <string name="discover_history_queued">시작 대기 중</string>
+  <string name="discover_history_needs_ok">승인 필요</string>
+  <string name="discover_history_failed">실패</string>
+  <plurals name="discover_history_results">
+    <item quantity="other">결과 %1$d개</item>
+  </plurals>
+  <string name="discover_history_no_results">결과 없음</string>
+  <plurals name="discover_history_waiting">
+    <item quantity="other">승인이 필요한 검색 %1$d개</item>
+  </plurals>
+  <plurals name="discover_waiting">
+    <item quantity="other">%1$d개 승인 대기 중</item>
+  </plurals>
+  <plurals name="discover_nav_waiting">
+    <item quantity="other">%1$s, %2$d개 승인 대기 중</item>
+  </plurals>
+  <string name="discover_setup_to_continue">계속하려면 찾기를 설정하세요</string>
+
+  <string name="command_discover_send">메시지 보내기</string>
+  <string name="command_discover_stop">검색 중지</string>
+  <string name="command_discover_allow">웹사이트 허용</string>
+  <string name="command_discover_deny">웹사이트 거부</string>
+  <string name="command_discover_discard">결과 제외 또는 검색 삭제</string>
+  <string name="command_discover_history">기록 보기/숨기기</string>
 </resources>

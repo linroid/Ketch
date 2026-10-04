@@ -46,6 +46,7 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.devices.storageLabel
+import com.linroid.ketch.app.ui.inspector.FirstThatFits
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.pulse_active
 import ketch.app.shared.generated.resources.pulse_idle
@@ -57,7 +58,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The phone's summary line under the "Downloads" title, such as
- * "↓ 4.2 MB/s · 2 active · Full speed ▾"; tapping it opens the [PulseSheet].
+ * "↓ 4.2 MB/s · 2 active · Full speed ▾"; tapping it opens the [PulseSheet]. When the page's
+ * buttons leave it too little room it drops its middle parts, then the speed mode, rather than
+ * end in an ellipsis; screen readers always hear all of it.
  */
 @Composable
 fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -74,8 +77,8 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
   } else {
     view.label
   }
-  val text = pulseSubtitle(pulse, mode).resolve()
-  val description = stringResource(Res.string.pulse_subtitle_description, text)
+  val variants = pulseSubtitleVariants(pulse, mode).map { it.resolve() }
+  val description = stringResource(Res.string.pulse_subtitle_description, variants.first())
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
@@ -86,22 +89,39 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
       .semantics(mergeDescendants = true) { contentDescription = description }
       .ketchClickable(interactions, focus, onClick = onClick),
   ) {
-    Text(
-      text = text,
-      style = KetchTheme.typography.caption,
-      color = if (view.limited) colors.status.paused.color else colors.textSecondary,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(1f, fill = false),
-    )
+    FirstThatFits(count = variants.size, modifier = Modifier.weight(1f, fill = false)) { variant ->
+      Text(
+        text = variants[variant],
+        style = KetchTheme.typography.caption,
+        color = if (view.limited) colors.status.paused.color else colors.textSecondary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
     KetchIconImage(icon = KetchIcon.ChevronDown, size = ChevronSize, tint = colors.textTertiary)
   }
 }
 
 /** The phone subtitle: "↓ 4.2 MB/s · 2 active · Full", or "Idle · Slow lane · 1 MB/s". */
-internal fun pulseSubtitle(pulse: PulseState, modeLabel: UiText): UiText {
+internal fun pulseSubtitle(pulse: PulseState, modeLabel: UiText): UiText =
+  pulseSubtitleVariants(pulse, modeLabel).first()
+
+/**
+ * The phone subtitle from the fullest to the shortest: all of it, then without the middle parts
+ * ("↓ 4.2 MB/s · Full"), then the first part alone ("↓ 4.2 MB/s").
+ */
+internal fun pulseSubtitleVariants(pulse: PulseState, modeLabel: UiText): List<UiText> {
+  val parts = pulseParts(pulse)
+  return listOfNotNull(
+    (parts + modeLabel).joinText(),
+    listOf(parts.first(), modeLabel).joinText().takeIf { parts.size > 1 },
+    parts.first(),
+  )
+}
+
+private fun pulseParts(pulse: PulseState): List<UiText> {
   val device = pulse.devices.firstOrNull()
-  val parts = when {
+  return when {
     device != null && !device.health.isOnline -> listOf(healthText(device.health))
     pulse.counts.downloading > 0 -> listOf(
       Res.string.pulse_subtitle_speed.text(speedText(pulse.totalSpeed)),
@@ -109,7 +129,6 @@ internal fun pulseSubtitle(pulse: PulseState, modeLabel: UiText): UiText {
     )
     else -> listOf(Res.string.pulse_idle.text())
   }
-  return (parts + modeLabel).joinText()
 }
 
 /**
