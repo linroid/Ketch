@@ -39,7 +39,7 @@ class KetchMcpServer(
   private val ketch: KetchApi,
 ) {
   private val toolRegistry = ToolRegistry {
-    tools(KetchToolSet(ketch).asDeclaredTools())
+    tools(KetchToolSet(ketch).tools())
   }
 
   /**

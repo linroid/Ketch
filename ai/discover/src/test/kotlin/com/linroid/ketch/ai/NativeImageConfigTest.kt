@@ -4,18 +4,13 @@ import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.ollama.client.OllamaClient
-import com.linroid.ketch.ai.agent.DiscoveryToolSet
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
-import java.lang.reflect.GenericArrayType
 import java.lang.reflect.ParameterizedType
-import java.lang.reflect.Type
-import java.lang.reflect.TypeVariable
-import java.lang.reflect.WildcardType
 import java.util.jar.JarFile
 import kotlin.reflect.KClass
 import kotlin.test.Test
@@ -39,36 +34,6 @@ class NativeImageConfigTest {
     val registered = registeredNames()
     val missing = subtypes.flatMap { lookupClassNames(it.java) }.filter { it !in registered }
     assertEquals(emptyList(), missing)
-  }
-
-  /**
-   * Koog lists a tool set's tools through kotlin-reflect, which loads every class in the tool
-   * set's member signatures: private members and generic type arguments included. The native
-   * binary fails to list the tools when one of them is not registered.
-   */
-  @Test
-  fun `every Ketch class in the tool set signatures is registered for reflection`() {
-    val toolSet = DiscoveryToolSet::class.java
-    val signatures = toolSet.declaredConstructors.flatMap { it.genericParameterTypes.asList() } +
-      toolSet.declaredFields.map { it.genericType } +
-      toolSet.declaredMethods.flatMap { it.genericParameterTypes.asList() + it.genericReturnType }
-    val ketchClasses = signatures.flatMap(::classesIn).map { it.name }
-      .filter { it.startsWith("com.linroid.ketch.") }
-      .distinct()
-    assertTrue(ketchClasses.isNotEmpty(), "found no Ketch classes in the tool set")
-
-    val registered = registeredNames()
-    assertEquals(emptyList(), ketchClasses.filter { it !in registered })
-  }
-
-  /** The classes [type] names, its type arguments and bounds included. */
-  private fun classesIn(type: Type): List<Class<*>> = when (type) {
-    is Class<*> -> if (type.isArray) classesIn(type.componentType) else listOf(type)
-    is ParameterizedType -> classesIn(type.rawType) + type.actualTypeArguments.flatMap(::classesIn)
-    is WildcardType -> (type.upperBounds + type.lowerBounds).flatMap(::classesIn)
-    is GenericArrayType -> classesIn(type.genericComponentType)
-    is TypeVariable<*> -> type.bounds.flatMap(::classesIn)
-    else -> emptyList()
   }
 
   /** Base types of the content-polymorphic serializers in the clients [LlmClientFactory] uses. */

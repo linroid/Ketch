@@ -30,8 +30,8 @@ ai/discover/
 ├── PageAccess.kt                # Approver asked before the agent opens a website
 │
 ├── agent/                       # Agent-driven discovery
-│   ├── DiscoveryToolSet.kt      # 7 @Tool methods for the LLM agent
-│   ├── DeclaredTools.kt         # Koog tools with optional parameters and plain text results
+│   ├── DiscoveryToolSet.kt      # The 7 tools of the LLM agent
+│   ├── TextTool.kt              # Hand-described Koog tools with plain text results
 │   ├── AgentOutputParser.kt     # Parse + validate the agent's summary and candidates
 │   ├── AgentText.kt             # Model text made safe to show as plain text
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
@@ -107,9 +107,11 @@ that explains itself in the summary with no candidates.
 | `validateUrl(url)` | Checks the URL's form and allowed sites; never looks the host up | `UrlValidator.check()` + `SiteAllowlist` |
 | `emitStep(title, details)` | Report progress to the user: a one-line title, details of up to 12 lines | `DiscoveryStepListener` |
 
-The tools are registered through `asDeclaredTools()` rather than Koog's `tools(toolSet)`, which
-(as of Koog 1.2.0) tells the model that `maxResults` and `reason` are required and sends each
-result as a quoted, escaped JSON string instead of the JSON the tool returned.
+The tools are `TextTool`s, whose names, descriptions and parameters `DiscoveryToolSet.tools()`
+writes out, rather than Koog's reflective `ToolSet`: that needs kotlin-reflect, which the apps
+and the CLI leave out, and (as of Koog 1.2.0) tells the model that `maxResults` and `reason` are
+required and sends each result as a quoted, escaped JSON string instead of the JSON the tool
+returned.
 
 ## Data Flow
 
@@ -457,7 +459,9 @@ Tests cover:
   first plus latest five), discarded links, summaries, per-run listener and
   approver, runs limited with `sites` never asking
 - `NativeImageConfigTest` — reflection metadata for Koog's content-polymorphic
-  types and for every Ketch class in `DiscoveryToolSet`'s signatures
+  types
+- `TextToolTest` — optional parameters, argument defaults and validation, results
+  passed on as they are
 - `UrlValidatorTest` — SSRF protection (20 tests)
 - `SafeFetcherTest` — validated redirect hops (GET and HEAD), hop limit, final
   URL, size caps and truncation, and no connection when a host rebinds to

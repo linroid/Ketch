@@ -21,8 +21,8 @@ dependencies {
   runtimeOnly(libs.koog.http.client.ktor)
 
   // Ktor client for fetching. SafeFetcher uses the OkHttp engine because,
-  // unlike CIO, it accepts a custom DNS resolver.
-  implementation(libs.ktor.client.cio)
+  // unlike CIO, it accepts a custom DNS resolver. The search and LLM clients
+  // use the default engine of the app (on Android, OkHttp alone).
   implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.contentNegotiation)
   implementation(libs.ktor.serialization.json)
