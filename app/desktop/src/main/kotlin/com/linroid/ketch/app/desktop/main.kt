@@ -70,6 +70,7 @@ import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseModel
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.isPairingLink
@@ -414,7 +415,10 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     onDispose { remove() }
   }
   DisposableEffect(settingsWindow) {
-    val remove = installPreferencesHandler(settingsWindow::show)
+    val remove = installSettingsHandlers(
+      onSettings = settingsWindow::show,
+      onAbout = { settingsWindow.open(SettingsTarget(SettingsTarget.Page.About)) },
+    )
     onDispose { remove() }
   }
 
@@ -662,13 +666,22 @@ private suspend fun announceBackground(trayState: TrayState) {
   trayState.sendNotification(notice)
 }
 
-/** Opens Settings from the macOS app menu's "Settings…" item; returns what removes it. */
-private fun installPreferencesHandler(onOpen: () -> Unit): () -> Unit {
+/** Opens Settings from the macOS Settings and About items; returns what removes the handlers. */
+private fun installSettingsHandlers(onSettings: () -> Unit, onAbout: () -> Unit): () -> Unit {
   if (!Desktop.isDesktopSupported()) return {}
   val desktop = Desktop.getDesktop()
-  if (!desktop.isSupported(Desktop.Action.APP_PREFERENCES)) return {}
-  desktop.setPreferencesHandler { EventQueue.invokeLater(onOpen) }
-  return { desktop.setPreferencesHandler(null) }
+  val preferencesSupported = desktop.isSupported(Desktop.Action.APP_PREFERENCES)
+  val aboutSupported = desktop.isSupported(Desktop.Action.APP_ABOUT)
+  if (preferencesSupported) {
+    desktop.setPreferencesHandler { EventQueue.invokeLater(onSettings) }
+  }
+  if (aboutSupported) {
+    desktop.setAboutHandler { EventQueue.invokeLater(onAbout) }
+  }
+  return {
+    if (preferencesSupported) desktop.setPreferencesHandler(null)
+    if (aboutSupported) desktop.setAboutHandler(null)
+  }
 }
 
 // The window's own shortcuts: Settings everywhere, and on Windows and Linux, which have no menu
