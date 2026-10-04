@@ -110,6 +110,12 @@ class SettingsPageTest {
     assertEquals("Not set up", discoverSummary(saved, saved).load())
     assertEquals("OpenAI", discoverSummary(saved, effective).load())
   }
+  @Test
+  fun discoverSummary_switchedOffWithoutKeys_saysOff() = runTest {
+    val off = AiSettings(enabled = false)
+    assertEquals("Off", discoverSummary(off, off).load())
+  }
+
 
   @Test
   fun downloadsSummary_namesFolderAndQueue() = runTest {

@@ -21,6 +21,7 @@ import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.PageAccessSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -80,6 +81,26 @@ class AiDiscoverySettingsRenderTest {
     }
   }
 
+  @Test
+  fun switchOff_disablesEverythingButTheSwitch() {
+    runDiscoverPage(trusted = listOf("ubuntu.com")) { ai ->
+      ai.setEnabled(false)
+      frames(FRAMES)
+
+      assertTrue(field(PLACEHOLDER).isDisabled(), "The page access field follows the switch")
+      assertTrue(control("Gemini").isDisabled(), "The provider chips follow the switch")
+      assertTrue(control("Ask for each new site").isDisabled(), "So does the page access menu")
+      assertFalse(discoverSwitch().isDisabled(), "The switch itself stays usable")
+
+      discoverSwitch().click()
+      frames(FRAMES)
+
+      assertTrue(ai.settings.enabled)
+      assertFalse(field(PLACEHOLDER).isDisabled())
+      assertEquals(listOf("ubuntu.com"), ai.settings.access.trustedSites, "Nothing is lost")
+    }
+  }
+
   /** Renders the Discover page with [trusted] sites and runs [test] on it. */
   private fun runDiscoverPage(
     trusted: List<String> = emptyList(),
@@ -107,6 +128,33 @@ class AiDiscoverySettingsRenderTest {
   private fun ImageComposeScene.addField(): SemanticsNode = nodes().first { node ->
     SemanticsActions.SetText in node.config && node.subtree().any { it.ownText() == PLACEHOLDER }
   }
+
+  /**
+   * The field showing [placeholder], usable or not: a disabled field cannot be edited, so it
+   * has no SetText.
+   */
+  private fun ImageComposeScene.field(placeholder: String): SemanticsNode = nodes().first { node ->
+    (SemanticsActions.SetText in node.config || SemanticsProperties.Disabled in node.config) &&
+      node.subtree().any { it.ownText() == placeholder }
+  }
+
+  /** The row that switches discovery on and off. */
+  private fun ImageComposeScene.discoverSwitch(): SemanticsNode = nodes().first { node ->
+    SemanticsProperties.ToggleableState in node.config &&
+      node.subtree().any { it.ownText() == "AI discovery" }
+  }
+
+  /** The control around the text [label]. */
+  private fun ImageComposeScene.control(label: String): SemanticsNode =
+    checkNotNull(nodes().first { it.ownText() == label }.clickableAround())
+
+  private fun SemanticsNode.clickableAround(): SemanticsNode? {
+    var node: SemanticsNode? = this
+    while (node != null && SemanticsActions.OnClick !in node.config) node = node.parent
+    return node
+  }
+
+  private fun SemanticsNode.isDisabled(): Boolean = SemanticsProperties.Disabled in config
 
   /** Puts the keyboard in the add field and types [text] into it. */
   private suspend fun ImageComposeScene.typeIntoAddField(text: String) {
