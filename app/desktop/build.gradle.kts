@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -239,6 +240,38 @@ compose.desktop {
         iconFile.set(rootProject.file("art/icon.png"))
       }
       packageVersion = installerVersion(providers.gradleProperty("VERSION_NAME").get())
+    }
+  }
+}
+
+// The tray menu is an AWT menu, which Windows draws with the fonts the runtime's fontconfig lists
+// for the JVM's default charset. That is UTF-8 since JDK 18, and the JDK's Windows fontconfig only
+// has UTF-8 sequences for Hindi, Japanese and Korean, so Chinese text showed as boxes. The runtime
+// reads conf/fonts/fontconfig.properties ahead of its built-in table: the JDK's own template plus
+// Chinese sequences, and a CJK fallback for other locales, where Ketch can still be in Chinese.
+if (providers.systemProperty("os.name").get().startsWith("Windows")) {
+  tasks.withType<AbstractJLinkTask>().configureEach {
+    // The same fonts the JDK uses for the GBK, x-windows-950 and x-MS950-HKSCS charsets.
+    val simplified = "alphabetic,chinese-ms936,dingbats,symbol,chinese-ms936-extb"
+    val traditional = "alphabetic,chinese-ms950,dingbats,symbol,chinese-ms950-extb"
+    val hongKong = "alphabetic,chinese-ms950,chinese-hkscs,dingbats,symbol,chinese-ms950-extb"
+    val sequences = mapOf(
+      "UTF-8.zh.CN" to simplified,
+      "UTF-8.zh.SG" to simplified,
+      "UTF-8.zh.TW" to traditional,
+      "UTF-8.zh.HK" to hongKong,
+      "UTF-8.zh.MO" to hongKong,
+      "UTF-8" to "alphabetic/default,chinese-ms936,japanese,korean,dingbats,symbol",
+    ).entries.joinToString("\n", postfix = "\n") { (elc, fonts) ->
+      "sequence.allfonts.$elc=$fonts"
+    }
+    doLast {
+      val runtime = (this as AbstractJLinkTask).destinationDir.get().asFile
+      val template = runtime.resolve("lib/fontconfig.properties.src")
+      check(template.isFile) { "No fontconfig template in the runtime image: $template" }
+      val config = runtime.resolve("conf/fonts/fontconfig.properties")
+      config.parentFile.mkdirs()
+      config.writeText(template.readText().trimEnd() + "\n\n# Added by Ketch\n" + sequences)
     }
   }
 }
