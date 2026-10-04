@@ -65,6 +65,25 @@ class WebResourcesTest {
   }
 
   @Test
+  fun gzippedFile_gzipRefusedButWildcardAccepted_isSentUnpacked() = testApplication {
+    routing { webResources(::resource) }
+
+    val response = client.get("/app.js") { header(HttpHeaders.AcceptEncoding, "gzip;q=0, *;q=1") }
+
+    assertNull(response.headers[HttpHeaders.ContentEncoding])
+    assertEquals(script, response.bodyAsText())
+  }
+
+  @Test
+  fun gzippedFile_onlyWildcardAccepted_isSentCompressed() = testApplication {
+    routing { webResources(::resource) }
+
+    val response = client.get("/app.js") { header(HttpHeaders.AcceptEncoding, "*") }
+
+    assertEquals("gzip", response.headers[HttpHeaders.ContentEncoding])
+  }
+
+  @Test
   fun plainFile_isSentAsItIs() = testApplication {
     routing { webResources(::resource) }
 

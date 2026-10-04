@@ -499,8 +499,11 @@ internal fun Route.webResources(
     }
     val gzipped = resource("web/$path.gz") ?: return@get
     call.response.header(HttpHeaders.Vary, HttpHeaders.AcceptEncoding)
-    val acceptsGzip = call.request.acceptEncodingItems()
-      .any { (it.value == "gzip" || it.value == "*") && it.quality > 0.0 }
+    // An explicit gzip entry decides, so "gzip;q=0, *" refuses gzip; "*" counts only without one.
+    val encodings = call.request.acceptEncodingItems()
+    val gzip = encodings.find { it.value.equals("gzip", ignoreCase = true) }
+      ?: encodings.find { it.value == "*" }
+    val acceptsGzip = gzip != null && gzip.quality > 0.0
     if (acceptsGzip) {
       call.response.header(HttpHeaders.ContentEncoding, "gzip")
       call.respondBytes(gzipped.readBytes(), contentType)
