@@ -149,6 +149,13 @@
   <string name="settings_notifications_devices">Über diese Geräte benachrichtigen</string>
   <string name="settings_notifications_devices_footer">Ketch bleibt mit den Geräten verbunden, über die es informiert.</string>
   <string name="settings_notifications_this_device">Dieses Gerät</string>
+  <string name="settings_notifications_success">Erfolgsrückmeldung</string>
+  <string name="settings_notifications_success_sound">Ton</string>
+  <string name="settings_notifications_success_sound_hint">Ein leiser Klang.</string>
+  <string name="settings_notifications_success_vibration">Vibration</string>
+  <string name="settings_notifications_success_vibration_hint">Ein kurzes Vibrieren, auch im Vibrationsmodus.</string>
+  <string name="settings_notifications_success_footer">Wenn ein Download fertig ist oder Entdecken Downloads findet.</string>
+  <string name="settings_notifications_success_footer_phone">Wenn ein Download fertig ist oder Entdecken Downloads findet. Lautlos und „Nicht stören“ schalten sie stumm; Mitteilungen im Hintergrund nutzen ihren eigenen Ton.</string>
   <string name="settings_notifications_browser">Browser-Benachrichtigungen</string>
   <string name="settings_notifications_allowed">Benachrichtigungen sind erlaubt</string>
   <string name="settings_notifications_allowed_hint">Werden angezeigt, während der Ketch-Tab im Hintergrund ist.</string>

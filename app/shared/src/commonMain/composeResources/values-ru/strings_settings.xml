@@ -157,6 +157,13 @@
   <string name="settings_notifications_devices">Уведомлять об этих устройствах</string>
   <string name="settings_notifications_devices_footer">Ketch остаётся подключённым к устройствам, о которых сообщает.</string>
   <string name="settings_notifications_this_device">Это устройство</string>
+  <string name="settings_notifications_success">Сигнал успеха</string>
+  <string name="settings_notifications_success_sound">Звук</string>
+  <string name="settings_notifications_success_sound_hint">Тихий сигнал.</string>
+  <string name="settings_notifications_success_vibration">Вибрация</string>
+  <string name="settings_notifications_success_vibration_hint">Короткая вибрация, также в режиме вибрации.</string>
+  <string name="settings_notifications_success_footer">Когда загрузка завершена или Поиск находит загрузки.</string>
+  <string name="settings_notifications_success_footer_phone">Когда загрузка завершена или Поиск находит загрузки. Беззвучный режим и «Не беспокоить» его отключают, а уведомления в фоне звучат по-своему.</string>
   <string name="settings_notifications_browser">Уведомления браузера</string>
   <string name="settings_notifications_allowed">Уведомления разрешены</string>
   <string name="settings_notifications_allowed_hint">Показываются, когда вкладка Ketch в фоне.</string>

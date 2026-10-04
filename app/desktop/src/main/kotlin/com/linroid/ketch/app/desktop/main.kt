@@ -37,6 +37,7 @@ import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
+import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
@@ -455,8 +456,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   fun inFront() = behavior.windowVisible && !windowState.isMinimized &&
     (windowFocused || settingsWindow.focused)
   val status = rememberDesktopStatus(controller, controller.pulse.state, mainInFront())
+  val successFeedback = remember { SuccessFeedback(DesktopFeedbackPlayer()) }
   val activityEvents = remember {
-    reportDesktopActivity(controller, notifier, ::inFront)
+    reportDesktopActivity(controller, notifier, successFeedback, ::inFront)
   }
   // Pairing requests ask in the main window; from the tray while it is not in front.
   remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
@@ -468,6 +470,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       settings = { controller.appSettings.config.notifications },
       inFront = snapshotFlow { inFront() },
     )
+  }
+  LaunchedEffect(controller, successFeedback) {
+    successFeedback.follow(controller.state.aiDiscover) {
+      controller.appSettings.config.notifications
+    }
   }
   KetchTray(controller, status, actions, speedMode, trayState)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
@@ -783,13 +790,15 @@ private fun windowExceptionHandlers(controller: AppController) =
 /**
  * Reports what happens on the devices the app watches: as toasts while the window is [inFront],
  * otherwise as notifications from the tray, as the notification settings allow. Downloads added
- * while the window is not in front, such as one the browser extension sent, are announced too.
+ * while the window is not in front, such as one the browser extension sent, are announced too,
+ * and finished downloads get [successFeedback].
  *
  * @return the events to show as toasts.
  */
 private fun reportDesktopActivity(
   controller: AppController,
   notifier: SystemNotifier,
+  successFeedback: SuccessFeedback,
   inFront: () -> Boolean,
 ): Flow<ActivityEvent> {
   val manager = controller.instanceManager
@@ -809,6 +818,7 @@ private fun reportDesktopActivity(
         ActivityRouting.copyOf(event, ActivityRouting.deviceNameOf(event, manager))
           ?.let { notifier.notify(event, it) }
       }
+      successFeedback.reported(event, delivery, settings, notificationsAlert = false)
       if (event is ActivityEvent.Added && announcesAdded(event, settings, front)) added.add(event)
     }
   }
