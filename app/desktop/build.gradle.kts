@@ -251,7 +251,8 @@ compose.desktop {
 // Chinese sequences, and a CJK fallback for other locales, where Ketch can still be in Chinese.
 if (providers.systemProperty("os.name").get().startsWith("Windows")) {
   tasks.withType<AbstractJLinkTask>().configureEach {
-    // The same fonts the JDK uses for the GBK, x-windows-950 and x-MS950-HKSCS charsets.
+    // The same fonts the JDK uses for the GBK, x-windows-950 and x-MS950-HKSCS charsets. Their
+    // encoders, and Japanese and Korean ones, are in java.base on Windows, not in jdk.charsets.
     val simplified = "alphabetic,chinese-ms936,dingbats,symbol,chinese-ms936-extb"
     val traditional = "alphabetic,chinese-ms950,dingbats,symbol,chinese-ms950-extb"
     val hongKong = "alphabetic,chinese-ms950,chinese-hkscs,dingbats,symbol,chinese-ms950-extb"
