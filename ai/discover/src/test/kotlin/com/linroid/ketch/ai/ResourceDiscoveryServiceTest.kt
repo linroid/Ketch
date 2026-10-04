@@ -428,7 +428,7 @@ class ResourceDiscoveryServiceTest {
 
   @Test
   fun systemPrompt_answersNarrowingFollowUpsFromEarlierResults() {
-    val prompt = ResourceDiscoveryService.SYSTEM_PROMPT
+    val prompt = ResourceDiscoveryService.systemPrompt(contentFilter = true)
     assertTrue("WORKFLOW for a first request" in prompt)
     assertTrue("answer from the earlier results alone" in prompt)
     assertTrue("emitStep(\"Refining\"" in prompt)
@@ -474,9 +474,30 @@ class ResourceDiscoveryServiceTest {
 
   @Test
   fun systemPrompt_asksForATitleForAFirstRequestOnly() {
-    val prompt = ResourceDiscoveryService.SYSTEM_PROMPT
+    val prompt = ResourceDiscoveryService.systemPrompt(contentFilter = true)
     assertTrue("\"title\": \"short name for this search\"" in prompt)
     assertTrue("Give it for a first request; a follow-up may" in prompt)
+  }
+
+  @Test
+  fun discover_contentFilterOn_toldToRefusePiracyAndBlockUnsafeLinks() = runTest {
+    val system = firstPrompt(DiscoverQuery(query = "tool release")).messages.first()
+
+    assertEquals(Role.System, system.role)
+    assertTrue("ANTI-PIRACY GUARDRAIL" in system.textContent())
+    assertTrue("BLOCK URL shorteners" in system.textContent())
+  }
+
+  @Test
+  fun discover_contentFilterOff_notToldToRefuseOrBlock() = runTest {
+    val query = DiscoverQuery(query = "tool release", contentFilter = false)
+
+    val system = firstPrompt(query).messages.first().textContent()
+
+    assertTrue("ANTI-PIRACY" !in system, system)
+    assertTrue("BLOCK" !in system, system)
+    assertTrue("content filter off" in system)
+    assertTrue("SAFETY CONSTRAINTS:" in system)
   }
 
   @Test
