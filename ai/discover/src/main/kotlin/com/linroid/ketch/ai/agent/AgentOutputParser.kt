@@ -48,9 +48,9 @@ internal class AgentOutputParser(
    * never the site.
    *
    * With [contentFilter], the [DeviceSafetyFilter] then drops candidates it
-   * blocks, counted in [ParsedOutput.filtered], and scales the confidence of
-   * the rest by its score. Without it, candidates keep the agent's
-   * confidence.
+   * blocks, counted in [ParsedOutput.filtered] once per link none of whose
+   * copies pass, and scales the confidence of the rest by its score.
+   * Without it, candidates keep the agent's confidence.
    *
    * The answer's title, and a candidate's title, description and file
    * name, are reduced to one line of plain text: the model wrote them, and
@@ -64,18 +64,19 @@ internal class AgentOutputParser(
   ): ParsedOutput {
     val decoded = decode(agentOutput) ?: return textAnswer(agentOutput)
     val excluded = excludedUrls.mapTo(HashSet(), SiteNames::canonicalUrl)
-    var filtered = 0
-    val candidates = decoded.candidates
+    // Every copy of a link is checked, so one the filter passes wins whatever comes first.
+    val checked = decoded.candidates
       .filterNot { SiteNames.canonicalUrl(it.url) in excluded }
+      .map { c -> SiteNames.canonicalUrl(c.url) to check(c, allowlist, contentFilter) }
+    val candidates = checked
+      .mapNotNull { (_, result) -> (result as? Checked.Kept)?.candidate }
       .distinctBy { SiteNames.canonicalUrl(it.url) }
-      .mapNotNull { c ->
-        when (val checked = check(c, allowlist, contentFilter)) {
-          is Checked.Kept -> checked.candidate
-          Checked.Filtered -> null.also { filtered++ }
-          Checked.Dropped -> null
-        }
-      }
       .sortedByDescending { it.confidence }
+    val shown = candidates.mapTo(HashSet()) { SiteNames.canonicalUrl(it.url) }
+    val filtered = checked
+      .filter { (url, result) -> result == Checked.Filtered && url !in shown }
+      .distinctBy { (url, _) -> url }
+      .size
     return ParsedOutput(
       summary = sanitizeAgentText(decoded.summary, MAX_SUMMARY_LENGTH),
       candidates = candidates,

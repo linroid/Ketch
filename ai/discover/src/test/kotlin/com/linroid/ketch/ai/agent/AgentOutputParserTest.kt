@@ -89,6 +89,18 @@ class AgentOutputParserTest {
   }
 
   @Test
+  fun parse_duplicateWhoseFirstCopyIsFiltered_keepsTheCleanCopy() = runTest {
+    val output = """[
+      {"name":"Patched","url":"https://example.com/app.zip","confidence":0.9,
+       "deviceSafetyNotes":"Includes a patch"},
+      {"name":"Clean","url":"https://example.com/app.zip#clean","confidence":0.8}
+    ]"""
+    val result = parser.parse(output)
+    assertEquals(listOf("Clean"), result.candidates.map { it.title })
+    assertEquals(0, result.filtered)
+  }
+
+  @Test
   fun parse_contentFilterOff_keepsWhatItWouldHideButNotPrivateAddresses() = runTest {
     val output = """[
       {"name":"Short","url":"https://bit.ly/abc","confidence":0.9},
