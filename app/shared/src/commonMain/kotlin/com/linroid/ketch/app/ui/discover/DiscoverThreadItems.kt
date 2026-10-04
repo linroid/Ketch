@@ -78,7 +78,15 @@ internal sealed interface ThreadItem {
     override val key: String = "${turn.id}/discarded"
   }
 
-  /** The turn found nothing; [canSearchEverywhere] offers the whole web. */
+  /** "2 hidden by the content filter · Settings" under the results the turn shows. */
+  data class Filtered(override val turn: DiscoverTurn) : ThreadItem {
+    override val key: String = "${turn.id}/filtered"
+  }
+
+  /**
+   * The turn found nothing; [canSearchEverywhere] offers the whole web. When the content filter
+   * hid what it found ([DiscoverTurn.filtered]), it says so and offers its setting.
+   */
   data class NoResults(
     override val turn: DiscoverTurn,
     val canSearchEverywhere: Boolean,
@@ -153,6 +161,7 @@ private fun MutableList<ThreadItem>.addResults(
   }
   val discarded = session.discardedIn(turn)
   if (discarded.isNotEmpty()) add(ThreadItem.Discarded(turn, discarded))
+  if (turn.filtered > 0 && turn.candidates.isNotEmpty()) add(ThreadItem.Filtered(turn))
   if (turn.candidates.isEmpty()) {
     add(ThreadItem.NoResults(turn, canSearchEverywhere = offers && turn.sites.isNotEmpty()))
   }

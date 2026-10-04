@@ -91,6 +91,12 @@
   <string name="discover_failed">Ошибка поиска</string>
   <string name="discover_none_title">Загрузки не найдены</string>
   <string name="discover_none_body">Показываются только файлы из надёжных источников. Попробуйте указать версию, платформу или сайт, который публикует файл.</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="one">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
+    <item quantity="few">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
+    <item quantity="many">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
+    <item quantity="other">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
+  </plurals>
   <string name="discover_search_everywhere">Искать по всему интернету</string>
   <string name="discover_stopped">Остановлено</string>
   <string name="discover_discard">Убрать</string>
@@ -102,6 +108,12 @@
     <item quantity="other">Убрано: %1$d</item>
   </plurals>
   <string name="discover_restore">Вернуть</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="one">Скрыто фильтром содержимого: %1$d</item>
+    <item quantity="few">Скрыто фильтром содержимого: %1$d</item>
+    <item quantity="many">Скрыто фильтром содержимого: %1$d</item>
+    <item quantity="other">Скрыто фильтром содержимого: %1$d</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="one">Убран %1$d результат</item>

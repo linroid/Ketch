@@ -11,6 +11,7 @@ import ketch.app.shared.generated.resources.settings_about_source
 import ketch.app.shared.generated.resources.settings_about_version
 import ketch.app.shared.generated.resources.settings_about_welcome
 import ketch.app.shared.generated.resources.settings_ai_access_mode
+import ketch.app.shared.generated.resources.settings_ai_content_filter
 import ketch.app.shared.generated.resources.settings_ai_access_trusted
 import ketch.app.shared.generated.resources.settings_ai_api_key
 import ketch.app.shared.generated.resources.settings_ai_discovery
@@ -56,6 +57,8 @@ import ketch.app.shared.generated.resources.settings_search_accent
 import ketch.app.shared.generated.resources.settings_search_accent_keywords
 import ketch.app.shared.generated.resources.settings_search_ai_access
 import ketch.app.shared.generated.resources.settings_search_ai_access_keywords
+import ketch.app.shared.generated.resources.settings_search_ai_content_filter
+import ketch.app.shared.generated.resources.settings_search_ai_content_filter_keywords
 import ketch.app.shared.generated.resources.settings_search_ai_keywords
 import ketch.app.shared.generated.resources.settings_search_ai_trusted
 import ketch.app.shared.generated.resources.settings_search_ai_trusted_keywords
@@ -302,6 +305,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_discovery,
     keywords = Res.string.settings_search_ai_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Discover,
+    title = Res.string.settings_ai_content_filter,
+    description = Res.string.settings_search_ai_content_filter.text(),
+    keywords = Res.string.settings_search_ai_content_filter_keywords,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,

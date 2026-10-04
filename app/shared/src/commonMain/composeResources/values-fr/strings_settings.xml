@@ -193,6 +193,8 @@
   <string name="settings_integration_quick_add_hint">Coller un lien l'ajoute aussitôt, avec possibilité d'annuler.</string>
 
   <string name="settings_ai_discovery">Découverte par IA</string>
+  <string name="settings_ai_content_filter">Filtre de contenu</string>
+  <string name="settings_ai_content_filter_hint">Masque les résultats qui semblent dangereux : liens raccourcis, agrégateurs de téléchargements, piratage, sites imitant d’autres sites et installeurs en HTTP non chiffré. Les liens vers votre propre réseau restent masqués dans tous les cas.</string>
   <string name="settings_ai_provider">Fournisseur</string>
   <string name="settings_ai_api_key">Clé API</string>
   <string name="settings_ai_model">Modèle</string>
@@ -541,6 +543,8 @@
   <string name="settings_search_web_search_keywords">fournisseur de recherche, clé api de recherche, moteur</string>
   <string name="settings_search_ai_access">Demander ou non avant que Découvrir ouvre un site web</string>
   <string name="settings_search_ai_access_keywords">accès aux pages, autorisation, permission, approbation, autoriser, demander, confidentialité, vie privée</string>
+  <string name="settings_search_ai_content_filter">Masquer ou non les résultats de Découvrir qui semblent dangereux</string>
+  <string name="settings_search_ai_content_filter_keywords">sécurité, recherche sécurisée, dangereux, logiciel malveillant, malware, piratage, bloquer, masquer, résultats masqués</string>
   <string name="settings_search_ai_trusted">Sites web que Découvrir ouvre sans demander</string>
   <string name="settings_search_ai_trusted_keywords">sites de confiance, toujours autorisés, liste d'autorisation, liste blanche, domaines, autorisation</string>
   <string name="settings_search_version_keywords">build, révision, mise à jour</string>

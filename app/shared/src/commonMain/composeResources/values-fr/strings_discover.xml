@@ -81,6 +81,10 @@
   <string name="discover_failed">La recherche a échoué</string>
   <string name="discover_none_title">Aucun téléchargement trouvé</string>
   <string name="discover_none_body">Découvrir ne liste que les fichiers de sources fiables. Essayez de préciser la version ou la plateforme, ou le site qui le publie.</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="one">Le filtre de contenu a masqué %1$d résultat qui semblait dangereux. Vous pouvez désactiver le filtre dans les Réglages de Découvrir.</item>
+    <item quantity="other">Le filtre de contenu a masqué %1$d résultats qui semblaient dangereux. Vous pouvez désactiver le filtre dans les Réglages de Découvrir.</item>
+  </plurals>
   <string name="discover_search_everywhere">Rechercher sur tout le web</string>
   <string name="discover_stopped">Arrêtée</string>
   <string name="discover_discard">Écarter</string>
@@ -90,6 +94,10 @@
     <item quantity="other">%1$d écartés</item>
   </plurals>
   <string name="discover_restore">Restaurer</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="one">%1$d masqué par le filtre de contenu</item>
+    <item quantity="other">%1$d masqués par le filtre de contenu</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="one">%1$d résultat écarté</item>

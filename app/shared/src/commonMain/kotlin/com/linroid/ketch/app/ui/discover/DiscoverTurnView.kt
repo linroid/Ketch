@@ -55,8 +55,10 @@ import ketch.app.shared.generated.resources.discover_clear_selection
 import ketch.app.shared.generated.resources.discover_discard_all
 import ketch.app.shared.generated.resources.discover_discarded_count
 import ketch.app.shared.generated.resources.discover_error_title
+import ketch.app.shared.generated.resources.discover_filtered_count
 import ketch.app.shared.generated.resources.discover_limited_to
 import ketch.app.shared.generated.resources.discover_none_body
+import ketch.app.shared.generated.resources.discover_none_filtered
 import ketch.app.shared.generated.resources.discover_none_title
 import ketch.app.shared.generated.resources.discover_queued
 import ketch.app.shared.generated.resources.discover_restore
@@ -250,6 +252,22 @@ internal fun DiscardedLine(count: Int, onRestore: () -> Unit, modifier: Modifier
 }
 
 /**
+ * "2 hidden by the content filter · Settings": results of the turn that the content filter hid,
+ * with Discover's settings, where it can be turned off.
+ */
+@Composable
+internal fun FilteredLine(count: Int, onSettings: () -> Unit, modifier: Modifier = Modifier) {
+  Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+    Text(
+      text = pluralStringResource(Res.plurals.discover_filtered_count, count, count) + SEPARATOR,
+      style = KetchTheme.typography.caption,
+      color = KetchTheme.colors.textTertiary,
+    )
+    TextLink(text = stringResource(Res.string.discover_settings), onClick = onSettings)
+  }
+}
+
+/**
  * What went wrong, with Discover's settings that may fix it, and Try again where [onRetry] is
  * given.
  */
@@ -345,10 +363,16 @@ internal fun StoppedNote(onRetry: (() -> Unit)?, modifier: Modifier = Modifier) 
 
 /**
  * The search found nothing it trusts, with tips, and the whole web where [onSearchEverywhere]
- * is given.
+ * is given. When the content filter hid [filtered] results, it says so instead of the tips and
+ * offers Discover's settings, where the filter can be turned off.
  */
 @Composable
-internal fun NoResults(onSearchEverywhere: (() -> Unit)?, modifier: Modifier = Modifier) {
+internal fun NoResults(
+  onSearchEverywhere: (() -> Unit)?,
+  filtered: Int,
+  onSettings: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   Row(
@@ -366,19 +390,38 @@ internal fun NoResults(onSearchEverywhere: (() -> Unit)?, modifier: Modifier = M
         color = colors.textPrimary,
       )
       Text(
-        text = stringResource(Res.string.discover_none_body),
+        text = if (filtered > 0) {
+          pluralStringResource(Res.plurals.discover_none_filtered, filtered, filtered)
+        } else {
+          stringResource(Res.string.discover_none_body)
+        },
         style = KetchTheme.typography.bodyS,
         color = colors.textSecondary,
       )
-      if (onSearchEverywhere != null) {
-        KetchButton(
-          text = stringResource(Res.string.discover_search_everywhere),
-          onClick = onSearchEverywhere,
-          variant = KetchButtonVariant.Secondary,
-          size = KetchButtonSize.Small,
-          leadingIcon = KetchIcon.Search,
+      if (onSearchEverywhere != null || filtered > 0) {
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(spacing.s2),
           modifier = Modifier.padding(top = spacing.s2),
-        )
+        ) {
+          if (onSearchEverywhere != null) {
+            KetchButton(
+              text = stringResource(Res.string.discover_search_everywhere),
+              onClick = onSearchEverywhere,
+              variant = KetchButtonVariant.Secondary,
+              size = KetchButtonSize.Small,
+              leadingIcon = KetchIcon.Search,
+            )
+          }
+          if (filtered > 0) {
+            KetchButton(
+              text = stringResource(Res.string.discover_settings),
+              onClick = onSettings,
+              variant = KetchButtonVariant.Secondary,
+              size = KetchButtonSize.Small,
+              leadingIcon = KetchIcon.Settings,
+            )
+          }
+        }
       }
     }
   }

@@ -189,6 +189,8 @@
   <string name="settings_integration_quick_add_hint">貼上單一連結時會立即新增，並可復原。</string>
 
   <string name="settings_ai_discovery">AI 探索</string>
+  <string name="settings_ai_content_filter">內容過濾器</string>
+  <string name="settings_ai_content_filter_hint">隱藏看起來不安全的結果：短網址、下載彙整網站、盜版、仿冒網站，以及透過未加密 HTTP 提供的安裝程式。指向你自己網路的連結一律隱藏。</string>
   <string name="settings_ai_provider">供應商</string>
   <string name="settings_ai_api_key">API 金鑰</string>
   <string name="settings_ai_model">模型</string>
@@ -530,6 +532,8 @@
   <string name="settings_search_web_search_keywords">搜尋供應商, 搜尋 API 金鑰, 搜尋引擎</string>
   <string name="settings_search_ai_access">「探索」開啟網站前是否詢問</string>
   <string name="settings_search_ai_access_keywords">網頁存取, 權限, 確認, 允許, 詢問, 隱私</string>
+  <string name="settings_search_ai_content_filter">「探索」是否隱藏看起來不安全的結果</string>
+  <string name="settings_search_ai_content_filter_keywords">安全, 安全搜尋, 不安全, 惡意軟體, 盜版, 封鎖, 隱藏, 隱藏的結果</string>
   <string name="settings_search_ai_trusted">「探索」不經詢問即可開啟的網站</string>
   <string name="settings_search_ai_trusted_keywords">信任的網站, 允許清單, 白名單, 網域, 權限</string>
   <string name="settings_search_version_keywords">組建, 修訂版本, 更新</string>

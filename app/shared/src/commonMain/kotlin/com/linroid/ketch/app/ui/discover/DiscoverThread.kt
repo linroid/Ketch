@@ -142,8 +142,15 @@ private fun LazyItemScope.ThreadItemView(
       onRestore = { state.restoreDiscovered(item.candidates.map { it.url }) },
       modifier = content.padding(top = spacing.s1),
     )
+    is ThreadItem.Filtered -> FilteredLine(
+      count = turn.filtered,
+      onSettings = openSettings,
+      modifier = content.padding(top = spacing.s1),
+    )
     is ThreadItem.NoResults -> NoResults(
       onSearchEverywhere = if (item.canSearchEverywhere) controller::searchEverywhere else null,
+      filtered = turn.filtered,
+      onSettings = openSettings,
       modifier = content.padding(top = spacing.s3),
     )
     is ThreadItem.Failed -> ProblemCard(

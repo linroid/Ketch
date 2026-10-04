@@ -139,6 +139,18 @@ class AiSettingsControllerTest {
   }
 
   @Test
+  fun save_contentFilterOff_keepsTheProviderAndPersistsIt() {
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
+    val factory = FakeFactory()
+    val controller = AiSettingsController(store, factory)
+    val first = controller.provider as FakeAiProvider
+    controller.save(usableSettings().copy(contentFilter = false))
+    assertSame(first, controller.provider)
+    assertEquals(1, factory.created.size)
+    assertFalse(store.load().ai.contentFilter)
+  }
+
+  @Test
   fun saveAccess_unchanged_savesNothing() {
     val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
     val controller = AiSettingsController(store, FakeFactory())

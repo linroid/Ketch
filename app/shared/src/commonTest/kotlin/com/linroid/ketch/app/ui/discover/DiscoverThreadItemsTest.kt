@@ -34,6 +34,7 @@ class DiscoverThreadItemsTest {
     summary: String = "",
     steps: List<DiscoveryStep> = emptyList(),
     access: List<AccessNote> = emptyList(),
+    filtered: Int = 0,
   ) = DiscoverTurn(
     id = id,
     message = "blender",
@@ -44,6 +45,7 @@ class DiscoverThreadItemsTest {
     candidates = found.toList(),
     summary = summary,
     access = access,
+    filtered = filtered,
   )
 
   private fun session(vararg turns: DiscoverTurn, discarded: Set<String> = emptySet()) =
@@ -167,6 +169,23 @@ class DiscoverThreadItemsTest {
       listOf("Message", "Steps", "Summary", "NoResults"),
       threadItems(session(done), emptyList()).kinds(),
     )
+  }
+
+  @Test
+  fun threadItems_contentFilterHidSome_showsTheFilteredLineUnderTheResults() {
+    val done = turn("t1", TurnStatus.Done, dmg, filtered = 2)
+
+    assertEquals(
+      listOf("Message", "Results", "Result", "Filtered"),
+      threadItems(session(done), emptyList()).kinds(),
+    )
+  }
+
+  @Test
+  fun threadItems_contentFilterHidEverything_showsNoResultsWithoutTheLine() {
+    val done = turn("t1", TurnStatus.Done, filtered = 3)
+
+    assertEquals(listOf("Message", "NoResults"), threadItems(session(done), emptyList()).kinds())
   }
 
   @Test

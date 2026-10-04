@@ -24,6 +24,7 @@ page's own setup links there too. It holds:
 | Field | Notes |
 |-------|-------|
 | AI discovery | Master switch. Picking a provider on the Discover page's setup switches it on. |
+| Content filter | On by default; see [the content filter](#the-content-filter). |
 | Before opening a website | **Allow automatically**, **Ask for each new site** (the default) or **Ask every time**; see [page access](#page-access). |
 | Always allowed | Sites Discover opens without asking, each with its subdomains. Type one or more, such as `ubuntu.com`, separated by commas or spaces, and press **Add**; a pasted URL is reduced to its domain. Each site shows as a chip whose ✕ removes it, and **Always allow** on a question adds one. |
 | Provider | OpenAI, Anthropic, Google Gemini, Ollama, or any OpenAI-compatible endpoint. |
@@ -35,9 +36,10 @@ page's own setup links there too. It holds:
 Changes are saved as you make them — there is no Save button. A change
 to the provider, key, model, endpoint or web search rebuilds the
 discovery engine in place, without restarting the app. Page access
-changes keep the engine: searches that are running carry on under the
-new rules, and questions waiting for an answer that the change covers
-are answered by it. **Test** sends a one-line prompt to the provider
+and content filter changes keep the engine: searches that are running
+carry on under the new rules, and questions waiting for an answer that
+the change covers are answered by it; the next search filters by the new
+setting. **Test** sends a one-line prompt to the provider
 with the saved settings, so a wrong key or model shows up immediately
 instead of on the first search.
 
@@ -118,6 +120,30 @@ Every page and HEAD request goes through the same safeguards:
   treated as crawling.
 - Before a page or HEAD request reaches a site, Discover may ask for
   your OK ([page access](#page-access)).
+
+## The content filter
+
+Before results show, Discover hides those that look unsafe:
+
+- links through URL shorteners and download aggregators;
+- links or descriptions with piracy signals, such as "crack" or
+  "keygen";
+- hosts that imitate a well-known one (`fake-github.com`,
+  `github.com.example.net`) and links with user info before the host
+  (`https://github.com@evil.example/...`);
+- installers (`.exe`, `.msi`, `.dmg`, `.pkg`, `.apk`) from a site off
+  Discover's short list of well-known hosts that are not served over
+  HTTPS. Over HTTPS they show, ranked below the same file from a
+  well-known host.
+
+A message whose results the filter hid says how many under its results,
+"2 hidden by the content filter", or in its *No downloads found* card,
+with a link to the Discover settings. Turning **Content filter** off
+there (`contentFilter = false` under `[ai]`) shows them in the next
+search, with the agent's own confidence. Links to private and local
+addresses, sites outside a search's [limit](#limiting-discovery-to-websites)
+and discarded links are never shown, whatever the setting. The agent is
+still told to prefer official sources and avoid unsafe ones.
 
 ## Page access
 
@@ -351,6 +377,7 @@ reporting that nothing was found.
 ```toml
 [ai]
 enabled = true
+contentFilter = true
 
 [ai.llm]
 provider = "openai-compatible"
@@ -635,6 +662,10 @@ Allow Discover to open www.blender.org? https://www.blender.org/download/
   asking.
 - `--yes` (`-y`) allows every website for the run, and `--sites` limits
   the run to websites, which never asks.
+
+It follows `contentFilter` under `[ai]` too; `--no-filter` turns
+[the filter](#the-content-filter) off for the run. When it hid results, a
+note on stderr says how many.
 
 Answers last for the run; the CLI never writes `config.toml`. It asks on
 the controlling terminal (`/dev/tty`), so the questions still reach you

@@ -34,6 +34,7 @@ data class AiCandidate(
  * @property fileTypes file types to prefer, such as `iso`; empty prefers none.
  * @property history earlier turns of the conversation, oldest first; empty for a first search.
  * @property excludedUrls links the user discarded, which the search never returns.
+ * @property contentFilter whether to hide results that look unsafe ([AiSettings.contentFilter]).
  */
 data class AiDiscoverRequest(
   val query: String,
@@ -42,6 +43,7 @@ data class AiDiscoverRequest(
   val fileTypes: List<String> = emptyList(),
   val history: List<AiDiscoverTurn> = emptyList(),
   val excludedUrls: Set<String> = emptySet(),
+  val contentFilter: Boolean = true,
 )
 
 /**
@@ -68,12 +70,15 @@ data class AiDiscoverTurn(
  * @property title the agent's short name for the search, which names a new conversation: one
  *   line of plain text that fetched pages may have shaped, so show it as text only. Blank when
  *   it gave none, as it may for a follow-up.
+ * @property filtered how many of the agent's results the content filter hid; [summary] may still
+ *   speak of them.
  */
 data class AiDiscoverResponse(
   val query: String,
   val candidates: List<AiCandidate>,
   val summary: String = "",
   val title: String = "",
+  val filtered: Int = 0,
 )
 
 /**

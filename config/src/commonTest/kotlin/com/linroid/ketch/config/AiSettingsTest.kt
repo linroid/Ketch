@@ -223,4 +223,20 @@ class AiSettingsTest {
       settings.copy(access = PageAccessSettings(mode = PageAccessMode.AskEveryTime)).engineSettings,
     )
   }
+
+  @Test
+  fun `the content filter is on by default and left out of the engine settings`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[ai]
+      |enabled = true
+      """.trimMargin(),
+    )
+    assertTrue(decoded.ai.contentFilter)
+    val off = AiSettings(enabled = true, contentFilter = false)
+    assertEquals(AiSettings(enabled = true), off.engineSettings)
+    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), KetchConfig(ai = off))
+    assertEquals(off, ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded).ai)
+  }
 }

@@ -408,6 +408,28 @@ class DiscoverSnapshots {
     }
   }
 
+  @Test
+  fun search_contentFilterHidSome_saysHowManyUnderTheResults() {
+    discoverSnapshot(
+      "discover-filtered",
+      SnapshotSize.Desktop,
+      SnapshotTheme.Light,
+      DiscoverScript.SomeFiltered,
+    ) {
+      state.openDiscover(DiscoverRequest(QUERY))
+    }
+  }
+
+  @Test
+  fun search_contentFilterHidEverything_offersItsSettings() {
+    for (theme in SnapshotTheme.entries) {
+      val script = DiscoverScript.AllFiltered
+      discoverSnapshot("discover-all-filtered", SnapshotSize.Medium, theme, script) {
+        state.openDiscover(DiscoverRequest(QUERY))
+      }
+    }
+  }
+
   /**
    * Renders the app at [size], with Discover running [script] for a chat's first message and
    * [followUp] for the others, after [open].
@@ -519,6 +541,12 @@ internal enum class DiscoverScript {
   /** Reports its steps and finds nothing it trusts. */
   Nothing,
 
+  /** Reports its steps and finds [Candidates], with two more the content filter hid. */
+  SomeFiltered,
+
+  /** Reports its steps and finds three results, which the content filter all hid. */
+  AllFiltered,
+
   /** Fails as a provider that rejects the key does. */
   Failure,
 
@@ -612,6 +640,14 @@ private class SampleDiscovery(
             AiDiscoverResponse(request.query, FollowUpCandidates, FOLLOW_UP_SUMMARY)
           }
           DiscoverScript.Nothing -> AiDiscoverResponse(request.query, emptyList())
+          DiscoverScript.SomeFiltered ->
+            AiDiscoverResponse(request.query, Candidates, title = FIRST_TITLE, filtered = 2)
+          DiscoverScript.AllFiltered -> AiDiscoverResponse(
+            query = request.query,
+            candidates = emptyList(),
+            summary = "Found 3 official installers for Windows and macOS.",
+            filtered = 3,
+          )
           DiscoverScript.Running -> {
             onStep(DiscoveryStep("Checking mirrors", "Comparing mirrors with the checksums"))
             awaitCancellation()

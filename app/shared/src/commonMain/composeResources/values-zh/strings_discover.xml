@@ -76,6 +76,9 @@
   <string name="discover_failed">发现失败</string>
   <string name="discover_none_title">未找到下载</string>
   <string name="discover_none_body">“发现”只列出来自可信来源的文件。可以试着写明版本、平台或发布它的网站。</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="other">内容过滤器隐藏了 %1$d 个看起来不安全的结果。可以在“发现设置”中关闭过滤器。</item>
+  </plurals>
   <string name="discover_search_everywhere">搜索整个网络</string>
   <string name="discover_stopped">已停止</string>
   <string name="discover_discard">丢弃</string>
@@ -84,6 +87,9 @@
     <item quantity="other">已丢弃 %1$d 个</item>
   </plurals>
   <string name="discover_restore">恢复</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="other">内容过滤器隐藏了 %1$d 个</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="other">已丢弃 %1$d 个结果</item>

@@ -76,6 +76,9 @@
   <string name="discover_failed">ディスカバーに失敗しました</string>
   <string name="discover_none_title">ダウンロードが見つかりません</string>
   <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="other">安全でないと思われる%1$d件の結果をコンテンツフィルタが非表示にしました。フィルタはディスカバーの設定でオフにできます。</item>
+  </plurals>
   <string name="discover_search_everywhere">Web全体を検索</string>
   <string name="discover_stopped">停止しました</string>
   <string name="discover_discard">除外</string>
@@ -84,6 +87,9 @@
     <item quantity="other">%1$d件を除外済み</item>
   </plurals>
   <string name="discover_restore">復元</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="other">コンテンツフィルタで%1$d件を非表示</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="other">%1$d件の結果を除外しました</item>

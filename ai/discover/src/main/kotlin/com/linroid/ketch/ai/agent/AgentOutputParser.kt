@@ -47,6 +47,11 @@ internal class AgentOutputParser(
    * offer a link into the user's network. The lookup reaches only DNS,
    * never the site.
    *
+   * With [contentFilter], the [DeviceSafetyFilter] then drops candidates it
+   * blocks, counted in [ParsedOutput.filtered] once per link none of whose
+   * copies pass, and scales the confidence of the rest by its score.
+   * Without it, candidates keep the agent's confidence.
+   *
    * The answer's title, and a candidate's title, description and file
    * name, are reduced to one line of plain text: the model wrote them, and
    * fetched pages may have shaped them.
@@ -55,18 +60,28 @@ internal class AgentOutputParser(
     agentOutput: String,
     allowlist: SiteAllowlist = SiteAllowlist.Unrestricted,
     excludedUrls: Set<String> = emptySet(),
+    contentFilter: Boolean = true,
   ): ParsedOutput {
     val decoded = decode(agentOutput) ?: return textAnswer(agentOutput)
     val excluded = excludedUrls.mapTo(HashSet(), SiteNames::canonicalUrl)
-    val candidates = decoded.candidates
+    // Every copy of a link is checked, so one the filter passes wins whatever comes first.
+    val checked = decoded.candidates
       .filterNot { SiteNames.canonicalUrl(it.url) in excluded }
-      .mapNotNull { c -> validateAndFilter(c, allowlist) }
+      .map { c -> SiteNames.canonicalUrl(c.url) to check(c, allowlist, contentFilter) }
+    val candidates = checked
+      .mapNotNull { (_, result) -> (result as? Checked.Kept)?.candidate }
       .distinctBy { SiteNames.canonicalUrl(it.url) }
       .sortedByDescending { it.confidence }
+    val shown = candidates.mapTo(HashSet()) { SiteNames.canonicalUrl(it.url) }
+    val filtered = checked
+      .filter { (url, result) -> result == Checked.Filtered && url !in shown }
+      .distinctBy { (url, _) -> url }
+      .size
     return ParsedOutput(
       summary = sanitizeAgentText(decoded.summary, MAX_SUMMARY_LENGTH),
       candidates = candidates,
       title = searchTitle(decoded.title),
+      filtered = filtered,
     )
   }
 
@@ -197,35 +212,44 @@ internal class AgentOutputParser(
     null
   }
 
-  private suspend fun validateAndFilter(
+  /**
+   * Checks [c] against [allowlist] and the URL validator, then, with [contentFilter], the
+   * device safety filter.
+   */
+  private suspend fun check(
     c: AgentCandidate,
     allowlist: SiteAllowlist,
-  ): RankedCandidate? {
+    contentFilter: Boolean,
+  ): Checked {
     if (!allowlist.allows(c.url)) {
       log.d { "Outside allowed sites: ${redactUrl(c.url)}" }
-      return null
+      return Checked.Dropped
     }
     val validation = urlValidator.validate(c.url)
     if (validation is ValidationResult.Blocked) {
       log.d { "Blocked URL: ${redactUrl(c.url)} (${validation.reason})" }
-      return null
+      return Checked.Dropped
     }
 
-    val evaluation = safetyFilter.evaluate(
-      url = c.url,
-      sourcePageUrl = c.sourcePageUrl,
-      extension = c.fileType,
-      context = c.deviceSafetyNotes,
-    )
-    if (evaluation.blocked) {
-      log.d { "Safety-blocked: ${redactUrl(c.url)} (${evaluation.reason})" }
-      return null
+    val score = if (contentFilter) {
+      val evaluation = safetyFilter.evaluate(
+        url = c.url,
+        sourcePageUrl = c.sourcePageUrl,
+        extension = c.fileType,
+        context = c.deviceSafetyNotes,
+      )
+      if (evaluation.blocked) {
+        log.d { "Safety-blocked: ${redactUrl(c.url)} (${evaluation.reason})" }
+        return Checked.Filtered
+      }
+      evaluation.score
+    } else {
+      1f
     }
 
-    val adjustedConfidence =
-      (c.confidence * evaluation.score).coerceIn(0f, 1f)
+    val adjustedConfidence = (c.confidence * score).coerceIn(0f, 1f)
 
-    return RankedCandidate(
+    val candidate = RankedCandidate(
       url = c.url,
       title = sanitizeAgentText(c.name, MAX_TITLE_LENGTH),
       fileName = fileNameFromUrl(c.url)
@@ -237,6 +261,19 @@ internal class AgentOutputParser(
       confidence = adjustedConfidence,
       description = sanitizeAgentText(c.description, MAX_DESCRIPTION_LENGTH),
     )
+    return Checked.Kept(candidate)
+  }
+
+  /** What [check] made of a candidate. */
+  private sealed interface Checked {
+    /** It passed every check. */
+    class Kept(val candidate: RankedCandidate) : Checked
+
+    /** The content filter hid it. */
+    data object Filtered : Checked
+
+    /** It is not allowed whatever the content filter says, such as a private address. */
+    data object Dropped : Checked
   }
 
   private fun fileNameFromUrl(url: String): String? {
@@ -286,11 +323,13 @@ internal class AgentOutputParser(
  * @param candidates its candidates that passed every check, most confident first
  * @param title its short name for the search, sanitized to one line of plain text; blank when
  *   it gave none, as a follow-up may, or answered with a bare array or text alone
+ * @param filtered how many of its candidates the content filter hid
  */
 internal data class ParsedOutput(
   val summary: String,
   val candidates: List<RankedCandidate>,
   val title: String = "",
+  val filtered: Int = 0,
 )
 
 /**

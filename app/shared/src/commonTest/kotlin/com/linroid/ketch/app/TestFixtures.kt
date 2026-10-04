@@ -134,6 +134,7 @@ internal class FakeAiProvider(
   private val failure: Throwable? = null,
   private val reply: String = "OK",
   private val verifyFailure: Throwable? = null,
+  private val filtered: Int = 0,
 ) : AiDiscoveryProvider {
   /** The searches asked for, oldest first. */
   val requests = mutableListOf<AiDiscoverRequest>()
@@ -158,7 +159,7 @@ internal class FakeAiProvider(
     for (page in pages) answers += page to approve(page)
     if (gated) gate.await()
     failure?.let { throw it }
-    return AiDiscoverResponse(request.query, candidates, summary, title)
+    return AiDiscoverResponse(request.query, candidates, summary, title, filtered)
   }
 
   override suspend fun verify(): String = verifyFailure?.let { throw it } ?: reply

@@ -249,6 +249,8 @@
 
   <!-- Discover: AI discovery's model, web search and page access. -->
   <string name="settings_ai_discovery">AI discovery</string>
+  <string name="settings_ai_content_filter">Content filter</string>
+  <string name="settings_ai_content_filter_hint">Hides results that look unsafe: shortened links, download aggregators, piracy, look-alike websites and installers over plain HTTP. Links into your own network stay hidden either way.</string>
   <string name="settings_ai_provider">Provider</string>
   <string name="settings_ai_api_key">API key</string>
   <!-- The row with the model's id. -->
@@ -711,6 +713,8 @@
   <string name="settings_search_web_search_keywords">search provider, search api key, engine</string>
   <string name="settings_search_ai_access">Whether Discover asks before it opens a website</string>
   <string name="settings_search_ai_access_keywords">page access, permission, approval, allow, ask, privacy</string>
+  <string name="settings_search_ai_content_filter">Whether Discover hides results that look unsafe</string>
+  <string name="settings_search_ai_content_filter_keywords">safety, safe search, unsafe, malware, piracy, block, hide, hidden results</string>
   <string name="settings_search_ai_trusted">Websites Discover opens without asking</string>
   <string name="settings_search_ai_trusted_keywords">trusted sites, allowlist, whitelist, domains, permission</string>
   <string name="settings_search_version_keywords">build, revision, update</string>

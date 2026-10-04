@@ -15,6 +15,9 @@ import kotlin.time.Instant
  *   to name a conversation by: one line of plain text of at most 60 characters. Untrusted model
  *   output like [summary], so show it as text only. Blank when the agent gave none, as it may
  *   for a follow-up
+ * @param filtered how many of the agent's candidates the content filter hid
+ *   ([DiscoverQuery.contentFilter]); they are not in [candidates], while [summary] may still
+ *   speak of them
  */
 data class DiscoverResult(
   val query: String,
@@ -22,6 +25,7 @@ data class DiscoverResult(
   val sources: List<Source>,
   val summary: String = "",
   val title: String = "",
+  val filtered: Int = 0,
 ) {
 
   /**

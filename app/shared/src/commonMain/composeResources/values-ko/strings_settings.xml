@@ -189,6 +189,8 @@
   <string name="settings_integration_quick_add_hint">링크 하나를 붙여넣으면 바로 추가되며, 실행 취소할 수 있습니다.</string>
 
   <string name="settings_ai_discovery">AI 찾기</string>
+  <string name="settings_ai_content_filter">콘텐츠 필터</string>
+  <string name="settings_ai_content_filter_hint">안전하지 않아 보이는 결과를 숨깁니다: 단축 링크, 다운로드 모음 사이트, 불법 복제, 사칭 웹사이트, 암호화되지 않은 HTTP 설치 파일. 내 네트워크로 연결되는 링크는 항상 숨깁니다.</string>
   <string name="settings_ai_provider">제공업체</string>
   <string name="settings_ai_api_key">API 키</string>
   <string name="settings_ai_model">모델</string>
@@ -530,6 +532,8 @@
   <string name="settings_search_web_search_keywords">검색 제공업체, 검색 API 키, 검색 엔진</string>
   <string name="settings_search_ai_access">찾기가 웹사이트를 열기 전에 물을지 여부</string>
   <string name="settings_search_ai_access_keywords">페이지 접근, 권한, 승인, 허용, 묻기, 확인, 개인정보</string>
+  <string name="settings_search_ai_content_filter">찾기가 안전하지 않아 보이는 결과를 숨길지 여부</string>
+  <string name="settings_search_ai_content_filter_keywords">안전, 세이프서치, 위험, 악성코드, 멀웨어, 불법 복제, 차단, 숨기기, 숨긴 결과</string>
   <string name="settings_search_ai_trusted">찾기가 묻지 않고 여는 웹사이트</string>
   <string name="settings_search_ai_trusted_keywords">신뢰할 수 있는 사이트, 항상 허용, 허용 목록, 화이트리스트, 도메인, 권한</string>
   <string name="settings_search_version_keywords">빌드, 리비전, 업데이트, 버전</string>
