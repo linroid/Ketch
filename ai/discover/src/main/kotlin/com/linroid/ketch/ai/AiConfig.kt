@@ -39,42 +39,45 @@ data class AiConfig(
  *
  * The API key for the configured provider is read from that provider's
  * conventional variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
- * `GEMINI_API_KEY`/`GOOGLE_API_KEY`). When [base] is still at its
- * defaults, any of those variables also selects the provider and
- * switches discovery on, which keeps the "export a key and go" flow
- * working for the CLI. The apps have an explicit Enable switch, so they
- * only resolve settings the user has switched on.
+ * `GEMINI_API_KEY`/`GOOGLE_API_KEY`). When [autoConfigure] is on and
+ * [base] is still at its defaults, any of those variables also selects
+ * the provider and switches discovery on, which keeps the "export a key
+ * and go" flow working for the CLI (discovery is on by default, and a
+ * config that switched it off is not untouched). The apps turn it off, so the
+ * environment never picks a provider their settings page does not show.
  *
  * Search works the same way: the selected provider's blank key (and,
  * for Google, engine id) are filled from `BRAVE_SEARCH_API_KEY`, or
  * `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_CX`, keeping every saved
- * value and never switching providers. Only untouched settings let the
- * environment pick a search provider.
+ * value and never switching providers. Only untouched settings, with
+ * [autoConfigure], let the environment pick a search provider.
  *
  * @param base settings loaded from the config file
  * @param getenv environment lookup, overridable for testing
+ * @param autoConfigure whether untouched settings may take their
+ *   providers from the environment
  */
 fun resolveAiSettingsFromEnv(
   base: AiSettings = AiSettings(),
   getenv: (String) -> String? = System::getenv,
+  autoConfigure: Boolean = true,
 ): AiSettings {
-  val llm = resolveLlmFromEnv(base, getenv)
-  val search = resolveSearchFromEnv(base, getenv)
-  val enabled = base.enabled ||
-    (base.engineSettings == AiSettings() && llm.apiKey.isNotBlank())
-  return base.copy(enabled = enabled, llm = llm, search = search)
+  val untouched = autoConfigure && base.engineSettings == AiSettings()
+  val llm = resolveLlmFromEnv(base.llm, untouched, getenv)
+  val search = resolveSearchFromEnv(base.search, untouched, getenv)
+  return base.copy(llm = llm, search = search)
 }
 
 private fun resolveLlmFromEnv(
-  base: AiSettings,
+  llm: LlmSettings,
+  untouched: Boolean,
   getenv: (String) -> String?,
 ): LlmSettings {
-  val llm = base.llm
   if (llm.apiKey.isNotBlank()) return llm
   val configured = envKeyFor(llm.provider, getenv)
   if (configured != null) return llm.copy(apiKey = configured)
   // Untouched settings: let any provider key pick the provider.
-  if (base.engineSettings != AiSettings()) return llm
+  if (!untouched) return llm
   for (provider in ENV_PROVIDER_ORDER) {
     val key = envKeyFor(provider, getenv) ?: continue
     return llm.copy(provider = provider, apiKey = key)
@@ -96,10 +99,10 @@ private fun envKeyFor(
 }?.takeIf { it.isNotBlank() }
 
 private fun resolveSearchFromEnv(
-  base: AiSettings,
+  search: SearchSettings,
+  untouched: Boolean,
   getenv: (String) -> String?,
 ): SearchSettings {
-  val search = base.search
   fun env(name: String): String? = getenv(name)?.takeIf { it.isNotBlank() }
   return when (search.provider) {
     // A chosen provider only has its own blanks filled; saved values
@@ -114,7 +117,7 @@ private fun resolveSearchFromEnv(
     // "None" is also the default, so it only yields to the environment
     // while nothing has been configured — the CLI's "export and go".
     SearchProvider.None -> {
-      if (base.engineSettings != AiSettings()) return search
+      if (!untouched) return search
       val brave = env(BRAVE_KEY)
       val googleKey = env(GOOGLE_KEY)
       val googleCx = env(GOOGLE_CX)

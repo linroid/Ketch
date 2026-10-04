@@ -158,18 +158,18 @@ class AppSettingsControllerTest {
 class AppDestinationTest {
 
   @Test
-  fun `discover is hidden where discovery cannot run`() {
+  fun `discover is hidden while discovery is not offered`() {
     assertEquals(
       listOf(AppDestination.Downloads, AppDestination.Devices),
-      AppDestination.visible(aiSupported = false),
+      AppDestination.visible(discoverOffered = false),
     )
   }
 
   @Test
-  fun `discover shows wherever discovery can run`() {
+  fun `discover shows while discovery is offered`() {
     assertEquals(
       AppDestination.entries.toList(),
-      AppDestination.visible(aiSupported = true),
+      AppDestination.visible(discoverOffered = true),
     )
   }
 }

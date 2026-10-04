@@ -172,14 +172,15 @@ data class SearchSettings(
 /**
  * User-facing AI discovery settings, persisted under `[ai]`.
  *
- * @property enabled master switch for the feature.
+ * @property enabled master switch for the feature, on by default: discovery runs once [llm] and
+ *   [search] are complete, and the apps hide it until then.
  * @property llm LLM connection settings.
  * @property search web search settings.
  * @property access when discovery may open websites, under `[ai.access]`.
  */
 @Serializable
 data class AiSettings(
-  val enabled: Boolean = false,
+  val enabled: Boolean = true,
   val llm: LlmSettings = LlmSettings(),
   val search: SearchSettings = SearchSettings(),
   val access: PageAccessSettings = PageAccessSettings(),

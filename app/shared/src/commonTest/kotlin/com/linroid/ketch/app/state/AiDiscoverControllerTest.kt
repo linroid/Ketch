@@ -782,7 +782,10 @@ class AiDiscoverControllerTest {
   @Test
   fun discover_notSetUp_waitsUntilSetUpThenRuns() = runTest {
     val provider = FakeAiProvider(candidates = listOf(candidate("ubuntu.iso")))
-    val settings = AiSettingsController(factory = { if (it.enabled) provider else null })
+    // Switched on by default, but nothing runs until a provider that needs no key is chosen.
+    val settings = AiSettingsController(
+      factory = { if (it.llm.provider == LlmProvider.Ollama) provider else null },
+    )
     val controller = controller(settings)
 
     controller.discover(DiscoverRequest("ubuntu server iso"))
@@ -877,6 +880,17 @@ class AiDiscoverControllerTest {
 
     assertEquals(TurnStatus.Done, controller.turn.status)
     assertTrue(next.requests.isEmpty())
+  }
+
+  @Test
+  fun discover_switchedOff_startsNothing() = runTest {
+    val settings = AiSettingsController(factory = { null }).apply { setEnabled(false) }
+    val controller = controller(settings)
+
+    controller.discover(DiscoverRequest("blender"))
+
+    assertNull(controller.currentId)
+    assertNull(controller.pending)
   }
 
   @Test

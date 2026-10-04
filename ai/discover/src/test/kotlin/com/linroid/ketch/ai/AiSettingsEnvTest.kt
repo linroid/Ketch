@@ -42,6 +42,20 @@ class AiSettingsEnvTest {
   }
 
   @Test
+  fun `without auto configuration untouched settings keep their providers`() {
+    val settings = resolveAiSettingsFromEnv(
+      getenv = env(
+        "ANTHROPIC_API_KEY" to "sk-ant",
+        "BRAVE_SEARCH_API_KEY" to "brave-key",
+      ),
+      autoConfigure = false,
+    )
+    assertEquals(LlmProvider.OpenAi, settings.llm.provider)
+    assertEquals("", settings.llm.apiKey)
+    assertEquals(SearchProvider.None, settings.search.provider)
+  }
+
+  @Test
   fun `anthropic key alone selects anthropic`() {
     val settings = resolveAiSettingsFromEnv(
       getenv = env("ANTHROPIC_API_KEY" to "sk-ant"),

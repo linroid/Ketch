@@ -70,6 +70,8 @@ import ketch.app.shared.generated.resources.discover_deleted
 import ketch.app.shared.generated.resources.discover_discarded
 import ketch.app.shared.generated.resources.discover_history_cleared
 import ketch.app.shared.generated.resources.discover_needs_ok
+import ketch.app.shared.generated.resources.discover_turned_off
+import ketch.app.shared.generated.resources.discover_turned_off_detail
 import ketch.app.shared.generated.resources.discover_undo_clear_history
 import ketch.app.shared.generated.resources.discover_undo_delete
 import ketch.app.shared.generated.resources.discover_undo_discard
@@ -469,7 +471,7 @@ class AppState(
   // samples, histories and timelines. Built on the main thread, which owns the settings cache;
   // the models collect them elsewhere.
   private val listSources: StateFlow<List<TaskListSource>> =
-    combine(instances, snapshotFlow { aiSettings.supported }) { entries, discover ->
+    combine(instances, snapshotFlow { aiSettings.offered }) { entries, discover ->
       entries.map { listSourceOf(it, discover) }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -750,6 +752,25 @@ class AppState(
       level = MessageLevel.Info,
       title = Res.plurals.discover_history_cleared.text(removed.size),
       actions = listOf(undoAction(op)),
+    )
+  }
+
+  /**
+   * Switches Discover off, which stops its searches and hides its page, with Undo, which switches
+   * it back on and shows it again. Settings switches it on later.
+   */
+  fun turnOffDiscover() {
+    aiSettings.setEnabled(false)
+    messages.postFeedback(
+      level = MessageLevel.Info,
+      title = Res.string.discover_turned_off.text(),
+      detail = Res.string.discover_turned_off_detail.text(),
+      actions = listOf(
+        MessageAction(Res.string.action_undo.text()) {
+          aiSettings.setEnabled(true)
+          runInShell(KetchCommands.Discover)
+        },
+      ),
     )
   }
 

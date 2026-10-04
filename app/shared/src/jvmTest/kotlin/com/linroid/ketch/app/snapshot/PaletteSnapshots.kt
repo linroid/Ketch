@@ -211,7 +211,7 @@ private fun PaletteOverlay(
         onDismiss = {},
         onCommand = commands::run,
         canRun = commands::binds,
-        destinations = AppDestination.visible(discover && state.aiSettings.supported),
+        destinations = AppDestination.visible(discover && state.aiSettings.offered),
         initialQuery = query,
         history = history,
       )

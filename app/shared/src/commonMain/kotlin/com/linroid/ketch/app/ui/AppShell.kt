@@ -60,6 +60,7 @@ import com.linroid.ketch.app.ui.devices.DevicesScreen
 import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.discover.DiscoverTopBarActions
+import com.linroid.ketch.app.ui.discover.discoverMenu
 import com.linroid.ketch.app.ui.discover.LocalDiscoverChrome
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
 import com.linroid.ketch.app.ui.downloads.LayoutTier
@@ -154,7 +155,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     }
   }
 
-  val destinations = AppDestination.visible(appState.aiSettings.supported)
+  val destinations = AppDestination.visible(appState.aiSettings.offered)
   val windowInfo = LocalWindowInfo.current
   val windowWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
   val layout = KetchLayout.of(windowWidth, appState.appSettings.ui.sidebarCollapsed)
@@ -485,6 +486,11 @@ private fun PhoneShell(
         showsBottomBar = showsBottomBar,
         actions = if (discover) {
           { DiscoverTopBarActions(appState, shell.discover) }
+        } else {
+          null
+        },
+        menu = if (discover) {
+          { discoverMenu(appState) }
         } else {
           null
         },

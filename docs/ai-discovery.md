@@ -320,16 +320,17 @@ Rules:
 
 - A token saved in the settings always wins; the environment only fills
   blanks.
-- **In the apps, the Enable switch decides.** An exported key fills in a
-  blank token once you switch discovery on, but it never switches the
-  feature on by itself.
+- **In the apps, the Enable switch decides.** Discovery is on by
+  default, so an exported key for the chosen provider is all it needs;
+  once you switch it off, a key never switches it back on. The
+  environment never picks a provider in the apps: an `ANTHROPIC_API_KEY`
+  alone does nothing while the settings name OpenAI.
 - **Web search follows the same rule.** Once you pick Brave or Google, a
   blank key (and Google's engine id) is filled from that provider's
   variables; saved values are kept and your choice is never switched to
   another provider.
-- **In the CLI**, which has no switch, untouched `[ai]` settings plus any
-  provider key select that provider (LLM and web search) and turn
-  discovery on — the "export a key and go" path. Once anything is
+- **In the CLI**, untouched `[ai]` settings plus any provider key select
+  that provider (LLM and web search) — the "export a key and go" path. Once anything is
   configured, the environment only fills blank credentials there too.
   Page access does not count: settings that differ only in `[ai.access]`
   are still untouched.
@@ -374,16 +375,22 @@ an unknown mode loads as `ask-site`. `trustedSites` holds bare domains,
 each covering its subdomains; an entry written another way, such as
 `Blender.org`, `www.blender.org` or `https://blender.org/`, counts as
 `blender.org`. A config file without an `[ai]` section keeps the
-defaults (discovery off).
+defaults: discovery switched on, waiting for a key. `enabled = false`
+switches it off.
 
 ## Where Discover shows
 
 The **Discover** destination shows in the sidebar, the rail and the
-phone's bottom bar wherever discovery can run (desktop and Android), set
-up or not. Until a provider is usable it shows a setup page: what
-Discover does, example searches and a button per provider, which
-switches discovery on with that provider and opens the Discover settings
-to finish.
+phone's bottom bar wherever discovery can run (desktop and Android)
+while it is switched on, which it is by default, set up or not. Until a
+provider is usable it shows a setup page: what Discover does, example
+searches and a button per provider, which opens the Discover settings
+to finish, and **Turn off Discover** for those who do not want it.
+
+Turning Discover off, from the setup page or the page's menu, hides it
+and every way into it at once, with **Undo** in the toast; switch it
+back on in Settings → Discover. Saved chats are kept for when it
+returns.
 
 Searches also start from outside the page:
 
@@ -401,11 +408,14 @@ Discover as you left it, ready to type.
 The page's own buttons:
 
 - **With a sidebar or rail:** the page header holds **History**, a ⋯
-  menu with **Delete this search** and **Clear history**, **New
-  search**, and the model Discover uses, such as "Anthropic ·
-  claude-opus-5", which opens its settings.
+  menu, **New search**, and the model Discover uses, such as
+  "Anthropic · claude-opus-5", which opens its settings.
 - **Phone layout:** the top bar holds **History** and **New search** in
-  place of the search button.
+  place of the search button, and its ⋮ menu starts with the page's
+  items.
+
+The page's menu holds **Delete this search**, **Clear history**,
+**Discover settings** and **Turn off Discover**.
 
 Switching Discover off, or clearing what it needs such as its key,
 stops the searches that run or wait to start, as **Stop** does, and

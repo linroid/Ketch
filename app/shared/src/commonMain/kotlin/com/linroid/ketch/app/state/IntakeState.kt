@@ -1078,7 +1078,7 @@ class IntakeSession internal constructor(
    * Whether Discover can search for text that holds no link; before it is set up, the search
    * waits on its setup page.
    */
-  val canDiscover: Boolean get() = state.aiSettings.supported
+  val canDiscover: Boolean get() = state.aiSettings.offered
 
   /**
    * Closes the sheet and searches Discover for [query]: by default the text, when it holds no

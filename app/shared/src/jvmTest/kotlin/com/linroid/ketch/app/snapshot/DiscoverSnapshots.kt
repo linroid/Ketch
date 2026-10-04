@@ -56,8 +56,8 @@ import kotlin.time.Instant
  * details unfolded, the results with the add bar, a follow-up with the agent's reply and a
  * discarded result, a request to open a website waiting for an answer (also asking every time,
  * for a redirect to a long host, and in another search than the one shown), what a failed,
- * stopped, waiting or empty search says, and the history of searches, also while Discover is
- * not set up; see [SnapshotHarness] for how to run it.
+ * stopped, waiting or empty search says, the history of searches, also while Discover is
+ * not set up, and the page's menu, which turns Discover off; see [SnapshotHarness] for how to run it.
  */
 class DiscoverSnapshots {
   @BeforeTest
@@ -378,6 +378,17 @@ class DiscoverSnapshots {
   }
 
   @Test
+  fun menu_open_offersToTurnDiscoverOff() {
+    for (size in listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
+      discoverSnapshot("discover-menu", size, SnapshotTheme.Light, DiscoverScript.Results) {
+        state.openDiscover(DiscoverRequest(QUERY))
+        scene.settle()
+        scene.clickOn(MORE)
+      }
+    }
+  }
+
+  @Test
   fun search_failed_explainsAndOffersARetry() {
     for (size in listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
       for (theme in SnapshotTheme.entries) {
@@ -477,6 +488,7 @@ class DiscoverSnapshots {
     const val NAS_ID = "nas.local:8642"
     const val SHOW_HISTORY = "Show history"
     const val DETAILS = "Details"
+    const val MORE = "More"
     val AppSizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
 
     // The content card of the default window, of a medium window beside the rail, and the

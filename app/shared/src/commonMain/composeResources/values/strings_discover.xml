@@ -181,6 +181,10 @@
   <!-- The header's ⋯ menu, and a search's trash in the history. -->
   <string name="discover_delete_search">Delete this search</string>
   <string name="discover_history_clear">Clear history</string>
+  <!-- Switches Discover off and hides it, from the page's menu and its setup page; then its toast. -->
+  <string name="discover_turn_off">Turn off Discover</string>
+  <string name="discover_turned_off">Discover is off</string>
+  <string name="discover_turned_off_detail">Turn it back on in Settings, under Discover.</string>
   <!-- The filter over the history, which matches the searches' messages. -->
   <string name="discover_history_filter">Search history</string>
   <string name="discover_history_empty">Searches you run show here.</string>

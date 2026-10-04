@@ -146,6 +146,9 @@
   <string name="discover_new_search">Новый запрос</string>
   <string name="discover_delete_search">Удалить этот запрос</string>
   <string name="discover_history_clear">Очистить историю</string>
+  <string name="discover_turn_off">Отключить поиск</string>
+  <string name="discover_turned_off">Поиск отключён</string>
+  <string name="discover_turned_off_detail">Включить его снова можно в настройках, в разделе «Поиск».</string>
   <string name="discover_history_filter">Поиск по истории</string>
   <string name="discover_history_empty">Здесь появятся ваши запросы.</string>
   <string name="discover_history_no_match">Нет запросов, содержащих «%1$s»</string>

@@ -142,9 +142,9 @@ internal class RunStepListener(
  * Builds [EmbeddedAiDiscoveryProvider] instances from saved settings,
  * filling blank credentials from the environment.
  *
- * Unlike the CLI, the apps show an explicit Enable switch, so disabled
- * settings never produce a provider — an environment key only fills in
- * the token once the user has switched discovery on.
+ * Disabled settings never produce a provider. Unlike the CLI, the
+ * environment only fills blank credentials of the providers the settings
+ * name, so the engine always runs what the settings page shows.
  *
  * @param getenv environment lookup, overridable for testing.
  */
@@ -160,9 +160,5 @@ class EmbeddedAiDiscoveryProviderFactory(
   }
 
   override fun withPlatformCredentials(settings: AiSettings): AiSettings =
-    // Resolved as switched on, so the environment only fills blanks: the
-    // untouched-settings shortcut that picks a provider and enables the
-    // feature is reserved for the CLI.
-    resolveAiSettingsFromEnv(settings.copy(enabled = true), getenv)
-      .copy(enabled = settings.enabled)
+    resolveAiSettingsFromEnv(settings, getenv, autoConfigure = false)
 }

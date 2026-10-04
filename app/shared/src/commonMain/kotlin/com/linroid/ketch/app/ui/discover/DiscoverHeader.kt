@@ -24,6 +24,7 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchGlyphBadge
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -43,6 +44,7 @@ import ketch.app.shared.generated.resources.discover_history_waiting
 import ketch.app.shared.generated.resources.discover_new_search
 import ketch.app.shared.generated.resources.discover_settings
 import ketch.app.shared.generated.resources.discover_title
+import ketch.app.shared.generated.resources.discover_turn_off
 import ketch.app.shared.generated.resources.shell_more
 import org.jetbrains.compose.resources.stringResource
 
@@ -63,9 +65,9 @@ internal class HistoryToggle(
 
 /**
  * The page header of wide windows: "Discover", the History toggle with how many other searches
- * wait for an OK, then the ⋯ menu (Delete this search, Clear history), New search and the model
- * Discover searches with, which opens its settings. Until Discover is set up only the title and,
- * with saved searches, History and the menu show.
+ * wait for an OK, then the ⋯ menu ([discoverMenu]), New search and the model Discover searches
+ * with, which opens its settings. Until Discover is set up only the title, the menu and, with
+ * saved searches, History show.
  */
 @Composable
 internal fun DiscoverHeader(
@@ -97,7 +99,7 @@ internal fun DiscoverHeader(
       horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
       modifier = Modifier.weight(1f),
     ) {
-      if (controller.sessions.isNotEmpty()) MoreMenu(state)
+      MoreMenu(state)
       if (available) {
         KetchButton(
           text = stringResource(Res.string.discover_new_search),
@@ -124,7 +126,8 @@ internal fun DiscoverHeader(
 
 /**
  * The phone top bar's actions on Discover, in place of search: History with how many other
- * searches wait for an OK, and New search once Discover is set up.
+ * searches wait for an OK, and New search once Discover is set up. The page's menu
+ * ([discoverMenu]) leads the bar's ⋮.
  */
 @Composable
 internal fun DiscoverTopBarActions(
@@ -198,10 +201,9 @@ private fun HistoryButton(controller: AiDiscoverController, history: HistoryTogg
   }
 }
 
-/** The header's ⋯: Delete this search, while one shows, and Clear history. */
+/** The header's ⋯, with the page's menu ([discoverMenu]). */
 @Composable
 private fun MoreMenu(state: AppState) {
-  val controller = state.aiDiscover
   var open by remember { mutableStateOf(false) }
   Box {
     KetchIconButton(
@@ -209,22 +211,41 @@ private fun MoreMenu(state: AppState) {
       onClick = { open = true },
       contentDescription = stringResource(Res.string.shell_more),
     )
-    KetchMenu(expanded = open, onDismissRequest = { open = false }) {
-      item(
-        label = Res.string.discover_delete_search.text(),
-        onClick = { controller.currentId?.let(state::deleteDiscoverSession) },
-        icon = KetchIcon.Trash,
-        enabled = controller.currentId != null,
-        destructive = true,
-      )
-      item(
-        label = Res.string.discover_history_clear.text(),
-        onClick = { state.clearDiscoverHistory() },
-        icon = KetchIcon.History,
-        enabled = controller.sessions.any { !it.running },
-      )
-    }
+    KetchMenu(expanded = open, onDismissRequest = { open = false }) { discoverMenu(state) }
   }
+}
+
+/**
+ * The Discover page's menu: Delete this search, while one shows, Clear history, Discover's
+ * settings and Turn off Discover, which hides the destination until it is switched back on in
+ * Settings.
+ */
+internal fun KetchMenuScope.discoverMenu(state: AppState) {
+  val controller = state.aiDiscover
+  item(
+    label = Res.string.discover_delete_search.text(),
+    onClick = { controller.currentId?.let(state::deleteDiscoverSession) },
+    icon = KetchIcon.Trash,
+    enabled = controller.currentId != null,
+    destructive = true,
+  )
+  item(
+    label = Res.string.discover_history_clear.text(),
+    onClick = { state.clearDiscoverHistory() },
+    icon = KetchIcon.History,
+    enabled = controller.sessions.any { !it.running },
+  )
+  divider()
+  item(
+    label = Res.string.discover_settings.text(),
+    onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
+    icon = KetchIcon.Settings,
+  )
+  item(
+    label = Res.string.discover_turn_off.text(),
+    onClick = { state.turnOffDiscover() },
+    icon = KetchIcon.Close,
+  )
 }
 
 // How far the History count reaches past its glyph's top and end: it covers only the glyph's

@@ -44,12 +44,13 @@ enum class AppDestination(val label: UiText, val icon: KetchIcon, val command: K
     /**
      * Destinations to offer in the navigation.
      *
-     * Discover shows wherever discovery can run, set up or not: until it is set up, the page
-     * shows how to set it up.
+     * Discover shows wherever discovery can run while it is switched on, set up or not: until it
+     * is set up, the page shows how to set it up, or to turn it off. Switched off, it shows again
+     * once it is switched on in Settings.
      *
-     * @param aiSupported whether this platform can run AI discovery.
+     * @param discoverOffered whether AI discovery can run here and is switched on.
      */
-    fun visible(aiSupported: Boolean): List<AppDestination> =
-      entries.filter { it != Discover || aiSupported }
+    fun visible(discoverOffered: Boolean): List<AppDestination> =
+      entries.filter { it != Discover || discoverOffered }
   }
 }

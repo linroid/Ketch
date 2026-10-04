@@ -192,7 +192,7 @@ class ShellCommandsTest {
 
   @Test
   fun run_discoverWhileHidden_leavesTheKey() = shellTest { fixture ->
-    fixture.shell.destinations = AppDestination.visible(aiSupported = false)
+    fixture.shell.destinations = AppDestination.visible(discoverOffered = false)
 
     assertFalse(fixture.commands.run(KetchCommands.Discover))
     assertEquals(AppDestination.Downloads, fixture.shell.destination)
