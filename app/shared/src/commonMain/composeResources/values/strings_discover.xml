@@ -119,6 +119,11 @@
   <string name="discover_failed">Discovery failed</string>
   <string name="discover_none_title">No downloads found</string>
   <string name="discover_none_body">Discover lists only files from sources it trusts. Try naming the version or platform, or the website that publishes it.</string>
+  <!-- The body of discover_none_title when the content filter hid everything the search found. The button under it opens Discover settings, where the filter can be turned off. -->
+  <plurals name="discover_none_filtered">
+    <item quantity="one">The content filter hid %1$d result that looked unsafe. You can turn the filter off in Discover settings.</item>
+    <item quantity="other">The content filter hid %1$d results that looked unsafe. You can turn the filter off in Discover settings.</item>
+  </plurals>
   <string name="discover_search_everywhere">Search the whole web</string>
   <!-- A search the user stopped, or that was running when the app closed. -->
   <string name="discover_stopped">Stopped</string>
@@ -131,6 +136,11 @@
     <item quantity="other">%1$d discarded</item>
   </plurals>
   <string name="discover_restore">Restore</string>
+  <!-- Under a message's results, followed by " · Discover settings", where the filter can be turned off. -->
+  <plurals name="discover_filtered_count">
+    <item quantity="one">%1$d hidden by the content filter</item>
+    <item quantity="other">%1$d hidden by the content filter</item>
+  </plurals>
 
   <!-- Toasts after discarding results and deleting searches, which offer Undo. -->
   <plurals name="discover_discarded">

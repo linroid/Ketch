@@ -52,6 +52,7 @@ data class AccessNote(
  *   gave no reason.
  * @property access how the user answered the agent's requests to open websites, each website
  *   and answer once.
+ * @property filtered how many of the agent's results the content filter hid.
  */
 data class DiscoverTurn(
   val id: String,
@@ -64,6 +65,7 @@ data class DiscoverTurn(
   val summary: String = "",
   val errorText: String? = null,
   val access: List<AccessNote> = emptyList(),
+  val filtered: Int = 0,
 )
 
 /**

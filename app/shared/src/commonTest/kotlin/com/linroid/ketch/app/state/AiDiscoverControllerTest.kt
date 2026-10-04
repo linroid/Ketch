@@ -493,6 +493,20 @@ class AiDiscoverControllerTest {
   }
 
   @Test
+  fun send_contentFilterOff_asksWithoutItAndKeepsWhatItHid() = runTest {
+    val provider = FakeAiProvider(filtered = 2)
+    val settings = settingsWith(provider)
+    settings.save(settings.settings.copy(contentFilter = false))
+    val controller = controller(settings)
+
+    controller.say("pure writer")
+    runCurrent()
+
+    assertEquals(false, provider.requests.single().contentFilter)
+    assertEquals(2, controller.turn.filtered)
+  }
+
+  @Test
   fun clearSelection_resultsOfSeveralTurns_deselectsThemAll() = runTest {
     val (first, later) = candidate("a.dmg") to candidate("b.dmg")
     val saved = savedSession("blender", ListFixtures.START, found = listOf(first)).let {

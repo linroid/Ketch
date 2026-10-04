@@ -72,6 +72,7 @@ internal object DiscoverHistoryCodec {
     summary = turn.summary,
     error = turn.errorText,
     access = turn.access.map { AccessRecord(it.host, it.allowed) },
+    filtered = turn.filtered,
   )
 
   private fun record(candidate: AiCandidate) = CandidateRecord(
@@ -106,6 +107,7 @@ internal object DiscoverHistoryCodec {
     summary = record.summary,
     errorText = record.error,
     access = record.access.map { AccessNote(it.host, it.allowed) },
+    filtered = record.filtered,
   )
 
   private fun candidate(record: CandidateRecord) = AiCandidate(
@@ -148,6 +150,7 @@ private class TurnRecord(
   val summary: String = "",
   val error: String? = null,
   val access: List<AccessRecord> = emptyList(),
+  val filtered: Int = 0,
 )
 
 @Serializable

@@ -325,6 +325,7 @@ ketch ai-discover <query> [options]
 | `--sites <domains>` | Comma-separated domains to limit discovery to, subdomains included; redirects to download hosts are followed (see [AI discovery](../docs/ai-discovery.md#limiting-discovery-to-websites)) |
 | `--max-results <n>` | Max candidates to return (default: 5) |
 | `-y`, `--yes` | Open websites without asking |
+| `--no-filter` | Show results the [content filter](../docs/ai-discovery.md#the-content-filter) hides |
 | `-h`, `--help` | Show the command's usage |
 
 Unknown options are an error rather than part of the query.

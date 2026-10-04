@@ -76,6 +76,35 @@ class AgentOutputParserTest {
   }
 
   @Test
+  fun parse_contentFilterBlocksSome_countsThemAsFiltered() = runTest {
+    val output = """[
+      {"name":"Short","url":"https://bit.ly/abc","confidence":0.9},
+      {"name":"Again","url":"https://BIT.ly/abc","confidence":0.9},
+      {"name":"Private","url":"https://intranet.example/a.zip","confidence":0.9},
+      {"name":"File","url":"https://example.com/file.zip","confidence":0.9}
+    ]"""
+    val result = parser.parse(output)
+    assertEquals(listOf("https://example.com/file.zip"), result.candidates.map { it.url })
+    assertEquals(1, result.filtered)
+  }
+
+  @Test
+  fun parse_contentFilterOff_keepsWhatItWouldHideButNotPrivateAddresses() = runTest {
+    val output = """[
+      {"name":"Short","url":"https://bit.ly/abc","confidence":0.9},
+      {"name":"Private","url":"https://intranet.example/a.zip","confidence":0.9},
+      {"name":"File","url":"https://example.com/file.zip","confidence":0.8}
+    ]"""
+    val result = parser.parse(output, contentFilter = false)
+    assertEquals(
+      listOf("https://bit.ly/abc", "https://example.com/file.zip"),
+      result.candidates.map { it.url },
+    )
+    assertEquals(listOf(0.9f, 0.8f), result.candidates.map { it.confidence })
+    assertEquals(0, result.filtered)
+  }
+
+  @Test
   fun parse_noJson_returnsEmpty() = runTest {
     val result = parser.parse("No results found.").candidates
     assertTrue(result.isEmpty())

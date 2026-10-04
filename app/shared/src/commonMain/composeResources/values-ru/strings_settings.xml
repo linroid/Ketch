@@ -201,6 +201,8 @@
   <string name="settings_integration_quick_add_hint">Одна вставленная ссылка добавляется сразу, с возможностью отмены.</string>
 
   <string name="settings_ai_discovery">ИИ-поиск</string>
+  <string name="settings_ai_content_filter">Фильтр содержимого</string>
+  <string name="settings_ai_content_filter_hint">Скрывает результаты, которые выглядят небезопасно: короткие ссылки, сборники загрузок, пиратство, сайты-подделки и установщики по незашифрованному HTTP. Ссылки в вашу собственную сеть скрываются всегда.</string>
   <string name="settings_ai_provider">Провайдер</string>
   <string name="settings_ai_api_key">Ключ API</string>
   <string name="settings_ai_model">Модель</string>
@@ -563,6 +565,8 @@
   <string name="settings_search_web_search_keywords">поисковый провайдер, ключ api поиска, поисковик</string>
   <string name="settings_search_ai_access">Спрашивает ли Поиск перед открытием сайта</string>
   <string name="settings_search_ai_access_keywords">доступ к страницам, разрешение, подтверждение, разрешить, спрашивать, конфиденциальность</string>
+  <string name="settings_search_ai_content_filter">Скрывает ли Поиск результаты, которые выглядят небезопасно</string>
+  <string name="settings_search_ai_content_filter_keywords">безопасность, безопасный поиск, небезопасно, вредоносное ПО, пиратство, блокировать, скрыть, скрытые результаты</string>
   <string name="settings_search_ai_trusted">Сайты, которые Поиск открывает, не спрашивая</string>
   <string name="settings_search_ai_trusted_keywords">доверенные сайты, белый список, разрешённые сайты, домены, разрешение</string>
   <string name="settings_search_version_keywords">сборка, ревизия, обновление</string>

@@ -598,6 +598,7 @@ private fun discover(args: List<String>, results: PrintStream): Int {
       query = options.query,
       sites = options.sites,
       maxResults = options.maxResults,
+      contentFilter = settings.contentFilter && !options.noFilter,
     )
     val response = try {
       aiModule.discoveryService.discover(
@@ -621,6 +622,14 @@ private fun discover(args: List<String>, results: PrintStream): Int {
     if (response.summary.isNotEmpty()) {
       results.println(response.summary.printable())
       results.println()
+    }
+    if (response.filtered > 0) {
+      // On stderr, like the other notes, so stdout keeps only what was found.
+      System.err.println(
+        "The content filter hid ${response.filtered} candidate(s); pass --no-filter," +
+          " or set contentFilter = false under [ai] in config.toml, to show them.",
+      )
+      System.err.println()
     }
     if (response.candidates.isEmpty()) {
       results.println("No candidates found.")
@@ -676,6 +685,9 @@ private fun printAiDiscoverUsage(out: PrintStream) {
   out.println("                       redirects to download hosts are followed")
   out.println("  --max-results <n>    Max results (default: 5)")
   out.println("  -y, --yes            Open websites without asking")
+  out.println("  --no-filter          Show results the content filter hides:")
+  out.println("                       shortened links, download aggregators,")
+  out.println("                       look-alike sites, installers over HTTP")
   out.println("  -h, --help           Show this help message")
   out.println()
   out.println("Discover asks before it opens a website unless [ai.access] in")

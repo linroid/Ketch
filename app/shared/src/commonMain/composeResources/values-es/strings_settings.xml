@@ -193,6 +193,8 @@
   <string name="settings_integration_quick_add_hint">Al pegar un enlace, se añade enseguida, con opción de deshacer.</string>
 
   <string name="settings_ai_discovery">Búsqueda con IA</string>
+  <string name="settings_ai_content_filter">Filtro de contenido</string>
+  <string name="settings_ai_content_filter_hint">Oculta los resultados que parecen inseguros: enlaces acortados, agregadores de descargas, piratería, sitios que imitan a otros e instaladores por HTTP sin cifrar. Los enlaces a tu propia red se ocultan siempre.</string>
   <string name="settings_ai_provider">Proveedor</string>
   <string name="settings_ai_api_key">Clave de API</string>
   <string name="settings_ai_model">Modelo</string>
@@ -541,6 +543,8 @@
   <string name="settings_search_web_search_keywords">proveedor de búsqueda, clave de api de búsqueda, motor, buscador</string>
   <string name="settings_search_ai_access">Si Descubrir pregunta antes de abrir un sitio web</string>
   <string name="settings_search_ai_access_keywords">acceso a páginas, permiso, aprobación, permitir, preguntar, privacidad</string>
+  <string name="settings_search_ai_content_filter">Si Descubrir oculta los resultados que parecen inseguros</string>
+  <string name="settings_search_ai_content_filter_keywords">seguridad, búsqueda segura, inseguro, malware, piratería, bloquear, ocultar, resultados ocultos</string>
   <string name="settings_search_ai_trusted">Sitios web que Descubrir abre sin preguntar</string>
   <string name="settings_search_ai_trusted_keywords">sitios de confianza, lista de permitidos, lista blanca, dominios, permiso</string>
   <string name="settings_search_version_keywords">compilación, revisión, actualización, versión</string>

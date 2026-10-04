@@ -55,6 +55,8 @@ import ketch.app.shared.generated.resources.settings_ai_api_key_env
 import ketch.app.shared.generated.resources.settings_ai_api_key_plain
 import ketch.app.shared.generated.resources.settings_ai_connected
 import ketch.app.shared.generated.resources.settings_ai_connected_in
+import ketch.app.shared.generated.resources.settings_ai_content_filter
+import ketch.app.shared.generated.resources.settings_ai_content_filter_hint
 import ketch.app.shared.generated.resources.settings_ai_discovery
 import ketch.app.shared.generated.resources.settings_ai_endpoint
 import ketch.app.shared.generated.resources.settings_ai_endpoint_compatible_hint
@@ -102,10 +104,11 @@ import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
- * Page access, provider, credentials and web search for AI discovery, from [state]'s AI
- * settings. Every change is saved as it is made. Changes to the model or search rebuild the
- * discovery engine; page access changes keep it, so running searches carry on and ask by the new
- * rules. Test calls the provider with the saved settings.
+ * The content filter, page access, provider, credentials and web search for AI discovery, from
+ * [state]'s AI settings. Every change is saved as it is made. Changes to the model or search
+ * rebuild the discovery engine; page access and content filter changes keep it, so running
+ * searches carry on, asking by the new rules, and the next search filters by the new setting.
+ * Test calls the provider with the saved settings.
  */
 @Composable
 fun AiDiscoverySettings(state: AppState) {
@@ -132,6 +135,14 @@ fun AiDiscoverySettings(state: AppState) {
       checked = settings.enabled,
       enabled = supported,
       onCheckedChange = { onChange(settings.copy(enabled = it)) },
+    )
+    // Each search reads it as it starts, so the engine carries on.
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_ai_content_filter),
+      description = stringResource(Res.string.settings_ai_content_filter_hint),
+      checked = settings.contentFilter,
+      enabled = supported,
+      onCheckedChange = { onChange(settings.copy(contentFilter = it)) },
     )
   }
 

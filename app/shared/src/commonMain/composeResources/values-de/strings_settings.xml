@@ -193,6 +193,8 @@
   <string name="settings_integration_quick_add_hint">Ein eingefügter Link wird sofort hinzugefügt, mit Rückgängig.</string>
 
   <string name="settings_ai_discovery">KI-Suche</string>
+  <string name="settings_ai_content_filter">Inhaltsfilter</string>
+  <string name="settings_ai_content_filter_hint">Blendet Ergebnisse aus, die unsicher wirken: Kurzlinks, Download-Portale, Piraterie, nachgeahmte Websites und Installationsprogramme über unverschlüsseltes HTTP. Links in dein eigenes Netzwerk bleiben immer ausgeblendet.</string>
   <string name="settings_ai_provider">Anbieter</string>
   <string name="settings_ai_api_key">API-Schlüssel</string>
   <string name="settings_ai_model">Modell</string>
@@ -541,6 +543,8 @@
   <string name="settings_search_web_search_keywords">Suchanbieter, Such-API-Schlüssel, Suchmaschine</string>
   <string name="settings_search_ai_access">Ob Entdecken fragt, bevor es eine Website öffnet</string>
   <string name="settings_search_ai_access_keywords">Seitenzugriff, Berechtigung, Erlaubnis, erlauben, zulassen, fragen, Datenschutz, Privatsphäre</string>
+  <string name="settings_search_ai_content_filter">Ob Entdecken Ergebnisse ausblendet, die unsicher wirken</string>
+  <string name="settings_search_ai_content_filter_keywords">Sicherheit, sicher, unsicher, Schadsoftware, Malware, Piraterie, blockieren, ausblenden, ausgeblendete Ergebnisse</string>
   <string name="settings_search_ai_trusted">Websites, die Entdecken ohne Nachfrage öffnet</string>
   <string name="settings_search_ai_trusted_keywords">vertrauenswürdige Websites, Positivliste, Whitelist, Allowlist, Domains, Berechtigung</string>
   <string name="settings_search_version_keywords">Build, Revision, Update, Aktualisierung</string>

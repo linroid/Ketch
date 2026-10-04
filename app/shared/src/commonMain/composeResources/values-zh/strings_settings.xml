@@ -189,6 +189,8 @@
   <string name="settings_integration_quick_add_hint">粘贴单个链接时会立即添加，并可撤销。</string>
 
   <string name="settings_ai_discovery">AI 发现</string>
+  <string name="settings_ai_content_filter">内容过滤器</string>
+  <string name="settings_ai_content_filter_hint">隐藏看起来不安全的结果：短链接、下载聚合站、盗版、仿冒网站，以及通过未加密 HTTP 提供的安装程序。指向你自己网络的链接始终隐藏。</string>
   <string name="settings_ai_provider">服务商</string>
   <string name="settings_ai_api_key">API 密钥</string>
   <string name="settings_ai_model">模型</string>
@@ -530,6 +532,8 @@
   <string name="settings_search_web_search_keywords">搜索服务, 搜索 API 密钥, 搜索引擎</string>
   <string name="settings_search_ai_access">“发现”打开网站前是否询问</string>
   <string name="settings_search_ai_access_keywords">网页访问, 权限, 授权, 确认, 允许, 询问, 隐私</string>
+  <string name="settings_search_ai_content_filter">“发现”是否隐藏看起来不安全的结果</string>
+  <string name="settings_search_ai_content_filter_keywords">安全, 安全搜索, 不安全, 恶意软件, 盗版, 屏蔽, 隐藏, 隐藏的结果</string>
   <string name="settings_search_ai_trusted">“发现”无需询问即可打开的网站</string>
   <string name="settings_search_ai_trusted_keywords">信任的网站, 可信网站, 允许列表, 白名单, 域名, 权限</string>
   <string name="settings_search_version_keywords">版本, 构建, 更新</string>

@@ -195,12 +195,13 @@ class ResourceDiscoveryService internal constructor(
       agentOutput = agentOutput,
       allowlist = allowlist,
       excludedUrls = query.excludedUrls,
+      contentFilter = query.contentFilter,
     )
     val candidates = output.candidates.take(query.maxResults)
 
     val elapsed = startMark.elapsedNow()
     log.i {
-      "Discovery complete: ${candidates.size} candidates" +
+      "Discovery complete: ${candidates.size} candidates, ${output.filtered} filtered" +
         " in ${elapsed.inWholeMilliseconds}ms"
     }
 
@@ -210,6 +211,7 @@ class ResourceDiscoveryService internal constructor(
       sources = toolSet.fetchedSources,
       summary = output.summary,
       title = output.title,
+      filtered = output.filtered,
     )
   }
 

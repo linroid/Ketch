@@ -40,6 +40,14 @@ class AiDiscoverArgsTest {
   }
 
   @Test
+  fun `no-filter turns the content filter off`() {
+    assertEquals(
+      AiDiscoverArgs.Discover(query = "pure writer", noFilter = true),
+      parseAiDiscoverArgs(listOf("--no-filter", "pure", "writer")),
+    )
+  }
+
+  @Test
   fun `unknown options are rejected rather than searched for`() {
     assertEquals(
       AiDiscoverArgs.Invalid("unknown option '--yess'"),

@@ -18,6 +18,10 @@ package com.linroid.ketch.ai
  * @param excludedUrls links the user discarded: they are never returned,
  *   compared by [com.linroid.ketch.config.SiteNames.canonicalUrl], and the
  *   agent is told not to suggest them
+ * @param contentFilter whether to hide results that look unsafe, such as links through URL
+ *   shorteners or download aggregators, piracy, look-alike websites and installers over plain
+ *   HTTP; [DiscoverResult.filtered] counts them. Private and local addresses, sites outside
+ *   [sites] and [excludedUrls] are dropped either way
  */
 data class DiscoverQuery(
   val query: String,
@@ -26,6 +30,7 @@ data class DiscoverQuery(
   val fileTypes: List<String> = emptyList(),
   val history: List<DiscoverTurn> = emptyList(),
   val excludedUrls: Set<String> = emptySet(),
+  val contentFilter: Boolean = true,
 )
 
 /**

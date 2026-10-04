@@ -77,6 +77,7 @@ class EmbeddedAiDiscoveryProvider internal constructor(
         },
         summary = result.summary,
         title = result.title,
+        filtered = result.filtered,
       )
     } catch (e: DiscoveryException) {
       throw AiDiscoverFailure(e.message, e.brief, e)
@@ -127,6 +128,7 @@ private fun AiDiscoverRequest.toQuery() = DiscoverQuery(
     )
   },
   excludedUrls = excludedUrls,
+  contentFilter = contentFilter,
 )
 
 /** Hands the steps of one search to [onStep], trimmed. */

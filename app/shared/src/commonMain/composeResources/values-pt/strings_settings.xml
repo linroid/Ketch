@@ -193,6 +193,8 @@
   <string name="settings_integration_quick_add_hint">Colar um link o adiciona na hora, com a opção de desfazer.</string>
 
   <string name="settings_ai_discovery">Descoberta por IA</string>
+  <string name="settings_ai_content_filter">Filtro de conteúdo</string>
+  <string name="settings_ai_content_filter_hint">Oculta resultados que parecem inseguros: links encurtados, agregadores de downloads, pirataria, sites que imitam outros e instaladores por HTTP sem criptografia. Links para a sua própria rede ficam sempre ocultos.</string>
   <string name="settings_ai_provider">Provedor</string>
   <string name="settings_ai_api_key">Chave de API</string>
   <string name="settings_ai_model">Modelo</string>
@@ -541,6 +543,8 @@
   <string name="settings_search_web_search_keywords">provedor de pesquisa, chave da api de pesquisa, mecanismo, busca</string>
   <string name="settings_search_ai_access">Se o Descobrir pergunta antes de abrir um site</string>
   <string name="settings_search_ai_access_keywords">acesso a páginas, permissão, aprovação, permitir, perguntar, privacidade, sites</string>
+  <string name="settings_search_ai_content_filter">Se o Descobrir oculta resultados que parecem inseguros</string>
+  <string name="settings_search_ai_content_filter_keywords">segurança, pesquisa segura, inseguro, malware, pirataria, bloquear, ocultar, resultados ocultos</string>
   <string name="settings_search_ai_trusted">Sites que o Descobrir abre sem perguntar</string>
   <string name="settings_search_ai_trusted_keywords">sites confiáveis, sempre permitidos, lista de permissões, lista branca, domínios, permissão</string>
   <string name="settings_search_version_keywords">build, revisão, atualização, versão</string>

@@ -578,6 +578,7 @@ class AiDiscoverController(
         )
       },
       excludedUrls = session.discarded,
+      contentFilter = aiSettings.settings.contentFilter,
     )
   }
 
@@ -595,7 +596,12 @@ class AiDiscoverController(
       )
       log.i { "Found ${found.size} candidates, session=${run.sessionId}" }
       editTurn(run, touched = now) {
-        it.copy(status = TurnStatus.Done, candidates = found, summary = response.summary)
+        it.copy(
+          status = TurnStatus.Done,
+          candidates = found,
+          summary = response.summary,
+          filtered = response.filtered,
+        )
       }
       if (session != null) name(session, run.turnId, response.title)
       if (found.isNotEmpty()) {

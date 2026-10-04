@@ -81,6 +81,10 @@
   <string name="discover_failed">A descoberta falhou</string>
   <string name="discover_none_title">Nenhum download encontrado</string>
   <string name="discover_none_body">O Descobrir lista apenas arquivos de fontes em que confia. Tente indicar a versão ou a plataforma, ou o site que publica o arquivo.</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="one">O filtro de conteúdo ocultou %1$d resultado que parecia inseguro. Você pode desativar o filtro nas Configurações do Descobrir.</item>
+    <item quantity="other">O filtro de conteúdo ocultou %1$d resultados que pareciam inseguros. Você pode desativar o filtro nas Configurações do Descobrir.</item>
+  </plurals>
   <string name="discover_search_everywhere">Pesquisar em toda a web</string>
   <string name="discover_stopped">Interrompida</string>
   <string name="discover_discard">Descartar</string>
@@ -90,6 +94,10 @@
     <item quantity="other">%1$d descartados</item>
   </plurals>
   <string name="discover_restore">Restaurar</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="one">%1$d ocultado pelo filtro de conteúdo</item>
+    <item quantity="other">%1$d ocultados pelo filtro de conteúdo</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="one">%1$d resultado descartado</item>

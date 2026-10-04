@@ -13,12 +13,15 @@ internal sealed interface AiDiscoverArgs {
    * @param sites websites the search is limited to
    * @param maxResults candidates to show at most
    * @param allowAll `--yes`: open every website without asking
+   * @param noFilter `--no-filter`: show the results the content filter would hide, whatever
+   *   `[ai] contentFilter` says
    */
   data class Discover(
     val query: String,
     val sites: List<String> = emptyList(),
     val maxResults: Int = DEFAULT_MAX_RESULTS,
     val allowAll: Boolean = false,
+    val noFilter: Boolean = false,
   ) : AiDiscoverArgs
 }
 
@@ -31,6 +34,7 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
   var sites = emptyList<String>()
   var maxResults = DEFAULT_MAX_RESULTS
   var allowAll = false
+  var noFilter = false
 
   var i = 0
   while (i < args.size) {
@@ -38,6 +42,7 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
     when {
       arg == "--help" || arg == "-h" -> return AiDiscoverArgs.Help
       arg == "--yes" || arg == "-y" -> allowAll = true
+      arg == "--no-filter" -> noFilter = true
       arg == "--sites" || arg == "--max-results" -> {
         val value = args.getOrNull(++i)
           ?: return AiDiscoverArgs.Invalid("$arg requires a value")
@@ -64,5 +69,6 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
     sites = sites,
     maxResults = maxResults,
     allowAll = allowAll,
+    noFilter = noFilter,
   )
 }

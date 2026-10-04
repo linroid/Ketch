@@ -177,6 +177,9 @@ data class SearchSettings(
  * @property llm LLM connection settings.
  * @property search web search settings.
  * @property access when discovery may open websites, under `[ai.access]`.
+ * @property contentFilter whether discovery hides results that look unsafe, such as links
+ *   through URL shorteners or download aggregators, piracy, look-alike websites and installers
+ *   over plain HTTP. Private and local addresses are refused either way.
  */
 @Serializable
 data class AiSettings(
@@ -184,15 +187,16 @@ data class AiSettings(
   val llm: LlmSettings = LlmSettings(),
   val search: SearchSettings = SearchSettings(),
   val access: PageAccessSettings = PageAccessSettings(),
+  val contentFilter: Boolean = true,
 ) {
   /** `true` when discovery is switched on and fully configured. */
   val isUsable: Boolean
     get() = enabled && llm.isComplete && search.isComplete
 
   /**
-   * These settings without [access], which the discovery engine never reads: two settings that
-   * differ only in [access] build the same engine.
+   * These settings without [access] and [contentFilter], which the discovery engine never reads
+   * (each search is given them): two settings that differ only in those build the same engine.
    */
   val engineSettings: AiSettings
-    get() = if (access == PageAccessSettings()) this else copy(access = PageAccessSettings())
+    get() = copy(access = PageAccessSettings(), contentFilter = true)
 }

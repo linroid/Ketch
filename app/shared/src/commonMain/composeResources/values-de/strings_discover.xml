@@ -81,6 +81,10 @@
   <string name="discover_failed">Suche fehlgeschlagen</string>
   <string name="discover_none_title">Keine Downloads gefunden</string>
   <string name="discover_none_body">Entdecken listet nur Dateien aus Quellen auf, denen es vertraut. Nenne die Version oder Plattform oder die Website, die sie veröffentlicht.</string>
+  <plurals name="discover_none_filtered">
+    <item quantity="one">Der Inhaltsfilter hat %1$d Ergebnis ausgeblendet, das unsicher wirkte. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
+    <item quantity="other">Der Inhaltsfilter hat %1$d Ergebnisse ausgeblendet, die unsicher wirkten. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
+  </plurals>
   <string name="discover_search_everywhere">Im ganzen Web suchen</string>
   <string name="discover_stopped">Gestoppt</string>
   <string name="discover_discard">Verwerfen</string>
@@ -90,6 +94,10 @@
     <item quantity="other">%1$d verworfen</item>
   </plurals>
   <string name="discover_restore">Wiederherstellen</string>
+  <plurals name="discover_filtered_count">
+    <item quantity="one">%1$d vom Inhaltsfilter ausgeblendet</item>
+    <item quantity="other">%1$d vom Inhaltsfilter ausgeblendet</item>
+  </plurals>
 
   <plurals name="discover_discarded">
     <item quantity="one">%1$d Ergebnis verworfen</item>

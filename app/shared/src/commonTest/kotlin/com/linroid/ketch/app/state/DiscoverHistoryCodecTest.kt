@@ -46,6 +46,7 @@ class DiscoverHistoryCodecTest {
           AccessNote("www.blender.org", allowed = true),
           AccessNote("mirror.example", allowed = false),
         ),
+        filtered = 2,
       ),
       DiscoverTurn(
         id = "t2",

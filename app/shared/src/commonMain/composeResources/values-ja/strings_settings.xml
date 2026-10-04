@@ -189,6 +189,8 @@
   <string name="settings_integration_quick_add_hint">リンクを1件貼り付けると、すぐに追加されます（取り消し可能）。</string>
 
   <string name="settings_ai_discovery">AIディスカバー</string>
+  <string name="settings_ai_content_filter">コンテンツフィルタ</string>
+  <string name="settings_ai_content_filter_hint">安全でないと思われる結果を非表示にします：短縮リンク、ダウンロードまとめサイト、海賊版、なりすましサイト、暗号化されていない HTTP のインストーラ。自分のネットワーク内へのリンクは常に非表示です。</string>
   <string name="settings_ai_provider">プロバイダ</string>
   <string name="settings_ai_api_key">APIキー</string>
   <string name="settings_ai_model">モデル</string>
@@ -530,6 +532,8 @@
   <string name="settings_search_web_search_keywords">検索プロバイダ, 検索APIキー, 検索エンジン</string>
   <string name="settings_search_ai_access">ディスカバーがWebサイトを開く前に確認するかどうか</string>
   <string name="settings_search_ai_access_keywords">ページへのアクセス, アクセス許可, 権限, 承認, 許可, 確認, プライバシー</string>
+  <string name="settings_search_ai_content_filter">ディスカバーが安全でないと思われる結果を非表示にするかどうか</string>
+  <string name="settings_search_ai_content_filter_keywords">安全, セーフサーチ, 危険, マルウェア, 海賊版, ブロック, 非表示, 隠された結果</string>
   <string name="settings_search_ai_trusted">ディスカバーが確認せずに開くWebサイト</string>
   <string name="settings_search_ai_trusted_keywords">信頼済みサイト, 許可リスト, ホワイトリスト, ドメイン, 権限, 常に許可</string>
   <string name="settings_search_version_keywords">ビルド, リビジョン, アップデート, 更新</string>
