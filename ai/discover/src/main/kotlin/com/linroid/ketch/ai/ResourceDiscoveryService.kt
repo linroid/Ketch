@@ -520,8 +520,8 @@ class ResourceDiscoveryService internal constructor(
       |   quotes, Markdown or a trailing period, such as "Blender 4.2 for
       |   Apple silicon". Give it for a first request; a follow-up may
       |   leave it out.
-      |   If no safe candidates: return "candidates": [] and explain why in
-      |   summary.
+      |   If no ${if (contentFilter) "safe candidates" else "candidates"}: return
+      |   "candidates": [] and explain why in summary.
       |
       |FOLLOW-UPS:
       |A conversation refines earlier requests; the latest request is the

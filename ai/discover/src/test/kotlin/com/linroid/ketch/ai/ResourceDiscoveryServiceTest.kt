@@ -486,6 +486,7 @@ class ResourceDiscoveryServiceTest {
     assertEquals(Role.System, system.role)
     assertTrue("ANTI-PIRACY GUARDRAIL" in system.textContent())
     assertTrue("BLOCK URL shorteners" in system.textContent())
+    assertTrue("If no safe candidates" in system.textContent())
   }
 
   @Test
@@ -496,6 +497,7 @@ class ResourceDiscoveryServiceTest {
 
     assertTrue("ANTI-PIRACY" !in system, system)
     assertTrue("BLOCK" !in system, system)
+    assertTrue("no safe candidates" !in system, system)
     assertTrue("content filter off" in system)
     assertTrue("SAFETY CONSTRAINTS:" in system)
   }
