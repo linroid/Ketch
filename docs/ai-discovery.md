@@ -142,8 +142,11 @@ with a link to the Discover settings. Turning **Content filter** off
 there (`contentFilter = false` under `[ai]`) shows them in the next
 search, with the agent's own confidence. Links to private and local
 addresses, sites outside a search's [limit](#limiting-discovery-to-websites)
-and discarded links are never shown, whatever the setting. The agent is
-still told to prefer official sources and avoid unsafe ones.
+and discarded links are never shown, whatever the setting. With the
+filter off the agent is no longer told to refuse pirated content or to
+drop risky links: it still prefers official sources and ranks risky
+links lower, noting why. The model may still decline a request on its
+own.
 
 ## Page access
 

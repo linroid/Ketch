@@ -359,8 +359,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Content filter (`AiSettings.contentFilter`, `[ai] contentFilter`, on by default;
   `DiscoverQuery.contentFilter`, CLI `--no-filter`): `DeviceSafetyFilter` drops shorteners,
   aggregators, piracy signals, look-alikes of its trusted hosts, URLs with user info and
-  installers from unlisted hosts without HTTPS (over HTTPS they are scored down).
-  `DiscoverResult.filtered` counts them, and the app's turn (`DiscoverTurn.filtered`, saved in the
+  installers from unlisted hosts without HTTPS (over HTTPS they are scored down). The system
+  prompt follows it too (`ResourceDiscoveryService.systemPrompt`): only with the filter on is the
+  agent told to refuse piracy and block risky links. `DiscoverResult.filtered` counts them, and the app's turn (`DiscoverTurn.filtered`, saved in the
   history) shows "N hidden by the content filter" or a No results card with Discover settings.
   Like `access`, it is left out of `AiSettings.engineSettings`
 - SSRF protection on every redirect hop, device safety scoring, rate limiting; the
