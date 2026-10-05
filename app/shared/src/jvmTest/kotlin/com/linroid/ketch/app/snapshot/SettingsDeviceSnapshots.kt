@@ -319,6 +319,7 @@ private class DeviceEnvironment(
     ),
     initialRemotes = data.remotes,
     configStore = store,
+    context = SnapshotHarness.ui,
   )
   private val speedMode = SpeedModeController(
     config = { api.status().config },
@@ -337,6 +338,8 @@ private class DeviceEnvironment(
   override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     speedMode = speedMode,
     clock = SampleData.CLOCK,
   )

@@ -193,12 +193,11 @@ class ShortcutHostTest {
     settle()
   }
 
-  private suspend fun ImageComposeScene.settle() = frames(FRAMES) { it * FRAME_NANOS }
+  private suspend fun ImageComposeScene.settle() = frames(FRAMES)
 
   private companion object {
     const val SIZE = 200
     const val FRAMES = 6
-    const val FRAME_NANOS = 16_000_000L
     val Side = 80.dp
   }
 }

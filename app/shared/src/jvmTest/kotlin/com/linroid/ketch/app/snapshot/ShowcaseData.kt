@@ -330,12 +330,15 @@ internal class ShowcaseEnvironment(
     ),
     initialRemotes = data.remotes,
     configStore = RecordingConfigStore(data.config(theme, density)),
+    context = SnapshotHarness.ui,
   )
 
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     clock = SampleData.CLOCK,
   )
 

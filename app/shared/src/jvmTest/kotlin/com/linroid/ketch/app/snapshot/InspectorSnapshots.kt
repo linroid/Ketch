@@ -46,7 +46,6 @@ import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
-import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
@@ -225,7 +224,7 @@ class InspectorSnapshots {
   ) {
     withSample(theme, size.density.toMode()) { env ->
       val state = env.controller.state
-      val key = runBlocking(SnapshotHarness.ui) { Setup(state, env.data).setup() }
+      val key = onUiThread { Setup(state, env.data).setup() }
       snapshot(name, size, theme, interact) {
         CompositionLocalProvider(LocalAppState provides state) {
           val scope = rememberCoroutineScope()

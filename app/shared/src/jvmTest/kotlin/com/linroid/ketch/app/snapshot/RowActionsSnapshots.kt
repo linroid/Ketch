@@ -76,16 +76,12 @@ import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.downloads.actions.rubberBand
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * The selection, row menus, hover actions, list keys, Remove dialog, drag preview and rubber
@@ -619,7 +615,7 @@ private fun PhoneRow(row: TaskRow, actions: ListActions) {
 
 private fun previewRows(data: SampleData): List<TaskRow> =
   withSample(SnapshotTheme.Light, data = data) { env ->
-    runBlocking(SnapshotHarness.ui) {
+    onUiThread {
       // The view follows the rows that start() waits for a moment later.
       val view = env.controller.state.taskList.view.first { it.rows.size == data.tasks.size }
       listOf(PHOTOS, LINUX, PODCAST).map { name -> view.rows.first { it.name == name } }
@@ -635,7 +631,7 @@ private fun bandSnapshot(
   size: SnapshotSize,
   theme: SnapshotTheme,
 ): File = withSample(theme) { environment ->
-  runBlocking(SnapshotHarness.ui) {
+  onUiThread {
     val scale = SnapshotHarness.SCALE
     val scene = ImageComposeScene(
       width = (size.width.value * scale).toInt(),
@@ -653,10 +649,8 @@ private fun bandSnapshot(
         }
       }
     }
-    val start = TimeSource.Monotonic.markNow()
     suspend fun frames(count: Int) = repeat(count) {
-      scene.render(start.elapsedNow().inWholeNanoseconds)
-      delay(16.milliseconds)
+      scene.frames(1)
       Snapshot.sendApplyNotifications()
     }
     try {
@@ -664,10 +658,11 @@ private fun bandSnapshot(
       val top = CARD_INSET + HEADER + TABS + COLUMN_HEADER
       val from = Offset(900f * scale, (size.height.value - 40f) * scale)
       val to = Offset(380f * scale, (top + ROW * 9 + ROW / 2).value * scale)
-      scene.sendPointerEvent(PointerEventType.Move, from)
+      scene.sendPointerEvent(PointerEventType.Move, from, timeMillis = SnapshotClock.millis)
       scene.sendPointerEvent(
         PointerEventType.Press,
         from,
+        timeMillis = SnapshotClock.millis,
         buttons = PointerButtons(isPrimaryPressed = true),
         button = PointerButton.Primary,
       )
@@ -676,12 +671,13 @@ private fun bandSnapshot(
         scene.sendPointerEvent(
           PointerEventType.Move,
           point,
+          timeMillis = SnapshotClock.millis,
           buttons = PointerButtons(isPrimaryPressed = true),
         )
         frames(2)
       }
       frames(20)
-      val image = scene.render(start.elapsedNow().inWholeNanoseconds)
+      val image = scene.render(SnapshotClock.nanos)
       val bytes = checkNotNull(image.encodeToData(EncodedImageFormat.PNG)).bytes
       SnapshotHarness.outputDir.mkdirs()
       File(SnapshotHarness.outputDir, "$name-${theme.id}-${size.id}.png")

@@ -238,6 +238,7 @@ private class DevicesPageEnvironment(
       )
     ),
     clock = clock,
+    context = SnapshotHarness.ui,
   )
   private val speedMode = SpeedModeController(
     config = { local.status().config },
@@ -249,6 +250,8 @@ private class DevicesPageEnvironment(
   override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     speedMode = speedMode,
     clock = SampleData.CLOCK,
   )

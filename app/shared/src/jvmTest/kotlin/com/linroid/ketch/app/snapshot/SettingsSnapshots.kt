@@ -366,6 +366,7 @@ internal class SettingsEnvironment(
         notifications = NotificationSettings(failed = NotificationMode.InApp),
       ),
     ),
+    context = SnapshotHarness.ui,
   )
   private val speedMode = SpeedModeController(
     config = { api.status().config },
@@ -385,6 +386,8 @@ internal class SettingsEnvironment(
     instanceManager = instanceManager,
     aiProviderFactory = IdleDiscovery,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     speedMode = speedMode,
     clock = SampleData.CLOCK,
   )

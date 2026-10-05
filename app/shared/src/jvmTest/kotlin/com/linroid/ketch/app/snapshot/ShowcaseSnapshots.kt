@@ -41,7 +41,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * The README showcase: the real app on a desktop window, an Android phone and an iOS phone, with
@@ -131,10 +130,10 @@ private fun iosScreen(theme: SnapshotTheme): Image =
     val feeder = CoroutineScope(SnapshotHarness.ui)
     feeder.launch {
       // Fed by the clock the lane rates are measured with, so they read as ISO_LANE_RATES.
-      var last = TimeSource.Monotonic.markNow()
+      var last = SnapshotClock.timeSource.markNow()
       while (isActive) {
         delay(FEED_INTERVAL)
-        val now = TimeSource.Monotonic.markNow()
+        val now = SnapshotClock.timeSource.markNow()
         ShowcaseData.advance(iso, ShowcaseData.ISO_LANE_RATES, now - last)
         last = now
       }
