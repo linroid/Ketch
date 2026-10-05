@@ -97,7 +97,8 @@ export function buildHeaders({ cookies = [], referrer, userAgent }) {
 export function buildDownloadRequest({ url, fileName, headers = {}, resolvedSource }) {
   const request = { url };
   const name = fileNameFromPath(fileName);
-  if (name && name !== '.' && name !== '..' && !isTorrentUrl(url) && !isTorrentFile({ fileName })) {
+  if (name && name !== '.' && name !== '..' && !isTorrentUrl(url) && !isTorrentFile({ fileName }) &&
+    !/\.(m3u8|mpd)(?:[?#]|$)/i.test(url)) {
     request.destination = name;
   }
   if (Object.keys(headers).length > 0) request.headers = headers;

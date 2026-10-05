@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "Cette instance Ketch ne prend pas en charge les listes multimédias. Mettez-la à jour avant d’envoyer ce lien."
+  },
+  "review_setting": {
+    "message": "Vérifier les téléchargements avant l’envoi"
+  },
+  "review_title": {
+    "message": "Vérifier le téléchargement"
+  },
+  "review_name": {
+    "message": "Nom du fichier (facultatif)"
+  },
+  "review_folder": {
+    "message": "Dossier sur l’appareil choisi (facultatif)"
+  },
+  "review_detail": {
+    "message": "Laissez le dossier vide pour utiliser celui par défaut de l’appareil. Le serveur contrôle les dossiers autorisés. Les torrents conservent leur structure. Fermer cette page rend au navigateur un téléchargement en pause."
+  },
+  "review_cancel": {
+    "message": "Annuler"
+  },
+  "review_invalid_destination": {
+    "message": "Saisissez un nom de fichier et un dossier valides."
+  },
+  "review_unavailable": {
+    "message": "Cette vérification n’est plus disponible. Consultez les téléchargements en attente dans les réglages avant de renvoyer."
   }
 }

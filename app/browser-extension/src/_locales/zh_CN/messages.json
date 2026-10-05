@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "此 Ketch 实例不支持媒体播放列表。发送链接前请先更新。"
+  },
+  "review_setting": {
+    "message": "发送前确认下载"
+  },
+  "review_title": {
+    "message": "确认下载"
+  },
+  "review_name": {
+    "message": "文件名（可选）"
+  },
+  "review_folder": {
+    "message": "所选设备上的文件夹（可选）"
+  },
+  "review_detail": {
+    "message": "文件夹留空时使用设备的默认文件夹。服务器控制允许使用的文件夹。种子保留其文件结构。关闭此页面会将暂停的下载交还浏览器。"
+  },
+  "review_cancel": {
+    "message": "取消"
+  },
+  "review_invalid_destination": {
+    "message": "请输入有效的文件名和文件夹。"
+  },
+  "review_unavailable": {
+    "message": "此确认已不可用。再次发送前，请在设置中检查待确认的下载。"
   }
 }

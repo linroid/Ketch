@@ -112,3 +112,9 @@ describe('buildDownloadRequest', () => {
     );
   });
 });
+
+test('playlist names do not override the media engine output extension', () => {
+  const request = buildDownloadRequest({ url: 'https://example.com/index.m3u8?token=x',
+    fileName: 'index.m3u8' });
+  assert.equal(request.destination, undefined);
+});

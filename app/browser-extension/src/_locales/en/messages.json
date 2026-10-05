@@ -828,5 +828,37 @@
   "error_media_unsupported": {
     "message": "This Ketch instance does not support media playlists. Update it before sending this link.",
     "description": "Media capability error"
+  },
+  "review_setting": {
+    "message": "Review downloads before sending",
+    "description": "Download review: setting"
+  },
+  "review_title": {
+    "message": "Review download",
+    "description": "Download review: title"
+  },
+  "review_name": {
+    "message": "File name (optional)",
+    "description": "Download review: name"
+  },
+  "review_folder": {
+    "message": "Folder on the selected device (optional)",
+    "description": "Download review: folder"
+  },
+  "review_detail": {
+    "message": "Leave the folder empty to use the device’s default. The server controls which folders are allowed. Torrents keep their own file layout. Closing this page returns a paused download to the browser.",
+    "description": "Download review: detail"
+  },
+  "review_cancel": {
+    "message": "Cancel",
+    "description": "Download review: cancel"
+  },
+  "review_invalid_destination": {
+    "message": "Enter a valid file name and folder.",
+    "description": "Download review: invalid_destination"
+  },
+  "review_unavailable": {
+    "message": "This review is no longer available. Check pending downloads in settings before sending again.",
+    "description": "Download review: unavailable"
   }
 }

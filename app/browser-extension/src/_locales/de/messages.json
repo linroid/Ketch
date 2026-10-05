@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "Diese Ketch-Instanz unterstützt keine Medien-Playlists. Aktualisiere sie, bevor du diesen Link sendest."
+  },
+  "review_setting": {
+    "message": "Downloads vor dem Senden prüfen"
+  },
+  "review_title": {
+    "message": "Download prüfen"
+  },
+  "review_name": {
+    "message": "Dateiname (optional)"
+  },
+  "review_folder": {
+    "message": "Ordner auf dem ausgewählten Gerät (optional)"
+  },
+  "review_detail": {
+    "message": "Ohne Ordnerangabe wird der Standard des Geräts verwendet. Der Server bestimmt die erlaubten Ordner. Torrents behalten ihre Dateistruktur. Beim Schließen dieser Seite übernimmt der Browser einen pausierten Download wieder."
+  },
+  "review_cancel": {
+    "message": "Abbrechen"
+  },
+  "review_invalid_destination": {
+    "message": "Gib einen gültigen Dateinamen und Ordner ein."
+  },
+  "review_unavailable": {
+    "message": "Diese Prüfung ist nicht mehr verfügbar. Prüfe ausstehende Downloads in den Einstellungen, bevor du erneut sendest."
   }
 }

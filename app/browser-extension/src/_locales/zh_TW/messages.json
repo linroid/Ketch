@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "此 Ketch 執行個體不支援媒體播放清單。傳送連結前請先更新。"
+  },
+  "review_setting": {
+    "message": "傳送前確認下載"
+  },
+  "review_title": {
+    "message": "確認下載"
+  },
+  "review_name": {
+    "message": "檔案名稱（選填）"
+  },
+  "review_folder": {
+    "message": "所選裝置上的資料夾（選填）"
+  },
+  "review_detail": {
+    "message": "資料夾留空時使用裝置的預設資料夾。伺服器控制允許使用的資料夾。種子保留其檔案結構。關閉此頁面會將暫停的下載交還瀏覽器。"
+  },
+  "review_cancel": {
+    "message": "取消"
+  },
+  "review_invalid_destination": {
+    "message": "請輸入有效的檔案名稱和資料夾。"
+  },
+  "review_unavailable": {
+    "message": "此確認已無法使用。再次傳送前，請在設定中檢查待確認的下載。"
   }
 }

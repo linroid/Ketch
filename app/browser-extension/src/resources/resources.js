@@ -2,6 +2,7 @@ import { ext } from '../lib/ext.js';
 import { cookieStoreIdForTab, sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { collectPageResources, mergePageResources } from '../lib/page-resources.js';
+import { reviewDestination } from '../lib/review.js';
 import { loadSettings } from '../lib/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -82,7 +83,7 @@ async function sendSelected() {
   const instance = settings.instances.find((it) => it.id === $('instance').value);
   if (!instance) { $('status').textContent = t('resources_unavailable'); return; }
   busy = true;
-  for (const id of ['scan', 'kind', 'instance', 'all', 'send']) $(id).disabled = true;
+  for (const id of ['scan', 'kind', 'instance', 'all', 'send', 'folder']) $(id).disabled = true;
   try {
     for (const box of selected) {
       const resource = resources.find((it) => it.url === box.value);
@@ -93,7 +94,9 @@ async function sendSelected() {
         if (!target || target.type !== instance.type || target.url !== instance.url ||
           target.token !== instance.token) throw new Error(t('resources_unavailable'));
         await sendToKetch(target, { url: resource.url, referrer: resource.pageUrl,
-          fileName: resource.name || undefined, cookieStoreId }, current);
+          fileName: resource.name || undefined, cookieStoreId,
+          destination: reviewDestination({ url: resource.url, fileName: resource.name },
+            resource.kind === 'stream' ? '' : resource.name, $('folder').value) }, current);
         submitted.add(resource.url);
         box.disabled = true;
         box.checked = false;
@@ -109,7 +112,7 @@ async function sendSelected() {
     }
   } finally {
     busy = false;
-    for (const id of ['scan', 'kind', 'instance', 'all']) $(id).disabled = false;
+    for (const id of ['scan', 'kind', 'instance', 'all', 'folder']) $(id).disabled = false;
     updateSelection();
   }
 }

@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "이 Ketch는 미디어 재생목록을 지원하지 않습니다. 링크를 보내기 전에 업데이트하세요."
+  },
+  "review_setting": {
+    "message": "보내기 전에 다운로드 검토"
+  },
+  "review_title": {
+    "message": "다운로드 검토"
+  },
+  "review_name": {
+    "message": "파일 이름 (선택 사항)"
+  },
+  "review_folder": {
+    "message": "선택한 기기의 폴더 (선택 사항)"
+  },
+  "review_detail": {
+    "message": "폴더를 비워 두면 기기의 기본 폴더를 사용합니다. 허용된 폴더는 서버가 관리합니다. 토렌트는 원래 파일 구조를 유지합니다. 이 페이지를 닫으면 일시 중지된 다운로드가 브라우저로 돌아갑니다."
+  },
+  "review_cancel": {
+    "message": "취소"
+  },
+  "review_invalid_destination": {
+    "message": "유효한 파일 이름과 폴더를 입력하세요."
+  },
+  "review_unavailable": {
+    "message": "이 검토는 더 이상 사용할 수 없습니다. 다시 보내기 전에 설정에서 보류 중인 다운로드를 확인하세요."
   }
 }

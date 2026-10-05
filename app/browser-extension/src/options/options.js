@@ -26,6 +26,7 @@ localizePage();
 const toggles = {
   interceptDownloads: $('intercept-downloads'),
   forwardCookies: $('forward-cookies'),
+  confirmDownloads: $('confirm-downloads'),
   captureMagnetLinks: $('capture-magnet-links'),
   notifications: $('notifications'),
   captureUnknownSize: $('capture-unknown-size'),
@@ -243,6 +244,7 @@ async function persist() {
     defaultInstanceId: defaultCard?.dataset.id,
     interceptDownloads: toggles.interceptDownloads.checked,
     forwardCookies: toggles.forwardCookies.checked,
+    confirmDownloads: toggles.confirmDownloads.checked,
     captureMagnetLinks: toggles.captureMagnetLinks.checked,
     notifications: toggles.notifications.checked,
     captureUnknownSize: toggles.captureUnknownSize.checked,

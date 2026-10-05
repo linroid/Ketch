@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "このKetchはメディアプレイリストに対応していません。リンクを送信する前に更新してください。"
+  },
+  "review_setting": {
+    "message": "送信前にダウンロードを確認"
+  },
+  "review_title": {
+    "message": "ダウンロードの確認"
+  },
+  "review_name": {
+    "message": "ファイル名（任意）"
+  },
+  "review_folder": {
+    "message": "選択したデバイスのフォルダ（任意）"
+  },
+  "review_detail": {
+    "message": "空欄の場合はデバイスの既定フォルダを使用します。許可されたフォルダはサーバーが管理します。トレントは元のファイル構成を保持します。このページを閉じると、一時停止中のダウンロードをブラウザに戻します。"
+  },
+  "review_cancel": {
+    "message": "キャンセル"
+  },
+  "review_invalid_destination": {
+    "message": "有効なファイル名とフォルダを入力してください。"
+  },
+  "review_unavailable": {
+    "message": "この確認は利用できなくなりました。再送信前に設定で保留中のダウンロードを確認してください。"
   }
 }

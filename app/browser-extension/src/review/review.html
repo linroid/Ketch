@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="review_title">Review download</title>
+  <link rel="stylesheet" href="../ui/common.css">
+  <link rel="stylesheet" href="review.css">
+  <script type="module" src="review.js"></script>
+</head>
+<body>
+  <main>
+    <h1 data-i18n="review_title">Review download</h1>
+    <p id="url" class="muted"></p>
+    <form id="form">
+      <label><span data-i18n="popup_instance_picker">Ketch instance</span>
+        <select id="instance"></select></label>
+      <label><span data-i18n="review_name">File name (optional)</span>
+        <input id="name" type="text" autocomplete="off" maxlength="255"></label>
+      <label><span data-i18n="review_folder">Folder on the selected device (optional)</span>
+        <input id="folder" type="text" autocomplete="off" maxlength="4096"></label>
+      <p class="muted" data-i18n="review_detail">Leave the folder empty to use the device’s
+        default. The server controls which folders are allowed. Torrents keep their own file
+        layout. Closing this page returns a paused download to the browser.</p>
+      <div class="actions">
+        <button id="send" type="submit" class="primary" disabled
+          data-i18n="popup_add_button">Download</button>
+        <button id="cancel" type="button" data-i18n="review_cancel">Cancel</button>
+      </div>
+    </form>
+    <p id="status" role="status"></p>
+  </main>
+</body>
+</html>

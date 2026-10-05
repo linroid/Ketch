@@ -229,3 +229,15 @@ test('remote torrent-content resolution also obeys credential permission', async
   await sendToKetch({ ...instance, forwardCookies: false }, TORRENT_DOWNLOAD, settings, { deps });
   assert.equal(siteCalls[0].init.credentials, 'omit');
 });
+
+test('review destination applies after resolving a torrent and can clear a suggested file name',
+  async () => {
+    const { deps, ketchCalls } = fakeDeps();
+    await sendToKetch(instance, { ...TORRENT_DOWNLOAD, destination: '/downloads/' }, settings,
+      { deps });
+    assert.equal(ketchCalls.at(-1).body.url, 'torrent:abc');
+    assert.equal(ketchCalls.at(-1).body.destination, '/downloads/');
+    await sendToKetch(instance, { url: 'https://example.com/get', fileName: 'suggested.zip',
+      destination: undefined }, settings, { deps });
+    assert.equal(ketchCalls.at(-1).body.destination, undefined);
+  });

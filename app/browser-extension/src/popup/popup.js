@@ -9,6 +9,7 @@ import { describeStatus, describeTaskState, failureHint, taskName } from '../lib
 import { sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
+import { openReview } from '../lib/review.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
 import { findInstance, loadSettings, saveSettings } from '../lib/settings.js';
 
@@ -213,7 +214,13 @@ async function onAdd(event) {
   }
   $('add-button').disabled = true;
   try {
-    const task = await sendToKetch(instance, { url }, settings, { timeoutMs: REQUEST_TIMEOUT_MS });
+    const current = await loadSettings();
+    if (current.confirmDownloads) {
+      await openReview(instance.id, { url });
+      window.close();
+      return;
+    }
+    const task = await sendToKetch(instance, { url }, current, { timeoutMs: REQUEST_TIMEOUT_MS });
     input.value = '';
     showAddMessage(t('popup_added', taskName(task)), 'success');
     refresh();

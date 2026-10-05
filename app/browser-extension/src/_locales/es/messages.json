@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "Esta instancia de Ketch no admite listas multimedia. Actualízala antes de enviar este enlace."
+  },
+  "review_setting": {
+    "message": "Revisar descargas antes de enviarlas"
+  },
+  "review_title": {
+    "message": "Revisar descarga"
+  },
+  "review_name": {
+    "message": "Nombre del archivo (opcional)"
+  },
+  "review_folder": {
+    "message": "Carpeta en el dispositivo elegido (opcional)"
+  },
+  "review_detail": {
+    "message": "Deja la carpeta vacía para usar la predeterminada del dispositivo. El servidor controla las carpetas permitidas. Los torrents conservan su estructura. Cerrar esta página devuelve al navegador una descarga pausada."
+  },
+  "review_cancel": {
+    "message": "Cancelar"
+  },
+  "review_invalid_destination": {
+    "message": "Introduce un nombre de archivo y una carpeta válidos."
+  },
+  "review_unavailable": {
+    "message": "Esta revisión ya no está disponible. Comprueba las descargas pendientes en ajustes antes de volver a enviar."
   }
 }
