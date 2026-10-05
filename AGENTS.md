@@ -262,6 +262,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### Pluggable Download Sources (`DownloadSource`)
 - `SourceResolver` routes URLs to the appropriate source
 - `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
+- `MediaDownloadSource` is built into core ahead of HTTP: finite, unencrypted `.m3u8` HLS and
+  `.mpd` DASH streams are concatenated into one media file. HLS masters choose the
+  highest-bandwidth variant; byte ranges and initialization segments are supported. Transfers
+  are sequential and pause/retry restarts from zero. Live streams, encryption and separate
+  audio/video tracks are rejected; see [media support and limits](docs/media.md)
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
@@ -777,10 +782,9 @@ Planned features not yet implemented:
 
 1. **Metalink** - Multi-source downloads with mirrors, checksums, and chunk verification
 2. **WebDAV** - Download from WebDAV servers with resume support
-3. **HLS and DASH** - HTTP Live Streaming (`.m3u8`) and MPEG-DASH (`.mpd`) as a pluggable
-   `DownloadSource`, downloading and merging the media segments into a single file. It picks a
-   variant (the reserved `FileSelectionMode.SINGLE`) with its matching audio, handles AES-128 and
-   byte-range segments, and refuses live and DRM streams with a typed error. HLS ships first
+3. **More HLS and DASH formats** - Extend the built-in finite media source with variant selection
+   (the reserved `FileSelectionMode.SINGLE`), matching separate audio/video tracks and AES-128
+   HLS encryption. Finite, unencrypted single-stream playlists and byte ranges already work
 4. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from

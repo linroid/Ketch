@@ -79,6 +79,11 @@ directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
 trackers of the default [config file](#config-file-locations).
 
+HTTP(S) `.m3u8` and `.mpd` URLs download finite, unencrypted HLS/DASH streams as one media file:
+`ketch 'https://example.com/video/index.m3u8'`. HLS master playlists choose the highest-bandwidth
+variant. Live streams and separate audio/video tracks are unsupported; see
+[media support and limits](../docs/media.md).
+
 The download is kept in memory only and is not recorded in the [task database](#database). The
 command exits when the download completes or fails.
 
