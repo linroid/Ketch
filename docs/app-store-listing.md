@@ -27,8 +27,9 @@ Android one as it is. Without fastlane, paste the text files into the consoles.
 ```
 
 The script runs the `StoreScreenshots` snapshot scenario (about 8 minutes), copies the images
-into the folders above, with the Play icon made from the iOS one, and checks that no
-screenshot has an alpha channel, which App Store Connect refuses. The scenario renders the real
+into the folders above, with the Play icon made from the iOS one, and checks that every image
+has the size its store slot takes and no alpha channel, which App Store Connect refuses (the
+Play icon needs one). The scenario renders the real
 app headlessly, as the [README showcase](development/testing.md#ui-snapshots) does, over
 brand-free sample data: the phone or tablet downloads its own files, with a Mac called Studio and
 a home server paired. Captions are English constants in `StoreScreenshots.kt`, and

@@ -36,15 +36,38 @@ else
   echo "oxipng not found: the images were copied without optimizing them" >&2
 fi
 
-# The App Store refuses images with an alpha channel; only the Play icon may have one.
-for file in "${files[@]}"; do
-  read -r width height alpha < <(
-    sips -g pixelWidth -g pixelHeight -g hasAlpha "$file" | awk 'NR > 1 { print $2 }' |
-      paste -sd ' ' -
-  )
-  echo "$width x $height alpha=$alpha  $file"
-  if [[ "$alpha" == "yes" && "$file" != "$play/icon.png" ]]; then
-    echo "error: $file has an alpha channel" >&2
-    exit 1
-  fi
-done
+# png_info <file>: the width, height and color type in the PNG's IHDR chunk, which starts at
+# byte 16; plain od, so it works wherever bash does.
+png_info() {
+  od -An -tu1 -j16 -N10 "$1" | awk '{
+    printf "%d %d %d\n", (($1 * 256 + $2) * 256 + $3) * 256 + $4,
+      (($5 * 256 + $6) * 256 + $7) * 256 + $8, $10
+  }'
+}
+
+# expect <width> <height> <alpha> <file>...: fails unless every file is that size, and has an
+# alpha channel when <alpha> is yes and none when it is no.
+expect() {
+  local width=$1 height=$2 alpha=$3 file w h type has
+  shift 3
+  for file in "$@"; do
+    read -r w h type < <(png_info "$file")
+    # Color types 4 (gray) and 6 (RGB) carry alpha.
+    has=no
+    if [[ $type == 4 || $type == 6 ]]; then has=yes; fi
+    echo "$w x $h alpha=$has  $file"
+    if [[ $w != "$width" || $h != "$height" || $has != "$alpha" ]]; then
+      echo "error: $file must be $width x $height with alpha=$alpha" >&2
+      exit 1
+    fi
+  done
+}
+
+# The sizes each store slot takes. The App Store refuses images with an alpha channel, and Play
+# asks for a 32-bit icon.
+expect 1440 2560 no "$play"/phoneScreenshots/*.png
+expect 2560 1440 no "$play"/tenInchScreenshots/*.png
+expect 1024 500 no "$play/featureGraphic.png"
+expect 512 512 yes "$play/icon.png"
+expect 1320 2868 no "$apple"/iphone-*.png
+expect 2752 2064 no "$apple"/ipad-*.png
