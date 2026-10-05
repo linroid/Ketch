@@ -19,6 +19,60 @@ class FileActionsJvmTest {
   }
 
   @Test
+  fun openCommand_windows_usesExplorerEvenWhenDesktopSupportsOpen() {
+    for (name in listOf("VibepolloSetup-v2.0.0.exe", "Ketch Setup.msi", "report.pdf")) {
+      val target = File(dir, name)
+
+      for (canOpen in listOf(true, false)) {
+        assertEquals(
+          OpenCommand.Run(listOf("explorer.exe", target.absolutePath)),
+          openCommand(DesktopOs.Windows, target, canOpen)
+        )
+      }
+    }
+  }
+
+  @Test
+  fun openCommand_windows_passesAbsolutePathAsOneLiteralArgument() {
+    val target = File("Downloads/安装 O'Brien & 100% ! (1), setup.exe")
+
+    assertEquals(
+      OpenCommand.Run(listOf("explorer.exe", target.absolutePath)),
+      openCommand(DesktopOs.Windows, target, canOpen = true)
+    )
+  }
+
+  @Test
+  fun openCommand_windows_opensFoldersThroughExplorer() {
+    assertEquals(
+      OpenCommand.Run(listOf("explorer.exe", dir.absolutePath)),
+      openCommand(DesktopOs.Windows, dir, canOpen = true)
+    )
+  }
+
+  @Test
+  fun openCommand_otherSystems_useDesktopWhenSupported() {
+    for (os in listOf(DesktopOs.MacOs, DesktopOs.Linux)) {
+      assertEquals(OpenCommand.Desktop(file), openCommand(os, file, canOpen = true))
+    }
+  }
+
+  @Test
+  fun openCommand_linuxWithoutDesktop_usesXdgOpen() {
+    assertEquals(
+      OpenCommand.Run(listOf("xdg-open", file.path)),
+      openCommand(DesktopOs.Linux, file, canOpen = false)
+    )
+  }
+
+  @Test
+  fun openCommand_macOsWithoutDesktop_reportsUnsupported() {
+    assertFailsWith<FileActionException> {
+      openCommand(DesktopOs.MacOs, file, canOpen = false)
+    }
+  }
+
+  @Test
   fun revealCommand_macOs_selectsInFinder() = runTest {
     val command = revealCommand(DesktopOs.MacOs, file, canBrowse = true)
 

@@ -47,6 +47,23 @@ internal sealed interface RevealCommand {
   data class OpenFolder(val folder: File) : RevealCommand
 }
 
+/** How [FileActions.open] hands a file to the operating system. */
+internal sealed interface OpenCommand {
+  data class Run(val command: List<String>) : OpenCommand
+
+  data class Desktop(val file: File) : OpenCommand
+}
+
+internal fun openCommand(os: DesktopOs, file: File, canOpen: Boolean): OpenCommand = when {
+  // AWT rejects executable types on Windows with "Unsupported URI content", even when
+  // OPEN is supported. Explorer handles file associations and installer elevation itself.
+  // Pass an absolute path as one argument, without a command shell interpreting the filename.
+  os == DesktopOs.Windows -> OpenCommand.Run(listOf("explorer.exe", file.absolutePath))
+  canOpen -> OpenCommand.Desktop(file)
+  os == DesktopOs.Linux -> OpenCommand.Run(listOf("xdg-open", file.path))
+  else -> throw FileActionException("This computer can't open ${file.name}")
+}
+
 /** Menu label of [FileActions.reveal] on [os]. */
 internal fun revealLabel(os: DesktopOs): UiText = when (os) {
   DesktopOs.MacOs -> Res.string.reveal_in_finder.text()
@@ -80,7 +97,7 @@ internal fun revealCommand(os: DesktopOs, file: File, canBrowse: Boolean): Revea
   }
 }
 
-/** Opens files through `java.awt.Desktop`, falling back to system commands where it cannot. */
+/** Opens files through Explorer on Windows and `java.awt.Desktop` or system commands elsewhere. */
 internal object DesktopFileActions : FileActions {
   private val os = DesktopOs.current
 
@@ -130,12 +147,11 @@ internal object DesktopFileActions : FileActions {
   }
 
   private fun openFile(file: File) {
-    when {
-      supports(Desktop.Action.OPEN) -> attempt("No app can open ${file.name}") {
-        Desktop.getDesktop().open(file)
+    when (val command = openCommand(os, file, supports(Desktop.Action.OPEN))) {
+      is OpenCommand.Desktop -> attempt("No app can open ${file.name}") {
+        Desktop.getDesktop().open(command.file)
       }
-      os == DesktopOs.Linux -> run(listOf("xdg-open", file.path), "No app can open ${file.name}")
-      else -> throw FileActionException("This computer can't open ${file.name}")
+      is OpenCommand.Run -> run(command.command, "Couldn't open ${file.name}")
     }
   }
 
