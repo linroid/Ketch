@@ -4,6 +4,7 @@ import { withEndpoint } from './connection.js';
 import { ext } from './ext.js';
 import { t } from './i18n.js';
 import { KetchClient } from './ketch-client.js';
+import { mayForwardCookies } from './settings.js';
 import { receiptEndpoint, submitDownload } from './submissions.js';
 import {
   buildDownloadRequest,
@@ -56,6 +57,7 @@ export async function sendToKetch(instance, download, settings, options = {}) {
     throw new Error(t('error_unsupported_link'));
   }
   const deps = options.deps ?? browserDeps();
+  const forwardCookies = mayForwardCookies(instance, settings);
   const deadline = () => options.timeoutMs === undefined
     ? undefined
     : AbortSignal.timeout(options.timeoutMs);
@@ -65,14 +67,14 @@ export async function sendToKetch(instance, download, settings, options = {}) {
   if (url.toLowerCase().startsWith('magnet:')) {
     request = buildDownloadRequest({ url });
   } else if (isTorrentFile(download) && !isTorrentUrl(url)) {
-    torrentContent = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies, deadline());
+    torrentContent = await fetchTorrentFile(deps.fetch, url, forwardCookies, deadline());
   } else {
-    const cookies = settings.forwardCookies
+    const cookies = forwardCookies
       ? await readCookies(deps, url, download.cookieStoreId)
       : [];
     const headers = buildHeaders({
       cookies,
-      referrer: settings.forwardCookies ? download.referrer : undefined,
+      referrer: forwardCookies ? download.referrer : undefined,
       userAgent: deps.userAgent,
     });
     request = buildDownloadRequest({ url, fileName: download.fileName, headers });

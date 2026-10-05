@@ -470,7 +470,7 @@
     "message": "Laisser les petits fichiers au navigateur"
   },
   "options_min_size_detail": {
-    "message": "Les fichiers plus petits que cette taille sont téléchargés par le navigateur. Les fichiers de taille inconnue sont toujours envoyés à Ketch. Indiquez 0 pour tout envoyer."
+    "message": "Les fichiers plus petits restent dans le navigateur. 0 envoie tout."
   },
   "options_min_size_unit": {
     "message": "Mo"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "Utilisez la commande d’enregistrement du navigateur pour cet élément."
+  },
+  "options_unknown_size": {
+    "message": "Capturer les fichiers de taille inconnue"
+  },
+  "options_file_types": {
+    "message": "Types de fichiers"
+  },
+  "file_types_all": {
+    "message": "Tous les types"
+  },
+  "file_types_only": {
+    "message": "Uniquement les types indiqués"
+  },
+  "file_types_except": {
+    "message": "Sauf les types indiqués"
+  },
+  "options_extensions": {
+    "message": "Extensions de fichiers, séparées par des virgules"
+  },
+  "instance_cookies": {
+    "message": "Autoriser les cookies et le référent pour ce serveur"
   }
 }

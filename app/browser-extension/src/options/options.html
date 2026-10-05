@@ -54,12 +54,28 @@
         <span class="row-text"><span data-i18n="options_min_size">Leave small files to the
           browser</span>
           <small class="muted" data-i18n="options_min_size_detail">Files smaller than this stay in
-            the browser. Files of unknown size always go to Ketch. 0 sends everything.</small>
+            the browser. 0 sends everything.</small>
         </span>
         <span class="size-field">
           <input id="min-file-size" type="number" min="0" step="1" inputmode="decimal">
           <span class="muted" data-i18n="options_min_size_unit">MB</span>
         </span>
+      </label>
+      <label class="row">
+        <span data-i18n="options_unknown_size">Capture files of unknown size</span>
+        <input id="capture-unknown-size" class="switch" type="checkbox" role="switch">
+      </label>
+      <label class="row">
+        <span data-i18n="options_file_types">File types</span>
+        <select id="file-type-mode">
+          <option value="all" data-i18n="file_types_all">All types</option>
+          <option value="only" data-i18n="file_types_only">Only listed types</option>
+          <option value="except" data-i18n="file_types_except">Except listed types</option>
+        </select>
+      </label>
+      <label class="row stacked">
+        <span data-i18n="options_extensions">File extensions, separated by commas</span>
+        <input id="file-extensions" type="text" placeholder="zip, iso, tar.gz" spellcheck="false">
       </label>
       <label class="row stacked">
         <span class="row-text"><span data-i18n="options_excluded">Sites to leave to the
@@ -177,6 +193,10 @@
         </label>
       </div>
       <p class="instance-status muted"></p>
+      <label class="row">
+        <span data-i18n="instance_cookies">Allow cookies and referrer for this server</span>
+        <input class="server-cookies switch" type="checkbox" role="switch">
+      </label>
       <p class="instance-note" data-i18n="instance_insecure" hidden>This address isn't encrypted:
         the access token and any cookies sent with downloads travel over the network in plain
         text. Prefer https, or use it only on a network you trust.</p>

@@ -470,7 +470,7 @@
     "message": "작은 파일은 브라우저에 맡기기"
   },
   "options_min_size_detail": {
-    "message": "이보다 작은 파일은 브라우저에서 다운로드합니다. 크기를 알 수 없는 파일은 항상 Ketch로 보냅니다. 0이면 모두 보냅니다."
+    "message": "이보다 작은 파일은 브라우저에서 다운로드합니다. 0은 모두 전송합니다."
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "이 항목은 브라우저의 기본 저장 기능을 사용하세요."
+  },
+  "options_unknown_size": {
+    "message": "크기를 알 수 없는 파일 캡처"
+  },
+  "options_file_types": {
+    "message": "파일 형식"
+  },
+  "file_types_all": {
+    "message": "모든 형식"
+  },
+  "file_types_only": {
+    "message": "나열된 형식만"
+  },
+  "file_types_except": {
+    "message": "나열된 형식 제외"
+  },
+  "options_extensions": {
+    "message": "쉼표로 구분된 파일 확장자"
+  },
+  "instance_cookies": {
+    "message": "이 서버에 쿠키 및 참조 페이지 전송 허용"
   }
 }

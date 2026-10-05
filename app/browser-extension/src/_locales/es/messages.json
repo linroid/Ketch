@@ -470,7 +470,7 @@
     "message": "Dejar los archivos pequeños al navegador"
   },
   "options_min_size_detail": {
-    "message": "Los archivos más pequeños que este tamaño se quedan en el navegador. Los de tamaño desconocido siempre van a Ketch. Con 0 se envía todo."
+    "message": "Los archivos más pequeños quedan en el navegador. 0 envía todo."
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "Usa la opción de guardar del navegador para este elemento."
+  },
+  "options_unknown_size": {
+    "message": "Capturar archivos de tamaño desconocido"
+  },
+  "options_file_types": {
+    "message": "Tipos de archivo"
+  },
+  "file_types_all": {
+    "message": "Todos los tipos"
+  },
+  "file_types_only": {
+    "message": "Solo los tipos indicados"
+  },
+  "file_types_except": {
+    "message": "Excepto los tipos indicados"
+  },
+  "options_extensions": {
+    "message": "Extensiones de archivo, separadas por comas"
+  },
+  "instance_cookies": {
+    "message": "Permitir cookies y referente para este servidor"
   }
 }

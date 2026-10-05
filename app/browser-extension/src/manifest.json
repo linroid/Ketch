@@ -35,7 +35,8 @@
     "downloads",
     "nativeMessaging",
     "notifications",
-    "storage"
+    "storage",
+    "webRequest"
   ],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [

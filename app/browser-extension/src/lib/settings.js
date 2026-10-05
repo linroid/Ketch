@@ -60,6 +60,9 @@ export function defaultSettings() {
     captureMagnetLinks: true,
     forwardCookies: true,
     minFileSizeMb: 0,
+    captureUnknownSize: true,
+    fileTypeMode: 'all',
+    fileExtensions: [],
     excludedHosts: [],
     notifications: true,
   };
@@ -162,6 +165,9 @@ export function normalizeSettings(raw) {
     forwardCookies: booleanOr(source.forwardCookies, defaults.forwardCookies),
     minFileSizeMb: Number.isFinite(minFileSizeMb) && minFileSizeMb > 0 ? minFileSizeMb : 0,
     excludedHosts: parseHostList(source.excludedHosts ?? []),
+    captureUnknownSize: booleanOr(source.captureUnknownSize, true),
+    fileTypeMode: ['only', 'except'].includes(source.fileTypeMode) ? source.fileTypeMode : 'all',
+    fileExtensions: parseFileExtensions(source.fileExtensions ?? []),
     notifications: booleanOr(source.notifications, defaults.notifications),
   };
 }
@@ -189,6 +195,7 @@ function normalizeInstance(candidate) {
     name: name || new URL(url).host,
     url,
     token: typeof candidate.token === 'string' ? candidate.token.trim() : '',
+    forwardCookies: booleanOr(candidate.forwardCookies, isLoopbackUrl(url)),
   };
 }
 
@@ -246,4 +253,17 @@ export function onSettingsChanged(listener) {
       listener(normalizeSettings(changes[SETTINGS_KEY].newValue));
     }
   });
+}
+
+/** Extensions are literal suffixes, including multipart names such as tar.gz. */
+export function parseFileExtensions(value) {
+  const words = Array.isArray(value) ? value : String(value).split(/[\s,]+/);
+  return [...new Set(words.map((word) => String(word).trim().toLowerCase().replace(/^\*?\./, ''))
+    .filter((word) => /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(word)))].slice(0, 100);
+}
+
+/** A remote server must be explicitly allowed to receive the site's credentials. */
+export function mayForwardCookies(instance, settings) {
+  return settings.forwardCookies && (instance.type === 'app' || instance.forwardCookies === true ||
+    (instance.forwardCookies === undefined && isLoopbackUrl(instance.url)));
 }

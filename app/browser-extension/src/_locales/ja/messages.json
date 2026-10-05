@@ -470,7 +470,7 @@
     "message": "小さいファイルはブラウザに任せる"
   },
   "options_min_size_detail": {
-    "message": "これより小さいファイルはブラウザでダウンロードします。サイズが不明なファイルは常にKetchに送信します。0にするとすべて送信します。"
+    "message": "これより小さいファイルはブラウザーでダウンロードします。0はすべて送信します。"
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "この項目はブラウザーの保存機能で保存してください。"
+  },
+  "options_unknown_size": {
+    "message": "サイズ不明のファイルをキャプチャ"
+  },
+  "options_file_types": {
+    "message": "ファイルの種類"
+  },
+  "file_types_all": {
+    "message": "すべての種類"
+  },
+  "file_types_only": {
+    "message": "指定した種類のみ"
+  },
+  "file_types_except": {
+    "message": "指定した種類を除く"
+  },
+  "options_extensions": {
+    "message": "ファイル拡張子（カンマ区切り）"
+  },
+  "instance_cookies": {
+    "message": "このサーバーへのCookieとリファラーの送信を許可"
   }
 }
