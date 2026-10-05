@@ -96,6 +96,12 @@ export async function sendToKetch(instance, download, settings, options = {}) {
     }
     return submitDownload(client, receiptEndpoint(instance, endpoint), request, {
       browserDownloadId: download.browserDownloadId, browserUrl: url,
+      recoverTasks: instance.type === 'app' ? () => withEndpoint(instance, (current) => {
+        const recovery = new KetchClient(current, {
+          fetch: deps.fetch, timeoutMs: options.timeoutMs,
+        });
+        return recovery.listTasks();
+      }, { deps: deps.connection }) : undefined,
     });
   }, { deps: deps.connection });
 }

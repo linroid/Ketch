@@ -13,7 +13,7 @@ globalThis.chrome = {
     instances: [{ id: 'server', type: 'server', name: 'Server', url: 'http://localhost:8642' }],
   } }) } },
   runtime: { getURL: (path) => `chrome-extension://test/${path}` },
-  tabs: { create: async () => ({ id: 7 }) },
+  tabs: { create: async () => ({ id: 7 }), get: async () => ({ id: 7 }) },
   downloads: {
     search: async () => [{ url: 'https://example.com/file', paused: true, state: 'in_progress' }],
     resume: async (id) => browserActions.push(['resume', id]),
@@ -21,7 +21,7 @@ globalThis.chrome = {
     erase: async ({ id }) => browserActions.push(['erase', id]),
   },
 };
-const { openReview, sendReview, cancelReview, closeReviews, reviewDestination } =
+const { openReview, sendReview, cancelReview, closeReviews, reviewDestination, resourceDestination } =
   await import('../src/lib/review.js');
 
 function reset() {
@@ -112,3 +112,50 @@ test('a browser original resumed independently cannot be submitted from an old r
     globalThis.chrome.downloads.search = search;
   }
 });
+
+test('untrusted batch names are sanitized while typed destinations remain strict', () => {
+  const resource = { url: 'https://example.com/get', kind: 'file' };
+  assert.equal(resourceDestination({ ...resource, name: 'reports/file.pdf' }, '/data'),
+    '/data/file.pdf');
+  assert.equal(resourceDestination({ ...resource, name: 'bad:*?<>|.pdf' }, ''), 'bad.pdf');
+  assert.equal(resourceDestination({ ...resource, name: 'CON.txt' }, '/data'), '/data/');
+  assert.equal(resourceDestination({ ...resource, name: 'reports/file.torrent' }, '/data'), '/data/');
+  assert.equal(resourceDestination({ ...resource, name: '.*?' }, ''), undefined);
+  assert.ok(new TextEncoder().encode(resourceDestination({ ...resource, name: '字'.repeat(300) }, ''))
+    .length <= 255);
+  assert.throws(() => reviewDestination(resource, 'reports/file.pdf', ''));
+});
+
+test('closing before tab association is saved resumes the original through the existence check',
+  async () => {
+    reset();
+    const set = session.set;
+    const getTab = globalThis.chrome.tabs.get;
+    let unblock;
+    let associating;
+    const ready = new Promise((resolve) => { associating = resolve; });
+    session.set = async (values) => {
+      if (Object.values(values).some((entry) => entry.tabId === 7)) {
+        associating();
+        await new Promise((resolve) => { unblock = resolve; });
+      }
+      await set(values);
+    };
+    try {
+      const opening = review();
+      const rejected = assert.rejects(opening, /closed/);
+      await ready;
+      await closeReviews(7); // No tabId in storage yet.
+      const id = Object.keys(data)[0].slice('review:'.length);
+      const premature = assert.rejects(sendReview(id, 'server', '', '',
+        async () => assert.fail('a closed review must not send')));
+      globalThis.chrome.tabs.get = async () => { throw new Error('closed'); };
+      unblock();
+      await Promise.all([rejected, premature]);
+      assert.deepEqual(browserActions, [['resume', 42]]);
+      assert.deepEqual(data, {});
+    } finally {
+      session.set = set;
+      globalThis.chrome.tabs.get = getTab;
+    }
+  });

@@ -171,8 +171,12 @@ class Ketch(
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
       if (existing != null) {
-        // Resolved metadata and runtime conditions are not persisted with the task.
+        // Live task controls are mutable; metadata and conditions are not persisted.
         require(existing.request.copy(
+          connections = request.connections,
+          speedLimit = request.speedLimit,
+          priority = request.priority,
+          schedule = request.schedule,
           resolvedSource = null,
           conditions = emptyList(),
         ) == request.copy(resolvedSource = null, conditions = emptyList())) {

@@ -2,7 +2,7 @@
 import { ext } from './ext.js';
 import { sendToKetch } from './handoff.js';
 import { t } from './i18n.js';
-import { isTorrentFile, isTorrentUrl } from './request.js';
+import { fileNameFromPath, isTorrentFile, isTorrentUrl } from './request.js';
 import { loadSettings } from './settings.js';
 
 const PREFIX = 'review:';
@@ -18,15 +18,19 @@ function locked(id, action) {
 
 export async function openReview(instanceId, download) {
   const id = crypto.randomUUID();
-  const entry = { instanceId, download, state: 'pending' };
-  await ext.storage.session.set({ [PREFIX + id]: entry });
-  try {
-    const tab = await ext.tabs.create({ url: ext.runtime.getURL(`review/review.html?id=${id}`) });
-    await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId: tab.id } });
-  } catch (error) {
-    await ext.storage.session.remove(PREFIX + id);
-    throw error;
-  }
+  return locked(id, async () => {
+    try {
+      const entry = { instanceId, download, state: 'pending' };
+      await ext.storage.session.set({ [PREFIX + id]: entry });
+      const tab = await ext.tabs.create({ url: ext.runtime.getURL(`review/review.html?id=${id}`) });
+      await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId: tab.id } });
+      // onRemoved may have run before the tab association reached storage.
+      await ext.tabs.get(tab.id);
+    } catch (error) {
+      await cancelPendingReview(id);
+      throw error;
+    }
+  });
 }
 
 export async function readReview(id) {
@@ -43,6 +47,19 @@ export function reviewDestination(download, fileName, folder) {
       name === '.' || name === '..'))) throw new Error(t('review_invalid_destination'));
   const prefix = directory ? directory.replace(/[\\/]+$/, '') + '/' : '';
   return prefix + (torrent ? '' : name) || undefined;
+}
+
+/** Page-provided names have no editor in the batch picker; reduce them to safe basenames. */
+export function resourceDestination(resource, folder) {
+  let name = fileNameFromPath(resource.name)
+    .replace(/[/:*?"<>|\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, '')
+    .replace(/[. ]+$/, '');
+  const chars = [...name];
+  while (new TextEncoder().encode(chars.join('')).length > 255) chars.pop();
+  name = chars.join('');
+  if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(name)) name = '';
+  return reviewDestination({ url: resource.url, fileName: resource.name },
+    resource.kind === 'stream' ? '' : name, folder);
 }
 
 export function sendReview(id, instanceId, fileName, folder, send = sendToKetch) {
@@ -84,13 +101,15 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
 }
 
 export function cancelReview(id) {
-  return locked(id, async () => {
-    const entry = await readReview(id);
-    if (!entry || entry.state !== 'pending') return;
-    const browserId = entry.download.browserDownloadId;
-    if (Number.isInteger(browserId)) await ext.downloads.resume(browserId).catch(() => {});
-    await ext.storage.session.remove(PREFIX + id);
-  });
+  return locked(id, () => cancelPendingReview(id));
+}
+
+async function cancelPendingReview(id) {
+  const entry = await readReview(id);
+  if (!entry || entry.state !== 'pending') return;
+  const browserId = entry.download.browserDownloadId;
+  if (Number.isInteger(browserId)) await ext.downloads.resume(browserId).catch(() => {});
+  await ext.storage.session.remove(PREFIX + id);
 }
 
 export async function closeReviews(tabId) {
