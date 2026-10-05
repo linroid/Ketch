@@ -8,6 +8,10 @@ opens when it needs it, or a Ketch server elsewhere, such as a NAS.
 - **Context menu**: right-click and open **Ketch** to toggle **Pause automatic capture**. On a
   link, image, video or audio, choose **Download link with Ketch** (or image, video, audio) in
   that menu. With several Ketch instances, a submenu lets you pick one.
+- **Download directly**: choose **Ketch → Download directly** on an HTTP(S) link, image, video
+  or audio to save it in the browser for this download only, without changing capture settings.
+  On a linked image, this downloads the link. In Chromium private windows, use the browser's
+  built-in save command instead.
 - **Magnet links**: clicking a magnet link adds it to Ketch. Alt+click opens it in another app.
 - **Torrent files**: a `.torrent` download becomes a torrent task, even when the site serves it
   from a script such as `download.php?id=7`.

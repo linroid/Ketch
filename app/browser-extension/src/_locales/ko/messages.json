@@ -540,5 +540,14 @@
   },
   "menu_pause_capture": {
     "message": "자동 캡처 일시 중지"
+  },
+  "menu_download_directly": {
+    "message": "직접 다운로드"
+  },
+  "notify_direct_failed": {
+    "message": "브라우저 다운로드를 시작하지 못했습니다"
+  },
+  "notify_direct_hint": {
+    "message": "이 항목은 브라우저의 기본 저장 기능을 사용하세요."
   }
 }

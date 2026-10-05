@@ -540,5 +540,14 @@
   },
   "menu_pause_capture": {
     "message": "暂停自动捕获"
+  },
+  "menu_download_directly": {
+    "message": "直接下载"
+  },
+  "notify_direct_failed": {
+    "message": "无法启动浏览器下载"
+  },
+  "notify_direct_hint": {
+    "message": "请使用浏览器内置的保存功能保存此项目。"
   }
 }

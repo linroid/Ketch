@@ -159,6 +159,10 @@ async function handleMenuClick(info, tab) {
     await setCapturePaused(info.checked);
     return;
   }
+  if (info.menuItemId === 'download-directly') {
+    await downloadDirectly(info, tab);
+    return;
+  }
   const target = parseMenuId(String(info.menuItemId));
   if (!target) return;
   const settings = await loadSettings();
@@ -182,6 +186,30 @@ async function handleMenuClick(info, tab) {
   }
 }
 
+/** Starts a browser download; its byExtensionId keeps it out of automatic capture. */
+async function downloadDirectly(info, tab) {
+  const url = info.linkUrl || info.srcUrl;
+  const firefox = !ext.downloads.onDeterminingFilename;
+  // Chromium's spanning background cannot select a private download context. Leave that
+  // case to the browser's native save command instead of using the regular cookie store.
+  if (!/^https?:\/\//i.test(url ?? '') || (tab?.incognito && !firefox)) {
+    notify(t('notify_direct_failed'), t('notify_direct_hint'));
+    return;
+  }
+  const options = { url };
+  if (firefox) {
+    if (tab?.cookieStoreId) options.cookieStoreId = tab.cookieStoreId;
+    if (tab?.incognito) options.incognito = true;
+  }
+  try {
+    // Let the browser choose the name, cookies and whether to show its Save As dialog.
+    await ext.downloads.download(options);
+  } catch {
+    console.warn('Ketch: could not start the browser download');
+    notify(t('notify_direct_failed'), t('notify_direct_hint'));
+  }
+}
+
 let menuUpdate = Promise.resolve();
 
 /**
@@ -201,6 +229,13 @@ function rebuildMenus(settings) {
       type: 'checkbox',
       checked: capturePaused,
       contexts: ['all'],
+    });
+    await createMenu({
+      id: 'download-directly',
+      parentId: 'ketch',
+      title: t('menu_download_directly'),
+      contexts: ['link', 'image', 'video', 'audio'],
+      targetUrlPatterns: ['http://*/*', 'https://*/*'],
     });
     const instances = [
       ...settings.instances.filter((it) => it.id === settings.defaultInstanceId),

@@ -540,5 +540,14 @@
   },
   "menu_pause_capture": {
     "message": "Приостановить автоматический перехват"
+  },
+  "menu_download_directly": {
+    "message": "Скачать напрямую"
+  },
+  "notify_direct_failed": {
+    "message": "Не удалось начать загрузку в браузере"
+  },
+  "notify_direct_hint": {
+    "message": "Используйте встроенную команду сохранения браузера для этого элемента."
   }
 }

@@ -12,9 +12,14 @@ function event() {
 const stored = {};
 const menus = new Map();
 const changed = event();
+const directDownloads = [];
+const notifications = [];
+let downloadError;
+let releasedDirectDownloads = 0;
 globalThis.chrome = {
   runtime: {
     id: 'ketch-extension',
+    getURL: (path) => `chrome-extension://ketch-extension/${path}`,
     onInstalled: event(),
     onStartup: event(),
     onMessage: event(),
@@ -43,7 +48,20 @@ globalThis.chrome = {
       callback();
     },
   },
-  downloads: { onDeterminingFilename: event() },
+  downloads: {
+    onDeterminingFilename: event(),
+    download: async (options) => {
+      directDownloads.push(options);
+      if (downloadError) throw downloadError;
+      const id = directDownloads.length;
+      await globalThis.chrome.downloads.onDeterminingFilename?.emit(
+        { id, url: options.url, byExtensionId: 'ketch-extension' },
+        () => { releasedDirectDownloads++; },
+      );
+      return id;
+    },
+  },
+  notifications: { create: async (message) => notifications.push(message) },
 };
 
 await import('../src/background.js');
@@ -61,6 +79,9 @@ test('Ketch submenu groups download actions and keeps the pause checkbox in sync
   assert.equal(menus.get('pause-capture').type, 'checkbox');
   assert.deepEqual(menus.get('pause-capture').contexts, ['all']);
   assert.equal(menus.get('pause-capture').checked, false);
+  assert.equal(menus.get('download-directly').parentId, 'ketch');
+  assert.deepEqual(menus.get('download-directly').contexts, ['link', 'image', 'video', 'audio']);
+  assert.deepEqual(menus.get('download-directly').targetUrlPatterns, ['http://*/*', 'https://*/*']);
   for (const kind of ['link', 'image', 'video', 'audio']) {
     assert.equal(menus.get(kind).parentId, 'ketch');
     assert.deepEqual(menus.get(kind).contexts, [kind]);
@@ -111,3 +132,78 @@ test('Ketch submenu groups download actions and keeps the pause checkbox in sync
   assert.deepEqual(linkTargets.map((menu) => menu.id), ['link:nas', 'link:local']);
   assert.equal(menus.get('pause-capture').checked, true);
 });
+
+test('direct links and media bypass capture without changing preferences or pausing', async () => {
+  await setCapturePaused(false);
+  const settings = await loadSettings();
+  const start = directDownloads.length;
+  const releasedBefore = releasedDirectDownloads;
+  for (const info of [
+    { linkUrl: 'https://example.com/file.zip', srcUrl: 'https://example.com/thumbnail.png' },
+    { srcUrl: 'https://example.com/video.mp4' },
+  ]) {
+    await ext.contextMenus.onClicked.emit({ menuItemId: 'download-directly', ...info });
+    await settle();
+  }
+  assert.deepEqual(directDownloads.slice(start), [
+    { url: 'https://example.com/file.zip' },
+    { url: 'https://example.com/video.mp4' },
+  ]);
+  assert.equal(releasedDirectDownloads - releasedBefore, 2);
+  assert.equal(await loadCapturePause(), false);
+  assert.deepEqual(await loadSettings(), settings);
+});
+
+test('direct Firefox downloads keep the tab container and private context', async () => {
+  const chromiumHook = ext.downloads.onDeterminingFilename;
+  delete ext.downloads.onDeterminingFilename;
+  try {
+    const start = directDownloads.length;
+    for (const tab of [
+      { cookieStoreId: 'firefox-container-2' },
+      { cookieStoreId: 'firefox-private', incognito: true },
+    ]) {
+      await ext.contextMenus.onClicked.emit(
+        { menuItemId: 'download-directly', linkUrl: 'https://example.com/file.zip' }, tab,
+      );
+      await settle();
+    }
+    assert.deepEqual(directDownloads.slice(start), [
+      { url: 'https://example.com/file.zip', cookieStoreId: 'firefox-container-2' },
+      { url: 'https://example.com/file.zip', cookieStoreId: 'firefox-private', incognito: true },
+    ]);
+  } finally {
+    ext.downloads.onDeterminingFilename = chromiumHook;
+  }
+});
+
+test('unsupported or failed direct downloads report a browser fallback without changing capture',
+  async () => {
+    await setCapturePaused(true);
+    const start = directDownloads.length;
+    const noticeCount = notifications.length;
+    for (const linkUrl of ['magnet:?xt=urn:btih:abc', 'javascript:alert(1)', 'blob:https://a/1']) {
+      await ext.contextMenus.onClicked.emit({ menuItemId: 'download-directly', linkUrl });
+      await settle();
+    }
+    await ext.contextMenus.onClicked.emit(
+      { menuItemId: 'download-directly', linkUrl: 'https://example.com/private.zip' },
+      { incognito: true },
+    );
+    await settle();
+    assert.equal(directDownloads.length, start);
+    assert.equal(notifications.length - noticeCount, 4);
+
+    downloadError = new Error('Browser download failed');
+    try {
+      await ext.contextMenus.onClicked.emit(
+        { menuItemId: 'download-directly', linkUrl: 'https://example.com/file.zip' },
+      );
+      await settle();
+      assert.equal(notifications.length - noticeCount, 5);
+      assert.equal(notifications.at(-1).title, 'Could not start the browser download');
+      assert.equal(await loadCapturePause(), true);
+    } finally {
+      downloadError = undefined;
+    }
+  });

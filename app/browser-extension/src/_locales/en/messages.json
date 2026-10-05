@@ -704,5 +704,17 @@
   "menu_pause_capture": {
     "message": "Pause automatic capture",
     "description": "Checkbox in the Ketch context submenu, checked while automatic download and magnet capture is paused. Unchecking resumes capture."
+  },
+  "menu_download_directly": {
+    "message": "Download directly",
+    "description": "Ketch context-menu action that downloads the clicked link or media in the browser, bypassing Ketch for this download only."
+  },
+  "notify_direct_failed": {
+    "message": "Could not start the browser download",
+    "description": "Notification title when a direct browser download cannot be started."
+  },
+  "notify_direct_hint": {
+    "message": "Use the browser’s built-in save command for this item.",
+    "description": "Notification guidance when a direct download fails or cannot preserve the private browsing context."
   }
 }

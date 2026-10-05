@@ -540,5 +540,14 @@
   },
   "menu_pause_capture": {
     "message": "Automatische Übernahme pausieren"
+  },
+  "menu_download_directly": {
+    "message": "Direkt herunterladen"
+  },
+  "notify_direct_failed": {
+    "message": "Der Browser-Download konnte nicht gestartet werden"
+  },
+  "notify_direct_hint": {
+    "message": "Verwende für dieses Element den Speicherbefehl des Browsers."
   }
 }

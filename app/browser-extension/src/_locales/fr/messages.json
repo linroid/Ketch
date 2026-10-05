@@ -540,5 +540,14 @@
   },
   "menu_pause_capture": {
     "message": "Suspendre la capture automatique"
+  },
+  "menu_download_directly": {
+    "message": "Télécharger directement"
+  },
+  "notify_direct_failed": {
+    "message": "Impossible de démarrer le téléchargement dans le navigateur"
+  },
+  "notify_direct_hint": {
+    "message": "Utilisez la commande d’enregistrement du navigateur pour cet élément."
   }
 }
