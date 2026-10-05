@@ -5,8 +5,13 @@ opens when it needs it, or a Ketch server elsewhere, such as a NAS.
 
 - **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
   can't be reached, the browser downloads them as usual.
-- **Context menu**: right-click a link, image, video or audio and choose **Download link with
-  Ketch** (or image, video, audio). With several Ketch instances, a submenu lets you pick one.
+- **Context menu**: right-click and open **Ketch** to toggle **Pause automatic capture**. On a
+  link, image, video or audio, choose **Download link with Ketch** (or image, video, audio) in
+  that menu. With several Ketch instances, a submenu lets you pick one.
+- **Download directly**: choose **Ketch → Download directly** on an HTTP(S) link, image, video
+  or audio to save it in the browser for this download only, without changing capture settings.
+  On a linked image, this downloads the link. In Chromium private windows, use the browser's
+  built-in save command instead.
 - **Magnet links**: clicking a magnet link adds it to Ketch. Alt+click opens it in another app.
 - **Torrent files**: a `.torrent` download becomes a torrent task, even when the site serves it
   from a script such as `download.php?id=7`.
@@ -103,11 +108,18 @@ or resumes it. If Firefox is set to ask where to save each file, that dialog app
 Downloads are left to the browser when:
 
 - capturing is turned off (in the popup or the settings page);
+- automatic capture is temporarily paused in the popup;
 - they come from a private window;
 - the link only exists in the browser (`blob:`, `data:`), as with media a page streams itself;
 - they come from a site in the exclusion list, or from a configured Ketch instance itself;
 - they are smaller than the minimum size, if one is set. Files of unknown size and `.torrent`
   files are always captured.
+
+Choose **Pause until resumed** in the popup to temporarily leave downloads and magnet links to
+the browser. Capture stays paused until you choose **Resume now**, including after closing the
+popup or restarting the browser. You can also check or uncheck **Ketch → Pause automatic
+capture** in the right-click menu; both controls share the same pause state. It preserves your
+capture preferences; context-menu download actions and pasted links still send to Ketch.
 
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
 the file name in Ketch's download folder; Ketch picks a free name if it is taken.

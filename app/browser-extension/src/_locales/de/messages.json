@@ -522,5 +522,32 @@
   },
   "options_help_command_line_detail": {
     "message": "Um <code>ketch server</code> auf diesem Computer oder Ketch aus einem als Flatpak oder Snap installierten Browser zu nutzen, der keine anderen Apps starten kann, füge es als Server unter <code>http://127.0.0.1:8642</code> hinzu."
+  },
+  "popup_pause_capture": {
+    "message": "Bis zum Fortsetzen pausieren"
+  },
+  "popup_resume_capture": {
+    "message": "Jetzt fortsetzen"
+  },
+  "popup_pause_detail": {
+    "message": "Downloads und Magnet-Links vorübergehend dem Browser überlassen."
+  },
+  "popup_capture_pause_failed": {
+    "message": "Die Pause konnte nicht geändert werden. Erneut versuchen."
+  },
+  "popup_capture_paused": {
+    "message": "Automatische Übernahme pausiert, bis du sie fortsetzt."
+  },
+  "menu_pause_capture": {
+    "message": "Automatische Übernahme pausieren"
+  },
+  "menu_download_directly": {
+    "message": "Direkt herunterladen"
+  },
+  "notify_direct_failed": {
+    "message": "Der Browser-Download konnte nicht gestartet werden"
+  },
+  "notify_direct_hint": {
+    "message": "Verwende für dieses Element den Speicherbefehl des Browsers."
   }
 }

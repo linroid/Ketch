@@ -522,5 +522,32 @@
   },
   "options_help_command_line_detail": {
     "message": "Чтобы использовать <code>ketch server</code> на этом компьютере или Ketch в браузере, установленном как Flatpak или Snap (такой браузер не может запускать другие приложения), добавьте его как сервер по адресу <code>http://127.0.0.1:8642</code>."
+  },
+  "popup_pause_capture": {
+    "message": "Приостановить до возобновления"
+  },
+  "popup_resume_capture": {
+    "message": "Возобновить сейчас"
+  },
+  "popup_pause_detail": {
+    "message": "Временно оставить загрузки и magnet-ссылки браузеру."
+  },
+  "popup_capture_pause_failed": {
+    "message": "Не удалось изменить паузу. Попробуйте ещё раз."
+  },
+  "popup_capture_paused": {
+    "message": "Автоматический перехват приостановлен, пока вы его не возобновите."
+  },
+  "menu_pause_capture": {
+    "message": "Приостановить автоматический перехват"
+  },
+  "menu_download_directly": {
+    "message": "Скачать напрямую"
+  },
+  "notify_direct_failed": {
+    "message": "Не удалось начать загрузку в браузере"
+  },
+  "notify_direct_hint": {
+    "message": "Используйте встроенную команду сохранения браузера для этого элемента."
   }
 }

@@ -522,5 +522,32 @@
   },
   "options_help_command_line_detail": {
     "message": "이 컴퓨터에서 <code>ketch server</code>를 사용하거나, 다른 앱을 시작할 수 없는 Flatpak 또는 Snap 브라우저에서 사용하려면 <code>http://127.0.0.1:8642</code>의 서버로 추가하세요."
+  },
+  "popup_pause_capture": {
+    "message": "재개할 때까지 일시 중지"
+  },
+  "popup_resume_capture": {
+    "message": "지금 재개"
+  },
+  "popup_pause_detail": {
+    "message": "다운로드와 마그넷 링크를 일시적으로 브라우저에서 처리합니다."
+  },
+  "popup_capture_pause_failed": {
+    "message": "일시 중지를 변경하지 못했습니다. 다시 시도하세요."
+  },
+  "popup_capture_paused": {
+    "message": "직접 재개할 때까지 자동 캡처가 일시 중지됩니다."
+  },
+  "menu_pause_capture": {
+    "message": "자동 캡처 일시 중지"
+  },
+  "menu_download_directly": {
+    "message": "직접 다운로드"
+  },
+  "notify_direct_failed": {
+    "message": "브라우저 다운로드를 시작하지 못했습니다"
+  },
+  "notify_direct_hint": {
+    "message": "이 항목은 브라우저의 기본 저장 기능을 사용하세요."
   }
 }

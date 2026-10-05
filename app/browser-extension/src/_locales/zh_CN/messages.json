@@ -522,5 +522,32 @@
   },
   "options_help_command_line_detail": {
     "message": "要在这台电脑上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安装的浏览器（无法启动其他应用）中使用 Ketch，请将其添加为服务器，地址为 <code>http://127.0.0.1:8642</code>。"
+  },
+  "popup_pause_capture": {
+    "message": "暂停直到手动恢复"
+  },
+  "popup_resume_capture": {
+    "message": "立即恢复"
+  },
+  "popup_pause_detail": {
+    "message": "暂时由浏览器处理下载和磁力链接。"
+  },
+  "popup_capture_pause_failed": {
+    "message": "无法更改暂停状态，请重试。"
+  },
+  "popup_capture_paused": {
+    "message": "自动捕获已暂停，直到您手动恢复。"
+  },
+  "menu_pause_capture": {
+    "message": "暂停自动捕获"
+  },
+  "menu_download_directly": {
+    "message": "直接下载"
+  },
+  "notify_direct_failed": {
+    "message": "无法启动浏览器下载"
+  },
+  "notify_direct_hint": {
+    "message": "请使用浏览器内置的保存功能保存此项目。"
   }
 }
