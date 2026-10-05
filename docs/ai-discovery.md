@@ -511,8 +511,12 @@ and it stays where you are; scroll back down and it follows again.
   and source page shown before.
 - **Devices.** Each search tells the agent the system and CPU of this
   device and of the device the results go to (the one **Adding** picks,
-  else the active one), as they last reported them, such as *macOS
-  aarch64* and *Linux amd64*. They are only hints: when you ask for
+  else the active one), as they last reported them when the search
+  starts, such as *macOS aarch64* and *Linux amd64*. On computers and
+  tablets with two devices or more, the message field shows the same
+  **On:** device chip until results bring the add bar, so the device can
+  be picked before the first search; phones use the active device until
+  then. They are only hints: when you ask for
   software that comes in builds per platform and name none, the agent
   prefers builds for them, those of the downloading device for software
   meant to run there, such as a server. It ignores them when you name a

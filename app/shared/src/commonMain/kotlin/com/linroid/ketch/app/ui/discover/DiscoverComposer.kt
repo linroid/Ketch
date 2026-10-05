@@ -91,6 +91,8 @@ import org.jetbrains.compose.resources.stringResource
  *   follows [softKeyboard].
  * @param softKeyboard whether the platform types with an on-screen keyboard, as phones and
  *   tablets do: Enter starts a line, and sending puts the keyboard away.
+ * @param target the device chip shown after the website chip, such as while no add bar shows
+ *   one; `null` for none.
  */
 @Composable
 internal fun DiscoverComposer(
@@ -104,6 +106,7 @@ internal fun DiscoverComposer(
   onSend: () -> Unit,
   onStop: () -> Unit,
   modifier: Modifier = Modifier,
+  target: (@Composable () -> Unit)? = null,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -197,6 +200,7 @@ internal fun DiscoverComposer(
           }
         },
       )
+      target?.invoke()
       Spacer(Modifier.weight(1f))
       if (running) {
         KetchButton(

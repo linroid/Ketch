@@ -445,6 +445,13 @@ private fun BottomBar(
           focus = focus,
           onSend = controller::send,
           onStop = { controller.stop() },
+          // Until results bring the add bar and its chip, so the device can be picked before a
+          // search, which picks builds for it. A phone's add bar keeps it in a menu.
+          target = if (!phone && !addBar) {
+            { DiscoverTargetChip(state) }
+          } else {
+            null
+          },
         )
       }
     }
