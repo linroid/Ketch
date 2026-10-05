@@ -204,9 +204,6 @@ fun main(args: Array<String>) {
     path = configDir.toOkioPath() / DISCOVER_HISTORY_FILE,
     dispatcher = Dispatchers.IO,
   )
-  // The window loads the history on the UI thread as it first composes; read now, meanwhile,
-  // the history is in memory by then.
-  thread(isDaemon = true, name = "ketch-discover-history") { discoverHistory.load() }
   // application() ends with exitProcess, which still runs shutdown hooks. The Discover history
   // goes first, so what it logs on the way reaches the log file.
   val closeFiles = Thread {
@@ -494,51 +491,53 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val icon = painterResource("icon.svg")
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
-    Window(
-      onCloseRequest = behavior::closeWindow,
-      state = windowState,
-      visible = behavior.windowVisible,
-      title = windowTitle(status.pulse).resolve(),
-      icon = icon,
-      onPreviewKeyEvent = { event ->
-        val command = windowShortcuts.match(event, ShortcutContext())
-        when (command) {
-          null -> Unit
-          // Settings has a window of its own, which opens without bringing this one forward.
-          KetchCommands.Settings -> settingsWindow.show()
-          else -> commands.run(command)
-        }
-        command != null
-      },
-    ) {
-      LaunchedEffect(Unit) {
-        window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
-        mainWindow = window
-      }
-      LaunchedEffect(behavior.windowVisible) {
-        if (behavior.windowVisible) bringToFront(window)
-      }
-      LaunchedEffect(behavior) {
-        behavior.frontRequests.collect { bringToFront(window) }
-      }
-      val focused = LocalWindowInfo.current.isWindowFocused
-      SideEffect { windowFocused = focused }
-      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.themeMode.isDark())
-      key(language) { KetchMenuBar(controller, status, actions, speedMode) }
-      val shellSkips = remember(speedMode) {
-        hostShortcuts(DesktopOs.current, slowLane = speedMode != null)
-      }
-      CompositionLocalProvider(
-        LocalDesktopHooks provides providedHooks,
-        LocalIntegrationStatus provides launch.integration.status,
-        LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
-        LocalHostShortcuts provides shellSkips,
-        LocalAppUpdates provides updater,
+    if (behavior.windowCreated) {
+      Window(
+        onCloseRequest = behavior::closeWindow,
+        state = windowState,
+        visible = behavior.windowVisible,
+        title = windowTitle(status.pulse).resolve(),
+        icon = icon,
+        onPreviewKeyEvent = { event ->
+          val command = windowShortcuts.match(event, ShortcutContext())
+          when (command) {
+            null -> Unit
+            // Settings has a window of its own, which opens without bringing this one forward.
+            KetchCommands.Settings -> settingsWindow.show()
+            else -> commands.run(command)
+          }
+          command != null
+        },
       ) {
-        val app = @Composable {
-          App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+        LaunchedEffect(Unit) {
+          window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+          mainWindow = window
         }
-        if (fullWindowContent) TitleBarArea(windowState, app) else app()
+        LaunchedEffect(behavior.windowVisible) {
+          if (behavior.windowVisible) bringToFront(window)
+        }
+        LaunchedEffect(behavior) {
+          behavior.frontRequests.collect { bringToFront(window) }
+        }
+        val focused = LocalWindowInfo.current.isWindowFocused
+        SideEffect { windowFocused = focused }
+        MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.themeMode.isDark())
+        key(language) { KetchMenuBar(controller, status, actions, speedMode) }
+        val shellSkips = remember(speedMode) {
+          hostShortcuts(DesktopOs.current, slowLane = speedMode != null)
+        }
+        CompositionLocalProvider(
+          LocalDesktopHooks provides providedHooks,
+          LocalIntegrationStatus provides launch.integration.status,
+          LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
+          LocalHostShortcuts provides shellSkips,
+          LocalAppUpdates provides updater,
+        ) {
+          val app = @Composable {
+            App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+          }
+          if (fullWindowContent) TitleBarArea(windowState, app) else app()
+        }
       }
     }
     SettingsWindow(

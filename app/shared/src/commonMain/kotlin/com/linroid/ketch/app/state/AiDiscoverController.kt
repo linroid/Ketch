@@ -113,9 +113,12 @@ class AiDiscoverController(
   // without the provider's reason, which may echo a token.
   private val savedErrors = mutableMapOf<String, String?>()
 
-  /** The sessions, newest first by [DiscoverSession.updatedAt]. */
-  var sessions by mutableStateOf(loadHistory())
-    private set
+  private val sessionState = lazy { mutableStateOf(loadHistory()) }
+
+  /** The sessions, loaded on first access, newest first by [DiscoverSession.updatedAt]. */
+  var sessions: List<DiscoverSession>
+    get() = sessionState.value.value
+    private set(value) { sessionState.value.value = value }
 
   /** Id of the session shown; `null` shows a new, empty one. */
   var currentId by mutableStateOf<String?>(null)
@@ -451,7 +454,7 @@ class AiDiscoverController(
    * the requests they wait on are declined.
    */
   fun close() {
-    if (!haltAll()) save()
+    if (sessionState.isInitialized() && !haltAll()) save()
   }
 
   /** Adds a session for [message] limited to [sites], shows it and starts its first turn. */

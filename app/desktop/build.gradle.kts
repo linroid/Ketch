@@ -251,6 +251,9 @@ val proguardRules by tasks.registering {
 compose.desktop {
   application {
     mainClass = "com.linroid.ketch.app.desktop.MainKt"
+    // Keep the initial heap small on high-memory desktops. Native graphics and JVM memory
+    // sit outside this limit; downloads stream their contents rather than retaining files.
+    jvmArgs += listOf("-Xms32m", "-Xmx512m")
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {

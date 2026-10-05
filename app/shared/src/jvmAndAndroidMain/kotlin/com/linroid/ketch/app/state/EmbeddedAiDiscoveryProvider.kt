@@ -17,35 +17,31 @@ import com.linroid.ketch.ai.DiscoverTurn as EngineTurn
  * In-process AI discovery using the `ai:discover` module directly.
  * Available on Android and JVM/Desktop, where the AI module can run.
  *
- * Searches may run at the same time, each with its own step listener and approver. [close]
- * releases the module once the searches running then have ended, so replacing the provider after
- * a settings change never cuts a search short.
+ * The engine is created by the first search or connection check. Searches may run at the same
+ * time, each with its own step listener and approver. [close] releases the module once active
+ * searches and connection checks have ended, so replacing the provider after a settings change
+ * never cuts them short.
  */
 class EmbeddedAiDiscoveryProvider internal constructor(
-  private val search: suspend (DiscoverQuery, DiscoveryStepListener, PageAccessApprover) ->
-    DiscoverResult,
-  private val verifyConnection: suspend () -> String,
-  private val release: () -> Unit,
+  createEngine: () -> Engine,
 ) : AiDiscoveryProvider {
+  /** Operations and resources created together on first use. */
+  internal class Engine(
+    val search: suspend (DiscoverQuery, DiscoveryStepListener, PageAccessApprover) -> DiscoverResult,
+    val verify: suspend () -> String,
+    val close: () -> Unit,
+  )
+
+  private val engine = lazy(createEngine)
   private val lock = Any()
   private var active = 0
   private var closing = false
-
-  internal constructor(module: AiModule) : this(
-    search = module.discoveryService::discover,
-    verifyConnection = module.discoveryService::verifyConnection,
-    release = module::close,
-  )
 
   override suspend fun discover(
     request: AiDiscoverRequest,
     onStep: (DiscoveryStep) -> Unit,
     approve: suspend (AiPageRequest) -> Boolean,
-  ): AiDiscoverResponse {
-    synchronized(lock) {
-      check(!closing) { "The discovery engine was closed" }
-      active++
-    }
+  ): AiDiscoverResponse = useEngine { engine ->
     try {
       val approver = PageAccessApprover { page ->
         approve(
@@ -61,8 +57,8 @@ class EmbeddedAiDiscoveryProvider internal constructor(
           ),
         )
       }
-      val result = search(request.toQuery(), RunStepListener(onStep), approver)
-      return AiDiscoverResponse(
+      val result = engine.search(request.toQuery(), RunStepListener(onStep), approver)
+      AiDiscoverResponse(
         query = result.query,
         candidates = result.candidates.map { c ->
           AiCandidate(
@@ -82,6 +78,18 @@ class EmbeddedAiDiscoveryProvider internal constructor(
       )
     } catch (e: DiscoveryException) {
       throw AiDiscoverFailure(e.message, e.brief, e)
+    }
+  }
+
+  override suspend fun verify(): String = useEngine { it.verify() }
+
+  private suspend fun <T> useEngine(block: suspend (Engine) -> T): T {
+    synchronized(lock) {
+      check(!closing) { "The discovery engine was closed" }
+      active++
+    }
+    try {
+      return block(engine.value)
     } finally {
       val last = synchronized(lock) {
         active--
@@ -91,7 +99,9 @@ class EmbeddedAiDiscoveryProvider internal constructor(
     }
   }
 
-  override suspend fun verify(): String = verifyConnection()
+  private fun release() {
+    if (engine.isInitialized()) engine.value.close()
+  }
 
   override fun close() {
     val idle = synchronized(lock) {
@@ -163,7 +173,14 @@ class EmbeddedAiDiscoveryProviderFactory(
     if (!settings.enabled) return null
     val resolved = withPlatformCredentials(settings)
     if (!resolved.isUsable) return null
-    return EmbeddedAiDiscoveryProvider(AiModule.create(AiConfig(settings = resolved)))
+    return EmbeddedAiDiscoveryProvider {
+      val module = AiModule.create(AiConfig(settings = resolved))
+      EmbeddedAiDiscoveryProvider.Engine(
+        search = module.discoveryService::discover,
+        verify = module.discoveryService::verifyConnection,
+        close = module::close,
+      )
+    }
   }
 
   override fun withPlatformCredentials(settings: AiSettings): AiSettings =

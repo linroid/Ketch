@@ -233,6 +233,10 @@ internal class CloseBehavior(
   var windowVisible: Boolean by mutableStateOf(!startHidden || !traySupported)
     private set
 
+  /** Create the window only when first needed, then retain it so hiding preserves UI state. */
+  var windowCreated: Boolean by mutableStateOf(windowVisible)
+    private set
+
   /**
    * What closing the main window does, following the `[desktop]` settings. Setting it forgets the
    * answer given in this run, so choosing Ask in Settings asks again.
@@ -266,6 +270,7 @@ internal class CloseBehavior(
   /** Shows the main window and brings it to the front. */
   fun showWindow() {
     if (quitting) return
+    windowCreated = true
     windowVisible = true
     windowState.isMinimized = false
     fronts.tryEmit(Unit)
