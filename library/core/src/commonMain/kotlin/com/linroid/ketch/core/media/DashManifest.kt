@@ -33,14 +33,12 @@ internal fun parseDash(text: String, url: String): MediaPlan {
   if (lists.isNotEmpty()) {
     val list = lists.last()
     val init = list.child("Initialization")
-    mediaRequire(init?.attributes?.get("sourceURL") != null,
-      "DASH requires an initialization segment")
-    val parts = mutableListOf(MediaPart(mediaUrl(base, init!!.attributes.getValue("sourceURL")),
+    mediaRequire(init != null, "DASH requires an initialization segment")
+    val parts = mutableListOf(MediaPart(mediaUrl(base, init!!.attributes["sourceURL"].orEmpty()),
       dashRange(init.attributes["range"])))
     for (segment in list.children.filter { it.name == "SegmentURL" }) {
-      val media = segment.attributes["media"]
-      mediaRequire(media != null, "DASH segment has no URL")
-      parts += MediaPart(mediaUrl(base, media!!), dashRange(segment.attributes["mediaRange"]))
+      val media = segment.attributes["media"].orEmpty()
+      parts += MediaPart(mediaUrl(base, media), dashRange(segment.attributes["mediaRange"]))
       mediaRequire(parts.size <= 10_000, "Too many media segments")
     }
     mediaRequire(parts.size > 1, "DASH contains no segments")
@@ -62,9 +60,11 @@ internal fun parseDash(text: String, url: String): MediaPlan {
   val offset = attrs["presentationTimeOffset"]?.toLongOrNull() ?: 0
   mediaRequire(offset >= 0, "Invalid DASH presentation offset")
   val endTime = seconds?.let { duration ->
-    val end = ceil(duration * scale) + offset
-    mediaRequire(end.isFinite() && end < Long.MAX_VALUE.toDouble(), "DASH duration is too large")
-    end.toLong()
+    val ticks = ceil(duration * scale)
+    mediaRequire(ticks.isFinite() && ticks > 0 && ticks < Long.MAX_VALUE.toDouble(),
+      "DASH duration is too large")
+    mediaRequire(ticks.toLong() <= Long.MAX_VALUE - offset, "DASH duration is too large")
+    ticks.toLong() + offset
   }
   var number = attrs["startNumber"]?.toLongOrNull() ?: 1
   mediaRequire(number >= 0, "Invalid DASH start number")
@@ -105,9 +105,20 @@ internal fun parseDash(text: String, url: String): MediaPlan {
     val duration = attrs["duration"]?.toLongOrNull()
     mediaRequire(duration != null && duration > 0 && endTime != null && endTime > offset,
       "DASH template requires a finite duration")
-    val count = ceil((endTime!! - offset).toDouble() / duration!!).toLong()
-    mediaRequire(count <= 9999 && duration <= Long.MAX_VALUE / count, "Too many media segments")
-    repeat(count.toInt()) { index -> add(index * duration) }
+    val delta = attrs["eptDelta"]?.let { value ->
+      value.toLongOrNull().also { mediaRequire(it != null, "Invalid DASH earliest presentation delta") }
+    } ?: 0
+    mediaRequire(delta >= -offset && delta <= Long.MAX_VALUE - offset,
+      "DASH first segment time is out of range")
+    val firstTime = offset + delta
+    mediaRequire(firstTime < endTime!!, "DASH contains no segments in the period")
+    val span = endTime - firstTime
+    val count = 1 + (span - 1) / duration!!
+    mediaRequire(count <= 9999 && (count == 1L ||
+      duration <= (Long.MAX_VALUE - offset) / (count - 1)), "Too many media segments")
+    // Simple addressing uses the sample start minus eptDelta for $Time$. The delta affects
+    // the number of segments needed to cover the period, but not their URL timestamps.
+    repeat(count.toInt()) { index -> add(offset + index * duration) }
   }
   mediaRequire(parts.size > 1, "DASH contains no segments")
   return MediaPlan(parts, "mp4")
