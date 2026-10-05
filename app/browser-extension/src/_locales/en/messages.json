@@ -680,5 +680,29 @@
   "options_help_command_line_detail": {
     "message": "To use <code>ketch server</code> on this computer, or from a browser installed as a Flatpak or Snap, which can't start other apps, add it as a server at <code>http://127.0.0.1:8642</code>.",
     "description": "Help text under options_help_command_line. Flatpak and Snap are Linux package formats. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
+  },
+  "popup_pause_capture": {
+    "message": "Pause until resumed",
+    "description": "Popup button that pauses automatic download and magnet capture until the user resumes."
+  },
+  "popup_resume_capture": {
+    "message": "Resume now",
+    "description": "Popup button that resumes automatic capture."
+  },
+  "popup_pause_detail": {
+    "message": "Temporarily leave downloads and magnet links to the browser.",
+    "description": "Popup explanation of the temporary capture pause."
+  },
+  "popup_capture_pause_failed": {
+    "message": "Could not update the pause. Try again.",
+    "description": "Popup error when saving or ending a temporary pause fails."
+  },
+  "popup_capture_paused": {
+    "message": "Automatic capture is paused until you resume.",
+    "description": "Popup status while automatic capture is paused until the user resumes."
+  },
+  "menu_pause_capture": {
+    "message": "Pause automatic capture",
+    "description": "Checkbox in the Ketch context submenu, checked while automatic download and magnet capture is paused. Unchecking resumes capture."
   }
 }

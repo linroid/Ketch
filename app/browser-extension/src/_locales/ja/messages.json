@@ -522,5 +522,23 @@
   },
   "options_help_command_line_detail": {
     "message": "このコンピュータで<code>ketch server</code>を使う場合や、他のアプリを起動できないFlatpak版またはSnap版のブラウザから使う場合は、<code>http://127.0.0.1:8642</code>のサーバーとして追加してください。"
+  },
+  "popup_pause_capture": {
+    "message": "再開するまで一時停止"
+  },
+  "popup_resume_capture": {
+    "message": "今すぐ再開"
+  },
+  "popup_pause_detail": {
+    "message": "ダウンロードとマグネットリンクの処理を一時的にブラウザーに任せます。"
+  },
+  "popup_capture_pause_failed": {
+    "message": "一時停止を変更できませんでした。もう一度お試しください。"
+  },
+  "popup_capture_paused": {
+    "message": "再開するまで自動キャプチャは一時停止されます。"
+  },
+  "menu_pause_capture": {
+    "message": "自動キャプチャを一時停止"
   }
 }

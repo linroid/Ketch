@@ -522,5 +522,23 @@
   },
   "options_help_command_line_detail": {
     "message": "Pour utiliser <code>ketch server</code> sur cet ordinateur, ou depuis un navigateur installé en Flatpak ou en Snap, qui ne peut pas lancer d'autres apps, ajoutez-le comme serveur à l'adresse <code>http://127.0.0.1:8642</code>."
+  },
+  "popup_pause_capture": {
+    "message": "Suspendre jusqu’à la reprise"
+  },
+  "popup_resume_capture": {
+    "message": "Reprendre maintenant"
+  },
+  "popup_pause_detail": {
+    "message": "Laisser temporairement le navigateur gérer les téléchargements et les liens magnet."
+  },
+  "popup_capture_pause_failed": {
+    "message": "Impossible de modifier la pause. Réessayez."
+  },
+  "popup_capture_paused": {
+    "message": "La capture automatique est suspendue jusqu’à ce que vous la repreniez."
+  },
+  "menu_pause_capture": {
+    "message": "Suspendre la capture automatique"
   }
 }

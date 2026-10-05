@@ -522,5 +522,23 @@
   },
   "options_help_command_line_detail": {
     "message": "若要在這台電腦上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安裝的瀏覽器（無法啟動其他應用程式）中使用 Ketch，請將其新增為伺服器，位址為 <code>http://127.0.0.1:8642</code>。"
+  },
+  "popup_pause_capture": {
+    "message": "暫停直到手動恢復"
+  },
+  "popup_resume_capture": {
+    "message": "立即恢復"
+  },
+  "popup_pause_detail": {
+    "message": "暫時由瀏覽器處理下載和磁力連結。"
+  },
+  "popup_capture_pause_failed": {
+    "message": "無法變更暫停狀態，請重試。"
+  },
+  "popup_capture_paused": {
+    "message": "自動擷取已暫停，直到您手動恢復。"
+  },
+  "menu_pause_capture": {
+    "message": "暫停自動擷取"
   }
 }
