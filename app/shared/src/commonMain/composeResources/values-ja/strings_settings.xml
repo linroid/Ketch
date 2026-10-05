@@ -16,7 +16,7 @@
   <string name="settings_category_downloads">ダウンロード</string>
   <string name="settings_category_downloads_description">ダウンロード先、キュー、再試行</string>
   <string name="settings_category_speed">速度</string>
-  <string name="settings_category_speed_description">速度モード、スローレーン、自動ルール</string>
+  <string name="settings_category_speed_description">速度モード、低速モード、自動ルール</string>
   <string name="settings_category_network">ネットワーク</string>
   <string name="settings_category_network_description">ダウンロードを分散させるネットワーク</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
@@ -47,16 +47,16 @@
   <string name="settings_summary_extension">拡張機能 ✓</string>
   <string name="settings_summary_extension_missing">拡張機能は未設定</string>
   <string name="settings_summary_clipboard_fill">コピーしたリンクを入力</string>
-  <string name="settings_summary_clipboard_suggest">コピーしたリンクを提案</string>
-  <string name="settings_summary_clipboard_off">クリップボード：オフ</string>
+  <string name="settings_summary_clipboard_suggest">コピーしたリンクのダウンロードを提案</string>
+  <string name="settings_summary_clipboard_off">クリップボードを読み取らない</string>
   <string name="settings_summary_discover_search">%1$s · %2$s検索</string>
   <string name="settings_summary_downloads_all">%1$s · すべて同時</string>
   <plurals name="settings_summary_downloads_count">
     <item quantity="other">%1$s · 同時に%2$d件</item>
   </plurals>
   <string name="settings_summary_speed_capped">フルスピード · %1$s</string>
-  <string name="settings_summary_speed_slow_lane">スローレーン · %1$s</string>
-  <string name="settings_summary_speed_auto_slow_lane">自動 · スローレーン %1$s</string>
+  <string name="settings_summary_speed_slow_lane">低速モード · %1$s</string>
+  <string name="settings_summary_speed_auto_slow_lane">自動 · 低速モード %1$s</string>
   <string name="settings_summary_speed_auto_full">自動 · フルスピード</string>
   <string name="settings_summary_no_limit">制限なし</string>
   <string name="settings_summary_limit">制限：%1$s</string>
@@ -150,8 +150,8 @@
   <string name="settings_notifications_success_sound_hint">控えめなチャイム。</string>
   <string name="settings_notifications_success_vibration">バイブレーション</string>
   <string name="settings_notifications_success_vibration_hint">短い振動。マナーモード中も振動します。</string>
-  <string name="settings_notifications_success_footer">ダウンロードが完了したときや、ディスカバーでダウンロードが見つかったとき。</string>
-  <string name="settings_notifications_success_footer_phone">ダウンロードが完了したときや、ディスカバーでダウンロードが見つかったとき。マナーモードやサイレントモード中は鳴らず、バックグラウンドの通知は通知自体の音で知らせます。</string>
+  <string name="settings_notifications_success_footer">ダウンロードが完了したときや、ディスカバーでファイルが見つかったときに通知します。</string>
+  <string name="settings_notifications_success_footer_phone">ダウンロードが完了したときや、ディスカバーでファイルが見つかったときに通知します。マナーモードやサイレントモード中は鳴りません。バックグラウンドではシステム通知の音を使います。</string>
   <string name="settings_notifications_browser">ブラウザの通知</string>
   <string name="settings_notifications_allowed">通知は許可されています</string>
   <string name="settings_notifications_allowed_hint">Ketchのタブがバックグラウンドにあるときに表示されます。</string>
@@ -177,12 +177,12 @@
   <string name="settings_integration_magnet_failed">マグネットリンクをKetchで開くように設定できませんでした：%1$s</string>
   <string name="settings_integration_torrent_failed">.torrentファイルをKetchで開くように設定できませんでした：%1$s</string>
   <string name="settings_integration_clipboard">クリップボード</string>
-  <string name="settings_integration_clipboard_suggest">クリップボードのリンクを提案</string>
+  <string name="settings_integration_clipboard_suggest">クリップボードのリンクのダウンロードを提案</string>
   <string name="settings_integration_clipboard_fill">自動的に入力</string>
   <string name="settings_integration_clipboard_suggest_choice">提案</string>
   <string name="settings_integration_clipboard_off">オフ</string>
   <string name="settings_integration_clipboard_fill_hint">コピーしたリンクが追加シートに入力されます。</string>
-  <string name="settings_integration_clipboard_suggest_hint">タップしたときだけクリップボードを読み取ります。</string>
+  <string name="settings_integration_clipboard_suggest_hint">ダウンロードの提案を選んだときだけクリップボードを読み取ります。</string>
   <string name="settings_integration_clipboard_off_hint">Ketchはクリップボードを読み取りません。</string>
   <string name="settings_integration_quick_add">貼り付けたリンクをすぐに追加</string>
   <string name="settings_integration_quick_add_key_hint">%1$sでリンクを1件貼り付けると、すぐに追加されます（取り消し可能）。</string>
@@ -252,7 +252,7 @@
   <string name="settings_ai_access_trusted_none">まだありません。ディスカバーに確認されたときに「常に許可」を選ぶか、ここでサイトを追加してください。</string>
   <string name="settings_ai_access_add">サイトを追加（例：ubuntu.com）</string>
   <string name="settings_ai_access_add_invalid">ubuntu.comのように、Webサイトのドメイン名を入力してください。</string>
-  <string name="settings_ai_access_footer">Webサイトを限定した検索では、自分で選んだサイトなので確認しません。</string>
+  <string name="settings_ai_access_footer">検索対象として指定したWebサイトは、確認せずに開きます。</string>
 
   <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。Ketchはその帆のように、すべてのダウンロードをレーンに分けます。</string>
   <string name="settings_about_discover_elsewhere">ディスカバーは、デスクトップ版とAndroid版のアプリで利用できます。</string>
@@ -282,7 +282,7 @@
   <string name="settings_about_update_current_hint">%1$sが最新リリースです。</string>
   <string name="settings_about_update_available">Ketch %1$sを利用できます</string>
   <string name="settings_about_update_available_hint">現在のバージョンは%1$sです。</string>
-  <string name="settings_about_update_source_hint">このコピーはソースから実行されています。インストーラはリリースページにあります。</string>
+  <string name="settings_about_update_source_hint">ソースコードからビルドしたバージョンを実行しています。インストーラはリリースページからダウンロードしてください。</string>
   <string name="settings_about_update_downloading">Ketch %1$sをダウンロード中…</string>
   <string name="settings_about_update_progress">%1$s / %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$sをインストールする準備ができました</string>
@@ -307,14 +307,14 @@
   <string name="settings_logs_share_subject">Ketchのログ</string>
 
   <string name="settings_downloads_folder">ダウンロードフォルダ</string>
-  <string name="settings_downloads_remote">%1$sに保存されます（再起動するまで有効）。</string>
+  <string name="settings_downloads_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。</string>
   <string name="settings_loading_from">%1$sから設定を読み込み中…</string>
   <string name="settings_downloads_save_to">保存先</string>
   <string name="settings_downloads_save_to_row">ダウンロードの保存先</string>
   <string name="settings_downloads_path_placeholder">%1$s上のフォルダのパス</string>
   <string name="settings_downloads_private_folder">このフォルダはKetchからしか見えません。「Download」などのフォルダを選んでください。</string>
   <string name="settings_downloads_choose_folder">フォルダを選択</string>
-  <string name="settings_downloads_torrents_own_folder">トレントは引き続きKetchのフォルダに保存されます。</string>
+  <string name="settings_downloads_torrents_own_folder">トレントでダウンロードしたファイルは、引き続きKetchのフォルダに保存されます。</string>
   <string name="settings_downloads_change">変更…</string>
   <string name="settings_downloads_enter_path">パスを入力…</string>
   <string name="settings_downloads_use_default">ダウンロードフォルダを使用</string>
@@ -354,36 +354,36 @@
   <string name="settings_downloads_retries_more">再試行の回数を増やす</string>
 
   <string name="settings_speed_mode_full">フルスピード</string>
-  <string name="settings_speed_mode_slow_lane">スローレーン</string>
+  <string name="settings_speed_mode_slow_lane">低速モード</string>
   <string name="settings_speed_mode_auto">自動</string>
-  <string name="settings_speed_remote">%1$sに保存されます（再起動するまで有効）。このデバイスではスローレーンと自動はまだ使用できません。</string>
+  <string name="settings_speed_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
   <string name="settings_speed_limit_group">制限</string>
   <string name="settings_speed_limit">速度制限</string>
   <string name="settings_speed_limit_hint">すべてのダウンロードで共有します。各ダウンロードの制限でさらに低くできます。</string>
   <string name="settings_speed_mode_group">モード</string>
   <string name="settings_speed_mode">速度モード</string>
-  <string name="settings_speed_full_unlimited">ダウンロードは出せる限りの速度を使います。</string>
-  <string name="settings_speed_full_capped">ダウンロードは最大%1$sを共有します。</string>
-  <string name="settings_speed_slow_lane_summary">ダウンロードは最大%1$sを共有し、通話などのための帯域を残します。</string>
-  <string name="settings_speed_auto_no_rules">下にルールを追加すると、スローレーンが自動的にオンになります。</string>
+  <string name="settings_speed_full_unlimited">ネットワークで利用できる最大速度でダウンロードします。</string>
+  <string name="settings_speed_full_capped">すべてのダウンロードの合計速度を%1$s以下に制限します。</string>
+  <string name="settings_speed_slow_lane_summary">すべてのダウンロードの合計速度を%1$s以下に抑え、通話に必要な帯域を確保します。</string>
+  <string name="settings_speed_auto_no_rules">下にルールを追加すると、低速モードが自動的にオンになります。</string>
   <string name="settings_speed_auto_summary">%1$s。</string>
   <string name="settings_speed_limits_group">制限</string>
   <string name="settings_speed_full_cap">フルスピードの上限</string>
-  <string name="settings_speed_full_cap_hint">スローレーン以外のときに、ダウンロード全体で使える最大の速度です。</string>
-  <string name="settings_speed_slow_lane">スローレーンの速度</string>
+  <string name="settings_speed_full_cap_hint">低速モードがオフのときの、ダウンロード全体の速度上限です。</string>
+  <string name="settings_speed_slow_lane">低速モードの速度</string>
   <string name="settings_speed_slow_lane_suggested">推奨値は約%1$s（今週の最高速度の%2$d%）。</string>
   <string name="settings_speed_slow_lane_unknown">この接続の速度が分かるまでは%1$sを使います。</string>
   <string name="settings_speed_slow_lane_capped">フルスピードの上限（%1$s）の方が低いため、そちらが適用されます。</string>
   <string name="settings_speed_rules">自動ルール</string>
-  <string name="settings_speed_rules_footer_auto">ルールはこのデバイスの時計に従います。</string>
-  <string name="settings_speed_rules_footer">ルールは自動モードで、このデバイスの時計に従って適用されます。</string>
+  <string name="settings_speed_rules_footer_auto">ルールはこのデバイスの現地時刻に合わせて実行されます。</string>
+  <string name="settings_speed_rules_footer">自動モードでは、このデバイスの現地時刻に合わせてルールが実行されます。</string>
   <string name="settings_speed_rule_add">ルールを追加</string>
   <plurals name="settings_speed_rules_max">
     <item quantity="other">ルールは%1$d件まで</item>
   </plurals>
   <string name="settings_speed_rules_empty">ルールはまだありません</string>
   <string name="settings_speed_rules_empty_hint">例：勤務時間中はダウンロードを遅くする。</string>
-  <string name="settings_speed_rule_slow_lane_on">スローレーンをオン</string>
+  <string name="settings_speed_rule_slow_lane_on">低速モードをオン</string>
   <string name="settings_speed_rule_start">開始</string>
   <string name="settings_speed_rule_end">終了</string>
   <string name="settings_speed_rule_remove">ルールを削除</string>
@@ -407,7 +407,7 @@
   <string name="settings_speed_connections_hint">HTTPとFTPが対象です。ダウンロードの開始時または再開時に適用されます。</string>
   <string name="settings_speed_switch_failed">%1$sに切り替えられませんでした</string>
   <string name="settings_speed_cap_failed">フルスピードの上限を変更できませんでした</string>
-  <string name="settings_speed_slow_lane_failed">スローレーンの速度を変更できませんでした</string>
+  <string name="settings_speed_slow_lane_failed">低速モードの速度を変更できませんでした</string>
   <string name="settings_speed_rules_failed">自動ルールを変更できませんでした</string>
 
   <string name="settings_network_system_default">システムのデフォルト</string>
@@ -553,12 +553,12 @@
   <string name="settings_search_per_server">1つのWebサイトから同時に行うダウンロード</string>
   <string name="settings_search_per_server_keywords">ホスト, Webサイト, キュー, 制限</string>
   <string name="settings_search_retries_keywords">再試行, リトライ, 試行回数, エラー</string>
-  <string name="settings_search_speed_mode">フルスピード、スローレーン、自動</string>
+  <string name="settings_search_speed_mode">フルスピード、低速モード、自動</string>
   <string name="settings_search_speed_mode_keywords">制限, 帯域幅, 帯域制限, 速度</string>
   <string name="settings_search_full_speed_cap">すべてのダウンロードで共有する速度制限</string>
   <string name="settings_search_full_speed_cap_keywords">速度制限, 帯域幅, 帯域制限, 最大</string>
   <string name="settings_search_slow_lane_keywords">制限, 帯域幅, 帯域制限, 低速</string>
-  <string name="settings_search_rules">決まった時間にスローレーンをオンにする</string>
+  <string name="settings_search_rules">決まった時間に低速モードをオンにする</string>
   <string name="settings_search_rules_keywords">スケジュール, 勤務時間, 平日, 時刻, 時間帯</string>
   <string name="settings_search_connections_keywords">セグメント, スレッド, 並列, 分割</string>
   <string name="settings_search_networks">ダウンロードに使うネットワーク</string>
@@ -582,9 +582,9 @@
   <string name="settings_rule_weekdays">平日</string>
   <string name="settings_rule_weekends">週末</string>
 
-  <string name="settings_auto_slow_lane_until">%1$sまでスローレーンがオン</string>
+  <string name="settings_auto_slow_lane_until">%1$sまで低速モードがオン</string>
   <string name="settings_auto_full_speed_until">%1$sまでフルスピード</string>
-  <string name="settings_auto_slow_lane_all_week">1週間ずっとスローレーンがオン</string>
+  <string name="settings_auto_slow_lane_all_week">1週間ずっと低速モードがオン</string>
   <string name="settings_auto_full_speed_all_week">フルスピード（今週開始するルールはありません）</string>
   <string name="settings_auto_tomorrow_at">明日%1$s</string>
   <string name="settings_auto_day_at">%1$s曜 %2$s</string>

@@ -4,7 +4,7 @@
   <string name="onboarding_loading">Ketchを読み込み中</string>
 
   <string name="onboarding_files_title">ダウンロードは「ファイル」アプリに</string>
-  <string name="onboarding_files_body">Ketchは、ダウンロードしたものを「ファイル」アプリで開いたり、共有したり、移動したりできる場所に保存します。</string>
+  <string name="onboarding_files_body">ダウンロードしたファイルは、「ファイル」アプリから開いたり、共有・移動したりできます。</string>
   <string name="onboarding_files_path">この%1$s内 › Ketch › Downloads</string>
 
   <string name="onboarding_folder_title">ダウンロードの保存先は？</string>
@@ -13,10 +13,10 @@
   <string name="onboarding_folder_not_now">今はしない</string>
   <string name="onboarding_folder_choose_another">別のフォルダを選択</string>
   <string name="onboarding_folder_saving_to">保存先：%1$s</string>
-  <string name="onboarding_folder_torrents">トレントはKetchのフォルダに保存されます。</string>
+  <string name="onboarding_folder_torrents">トレントでダウンロードしたファイルは、引き続きKetchのフォルダに保存されます。</string>
   <string name="onboarding_folder_error">そのフォルダは使用できませんでした。別のフォルダを選んでください。</string>
 
-  <string name="onboarding_use_title">ここでKetchをどのように使いますか？</string>
+  <string name="onboarding_use_title">Ketchをどのように使いますか？</string>
   <string name="onboarding_use_body">まずはどちらかを選んでください。もう一方はあとからいつでも使えます。</string>
   <string name="onboarding_use_download">%1$sでダウンロード</string>
   <string name="onboarding_use_download_ios">Ketchがバックグラウンドにあるときは、ダウンロードが一時停止することがあります。</string>
@@ -33,7 +33,7 @@
   <string name="onboarding_intake_select">リンクを選択</string>
   <string name="onboarding_intake_select_body">テキストを選択して表示されるメニューで「Ketchでダウンロード」を選びます。</string>
   <string name="onboarding_intake_copy">リンクをコピー</string>
-  <string name="onboarding_intake_copy_body">Ketchに戻ると、そのリンクをダウンロードするか確認します。</string>
+  <string name="onboarding_intake_copy_body">Ketchに戻ると、リンク先のファイルをダウンロードするか確認できます。</string>
   <string name="onboarding_intake_torrents">マグネットリンクと.torrentファイルを開く</string>
   <string name="onboarding_intake_torrents_body">Ketchで開き、必要なファイルをすぐに選べます。</string>
   <string name="onboarding_intake_notify">ダウンロードの完了を通知</string>

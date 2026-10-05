@@ -33,7 +33,7 @@
     <item quantity="other">%1$d 个停滞</item>
   </plurals>
 
-  <string name="component_limit_applies">%1$s %2$s 适用于所有下载</string>
+  <string name="component_limit_applies">所有下载均受%1$s限制（%2$s）</string>
   <string name="component_limit_custom">自定义…</string>
   <string name="component_limit_custom_hint">例如 750k 或 1.5m</string>
   <string name="component_limit_unit_tooltip">不带 k 或 m 的数字所用的单位</string>
@@ -46,15 +46,15 @@
   <plurals name="component_stepper_connections">
     <item quantity="other">%1$d 个连接</item>
   </plurals>
-  <string name="component_stepper_connections_auto">连接数自动</string>
-  <string name="component_stepper_connections_auto_count">连接数自动（%1$d）</string>
+  <string name="component_stepper_connections_auto">连接数：自动</string>
+  <string name="component_stepper_connections_auto_count">连接数：自动（%1$d）</string>
   <string name="component_stepper_fewer_peers">减少节点数</string>
   <string name="component_stepper_more_peers">增加节点数</string>
   <plurals name="component_stepper_peers">
     <item quantity="other">%1$d 个节点</item>
   </plurals>
-  <string name="component_stepper_peers_auto">节点数自动</string>
-  <string name="component_stepper_peers_auto_count">节点数自动（%1$d）</string>
+  <string name="component_stepper_peers_auto">节点数：自动</string>
+  <string name="component_stepper_peers_auto_count">节点数：自动（%1$d）</string>
 
   <string name="component_start_now">立即开始</string>
   <string name="component_start_in_hour">1小时后</string>
@@ -78,6 +78,6 @@
   <string name="component_start_pick">选择日期和时间…</string>
   <string name="component_start_clear">清除</string>
   <string name="component_start_dialog_title">选择开始时间</string>
-  <string name="component_start_schedule">计划</string>
+  <string name="component_start_schedule">设置开始时间</string>
   <string name="component_start_passed">该时间已过</string>
 </resources>

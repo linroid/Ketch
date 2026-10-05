@@ -106,7 +106,7 @@
   <string name="device_rename_local_hint">Deine anderen Geräte sehen diesen Namen nach einem Neustart.</string>
   <string name="device_rename_name">Name</string>
   <string name="device_remove_title">%1$s entfernen?</string>
-  <string name="device_remove_body">Ketch zeigt seine Downloads hier nicht mehr an. Sie laufen auf %1$s weiter, und du kannst es später wieder hinzufügen.</string>
+  <string name="device_remove_body">Ketch zeigt die Downloads dieses Geräts hier nicht mehr an. Auf %1$s laufen sie weiter. Du kannst das Gerät später wieder hinzufügen.</string>
 
   <string name="device_speed_of">Geschwindigkeit von %1$s</string>
 

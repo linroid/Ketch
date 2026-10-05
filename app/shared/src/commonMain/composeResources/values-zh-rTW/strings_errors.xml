@@ -31,14 +31,14 @@
   <string name="error_file_changed">伺服器上的檔案已變更</string>
   <string name="error_file_changed_hint">繼續下載會損壞檔案（%1$s）。</string>
   <string name="error_file_changed_hint_short">繼續下載會損壞檔案（%1$s）</string>
-  <string name="error_corrupt_resume">已儲存的進度已損壞</string>
+  <string name="error_corrupt_resume">儲存的進度已損壞</string>
   <string name="error_corrupt_resume_hint">已下載的部分無法再使用。</string>
   <string name="error_corrupt_resume_hint_short">已下載的部分無法再使用</string>
   <string name="error_canceled">已取消</string>
   <string name="error_wrong_credentials">使用者名稱或密碼錯誤</string>
   <string name="error_wrong_credentials_hint">%1$s 伺服器拒絕登入。</string>
   <string name="error_wrong_credentials_hint_short">%1$s 伺服器拒絕登入</string>
-  <string name="error_torrent_stopped">種子已停止</string>
+  <string name="error_torrent_stopped">種子下載已停止</string>
   <string name="error_torrent_stopped_hint">沒有可連線的對等端或 Tracker。</string>
   <string name="error_torrent_stopped_hint_short">沒有可連線的對等端或 Tracker</string>
   <string name="error_source">%1$s 伺服器回報錯誤</string>
@@ -50,7 +50,7 @@
   <string name="error_http_sign_in_hint_server_short">伺服器要求你登入</string>
   <string name="error_http_forbidden">拒絕存取（403）</string>
   <string name="error_http_forbidden_hint">連結可能已過期。</string>
-  <string name="error_http_forbidden_hint_browser">連結可能已過期。是從 %1$s 擷取的嗎？請從該網頁重新擷取。</string>
+  <string name="error_http_forbidden_hint_browser">連結可能已過期。如果連結來自 %1$s，請回到原網頁重新傳送到 Ketch。</string>
   <string name="error_http_forbidden_hint_short">連結可能已過期</string>
   <string name="error_browser_yours">你的瀏覽器</string>
   <string name="error_http_not_found">找不到檔案（%1$d）</string>

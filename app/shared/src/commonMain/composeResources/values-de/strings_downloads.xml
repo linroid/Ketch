@@ -124,7 +124,7 @@
   <string name="launchpad_paste_hint_plain">Kopiere einen Link und füge ihn dann irgendwo in Ketch ein.</string>
   <string name="launchpad_torrent_title">Link, Magnet-Link oder .torrent ablegen</string>
   <string name="launchpad_torrent_title_phone">.torrent-Datei öffnen</string>
-  <string name="launchpad_torrent_hint">Irgendwo in diesem Fenster, oder wähle eine .torrent-Datei.</string>
+  <string name="launchpad_torrent_hint">Ziehe Links oder Dateien in dieses Fenster oder wähle eine .torrent-Datei aus.</string>
   <string name="launchpad_torrent_hint_phone">Oder öffne einen Magnet-Link aus deinem Browser.</string>
   <string name="launchpad_browser_title">Downloads aus dem Browser abfangen</string>
   <string name="launchpad_browser_none">Sende Downloads aus Chrome, Edge oder Firefox an Ketch.</string>
@@ -174,8 +174,8 @@
     <item quantity="one">Fortschritt von %1$d Download verwerfen?</item>
     <item quantity="other">Fortschritt von %1$d Downloads verwerfen?</item>
   </plurals>
-  <string name="downloads_discard_body">%1$s kann danach nicht mehr fortgesetzt werden.</string>
-  <string name="downloads_discard_body_many">Sie können danach nicht mehr fortgesetzt werden.</string>
+  <string name="downloads_discard_body">Der Fortschritt von %1$s wird verworfen. Ein erneuter Download beginnt von vorn.</string>
+  <string name="downloads_discard_body_many">Der Fortschritt wird verworfen. Erneute Downloads beginnen von vorn.</string>
   <string name="downloads_discard_keep">Behalten</string>
   <string name="downloads_discard_confirm">Fortschritt verwerfen</string>
   <string name="downloads_speed_title">Tempolimit</string>

@@ -2,7 +2,7 @@
 <resources>
   <string name="discover_title">Descubrir</string>
   <string name="discover_settings">Ajustes de Descubrir</string>
-  <string name="discover_hero_title">Descríbelo. Ketch encuentra la descarga.</string>
+  <string name="discover_hero_title">Describe lo que buscas. Ketch encuentra los archivos.</string>
   <string name="discover_intro_body">Descubrir pide a %1$s que busque en la web y lea las páginas que encuentre, y luego muestra los archivos que considera fiables. No se descarga nada hasta que lo añades.</string>
   <string name="discover_example_blender">Blender para Apple silicon</string>
   <string name="discover_example_ubuntu">ISO de Ubuntu 24.04 Server</string>
@@ -56,7 +56,7 @@
   <string name="discover_approval_file">¿Comprobar un archivo en %1$s?</string>
   <string name="discover_approval_redirect">¿Seguir una redirección a %1$s?</string>
   <string name="discover_approval_redirect_from">Redirigido desde %1$s</string>
-  <string name="discover_approval_reason">Descubrir dice: %1$s</string>
+  <string name="discover_approval_reason">Motivo de la solicitud: %1$s</string>
   <string name="discover_approval_allow">Permitir</string>
   <string name="discover_approval_allow_once">Permitir una vez</string>
   <string name="discover_approval_deny">Denegar</string>
@@ -80,7 +80,7 @@
   <string name="discover_error_title">Descubrir no pudo terminar esta búsqueda</string>
   <string name="discover_failed">La búsqueda falló</string>
   <string name="discover_none_title">No se encontraron descargas</string>
-  <string name="discover_none_body">Descubrir solo muestra archivos de fuentes que considera fiables. Prueba a indicar la versión o la plataforma, o el sitio web que lo publica.</string>
+  <string name="discover_none_body">Descubrir solo muestra archivos de fuentes fiables. Prueba a indicar la versión, la plataforma o el sitio web en el que buscar.</string>
   <plurals name="discover_none_filtered">
     <item quantity="one">El filtro de contenido ocultó %1$d resultado que parecía inseguro. Puedes desactivar el filtro en Ajustes de Descubrir.</item>
     <item quantity="other">El filtro de contenido ocultó %1$d resultados que parecían inseguros. Puedes desactivar el filtro en Ajustes de Descubrir.</item>
@@ -108,9 +108,9 @@
     <item quantity="one">Se borró %1$d búsqueda del historial</item>
     <item quantity="other">Se borraron %1$d búsquedas del historial</item>
   </plurals>
-  <string name="discover_undo_discard">Deshacer descartar los resultados</string>
-  <string name="discover_undo_delete">Deshacer eliminar la búsqueda</string>
-  <string name="discover_undo_clear_history">Deshacer borrar el historial</string>
+  <string name="discover_undo_discard">Restaurar los resultados descartados</string>
+  <string name="discover_undo_delete">Restaurar la búsqueda eliminada</string>
+  <string name="discover_undo_clear_history">Restaurar el historial borrado</string>
   <string name="discover_needs_ok">Descubrir necesita tu aprobación para abrir %1$s</string>
 
   <string name="discover_select_to_add">Selecciona las descargas que quieras añadir</string>
@@ -123,7 +123,7 @@
     <item quantity="other">%1$d de antes</item>
   </plurals>
   <string name="discover_add_now">Añadir ahora</string>
-  <string name="discover_add_options">Más formas de añadir</string>
+  <string name="discover_add_options">Más opciones para añadir</string>
   <string name="discover_add_to">Añadir a</string>
   <string name="discover_review_add">Revisar y añadir</string>
   <string name="discover_review_add_count">Revisar y añadir %1$d</string>

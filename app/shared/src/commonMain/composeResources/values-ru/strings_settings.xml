@@ -16,7 +16,7 @@
   <string name="settings_category_downloads">Загрузки</string>
   <string name="settings_category_downloads_description">Куда сохранять загрузки, очередь и повторы</string>
   <string name="settings_category_speed">Скорость</string>
-  <string name="settings_category_speed_description">Режимы скорости, медленная полоса и правила «Авто»</string>
+  <string name="settings_category_speed_description">Режимы скорости и правила автоматического переключения</string>
   <string name="settings_category_network">Сеть</string>
   <string name="settings_category_network_description">Сети, по которым распределяются загрузки</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
@@ -64,8 +64,8 @@
     <item quantity="other">%1$s · по %2$d одновременно</item>
   </plurals>
   <string name="settings_summary_speed_capped">Полная скорость · %1$s</string>
-  <string name="settings_summary_speed_slow_lane">Медленная полоса · %1$s</string>
-  <string name="settings_summary_speed_auto_slow_lane">Авто · медленная полоса %1$s</string>
+  <string name="settings_summary_speed_slow_lane">Низкая скорость · %1$s</string>
+  <string name="settings_summary_speed_auto_slow_lane">Авто · низкая скорость %1$s</string>
   <string name="settings_summary_speed_auto_full">Авто · полная скорость</string>
   <string name="settings_summary_no_limit">Без ограничения</string>
   <string name="settings_summary_limit">Ограничение %1$s</string>
@@ -162,8 +162,8 @@
   <string name="settings_notifications_success_sound_hint">Тихий сигнал.</string>
   <string name="settings_notifications_success_vibration">Вибрация</string>
   <string name="settings_notifications_success_vibration_hint">Короткая вибрация, также в режиме вибрации.</string>
-  <string name="settings_notifications_success_footer">Когда загрузка завершена или Поиск находит загрузки.</string>
-  <string name="settings_notifications_success_footer_phone">Когда загрузка завершена или Поиск находит загрузки. Беззвучный режим и «Не беспокоить» его отключают, а уведомления в фоне звучат по-своему.</string>
+  <string name="settings_notifications_success_footer">Когда загрузка завершается или Поиск находит файлы.</string>
+  <string name="settings_notifications_success_footer_phone">Когда загрузка завершается или Поиск находит файлы. В беззвучном режиме и режиме «Не беспокоить» сигнал отключён. Для фоновых уведомлений используется собственный звук.</string>
   <string name="settings_notifications_browser">Уведомления браузера</string>
   <string name="settings_notifications_allowed">Уведомления разрешены</string>
   <string name="settings_notifications_allowed_hint">Показываются, когда вкладка Ketch в фоне.</string>
@@ -194,7 +194,7 @@
   <string name="settings_integration_clipboard_suggest_choice">Предлагать</string>
   <string name="settings_integration_clipboard_off">Выкл.</string>
   <string name="settings_integration_clipboard_fill_hint">Скопированная ссылка сразу появляется в окне добавления.</string>
-  <string name="settings_integration_clipboard_suggest_hint">Буфер обмена читается, только когда вы нажмёте.</string>
+  <string name="settings_integration_clipboard_suggest_hint">Буфер обмена читается только при нажатии на предложение добавить ссылку.</string>
   <string name="settings_integration_clipboard_off_hint">Ketch никогда не читает буфер обмена.</string>
   <string name="settings_integration_quick_add">Сразу добавлять вставленные ссылки</string>
   <string name="settings_integration_quick_add_key_hint">Одна ссылка, вставленная через %1$s, добавляется сразу, с возможностью отмены.</string>
@@ -264,7 +264,7 @@
   <string name="settings_ai_access_trusted_none">Пока нет. Выберите «Всегда разрешать», когда Поиск спросит, или добавьте сайт здесь.</string>
   <string name="settings_ai_access_add">Добавьте сайт, например ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">Введите адрес сайта, например ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Если ограничить запрос сайтами, Поиск не спрашивает разрешения: эти сайты вы выбрали сами.</string>
+  <string name="settings_ai_access_footer">Доступ к сайтам, которые вы укажете для поиска, не требует дополнительного разрешения.</string>
 
   <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно. Ketch делит каждую загрузку на дорожки, как его паруса.</string>
   <string name="settings_about_discover_elsewhere">Поиск работает в настольном приложении и в приложении для Android.</string>
@@ -294,17 +294,17 @@
   <string name="settings_about_update_current_hint">%1$s — последний выпуск.</string>
   <string name="settings_about_update_available">Доступен Ketch %1$s</string>
   <string name="settings_about_update_available_hint">У вас %1$s.</string>
-  <string name="settings_about_update_source_hint">Эта копия запущена из исходного кода. Установщики есть на странице выпуска.</string>
+  <string name="settings_about_update_source_hint">Эта версия собрана из исходного кода. Установочные файлы доступны на странице выпуска.</string>
   <string name="settings_about_update_downloading">Загрузка Ketch %1$s…</string>
   <string name="settings_about_update_progress">%1$s из %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s готов к установке</string>
-  <string name="settings_about_update_ready_hint">Ketch перезапустится, чтобы установить его. Загрузки продолжатся с того же места.</string>
+  <string name="settings_about_update_ready_hint">Ketch перезапустится для установки обновления. Загрузки продолжатся с того же места.</string>
   <string name="settings_about_update_ready_open_hint">Откройте установщик и следуйте его шагам.</string>
   <string name="settings_about_update_check_failed">Не удалось проверить обновления</string>
   <string name="settings_about_update_download_failed">Не удалось скачать обновление</string>
   <string name="settings_about_update_install_failed">Не удалось установить обновление</string>
   <string name="settings_about_update_auto">Проверять обновления автоматически</string>
-  <string name="settings_about_update_auto_hint">Раз в день, по выпускам Ketch на GitHub.</string>
+  <string name="settings_about_update_auto_hint">Ежедневно проверять наличие новой версии Ketch на GitHub.</string>
   <string name="settings_about_update_notes">Что нового в %1$s</string>
   <string name="settings_about_update_check">Проверить</string>
   <string name="settings_about_update_install">Обновить</string>
@@ -319,14 +319,14 @@
   <string name="settings_logs_share_subject">Журналы Ketch</string>
 
   <string name="settings_downloads_folder">Папка «Загрузки»</string>
-  <string name="settings_downloads_remote">Сохраняется на устройстве «%1$s» до его перезапуска.</string>
+  <string name="settings_downloads_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска.</string>
   <string name="settings_loading_from">Получение настроек с устройства «%1$s»…</string>
   <string name="settings_downloads_save_to">Сохранять в</string>
   <string name="settings_downloads_save_to_row">Сохранять загрузки в</string>
   <string name="settings_downloads_path_placeholder">Путь к папке на устройстве «%1$s»</string>
   <string name="settings_downloads_private_folder">Эту папку видит только Ketch. Выберите другую, например Download.</string>
   <string name="settings_downloads_choose_folder">Выбрать папку</string>
-  <string name="settings_downloads_torrents_own_folder">Торренты по-прежнему сохраняются в собственную папку Ketch.</string>
+  <string name="settings_downloads_torrents_own_folder">Файлы, скачанные через торренты, по-прежнему сохраняются в папку Ketch.</string>
   <string name="settings_downloads_change">Изменить…</string>
   <string name="settings_downloads_enter_path">Ввести путь…</string>
   <string name="settings_downloads_use_default">Использовать папку «Загрузки»</string>
@@ -337,7 +337,7 @@
   <string name="settings_downloads_unpin">Открепить %1$s</string>
   <string name="settings_downloads_pin">Закрепить</string>
   <string name="settings_downloads_queue">Очередь</string>
-  <string name="settings_downloads_queue_footer">При снижении лимита текущие загрузки завершатся. Число повторов применяется, когда загрузки запускаются или возобновляются.</string>
+  <string name="settings_downloads_queue_footer">Снижение лимита не прерывает текущие загрузки. Число повторных попыток применяется при запуске или возобновлении загрузки.</string>
   <string name="settings_count_unlimited">Без ограничений</string>
   <string name="settings_downloads_run_at_once">Одновременно</string>
   <string name="settings_downloads_run_at_once_hint">Остальные ждут в очереди по приоритету.</string>
@@ -375,29 +375,29 @@
   <string name="settings_downloads_retries_more">Больше повторов</string>
 
   <string name="settings_speed_mode_full">Полная скорость</string>
-  <string name="settings_speed_mode_slow_lane">Медленная полоса</string>
+  <string name="settings_speed_mode_slow_lane">Низкая скорость</string>
   <string name="settings_speed_mode_auto">Авто</string>
-  <string name="settings_speed_remote">Сохраняется на устройстве «%1$s» до его перезапуска. Медленная полоса и «Авто» для него пока недоступны.</string>
+  <string name="settings_speed_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска. Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
   <string name="settings_speed_limit_group">Ограничение</string>
   <string name="settings_speed_limit">Ограничение скорости</string>
   <string name="settings_speed_limit_hint">Общее для всех загрузок; собственное ограничение загрузки может быть ниже.</string>
   <string name="settings_speed_mode_group">Режим</string>
   <string name="settings_speed_mode">Режим скорости</string>
   <string name="settings_speed_full_unlimited">Загрузки используют всю доступную скорость.</string>
-  <string name="settings_speed_full_capped">Загрузки делят до %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Загрузки делят не более %1$s, оставляя запас для звонков.</string>
-  <string name="settings_speed_auto_no_rules">Добавьте правило ниже, чтобы медленная полоса включалась сама.</string>
+  <string name="settings_speed_full_capped">Общая скорость загрузок ограничена до %1$s.</string>
+  <string name="settings_speed_slow_lane_summary">Общая скорость загрузок ограничена до %1$s, чтобы оставить пропускную способность для звонков.</string>
+  <string name="settings_speed_auto_no_rules">Добавьте правило ниже, чтобы низкая скорость включалась сама.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Ограничения</string>
   <string name="settings_speed_full_cap">Предел полной скорости</string>
-  <string name="settings_speed_full_cap_hint">Максимум, который делят загрузки вне медленной полосы.</string>
-  <string name="settings_speed_slow_lane">Скорость медленной полосы</string>
+  <string name="settings_speed_full_cap_hint">Максимальная общая скорость загрузок, когда режим низкой скорости выключен.</string>
+  <string name="settings_speed_slow_lane">Лимит в режиме низкой скорости</string>
   <string name="settings_speed_slow_lane_suggested">Рекомендуется ≈ %1$s — %2$d % от максимальной скорости за эту неделю.</string>
   <string name="settings_speed_slow_lane_unknown">%1$s, пока Ketch не узнает, насколько быстро это подключение.</string>
   <string name="settings_speed_slow_lane_capped">Предел полной скорости (%1$s) ниже, поэтому действует он.</string>
   <string name="settings_speed_rules">Правила «Авто»</string>
-  <string name="settings_speed_rules_footer_auto">Правила работают по часам этого устройства.</string>
-  <string name="settings_speed_rules_footer">Правила действуют в режиме «Авто» по часам этого устройства.</string>
+  <string name="settings_speed_rules_footer_auto">Правила используют местное время этого устройства.</string>
+  <string name="settings_speed_rules_footer">В режиме «Авто» правила используют местное время этого устройства.</string>
   <string name="settings_speed_rule_add">Добавить правило</string>
   <plurals name="settings_speed_rules_max">
     <item quantity="one">Не более %1$d правила</item>
@@ -407,7 +407,7 @@
   </plurals>
   <string name="settings_speed_rules_empty">Правил пока нет</string>
   <string name="settings_speed_rules_empty_hint">Например, замедлять загрузки в рабочее время.</string>
-  <string name="settings_speed_rule_slow_lane_on">Включать медленную полосу</string>
+  <string name="settings_speed_rule_slow_lane_on">Включать режим низкой скорости</string>
   <string name="settings_speed_rule_start">Начало</string>
   <string name="settings_speed_rule_end">Конец</string>
   <string name="settings_speed_rule_remove">Удалить правило</string>
@@ -431,7 +431,7 @@
   <string name="settings_speed_connections_hint">Для HTTP и FTP; применяется, когда загрузки запускаются или возобновляются.</string>
   <string name="settings_speed_switch_failed">Не удалось включить режим «%1$s»</string>
   <string name="settings_speed_cap_failed">Не удалось изменить предел полной скорости</string>
-  <string name="settings_speed_slow_lane_failed">Не удалось изменить скорость медленной полосы</string>
+  <string name="settings_speed_slow_lane_failed">Не удалось изменить лимит в режиме низкой скорости</string>
   <string name="settings_speed_rules_failed">Не удалось изменить правила «Авто»</string>
 
   <string name="settings_network_system_default">Системная по умолчанию</string>
@@ -586,12 +586,12 @@
   <string name="settings_search_per_server">Загрузки с одного сайта одновременно</string>
   <string name="settings_search_per_server_keywords">хост, сайт, очередь, лимит, ограничение</string>
   <string name="settings_search_retries_keywords">повтор, попытки, ошибки</string>
-  <string name="settings_search_speed_mode">Полная скорость, медленная полоса или «Авто»</string>
+  <string name="settings_search_speed_mode">Полная скорость, низкая скорость или «Авто»</string>
   <string name="settings_search_speed_mode_keywords">ограничение, лимит, пропускная способность, канал, трафик</string>
   <string name="settings_search_full_speed_cap">Ограничение скорости, общее для всех загрузок</string>
   <string name="settings_search_full_speed_cap_keywords">ограничение скорости, лимит, пропускная способность, максимум</string>
   <string name="settings_search_slow_lane_keywords">ограничение, лимит, пропускная способность, замедлить</string>
-  <string name="settings_search_rules">Включать медленную полосу по расписанию</string>
+  <string name="settings_search_rules">Включать режим низкой скорости по расписанию</string>
   <string name="settings_search_rules_keywords">расписание, рабочее время, будни, время</string>
   <string name="settings_search_connections_keywords">сегменты, потоки, параллельно, части</string>
   <string name="settings_search_networks">Сети, через которые идут загрузки</string>
@@ -615,9 +615,9 @@
   <string name="settings_rule_weekdays">По будням</string>
   <string name="settings_rule_weekends">По выходным</string>
 
-  <string name="settings_auto_slow_lane_until">Медленная полоса включена до %1$s</string>
+  <string name="settings_auto_slow_lane_until">Режим низкой скорости включён до %1$s</string>
   <string name="settings_auto_full_speed_until">Полная скорость до %1$s</string>
-  <string name="settings_auto_slow_lane_all_week">Медленная полоса включена всю неделю</string>
+  <string name="settings_auto_slow_lane_all_week">Режим низкой скорости включён всю неделю</string>
   <string name="settings_auto_full_speed_all_week">Полная скорость, на этой неделе правила не срабатывают</string>
   <string name="settings_auto_tomorrow_at">%1$s завтра</string>
   <string name="settings_auto_day_at">%1$s, %2$s</string>

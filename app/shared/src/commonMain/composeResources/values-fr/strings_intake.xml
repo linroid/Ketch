@@ -185,7 +185,7 @@
   <string name="intake_start">Démarrage</string>
   <string name="intake_peer_limit">Limite de pairs</string>
   <string name="intake_single_connection">Ce serveur n'autorise qu'une connexion</string>
-  <string name="intake_auto_device">Auto laisse l'appareil décider</string>
+  <string name="intake_auto_device">« Auto » utilise la limite de pairs par défaut de l'appareil</string>
   <string name="intake_auto_setting">Auto utilise le réglage de l'appareil : %1$d</string>
   <string name="intake_priority_low_caption">S'exécute quand rien d'autre n'attend</string>
   <string name="intake_priority_normal_caption">Ordre par défaut</string>
@@ -215,7 +215,7 @@
   <string name="intake_pin">Épingler %1$s</string>
   <string name="intake_choose_folder">Choisir un dossier…</string>
   <string name="intake_folder_on">Dossier sur %1$s</string>
-  <string name="intake_torrents_app_folder">Les torrents sont enregistrés dans le dossier de l'app : les dossiers choisis dans Fichiers ne servent qu'aux liens</string>
+  <string name="intake_torrents_app_folder">Les fichiers téléchargés par torrent sont enregistrés dans le dossier de l'app. Les dossiers choisis dans Fichiers servent uniquement aux téléchargements par lien classique</string>
 
   <string name="intake_advanced">Avancé</string>
   <string name="intake_hide">Masquer</string>

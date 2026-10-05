@@ -13,7 +13,7 @@
   <string name="command_pause_all">모두 일시정지</string>
   <string name="command_resume_all">모두 재개</string>
   <string name="command_retry_failed">실패한 항목 모두 재시도</string>
-  <string name="command_slow_lane">저속 차로</string>
+  <string name="command_slow_lane">저속 모드</string>
   <string name="command_inspector_show">세부 정보 보기</string>
   <string name="command_sidebar_toggle">사이드바 보기/숨기기</string>
   <string name="command_activity">활동</string>

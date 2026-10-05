@@ -13,7 +13,7 @@
   <string name="command_pause_all">Pausar todo</string>
   <string name="command_resume_all">Reanudar todo</string>
   <string name="command_retry_failed">Reintentar todas las descargas con error</string>
-  <string name="command_slow_lane">Carril lento</string>
+  <string name="command_slow_lane">Modo lento</string>
   <string name="command_inspector_show">Mostrar detalles</string>
   <string name="command_sidebar_toggle">Mostrar u ocultar la barra lateral</string>
   <string name="command_activity">Actividad</string>

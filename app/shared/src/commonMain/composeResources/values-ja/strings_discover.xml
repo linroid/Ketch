@@ -2,14 +2,14 @@
 <resources>
   <string name="discover_title">ディスカバー</string>
   <string name="discover_settings">ディスカバーの設定</string>
-  <string name="discover_hero_title">説明するだけで、Ketchがダウンロードを見つけます。</string>
-  <string name="discover_intro_body">ディスカバーは%1$sにWebを検索させ、見つかったページを読み込んで、信頼できるファイルを一覧表示します。追加するまで何もダウンロードされません。</string>
+  <string name="discover_hero_title">欲しいファイルを伝えるだけ。Ketchが探します。</string>
+  <string name="discover_intro_body">ディスカバーは%1$sを使ってWebを検索し、見つかったページを読んで信頼できると判断したファイルを表示します。追加するまでダウンロードは始まりません。</string>
   <string name="discover_example_blender">Appleシリコン版Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 サーバー版ISO</string>
   <string name="discover_example_footage">パブリックドメインの4K自然映像</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">ディスカバーはAIモデルにWebを検索させ、見つかったページを読み込んで、信頼できるファイルを一覧表示します。検索内容は選択したプロバイダに送信されます。</string>
+  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、ページを調べて信頼できるファイルを探します。検索内容は選択したプロバイダに送信されます。</string>
   <string name="discover_setup_unsupported">ディスカバーは、コンピュータまたはAndroidスマートフォンのKetchアプリで利用できます。</string>
   <string name="discover_setup_pending">「%1$s」の検索は、ディスカバーの設定が完了するとすぐに実行されます。</string>
   <string name="discover_setup_choose_model">モデルを選択</string>
@@ -52,7 +52,7 @@
   <string name="discover_approval_file">%1$sのファイルを調べますか？</string>
   <string name="discover_approval_redirect">%1$sへのリダイレクトをたどりますか？</string>
   <string name="discover_approval_redirect_from">%1$sからのリダイレクト</string>
-  <string name="discover_approval_reason">ディスカバーの説明：%1$s</string>
+  <string name="discover_approval_reason">アクセスが必要な理由：%1$s</string>
   <string name="discover_approval_allow">許可</string>
   <string name="discover_approval_allow_once">1回だけ許可</string>
   <string name="discover_approval_deny">拒否</string>
@@ -73,8 +73,8 @@
   <string name="discover_match_tooltip">検索内容との一致度</string>
   <string name="discover_not_encrypted">暗号化されていません</string>
   <string name="discover_error_title">ディスカバーはこの検索を完了できませんでした</string>
-  <string name="discover_failed">ディスカバーに失敗しました</string>
-  <string name="discover_none_title">ダウンロードが見つかりません</string>
+  <string name="discover_failed">検索に失敗しました</string>
+  <string name="discover_none_title">ダウンロードできるファイルが見つかりません</string>
   <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
   <plurals name="discover_none_filtered">
     <item quantity="other">安全でないと思われる%1$d件の結果をコンテンツフィルタが非表示にしました。フィルタはディスカバーの設定でオフにできます。</item>
@@ -111,7 +111,7 @@
     <item quantity="other">以前の結果から%1$d件</item>
   </plurals>
   <string name="discover_add_now">今すぐ追加</string>
-  <string name="discover_add_options">その他の追加方法</string>
+  <string name="discover_add_options">追加オプション</string>
   <string name="discover_add_to">追加先</string>
   <string name="discover_review_add">確認して追加</string>
   <string name="discover_review_add_count">確認して%1$d件を追加</string>

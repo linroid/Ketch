@@ -13,7 +13,7 @@
   <string name="command_pause_all">Приостановить все</string>
   <string name="command_resume_all">Возобновить все</string>
   <string name="command_retry_failed">Повторить все с ошибками</string>
-  <string name="command_slow_lane">Медленная полоса</string>
+  <string name="command_slow_lane">Низкая скорость</string>
   <string name="command_inspector_show">Показать подробности</string>
   <string name="command_sidebar_toggle">Показать или скрыть боковую панель</string>
   <string name="command_activity">Активность</string>

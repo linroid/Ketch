@@ -167,7 +167,7 @@
   <string name="intake_start">開始</string>
   <string name="intake_peer_limit">ピア数の上限</string>
   <string name="intake_single_connection">このサーバーで使える接続は1つです</string>
-  <string name="intake_auto_device">「自動」ではデバイスが決定します</string>
+  <string name="intake_auto_device">「自動」ではデバイスの既定のピア数上限を使います</string>
   <string name="intake_auto_setting">「自動」ではデバイスの設定を使用します：%1$d</string>
   <string name="intake_priority_low_caption">ほかに待機中のものがないときに実行</string>
   <string name="intake_priority_normal_caption">標準の順序</string>
@@ -195,7 +195,7 @@
   <string name="intake_pin">%1$sをピン留め</string>
   <string name="intake_choose_folder">フォルダを選択…</string>
   <string name="intake_folder_on">%1$s上のフォルダ</string>
-  <string name="intake_torrents_app_folder">トレントはアプリのフォルダに保存されます。「ファイル」で選んだフォルダはリンクのダウンロードにのみ使用されます</string>
+  <string name="intake_torrents_app_folder">トレントでダウンロードしたファイルはアプリのフォルダに保存されます。「ファイル」で選んだフォルダは通常のリンクからのダウンロードに使われます</string>
 
   <string name="intake_advanced">詳細</string>
   <string name="intake_hide">隠す</string>

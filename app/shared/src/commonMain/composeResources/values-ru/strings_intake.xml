@@ -221,7 +221,7 @@
   <string name="intake_start">Запуск</string>
   <string name="intake_peer_limit">Лимит пиров</string>
   <string name="intake_single_connection">Этот сервер разрешает 1 подключение</string>
-  <string name="intake_auto_device">«Авто» — решает устройство</string>
+  <string name="intake_auto_device">В режиме «Авто» используется стандартный лимит пиров устройства</string>
   <string name="intake_auto_setting">«Авто» — по настройке устройства: %1$d</string>
   <string name="intake_priority_low_caption">Запускается, когда больше ничего не ожидает</string>
   <string name="intake_priority_normal_caption">Обычный порядок</string>
@@ -255,7 +255,7 @@
   <string name="intake_pin">Закрепить %1$s</string>
   <string name="intake_choose_folder">Выбрать папку…</string>
   <string name="intake_folder_on">Папка на устройстве «%1$s»</string>
-  <string name="intake_torrents_app_folder">Торренты сохраняются в папку приложения: папки, выбранные в «Файлах», подходят только для ссылок</string>
+  <string name="intake_torrents_app_folder">Файлы из торрентов сохраняются в папку приложения. Папки, выбранные в «Файлах», используются только для загрузок по обычным ссылкам</string>
 
   <string name="intake_advanced">Дополнительно</string>
   <string name="intake_hide">Скрыть</string>

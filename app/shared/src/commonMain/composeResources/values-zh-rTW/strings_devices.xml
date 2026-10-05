@@ -42,9 +42,9 @@
   <string name="device_not_connected">未連線</string>
 
   <string name="device_problem_unauthorized">需要新的存取權杖</string>
-  <string name="device_problem_token_rejected">它拒絕了為它儲存的存取權杖。</string>
-  <string name="device_problem_over_limit">Ketch 同時只會與少數幾台裝置保持連線，顯示這台裝置時才會與它連線。</string>
-  <string name="device_problem_not_kept">Ketch 會在顯示這台裝置時，或在設為保持連線時與它連線。</string>
+  <string name="device_problem_token_rejected">該裝置不接受已儲存的存取權杖。</string>
+  <string name="device_problem_over_limit">Ketch 同時只會與少數幾台裝置保持連線。切換至這台裝置時會自動連線。</string>
+  <string name="device_problem_not_kept">切換至這台裝置或開啟「保持連線」後，Ketch 會自動連線。</string>
   <string name="device_problem_connecting">正在連線…</string>
   <string name="device_problem_offline_for">已離線 %1$s · 正在重試</string>
   <string name="device_problem_offline">離線 · 正在重試</string>
@@ -96,11 +96,11 @@
   <string name="device_menu_remove">移除…</string>
   <string name="device_rename_title">重新命名 %1$s</string>
   <string name="device_rename_confirm">重新命名</string>
-  <string name="device_rename_remote_hint">留空即使用它自己公布的名稱。</string>
+  <string name="device_rename_remote_hint">留空即使用裝置提供的名稱。</string>
   <string name="device_rename_local_hint">你的其他裝置會在重新啟動後看到這個名稱。</string>
   <string name="device_rename_name">名稱</string>
   <string name="device_remove_title">要移除 %1$s 嗎？</string>
-  <string name="device_remove_body">Ketch 將不再於此處顯示它的下載項目。這些下載會繼續在 %1$s 上執行，你之後也可以再次新增它。</string>
+  <string name="device_remove_body">移除後，這裡將不再顯示該裝置的下載項目。下載會繼續在 %1$s 上進行，之後可隨時重新新增該裝置。</string>
 
   <string name="device_speed_of">%1$s 的速度</string>
 
@@ -133,7 +133,7 @@
   <string name="connect_add_failed">無法新增裝置：%1$s</string>
   <string name="connect_connected">已連線至 %1$s</string>
   <string name="connect_added">已新增 %1$s</string>
-  <string name="connect_added_detail">Ketch 會在能連線時與它連線</string>
+  <string name="connect_added_detail">裝置恢復可連線狀態後，Ketch 會自動連線</string>
   <string name="connect_link_incomplete">這個配對連結不完整</string>
   <string name="connect_link_incomplete_detail">請從另一台裝置的「設定 › 共享」再複製一次</string>
 
@@ -153,12 +153,12 @@
   <string name="connect_asks_for_code">%1$s · 需要存取碼</string>
   <string name="connect_asks_for_approval">%1$s · 需要核准</string>
   <string name="connect_approval_waiting">正在等待 %1$s…</string>
-  <string name="connect_approval_check">請在 %1$s 上確認顯示的是這組代碼，然後允許此裝置。</string>
+  <string name="connect_approval_check">請確認 %1$s 上顯示的配對碼與此處相同，再允許此裝置連線。</string>
   <string name="connect_approval_enter_code">改為輸入存取碼</string>
-  <string name="connect_approval_denied">%1$s 未允許此裝置。請再次要求，或輸入其存取碼。</string>
-  <string name="connect_approval_expired">%1$s 上沒有人回應。請再次要求，或輸入其存取碼。</string>
-  <string name="connect_approval_busy">%1$s 仍在處理此裝置的另一個要求。請稍後再次要求，或輸入其存取碼。</string>
-  <string name="connect_approval_ask_again">再次要求</string>
+  <string name="connect_approval_denied">%1$s 拒絕了配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_expired">%1$s 未及時回應配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_busy">%1$s 仍在處理此裝置的另一個配對要求。請稍後重試，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_ask_again">重新傳送要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s嗎？</string>
   <string name="connect_show_pairing_code">顯示它的配對碼</string>
@@ -175,12 +175,12 @@
   <string name="connect_pairing_title">要連線至 %1$s 嗎？</string>
   <string name="connect_not_now">暫時不要</string>
   <string name="connect_pairing_new">你會在這裡看到它的下載項目，也可以從%1$s為它新增下載。</string>
-  <string name="connect_pairing_known">你已新增過 %1$s，連線後就會顯示它。</string>
-  <string name="connect_pairing_known_code">你已新增過 %1$s，連線後就會顯示它，並為它套用此連結的存取碼。</string>
+  <string name="connect_pairing_known">已新增過 %1$s。連線後將切換至該裝置。</string>
+  <string name="connect_pairing_known_code">已新增過 %1$s。連線後將切換至該裝置，並更新為此連結中的存取碼。</string>
   <string name="connect_pairing_has_code">此連結包含它的存取碼。</string>
   <string name="pairing_request_title">要允許 %1$s 控制%2$s嗎？</string>
-  <string name="pairing_request_check">只有在 %1$s 顯示這組代碼時才允許：</string>
-  <string name="pairing_request_note">允許後，它可以在這裡新增、暫停和移除下載。之後若要撤銷，請在「設定 › 共享」中選擇「新存取碼」。</string>
+  <string name="pairing_request_check">請確認 %1$s 上顯示的配對碼與下方一致，再允許連線：</string>
+  <string name="pairing_request_note">允許後，該裝置可以新增、暫停和移除這裡的下載項目。若要撤銷存取權限，請在「設定 › 共享」中選擇「新存取碼」。</string>
   <string name="pairing_request_allow">允許</string>
   <string name="pairing_request_deny">不允許</string>
 

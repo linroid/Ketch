@@ -22,7 +22,7 @@
   <string name="tray_show">Mostrar</string>
   <string name="tray_enter_token">Inserir token…</string>
   <string name="tray_retry_now">Tentar agora</string>
-  <string name="tray_stay_connected">Manter conectado</string>
+  <string name="tray_stay_connected">Manter a conexão</string>
   <plurals name="tray_retry_failed">
     <item quantity="one">Tentar novamente %1$d que falhou</item>
     <item quantity="other">Tentar novamente %1$d que falharam</item>
@@ -69,8 +69,8 @@
   <string name="message_restart">Reiniciar</string>
   <string name="message_open_installer">Abrir instalador</string>
   <string name="message_whats_new">Novidades</string>
-  <string name="message_slow_lane_on">%1$s: Faixa lenta ativada · %2$s</string>
-  <string name="message_slow_lane_off">%1$s: Faixa lenta desativada</string>
+  <string name="message_slow_lane_on">%1$s: Modo lento ativado · %2$s</string>
+  <string name="message_slow_lane_off">%1$s: Modo lento desativado</string>
   <string name="message_speed_follows_rules">%1$s: a velocidade segue suas regras</string>
   <string name="message_speed_limit_failed">Não foi possível definir o limite de velocidade (%1$s)</string>
   <string name="message_reconnect_failed">Não foi possível reconectar a %1$s</string>

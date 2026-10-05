@@ -51,7 +51,7 @@
   <string name="error_http_sign_in_hint_server_short">o servidor exige login</string>
   <string name="error_http_forbidden">Acesso negado (403)</string>
   <string name="error_http_forbidden_hint">O link pode ter expirado.</string>
-  <string name="error_http_forbidden_hint_browser">O link pode ter expirado. Foi capturado do %1$s? Capture-o novamente na página.</string>
+  <string name="error_http_forbidden_hint_browser">O link pode ter expirado. Se você o enviou do %1$s, envie-o novamente ao Ketch a partir da página original.</string>
   <string name="error_http_forbidden_hint_short">o link pode ter expirado</string>
   <string name="error_browser_yours">seu navegador</string>
   <string name="error_http_not_found">Arquivo não encontrado (%1$d)</string>

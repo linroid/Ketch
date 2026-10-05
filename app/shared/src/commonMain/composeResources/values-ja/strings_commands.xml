@@ -13,7 +13,7 @@
   <string name="command_pause_all">すべて一時停止</string>
   <string name="command_resume_all">すべて再開</string>
   <string name="command_retry_failed">失敗したものをすべて再試行</string>
-  <string name="command_slow_lane">スローレーン</string>
+  <string name="command_slow_lane">低速モード</string>
   <string name="command_inspector_show">詳細を表示</string>
   <string name="command_sidebar_toggle">サイドバーの表示を切り替え</string>
   <string name="command_activity">アクティビティ</string>

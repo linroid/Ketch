@@ -25,7 +25,7 @@
   <string name="shell_device_connecting">Verbindet</string>
   <string name="shell_device_connecting_now">Verbindung wird hergestellt…</string>
   <string name="shell_device_idle">Inaktiv</string>
-  <string name="shell_device_slow_lane">Kriechspur</string>
+  <string name="shell_device_slow_lane">Drosselung</string>
   <plurals name="shell_device_active">
     <item quantity="one">%1$d aktiv</item>
     <item quantity="other">%1$d aktiv</item>
@@ -51,7 +51,7 @@
   <string name="sidebar_menu_speed">Geschwindigkeit</string>
   <string name="sidebar_menu_settings">Einstellungen für dieses Gerät…</string>
   <string name="sidebar_menu_full_speed">Volle Geschwindigkeit</string>
-  <string name="sidebar_menu_slow_lane">Kriechspur · %1$s</string>
+  <string name="sidebar_menu_slow_lane">Drosselung · %1$s</string>
   <string name="sidebar_menu_no_limit">Kein Limit</string>
 
   <string name="switcher_overview">Übersicht</string>
@@ -131,11 +131,11 @@
   <string name="palette_add_with_options">Mit Optionen hinzufügen…</string>
   <string name="palette_add_with_options_detail">Ordner, Geschwindigkeit, Priorität und Startzeit</string>
   <string name="palette_limit_to">Downloads auf %1$s begrenzen</string>
-  <string name="palette_slow_lane_to">Kriechspur auf %1$s setzen</string>
-  <string name="palette_slow_lane_turns_on">Schaltet die Kriechspur ein</string>
-  <string name="palette_slow_lane_is_on">Kriechspur ist aktiv</string>
+  <string name="palette_slow_lane_to">Drosselung auf %1$s setzen</string>
+  <string name="palette_slow_lane_turns_on">Schaltet die Drosselung ein</string>
+  <string name="palette_slow_lane_is_on">Drosselung ist aktiv</string>
   <string name="palette_slow_lane_now">Aktuell %1$s</string>
-  <string name="palette_limit_while_off">Gilt, solange die Kriechspur aus ist</string>
+  <string name="palette_limit_while_off">Gilt, solange die Drosselung aus ist</string>
 
   <plurals name="palette_pause_count">
     <item quantity="one">%1$d Download pausieren</item>
@@ -152,11 +152,11 @@
     <item quantity="other">%1$d fehlgeschlagene Downloads erneut versuchen</item>
   </plurals>
   <string name="palette_nothing_failed">Nichts fehlgeschlagen</string>
-  <string name="palette_slow_lane_off">Kriechspur ausschalten</string>
-  <string name="palette_slow_lane_on">Kriechspur einschalten</string>
+  <string name="palette_slow_lane_off">Drosselung ausschalten</string>
+  <string name="palette_slow_lane_on">Drosselung einschalten</string>
   <string name="palette_nothing_to_undo">Nichts rückgängig zu machen</string>
   <string name="palette_full_speed">Volle Geschwindigkeit</string>
-  <string name="palette_full_speed_slow_lane">Schaltet die Kriechspur aus</string>
+  <string name="palette_full_speed_slow_lane">Schaltet die Drosselung aus</string>
   <string name="palette_full_speed_rules">Schaltet die Geschwindigkeitsregeln aus</string>
   <string name="palette_full_speed_cap">Hebt das Limit von %1$s auf</string>
   <string name="palette_full_speed_already">Bereits volle Geschwindigkeit</string>

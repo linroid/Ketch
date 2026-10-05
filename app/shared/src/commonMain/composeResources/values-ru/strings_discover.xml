@@ -2,20 +2,20 @@
 <resources>
   <string name="discover_title">Поиск</string>
   <string name="discover_settings">Настройки поиска</string>
-  <string name="discover_hero_title">Опишите, что нужно. Ketch найдёт загрузку.</string>
-  <string name="discover_intro_body">Ketch просит %1$s поискать в интернете и прочитать найденные страницы, а затем показывает файлы, которым доверяет. Ничего не скачивается, пока вы это не добавите.</string>
+  <string name="discover_hero_title">Опишите, что ищете. Ketch найдёт нужные файлы.</string>
+  <string name="discover_intro_body">Поиск использует %1$s для поиска в интернете и просмотра найденных страниц, а затем предлагает файлы из надёжных источников. Загрузка начнётся только после того, как вы её добавите.</string>
   <string name="discover_example_blender">Blender для Apple silicon</string>
   <string name="discover_example_ubuntu">Серверный ISO Ubuntu 24.04</string>
   <string name="discover_example_footage">Видео природы в 4K, общественное достояние</string>
   <string name="discover_example_quoted">«%1$s»</string>
 
-  <string name="discover_setup_body">Ketch просит ИИ-модель поискать в интернете и прочитать найденные страницы, а затем показывает файлы, которым доверяет. Ваши запросы отправляются выбранному вами провайдеру.</string>
+  <string name="discover_setup_body">Поиск использует ИИ-модель для поиска в интернете и просмотра найденных страниц, а затем предлагает файлы из надёжных источников. Ваши запросы отправляются выбранному провайдеру.</string>
   <string name="discover_setup_unsupported">Поиск работает в приложении Ketch на компьютере или телефоне Android.</string>
   <string name="discover_setup_pending">Ваш запрос «%1$s» выполнится, как только поиск будет настроен.</string>
   <string name="discover_setup_choose_model">Выберите модель</string>
   <string name="discover_setup_local_provider">%1$s · работает локально, без ключа</string>
   <string name="discover_setup_finish">Завершить настройку %1$s</string>
-  <string name="discover_setup_in_settings">Настроить в Настройках</string>
+  <string name="discover_setup_in_settings">Открыть настройки</string>
   <string name="discover_provider_openai_compatible">Совместимый с OpenAI</string>
 
   <string name="discover_query_placeholder">Опишите, что нужно найти…</string>
@@ -64,7 +64,7 @@
   <string name="discover_approval_file">Проверить файл на сайте %1$s?</string>
   <string name="discover_approval_redirect">Перейти на %1$s по перенаправлению?</string>
   <string name="discover_approval_redirect_from">Перенаправлено с %1$s</string>
-  <string name="discover_approval_reason">Поиск поясняет: %1$s</string>
+  <string name="discover_approval_reason">Причина запроса: %1$s</string>
   <string name="discover_approval_allow">Разрешить</string>
   <string name="discover_approval_allow_once">Разрешить один раз</string>
   <string name="discover_approval_deny">Отклонить</string>
@@ -89,7 +89,7 @@
   <string name="discover_not_encrypted">Без шифрования</string>
   <string name="discover_error_title">Не удалось завершить этот поиск</string>
   <string name="discover_failed">Ошибка поиска</string>
-  <string name="discover_none_title">Загрузки не найдены</string>
+  <string name="discover_none_title">Файлы не найдены</string>
   <string name="discover_none_body">Показываются только файлы из надёжных источников. Попробуйте указать версию, платформу или сайт, который публикует файл.</string>
   <plurals name="discover_none_filtered">
     <item quantity="one">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
@@ -147,7 +147,7 @@
     <item quantity="other">%1$d из предыдущих сообщений</item>
   </plurals>
   <string name="discover_add_now">Добавить сейчас</string>
-  <string name="discover_add_options">Другие способы добавить</string>
+  <string name="discover_add_options">Другие варианты добавления</string>
   <string name="discover_add_to">Добавить на устройство</string>
   <string name="discover_review_add">Проверить и добавить</string>
   <string name="discover_review_add_count">Проверить и добавить (%1$d)</string>

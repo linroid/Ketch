@@ -2,20 +2,20 @@
 <resources>
   <string name="discover_title">Descobrir</string>
   <string name="discover_settings">Configurações do Descobrir</string>
-  <string name="discover_hero_title">Descreva. O Ketch encontra o download.</string>
-  <string name="discover_intro_body">O Descobrir usa %1$s para pesquisar na web e ler as páginas que encontrar, depois lista os arquivos em que confia. Nada é baixado até você adicionar.</string>
+  <string name="discover_hero_title">Descreva o que você procura. O Ketch encontra os arquivos.</string>
+  <string name="discover_intro_body">O Descobrir usa %1$s para pesquisar na web e consultar as páginas encontradas. Depois, mostra arquivos de fontes confiáveis. Nenhum download começa até você adicioná-lo.</string>
   <string name="discover_example_blender">Blender para Apple silicon</string>
   <string name="discover_example_ubuntu">ISO do Ubuntu 24.04 Server</string>
   <string name="discover_example_footage">Vídeos de natureza em 4K de domínio público</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">O Descobrir usa um modelo de IA para pesquisar na web e ler as páginas que encontrar, depois lista os arquivos em que confia. Suas pesquisas vão para o provedor que você escolher.</string>
+  <string name="discover_setup_body">O Descobrir usa um modelo de IA para pesquisar na web e consultar as páginas encontradas. Depois, mostra arquivos de fontes confiáveis. Suas pesquisas são enviadas ao provedor escolhido.</string>
   <string name="discover_setup_unsupported">O Descobrir funciona no app Ketch em um computador ou em um celular Android.</string>
   <string name="discover_setup_pending">Sua pesquisa por “%1$s” começa assim que o Descobrir for configurado.</string>
   <string name="discover_setup_choose_model">Escolha um modelo</string>
   <string name="discover_setup_local_provider">%1$s · roda localmente, sem chave</string>
   <string name="discover_setup_finish">Terminar de configurar %1$s</string>
-  <string name="discover_setup_in_settings">Configurar em Configurações</string>
+  <string name="discover_setup_in_settings">Abrir configurações</string>
   <string name="discover_provider_openai_compatible">Compatível com OpenAI</string>
 
   <string name="discover_query_placeholder">Descreva o que procurar…</string>
@@ -56,7 +56,7 @@
   <string name="discover_approval_file">Verificar um arquivo em %1$s?</string>
   <string name="discover_approval_redirect">Seguir um redirecionamento para %1$s?</string>
   <string name="discover_approval_redirect_from">Redirecionado de %1$s</string>
-  <string name="discover_approval_reason">O Descobrir diz: %1$s</string>
+  <string name="discover_approval_reason">Motivo da solicitação: %1$s</string>
   <string name="discover_approval_allow">Permitir</string>
   <string name="discover_approval_allow_once">Permitir uma vez</string>
   <string name="discover_approval_deny">Negar</string>
@@ -78,7 +78,7 @@
   <string name="discover_match_tooltip">O quanto corresponde à sua pesquisa</string>
   <string name="discover_not_encrypted">Sem criptografia</string>
   <string name="discover_error_title">O Descobrir não conseguiu concluir esta pesquisa</string>
-  <string name="discover_failed">A descoberta falhou</string>
+  <string name="discover_failed">Falha na busca</string>
   <string name="discover_none_title">Nenhum download encontrado</string>
   <string name="discover_none_body">O Descobrir lista apenas arquivos de fontes em que confia. Tente indicar a versão ou a plataforma, ou o site que publica o arquivo.</string>
   <plurals name="discover_none_filtered">
@@ -123,7 +123,7 @@
     <item quantity="other">%1$d de mensagens anteriores</item>
   </plurals>
   <string name="discover_add_now">Adicionar agora</string>
-  <string name="discover_add_options">Outras formas de adicionar</string>
+  <string name="discover_add_options">Mais opções para adicionar</string>
   <string name="discover_add_to">Adicionar a</string>
   <string name="discover_review_add">Revisar e adicionar</string>
   <string name="discover_review_add_count">Revisar e adicionar %1$d</string>

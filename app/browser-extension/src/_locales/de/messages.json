@@ -55,7 +55,7 @@
     "message": "Ketch kann das nicht herunterladen"
   },
   "notify_unsupported_stream": {
-    "message": "Die Seite streamt dieses Medium selbst, daher gibt es keinen Link zum Herunterladen."
+    "message": "Dieses Medium wird auf der Seite gestreamt. Es gibt keinen direkten Download-Link."
   },
   "notify_unsupported_scheme": {
     "message": "Nur http-, https-, ftp- und Magnet-Links können an Ketch gesendet werden."
@@ -361,7 +361,7 @@
     "message": "Standard"
   },
   "instance_app_detail": {
-    "message": "Die Ketch-App auf diesem Computer. Die Erweiterung öffnet sie, wenn ein Download sie braucht."
+    "message": "Die Ketch-App auf diesem Computer. Die Erweiterung öffnet Ketch automatisch, wenn du einen Download sendest."
   },
   "instance_address": {
     "message": "Adresse"
@@ -485,7 +485,7 @@
     "message": "Cookies und Referrer senden"
   },
   "options_cookies_detail": {
-    "message": "Damit kann Ketch Dateien herunterladen, für die du angemeldet sein musst. Ketch speichert sie mit der Aufgabe, um sie später fortsetzen zu können."
+    "message": "Damit kann Ketch Dateien herunterladen, für die du angemeldet sein musst. Cookies und Referrer werden mit der Aufgabe gespeichert, damit du den Download später fortsetzen kannst."
   },
   "options_links_notifications": {
     "message": "Links und Benachrichtigungen"

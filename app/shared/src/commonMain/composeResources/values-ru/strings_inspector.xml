@@ -19,7 +19,7 @@
   <string name="inspector_reason_paused_resumes">Приостановлена · продолжится с того же места</string>
   <string name="inspector_reason_paused_restarts">Приостановлена · при возобновлении начнётся заново</string>
   <string name="inspector_file_missing">Файл перемещён или удалён</string>
-  <string name="inspector_reason_slow_lane">Ограничено медленной полосой (%1$s)</string>
+  <string name="inspector_reason_slow_lane">Ограничено режимом низкой скорости (%1$s)</string>
   <string name="inspector_reason_global_limit">Действует глобальное ограничение (%1$s)</string>
   <string name="inspector_reason_own_limit">Ограничено до %1$s</string>
 
@@ -82,7 +82,7 @@
   <string name="inspector_control_peer_limit">Лимит пиров</string>
   <string name="inspector_control_priority">Приоритет</string>
   <string name="inspector_control_start">Запуск</string>
-  <string name="inspector_global_slow_lane">Медленная полоса</string>
+  <string name="inspector_global_slow_lane">Низкая скорость</string>
   <string name="inspector_global_limit">Глобальное ограничение</string>
   <string name="inspector_limit_marker">%1$s %2$s</string>
   <string name="inspector_speed_limit">Ограничение скорости</string>

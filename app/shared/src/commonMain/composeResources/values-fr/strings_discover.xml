@@ -2,14 +2,14 @@
 <resources>
   <string name="discover_title">Découvrir</string>
   <string name="discover_settings">Réglages de Découvrir</string>
-  <string name="discover_hero_title">Décrivez-le. Ketch trouve le téléchargement.</string>
-  <string name="discover_intro_body">Découvrir demande à %1$s de chercher sur le web et de lire les pages trouvées, puis liste les fichiers jugés fiables. Rien n'est téléchargé tant que vous ne l'ajoutez pas.</string>
+  <string name="discover_hero_title">Décrivez ce que vous cherchez. Ketch trouve les fichiers.</string>
+  <string name="discover_intro_body">Découvrir utilise %1$s pour chercher sur le web et consulter les pages trouvées, puis propose des fichiers provenant de sources fiables. Aucun téléchargement ne démarre tant que vous ne l'ajoutez pas.</string>
   <string name="discover_example_blender">Blender pour Apple silicon</string>
   <string name="discover_example_ubuntu">ISO Ubuntu Server 24.04</string>
   <string name="discover_example_footage">Vidéos de nature 4K du domaine public</string>
   <string name="discover_example_quoted">« %1$s »</string>
 
-  <string name="discover_setup_body">Découvrir demande à un modèle d'IA de chercher sur le web et de lire les pages trouvées, puis liste les fichiers jugés fiables. Vos recherches sont envoyées au fournisseur que vous choisissez.</string>
+  <string name="discover_setup_body">Découvrir utilise un modèle d'IA pour chercher sur le web et consulter les pages trouvées, puis propose des fichiers provenant de sources fiables. Vos recherches sont envoyées au fournisseur choisi.</string>
   <string name="discover_setup_unsupported">Découvrir fonctionne dans l'app Ketch sur un ordinateur ou un téléphone Android.</string>
   <string name="discover_setup_pending">Votre recherche « %1$s » sera lancée dès que Découvrir sera configuré.</string>
   <string name="discover_setup_choose_model">Choisir un modèle</string>
@@ -56,7 +56,7 @@
   <string name="discover_approval_file">Vérifier un fichier sur %1$s ?</string>
   <string name="discover_approval_redirect">Suivre une redirection vers %1$s ?</string>
   <string name="discover_approval_redirect_from">Redirigé depuis %1$s</string>
-  <string name="discover_approval_reason">Découvrir explique : %1$s</string>
+  <string name="discover_approval_reason">Motif de la demande : %1$s</string>
   <string name="discover_approval_allow">Autoriser</string>
   <string name="discover_approval_allow_once">Autoriser une fois</string>
   <string name="discover_approval_deny">Refuser</string>
@@ -80,7 +80,7 @@
   <string name="discover_error_title">Découvrir n'a pas pu terminer cette recherche</string>
   <string name="discover_failed">La recherche a échoué</string>
   <string name="discover_none_title">Aucun téléchargement trouvé</string>
-  <string name="discover_none_body">Découvrir ne liste que les fichiers de sources fiables. Essayez de préciser la version ou la plateforme, ou le site qui le publie.</string>
+  <string name="discover_none_body">Découvrir propose uniquement des fichiers provenant de sources fiables. Précisez la version, la plateforme ou le site sur lequel chercher.</string>
   <plurals name="discover_none_filtered">
     <item quantity="one">Le filtre de contenu a masqué %1$d résultat qui semblait dangereux. Vous pouvez désactiver le filtre dans les Réglages de Découvrir.</item>
     <item quantity="other">Le filtre de contenu a masqué %1$d résultats qui semblaient dangereux. Vous pouvez désactiver le filtre dans les Réglages de Découvrir.</item>
@@ -123,7 +123,7 @@
     <item quantity="other">%1$d de messages précédents</item>
   </plurals>
   <string name="discover_add_now">Ajouter maintenant</string>
-  <string name="discover_add_options">Autres façons d'ajouter</string>
+  <string name="discover_add_options">Autres options d'ajout</string>
   <string name="discover_add_to">Ajouter à</string>
   <string name="discover_review_add">Vérifier et ajouter</string>
   <string name="discover_review_add_count">Vérifier et ajouter %1$d</string>

@@ -60,10 +60,10 @@
   <string name="error_http_range_hint">저장된 위치가 더 이상 유효하지 않습니다.</string>
   <string name="error_http_range_hint_short">저장된 위치가 더 이상 유효하지 않음</string>
   <string name="error_http_rate_limited">서버가 요청 속도를 제한하는 중</string>
-  <string name="error_http_rate_limited_hint_in">%1$d초 후 더 적은 연결로 다시 시도하세요.</string>
-  <string name="error_http_rate_limited_hint_in_short">%1$d초 후 더 적은 연결로 다시 시도</string>
-  <string name="error_http_rate_limited_hint">나중에 더 적은 연결로 다시 시도하세요.</string>
-  <string name="error_http_rate_limited_hint_short">나중에 더 적은 연결로 다시 시도</string>
+  <string name="error_http_rate_limited_hint_in">%1$d초 후 연결 수를 줄여 다시 시도하세요.</string>
+  <string name="error_http_rate_limited_hint_in_short">%1$d초 후 연결 수를 줄여 다시 시도</string>
+  <string name="error_http_rate_limited_hint">잠시 후 연결 수를 줄여 다시 시도하세요.</string>
+  <string name="error_http_rate_limited_hint_short">잠시 후 연결 수를 줄여 다시 시도</string>
   <string name="error_http_server">서버 오류(%1$d)</string>
   <string name="error_http_server_hint">대개 일시적인 문제입니다.</string>
   <string name="error_http_server_hint_short">대개 일시적인 문제</string>

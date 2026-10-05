@@ -33,7 +33,7 @@
     <item quantity="other">%1$d connexions</item>
   </plurals>
   <string name="row_speed_limit">limite %1$s</string>
-  <string name="row_limited_by_slow_lane">limité par la Voie lente</string>
+  <string name="row_limited_by_slow_lane">limité par la vitesse réduite</string>
   <string name="row_starts_today">Démarre aujourd'hui à %1$s</string>
   <string name="row_starts_tomorrow">Démarre demain à %1$s</string>
   <string name="row_starts_on">Démarre le %1$s à %2$s</string>

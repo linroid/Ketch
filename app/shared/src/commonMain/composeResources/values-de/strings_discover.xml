@@ -2,14 +2,14 @@
 <resources>
   <string name="discover_title">Entdecken</string>
   <string name="discover_settings">Einstellungen für Entdecken</string>
-  <string name="discover_hero_title">Beschreib es. Ketch findet den Download.</string>
-  <string name="discover_intro_body">Entdecken lässt %1$s das Web durchsuchen und die gefundenen Seiten lesen und listet dann die Dateien auf, denen es vertraut. Heruntergeladen wird erst, wenn du etwas hinzufügst.</string>
+  <string name="discover_hero_title">Sag, was du suchst. Ketch findet die passenden Dateien.</string>
+  <string name="discover_intro_body">Entdecken durchsucht mit %1$s das Web, liest die gefundenen Seiten und zeigt Dateien an, die es für vertrauenswürdig hält. Downloads starten erst, wenn du sie hinzufügst.</string>
   <string name="discover_example_blender">Blender für Apple Silicon</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 Server-ISO</string>
   <string name="discover_example_footage">Gemeinfreie 4K-Naturaufnahmen</string>
   <string name="discover_example_quoted">„%1$s“</string>
 
-  <string name="discover_setup_body">Entdecken lässt ein KI-Modell das Web durchsuchen und die gefundenen Seiten lesen und listet dann die Dateien auf, denen es vertraut. Deine Suchanfragen gehen an den Anbieter, den du wählst.</string>
+  <string name="discover_setup_body">Entdecken durchsucht mit einem KI-Modell das Web, liest die gefundenen Seiten und zeigt Dateien an, die es für vertrauenswürdig hält. Deine Suchanfragen werden an den gewählten Anbieter gesendet.</string>
   <string name="discover_setup_unsupported">Entdecken läuft in der Ketch-App auf einem Computer oder einem Android-Telefon.</string>
   <string name="discover_setup_pending">Deine Suche nach „%1$s“ startet, sobald Entdecken eingerichtet ist.</string>
   <string name="discover_setup_choose_model">Modell wählen</string>
@@ -54,9 +54,9 @@
 
   <string name="discover_approval_page">%1$s öffnen?</string>
   <string name="discover_approval_file">Eine Datei auf %1$s prüfen?</string>
-  <string name="discover_approval_redirect">Weiterleitung zu %1$s folgen?</string>
+  <string name="discover_approval_redirect">Der Weiterleitung zu %1$s folgen?</string>
   <string name="discover_approval_redirect_from">Weitergeleitet von %1$s</string>
-  <string name="discover_approval_reason">Entdecken sagt: %1$s</string>
+  <string name="discover_approval_reason">Grund für den Zugriff: %1$s</string>
   <string name="discover_approval_allow">Erlauben</string>
   <string name="discover_approval_allow_once">Einmal erlauben</string>
   <string name="discover_approval_deny">Ablehnen</string>
@@ -80,7 +80,7 @@
   <string name="discover_error_title">Entdecken konnte diese Suche nicht abschließen</string>
   <string name="discover_failed">Suche fehlgeschlagen</string>
   <string name="discover_none_title">Keine Downloads gefunden</string>
-  <string name="discover_none_body">Entdecken listet nur Dateien aus Quellen auf, denen es vertraut. Nenne die Version oder Plattform oder die Website, die sie veröffentlicht.</string>
+  <string name="discover_none_body">Entdecken zeigt nur Dateien aus vertrauenswürdigen Quellen an. Gib eine Version, eine Plattform oder die Website an, auf der die Datei angeboten wird.</string>
   <plurals name="discover_none_filtered">
     <item quantity="one">Der Inhaltsfilter hat %1$d Ergebnis ausgeblendet, das unsicher wirkte. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
     <item quantity="other">Der Inhaltsfilter hat %1$d Ergebnisse ausgeblendet, die unsicher wirkten. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
@@ -123,7 +123,7 @@
     <item quantity="other">%1$d von früher</item>
   </plurals>
   <string name="discover_add_now">Jetzt hinzufügen</string>
-  <string name="discover_add_options">Weitere Optionen zum Hinzufügen</string>
+  <string name="discover_add_options">Weitere Optionen</string>
   <string name="discover_add_to">Hinzufügen zu</string>
   <string name="discover_review_add">Prüfen und hinzufügen</string>
   <string name="discover_review_add_count">%1$d prüfen und hinzufügen</string>
@@ -139,7 +139,7 @@
   <string name="discover_turned_off_detail">Du kannst es in den Einstellungen unter Entdecken wieder einschalten.</string>
   <string name="discover_history_filter">Verlauf durchsuchen</string>
   <string name="discover_history_empty">Deine Suchen erscheinen hier.</string>
-  <string name="discover_history_no_match">Keine Suchen passen zu „%1$s“</string>
+  <string name="discover_history_no_match">Keine Suchanfragen zu „%1$s“ gefunden</string>
   <string name="discover_history_earlier">Früher</string>
   <string name="discover_history_searching">Suche läuft…</string>
   <string name="discover_history_queued">Wartet auf Start</string>

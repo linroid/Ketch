@@ -14,8 +14,8 @@
   <string name="pulse_connecting">正在連線至 %1$s</string>
   <string name="pulse_needs_token">%1$s 需要權杖</string>
   <string name="pulse_offline">%1$s 已離線 · 正在重試</string>
-  <string name="pulse_slow_lane">慢車道</string>
-  <string name="pulse_slow_lane_until">慢車道至 %1$s</string>
+  <string name="pulse_slow_lane">低速模式</string>
+  <string name="pulse_slow_lane_until">低速模式至 %1$s</string>
   <string name="pulse_disk_tooltip">%2$s 上%1$s · %3$s</string>
   <string name="pulse_downloading_count">%1$d 個下載中</string>
   <string name="pulse_tab_progress">↓ %1$s</string>
@@ -34,7 +34,7 @@
   <string name="pulse_speed_downloading">正在以 %1$s 下載，顯示過去 5 分鐘</string>
   <string name="pulse_speed_idle">閒置，顯示過去 5 分鐘</string>
   <string name="pulse_idle">閒置</string>
-  <string name="pulse_disk_short">不足以容納等待中的下載</string>
+  <string name="pulse_disk_short">剩餘空間不足以儲存等待中的下載</string>
   <plurals name="pulse_activity_unread">
     <item quantity="other">動態，%1$d 則未讀</item>
   </plurals>
@@ -53,7 +53,7 @@
   <string name="pulse_mode_full">全速</string>
   <string name="pulse_mode_auto_name">自動</string>
   <string name="pulse_mode_capped">已限速 · %1$s</string>
-  <string name="pulse_mode_slow_lane">慢車道 · %1$s</string>
+  <string name="pulse_mode_slow_lane">低速模式 · %1$s</string>
   <string name="pulse_mode_auto">自動 · %1$s</string>
   <string name="pulse_full_speed_until">全速至 %1$s</string>
   <string name="pulse_mode_full_short">全速</string>
@@ -71,31 +71,31 @@
   <string name="pulse_no_limit">無限制</string>
   <string name="pulse_limit">限制 %1$s</string>
 
-  <string name="pulse_slow_lane_turn_on">開啟慢車道</string>
-  <string name="pulse_slow_lane_turn_off">關閉慢車道</string>
+  <string name="pulse_slow_lane_turn_on">開啟低速模式</string>
+  <string name="pulse_slow_lane_turn_off">關閉低速模式</string>
   <string name="pulse_speed_limit">速度限制</string>
   <string name="pulse_limited">已限速</string>
   <string name="pulse_not_limited">未限速</string>
   <string name="pulse_speed_options">速度選項</string>
   <string name="pulse_speed_mode">速度模式</string>
-  <string name="pulse_slow_lane_speed">慢車道速度</string>
-  <string name="pulse_use_as_slow_lane">設為慢車道速度</string>
+  <string name="pulse_slow_lane_speed">低速模式的速度上限</string>
+  <string name="pulse_use_as_slow_lane">設為低速模式的速度上限</string>
   <string name="pulse_speed_settings">速度設定…</string>
   <string name="pulse_update_failed">無法更新 %1$s · %2$s</string>
   <string name="pulse_caption_full">下載會以網路允許的最快速度進行。</string>
   <string name="pulse_caption_capped">下載速度上限為 %1$s。</string>
-  <string name="pulse_caption_slow_lane">下載共用 %1$s，將頻寬留給其他用途。</string>
+  <string name="pulse_caption_slow_lane">所有下載的總速度不超過 %1$s，為其他應用程式保留頻寬。</string>
   <string name="pulse_caption_no_rules">尚無速度規則。請在「速度設定」中新增。</string>
-  <string name="pulse_caption_rule_slow_lane">有規則讓慢車道保持開啟。</string>
-  <string name="pulse_caption_rule_full">全速，直到有規則開啟慢車道。</string>
-  <string name="pulse_caption_slow_lane_until">慢車道持續至 %1$s，之後依你的規則決定。</string>
-  <string name="pulse_caption_full_until">全速持續至 %1$s，之後依你的規則決定。</string>
-  <string name="pulse_limit_for_slow_lane">慢車道開啟時使用。</string>
+  <string name="pulse_caption_rule_slow_lane">已依規則開啟低速模式。</string>
+  <string name="pulse_caption_rule_full">目前為全速，規則生效時將開啟低速模式。</string>
+  <string name="pulse_caption_slow_lane_until">低速模式將持續至 %1$s，之後依規則調整。</string>
+  <string name="pulse_caption_full_until">全速模式將持續至 %1$s，之後依規則調整。</string>
+  <string name="pulse_limit_for_slow_lane">低速模式開啟時使用。</string>
   <string name="pulse_limit_for_device">套用至 %1$s 上的所有下載。</string>
-  <string name="pulse_limit_after_slow_lane">慢車道關閉後套用。</string>
+  <string name="pulse_limit_after_slow_lane">低速模式關閉後套用。</string>
 
-  <string name="pulse_slow_lane_on">已開啟慢車道 · %1$s</string>
-  <string name="pulse_slow_lane_off">已關閉慢車道</string>
+  <string name="pulse_slow_lane_on">已開啟低速模式 · %1$s</string>
+  <string name="pulse_slow_lane_off">已關閉低速模式</string>
   <string name="pulse_speed_follows_rules">速度將依照你的規則調整</string>
   <string name="pulse_switch_failed">無法切換至「%1$s」</string>
   <string name="pulse_limit_failed">無法設定速度限制</string>
@@ -113,6 +113,6 @@
   <string name="pulse_timeline_connections">連線數 %1$s → %2$s</string>
   <string name="pulse_timeline_auto">自動</string>
   <string name="pulse_timeline_limit">限制 → %1$s</string>
-  <string name="pulse_timeline_limit_removed">已移除限制</string>
+  <string name="pulse_timeline_limit_removed">已移除速度限制</string>
   <string name="pulse_timeline_priority">優先順序 → %1$s</string>
 </resources>

@@ -27,14 +27,14 @@ Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidab
 | remove (from list) | 移除 | 移除 | 削除 | 제거 | quitar | remover | entfernen | retirer | удалить |
 | delete (files) | 删除 | 刪除 | 削除 | 삭제 | eliminar | apagar | löschen | supprimer | удалить |
 | speed limit | 限速 | 速度限制 | 速度制限 | 속도 제한 | límite de velocidad | limite de velocidade | Tempolimit | limite de vitesse | ограничение скорости |
-| Slow lane (speed mode) | 慢车道 | 慢車道 | スローレーン | 저속 차로 | Carril lento | Faixa lenta | Kriechspur | Voie lente | Медленная полоса |
+| Slow lane (speed mode) | 低速模式 | 低速模式 | 低速モード | 저속 모드 | Modo lento | Modo lento | Drosselung | Vitesse réduite | Низкая скорость |
 | Full speed (speed mode) | 全速 | 全速 | フルスピード | 최대 속도 | Velocidad máxima | Velocidade máxima | Volle Geschwindigkeit | Pleine vitesse | Полная скорость |
 | Auto (speed mode) | 自动 | 自動 | 自動 | 자동 | Automático | Automático | Automatisch | Automatique | Авто |
 | queued / waiting / scheduled | 排队中 / 等待中 / 已计划 | 佇列中 / 等待中 / 已排程 | キュー待ち / 待機中 / 予約済み | 대기열 / 대기 중 / 예약됨 | en cola / en espera / programada | na fila / aguardando / agendado | in Warteschlange / wartet / geplant | en file d'attente / en attente / planifié | в очереди / ожидает / запланирована |
 | downloading / paused / done / failed | 下载中 / 已暂停 / 已完成 / 失败 | 下載中 / 已暫停 / 已完成 / 失敗 | ダウンロード中 / 一時停止中 / 完了 / 失敗 | 다운로드 중 / 일시정지됨 / 완료 / 실패 | descargando / en pausa / completada / con error | baixando / pausado / concluído / com falha | lädt / pausiert / fertig / fehlgeschlagen | en cours / en pause / terminé / échec | загружается / приостановлена / готово / ошибка |
 | connection | 连接 | 連線 | 接続 | 연결 | conexión | conexão | Verbindung | connexion | подключение |
 | priority (Low/Normal/High/Urgent) | 优先级（低/普通/高/紧急） | 優先順序（低/一般/高/緊急） | 優先度（低/標準/高/緊急） | 우선순위(낮음/보통/높음/긴급) | prioridad (Baja/Normal/Alta/Urgente) | prioridade (Baixa/Normal/Alta/Urgente) | Priorität (Niedrig/Normal/Hoch/Dringend) | priorité (Basse/Normale/Haute/Urgente) | приоритет (Низкий/Обычный/Высокий/Срочный) |
-| Discover (AI search feature) | 发现 | 探索 | ディスカバー | 찾기 | Descubrir | Descobrir | Entdecken | Découvrir | Поиск |
+| Discover (AI search feature) | 搜索 | 搜尋 | ディスカバー | 찾기 | Descubrir | Descobrir | Entdecken | Découvrir | Поиск |
 | chat (a Discover conversation) | 对话 | 對話 | チャット | 대화 | chat | conversa | Chat | conversation | чат |
 | follow-up (a later message in a chat) | 追问 | 追問 | 追加の質問 | 후속 질문 | pregunta de seguimiento | pergunta de acompanhamento | Folgefrage | question de suivi | уточняющий вопрос |
 | search (one Discover chat, as in "New search") | 搜索 | 搜尋 | 検索 | 검색 | búsqueda | pesquisa | Suche | recherche | запрос |
@@ -64,3 +64,11 @@ Durations: write natural short forms ("1 h 5 min" in de/fr/es/pt, "1 ч 5 мин
 "1小时5分钟" in zh-Hans, "1小時5分鐘" in zh-Hant, "1時間5分" in ja, "1시간 5분" in ko).
 Dates: month-day order of the language (zh/ja "9月28日", ko "9월 28일", de "28. Sep.",
 fr "28 sept.", es "28 sept", pt "28 de set.", ru "28 сент.").
+
+Localized names for the Slow lane speed mode describe reduced speed rather than translating the
+road metaphor. Use the names in the table consistently across settings, the speed panel, commands,
+and desktop notifications.
+
+In Chinese, use 下载/下載 for the action and 下载任务/下載項目 when a count or sentence needs a noun;
+Discover finds 可下载的文件/可下載的檔案. Describe clipboard suggestions as
+提示下载已复制的链接/提示下載已複製的連結 so they do not read as instructions to copy a link.

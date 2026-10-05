@@ -19,7 +19,7 @@
   <string name="inspector_reason_paused_resumes">Pausiert · wird an derselben Stelle fortgesetzt</string>
   <string name="inspector_reason_paused_restarts">Pausiert · Fortsetzen beginnt von vorn</string>
   <string name="inspector_file_missing">Datei verschoben oder gelöscht</string>
-  <string name="inspector_reason_slow_lane">Durch die Kriechspur begrenzt (%1$s)</string>
+  <string name="inspector_reason_slow_lane">Durch die Drosselung begrenzt (%1$s)</string>
   <string name="inspector_reason_global_limit">Durch das globale Limit begrenzt (%1$s)</string>
   <string name="inspector_reason_own_limit">Begrenzt auf %1$s</string>
 
@@ -74,7 +74,7 @@
   <string name="inspector_control_peer_limit">Peer-Limit</string>
   <string name="inspector_control_priority">Priorität</string>
   <string name="inspector_control_start">Start</string>
-  <string name="inspector_global_slow_lane">Kriechspur</string>
+  <string name="inspector_global_slow_lane">Drosselung</string>
   <string name="inspector_global_limit">Globales Limit</string>
   <string name="inspector_limit_marker">%1$s %2$s</string>
   <string name="inspector_speed_limit">Tempolimit</string>

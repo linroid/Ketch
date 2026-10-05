@@ -124,7 +124,7 @@
   <string name="launchpad_paste_hint_plain">Copiez un lien, puis collez-le n'importe où dans Ketch.</string>
   <string name="launchpad_torrent_title">Déposez un lien, un magnet ou un .torrent</string>
   <string name="launchpad_torrent_title_phone">Ouvrir un fichier .torrent</string>
-  <string name="launchpad_torrent_hint">N'importe où dans cette fenêtre, ou choisissez un fichier .torrent.</string>
+  <string name="launchpad_torrent_hint">Déposez des liens ou des fichiers dans cette fenêtre, ou choisissez un fichier .torrent.</string>
   <string name="launchpad_torrent_hint_phone">Ou ouvrez un lien magnet depuis votre navigateur.</string>
   <string name="launchpad_browser_title">Intercepter depuis votre navigateur</string>
   <string name="launchpad_browser_none">Envoyez des téléchargements à Ketch depuis Chrome, Edge ou Firefox.</string>
@@ -174,8 +174,8 @@
     <item quantity="one">Abandonner la progression de %1$d téléchargement ?</item>
     <item quantity="other">Abandonner la progression de %1$d téléchargements ?</item>
   </plurals>
-  <string name="downloads_discard_body">%1$s ne pourra plus être repris ensuite.</string>
-  <string name="downloads_discard_body_many">Ils ne pourront plus être repris ensuite.</string>
+  <string name="downloads_discard_body">La progression de %1$s sera perdue. Tout nouveau téléchargement repartira de zéro.</string>
+  <string name="downloads_discard_body_many">La progression sera perdue. Tout nouveau téléchargement repartira de zéro.</string>
   <string name="downloads_discard_keep">Conserver</string>
   <string name="downloads_discard_confirm">Abandonner la progression</string>
   <string name="downloads_speed_title">Limite de vitesse</string>

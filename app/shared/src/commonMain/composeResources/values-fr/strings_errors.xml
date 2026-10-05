@@ -51,7 +51,7 @@
   <string name="error_http_sign_in_hint_server_short">le serveur exige que vous soyez connecté</string>
   <string name="error_http_forbidden">Accès refusé (403)</string>
   <string name="error_http_forbidden_hint">Le lien a peut-être expiré.</string>
-  <string name="error_http_forbidden_hint_browser">Le lien a peut-être expiré. Intercepté depuis %1$s ? Interceptez-le à nouveau depuis la page.</string>
+  <string name="error_http_forbidden_hint_browser">Le lien a peut-être expiré. S'il provient de %1$s, renvoyez-le à Ketch depuis la page d'origine.</string>
   <string name="error_http_forbidden_hint_short">le lien a peut-être expiré</string>
   <string name="error_browser_yours">votre navigateur</string>
   <string name="error_http_not_found">Fichier introuvable (%1$d)</string>

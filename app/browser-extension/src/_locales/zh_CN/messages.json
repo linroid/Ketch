@@ -114,7 +114,7 @@
     "message": "Ketch 未在运行"
   },
   "error_app_connect_failed": {
-    "message": "Ketch 应用无法连接"
+    "message": "无法连接到 Ketch 应用"
   },
   "error_app_invalid_reply": {
     "message": "Ketch 应用返回了无效的响应"
@@ -169,7 +169,7 @@
     "message": "请打开 Ketch，在“设置 → 共享”中选择“允许其他设备”，或运行“ketch server”。"
   },
   "hint_remote_server": {
-    "message": "请检查服务器是否正在运行，以及从这里能否访问此地址。"
+    "message": "请确认服务器正在运行，且当前设备可以访问此地址。"
   },
   "hint_access_token": {
     "message": "请输入 Ketch 中“设置 → 共享 → 高级”下显示的访问码。"
@@ -385,7 +385,7 @@
     "message": "请输入 Ketch 服务器的地址。"
   },
   "popup_instance_picker": {
-    "message": "Ketch 实例"
+    "message": "选择 Ketch 设备"
   },
   "popup_settings": {
     "message": "设置"
@@ -446,10 +446,10 @@
     "message": "允许访问"
   },
   "options_instances": {
-    "message": "Ketch 实例"
+    "message": "Ketch 设备"
   },
   "options_instances_detail": {
-    "message": "捕获的下载和磁力链接会发送到默认实例。右键点击链接、图片或视频，可将其发送到任一实例。"
+    "message": "捕获的下载和磁力链接会发送到默认设备。右键点击链接、图片或视频，可选择发送到其他设备。"
   },
   "options_add_app": {
     "message": "添加这台电脑上的 Ketch"
@@ -476,13 +476,13 @@
     "message": "MB"
   },
   "options_excluded": {
-    "message": "交给浏览器的网站"
+    "message": "由浏览器下载的网站"
   },
   "options_excluded_detail": {
-    "message": "每行一个。包括其子域名，因此 example.com 也涵盖 downloads.example.com。"
+    "message": "每行输入一个网站，同时适用于其子域名。例如，example.com 也包含 downloads.example.com。"
   },
   "options_cookies": {
-    "message": "发送 Cookie 和来源页"
+    "message": "发送 Cookie 和来源页地址"
   },
   "options_cookies_detail": {
     "message": "让 Ketch 能下载需要登录的文件。Ketch 会将它们与任务一起保存，以便之后继续下载。"
@@ -497,7 +497,7 @@
     "message": "按住 Alt 键点击磁力链接，可改用其他应用打开。"
   },
   "options_notify": {
-    "message": "发送下载时通知"
+    "message": "发送下载时显示通知"
   },
   "options_notify_detail": {
     "message": "出现问题时始终会通知。"

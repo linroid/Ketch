@@ -37,9 +37,9 @@
   <string name="intake_offer_paste">貼上 %1$s</string>
   <string name="intake_offer_paste_clipboard">從剪貼簿貼上 %1$s</string>
   <string name="intake_offer_paste_copied">貼上已複製的連結</string>
-  <string name="intake_discover_offer">這裡沒有連結。要用「探索」搜尋「%1$s」嗎？</string>
+  <string name="intake_discover_offer">這裡沒有連結。要搜尋「%1$s」嗎？</string>
   <string name="intake_no_links">這裡沒有連結。請貼上連結、磁力連結或 cURL 命令。</string>
-  <string name="intake_discover">探索</string>
+  <string name="intake_discover">搜尋</string>
 
   <string name="intake_notice_no_curl">剪貼簿中沒有 cURL 命令。請在瀏覽器的網路面板中，以滑鼠右鍵按一下該請求，然後選擇「複製為 cURL」。</string>
   <string name="intake_notice_close_first">請先關閉此面板，再新增其他下載</string>
@@ -115,7 +115,7 @@
     <item quantity="other">%1$d 分鐘內沒有對等端傳來檔案清單</item>
   </plurals>
   <string name="intake_problem_unsupported">Ketch 無法下載這類連結</string>
-  <string name="intake_problem_unsupported_detail">支援 http(s)、ftp(s)、magnet 和 .torrent</string>
+  <string name="intake_problem_unsupported_detail">支援 http(s)、ftp(s)、磁力連結和 .torrent 檔案</string>
   <string name="intake_problem_forbidden">伺服器拒絕存取（403）</string>
   <string name="intake_problem_forbidden_detail">從已登入網頁複製的連結通常需要該網頁的 Cookie</string>
   <string name="intake_problem_not_found">找不到</string>
@@ -133,7 +133,7 @@
   <string name="intake_problem_file_unreadable">無法讀取這個檔案</string>
   <string name="intake_problem_sign_in">需要登入</string>
   <string name="intake_action_sign_in">登入</string>
-  <string name="intake_action_paste_curl">以 cURL 貼上</string>
+  <string name="intake_action_paste_curl">貼上 cURL 命令</string>
   <string name="intake_action_add_headers">新增標頭</string>
   <string name="intake_action_find_mirror">尋找可用的鏡像站</string>
   <string name="intake_action_keep_waiting">繼續等待</string>
@@ -167,8 +167,8 @@
   <string name="intake_start">開始時間</string>
   <string name="intake_peer_limit">對等端上限</string>
   <string name="intake_single_connection">此伺服器只允許 1 個連線</string>
-  <string name="intake_auto_device">「自動」由裝置決定</string>
-  <string name="intake_auto_setting">「自動」使用裝置的設定：%1$d</string>
+  <string name="intake_auto_device">「自動」使用裝置的預設對等端上限</string>
+  <string name="intake_auto_setting">「自動」使用裝置的預設連線數：%1$d</string>
   <string name="intake_priority_low_caption">沒有其他等待中的項目時才執行</string>
   <string name="intake_priority_normal_caption">預設順序</string>
   <string name="intake_priority_high_caption">排在「一般」和「低」之前</string>
@@ -195,7 +195,7 @@
   <string name="intake_pin">釘選 %1$s</string>
   <string name="intake_choose_folder">選擇資料夾…</string>
   <string name="intake_folder_on">%1$s 上的資料夾</string>
-  <string name="intake_torrents_app_folder">種子會儲存到應用程式資料夾：在「檔案」中選擇的資料夾只適用於連結</string>
+  <string name="intake_torrents_app_folder">透過種子下載的檔案會儲存在應用程式資料夾中；在「檔案」中選擇的資料夾僅用於一般連結下載</string>
 
   <string name="intake_advanced">進階</string>
   <string name="intake_hide">隱藏</string>
@@ -292,11 +292,11 @@
   <string name="intake_file_empty">檔案是空的</string>
   <string name="intake_file_too_large">檔案大於 %1$d MiB</string>
 
-  <string name="intake_tracker_too_long">太長。</string>
-  <string name="intake_tracker_spaces">包含空格。</string>
+  <string name="intake_tracker_too_long">網址過長。</string>
+  <string name="intake_tracker_spaces">網址不能包含空格。</string>
   <string name="intake_tracker_scheme">請以 http://、https:// 或 udp:// 開頭。</string>
   <string name="intake_tracker_no_host">缺少主機名稱。</string>
   <string name="intake_tracker_udp_user_info">UDP Tracker 不能包含使用者名稱或密碼。</string>
-  <string name="intake_tracker_udp_port">UDP Tracker 需要連接埠。</string>
+  <string name="intake_tracker_udp_port">UDP Tracker 網址必須指定連接埠。</string>
   <string name="intake_tracker_port">請使用 1 到 65535 之間的連接埠。</string>
 </resources>

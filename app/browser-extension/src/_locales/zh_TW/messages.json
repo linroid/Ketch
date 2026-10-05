@@ -114,7 +114,7 @@
     "message": "Ketch 未在執行"
   },
   "error_app_connect_failed": {
-    "message": "Ketch 應用程式無法連線"
+    "message": "無法連線至 Ketch 應用程式"
   },
   "error_app_invalid_reply": {
     "message": "Ketch 應用程式傳回了無效的回應"
@@ -169,7 +169,7 @@
     "message": "請開啟 Ketch，在「設定 → 共享」中選擇「允許其他裝置」，或執行「ketch server」。"
   },
   "hint_remote_server": {
-    "message": "請確認伺服器正在執行，且從這裡可以連到此位址。"
+    "message": "請確認伺服器正在執行，且目前裝置可以連線至此位址。"
   },
   "hint_access_token": {
     "message": "請輸入 Ketch 中「設定 → 共享 → 進階」下顯示的存取碼。"
@@ -385,7 +385,7 @@
     "message": "請輸入 Ketch 伺服器的位址。"
   },
   "popup_instance_picker": {
-    "message": "Ketch 實例"
+    "message": "選擇 Ketch 裝置"
   },
   "popup_settings": {
     "message": "設定"
@@ -446,10 +446,10 @@
     "message": "允許存取"
   },
   "options_instances": {
-    "message": "Ketch 實例"
+    "message": "Ketch 裝置"
   },
   "options_instances_detail": {
-    "message": "擷取的下載項目和磁力連結會傳送到預設實例。在連結、圖片或影片上按右鍵，即可傳送到任一實例。"
+    "message": "擷取的下載項目和磁力連結會傳送到預設裝置。在連結、圖片或影片上按右鍵，即可選擇傳送到其他裝置。"
   },
   "options_add_app": {
     "message": "新增這台電腦上的 Ketch"
@@ -476,13 +476,13 @@
     "message": "MB"
   },
   "options_excluded": {
-    "message": "交給瀏覽器的網站"
+    "message": "由瀏覽器下載的網站"
   },
   "options_excluded_detail": {
-    "message": "每行一個。包含其子網域，因此 example.com 也涵蓋 downloads.example.com。"
+    "message": "每行輸入一個網站，同時適用於其子網域。例如，example.com 也包含 downloads.example.com。"
   },
   "options_cookies": {
-    "message": "傳送 Cookie 和參照網址"
+    "message": "傳送 Cookie 和來源網頁網址"
   },
   "options_cookies_detail": {
     "message": "讓 Ketch 能下載需要登入的檔案。Ketch 會將它們與任務一起儲存，以便日後繼續下載。"
@@ -497,7 +497,7 @@
     "message": "按住 Alt 鍵點擊磁力連結，即可改用其他應用程式開啟。"
   },
   "options_notify": {
-    "message": "傳送下載項目時通知"
+    "message": "傳送下載項目時顯示通知"
   },
   "options_notify_detail": {
     "message": "發生問題時一律會通知。"

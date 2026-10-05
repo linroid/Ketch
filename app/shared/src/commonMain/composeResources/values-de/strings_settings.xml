@@ -16,7 +16,7 @@
   <string name="settings_category_downloads">Downloads</string>
   <string name="settings_category_downloads_description">Speicherort, Warteschlange und Wiederholungen</string>
   <string name="settings_category_speed">Geschwindigkeit</string>
-  <string name="settings_category_speed_description">Geschwindigkeitsmodi, Kriechspur und automatische Regeln</string>
+  <string name="settings_category_speed_description">Geschwindigkeitsmodi, Drosselung und automatische Regeln</string>
   <string name="settings_category_network">Netzwerk</string>
   <string name="settings_category_network_description">Die Netzwerke, auf die Downloads verteilt werden</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
@@ -50,7 +50,7 @@
   <string name="settings_summary_extension_missing">Erweiterung nicht eingerichtet</string>
   <string name="settings_summary_clipboard_fill">Fügt kopierte Links ein</string>
   <string name="settings_summary_clipboard_suggest">Schlägt kopierte Links vor</string>
-  <string name="settings_summary_clipboard_off">Zwischenablage aus</string>
+  <string name="settings_summary_clipboard_off">Zwischenablage wird nicht gelesen</string>
   <string name="settings_summary_discover_search">%1$s · %2$s-Suche</string>
   <string name="settings_summary_downloads_all">%1$s · alle gleichzeitig</string>
   <plurals name="settings_summary_downloads_count">
@@ -58,8 +58,8 @@
     <item quantity="other">%1$s · %2$d gleichzeitig</item>
   </plurals>
   <string name="settings_summary_speed_capped">Volle Geschwindigkeit · %1$s</string>
-  <string name="settings_summary_speed_slow_lane">Kriechspur · %1$s</string>
-  <string name="settings_summary_speed_auto_slow_lane">Automatisch · Kriechspur %1$s</string>
+  <string name="settings_summary_speed_slow_lane">Drosselung · %1$s</string>
+  <string name="settings_summary_speed_auto_slow_lane">Automatisch · Drosselung %1$s</string>
   <string name="settings_summary_speed_auto_full">Automatisch · Volle Geschwindigkeit</string>
   <string name="settings_summary_no_limit">Kein Limit</string>
   <string name="settings_summary_limit">Limit %1$s</string>
@@ -154,8 +154,8 @@
   <string name="settings_notifications_success_sound_hint">Ein leiser Klang.</string>
   <string name="settings_notifications_success_vibration">Vibration</string>
   <string name="settings_notifications_success_vibration_hint">Ein kurzes Vibrieren, auch im Vibrationsmodus.</string>
-  <string name="settings_notifications_success_footer">Wenn ein Download fertig ist oder Entdecken Downloads findet.</string>
-  <string name="settings_notifications_success_footer_phone">Wenn ein Download fertig ist oder Entdecken Downloads findet. Lautlos und „Nicht stören“ schalten sie stumm; Mitteilungen im Hintergrund nutzen ihren eigenen Ton.</string>
+  <string name="settings_notifications_success_footer">Wenn ein Download fertig ist oder Entdecken Dateien findet.</string>
+  <string name="settings_notifications_success_footer_phone">Wenn ein Download fertig ist oder Entdecken Dateien findet. Im Lautlos- und „Nicht stören“-Modus bleibt der Ton aus. Hintergrundbenachrichtigungen verwenden ihren eigenen Benachrichtigungston.</string>
   <string name="settings_notifications_browser">Browser-Benachrichtigungen</string>
   <string name="settings_notifications_allowed">Benachrichtigungen sind erlaubt</string>
   <string name="settings_notifications_allowed_hint">Werden angezeigt, während der Ketch-Tab im Hintergrund ist.</string>
@@ -185,12 +185,12 @@
   <string name="settings_integration_clipboard_fill">Automatisch einfügen</string>
   <string name="settings_integration_clipboard_suggest_choice">Vorschlagen</string>
   <string name="settings_integration_clipboard_off">Aus</string>
-  <string name="settings_integration_clipboard_fill_hint">Ein kopierter Link füllt das Hinzufügen-Fenster.</string>
-  <string name="settings_integration_clipboard_suggest_hint">Liest die Zwischenablage nur, wenn du tippst.</string>
+  <string name="settings_integration_clipboard_fill_hint">Kopierte Links werden automatisch ins Hinzufügen-Fenster eingefügt.</string>
+  <string name="settings_integration_clipboard_suggest_hint">Liest die Zwischenablage erst, wenn du den Downloadvorschlag auswählst.</string>
   <string name="settings_integration_clipboard_off_hint">Ketch liest die Zwischenablage nie.</string>
   <string name="settings_integration_quick_add">Eingefügte Links sofort hinzufügen</string>
-  <string name="settings_integration_quick_add_key_hint">Ein mit %1$s eingefügter Link wird sofort hinzugefügt, mit Rückgängig.</string>
-  <string name="settings_integration_quick_add_hint">Ein eingefügter Link wird sofort hinzugefügt, mit Rückgängig.</string>
+  <string name="settings_integration_quick_add_key_hint">Ein mit %1$s eingefügter Link wird sofort hinzugefügt. Du kannst dies rückgängig machen.</string>
+  <string name="settings_integration_quick_add_hint">Ein eingefügter Link wird sofort hinzugefügt. Du kannst dies rückgängig machen.</string>
 
   <string name="settings_ai_discovery">KI-Suche</string>
   <string name="settings_ai_content_filter">Inhaltsfilter</string>
@@ -256,7 +256,7 @@
   <string name="settings_ai_access_trusted_none">Noch keine. Wähle „Immer erlauben“, wenn Entdecken fragt, oder füge hier eine Website hinzu.</string>
   <string name="settings_ai_access_add">Website hinzufügen, z. B. ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">Gib den Namen einer Website ein, z. B. ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Suchen, die du auf Websites beschränkst, fragen nie: Diese Websites hast du selbst gewählt.</string>
+  <string name="settings_ai_access_footer">Für Websites, die du als Suchziel angibst, wird keine weitere Erlaubnis eingeholt.</string>
 
   <string name="settings_about_name_line">Eine Ketsch ist ein Segelboot mit zwei Masten. Wie ihre Segel teilt Ketch jeden Download in Spuren auf.</string>
   <string name="settings_about_discover_elsewhere">Entdecken läuft in der Desktop- und der Android-App.</string>
@@ -286,17 +286,17 @@
   <string name="settings_about_update_current_hint">%1$s ist die neueste Version.</string>
   <string name="settings_about_update_available">Ketch %1$s ist verfügbar</string>
   <string name="settings_about_update_available_hint">Du hast %1$s.</string>
-  <string name="settings_about_update_source_hint">Diese Kopie läuft aus dem Quellcode. Die Installationsprogramme findest du auf der Release-Seite.</string>
+  <string name="settings_about_update_source_hint">Du nutzt eine aus dem Quellcode erstellte Version. Lade ein Installationsprogramm von der Release-Seite herunter.</string>
   <string name="settings_about_update_downloading">Ketch %1$s wird heruntergeladen…</string>
   <string name="settings_about_update_progress">%1$s von %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s ist bereit zur Installation</string>
-  <string name="settings_about_update_ready_hint">Ketch startet neu, um es zu installieren. Downloads werden dort fortgesetzt, wo sie aufgehört haben.</string>
+  <string name="settings_about_update_ready_hint">Ketch startet neu, um das Update zu installieren. Downloads werden an der bisherigen Stelle fortgesetzt.</string>
   <string name="settings_about_update_ready_open_hint">Öffne das Installationsprogramm und folge den Schritten.</string>
   <string name="settings_about_update_check_failed">Die Suche nach Updates ist fehlgeschlagen</string>
   <string name="settings_about_update_download_failed">Das Update konnte nicht heruntergeladen werden</string>
   <string name="settings_about_update_install_failed">Das Update konnte nicht installiert werden</string>
   <string name="settings_about_update_auto">Automatisch nach Updates suchen</string>
-  <string name="settings_about_update_auto_hint">Einmal am Tag, in den Releases von Ketch auf GitHub.</string>
+  <string name="settings_about_update_auto_hint">Prüft täglich auf GitHub, ob eine neue Version von Ketch verfügbar ist.</string>
   <string name="settings_about_update_notes">Neu in %1$s</string>
   <string name="settings_about_update_check">Jetzt suchen</string>
   <string name="settings_about_update_install">Aktualisieren</string>
@@ -311,14 +311,14 @@
   <string name="settings_logs_share_subject">Ketch-Protokolle</string>
 
   <string name="settings_downloads_folder">Downloads-Ordner</string>
-  <string name="settings_downloads_remote">Auf %1$s bis zum Neustart gespeichert.</string>
+  <string name="settings_downloads_remote">Die Einstellungen gelten auf %1$s bis zum nächsten Neustart.</string>
   <string name="settings_loading_from">Einstellungen werden von %1$s geladen…</string>
   <string name="settings_downloads_save_to">Speichern in</string>
   <string name="settings_downloads_save_to_row">Downloads speichern in</string>
   <string name="settings_downloads_path_placeholder">Pfad eines Ordners auf %1$s</string>
   <string name="settings_downloads_private_folder">Nur Ketch kann diesen Ordner sehen. Wähle einen wie „Download“.</string>
   <string name="settings_downloads_choose_folder">Ordner wählen</string>
-  <string name="settings_downloads_torrents_own_folder">Torrents werden weiterhin im eigenen Ordner von Ketch gespeichert.</string>
+  <string name="settings_downloads_torrents_own_folder">Per Torrent heruntergeladene Dateien bleiben im Ketch-Ordner.</string>
   <string name="settings_downloads_change">Ändern…</string>
   <string name="settings_downloads_enter_path">Pfad eingeben…</string>
   <string name="settings_downloads_use_default">Downloads-Ordner verwenden</string>
@@ -329,7 +329,7 @@
   <string name="settings_downloads_unpin">%1$s loslösen</string>
   <string name="settings_downloads_pin">Anheften</string>
   <string name="settings_downloads_queue">Warteschlange</string>
-  <string name="settings_downloads_queue_footer">Ein niedrigeres Limit lässt laufende Downloads fertig werden. Wiederholungen gelten, wenn Downloads starten oder fortgesetzt werden.</string>
+  <string name="settings_downloads_queue_footer">Ein niedrigeres Limit unterbricht keine laufenden Downloads. Die Anzahl der Wiederholungsversuche gilt ab dem nächsten Start oder Fortsetzen eines Downloads.</string>
   <string name="settings_count_unlimited">Unbegrenzt</string>
   <string name="settings_downloads_run_at_once">Gleichzeitig ausführen</string>
   <string name="settings_downloads_run_at_once_hint">Die übrigen warten nach Priorität in der Warteschlange.</string>
@@ -361,29 +361,29 @@
   <string name="settings_downloads_retries_more">Mehr Wiederholungen</string>
 
   <string name="settings_speed_mode_full">Volle Geschwindigkeit</string>
-  <string name="settings_speed_mode_slow_lane">Kriechspur</string>
+  <string name="settings_speed_mode_slow_lane">Drosselung</string>
   <string name="settings_speed_mode_auto">Automatisch</string>
-  <string name="settings_speed_remote">Auf %1$s bis zum Neustart gespeichert. Kriechspur und Automatisch gibt es dafür noch nicht.</string>
+  <string name="settings_speed_remote">Die Einstellungen gelten auf %1$s bis zum nächsten Neustart. Drosselung und Automatikmodus werden dort noch nicht unterstützt.</string>
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Tempolimit</string>
   <string name="settings_speed_limit_hint">Alle Downloads teilen es sich; das eigene Limit eines Downloads kann niedriger sein.</string>
   <string name="settings_speed_mode_group">Modus</string>
   <string name="settings_speed_mode">Geschwindigkeitsmodus</string>
   <string name="settings_speed_full_unlimited">Downloads nutzen die volle verfügbare Geschwindigkeit.</string>
-  <string name="settings_speed_full_capped">Downloads teilen sich bis zu %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Downloads teilen sich höchstens %1$s und lassen Platz für Anrufe.</string>
-  <string name="settings_speed_auto_no_rules">Füge unten eine Regel hinzu, damit sich die Kriechspur von selbst einschaltet.</string>
+  <string name="settings_speed_full_capped">Die Gesamtgeschwindigkeit aller Downloads ist auf %1$s begrenzt.</string>
+  <string name="settings_speed_slow_lane_summary">Die Gesamtgeschwindigkeit aller Downloads ist auf %1$s begrenzt. So bleibt Bandbreite für Anrufe frei.</string>
+  <string name="settings_speed_auto_no_rules">Füge unten eine Regel hinzu, damit sich die Drosselung von selbst einschaltet.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Limits</string>
   <string name="settings_speed_full_cap">Obergrenze bei voller Geschwindigkeit</string>
-  <string name="settings_speed_full_cap_hint">Das Maximum, das sich Downloads außerhalb der Kriechspur teilen.</string>
-  <string name="settings_speed_slow_lane">Geschwindigkeit der Kriechspur</string>
+  <string name="settings_speed_full_cap_hint">Die maximale Gesamtgeschwindigkeit aller Downloads, wenn die Drosselung ausgeschaltet ist.</string>
+  <string name="settings_speed_slow_lane">Gedrosselte Geschwindigkeit</string>
   <string name="settings_speed_slow_lane_suggested">≈ %1$s empfohlen, %2$d % der höchsten Geschwindigkeit dieser Woche.</string>
   <string name="settings_speed_slow_lane_unknown">%1$s, bis Ketch weiß, wie schnell diese Verbindung ist.</string>
   <string name="settings_speed_slow_lane_capped">Die Obergrenze von %1$s bei voller Geschwindigkeit ist niedriger und gilt stattdessen.</string>
   <string name="settings_speed_rules">Automatische Regeln</string>
-  <string name="settings_speed_rules_footer_auto">Regeln folgen der Uhr dieses Geräts.</string>
-  <string name="settings_speed_rules_footer">Regeln gelten im Modus „Automatisch“ nach der Uhr dieses Geräts.</string>
+  <string name="settings_speed_rules_footer_auto">Die Regeln richten sich nach der Ortszeit dieses Geräts.</string>
+  <string name="settings_speed_rules_footer">Im Automatikmodus richten sich die Regeln nach der Ortszeit dieses Geräts.</string>
   <string name="settings_speed_rule_add">Regel hinzufügen</string>
   <plurals name="settings_speed_rules_max">
     <item quantity="one">Bis zu %1$d Regel</item>
@@ -391,7 +391,7 @@
   </plurals>
   <string name="settings_speed_rules_empty">Noch keine Regeln</string>
   <string name="settings_speed_rules_empty_hint">Zum Beispiel Downloads während der Arbeitszeit verlangsamen.</string>
-  <string name="settings_speed_rule_slow_lane_on">Kriechspur an</string>
+  <string name="settings_speed_rule_slow_lane_on">Drosselung an</string>
   <string name="settings_speed_rule_start">Start</string>
   <string name="settings_speed_rule_end">Ende</string>
   <string name="settings_speed_rule_remove">Regel entfernen</string>
@@ -415,7 +415,7 @@
   <string name="settings_speed_connections_hint">Für HTTP und FTP; gilt, wenn Downloads starten oder fortgesetzt werden.</string>
   <string name="settings_speed_switch_failed">%1$s konnte nicht aktiviert werden</string>
   <string name="settings_speed_cap_failed">Die Obergrenze bei voller Geschwindigkeit konnte nicht geändert werden</string>
-  <string name="settings_speed_slow_lane_failed">Die Geschwindigkeit der Kriechspur konnte nicht geändert werden</string>
+  <string name="settings_speed_slow_lane_failed">Die gedrosselte Geschwindigkeit konnte nicht geändert werden</string>
   <string name="settings_speed_rules_failed">Die automatischen Regeln konnten nicht geändert werden</string>
 
   <string name="settings_network_system_default">Systemstandard</string>
@@ -564,12 +564,12 @@
   <string name="settings_search_per_server">Gleichzeitige Downloads von einer Website</string>
   <string name="settings_search_per_server_keywords">Host, Website, Warteschlange, Limit</string>
   <string name="settings_search_retries_keywords">wiederholen, Versuche, Fehler</string>
-  <string name="settings_search_speed_mode">Volle Geschwindigkeit, Kriechspur oder Automatisch</string>
+  <string name="settings_search_speed_mode">Volle Geschwindigkeit, Drosselung oder Automatisch</string>
   <string name="settings_search_speed_mode_keywords">Limit, Bandbreite, drosseln, Drosselung</string>
   <string name="settings_search_full_speed_cap">Das Tempolimit, das sich alle Downloads teilen</string>
   <string name="settings_search_full_speed_cap_keywords">Geschwindigkeitslimit, Bandbreite, drosseln, Maximum</string>
   <string name="settings_search_slow_lane_keywords">Limit, Bandbreite, drosseln, Drosselung</string>
-  <string name="settings_search_rules">Die Kriechspur zu festen Zeiten einschalten</string>
+  <string name="settings_search_rules">Die Drosselung zu festen Zeiten einschalten</string>
   <string name="settings_search_rules_keywords">Zeitplan, Arbeitszeit, Wochentage, Uhrzeit</string>
   <string name="settings_search_connections_keywords">Segmente, Threads, parallel, aufteilen</string>
   <string name="settings_search_networks">Die Netzwerke, die Downloads nutzen</string>
@@ -593,9 +593,9 @@
   <string name="settings_rule_weekdays">Werktags</string>
   <string name="settings_rule_weekends">Am Wochenende</string>
 
-  <string name="settings_auto_slow_lane_until">Kriechspur an bis %1$s</string>
+  <string name="settings_auto_slow_lane_until">Drosselung an bis %1$s</string>
   <string name="settings_auto_full_speed_until">Volle Geschwindigkeit bis %1$s</string>
-  <string name="settings_auto_slow_lane_all_week">Kriechspur die ganze Woche an</string>
+  <string name="settings_auto_slow_lane_all_week">Drosselung die ganze Woche an</string>
   <string name="settings_auto_full_speed_all_week">Volle Geschwindigkeit, diese Woche startet keine Regel</string>
   <string name="settings_auto_tomorrow_at">morgen %1$s</string>
   <string name="settings_auto_day_at">%1$s %2$s</string>

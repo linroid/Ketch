@@ -4,20 +4,20 @@
   <string name="onboarding_loading">正在加载 Ketch</string>
 
   <string name="onboarding_files_title">下载内容都在“文件”中</string>
-  <string name="onboarding_files_body">Ketch 会把下载的内容保存在“文件”应用可以打开、分享和移动的位置。</string>
+  <string name="onboarding_files_body">下载的文件会保存在 Ketch 文件夹中，可通过“文件”应用打开、分享或移动。</string>
   <string name="onboarding_files_path">我的 %1$s › Ketch › Downloads</string>
 
   <string name="onboarding_folder_title">下载内容保存到哪里？</string>
-  <string name="onboarding_folder_body">其他应用无法打开 Ketch 自己的文件夹。保存到 Download，文件就能在任何地方显示。</string>
+  <string name="onboarding_folder_body">其他应用无法访问 Ketch 的专用文件夹。保存到 Download 文件夹后，就能在其他应用中访问下载的文件。</string>
   <string name="onboarding_folder_use_download">使用 Download 文件夹</string>
   <string name="onboarding_folder_not_now">以后再说</string>
   <string name="onboarding_folder_choose_another">选择其他文件夹</string>
   <string name="onboarding_folder_saving_to">保存到 %1$s</string>
-  <string name="onboarding_folder_torrents">种子仍保存在 Ketch 的文件夹中。</string>
+  <string name="onboarding_folder_torrents">通过种子下载的文件仍会保存在 Ketch 文件夹中。</string>
   <string name="onboarding_folder_error">无法使用该文件夹，请换一个试试。</string>
 
-  <string name="onboarding_use_title">在这里如何使用 Ketch？</string>
-  <string name="onboarding_use_body">先选一种开始，之后随时可以使用另一种。</string>
+  <string name="onboarding_use_title">想如何使用 Ketch？</string>
+  <string name="onboarding_use_body">先选一种使用方式，之后随时可以使用另一种。</string>
   <string name="onboarding_use_download">在%1$s上下载</string>
   <string name="onboarding_use_download_ios">Ketch 在后台时，下载可能会暂停。</string>
   <string name="onboarding_use_download_android">使用其他应用时，下载会继续进行。</string>
@@ -33,7 +33,7 @@
   <string name="onboarding_intake_select">选择链接</string>
   <string name="onboarding_intake_select_body">在所选文本上方的菜单中选择“使用 Ketch 下载”。</string>
   <string name="onboarding_intake_copy">复制链接</string>
-  <string name="onboarding_intake_copy_body">回到 Ketch，它会提示你下载该链接。</string>
+  <string name="onboarding_intake_copy_body">返回 Ketch 后，会提示是否下载该链接的内容。</string>
   <string name="onboarding_intake_torrents">打开磁力链接和 .torrent 文件</string>
   <string name="onboarding_intake_torrents_body">它们会在 Ketch 中打开，方便选择需要的文件。</string>
   <string name="onboarding_intake_notify">下载完成时收到通知</string>

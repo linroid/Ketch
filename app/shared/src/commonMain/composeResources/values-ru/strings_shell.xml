@@ -27,7 +27,7 @@
   <string name="shell_device_connecting">Подключение</string>
   <string name="shell_device_connecting_now">Подключение…</string>
   <string name="shell_device_idle">Простой</string>
-  <string name="shell_device_slow_lane">Медленная полоса</string>
+  <string name="shell_device_slow_lane">Низкая скорость</string>
   <plurals name="shell_device_active">
     <item quantity="one">%1$d активна</item>
     <item quantity="few">%1$d активны</item>
@@ -59,7 +59,7 @@
   <string name="sidebar_menu_speed">Скорость</string>
   <string name="sidebar_menu_settings">Настройки этого устройства…</string>
   <string name="sidebar_menu_full_speed">Полная скорость</string>
-  <string name="sidebar_menu_slow_lane">Медленная полоса · %1$s</string>
+  <string name="sidebar_menu_slow_lane">Низкая скорость · %1$s</string>
   <string name="sidebar_menu_no_limit">Без ограничения</string>
 
   <string name="switcher_overview">Обзор</string>
@@ -145,11 +145,11 @@
   <string name="palette_add_with_options">Добавить с параметрами…</string>
   <string name="palette_add_with_options_detail">Папка, скорость, приоритет и время запуска</string>
   <string name="palette_limit_to">Ограничить загрузки до %1$s</string>
-  <string name="palette_slow_lane_to">Скорость медленной полосы: %1$s</string>
-  <string name="palette_slow_lane_turns_on">Включает медленную полосу</string>
-  <string name="palette_slow_lane_is_on">Медленная полоса включена</string>
+  <string name="palette_slow_lane_to">Лимит в режиме низкой скорости: %1$s</string>
+  <string name="palette_slow_lane_turns_on">Включает режим низкой скорости</string>
+  <string name="palette_slow_lane_is_on">Режим низкой скорости включён</string>
   <string name="palette_slow_lane_now">Сейчас %1$s</string>
-  <string name="palette_limit_while_off">Действует, пока медленная полоса выключена</string>
+  <string name="palette_limit_while_off">Действует, пока низкая скорость выключена</string>
 
   <plurals name="palette_pause_count">
     <item quantity="one">Приостановить %1$d загрузку</item>
@@ -172,11 +172,11 @@
     <item quantity="other">Повторить %1$d загрузки с ошибкой</item>
   </plurals>
   <string name="palette_nothing_failed">Ошибок нет</string>
-  <string name="palette_slow_lane_off">Выключить медленную полосу</string>
-  <string name="palette_slow_lane_on">Включить медленную полосу</string>
+  <string name="palette_slow_lane_off">Выключить режим низкой скорости</string>
+  <string name="palette_slow_lane_on">Включить режим низкой скорости</string>
   <string name="palette_nothing_to_undo">Нечего отменять</string>
   <string name="palette_full_speed">Полная скорость</string>
-  <string name="palette_full_speed_slow_lane">Выключает медленную полосу</string>
+  <string name="palette_full_speed_slow_lane">Выключает режим низкой скорости</string>
   <string name="palette_full_speed_rules">Выключает правила скорости</string>
   <string name="palette_full_speed_cap">Снимает ограничение %1$s</string>
   <string name="palette_full_speed_already">Уже полная скорость</string>

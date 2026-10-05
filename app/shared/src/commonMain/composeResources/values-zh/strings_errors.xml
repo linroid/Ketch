@@ -38,7 +38,7 @@
   <string name="error_wrong_credentials">用户名或密码错误</string>
   <string name="error_wrong_credentials_hint">%1$s 服务器拒绝了登录。</string>
   <string name="error_wrong_credentials_hint_short">%1$s 服务器拒绝了登录</string>
-  <string name="error_torrent_stopped">种子已停止</string>
+  <string name="error_torrent_stopped">种子下载已停止</string>
   <string name="error_torrent_stopped_hint">没有可连接的节点或 Tracker。</string>
   <string name="error_torrent_stopped_hint_short">没有可连接的节点或 Tracker</string>
   <string name="error_source">%1$s 服务器报告了错误</string>
@@ -50,7 +50,7 @@
   <string name="error_http_sign_in_hint_server_short">服务器要求登录</string>
   <string name="error_http_forbidden">拒绝访问（403）</string>
   <string name="error_http_forbidden_hint">链接可能已过期。</string>
-  <string name="error_http_forbidden_hint_browser">链接可能已过期。是从 %1$s 捕获的吗？请在网页上重新捕获。</string>
+  <string name="error_http_forbidden_hint_browser">链接可能已过期。如果链接来自 %1$s，请返回原网页重新发送到 Ketch。</string>
   <string name="error_http_forbidden_hint_short">链接可能已过期</string>
   <string name="error_browser_yours">你的浏览器</string>
   <string name="error_http_not_found">找不到文件（%1$d）</string>
