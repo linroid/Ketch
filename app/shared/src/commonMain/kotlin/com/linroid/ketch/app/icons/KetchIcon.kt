@@ -92,8 +92,7 @@ enum class KetchIcon(internal val data: IconData) {
   // Sidebar nav
   All(IconData.strokes("M4 6h12", "M4 10h12", "M4 14h8")),
   Active(IconData.strokes(
-    "M10 2.5v10", "M6.5 9L10 12.5L13.5 9",
-    "M3.5 13.5v2.5a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-2.5"
+    DOWNLOAD_ARROW, DOWNLOAD_TRAY
   )),
   Queued(IconData.strokes(CIRCLE, "M10 6v4l3 2")),
   Scheduled(IconData.strokes(
@@ -105,19 +104,12 @@ enum class KetchIcon(internal val data: IconData) {
   Failed(IconData.strokes(CIRCLE, "M7.5 7.5l5 5", "M12.5 7.5l-5 5")),
 
   // Navigation
+  // A lookout's telescope catching a star; the renderer animates its barrel and spark.
   Discover(IconData.paths(
-    stroke = listOf("M8.5 2.5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z", "M12.9 12.9l4.1 4.1"),
-    fill = listOf(
-      "M8.5 5.5C8.9 7.6 9.4 8.1 11.5 8.5C9.4 8.9 8.9 9.4 8.5 11.5" +
-        "C8.1 9.4 7.6 8.9 5.5 8.5C7.6 8.1 8.1 7.6 8.5 5.5Z"
-    ),
+    stroke = listOf(DISCOVER_STAND, DISCOVER_BARREL, DISCOVER_EYEPIECE),
+    fill = listOf(DISCOVER_SPARK),
   )),
-  Devices(IconData.strokes(
-    "M15 5.5V5A1.5 1.5 0 0 0 13.5 3.5h-10A1.5 1.5 0 0 0 2 5v6.5A1.5 1.5 0 0 0 3.5 13H10",
-    "M7 13v3.5", "M5 16.5h4",
-    "M13.7 8h3.1A1.2 1.2 0 0 1 18 9.2v7.1a1.2 1.2 0 0 1 -1.2 1.2h-3.1a1.2 1.2 0 0 1 -1.2-1.2" +
-      "V9.2A1.2 1.2 0 0 1 13.7 8z"
-  )),
+  Devices(IconData.strokes(DEVICES_DISPLAY, DEVICES_PHONE)),
   Bell(IconData.strokes("M5 12.5V8a5 5 0 0 1 10 0v4.5l1.5 2h-13z", "M8 16.5a2 2 0 0 0 4 0")),
   Command(IconData.strokes(
     "M12.5 5v10a2.5 2.5 0 1 0 2.5-2.5H5a2.5 2.5 0 1 0 2.5 2.5V5a2.5 2.5 0 1 0 -2.5 2.5" +
