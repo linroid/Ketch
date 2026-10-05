@@ -60,6 +60,12 @@ ext.tabs?.onRemoved.addListener((id) => {
 });
 
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('popup/')) &&
+    message?.type === 'review-open') {
+    openReview(message.instanceId, message.download).then(() => sendResponse({ ok: true }),
+      (error) => sendResponse({ ok: false, message: error.message }));
+    return true;
+  }
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('review/')) &&
     ['review-send', 'review-cancel'].includes(message?.type)) {
     const action = message.type === 'review-send'

@@ -9,7 +9,6 @@ import { describeStatus, describeTaskState, failureHint, taskName } from '../lib
 import { sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
-import { openReview } from '../lib/review.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
 import { findInstance, loadSettings, saveSettings } from '../lib/settings.js';
 
@@ -216,7 +215,9 @@ async function onAdd(event) {
   try {
     const current = await loadSettings();
     if (current.confirmDownloads) {
-      await openReview(instance.id, { url });
+      const response = await ext.runtime.sendMessage({ type: 'review-open',
+        instanceId: instance.id, download: { url } });
+      if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
       window.close();
       return;
     }

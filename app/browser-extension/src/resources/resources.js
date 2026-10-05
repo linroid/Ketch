@@ -2,7 +2,7 @@ import { ext } from '../lib/ext.js';
 import { cookieStoreIdForTab, sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { collectPageResources, mergePageResources } from '../lib/page-resources.js';
-import { reviewDestination } from '../lib/review.js';
+import { resourceDestination } from '../lib/review.js';
 import { loadSettings } from '../lib/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -95,8 +95,7 @@ async function sendSelected() {
           target.token !== instance.token) throw new Error(t('resources_unavailable'));
         await sendToKetch(target, { url: resource.url, referrer: resource.pageUrl,
           fileName: resource.name || undefined, cookieStoreId,
-          destination: reviewDestination({ url: resource.url, fileName: resource.name },
-            resource.kind === 'stream' ? '' : resource.name, $('folder').value) }, current);
+          destination: resourceDestination(resource, $('folder').value) }, current);
         submitted.add(resource.url);
         box.disabled = true;
         box.checked = false;
