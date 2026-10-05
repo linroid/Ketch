@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "Cookies und Referrer für diesen Server erlauben"
+  },
+  "resources_title": {
+    "message": "Seitenressourcen"
+  },
+  "resources_detail": {
+    "message": "Wähle Dateien, die auf der Seite sichtbar oder geladen sind. Scrolle oder spiele Medien auf der ursprünglichen Seite ab und scanne erneut. Streaming-Wiedergabelisten sind nicht enthalten."
+  },
+  "resources_images": {
+    "message": "Bilder"
+  },
+  "resources_video": {
+    "message": "Video"
+  },
+  "resources_audio": {
+    "message": "Audio"
+  },
+  "resources_files": {
+    "message": "Dateien"
+  },
+  "resources_scan": {
+    "message": "Erneut scannen"
+  },
+  "resources_select": {
+    "message": "Sichtbare Ressourcen auswählen"
+  },
+  "resources_send": {
+    "message": "Auswahl herunterladen"
+  },
+  "resources_empty": {
+    "message": "Keine direkten Dateien gefunden. Scrolle oder spiele Medien ab und scanne erneut."
+  },
+  "resources_unavailable": {
+    "message": "Diese Seite kann nicht gescannt werden. Öffne eine normale Website in einem nicht privaten Tab und versuche es erneut."
   }
 }

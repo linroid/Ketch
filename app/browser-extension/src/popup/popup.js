@@ -56,6 +56,12 @@ async function init() {
     ext.storage.local.set({ [SHOWN_INSTANCE_KEY]: event.target.value });
   });
   $('capture').addEventListener('change', onCaptureChanged);
+  $('page-resources').addEventListener('click', async () => {
+    const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
+    if (!Number.isInteger(tab?.id)) return;
+    await ext.tabs.create({ url: ext.runtime.getURL(`resources/resources.html?tab=${tab.id}`) });
+    window.close();
+  });
   $('add-form').addEventListener('submit', onAdd);
   $('tasks').addEventListener('click', onTaskAction);
   $('open-app').addEventListener('click', onOpenApp);
