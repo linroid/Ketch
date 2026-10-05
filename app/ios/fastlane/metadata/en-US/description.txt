@@ -1,0 +1,30 @@
+Ketch is a fast, open-source download manager. It splits every download across parallel connections, shows each one as a live lane, and lets you control the downloads on your computers and home server from your iPhone or iPad.
+
+FASTER DOWNLOADS
+• Parallel connections: Ketch downloads several ranges of a file at once and shows the speed of each. Add or remove connections while a download runs.
+• Pause and resume, even after a restart. Ketch checks that the file on the server has not changed before it continues, and retries failed connections on its own.
+• On iOS 26 and later, downloads you start keep running in the background.
+
+WEB AND FTP LINKS
+• HTTP and HTTPS, and FTP and FTPS with parallel connections and resume
+• Paste one link or many: Ketch reads each file's name and size before it starts
+• Finished files are in the Files app, under On My iPhone › Ketch, ready to open or share
+
+ALL YOUR DEVICES IN ONE APP
+• Pair the Ketch desktop app on a Mac, Windows or Linux computer, or a home server running Ketch, by scanning a QR code with your camera
+• See every device with its live speed, and add, pause or resume downloads on any of them
+• Send a download to another device, or list the downloads of every device in one place
+
+IN CONTROL OF YOUR BANDWIDTH
+• Speed modes: Full speed, a Slow lane that leaves room for calls and streaming, or Auto, which switches between them on a weekly schedule
+• Speed limits, connection counts and priorities per download, changed while it runs. Urgent starts a download right away.
+• A queue that limits how many downloads run at once, and downloads that start at a time you pick
+
+MADE FOR IPAD TOO
+• A sidebar with every device, the downloads table and a details panel side by side
+
+PRIVATE BY DESIGN
+• No account, no ads, no tracking. Ketch has no servers of its own: it connects only to the sites you download from and the devices you pair.
+• Open source under the Apache 2.0 license: https://github.com/linroid/Ketch
+
+Light and dark themes, in English, 简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français and Русский.

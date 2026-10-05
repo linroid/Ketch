@@ -144,6 +144,12 @@ internal enum class PhoneKind {
 }
 
 /**
+ * The look of a phone's body: a graphite or silver metal band around a black bezel, or [Clay], a
+ * matte light body all the way to the screen, as product mockups draw it.
+ */
+internal enum class PhoneFinish { Graphite, Silver, Clay }
+
+/**
  * Proportions of a [PhoneKind], in dp of its screen.
  *
  * @property bezel black border around the screen.
@@ -182,8 +188,8 @@ internal data class PhoneGeometry(
 
 /**
  * A phone of [kind] showing [screen], a capture of a [screenWidth] by [screenHeight] dp screen,
- * drawn [scale] showcase units per dp. The status bar reads [time] in [ink], the color of the
- * app's text.
+ * drawn [scale] showcase units per dp, its body in [finish] with the bezel and band of
+ * [geometry]. The status bar reads [time] in [ink], the color of the app's text.
  */
 @Composable
 internal fun Phone(
@@ -195,9 +201,10 @@ internal fun Phone(
   ink: Color,
   dark: Boolean,
   time: String,
+  finish: PhoneFinish = PhoneFinish.Graphite,
+  geometry: PhoneGeometry = PhoneGeometry.of(kind),
   modifier: Modifier = Modifier,
 ) {
-  val geometry = PhoneGeometry.of(kind)
   val edge = geometry.bezel + geometry.frame
   val bodyRadius = (geometry.screenRadius + edge) * scale
   val bodyShape = RoundedCornerShape(bodyRadius)
@@ -210,16 +217,16 @@ internal fun Phone(
       .size(width, height)
       .deviceShadow(bodyShape, dark)
       .clip(bodyShape)
-      .background(frameBrush(kind, dark), bodyShape),
+      .background(frameBrush(kind, dark, finish), bodyShape),
   ) {
     // The band's bright edge, as light catches the metal.
-    Box(Modifier.fillMaxSize().border((1.2f * scale).dp, frameEdge(dark), bodyShape))
+    Box(Modifier.fillMaxSize().border((1.2f * scale).dp, frameEdge(dark, finish), bodyShape))
     Box(
       Modifier
         .padding(geometry.frame * scale)
         .fillMaxSize()
         .clip(innerShape)
-        .background(Bezel, innerShape),
+        .background(if (finish == PhoneFinish.Clay) ClayBezel else Bezel, innerShape),
     )
     Box(
       Modifier
@@ -229,18 +236,28 @@ internal fun Phone(
     ) {
       ScreenImage(screen, Modifier.fillMaxSize())
       Box(Modifier.nativeScale(screenWidth, screenHeight, scale)) {
-        when (kind) {
-          PhoneKind.Android -> AndroidChrome(geometry, ink, time)
-          PhoneKind.Ios -> IosChrome(geometry, ink, time)
-        }
+        PhoneChrome(kind, ink, time)
       }
     }
   }
 }
 
+/**
+ * What a phone of [kind] draws over the app, in screen dp: the status bar reading [time] in
+ * [ink] and the gesture handle, with the camera cutout when [cutout] is set.
+ */
+@Composable
+internal fun PhoneChrome(kind: PhoneKind, ink: Color, time: String, cutout: Boolean = true) {
+  val geometry = PhoneGeometry.of(kind)
+  when (kind) {
+    PhoneKind.Android -> AndroidChrome(geometry, ink, time, cutout)
+    PhoneKind.Ios -> IosChrome(geometry, ink, time, cutout)
+  }
+}
+
 /** The punch-hole camera, the status bar and the gesture handle, in screen dp. */
 @Composable
-private fun AndroidChrome(geometry: PhoneGeometry, ink: Color, time: String) {
+private fun AndroidChrome(geometry: PhoneGeometry, ink: Color, time: String, cutout: Boolean) {
   Box(Modifier.fillMaxSize()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -253,14 +270,16 @@ private fun AndroidChrome(geometry: PhoneGeometry, ink: Color, time: String) {
       Spacer(Modifier.weight(1f))
       StatusGlyphs(ink, wedgeSignal = true, verticalBattery = true)
     }
-    Box(
-      Modifier
-        .align(Alignment.TopCenter)
-        .offset(y = 11.dp)
-        .size(12.dp)
-        .clip(CircleShape)
-        .background(Lens),
-    )
+    if (cutout) {
+      Box(
+        Modifier
+          .align(Alignment.TopCenter)
+          .offset(y = 11.dp)
+          .size(12.dp)
+          .clip(CircleShape)
+          .background(Lens),
+      )
+    }
     Box(
       Modifier
         .align(Alignment.BottomCenter)
@@ -274,7 +293,7 @@ private fun AndroidChrome(geometry: PhoneGeometry, ink: Color, time: String) {
 
 /** The pill cutout, the status bar either side of it and the home indicator, in screen dp. */
 @Composable
-private fun IosChrome(geometry: PhoneGeometry, ink: Color, time: String) {
+private fun IosChrome(geometry: PhoneGeometry, ink: Color, time: String, cutout: Boolean) {
   Box(Modifier.fillMaxSize()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -287,14 +306,16 @@ private fun IosChrome(geometry: PhoneGeometry, ink: Color, time: String) {
       Spacer(Modifier.weight(1f))
       StatusGlyphs(ink, wedgeSignal = false, verticalBattery = false)
     }
-    Box(
-      Modifier
-        .align(Alignment.TopCenter)
-        .offset(y = 11.dp)
-        .size(width = 106.dp, height = 32.dp)
-        .clip(CircleShape)
-        .background(Lens),
-    )
+    if (cutout) {
+      Box(
+        Modifier
+          .align(Alignment.TopCenter)
+          .offset(y = 11.dp)
+          .size(width = 106.dp, height = 32.dp)
+          .clip(CircleShape)
+          .background(Lens),
+      )
+    }
     Box(
       Modifier
         .align(Alignment.BottomCenter)
@@ -307,7 +328,7 @@ private fun IosChrome(geometry: PhoneGeometry, ink: Color, time: String) {
 }
 
 @Composable
-private fun StatusTime(time: String, ink: Color, size: Int) {
+internal fun StatusTime(time: String, ink: Color, size: Int) {
   Text(
     text = time,
     color = ink,
@@ -317,7 +338,7 @@ private fun StatusTime(time: String, ink: Color, size: Int) {
 
 /** Signal, Wi-Fi and battery, drawn as plain shapes without numbers. */
 @Composable
-private fun StatusGlyphs(ink: Color, wedgeSignal: Boolean, verticalBattery: Boolean) {
+internal fun StatusGlyphs(ink: Color, wedgeSignal: Boolean, verticalBattery: Boolean) {
   Row(
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -503,15 +524,23 @@ internal fun TerminalWindow(
   }
 }
 
-private fun frameBrush(kind: PhoneKind, dark: Boolean): Brush {
+/** The metal band of a phone of [kind] in [finish], a little lighter on a [dark] canvas. */
+internal fun frameBrush(kind: PhoneKind, dark: Boolean, finish: PhoneFinish): Brush {
+  if (finish == PhoneFinish.Silver) return Brush.verticalGradient(listOf(SilverTop, SilverBottom))
+  if (finish == PhoneFinish.Clay) return Brush.verticalGradient(listOf(ClayTop, ClayBottom))
   val lift = if (dark) 0.06f else 0f
   val top = if (kind == PhoneKind.Ios) Color(0xFF4A4F59) else Color(0xFF3A3E46)
   val bottom = if (kind == PhoneKind.Ios) Color(0xFF2A2D33) else Color(0xFF23262B)
   return Brush.verticalGradient(listOf(lighten(top, lift), lighten(bottom, lift)))
 }
 
-private fun frameEdge(dark: Boolean): Color =
-  if (dark) Color(0xFF6A717E) else Color(0xFF5A606B)
+/** The bright edge of a band in [finish], as light catches the metal. */
+internal fun frameEdge(dark: Boolean, finish: PhoneFinish): Color = when {
+  finish == PhoneFinish.Silver -> SilverEdge
+  finish == PhoneFinish.Clay -> ClayEdge
+  dark -> Color(0xFF6A717E)
+  else -> Color(0xFF5A606B)
+}
 
 private fun lighten(color: Color, amount: Float): Color = Color(
   red = color.red + (1 - color.red) * amount,
@@ -521,6 +550,13 @@ private fun lighten(color: Color, amount: Float): Color = Color(
 )
 
 private val ShadowInk = Color(0xFF0F172A)
+private val SilverTop = Color(0xFFE6E9ED)
+private val SilverBottom = Color(0xFFB4BAC3)
+private val SilverEdge = Color(0xFFF7F8FA)
+private val ClayTop = Color(0xFFF9FAFB)
+private val ClayBottom = Color(0xFFE3E6EB)
+private val ClayBezel = Color(0xFFF1F3F6)
+private val ClayEdge = Color(0xFFFFFFFF)
 private val Bezel = Color(0xFF07080A)
 private val Lens = Color(0xFF050506)
 private const val DARK_SHADOW = 2.4f

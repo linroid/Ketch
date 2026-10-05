@@ -1,0 +1,11 @@
+Ketch is a download manager. It needs no account or login, and every feature works on this device alone.
+
+To try it:
+1. Tap Add, paste a link to a large file and tap Download. Any large public file works, for example an asset of https://github.com/linroid/Ketch/releases/latest (copy the link of a .dmg or .msi file).
+2. Tap the download to open its details, then the Connections tab to see its parallel connections, each with its own speed. Pause and resume it from the same sheet.
+3. Finished files appear in the Files app under On My iPhone › Ketch.
+4. Settings › Speed shows the speed modes and their weekly schedule.
+
+Pairing with other devices (Devices › Add device) is optional. It needs a computer running the Ketch desktop app, or a server running "ketch server", on the same network. The Local Network permission is only used to find those devices.
+
+Ketch has no servers of its own and collects no data. It is open source: https://github.com/linroid/Ketch

@@ -1,0 +1,7 @@
+First release on Google Play:
+• Parallel downloads with a live lane per connection
+• Pause and resume that survive restarts
+• Links, FTP, torrents and magnet links
+• Speed modes with a weekly schedule
+• Control Ketch on your computers and home server
+• Discover: find downloads with AI (preview)

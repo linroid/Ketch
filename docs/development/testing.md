@@ -142,6 +142,14 @@ background. The run also writes `-desktop`, `-android`, `-ios` and `-2x` files t
 the two images are committed. Regenerate them when a release changes the UI, not on every UI
 commit.
 
+The app store screenshots and the Play feature graphic are the `StoreScreenshots` scenario: the
+real app on a framed iPhone, iPad, Android phone and Android tablet under English captions, at the
+exact size each store takes and without an alpha channel. `art/render-store-assets.sh` renders
+them (about 8 minutes) and copies them into the fastlane folders of `app/android` and `app/ios`;
+the scenario makes the app name the device as a phone or tablet would (`localDeviceKindOverride`)
+and write its shortcuts with that platform's keys (`KeyboardPlatform.override`). See
+[app store listings](../app-store-listing.md).
+
 ## Other Suites
 
 - iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless

@@ -8,6 +8,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
+import kotlin.concurrent.Volatile
 
 /**
  * Keyboard conventions: which key [KeyChord.primary] stands for, how chords are printed and
@@ -31,7 +32,16 @@ enum class KeyboardPlatform(val isApple: Boolean, val isWeb: Boolean) {
 
   companion object {
     /** The conventions of the device the app runs on. */
-    val current: KeyboardPlatform by lazy { detectKeyboardPlatform() }
+    val current: KeyboardPlatform get() = override ?: detected
+
+    /**
+     * Conventions [current] reports instead of the device's, for snapshots that render the app
+     * as it looks on another platform; `null` reports the device's.
+     */
+    @Volatile
+    internal var override: KeyboardPlatform? = null
+
+    private val detected: KeyboardPlatform by lazy { detectKeyboardPlatform() }
   }
 }
 
