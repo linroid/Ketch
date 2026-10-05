@@ -7,7 +7,7 @@ links and page resources to a configured server.
 
 - **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
   can't be reached, the browser downloads them as usual.
-- **Context menu**: right-click and open **Ketch** to toggle **Pause automatic capture**. On a
+- **Context menu**: right-click and open **Ketch → Page resources** to scan the page. On a
   link, image, video or audio, choose **Download link with Ketch** (or image, video, audio) in
   that menu. With several Ketch instances, a submenu lets you pick one.
 - **Download directly**: choose **Ketch → Download directly** on an HTTP(S) link, image, video
@@ -118,7 +118,6 @@ or resumes it. If Firefox is set to ask where to save each file, that dialog app
 Downloads are left to the browser when:
 
 - capturing is turned off (in the popup or the settings page);
-- automatic capture is temporarily paused in the popup;
 - they come from a private window;
 - the link only exists in the browser (`blob:`, `data:`), as with media a page streams itself;
 - they come from a site in the exclusion list, or from a configured Ketch instance itself;
@@ -133,18 +132,16 @@ files served through a CDN still respect the originating site's exclusion. Reque
 kept in memory for at most 30 seconds and 512 requests; it contains no request bodies or headers.
 If the browser did not expose a request method, capture cannot establish whether it was a POST.
 
-Choose **Pause until resumed** in the popup to temporarily leave downloads and magnet links to
-the browser. Capture stays paused until you choose **Resume now**, including after closing the
-popup or restarting the browser. You can also check or uncheck **Ketch → Pause automatic
-capture** in the right-click menu; both controls share the same pause state. It preserves your
-capture preferences; context-menu download actions and pasted links still send to Ketch.
+Turn off **Capture browser downloads** in the popup to leave downloads to the browser.
+Magnet capture has its own switch in settings.
 
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
 the file name in Ketch's download folder; Ketch picks a free name if it is taken.
 
 ## Page resources
 
-Choose **Page resources** in the popup to scan the active website on demand. The picker lists
+Choose **Page resources** in the popup or **Ketch → Page resources** in the right-click menu
+to scan that website on demand. The picker lists
 images, ordinary audio/video URLs and direct file links from accessible frames and resources
 already loaded by the page. It does not fetch candidates, start playback, or transmit page data
 to Ketch while scanning. Private and browser-internal pages cannot be scanned.
@@ -186,10 +183,10 @@ Nothing is sent anywhere except to the Ketch instances you add.
 |---|---|
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
 | `nativeMessaging` | Reach and open the Ketch app on this computer |
-| `scripting`, `activeTab` | Scan page resources when requested from the popup |
+| `scripting`, `activeTab` | Scan page resources from the popup or context menu |
 | `webRequest` | Observe request methods and source pages for capture rules; no bodies or headers |
 | `cookies` | Send a site's cookies to Ketch so downloads that need a session work |
-| `contextMenus` | The **Download … with Ketch** menu items |
+| `contextMenus` | Download actions and the **Page resources** entry |
 | `notifications` | Tell you when a download was sent, or why it wasn't |
 | `storage` | Settings, including instance addresses and access tokens |
 | Access to all sites | Read cookies for any download, see magnet link clicks, and reach Ketch at any address |

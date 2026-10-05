@@ -5,11 +5,6 @@
  */
 
 import { FailureKind } from './lib/ketch-client.js';
-import {
-  CAPTURE_PAUSED_KEY,
-  loadCapturePause,
-  setCapturePaused,
-} from './lib/capture-pause.js';
 import { ext, remoteOnly } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
@@ -43,13 +38,6 @@ ext.runtime.onInstalled.addListener(async ({ reason }) => {
 ext.runtime.onStartup.addListener(async () => rebuildMenus(await loadSettings()));
 
 onSettingsChanged((settings) => rebuildMenus(settings));
-
-ext.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes[CAPTURE_PAUSED_KEY]) return;
-  loadSettings().then(rebuildMenus).catch((error) => {
-    console.error('Ketch: could not update the capture menu', error);
-  });
-});
 
 ext.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((error) => console.error('Ketch: menu action failed', error));
@@ -121,15 +109,14 @@ async function captureDownload(item, gate) {
     console.error('Ketch: could not give the download back to the browser', error);
   });
   let settings;
-  let capturePaused;
   try {
-    [settings, capturePaused] = await Promise.all([loadSettings(), loadCapturePause()]);
+    settings = await loadSettings();
   } catch (error) {
     console.error('Ketch: could not load settings', error);
     return release();
   }
   const decision = captureDecision(
-    requestContext.forDownload(item), settings, ext.runtime.id, capturePaused);
+    requestContext.forDownload(item), settings, ext.runtime.id);
   if (!decision.capture) {
     console.debug(`Ketch: leaving download ${item.id} to the browser: ${decision.reason}`);
     return release();
@@ -187,7 +174,6 @@ async function removeBrowserDownload(downloadId) {
 }
 
 async function handleMagnet(url) {
-  if (await loadCapturePause()) return { handled: false };
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
   const instance = findInstance(settings);
@@ -207,8 +193,11 @@ async function handleMagnet(url) {
 }
 
 async function handleMenuClick(info, tab) {
-  if (info.menuItemId === 'pause-capture') {
-    await setCapturePaused(info.checked);
+  if (info.menuItemId === 'page-resources') {
+    if (!Number.isInteger(tab?.id) || tab.id < 0) return;
+    await ext.tabs.create({
+      url: ext.runtime.getURL(`resources/resources.html?tab=${tab.id}`),
+    });
     return;
   }
   if (info.menuItemId === 'download-directly') {
@@ -277,16 +266,14 @@ let menuUpdate = Promise.resolve();
  */
 function rebuildMenus(settings) {
   menuUpdate = menuUpdate.then(async () => {
-    const capturePaused = await loadCapturePause();
     await ext.contextMenus.removeAll();
     await createMenu({ id: 'ketch', title: 'Ketch', contexts: ['all'] });
-    if (!remoteOnly) await createMenu({
-      id: 'pause-capture',
+    await createMenu({
+      id: 'page-resources',
       parentId: 'ketch',
-      title: t('menu_pause_capture'),
-      type: 'checkbox',
-      checked: capturePaused,
+      title: t('resources_title'),
       contexts: ['all'],
+      documentUrlPatterns: ['http://*/*', 'https://*/*'],
     });
     if (!remoteOnly) await createMenu({
       id: 'download-directly',

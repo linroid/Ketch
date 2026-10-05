@@ -84,18 +84,6 @@ body {
   flex-direction: column;
 }
 
-.capture-pause {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 8px 12px 0;
-}
-
-.capture-pause p {
-  margin: 0;
-}
-
 .recent h2 {
   margin: 14px 12px 4px;
   color: var(--text-sec);

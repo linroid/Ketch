@@ -547,24 +547,6 @@
   "error_handoff_uncertain": {
     "message": "Ketch可能已接受此下载。请先在扩展设置中检查待确认的下载，再重试或在浏览器中继续。"
   },
-  "popup_pause_capture": {
-    "message": "暂停直到手动恢复"
-  },
-  "popup_resume_capture": {
-    "message": "立即恢复"
-  },
-  "popup_pause_detail": {
-    "message": "暂时由浏览器处理下载和磁力链接。"
-  },
-  "popup_capture_pause_failed": {
-    "message": "无法更改暂停状态，请重试。"
-  },
-  "popup_capture_paused": {
-    "message": "自动捕获已暂停，直到您手动恢复。"
-  },
-  "menu_pause_capture": {
-    "message": "暂停自动捕获"
-  },
   "menu_download_directly": {
     "message": "直接下载"
   },
