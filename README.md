@@ -10,12 +10,14 @@
 
 <p align="center">
   <b>A fast, open-source download manager for every device you own.</b><br>
-  macOS · Windows · Linux · Android · iOS · Web · Command line
+  macOS · Windows · Linux · Android · iOS · Web · Command line<br>
+  A Kotlin Multiplatform library you can embed in your own application.
 </p>
 
 <p align="center">
 
 [![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web app](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
@@ -42,6 +44,10 @@
 Ketch splits every download across parallel connections, and shows each one as a live lane. It
 takes web links, FTP servers, torrents and magnet links in one place. Pair your laptop, phone and
 home server, and you can watch and control the downloads on all of them from any one of them.
+
+**Building your own app?** Embed the same download engine that powers Ketch's apps, with parallel
+downloads, pause and resume, queues and speed limits. The Kotlin Multiplatform library is
+available on Maven Central. [Start integrating Ketch →](docs/developers.md#quick-start)
 
 > [!WARNING]
 > 🚧 Ketch is in active development and only has release candidates so far. Expect rough edges,
@@ -211,9 +217,13 @@ the [CLI documentation](cli/README.md) lists every command.
 
 ## For developers
 
-Everything the apps do is built on Ketch's Kotlin Multiplatform library, which you can use in your
-own app: embed the download engine on Android, iOS, the JVM, Node.js or WASI, or control a Ketch
-server from Android, iOS, the JVM or the browser, through the same `KetchApi`.
+**Embed Ketch in your application.** Its Kotlin Multiplatform library gives you the same download
+engine used by the Ketch apps, with your own UI and application logic. Add the modules you need
+from Maven Central under `com.linroid.ketch`.
+
+Run the engine inside your Android, iOS or JVM app with `core` and `ktor`; Node.js and WASI can
+use `core` with a custom HTTP engine. Or use `remote` to control a Ketch server from Android,
+iOS, the JVM or the browser through the same `KetchApi`.
 
 - [Developer guide](docs/developers.md) — Modules, a quick start, the REST API and extending Ketch
 - [API reference](docs/api.md) — Installation, configuration, priorities, errors and logging
