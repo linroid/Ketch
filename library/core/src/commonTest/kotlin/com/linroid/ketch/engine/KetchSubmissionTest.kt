@@ -1,5 +1,8 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -9,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration.Companion.seconds
 
 class KetchSubmissionTest {
   private val request = DownloadRequest(
@@ -35,13 +39,28 @@ class KetchSubmissionTest {
   fun download_afterStoreRestart_returnsRetainedTask() = runTest {
     val store = InMemoryTaskStore()
     val first = Ketch(httpEngine = FakeHttpEngine(), taskStore = store)
-    val taskId = first.download(request).taskId
+    val task = first.download(request)
+    val taskId = task.taskId
+    task.setConnections(3)
+    task.setSpeedLimit(SpeedLimit.of(1024))
+    task.setPriority(DownloadPriority.HIGH)
+    task.reschedule(DownloadSchedule.AfterDelay(60.seconds))
+    assertEquals(taskId, first.download(request).taskId)
+    assertEquals(3, task.request.connections)
+    assertEquals(SpeedLimit.of(1024), task.request.speedLimit)
+    assertEquals(DownloadPriority.HIGH, task.request.priority)
     first.close()
     val next = Ketch(httpEngine = FakeHttpEngine(), taskStore = store)
     try {
       next.start()
       assertEquals(taskId, next.download(request).taskId)
       assertEquals(1, store.loadAll().size)
+      assertEquals(3, next.tasks.value.single().request.connections)
+      assertEquals(SpeedLimit.of(1024), next.tasks.value.single().request.speedLimit)
+      assertEquals(DownloadPriority.HIGH, next.tasks.value.single().request.priority)
+      assertFailsWith<IllegalArgumentException> {
+        next.download(request.copy(headers = mapOf("Cookie" to "different")))
+      }
     } finally {
       next.close()
     }
