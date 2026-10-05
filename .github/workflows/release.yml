@@ -216,18 +216,34 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # The JDK the app bundles (desktopJavaHome below).
       - uses: actions/setup-java@v5
+        id: jdk
         with:
           distribution: temurin
           java-version: 21
 
+      # JDK-8371740, a LinkedTransferQueue race fixed only in JDK 26, makes Gradle on Windows ARM64
+      # often fail once the build is done: a build event listener misses the end of its queue, and
+      # Gradle gives up after 60 s with "Timeout waiting for concurrent jobs to complete". Gradle
+      # runs on the JDK that launches it, so installing 21.0.1, the last build before the bug, last
+      # makes it Gradle's JDK there; the app still bundles the Temurin JDK above.
+      - uses: actions/setup-java@v5
+        if: matrix.os == 'windows' && matrix.arch == 'arm64'
+        with:
+          distribution: microsoft
+          java-version: 21.0.1
+
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build desktop package
+        env:
+          DESKTOP_JAVA_HOME: ${{ steps.jdk.outputs.path }}
         run: >
           ./gradlew :app:desktop:${{ matrix.task }}
           ${{ matrix.portable && ':app:desktop:packageReleasePortableZip' || '' }}
           -PVERSION_NAME=${KETCH_VERSION#v}
+          "-PdesktopJavaHome=$DESKTOP_JAVA_HOME"
 
       # jpackage marks every MSI as x64, yet the ARM64 one carries jpackage's ARM64 custom action
       # DLL. Windows Installer runs it in an x64 host, which can't load it, so installing fails
