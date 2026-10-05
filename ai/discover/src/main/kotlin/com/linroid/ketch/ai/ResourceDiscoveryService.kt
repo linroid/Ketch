@@ -2,9 +2,20 @@ package com.linroid.ketch.ai
 
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.config.AIAgentConfig
+import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
+import ai.koog.agents.core.agent.entity.AIAgentNodeBase
+import ai.koog.agents.core.dsl.builder.strategy
+import ai.koog.agents.core.dsl.extension.asUserMessage
+import ai.koog.agents.core.dsl.extension.nodeExecuteTools
+import ai.koog.agents.core.dsl.extension.nodeLLMRequest
+import ai.koog.agents.core.dsl.extension.nodeLLMSendMessage
+import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
+import ai.koog.agents.core.dsl.extension.onTextMessage
+import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.message.Message
 import ai.koog.prompt.params.LLMParams
 import com.linroid.ketch.ai.agent.AgentOutputParser
 import com.linroid.ketch.ai.agent.DeviceSafetyFilter
@@ -172,6 +183,7 @@ class ResourceDiscoveryService internal constructor(
         model = llm.model,
         maxAgentIterations = agentIterations(config.agent.maxToolCalls),
       ),
+      strategy = discoveryStrategy(outputParser::hasAnswer),
       toolRegistry = ToolRegistry { tools(toolSet.tools()) },
     )
 
@@ -407,6 +419,14 @@ class ResourceDiscoveryService internal constructor(
     /** Rounds of tool calls the agent may make after its tool budget is spent. */
     private const val WRAP_UP_ROUNDS = 3
 
+    /** Times a run reminds the agent to answer when it replies with neither tools nor JSON. */
+    internal const val MAX_ANSWER_REMINDERS = 2
+
+    /** Sent when the agent replies with neither a tool call nor its JSON answer. */
+    internal const val ANSWER_REMINDER = "Your last reply has no tool call and no JSON answer." +
+      " If you are still searching, call the next tool now. Otherwise return only the JSON" +
+      " object described in OUTPUT."
+
     /** Earlier turns replayed to the agent: the first and the latest ones. */
     private const val MAX_REPLAYED_TURNS = 6
 
@@ -437,9 +457,48 @@ class ResourceDiscoveryService internal constructor(
      * Koog counts every node the agent passes: the start, the first request and the finish, and
      * two per round of tool calls (running them and sending back their results). A round holds
      * one call or more, and [WRAP_UP_ROUNDS] more let the agent answer once the budget is spent.
+     * Each of the [MAX_ANSWER_REMINDERS] reminders adds one.
      */
     internal fun agentIterations(maxToolCalls: Int): Int =
-      3 + 2 * (maxToolCalls + WRAP_UP_ROUNDS)
+      3 + 2 * (maxToolCalls + WRAP_UP_ROUNDS) + MAX_ANSWER_REMINDERS
+
+    /**
+     * Koog's single-run loop, except that a reply holding neither tool calls nor an answer (as
+     * [hasAnswer] reads it) does not end the run. Some models, such as GLM, narrate what they
+     * will do next ("Now let me check…") without calling a tool; Koog took that for the final
+     * answer, which had no candidates. Such a reply gets [ANSWER_REMINDER], up to
+     * [MAX_ANSWER_REMINDERS] times a run; after that, the reply ends the run as before.
+     */
+    internal fun discoveryStrategy(
+      hasAnswer: (String) -> Boolean,
+    ): AIAgentGraphStrategy<String, String> = strategy("ketch_discover") {
+      val nodeCallLLM by nodeLLMRequest()
+      val nodeExecuteTools by nodeExecuteTools()
+      val nodeSendToolResults by nodeLLMSendToolResults()
+      val nodeRemind by nodeLLMSendMessage()
+      var reminders = 0
+
+      fun routeReply(node: AIAgentNodeBase<*, Message.Assistant>) {
+        edge(node forwardTo nodeExecuteTools onToolCalls { true })
+        edge(
+          node forwardTo nodeFinish onTextMessage { true } onCondition { text ->
+            reminders >= MAX_ANSWER_REMINDERS || hasAnswer(text)
+          },
+        )
+        edge(
+          node forwardTo nodeRemind onTextMessage { true } asUserMessage {
+            reminders++
+            ANSWER_REMINDER
+          },
+        )
+      }
+
+      edge(nodeStart forwardTo nodeCallLLM)
+      edge(nodeExecuteTools forwardTo nodeSendToolResults)
+      routeReply(nodeCallLLM)
+      routeReply(nodeSendToolResults)
+      routeReply(nodeRemind)
+    }
 
     /**
      * The agent's instructions. With [contentFilter] the agent is also told to drop links the
