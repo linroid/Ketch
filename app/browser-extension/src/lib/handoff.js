@@ -90,6 +90,10 @@ export async function sendToKetch(instance, download, settings, options = {}) {
       const resolved = await client.resolveContent(torrentContent, download.fileName || undefined);
       request = buildDownloadRequest({ url: resolved.url, resolvedSource: resolved });
     }
+    if (Object.hasOwn(download, 'destination')) {
+      if (download.destination) request.destination = download.destination;
+      else delete request.destination;
+    }
     return submitDownload(client, receiptEndpoint(instance, endpoint), request, {
       browserDownloadId: download.browserDownloadId, browserUrl: url,
       recoverTasks: instance.type === 'app' ? () => withEndpoint(instance, (current) => {

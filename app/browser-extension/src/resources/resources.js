@@ -2,6 +2,7 @@ import { ext } from '../lib/ext.js';
 import { cookieStoreIdForTab, sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { collectPageResources, mergePageResources } from '../lib/page-resources.js';
+import { resourceDestination } from '../lib/review.js';
 import { loadSettings } from '../lib/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -79,7 +80,7 @@ async function sendSelected() {
   if (busy) return;
   const selected = [...document.querySelectorAll('#resources input:checked:not(:disabled)')];
   busy = true;
-  for (const id of ['scan', 'kind', 'instance', 'all', 'send']) $(id).disabled = true;
+  for (const id of ['scan', 'kind', 'instance', 'all', 'send', 'folder']) $(id).disabled = true;
   try {
     const settings = await loadSettings();
     const instance = settings.instances.find((it) => it.id === $('instance').value);
@@ -93,7 +94,8 @@ async function sendSelected() {
         if (!target || target.type !== instance.type || target.url !== instance.url ||
           target.token !== instance.token) throw new Error(t('resources_unavailable'));
         await sendToKetch(target, { url: resource.url, referrer: resource.pageUrl,
-          fileName: resource.name || undefined, cookieStoreId }, current);
+          fileName: resource.name || undefined, cookieStoreId,
+          destination: resourceDestination(resource, $('folder').value) }, current);
         submitted.add(resource.url);
         box.disabled = true;
         box.checked = false;
@@ -111,7 +113,7 @@ async function sendSelected() {
     $('status').textContent = error.message;
   } finally {
     busy = false;
-    for (const id of ['scan', 'kind', 'instance', 'all']) $(id).disabled = false;
+    for (const id of ['scan', 'kind', 'instance', 'all', 'folder']) $(id).disabled = false;
     updateSelection();
   }
 }

@@ -304,3 +304,15 @@ Streaming playlists in the resource picker require a server advertising `media.f
 Finite, unencrypted, single-stream HLS and static MP4 DASH are supported within the
 [media engine's documented limits](../../docs/media.md). Live or encrypted streams and
 separate tracks that require merging are rejected by the engine.
+
+Turn on **Review downloads before sending** to choose the receiving device, an optional file
+name, and a folder before each captured download, context-menu link, pasted link or magnet is
+sent. The folder belongs to the receiving device and remains subject to its server directory
+policy. Torrents retain their file layout. The page resource picker already reviews a batch
+and also has an optional destination folder.
+
+A captured browser download must pause successfully before the review opens. Canceling or
+closing an unsent review resumes it in the browser. Acceptance removes the browser original;
+an uncertain send keeps it paused until you check pending downloads in settings. Reviews and
+receipts last only for the browser session. After restarting the browser, inspect Ketch and
+the browser's downloads before manually resuming a paused original.

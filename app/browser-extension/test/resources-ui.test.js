@@ -34,13 +34,14 @@ test('batch send locks before awaiting storage and prevents a competing send or 
     tabs: { get: async () => ({ url: 'https://example.com/page' }) },
     scripting: { executeScript: async () => {
       scans++;
-      return [{ result: [{ url: 'https://example.com/file.zip', name: '', kind: 'file',
+      return [{ result: [{ url: 'https://example.com/file.zip', name: 'reports/file.pdf', kind: 'file',
         pageUrl: 'https://example.com/page' }] }];
     } },
   };
   globalThis.fetch = async (url, init) => {
     if (url.endsWith('/api/status')) return Response.json({ features: [] });
     assert.equal(init.method, 'POST');
+    assert.equal(JSON.parse(init.body).destination, 'file.pdf');
     writes++;
     return Response.json({ taskId: 'one', request: JSON.parse(init.body) });
   };

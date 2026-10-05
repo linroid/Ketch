@@ -213,7 +213,15 @@ async function onAdd(event) {
   }
   $('add-button').disabled = true;
   try {
-    const task = await sendToKetch(instance, { url }, settings, { timeoutMs: REQUEST_TIMEOUT_MS });
+    const current = await loadSettings();
+    if (current.confirmDownloads) {
+      const response = await ext.runtime.sendMessage({ type: 'review-open',
+        instanceId: instance.id, download: { url } });
+      if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
+      window.close();
+      return;
+    }
+    const task = await sendToKetch(instance, { url }, current, { timeoutMs: REQUEST_TIMEOUT_MS });
     input.value = '';
     showAddMessage(t('popup_added', taskName(task)), 'success');
     refresh();

@@ -14,6 +14,7 @@ import { ext } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
+import { openReview, sendReview, cancelReview, closeReviews } from './lib/review.js';
 import { RequestContext } from './lib/request-context.js';
 import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
@@ -54,7 +55,26 @@ ext.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((error) => console.error('Ketch: menu action failed', error));
 });
 
+ext.tabs?.onRemoved.addListener((id) => {
+  closeReviews(id).catch((error) => console.warn('Ketch: could not close review', error));
+});
+
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('popup/')) &&
+    message?.type === 'review-open') {
+    openReview(message.instanceId, message.download).then(() => sendResponse({ ok: true }),
+      (error) => sendResponse({ ok: false, message: error.message }));
+    return true;
+  }
+  if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('review/')) &&
+    ['review-send', 'review-cancel'].includes(message?.type)) {
+    const action = message.type === 'review-send'
+      ? sendReview(message.id, message.instanceId, message.fileName, message.folder)
+      : cancelReview(message.id);
+    action.then(() => sendResponse({ ok: true }), (error) =>
+      sendResponse({ ok: false, message: error.message, kind: error.kind }));
+    return true;
+  }
   if (sender.id !== ext.runtime.id || message?.type !== 'magnet') return false;
   handleMagnet(message.url).then(sendResponse, (error) => {
     console.error('Ketch: magnet hand-off failed', error);
@@ -117,6 +137,21 @@ async function captureDownload(item, gate) {
   await gate.hold();
   const instance = findInstance(settings);
   const fileName = fileNameFromPath(item.filename);
+  if (settings.confirmDownloads) {
+    // Finish Chromium's filename hook before asking the browser to pause. If the download
+    // already completed or cannot pause, keep it in the browser without submitting a copy.
+    await release();
+    try {
+      await ext.downloads.pause(item.id);
+      await openReview(instance.id, {
+        url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
+        cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
+      });
+    } catch {
+      await ext.downloads.resume(item.id).catch(() => {});
+    }
+    return;
+  }
   let task;
   try {
     task = await sendToKetch(instance, {
@@ -157,6 +192,10 @@ async function handleMagnet(url) {
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
   const instance = findInstance(settings);
   try {
+    if (settings.confirmDownloads) {
+      await openReview(instance.id, { url });
+      return { handled: true };
+    }
     const task = await sendToKetch(instance, { url }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
     notifySent(settings, instance, taskName(task));
     return { handled: true };
@@ -188,11 +227,16 @@ async function handleMenuClick(info, tab) {
     return;
   }
   try {
-    const task = await sendToKetch(instance, {
+    const download = {
       url,
       referrer: info.frameUrl || info.pageUrl,
       cookieStoreId: await cookieStoreIdForTab(tab),
-    }, settings);
+    };
+    if (settings.confirmDownloads) {
+      await openReview(instance.id, download);
+      return;
+    }
+    const task = await sendToKetch(instance, download, settings);
     notifySent(settings, instance, taskName(task) || nameFromUrl(url));
   } catch (error) {
     notifyFailure(t('notify_send_failed', instance.name), instance, error);

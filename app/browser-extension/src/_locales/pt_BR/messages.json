@@ -633,5 +633,29 @@
   },
   "error_media_unsupported": {
     "message": "Esta instância do Ketch não suporta listas de mídia. Atualize-a antes de enviar este link."
+  },
+  "review_setting": {
+    "message": "Revisar downloads antes de enviar"
+  },
+  "review_title": {
+    "message": "Revisar download"
+  },
+  "review_name": {
+    "message": "Nome do arquivo (opcional)"
+  },
+  "review_folder": {
+    "message": "Pasta no dispositivo selecionado (opcional)"
+  },
+  "review_detail": {
+    "message": "Deixe a pasta vazia para usar o padrão do dispositivo. O servidor controla as pastas permitidas. Torrents mantêm sua estrutura de arquivos. Fechar esta página devolve ao navegador um download pausado."
+  },
+  "review_cancel": {
+    "message": "Cancelar"
+  },
+  "review_invalid_destination": {
+    "message": "Digite um nome de arquivo e uma pasta válidos."
+  },
+  "review_unavailable": {
+    "message": "Esta revisão não está mais disponível. Verifique os downloads pendentes nas configurações antes de enviar novamente."
   }
 }

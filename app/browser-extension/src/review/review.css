@@ -1,0 +1,8 @@
+body { min-width: 320px; }
+main { max-width: 680px; margin: 40px auto; padding: 24px; }
+#url { overflow-wrap: anywhere; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+form { display: grid; gap: 16px; }
+label { display: grid; gap: 8px; }
+input, select { width: 100%; box-sizing: border-box; }
+.actions { display: flex; gap: 12px; }
+#status { overflow-wrap: anywhere; }
