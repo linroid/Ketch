@@ -55,6 +55,9 @@ import kotlinx.serialization.Serializable
  *   [KetchApi.resolve]. When present, the download engine skips
  *   its own probe and uses this information directly. Not persisted
  *   across restarts.
+ * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
+ *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
+ *   is retained, including after restart. Reusing an ID with different options is rejected.
  */
 @Serializable
 data class DownloadRequest(
@@ -69,9 +72,14 @@ data class DownloadRequest(
   val selectedFileIds: Set<String> = emptySet(),
   val conditions: List<DownloadCondition> = emptyList(),
   val resolvedSource: ResolvedSource? = null,
+  val requestId: String? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }
     require(connections >= 0) { "Connections must be non-negative" }
+    require(requestId == null || REQUEST_ID.matches(requestId)) { "Request ID must be a UUID" }
   }
+
 }
+
+private val REQUEST_ID = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")

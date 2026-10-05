@@ -522,5 +522,29 @@
   },
   "options_help_command_line_detail": {
     "message": "要在这台电脑上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安装的浏览器（无法启动其他应用）中使用 Ketch，请将其添加为服务器，地址为 <code>http://127.0.0.1:8642</code>。"
+  },
+  "options_diagnostics": {
+    "message": "诊断"
+  },
+  "diagnostics_detail": {
+    "message": "检查结果不明的提交，或导出最近100条结果。报告不含网址、文件名、Cookie或访问令牌。"
+  },
+  "diagnostics_check": {
+    "message": "检查待确认的下载"
+  },
+  "diagnostics_export": {
+    "message": "导出诊断"
+  },
+  "diagnostics_clear": {
+    "message": "清除诊断"
+  },
+  "diagnostics_checked": {
+    "message": "没有待确认的提交。"
+  },
+  "diagnostics_cleared": {
+    "message": "已清除诊断。"
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketch可能已接受此下载。请先在扩展设置中检查待确认的下载，再重试或在浏览器中继续。"
   }
 }

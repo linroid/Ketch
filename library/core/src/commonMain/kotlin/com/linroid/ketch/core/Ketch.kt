@@ -53,8 +53,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -134,6 +136,7 @@ class Ketch(
   )
 
   private val tasksMutex = Mutex()
+  private val submissionsMutex = Mutex()
   private val monitorMutex = Mutex()
   private val taskMonitors = mutableMapOf<String, Job>()
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
@@ -163,6 +166,26 @@ class Ketch(
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
+    if (request.requestId == null) return createDownload(request)
+    return submissionsMutex.withLock {
+      val existing = tasks.value.find { it.request.requestId == request.requestId }
+      if (existing != null) {
+        // Resolved metadata and runtime conditions are not persisted with the task.
+        require(existing.request.copy(
+          resolvedSource = null,
+          conditions = emptyList(),
+        ) == request.copy(resolvedSource = null, conditions = emptyList())) {
+          "Request ID already belongs to a different download request"
+        }
+        existing
+      } else {
+        // A disconnected caller must not interrupt publication after the record was saved.
+        withContext(NonCancellable) { createDownload(request) }
+      }
+    }
+  }
+
+  private suspend fun createDownload(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
     val isScheduled = request.schedule !is DownloadSchedule.Immediate ||

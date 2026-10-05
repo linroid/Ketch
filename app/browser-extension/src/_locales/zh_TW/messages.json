@@ -522,5 +522,29 @@
   },
   "options_help_command_line_detail": {
     "message": "若要在這台電腦上使用 <code>ketch server</code>，或在以 Flatpak 或 Snap 安裝的瀏覽器（無法啟動其他應用程式）中使用 Ketch，請將其新增為伺服器，位址為 <code>http://127.0.0.1:8642</code>。"
+  },
+  "options_diagnostics": {
+    "message": "診斷"
+  },
+  "diagnostics_detail": {
+    "message": "檢查結果不明的提交，或匯出最近100筆結果。報告不含網址、檔案名稱、Cookie或存取權杖。"
+  },
+  "diagnostics_check": {
+    "message": "檢查待確認的下載"
+  },
+  "diagnostics_export": {
+    "message": "匯出診斷"
+  },
+  "diagnostics_clear": {
+    "message": "清除診斷"
+  },
+  "diagnostics_checked": {
+    "message": "沒有待確認的提交。"
+  },
+  "diagnostics_cleared": {
+    "message": "已清除診斷。"
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketch可能已接受此下載。請先在擴充功能設定中檢查待確認的下載，再重試或在瀏覽器中繼續。"
   }
 }

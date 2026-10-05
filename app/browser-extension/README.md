@@ -112,6 +112,26 @@ Downloads are left to the browser when:
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
 the file name in Ketch's download folder; Ketch picks a free name if it is taken.
 
+## Submission recovery and diagnostics
+
+Each submission to a supporting Ketch instance has a UUID. Ketch returns the same retained task
+when that UUID is submitted again with the same options, including after loading its task store.
+Removing the task also removes that receipt. Older instances still accept downloads, but the
+extension never automatically repeats a write when its result is unknown.
+
+If the response is lost, the extension checks the task list. When it still cannot confirm the
+result, it retains a pending receipt for the browser session and blocks another send of that URL
+to the same endpoint. An intercepted browser download is paused where possible; check Ketch
+before resuming it manually. In extension settings, **Check pending downloads** looks up receipts
+without launching the app or submitting downloads. Confirmed handoffs cancel the matching browser
+download. A missing receipt, removed task, or older server needs manual inspection; restarting the
+browser clears pending receipts. Changing a server's address or token does not move its receipts
+to the new connection.
+
+**Export diagnostics** saves the last 100 outcome codes and timestamps with the extension version.
+It contains no URLs, filenames, instance names, cookies, access tokens or raw error messages.
+**Clear diagnostics** clears that history without forgetting pending submissions.
+
 ## Privacy and permissions
 
 Nothing is sent anywhere except to the Ketch instances you add.

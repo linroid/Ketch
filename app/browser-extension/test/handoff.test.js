@@ -27,6 +27,7 @@ function fakeDeps({
       siteCalls.push({ url, init });
       return siteResponse(init);
     }
+    if (url.endsWith('/api/status')) return Response.json({ features: [] });
     const body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     ketchCalls.push({ path: url.slice(instance.url.length), body });
     if (url.includes('/api/resolve/content')) {

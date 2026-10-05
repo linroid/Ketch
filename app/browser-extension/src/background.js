@@ -4,6 +4,7 @@
  * the top level because the browser may stop this script whenever it is idle.
  */
 
+import { FailureKind } from './lib/ketch-client.js';
 import { ext } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
@@ -106,10 +107,16 @@ async function captureDownload(item, gate) {
       fileName,
       mime: item.mime,
       cookieStoreId: item.cookieStoreId,
+      browserDownloadId: item.id,
     }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
   } catch (error) {
     await release();
-    notifyFailure(t('notify_fallback_browser'), instance, error);
+    if (error.kind === FailureKind.UNCERTAIN) {
+      await ext.downloads.pause(item.id).catch(() => {});
+      notifyFailure(t('options_diagnostics'), instance, error);
+    } else {
+      notifyFailure(t('notify_fallback_browser'), instance, error);
+    }
     return;
   }
   await removeBrowserDownload(item.id);
@@ -135,8 +142,9 @@ async function handleMagnet(url) {
     notifySent(settings, instance, taskName(task));
     return { handled: true };
   } catch (error) {
-    notifyFailure(t('notify_fallback_magnet'), instance, error);
-    return { handled: false };
+    notifyFailure(t(error.kind === FailureKind.UNCERTAIN
+      ? 'options_diagnostics' : 'notify_fallback_magnet'), instance, error);
+    return { handled: error.kind === FailureKind.UNCERTAIN };
   }
 }
 

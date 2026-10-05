@@ -1,3 +1,5 @@
+import { diagnosticReport, fingerprint, forgetSubmission, pendingSubmissions,
+  receiptEndpoint, reconcileSubmissions, recordOutcome } from '../lib/submissions.js';
 import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
 import { describeStatus, failureHint, withHint } from '../lib/format.js';
@@ -247,3 +249,49 @@ async function persist() {
     $('saved').hidden = true;
   }, 1_500);
 }
+
+async function checkHandoffs() {
+  $('check-handoffs').disabled = true;
+  try {
+    const latest = await loadSettings();
+    for (const instance of latest.instances) {
+      try {
+        await withEndpoint(instance, async (endpoint) => {
+          const client = new KetchClient(endpoint, { timeoutMs: CHECK_TIMEOUT_MS });
+          for (const { entry } of await reconcileSubmissions(client, receiptEndpoint(instance, endpoint))) {
+            if (Number.isInteger(entry.browserDownloadId)) {
+              const [item] = await ext.downloads.search({ id: entry.browserDownloadId });
+              if (item && item.state === 'in_progress' &&
+                await fingerprint(item.finalUrl || item.url) === entry.urlHash) {
+                await ext.downloads.cancel(item.id);
+                await ext.downloads.erase({ id: item.id });
+              }
+            }
+            await forgetSubmission(entry.id);
+            await recordOutcome('recovered');
+          }
+        }, { launch: false });
+      } catch { /* A disconnected instance retains its pending submissions. */ }
+    }
+    $('diagnostic-status').textContent = (await pendingSubmissions()).length
+      ? t('error_handoff_uncertain') : t('diagnostics_checked');
+  } finally {
+    $('check-handoffs').disabled = false;
+  }
+}
+
+$('check-handoffs').addEventListener('click', checkHandoffs);
+$('export-diagnostics').addEventListener('click', async () => {
+  const data = { version: ext.runtime.getManifest().version, events: await diagnosticReport() };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)],
+    { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'ketch-extension-diagnostics.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+});
+$('clear-diagnostics').addEventListener('click', async () => {
+  await ext.storage.local.remove('handoffDiagnostics');
+  $('diagnostic-status').textContent = t('diagnostics_cleared');
+});

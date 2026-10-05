@@ -9,6 +9,8 @@ import { t } from './i18n.js';
 export const FailureKind = Object.freeze({
   /** Nothing answered: the server is off, or the address is wrong. */
   UNREACHABLE: 'unreachable',
+  /** The server may have accepted the submission; check its receipt before trying again. */
+  UNCERTAIN: 'uncertain',
   /** The server did not answer in time. */
   TIMEOUT: 'timeout',
   /** The server requires a different access token. */
