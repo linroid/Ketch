@@ -91,6 +91,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **FTP and FTPS**, with parallel connections and resume.
 - **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files, in an
   engine written in pure Kotlin ([details](docs/torrent.md)).
+- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
+  HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
   the file manager lands in Ketch.
 
@@ -187,8 +189,8 @@ the [CLI documentation](cli/README.md) lists every command.
   ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads from several mirrors at once, with checksums
 - **WebDAV** — Download from WebDAV servers, with resume
-- **HLS and DASH** — Download and merge HTTP Live Streaming and MPEG-DASH videos, choosing the
-  quality and its matching audio
+- **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
+  AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Checksums** — Check a download against a hash you provide, or one the server publishes

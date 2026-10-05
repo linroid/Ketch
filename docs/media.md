@@ -5,6 +5,33 @@ and downloads supported media segments into one file. The browser extension's pa
 picker includes these playlists. It checks for the instance's `media.finite` capability before
 submitting them. Signed URL query strings are preserved.
 
+## Download an m3u8 playlist
+
+Paste the HTTP(S) `.m3u8` URL into the app's Add sheet, or pass it to the CLI:
+
+```bash
+ketch 'https://example.com/video/index.m3u8'
+```
+
+Use a destination directory to keep the media extension chosen by Ketch. An explicit file
+destination is used as given; naming it `.mp4` does not convert a transport stream to MP4.
+
+The SDK uses the same `DownloadRequest` as a regular HTTP download; no additional source or
+external executable is required:
+
+```kotlin
+val task = ketch.download(DownloadRequest(
+  url = "https://example.com/video/index.m3u8",
+  destination = Destination("downloads/"),
+))
+```
+
+The playlist must be finite (`EXT-X-ENDLIST`). A master playlist automatically selects its
+highest-bandwidth variant. The result contains the media bytes, rather than the playlist text.
+Progress has an unknown total until completion, and pause/resume restarts the transfer.
+
+## Supported formats and limits
+
 Supported formats:
 
 - HLS media playlists with `EXT-X-ENDLIST`: MPEG-TS, packed AAC/MP3, or fragmented MP4 with
