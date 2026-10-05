@@ -303,6 +303,25 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Install emulator image with retries
+        timeout-minutes: 10
+        run: |
+          # The runner installs command-line tools without adding them to PATH.
+          sdk_manager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # SDK downloads can fail with a truncated archive before any tests run.
+          # Disable pipefail only here: yes may receive SIGPIPE after licenses are accepted.
+          (set +o pipefail; yes | "$sdk_manager" --licenses > /dev/null)
+          for attempt in 1 2 3; do
+            if "$sdk_manager" --install 'system-images;android-36;google_apis;x86_64' --channel=0; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Emulator image installation failed (attempt $attempt of 3); retrying."
+              sleep "$((attempt * 10))"
+            fi
+          done
+          echo '::error::Emulator image installation failed after 3 attempts.'
+          exit 1
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
