@@ -61,7 +61,7 @@ export function releaseVersion(release, build) {
 function targetManifests({ version: manifestVersion, versionName }) {
   const base = { ...manifest, version: manifestVersion };
   const chrome = versionName === manifestVersion ? base : { ...base, version_name: versionName };
-  return { chrome, firefox: firefoxManifest(base) };
+  return { chrome, firefox: firefoxManifest(base), safari: safariManifest(base) };
 }
 
 /**
@@ -81,6 +81,18 @@ function firefoxManifest(base) {
         data_collection_permissions: { required: ['none'] },
       },
     },
+  };
+}
+
+/** Safari reaches configured servers; native host launching and capture are not included. */
+function safariManifest(base) {
+  const { key: _key, minimum_chrome_version: _minimum, ...rest } = base;
+  return {
+    ...rest,
+    options_ui: { page: base.options_ui.page },
+    browser_specific_settings: { safari: { strict_min_version: '16.4' } },
+    permissions: base.permissions.filter((permission) =>
+      !['downloads', 'nativeMessaging', 'notifications', 'webRequest'].includes(permission)),
   };
 }
 

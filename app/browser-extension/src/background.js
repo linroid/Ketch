@@ -10,7 +10,7 @@ import {
   loadCapturePause,
   setCapturePaused,
 } from './lib/capture-pause.js';
-import { ext } from './lib/ext.js';
+import { ext, remoteOnly } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
@@ -23,7 +23,7 @@ import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './l
 /** Captured downloads wait for Ketch this long before the browser takes them back. */
 const CAPTURE_TIMEOUT_MS = 6_000;
 const requestContext = new RequestContext();
-ext.webRequest.onBeforeRequest.addListener((details) => requestContext.observe(details),
+if (!remoteOnly) ext.webRequest?.onBeforeRequest.addListener((details) => requestContext.observe(details),
   { urls: ['http://*/*', 'https://*/*'] });
 
 const MENUS = [
@@ -83,7 +83,7 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-if (ext.downloads.onDeterminingFilename) {
+if (!remoteOnly && ext.downloads?.onDeterminingFilename) {
   // Chromium: the download waits here before any "Save as" dialog, until suggest() is called.
   ext.downloads.onDeterminingFilename.addListener((item, suggest) => {
     captureDownload(item, {
@@ -92,7 +92,7 @@ if (ext.downloads.onDeterminingFilename) {
     });
     return true;
   });
-} else {
+} else if (!remoteOnly && ext.downloads?.onCreated) {
   // Firefox: the download has started; pause it while Ketch is asked to take over.
   ext.downloads.onCreated.addListener((item) => {
     let paused = false;
@@ -221,6 +221,7 @@ async function handleMenuClick(info, tab) {
   const instance = findInstance(settings, target.instanceId);
   const url = target.kind === 'link' ? info.linkUrl : info.srcUrl;
   if (!url || !isSupportedLinkUrl(url)) {
+    if (remoteOnly) { await openReview(instance.id, { url }); return; }
     notify(t('notify_unsupported'), url?.startsWith('blob:')
       ? t('notify_unsupported_stream')
       : t('notify_unsupported_scheme'));
@@ -279,7 +280,7 @@ function rebuildMenus(settings) {
     const capturePaused = await loadCapturePause();
     await ext.contextMenus.removeAll();
     await createMenu({ id: 'ketch', title: 'Ketch', contexts: ['all'] });
-    await createMenu({
+    if (!remoteOnly) await createMenu({
       id: 'pause-capture',
       parentId: 'ketch',
       title: t('menu_pause_capture'),
@@ -287,7 +288,7 @@ function rebuildMenus(settings) {
       checked: capturePaused,
       contexts: ['all'],
     });
-    await createMenu({
+    if (!remoteOnly) await createMenu({
       id: 'download-directly',
       parentId: 'ketch',
       title: t('menu_download_directly'),
@@ -352,6 +353,7 @@ function notifyFailure(title, instance, error) {
 }
 
 function notify(title, message) {
+  if (remoteOnly || !ext.notifications) return;
   ext.notifications.create({
     type: 'basic',
     iconUrl: ext.runtime.getURL('icons/icon-128.png'),

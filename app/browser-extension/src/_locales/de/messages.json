@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "Diese Prüfung ist nicht mehr verfügbar. Prüfe ausstehende Downloads in den Einstellungen, bevor du erneut sendest."
+  },
+  "safari_detail": {
+    "message": "Safari sendet geprüfte Links und Seitenressourcen an einen eingerichteten Ketch-Server. Aktiviere die Freigabe in Ketch und gib hier Adresse und Zugriffstoken ein. Automatische Download-Erfassung und App-Start sind nicht verfügbar."
   }
 }

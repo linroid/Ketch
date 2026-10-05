@@ -52,7 +52,7 @@ app/
   desktop/    # Desktop (JVM) app
   web/        # Wasm browser app
   ios/        # Native iOS app (Xcode project, consumes shared module)
-  browser-extension/  # Chromium/Firefox extension that sends downloads to Ketch (plain JS)
+  browser-extension/  # Chromium/Firefox/Safari extension that sends downloads to Ketch (plain JS)
 cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; GraalVM native releases)
 ```
 
@@ -615,10 +615,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `startMcpServer`, whose sessions start later
 
 ### Browser Extension (`app/browser-extension`)
-- Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
+- Manifest V3 extension for Chromium browsers, Firefox and a limited Safari target; plain JavaScript modules with no
   dependencies. `src/` loads unpacked in Chromium; `node build.mjs` writes `build/chrome`,
   `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
-  workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number)
+  workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number).
+  `build/safari` reaches configured servers only, with mandatory review and no download capture,
+  native app launching or notifications. `npm run safari` generates an unsigned macOS Xcode host
+  project; signing and Safari enablement are separate local/distribution steps
 - Talks to the daemon REST API (`/api/tasks`, task pause/resume, `/api/resolve/content`,
   `/api/status`) of one or more instances: the Ketch app on this computer and servers
   (`ketch server`, other devices), each with an optional bearer token. Captured downloads and

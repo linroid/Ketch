@@ -1,4 +1,4 @@
-import { ext } from './ext.js';
+import { ext, remoteOnly } from './ext.js';
 import { t } from './i18n.js';
 
 /** Port the Ketch app and `ketch server` listen on unless configured otherwise. */
@@ -48,6 +48,8 @@ function localInstanceName() {
 
 /** @returns {Instance} the Ketch app on this computer */
 export function localInstance() {
+  if (remoteOnly) return { id: LOCAL_INSTANCE_ID, type: 'server', name: localInstanceName(),
+    url: `http://127.0.0.1:${DEFAULT_PORT}`, token: '', forwardCookies: true };
   return { id: LOCAL_INSTANCE_ID, type: 'app', name: localInstanceName() };
 }
 
@@ -56,16 +58,16 @@ export function defaultSettings() {
   return {
     instances: [localInstance()],
     defaultInstanceId: LOCAL_INSTANCE_ID,
-    interceptDownloads: true,
+    interceptDownloads: !remoteOnly,
     captureMagnetLinks: true,
     forwardCookies: true,
-    confirmDownloads: false,
+    confirmDownloads: remoteOnly,
     minFileSizeMb: 0,
     captureUnknownSize: true,
     fileTypeMode: 'all',
     fileExtensions: [],
     excludedHosts: [],
-    notifications: true,
+    notifications: !remoteOnly,
   };
 }
 
@@ -161,16 +163,17 @@ export function normalizeSettings(raw) {
   return {
     instances,
     defaultInstanceId,
-    interceptDownloads: booleanOr(source.interceptDownloads, defaults.interceptDownloads),
+    interceptDownloads: !remoteOnly &&
+      booleanOr(source.interceptDownloads, defaults.interceptDownloads),
     captureMagnetLinks: booleanOr(source.captureMagnetLinks, defaults.captureMagnetLinks),
     forwardCookies: booleanOr(source.forwardCookies, defaults.forwardCookies),
-    confirmDownloads: booleanOr(source.confirmDownloads, false),
+    confirmDownloads: remoteOnly || booleanOr(source.confirmDownloads, false),
     minFileSizeMb: Number.isFinite(minFileSizeMb) && minFileSizeMb > 0 ? minFileSizeMb : 0,
     excludedHosts: parseHostList(source.excludedHosts ?? []),
     captureUnknownSize: booleanOr(source.captureUnknownSize, true),
     fileTypeMode: ['only', 'except'].includes(source.fileTypeMode) ? source.fileTypeMode : 'all',
     fileExtensions: parseFileExtensions(source.fileExtensions ?? []),
-    notifications: booleanOr(source.notifications, defaults.notifications),
+    notifications: !remoteOnly && booleanOr(source.notifications, defaults.notifications),
   };
 }
 
@@ -184,6 +187,7 @@ function normalizeInstance(candidate) {
   const type = candidate.type === 'app' || (candidate.type !== 'server' && !candidate.url)
     ? 'app'
     : 'server';
+  if (type === 'app' && remoteOnly) return null;
   if (type === 'app') return { id, type, name: name || localInstanceName() };
   let url;
   try {

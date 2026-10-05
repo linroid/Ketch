@@ -4,7 +4,7 @@ import {
   setCapturePaused,
 } from '../lib/capture-pause.js';
 import { withEndpoint } from '../lib/connection.js';
-import { ext } from '../lib/ext.js';
+import { ext, remoteOnly } from '../lib/ext.js';
 import { describeStatus, describeTaskState, failureHint, taskName } from '../lib/format.js';
 import { sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
@@ -38,6 +38,10 @@ init().catch((error) => showOffline(error));
 
 async function init() {
   settings = await loadSettings();
+  if (remoteOnly) {
+    $('capture').closest('label').hidden = true;
+    $('capture-pause').closest('div').hidden = true;
+  }
   const stored = await ext.storage.local.get(SHOWN_INSTANCE_KEY);
   showInstance(findInstance(settings, stored[SHOWN_INSTANCE_KEY]).id);
   renderCapture();

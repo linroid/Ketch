@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "Esta revisão não está mais disponível. Verifique os downloads pendentes nas configurações antes de enviar novamente."
+  },
+  "safari_detail": {
+    "message": "O Safari envia links revisados e recursos de páginas a um servidor Ketch configurado. Ative o compartilhamento no Ketch e insira o endereço e o token aqui. Captura automática de downloads e abertura do app não estão disponíveis."
   }
 }

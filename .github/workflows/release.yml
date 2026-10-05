@@ -350,7 +350,7 @@ jobs:
 
       # Manifests only take numeric versions: the run number keeps each release newer than the
       # last one, and Chromium displays the tag's version.
-      - name: Build Chromium and Firefox packages
+      - name: Build browser extension packages
         run: node build.mjs --version "${KETCH_VERSION#v}" --build "${{ github.run_number }}"
 
       - uses: actions/upload-artifact@v7

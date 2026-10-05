@@ -860,5 +860,9 @@
   "review_unavailable": {
     "message": "This review is no longer available. Check pending downloads in settings before sending again.",
     "description": "Download review: unavailable"
+  },
+  "safari_detail": {
+    "message": "Safari sends reviewed links and page resources to a configured Ketch server. Start sharing in Ketch and enter its address and access token here. Automatic download capture and app launching are not available.",
+    "description": "Safari server setup and supported features"
   }
 }
