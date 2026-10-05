@@ -176,6 +176,9 @@ the [CLI documentation](cli/README.md) lists every command.
 
 ## Roadmap
 
+- **Distribution before v1.0.0** — Signed Windows releases, signed and notarized macOS releases,
+  browser-store extensions and verified installation/update paths
+  ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads from several mirrors at once, with checksums
 - **WebDAV** — Download from WebDAV servers, with resume
 - **HLS and DASH** — Download and merge HTTP Live Streaming and MPEG-DASH videos, choosing the
