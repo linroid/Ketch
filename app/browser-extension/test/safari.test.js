@@ -46,6 +46,7 @@ test('background loads with no downloads, native messaging, web request or notif
     await startup();
     assert.ok(menus.has('link'));
     assert.ok(menus.has('video'));
+    assert.ok(menus.has('page-resources'));
     assert.ok(!menus.has('download-directly'));
     assert.ok(!menus.has('pause-capture'));
   });

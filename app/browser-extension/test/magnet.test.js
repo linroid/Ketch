@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 const source = readFileSync(new URL('../src/content/magnet.js', import.meta.url), 'utf8');
 
-test('magnet clicks stay native during a pause until the user resumes',
+test('magnet clicks follow capture settings and ignore the removed pause flag',
   async () => {
     let click;
     let storageChanged;
@@ -20,7 +20,7 @@ test('magnet clicks stay native during a pause until the user resumes',
           sendMessage: async () => { sent++; return { handled: true }; },
         },
         storage: {
-          local: { get: async () => ({ captureMagnetLinks: true, capturePaused: true }) },
+          local: { get: async () => ({ captureMagnetLinks: false, capturePaused: true }) },
           onChanged: { addListener: (listener) => { storageChanged = listener; } },
         },
       },
@@ -40,13 +40,11 @@ test('magnet clicks stay native during a pause until the user resumes',
     };
     assert.equal(clickMagnet(), false);
     assert.equal(sent, 0);
-    storageChanged({ capturePaused: { newValue: false } }, 'local');
+    storageChanged({ captureMagnetLinks: { newValue: true } }, 'local');
     assert.equal(clickMagnet(), true);
     assert.equal(sent, 1);
 
     storageChanged({ capturePaused: { newValue: true } }, 'local');
-    assert.equal(clickMagnet(), false);
-    storageChanged({ capturePaused: { newValue: false } }, 'local');
     assert.equal(clickMagnet(), true);
     assert.equal(sent, 2);
 

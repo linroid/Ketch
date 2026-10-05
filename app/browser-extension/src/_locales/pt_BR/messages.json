@@ -547,24 +547,6 @@
   "error_handoff_uncertain": {
     "message": "O Ketch pode ter aceitado este download. Verifique os downloads pendentes nas configurações da extensão antes de tentar novamente ou retomá-lo no navegador."
   },
-  "popup_pause_capture": {
-    "message": "Pausar até retomar"
-  },
-  "popup_resume_capture": {
-    "message": "Retomar agora"
-  },
-  "popup_pause_detail": {
-    "message": "Deixar temporariamente os downloads e links magnet com o navegador."
-  },
-  "popup_capture_pause_failed": {
-    "message": "Não foi possível alterar a pausa. Tente novamente."
-  },
-  "popup_capture_paused": {
-    "message": "A captura automática fica pausada até você retomá-la."
-  },
-  "menu_pause_capture": {
-    "message": "Pausar captura automática"
-  },
   "menu_download_directly": {
     "message": "Baixar diretamente"
   },

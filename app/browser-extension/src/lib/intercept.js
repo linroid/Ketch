@@ -31,11 +31,9 @@ export function hostMatches(host, patterns) {
  * }} item a `downloads.DownloadItem`
  * @param {import('./settings.js').Settings} settings
  * @param {string} extensionId this extension's id; its own downloads are never captured
- * @param {boolean} [capturePaused] whether capture is paused until the user resumes
  * @returns {{ capture: boolean, reason: string }} the reason explains a skipped download
  */
-export function captureDecision(item, settings, extensionId, capturePaused = false) {
-  if (capturePaused === true) return skip('capturing is temporarily paused');
+export function captureDecision(item, settings, extensionId) {
   if (!settings.interceptDownloads) return skip('capturing is turned off');
   if (item.byExtensionId) {
     return skip('started by an extension');

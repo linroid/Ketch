@@ -39,18 +39,6 @@ describe('captureDecision', () => {
     assert.equal(decide(download(), off).capture, false);
   });
 
-  test('pausing bypasses ordinary downloads and torrents until resumed', () => {
-    const torrent = download({ mime: 'application/x-bittorrent' });
-    for (const item of [download(), torrent]) {
-      assert.equal(captureDecision(item, settings, EXTENSION_ID, true).capture, false);
-    }
-    for (const item of [download(), torrent]) {
-      assert.equal(captureDecision(item, settings, EXTENSION_ID, false).capture, true);
-    }
-    const off = { ...settings, interceptDownloads: false };
-    assert.equal(captureDecision(download(), off, EXTENSION_ID, false).capture, false);
-  });
-
   test('skips its own downloads and private windows', () => {
     assert.equal(decide(download({ byExtensionId: EXTENSION_ID })).capture, false);
     assert.equal(decide(download({ incognito: true })).capture, false);

@@ -547,24 +547,6 @@
   "error_handoff_uncertain": {
     "message": "Ketch hat diesen Download möglicherweise angenommen. Prüfe ausstehende Downloads in den Erweiterungseinstellungen, bevor du es erneut versuchst oder den Download im Browser fortsetzt."
   },
-  "popup_pause_capture": {
-    "message": "Bis zum Fortsetzen pausieren"
-  },
-  "popup_resume_capture": {
-    "message": "Jetzt fortsetzen"
-  },
-  "popup_pause_detail": {
-    "message": "Downloads und Magnet-Links vorübergehend dem Browser überlassen."
-  },
-  "popup_capture_pause_failed": {
-    "message": "Die Pause konnte nicht geändert werden. Erneut versuchen."
-  },
-  "popup_capture_paused": {
-    "message": "Automatische Übernahme pausiert, bis du sie fortsetzt."
-  },
-  "menu_pause_capture": {
-    "message": "Automatische Übernahme pausieren"
-  },
   "menu_download_directly": {
     "message": "Direkt herunterladen"
   },
