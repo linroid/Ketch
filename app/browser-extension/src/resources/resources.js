@@ -79,12 +79,12 @@ function updateSelection() {
 async function sendSelected() {
   if (busy) return;
   const selected = [...document.querySelectorAll('#resources input:checked:not(:disabled)')];
-  const settings = await loadSettings();
-  const instance = settings.instances.find((it) => it.id === $('instance').value);
-  if (!instance) { $('status').textContent = t('resources_unavailable'); return; }
   busy = true;
   for (const id of ['scan', 'kind', 'instance', 'all', 'send', 'folder']) $(id).disabled = true;
   try {
+    const settings = await loadSettings();
+    const instance = settings.instances.find((it) => it.id === $('instance').value);
+    if (!instance) throw new Error(t('resources_unavailable'));
     for (const box of selected) {
       const resource = resources.find((it) => it.url === box.value);
       const status = box.closest('li').querySelector('small');
@@ -110,6 +110,8 @@ async function sendSelected() {
         }
       }
     }
+  } catch (error) {
+    $('status').textContent = error.message;
   } finally {
     busy = false;
     for (const id of ['scan', 'kind', 'instance', 'all', 'folder']) $(id).disabled = false;
