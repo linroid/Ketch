@@ -12,8 +12,7 @@
   <main>
     <h1 data-i18n="resources_title">Page resources</h1>
     <p class="muted" data-i18n="resources_detail">Choose files already visible or loaded on the
-      page. Scroll or play media on the original page, then scan again. Streaming playlists are
-      not included.</p>
+      page. Scroll or play media on the original page, then scan again. Finite, unencrypted single-stream HLS and DASH require a compatible Ketch instance.</p>
     <div class="toolbar">
       <select id="instance" aria-label="Ketch instance" data-i18n-aria-label="popup_instance_picker">
       </select>
@@ -23,6 +22,7 @@
         <option value="video" data-i18n="resources_video">Video</option>
         <option value="audio" data-i18n="resources_audio">Audio</option>
         <option value="file" data-i18n="resources_files">Files</option>
+        <option value="stream" data-i18n="resources_streams">Streaming playlists</option>
       </select>
       <button id="scan" data-i18n="resources_scan">Scan again</button>
     </div>

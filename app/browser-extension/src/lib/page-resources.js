@@ -9,7 +9,7 @@ export function collectPageResources() {
     let url;
     try { url = new URL(value, document.baseURI); } catch { return; }
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return;
-    if (/\.(m3u8|mpd)$/i.test(url.pathname)) return;
+    if (/\.(m3u8|mpd)$/i.test(url.pathname)) kind = 'stream';
     url.hash = '';
     if (seen.has(url.href)) return;
     seen.add(url.href);
@@ -18,6 +18,7 @@ export function collectPageResources() {
   function kindFor(url) {
     let path;
     try { path = new URL(url, document.baseURI).pathname; } catch { return null; }
+    if (/\.(m3u8|mpd)$/i.test(path)) return 'stream';
     if (/\.(mp4|webm|mov|m4v)$/i.test(path)) return 'video';
     if (/\.(mp3|m4a|ogg|oga|wav|flac|aac)$/i.test(path)) return 'audio';
     if (media.test(path)) return 'image';
@@ -55,7 +56,7 @@ export function mergePageResources(results) {
         const page = new URL(candidate.pageUrl);
         if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
           !['http:', 'https:'].includes(page.protocol)) continue;
-        if (!['file', 'image', 'audio', 'video'].includes(candidate.kind)) continue;
+        if (!['file', 'image', 'audio', 'video', 'stream'].includes(candidate.kind)) continue;
         url.hash = '';
         if (resources.has(url.href)) continue;
         resources.set(url.href, { url: url.href, kind: candidate.kind, pageUrl: page.href,

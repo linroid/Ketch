@@ -782,8 +782,8 @@
     "description": "Page resource picker: resources_title"
   },
   "resources_detail": {
-    "message": "Choose files already visible or loaded on the page. Scroll or play media on the original page, then scan again. Streaming playlists are not included.",
-    "description": "Page resource picker: resources_detail"
+    "message": "Choose files already visible or loaded on the page. Scroll or play media on the original page, then scan again. Finite, unencrypted single-stream HLS and DASH require a compatible Ketch instance.",
+    "description": "Instructions for scanning page resources"
   },
   "resources_images": {
     "message": "Images",
@@ -820,5 +820,13 @@
   "resources_unavailable": {
     "message": "This page cannot be scanned. Open a regular website in a non-private tab and try again.",
     "description": "Page resource picker: resources_unavailable"
+  },
+  "resources_streams": {
+    "message": "Streaming playlists",
+    "description": "Filter for streaming manifests"
+  },
+  "error_media_unsupported": {
+    "message": "This Ketch instance does not support media playlists. Update it before sending this link.",
+    "description": "Media capability error"
   }
 }

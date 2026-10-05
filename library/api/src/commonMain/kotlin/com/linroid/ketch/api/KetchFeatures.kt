@@ -10,6 +10,9 @@ object KetchFeatures {
   /** [DownloadTask.queuePosition] reports positions. */
   const val QUEUE_POSITION: String = "task.queuePosition"
 
+  /** Finite, clear single-stream HLS and DASH downloads, with restart rather than byte resume. */
+  const val FINITE_MEDIA: String = "media.finite"
+
   /** Every feature this version of Ketch supports. */
-  val ALL: Set<String> = setOf(AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID)
+  val ALL: Set<String> = setOf(AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, FINITE_MEDIA)
 }

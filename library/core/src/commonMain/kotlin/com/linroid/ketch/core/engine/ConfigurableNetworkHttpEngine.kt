@@ -76,6 +76,12 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
     withEngine { it.probe(url, headers) }
 
+  override suspend fun downloadResource(
+    url: String,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ): String = withEngine { it.downloadResource(url, headers, onData) }
+
   override suspend fun download(
     url: String,
     range: LongRange?,

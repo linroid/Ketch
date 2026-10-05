@@ -124,8 +124,23 @@ class KtorHttpEngine(
     headers: Map<String, String>,
     onData: suspend (ByteArray) -> Unit,
   ) {
+    transfer(url, range, headers, onData)
+  }
+
+  override suspend fun downloadResource(
+    url: String,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ): String = transfer(url, null, headers, onData)
+
+  private suspend fun transfer(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ): String {
     val requestHeaders = requestHeaders(headers)
-    transport {
+    return transport {
       if (range != null) {
         if (logRequests) log.d {
           "GET request: ${redactUrl(url)}, range=${range.first}-${range.last}"
@@ -177,6 +192,7 @@ class KtorHttpEngine(
             cause = IllegalStateException("Response ended before requested length"),
           )
         }
+        response.call.request.url.toString()
       }
     }
   }

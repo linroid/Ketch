@@ -599,7 +599,7 @@
     "message": "Recursos de la página"
   },
   "resources_detail": {
-    "message": "Elige archivos visibles o cargados en la página. Desplázate o reproduce contenido en la página original y vuelve a buscar. No se incluyen listas de streaming."
+    "message": "Elige archivos visibles o cargados en la página. Desplázate o reproduce contenido en la página original y vuelve a buscar. HLS y DASH finitos, sin cifrar y de una sola pista requieren una instancia compatible de Ketch."
   },
   "resources_images": {
     "message": "Imágenes"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "No se puede analizar esta página. Abre un sitio web normal en una pestaña no privada e inténtalo de nuevo."
+  },
+  "resources_streams": {
+    "message": "Listas de reproducción"
+  },
+  "error_media_unsupported": {
+    "message": "Esta instancia de Ketch no admite listas multimedia. Actualízala antes de enviar este enlace."
   }
 }

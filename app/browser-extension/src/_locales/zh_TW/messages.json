@@ -599,7 +599,7 @@
     "message": "頁面資源"
   },
   "resources_detail": {
-    "message": "選擇頁面上已顯示或載入的檔案。在原頁面捲動或播放媒體後，再次掃描。不包含串流播放清單。"
+    "message": "選擇頁面中已顯示或載入的檔案。在原頁面捲動或播放媒體後可重新掃描。有限、未加密、單串流的 HLS 和 DASH 需要相容的 Ketch 執行個體。"
   },
   "resources_images": {
     "message": "圖片"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "無法掃描此頁面。請在非私密分頁中開啟一般網站後重試。"
+  },
+  "resources_streams": {
+    "message": "串流播放清單"
+  },
+  "error_media_unsupported": {
+    "message": "此 Ketch 執行個體不支援媒體播放清單。傳送連結前請先更新。"
   }
 }

@@ -599,7 +599,7 @@
     "message": "Ressources de la page"
   },
   "resources_detail": {
-    "message": "Choisissez des fichiers visibles ou chargés sur la page. Faites défiler ou lisez un média sur la page d’origine, puis relancez la recherche. Les listes de streaming sont exclues."
+    "message": "Choisissez les fichiers visibles ou chargés sur la page. Faites défiler la page d’origine ou lancez la lecture, puis relancez la recherche. Les flux HLS et DASH finis, non chiffrés et à une seule piste nécessitent une instance Ketch compatible."
   },
   "resources_images": {
     "message": "Images"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "Cette page ne peut pas être analysée. Ouvrez un site web normal dans un onglet non privé et réessayez."
+  },
+  "resources_streams": {
+    "message": "Listes de lecture"
+  },
+  "error_media_unsupported": {
+    "message": "Cette instance Ketch ne prend pas en charge les listes multimédias. Mettez-la à jour avant d’envoyer ce lien."
   }
 }

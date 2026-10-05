@@ -599,7 +599,7 @@
     "message": "Seitenressourcen"
   },
   "resources_detail": {
-    "message": "Wähle Dateien, die auf der Seite sichtbar oder geladen sind. Scrolle oder spiele Medien auf der ursprünglichen Seite ab und scanne erneut. Streaming-Wiedergabelisten sind nicht enthalten."
+    "message": "Wähle bereits sichtbare oder geladene Dateien. Scrolle oder spiele Medien auf der ursprünglichen Seite ab und suche erneut. Abgeschlossene, unverschlüsselte HLS- und DASH-Streams mit einer Spur benötigen eine kompatible Ketch-Instanz."
   },
   "resources_images": {
     "message": "Bilder"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "Diese Seite kann nicht gescannt werden. Öffne eine normale Website in einem nicht privaten Tab und versuche es erneut."
+  },
+  "resources_streams": {
+    "message": "Streaming-Playlists"
+  },
+  "error_media_unsupported": {
+    "message": "Diese Ketch-Instanz unterstützt keine Medien-Playlists. Aktualisiere sie, bevor du diesen Link sendest."
   }
 }

@@ -599,7 +599,7 @@
     "message": "页面资源"
   },
   "resources_detail": {
-    "message": "选择页面上已显示或加载的文件。在原页面滚动或播放媒体后，再次扫描。不包含流媒体播放列表。"
+    "message": "选择页面中已显示或加载的文件。在原页面滚动或播放媒体后可重新扫描。有限、未加密、单流的 HLS 和 DASH 需要兼容的 Ketch 实例。"
   },
   "resources_images": {
     "message": "图片"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "无法扫描此页面。请在非隐私标签页中打开普通网站后重试。"
+  },
+  "resources_streams": {
+    "message": "流媒体播放列表"
+  },
+  "error_media_unsupported": {
+    "message": "此 Ketch 实例不支持媒体播放列表。发送链接前请先更新。"
   }
 }

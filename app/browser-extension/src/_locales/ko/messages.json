@@ -599,7 +599,7 @@
     "message": "페이지 리소스"
   },
   "resources_detail": {
-    "message": "페이지에 표시되거나 로드된 파일을 선택하세요. 원래 페이지에서 스크롤하거나 미디어를 재생한 후 다시 검색하세요. 스트리밍 재생목록은 포함되지 않습니다."
+    "message": "페이지에 표시되거나 로드된 파일을 선택하세요. 원래 페이지에서 스크롤하거나 미디어를 재생한 후 다시 검색하세요. 종료된 비암호화 단일 스트림 HLS 및 DASH에는 호환되는 Ketch가 필요합니다."
   },
   "resources_images": {
     "message": "이미지"
@@ -627,5 +627,11 @@
   },
   "resources_unavailable": {
     "message": "이 페이지는 검색할 수 없습니다. 일반 웹사이트를 비공개가 아닌 탭에서 열고 다시 시도하세요."
+  },
+  "resources_streams": {
+    "message": "스트리밍 재생목록"
+  },
+  "error_media_unsupported": {
+    "message": "이 Ketch는 미디어 재생목록을 지원하지 않습니다. 링크를 보내기 전에 업데이트하세요."
   }
 }
