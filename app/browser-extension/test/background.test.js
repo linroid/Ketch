@@ -61,6 +61,7 @@ globalThis.chrome = {
       return id;
     },
   },
+  webRequest: { onBeforeRequest: event() },
   notifications: { create: async (message) => notifications.push(message) },
 };
 

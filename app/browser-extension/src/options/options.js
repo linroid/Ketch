@@ -13,6 +13,7 @@ import {
   normalizeServerUrl,
   onSettingsChanged,
   parseHostList,
+  parseFileExtensions,
   saveSettings,
 } from '../lib/settings.js';
 
@@ -27,6 +28,7 @@ const toggles = {
   forwardCookies: $('forward-cookies'),
   captureMagnetLinks: $('capture-magnet-links'),
   notifications: $('notifications'),
+  captureUnknownSize: $('capture-unknown-size'),
 };
 
 /**
@@ -59,6 +61,8 @@ async function init() {
   });
   for (const toggle of Object.values(toggles)) toggle.addEventListener('change', persist);
   $('min-file-size').addEventListener('change', persist);
+  $('file-type-mode').addEventListener('change', persist);
+  $('file-extensions').addEventListener('change', persist);
   $('excluded-hosts').addEventListener('change', () => {
     $('excluded-hosts').value = parseHostList($('excluded-hosts').value).join('\n');
     persist();
@@ -73,6 +77,10 @@ async function init() {
 }
 
 function fillPreferences(settings) {
+  $('file-type-mode').value = settings.fileTypeMode;
+  if (document.activeElement !== $('file-extensions')) {
+    $('file-extensions').value = settings.fileExtensions.join(', ');
+  }
   for (const [key, toggle] of Object.entries(toggles)) toggle.checked = settings[key];
   if (document.activeElement !== $('min-file-size')) {
     $('min-file-size').value = String(settings.minFileSizeMb);
@@ -104,6 +112,8 @@ function addCard(instance, isDefault = false) {
     const tokenInput = card.querySelector('.instance-token');
     urlInput.value = instance.url;
     tokenInput.value = instance.token;
+    card.querySelector('.server-cookies').checked = instance.forwardCookies ?? false;
+    card.querySelector('.server-cookies').addEventListener('change', persist);
     defaultRadio.disabled = !instance.url;
     updateNote(card);
     urlInput.addEventListener('change', () => onUrlChanged(card));
@@ -132,6 +142,7 @@ function onUrlChanged(card) {
     return;
   }
   input.removeAttribute('aria-invalid');
+  if (card.dataset.savedUrl !== input.value) card.querySelector('.server-cookies').checked = false;
   card.dataset.savedUrl = input.value;
   card.querySelector('input[type="radio"]').disabled = false;
   updateNote(card);
@@ -226,6 +237,7 @@ async function persist() {
         type: 'server',
         url: card.dataset.savedUrl,
         token: card.querySelector('.instance-token').value,
+        forwardCookies: card.querySelector('.server-cookies').checked,
       };
     }),
     defaultInstanceId: defaultCard?.dataset.id,
@@ -233,6 +245,9 @@ async function persist() {
     forwardCookies: toggles.forwardCookies.checked,
     captureMagnetLinks: toggles.captureMagnetLinks.checked,
     notifications: toggles.notifications.checked,
+    captureUnknownSize: toggles.captureUnknownSize.checked,
+    fileTypeMode: $('file-type-mode').value,
+    fileExtensions: parseFileExtensions($('file-extensions').value),
     minFileSizeMb: Number($('min-file-size').value),
     excludedHosts: parseHostList($('excluded-hosts').value),
   });

@@ -610,7 +610,7 @@
     "description": "Label of the field for the size below which downloads stay in the browser."
   },
   "options_min_size_detail": {
-    "message": "Files smaller than this stay in the browser. Files of unknown size always go to Ketch. 0 sends everything.",
+    "message": "Files smaller than this stay in the browser. 0 sends everything.",
     "description": "Description of options_min_size."
   },
   "options_min_size_unit": {
@@ -748,5 +748,33 @@
   "notify_direct_hint": {
     "message": "Use the browser’s built-in save command for this item.",
     "description": "Notification guidance when a direct download fails or cannot preserve the private browsing context."
+  },
+  "options_unknown_size": {
+    "message": "Capture files of unknown size",
+    "description": "Download capture setting: options_unknown_size"
+  },
+  "options_file_types": {
+    "message": "File types",
+    "description": "Download capture setting: options_file_types"
+  },
+  "file_types_all": {
+    "message": "All types",
+    "description": "Download capture setting: file_types_all"
+  },
+  "file_types_only": {
+    "message": "Only listed types",
+    "description": "Download capture setting: file_types_only"
+  },
+  "file_types_except": {
+    "message": "Except listed types",
+    "description": "Download capture setting: file_types_except"
+  },
+  "options_extensions": {
+    "message": "File extensions, separated by commas",
+    "description": "Download capture setting: options_extensions"
+  },
+  "instance_cookies": {
+    "message": "Allow cookies and referrer for this server",
+    "description": "Download capture setting: instance_cookies"
   }
 }

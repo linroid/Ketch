@@ -14,12 +14,16 @@ import { ext } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
+import { RequestContext } from './lib/request-context.js';
 import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
 import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './lib/settings.js';
 
 /** Captured downloads wait for Ketch this long before the browser takes them back. */
 const CAPTURE_TIMEOUT_MS = 6_000;
+const requestContext = new RequestContext();
+ext.webRequest.onBeforeRequest.addListener((details) => requestContext.observe(details),
+  { urls: ['http://*/*', 'https://*/*'] });
 
 const MENUS = [
   { kind: 'link', contexts: ['link'], title: t('menu_download_link') },
@@ -104,7 +108,8 @@ async function captureDownload(item, gate) {
     console.error('Ketch: could not load settings', error);
     return release();
   }
-  const decision = captureDecision(item, settings, ext.runtime.id, capturePaused);
+  const decision = captureDecision(
+    requestContext.forDownload(item), settings, ext.runtime.id, capturePaused);
   if (!decision.capture) {
     console.debug(`Ketch: leaving download ${item.id} to the browser: ${decision.reason}`);
     return release();

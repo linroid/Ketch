@@ -3,7 +3,7 @@ import { describe, test } from 'node:test';
 import { MAX_TORRENT_BYTES, sendToKetch } from '../src/lib/handoff.js';
 import { normalizeSettings } from '../src/lib/settings.js';
 
-const instance = { id: 'nas', name: 'NAS', url: 'http://nas:8642', token: '' };
+const instance = { id: 'nas', name: 'NAS', forwardCookies: true, url: 'http://nas:8642', token: '' };
 const settings = normalizeSettings({ instances: [instance] });
 const TORRENT_BYTES = new TextEncoder().encode('d8:announce0:e');
 
@@ -214,4 +214,18 @@ describe('sendToKetch', () => {
     );
     assert.deepEqual(ketchCalls, []);
   });
+});
+
+test('remote credentials require both global and per-server permission', async () => {
+  const { deps, ketchCalls, cookieQueries } = fakeDeps();
+  await sendToKetch({ ...instance, forwardCookies: false },
+    { url: 'https://a.com/file', referrer: 'https://a.com/' }, settings, { deps });
+  assert.deepEqual(cookieQueries, []);
+  assert.deepEqual(ketchCalls[0].body.headers, { 'User-Agent': 'Browser/1.0' });
+});
+
+test('remote torrent-content resolution also obeys credential permission', async () => {
+  const { deps, siteCalls } = fakeDeps();
+  await sendToKetch({ ...instance, forwardCookies: false }, TORRENT_DOWNLOAD, settings, { deps });
+  assert.equal(siteCalls[0].init.credentials, 'omit');
 });

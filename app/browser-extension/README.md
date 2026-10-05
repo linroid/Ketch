@@ -112,8 +112,16 @@ Downloads are left to the browser when:
 - they come from a private window;
 - the link only exists in the browser (`blob:`, `data:`), as with media a page streams itself;
 - they come from a site in the exclusion list, or from a configured Ketch instance itself;
-- they are smaller than the minimum size, if one is set. Files of unknown size and `.torrent`
-  files are always captured.
+- the observed request uses a method other than GET, or saves a web document;
+- another extension owns the download;
+- their type is excluded by the file-type rules, including multipart suffixes such as `tar.gz`;
+- they are smaller than the minimum size, if one is set. The unknown-size switch controls files
+  without a known size; `.torrent` files bypass the size checks.
+
+Site exclusions check the original URL, final URL, referring page and observed page origin, so
+files served through a CDN still respect the originating site's exclusion. Request metadata is
+kept in memory for at most 30 seconds and 512 requests; it contains no request bodies or headers.
+If the browser did not expose a request method, capture cannot establish whether it was a POST.
 
 Choose **Pause until resumed** in the popup to temporarily leave downloads and magnet links to
 the browser. Capture stays paused until you choose **Resume now**, including after closing the
@@ -152,6 +160,7 @@ Nothing is sent anywhere except to the Ketch instances you add.
 |---|---|
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
 | `nativeMessaging` | Reach and open the Ketch app on this computer |
+| `webRequest` | Observe request methods and source pages for capture rules; no bodies or headers |
 | `cookies` | Send a site's cookies to Ketch so downloads that need a session work |
 | `contextMenus` | The **Download … with Ketch** menu items |
 | `notifications` | Tell you when a download was sent, or why it wasn't |
@@ -163,7 +172,10 @@ button.
 
 Things to know:
 
-- With **Send cookies and referrer** on (the default), Ketch stores the cookies with the task so
+- **Send cookies and referrer** is a global switch. Remote servers additionally need **Allow
+  cookies and referrer for this server**, off by default, including when upgrading existing
+  settings without an explicit grant. Changing a server address clears its grant. The native
+  app and existing loopback servers retain local forwarding. With forwarding allowed, Ketch stores the cookies with the task so
   it can resume it later, in its task database on the device that downloads. Turn the option off
   for downloads that don't need a session.
 - Access tokens of servers are stored in the browser's extension storage, like the apps store

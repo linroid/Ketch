@@ -470,7 +470,7 @@
     "message": "小文件交给浏览器"
   },
   "options_min_size_detail": {
-    "message": "小于此大小的文件留在浏览器中下载。大小未知的文件始终交给 Ketch。设为 0 则全部发送。"
+    "message": "小于此大小的文件由浏览器下载。0表示发送所有文件。"
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "请使用浏览器内置的保存功能保存此项目。"
+  },
+  "options_unknown_size": {
+    "message": "捕获大小未知的文件"
+  },
+  "options_file_types": {
+    "message": "文件类型"
+  },
+  "file_types_all": {
+    "message": "所有类型"
+  },
+  "file_types_only": {
+    "message": "仅列出的类型"
+  },
+  "file_types_except": {
+    "message": "排除列出的类型"
+  },
+  "options_extensions": {
+    "message": "文件扩展名，以逗号分隔"
+  },
+  "instance_cookies": {
+    "message": "允许向此服务器发送Cookie和来源页面"
   }
 }

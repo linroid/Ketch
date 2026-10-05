@@ -93,6 +93,7 @@ describe('normalizeSettings', () => {
         name: 'NAS',
         url: `http://nas.local:${DEFAULT_PORT}`,
         token: '',
+        forwardCookies: false,
       },
     ]);
   });
@@ -161,4 +162,13 @@ describe('findInstance', () => {
     assert.equal(findInstance(settings).id, 'b');
     assert.equal(findInstance(settings, 'removed').id, 'b');
   });
+});
+
+test('servers saved without an explicit grant only forward cookies on loopback', () => {
+  const settings = normalizeSettings({ instances: [
+    { id: 'remote', url: 'https://nas.example' },
+    { id: 'local', url: 'http://localhost:8642' },
+  ] });
+  assert.equal(settings.instances[0].forwardCookies, false);
+  assert.equal(settings.instances[1].forwardCookies, true);
 });

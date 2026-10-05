@@ -470,7 +470,7 @@
     "message": "Kleine Dateien dem Browser überlassen"
   },
   "options_min_size_detail": {
-    "message": "Kleinere Dateien bleiben im Browser. Dateien unbekannter Größe gehen immer an Ketch. Bei 0 wird alles gesendet."
+    "message": "Kleinere Dateien bleiben im Browser. 0 sendet alles."
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "Verwende für dieses Element den Speicherbefehl des Browsers."
+  },
+  "options_unknown_size": {
+    "message": "Dateien unbekannter Größe erfassen"
+  },
+  "options_file_types": {
+    "message": "Dateitypen"
+  },
+  "file_types_all": {
+    "message": "Alle Typen"
+  },
+  "file_types_only": {
+    "message": "Nur aufgeführte Typen"
+  },
+  "file_types_except": {
+    "message": "Außer aufgeführten Typen"
+  },
+  "options_extensions": {
+    "message": "Dateiendungen, durch Kommas getrennt"
+  },
+  "instance_cookies": {
+    "message": "Cookies und Referrer für diesen Server erlauben"
   }
 }

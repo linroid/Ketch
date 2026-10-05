@@ -56,8 +56,8 @@ describe('captureDecision', () => {
     assert.equal(decide(download({ incognito: true })).capture, false);
   });
 
-  test('captures downloads started by other extensions', () => {
-    assert.equal(decide(download({ byExtensionId: 'other-extension' })).capture, true);
+  test('leaves downloads started by other extensions to their owner', () => {
+    assert.equal(decide(download({ byExtensionId: 'other-extension' })).capture, false);
   });
 
   test('skips downloads that are no longer running', () => {
@@ -96,4 +96,33 @@ describe('captureDecision', () => {
     assert.equal(decide(download({ ...tiny, filename: '/tmp/ubuntu.torrent' })).capture, true);
     assert.equal(decide(download({ ...tiny, url: 'https://a.com/ubuntu.torrent' })).capture, true);
   });
+});
+
+test('site exclusions follow the page and original URL when files use a CDN', () => {
+  const url = 'https://cdn.example.net/file.iso';
+  assert.equal(decide(download({ url, referrer: 'https://example.org/page' })).capture, false);
+  assert.equal(decide(download({ url, pageUrl: 'https://sub.example.org/page' })).capture, false);
+  assert.equal(decide(download({ url: 'https://example.org/get', finalUrl: url })).capture, false);
+});
+
+test('known POST requests and saved documents remain browser-owned', () => {
+  assert.equal(decide(download({ requestMethod: 'POST' })).capture, false);
+  assert.equal(decide(download({ filename: 'page.mhtml' })).capture, false);
+  assert.equal(decide(download({ mime: 'text/html; charset=utf-8' })).capture, false);
+});
+
+test('file type rules match multipart suffixes and let only-mode exclude unknown types', () => {
+  const only = { ...settings, fileTypeMode: 'only', fileExtensions: ['tar.gz'] };
+  assert.equal(decide(download({ filename: 'archive.TAR.GZ' }), only).capture, true);
+  assert.equal(decide(download({ filename: 'archive.gz' }), only).capture, false);
+  assert.equal(decide(download({ url: 'https://example.net/get' }), only).capture, false);
+  assert.equal(decide(download({ filename: 'archive.tar.gz' }),
+    { ...only, fileTypeMode: 'except' }).capture, false);
+});
+
+test('unknown-size preference does not prevent tiny torrent handoffs', () => {
+  const configured = { ...settings, captureUnknownSize: false };
+  assert.equal(decide(download({ totalBytes: -1 }), configured).capture, false);
+  assert.equal(decide(download({ totalBytes: -1, mime: 'application/x-bittorrent' }),
+    configured).capture, true);
 });

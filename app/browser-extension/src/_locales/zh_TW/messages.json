@@ -470,7 +470,7 @@
     "message": "小檔案交給瀏覽器"
   },
   "options_min_size_detail": {
-    "message": "小於此大小的檔案會留在瀏覽器下載。大小不明的檔案一律交給 Ketch。設為 0 則全部傳送。"
+    "message": "小於此大小的檔案由瀏覽器下載。0表示傳送所有檔案。"
   },
   "options_min_size_unit": {
     "message": "MB"
@@ -573,5 +573,26 @@
   },
   "notify_direct_hint": {
     "message": "請使用瀏覽器內建的儲存功能儲存此項目。"
+  },
+  "options_unknown_size": {
+    "message": "擷取大小未知的檔案"
+  },
+  "options_file_types": {
+    "message": "檔案類型"
+  },
+  "file_types_all": {
+    "message": "所有類型"
+  },
+  "file_types_only": {
+    "message": "僅列出的類型"
+  },
+  "file_types_except": {
+    "message": "排除列出的類型"
+  },
+  "options_extensions": {
+    "message": "副檔名，以逗號分隔"
+  },
+  "instance_cookies": {
+    "message": "允許向此伺服器傳送Cookie和來源頁面"
   }
 }

@@ -37,10 +37,14 @@ export function hostMatches(host, patterns) {
 export function captureDecision(item, settings, extensionId, capturePaused = false) {
   if (capturePaused === true) return skip('capturing is temporarily paused');
   if (!settings.interceptDownloads) return skip('capturing is turned off');
-  if (item.byExtensionId && item.byExtensionId === extensionId) {
-    return skip('started by this extension');
+  if (item.byExtensionId) {
+    return skip('started by an extension');
   }
   if (item.incognito) return skip('private window');
+  if (item.requestMethod && item.requestMethod !== 'GET') return skip('requires browser request');
+  if (/\.(?:html?|xhtml|mhtml?|xml)$/i.test(item.filename ?? '')) return skip('saved web page');
+  if (['text/html', 'application/xhtml+xml', 'text/xml', 'application/xml']
+    .includes(item.mime?.split(';')[0].trim().toLowerCase())) return skip('web document');
   if (item.state && item.state !== 'in_progress') return skip(`already ${item.state}`);
 
   let url;
@@ -53,14 +57,25 @@ export function captureDecision(item, settings, extensionId, capturePaused = fal
     return skip(`${url.protocol} links only exist in the browser`);
   }
   if (servedByKetch(url, settings)) return skip('served by Ketch');
-  if (hostMatches(url.hostname, settings.excludedHosts)) return skip('excluded site');
+  if ([item.url, item.finalUrl, item.referrer, item.pageUrl].some((value) => {
+    try { return hostMatches(new URL(value).hostname, settings.excludedHosts); }
+    catch { return false; }
+  })) return skip('excluded site');
+  const names = [item.filename, url.pathname].filter(Boolean);
+  const matchesType = settings.fileExtensions?.some((extension) =>
+    names.some((name) => name.toLowerCase().endsWith(`.${extension}`)));
+  if ((settings.fileTypeMode === 'only' && !matchesType) ||
+    (settings.fileTypeMode === 'except' && matchesType)) return skip('file type rule');
 
   // A .torrent file is tiny but stands for a large download, so the size limit doesn't apply.
   const isTorrent = isTorrentUrl(url.href) ||
     isTorrentFile({ mime: item.mime, fileName: item.filename });
-  const size = Math.max(item.totalBytes ?? 0, item.fileSize ?? 0);
-  // Downloads of unknown size are captured: the size limit is for skipping small files.
-  if (!isTorrent && size > 0 && size < settings.minFileSizeMb * MEGABYTE) {
+  const size = Math.max(item.totalBytes ?? -1, item.fileSize ?? -1);
+  if (!isTorrent && size < 0 && settings.captureUnknownSize === false) {
+    return skip('unknown size');
+  }
+  // Unknown sizes follow their own preference; zero-byte files are known to be small.
+  if (!isTorrent && size >= 0 && size < settings.minFileSizeMb * MEGABYTE) {
     return skip('smaller than minimum');
   }
   return { capture: true, reason: '' };
