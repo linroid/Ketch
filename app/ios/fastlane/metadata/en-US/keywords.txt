@@ -1,0 +1,1 @@
+downloader,accelerator,ftp,resume,pause,parallel,segmented,queue,speed,limit,files,nas,server,remote

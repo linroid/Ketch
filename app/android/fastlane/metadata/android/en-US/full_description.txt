@@ -1,0 +1,35 @@
+Ketch is a fast, open-source download manager. It splits every download across parallel connections, shows each one as a live lane, and lets you control the downloads on your computers and home server from your phone.
+
+FASTER DOWNLOADS
+• Parallel connections: Ketch downloads several ranges of a file at once and shows the speed of each. Add or remove connections while a download runs.
+• Several networks at once: spread one download over Wi-Fi and mobile data.
+• Pause and resume, even after a restart. Ketch checks that the file on the server has not changed before it continues, and retries failed connections on its own.
+• Downloads keep running in the background, with their progress in a notification.
+
+EVERY KIND OF LINK
+• HTTP and HTTPS
+• FTP and FTPS, with parallel connections and resume
+• BitTorrent and magnet links: v1, v2 and hybrid torrents, with a choice of files
+• Open magnet links and .torrent files from your browser or file manager, or share a link to Ketch from any app
+
+ALL YOUR DEVICES IN ONE APP
+• Pair the Ketch desktop app on a Mac, Windows or Linux computer, or a home server running Ketch, by scanning a QR code
+• See every device with its live speed, and add, pause or resume downloads on any of them
+• Send a download to another device, or list the downloads of every device in one place
+
+IN CONTROL OF YOUR BANDWIDTH
+• Speed modes: Full speed, a Slow lane that leaves room for calls and streaming, or Auto, which switches between them on a weekly schedule
+• Speed limits, connection counts and priorities per download, changed while it runs. Urgent starts a download right away.
+• A queue that limits how many downloads run at once, and downloads that start at a time you pick
+
+FIND DOWNLOADS WITH AI (PREVIEW)
+• Discover: describe what you want, and an AI agent searches the web, checks the links and ranks the files it finds. Narrow it down with follow-up messages.
+• Bring your own model: OpenAI, Anthropic, Gemini, Ollama or any OpenAI-compatible service, with your own key. Discover asks before it opens a website, and you can switch it off.
+
+PRIVATE BY DESIGN
+• No account, no ads, no tracking. Ketch has no servers of its own: it connects only to the sites you download from, the devices you pair and the AI service you choose.
+• Open source under the Apache 2.0 license: https://github.com/linroid/Ketch
+
+Light and dark themes, in English, 简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français and Русский.
+
+Ketch downloads what you ask it to. Please only download content you have the right to.

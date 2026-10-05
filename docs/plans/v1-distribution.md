@@ -18,7 +18,9 @@ Edge Add-ons and Mozilla Add-ons, and provide a Mozilla-signed Firefox XPI on Gi
 Microsoft Store/MSIX, Mac App Store, Google Play, iOS App Store, package-manager listings and
 Docker distribution are follow-up work under this plan. They do not block v1.0.0. In particular,
 do not advertise an iOS store download before one exists; preserve the documented source-build
-route. Safari remains outside the extension's supported browsers.
+route. Safari remains outside the extension's supported browsers. Listing text, screenshots and
+store answers for Google Play and the App Store are prepared in
+[app store listings](../app-store-listing.md).
 
 ## Current baseline
 
