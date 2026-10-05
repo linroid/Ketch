@@ -33,6 +33,8 @@ route. Safari remains outside the extension's supported browsers.
 - [Extension packaging](../../app/browser-extension/build.mjs) produces Chromium and Firefox
   ZIPs. The [installation instructions](../../app/browser-extension/README.md#installing) still
   require unpacked or temporary installation. Firefox's stable ID is `ketch@linroid.github.io`.
+  The Chromium ZIP retains the development `key`; it is not the key-free store upload described
+  in the extension's [development instructions](../../app/browser-extension/README.md#development).
 - `NativeHostRegistration` currently allows one development Chromium ID. Its comment calls for
   adding Chrome Web Store and Edge Add-ons IDs when published.
 - The [updater](../updates.md) selects assets by exact naming conventions and verifies GitHub's
@@ -122,8 +124,14 @@ require an Apple certificate for the extension itself; the native Ketch app stil
   privacy policy matching the implementation. Explain download interception, native messaging,
   cookies and headers forwarded to the user's selected Ketch instance. Check each store's data
   disclosures against those behaviors, including Firefox's current `none` declaration.
-- [ ] Submit the Chromium package to Chrome Web Store and Edge Add-ons. Normal users should
-  install from store links; keep unpacked ZIP installation documented for development only.
+- [ ] Add a distinct Chromium store artifact to `build.mjs` and release CI, such as
+  `ketch-extension-<version>-chrome-store.zip`, whose manifest omits the development `key`.
+  Preserve the key in the existing Chromium ZIP and unpacked build so local development keeps
+  its stable ID. Add packaging tests that inspect both generated ZIP manifests: the store
+  artifact must have no `key`, and the development artifact must retain the pinned key.
+- [ ] Submit only the key-free store artifact to Chrome Web Store and Edge Add-ons; verify its
+  manifest before upload. Normal users should install from store links; keep unpacked ZIP
+  installation documented for development only.
 - [ ] Add the actual store IDs to `NativeHostRegistration.CHROMIUM_EXTENSION_IDS` before
   freezing desktop release candidates. Keep the development ID for documented local builds,
   and test that unlisted origins remain refused.
@@ -186,6 +194,7 @@ row needs evidence; a successful RC does not substitute for verifying the final 
 - [ ] Windows MSI, portable executable and CLI signatures verified.
 - [ ] macOS app and CLI signed, notarization accepted, final DMG ticket validated.
 - [ ] Fresh installations and supported upgrades pass without data loss.
+- [ ] Chrome and Edge submissions use the key-free store artifact; packaging checks pass.
 - [ ] Chrome, Edge and Firefox production install routes work with the packaged native host.
 - [ ] Firefox GitHub XPI is Mozilla-signed and its update path is verified.
 - [ ] Android, Linux, SDK and web checks pass; notices and final hashes are included.
