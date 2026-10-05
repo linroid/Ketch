@@ -110,7 +110,9 @@ export async function submitDownload(client, endpoint, request, options = {}) {
     }
     if (supported) {
       try {
-        const tasks = await client.listTasks();
+        // App ports and tokens change on restart. Reconnect only for this read, never replay
+        // the write: a dropped response does not prove the task was not persisted.
+        const tasks = options.recoverTasks ? await options.recoverTasks() : await client.listTasks();
         const task = tasks.find((it) => it.request?.requestId === id);
         if (task) {
           await forgetSubmission(id, storage);
