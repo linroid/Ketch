@@ -38,7 +38,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.isAltPressed
-import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -79,6 +78,7 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.input.onContextClick
 import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
 import com.linroid.ketch.app.state.ListArrangement
 import com.linroid.ketch.app.state.RowGroup
@@ -238,15 +238,7 @@ private fun TableHeader(
         .height(spacing.tableHeaderHeight)
         .background(colors.surfaceSunken)
         .rowDivider(colors.hairline)
-        .pointerInput(Unit) {
-          awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            if (currentEvent.buttons.isSecondaryPressed) {
-              down.consume()
-              chooserAt = down.position
-            }
-          }
-        }
+        .onContextClick(pass = PointerEventPass.Initial) { chooserAt = it }
         .padding(horizontal = TablePadding),
     ) {
       Box(Modifier.width(TableColumn.StatusDotWidth), contentAlignment = Alignment.Center) {

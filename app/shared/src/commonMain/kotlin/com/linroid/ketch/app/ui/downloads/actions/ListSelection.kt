@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
 import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -11,19 +10,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
-import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.input.awaitAnyButtonDown
+import com.linroid.ketch.app.input.isContextClick
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.SelectionState
@@ -172,18 +171,19 @@ private class RowPointerNode(
   private suspend fun PointerInputScope.detect() {
     val apple = KeyboardPlatform.current.isApple
     awaitEachGesture {
-      val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Main)
+      val down = awaitAnyButtonDown()
       val event = currentEvent
       val keys = event.keyboardModifiers
-      val secondary = event.buttons.isSecondaryPressed ||
-        apple && keys.isCtrlPressed && event.buttons.isPrimaryPressed
-      if (secondary) {
+      if (event.isContextClick) {
         down.consume()
         onContextClick(down.position)
         return@awaitEachGesture
       }
       if (down.isConsumed) return@awaitEachGesture
       val touch = down.type == PointerType.Touch
+      if (down.type == PointerType.Mouse && !event.buttons.isPrimaryPressed) {
+        return@awaitEachGesture
+      }
       if (touch) {
         var cancelled = false
         val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
