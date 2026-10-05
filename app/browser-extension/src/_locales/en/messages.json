@@ -776,5 +776,49 @@
   "instance_cookies": {
     "message": "Allow cookies and referrer for this server",
     "description": "Download capture setting: instance_cookies"
+  },
+  "resources_title": {
+    "message": "Page resources",
+    "description": "Page resource picker: resources_title"
+  },
+  "resources_detail": {
+    "message": "Choose files already visible or loaded on the page. Scroll or play media on the original page, then scan again. Streaming playlists are not included.",
+    "description": "Page resource picker: resources_detail"
+  },
+  "resources_images": {
+    "message": "Images",
+    "description": "Page resource picker: resources_images"
+  },
+  "resources_video": {
+    "message": "Video",
+    "description": "Page resource picker: resources_video"
+  },
+  "resources_audio": {
+    "message": "Audio",
+    "description": "Page resource picker: resources_audio"
+  },
+  "resources_files": {
+    "message": "Files",
+    "description": "Page resource picker: resources_files"
+  },
+  "resources_scan": {
+    "message": "Scan again",
+    "description": "Page resource picker: resources_scan"
+  },
+  "resources_select": {
+    "message": "Select visible resources",
+    "description": "Page resource picker: resources_select"
+  },
+  "resources_send": {
+    "message": "Download selected",
+    "description": "Page resource picker: resources_send"
+  },
+  "resources_empty": {
+    "message": "No direct files found. Try scrolling or playing media, then scan again.",
+    "description": "Page resource picker: resources_empty"
+  },
+  "resources_unavailable": {
+    "message": "This page cannot be scanned. Open a regular website in a non-private tab and try again.",
+    "description": "Page resource picker: resources_unavailable"
   }
 }

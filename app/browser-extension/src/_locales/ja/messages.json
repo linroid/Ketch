@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "このサーバーへのCookieとリファラーの送信を許可"
+  },
+  "resources_title": {
+    "message": "ページのリソース"
+  },
+  "resources_detail": {
+    "message": "ページに表示または読み込み済みのファイルを選択します。元のページでスクロールやメディア再生を行い、再検索してください。ストリーミングのプレイリストは含まれません。"
+  },
+  "resources_images": {
+    "message": "画像"
+  },
+  "resources_video": {
+    "message": "動画"
+  },
+  "resources_audio": {
+    "message": "音声"
+  },
+  "resources_files": {
+    "message": "ファイル"
+  },
+  "resources_scan": {
+    "message": "再検索"
+  },
+  "resources_select": {
+    "message": "表示中のリソースを選択"
+  },
+  "resources_send": {
+    "message": "選択項目をダウンロード"
+  },
+  "resources_empty": {
+    "message": "直接ダウンロードできるファイルが見つかりません。スクロールやメディア再生を行い、再検索してください。"
+  },
+  "resources_unavailable": {
+    "message": "このページは検索できません。通常のウェブサイトをプライベートではないタブで開き、再試行してください。"
   }
 }

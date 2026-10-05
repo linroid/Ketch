@@ -132,6 +132,22 @@ capture preferences; context-menu download actions and pasted links still send t
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
 the file name in Ketch's download folder; Ketch picks a free name if it is taken.
 
+## Page resources
+
+Choose **Page resources** in the popup to scan the active website on demand. The picker lists
+images, ordinary audio/video URLs and direct file links from accessible frames and resources
+already loaded by the page. It does not fetch candidates, start playback, or transmit page data
+to Ketch while scanning. Private and browser-internal pages cannot be scanned.
+
+Filter by type, select visible resources and choose an instance to download the selection.
+Results are deduplicated and capped at 500. Each submission uses the current cookie permissions;
+changing the target's connection settings prevents the batch from silently switching servers.
+Successes and uncertain submissions are disabled to avoid resending them within the picker.
+
+Scroll or play media in the original tab, then **Scan again**, to find lazy-loaded content.
+`blob:` URLs, HLS/DASH playlists, DRM and resources hidden in custom player internals are not
+included. Finding a URL does not guarantee it is still valid or independently downloadable.
+
 ## Submission recovery and diagnostics
 
 Each submission to a supporting Ketch instance has a UUID. Ketch returns the same retained task
@@ -160,6 +176,7 @@ Nothing is sent anywhere except to the Ketch instances you add.
 |---|---|
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
 | `nativeMessaging` | Reach and open the Ketch app on this computer |
+| `scripting`, `activeTab` | Scan page resources when requested from the popup |
 | `webRequest` | Observe request methods and source pages for capture rules; no bodies or headers |
 | `cookies` | Send a site's cookies to Ketch so downloads that need a session work |
 | `contextMenus` | The **Download … with Ketch** menu items |

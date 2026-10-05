@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "允许向此服务器发送Cookie和来源页面"
+  },
+  "resources_title": {
+    "message": "页面资源"
+  },
+  "resources_detail": {
+    "message": "选择页面上已显示或加载的文件。在原页面滚动或播放媒体后，再次扫描。不包含流媒体播放列表。"
+  },
+  "resources_images": {
+    "message": "图片"
+  },
+  "resources_video": {
+    "message": "视频"
+  },
+  "resources_audio": {
+    "message": "音频"
+  },
+  "resources_files": {
+    "message": "文件"
+  },
+  "resources_scan": {
+    "message": "再次扫描"
+  },
+  "resources_select": {
+    "message": "选择可见资源"
+  },
+  "resources_send": {
+    "message": "下载所选项目"
+  },
+  "resources_empty": {
+    "message": "未找到可直接下载的文件。请滚动页面或播放媒体后再次扫描。"
+  },
+  "resources_unavailable": {
+    "message": "无法扫描此页面。请在非隐私标签页中打开普通网站后重试。"
   }
 }

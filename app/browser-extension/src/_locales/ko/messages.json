@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "이 서버에 쿠키 및 참조 페이지 전송 허용"
+  },
+  "resources_title": {
+    "message": "페이지 리소스"
+  },
+  "resources_detail": {
+    "message": "페이지에 표시되거나 로드된 파일을 선택하세요. 원래 페이지에서 스크롤하거나 미디어를 재생한 후 다시 검색하세요. 스트리밍 재생목록은 포함되지 않습니다."
+  },
+  "resources_images": {
+    "message": "이미지"
+  },
+  "resources_video": {
+    "message": "동영상"
+  },
+  "resources_audio": {
+    "message": "오디오"
+  },
+  "resources_files": {
+    "message": "파일"
+  },
+  "resources_scan": {
+    "message": "다시 검색"
+  },
+  "resources_select": {
+    "message": "표시된 리소스 선택"
+  },
+  "resources_send": {
+    "message": "선택 항목 다운로드"
+  },
+  "resources_empty": {
+    "message": "직접 다운로드할 파일을 찾지 못했습니다. 스크롤하거나 미디어를 재생한 후 다시 검색하세요."
+  },
+  "resources_unavailable": {
+    "message": "이 페이지는 검색할 수 없습니다. 일반 웹사이트를 비공개가 아닌 탭에서 열고 다시 시도하세요."
   }
 }

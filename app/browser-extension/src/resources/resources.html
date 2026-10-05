@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="resources_title">Page resources</title>
+  <link rel="stylesheet" href="../ui/common.css">
+  <link rel="stylesheet" href="resources.css">
+  <script type="module" src="resources.js"></script>
+</head>
+<body>
+  <main>
+    <h1 data-i18n="resources_title">Page resources</h1>
+    <p class="muted" data-i18n="resources_detail">Choose files already visible or loaded on the
+      page. Scroll or play media on the original page, then scan again. Streaming playlists are
+      not included.</p>
+    <div class="toolbar">
+      <select id="instance" aria-label="Ketch instance" data-i18n-aria-label="popup_instance_picker">
+      </select>
+      <select id="kind" aria-label="File types" data-i18n-aria-label="options_file_types">
+        <option value="all" data-i18n="file_types_all">All types</option>
+        <option value="image" data-i18n="resources_images">Images</option>
+        <option value="video" data-i18n="resources_video">Video</option>
+        <option value="audio" data-i18n="resources_audio">Audio</option>
+        <option value="file" data-i18n="resources_files">Files</option>
+      </select>
+      <button id="scan" data-i18n="resources_scan">Scan again</button>
+    </div>
+    <div class="toolbar">
+      <label><input id="all" type="checkbox"><span data-i18n="resources_select">Select visible
+        resources</span></label>
+      <button id="send" class="primary" disabled data-i18n="resources_send">Download selected</button>
+    </div>
+    <p id="status" role="status"></p>
+    <ul id="resources"></ul>
+  </main>
+</body>
+</html>

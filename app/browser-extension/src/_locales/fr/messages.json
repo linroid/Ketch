@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "Autoriser les cookies et le référent pour ce serveur"
+  },
+  "resources_title": {
+    "message": "Ressources de la page"
+  },
+  "resources_detail": {
+    "message": "Choisissez des fichiers visibles ou chargés sur la page. Faites défiler ou lisez un média sur la page d’origine, puis relancez la recherche. Les listes de streaming sont exclues."
+  },
+  "resources_images": {
+    "message": "Images"
+  },
+  "resources_video": {
+    "message": "Vidéo"
+  },
+  "resources_audio": {
+    "message": "Audio"
+  },
+  "resources_files": {
+    "message": "Fichiers"
+  },
+  "resources_scan": {
+    "message": "Rechercher à nouveau"
+  },
+  "resources_select": {
+    "message": "Sélectionner les ressources visibles"
+  },
+  "resources_send": {
+    "message": "Télécharger la sélection"
+  },
+  "resources_empty": {
+    "message": "Aucun fichier direct trouvé. Faites défiler ou lisez un média, puis réessayez."
+  },
+  "resources_unavailable": {
+    "message": "Cette page ne peut pas être analysée. Ouvrez un site web normal dans un onglet non privé et réessayez."
   }
 }

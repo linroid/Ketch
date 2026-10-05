@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "Permitir cookies y referente para este servidor"
+  },
+  "resources_title": {
+    "message": "Recursos de la página"
+  },
+  "resources_detail": {
+    "message": "Elige archivos visibles o cargados en la página. Desplázate o reproduce contenido en la página original y vuelve a buscar. No se incluyen listas de streaming."
+  },
+  "resources_images": {
+    "message": "Imágenes"
+  },
+  "resources_video": {
+    "message": "Vídeo"
+  },
+  "resources_audio": {
+    "message": "Audio"
+  },
+  "resources_files": {
+    "message": "Archivos"
+  },
+  "resources_scan": {
+    "message": "Buscar de nuevo"
+  },
+  "resources_select": {
+    "message": "Seleccionar recursos visibles"
+  },
+  "resources_send": {
+    "message": "Descargar selección"
+  },
+  "resources_empty": {
+    "message": "No se encontraron archivos directos. Desplázate o reproduce contenido y vuelve a buscar."
+  },
+  "resources_unavailable": {
+    "message": "No se puede analizar esta página. Abre un sitio web normal en una pestaña no privada e inténtalo de nuevo."
   }
 }

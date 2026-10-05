@@ -36,7 +36,9 @@
     "nativeMessaging",
     "notifications",
     "storage",
-    "webRequest"
+    "webRequest",
+    "scripting",
+    "activeTab"
   ],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [

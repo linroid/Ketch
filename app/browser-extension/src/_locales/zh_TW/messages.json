@@ -594,5 +594,38 @@
   },
   "instance_cookies": {
     "message": "允許向此伺服器傳送Cookie和來源頁面"
+  },
+  "resources_title": {
+    "message": "頁面資源"
+  },
+  "resources_detail": {
+    "message": "選擇頁面上已顯示或載入的檔案。在原頁面捲動或播放媒體後，再次掃描。不包含串流播放清單。"
+  },
+  "resources_images": {
+    "message": "圖片"
+  },
+  "resources_video": {
+    "message": "影片"
+  },
+  "resources_audio": {
+    "message": "音訊"
+  },
+  "resources_files": {
+    "message": "檔案"
+  },
+  "resources_scan": {
+    "message": "再次掃描"
+  },
+  "resources_select": {
+    "message": "選擇可見資源"
+  },
+  "resources_send": {
+    "message": "下載所選項目"
+  },
+  "resources_empty": {
+    "message": "未找到可直接下載的檔案。請捲動頁面或播放媒體後再次掃描。"
+  },
+  "resources_unavailable": {
+    "message": "無法掃描此頁面。請在非私密分頁中開啟一般網站後重試。"
   }
 }
