@@ -1,12 +1,14 @@
 package com.linroid.ketch.app.icons
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.snapshot.withScene
 import com.linroid.ketch.app.theme.KetchTheme
 import kotlinx.coroutines.delay
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class KetchIconMotionTest {
@@ -25,6 +27,25 @@ class KetchIconMotionTest {
       assertEquals(1, reduced.distinct().size, "${icon.name} must respect reduced motion")
       assertEquals(1, disabled.distinct().size, "${icon.name} must respect animate=false")
       assertEquals(disabled, reduced, "${icon.name} must use the same static silhouette")
+    }
+  }
+
+  @Test
+  fun animatedIcons_afterGesture_stopRequestingFrames() {
+    for (icon in AnimatedIcons) {
+      withScene(80, 80, content = {
+        KetchTheme(darkTheme = false, reduceMotion = false) {
+          Box { KetchIconImage(icon, size = 64.dp) }
+        }
+      }) {
+        // Advance beyond the longest gesture (3.2 seconds), into every icon's rest interval.
+        for (frame in 0..40) {
+          render(frame * 100_000_000L).close()
+          delay(2)
+          Snapshot.sendApplyNotifications()
+        }
+        assertFalse(hasInvalidations(), "${icon.name} must stop requesting frames while resting")
+      }
     }
   }
 

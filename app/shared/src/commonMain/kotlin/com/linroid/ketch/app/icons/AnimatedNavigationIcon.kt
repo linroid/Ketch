@@ -1,18 +1,20 @@
 package com.linroid.ketch.app.icons
 
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.linroid.ketch.app.theme.KetchTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 internal const val DOWNLOAD_ARROW = "M10 2.5v10M6.5 9L10 12.5L13.5 9"
 internal const val DOWNLOAD_TRAY =
@@ -37,19 +39,20 @@ internal fun AnimatedNavigationIcon(
   colorFilter: ColorFilter,
 ) {
   val easing = KetchTheme.motion.easeStandard
-  val movement = rememberInfiniteTransition(label = "navigationIcon").animateFloat(
-    initialValue = 0f,
-    targetValue = 0f,
-    animationSpec = infiniteRepeatable(keyframes {
-      durationMillis = LOOP_MILLIS
-      0f at 0 using easing
-      1f at 700 using easing
-      -0.35f at 1200 using easing
-      0f at 1800
-      0f at LOOP_MILLIS
-    }),
-    label = "navigationGesture",
-  )
+  val movement = remember { Animatable(0f) }
+  LaunchedEffect(easing) {
+    while (isActive) {
+      movement.animateTo(0f, keyframes {
+        durationMillis = GESTURE_MILLIS
+        0f at 0 using easing
+        1f at 700 using easing
+        -0.35f at 1200 using easing
+        0f at GESTURE_MILLIS
+      })
+      // Suspend instead of ticking through identical keyframes while the icon is still.
+      delay(REST_MILLIS)
+    }
+  }
   val stationary = when (icon) {
     KetchIcon.Active -> DownloadTray
     KetchIcon.Devices -> DevicesDisplay
@@ -95,4 +98,5 @@ internal fun AnimatedNavigationIcon(
   }
 }
 
-private const val LOOP_MILLIS = 7000
+private const val GESTURE_MILLIS = 1800
+private const val REST_MILLIS = 5200L

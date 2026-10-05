@@ -1,18 +1,22 @@
 package com.linroid.ketch.app.icons
 
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.linroid.ketch.app.theme.KetchTheme
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 internal const val DISCOVER_STAND = "M9.5 12.6V14M6.5 17.5l3-3.5 3 3.5"
 internal const val DISCOVER_BARREL = "M4 9.5L11 5l3 5-8 3z"
@@ -31,33 +35,34 @@ private val Spark by lazy { IconData.fills(DISCOVER_SPARK).toImageVector("discov
 @Composable
 internal fun AnimatedDiscoverIcon(modifier: Modifier, colorFilter: ColorFilter) {
   val easing = KetchTheme.motion.easeStandard
-  val transition = rememberInfiniteTransition(label = "discoverLookout")
-  val angle = transition.animateFloat(
-    initialValue = 0f,
-    targetValue = 0f,
-    animationSpec = infiniteRepeatable(keyframes {
-      durationMillis = LOOP_MILLIS
-      0f at 0 using easing
-      7f at 900 using easing
-      -5f at 1900 using easing
-      0f at 2600
-      0f at LOOP_MILLIS
-    }),
-    label = "telescopeScan",
-  )
-  val twinkle = transition.animateFloat(
-    initialValue = 1f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(keyframes {
-      durationMillis = LOOP_MILLIS
-      1f at 0 using easing
-      0.65f at 1900 using easing
-      1.15f at 2700 using easing
-      1f at 3200
-      1f at LOOP_MILLIS
-    }),
-    label = "discoverySpark",
-  )
+  val angle = remember { Animatable(0f) }
+  val twinkle = remember { Animatable(1f) }
+  LaunchedEffect(easing) {
+    while (isActive) {
+      coroutineScope {
+        launch {
+          angle.animateTo(0f, keyframes {
+            durationMillis = SCAN_MILLIS
+            0f at 0 using easing
+            7f at 900 using easing
+            -5f at 1900 using easing
+            0f at SCAN_MILLIS
+          })
+        }
+        launch {
+          twinkle.animateTo(1f, keyframes {
+            durationMillis = TWINKLE_MILLIS
+            1f at 0 using easing
+            0.65f at 1900 using easing
+            1.15f at 2700 using easing
+            1f at TWINKLE_MILLIS
+          })
+        }
+      }
+      // Both gestures have finished: request no frames until the next seven-second cycle.
+      delay(REST_MILLIS)
+    }
+  }
   Box(modifier) {
     Image(
       painter = rememberVectorPainter(Stand),
@@ -87,4 +92,6 @@ internal fun AnimatedDiscoverIcon(modifier: Modifier, colorFilter: ColorFilter) 
   }
 }
 
-private const val LOOP_MILLIS = 7000
+private const val SCAN_MILLIS = 2600
+private const val TWINKLE_MILLIS = 3200
+private const val REST_MILLIS = 3800L
