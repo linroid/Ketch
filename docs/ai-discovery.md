@@ -509,6 +509,15 @@ and it stays where you are; scroll back down and it follows again.
   list for the latest request and re-checks only links it has not
   checked in the chat; a result it returns again keeps the size, type
   and source page shown before.
+- **Devices.** Each search tells the agent the system and CPU of this
+  device and of the device the results go to (the one **Adding** picks,
+  else the active one), as they last reported them, such as *macOS
+  aarch64* and *Linux amd64*. They are only hints: when you ask for
+  software that comes in builds per platform and name none, the agent
+  prefers builds for them, those of the downloading device for software
+  meant to run there, such as a server. It ignores them when you name a
+  platform or the files are the same everywhere, and says in each
+  result's description which system and CPU a build is for.
 - **Summary.** The agent writes one or two plain sentences above its
   results. When it finds nothing it can recommend, such as for a request
   for pirated copies, the summary says why.
@@ -643,7 +652,9 @@ new line.
 ## Command line
 
 `ketch ai-discover "<request>"` runs one search with the `[ai]` settings
-of the default config file. It has no follow-ups or history. Only the
+of the default config file. It has no follow-ups or history, and tells
+the agent this machine's system and CPU as the [devices](#chats) hint
+for both the user's and the downloading device. Only the
 summary and the results go to stdout; the version banner, the model and
 query it uses, the agent's steps as they happen (one line each), the
 questions and errors go to stderr, so `> results.txt` keeps just the

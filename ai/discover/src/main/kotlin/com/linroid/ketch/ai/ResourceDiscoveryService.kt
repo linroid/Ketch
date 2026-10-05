@@ -321,6 +321,8 @@ class ResourceDiscoveryService internal constructor(
           "Expected file types: ${query.fileTypes.joinToString()}"
         )
       }
+      query.userDevice?.let(::deviceLabel)?.let { appendLine("User's device: $it") }
+      query.downloadDevice?.let(::deviceLabel)?.let { appendLine("Downloading device: $it") }
       appendLine("Return up to ${query.maxResults} candidates.")
       appendLine("Tool budget: ${config.agent.maxToolCalls} tool calls, emitStep included.")
       val earlier = buildJsonArray {
@@ -383,6 +385,19 @@ class ResourceDiscoveryService internal constructor(
       url.startsWith("http://", ignoreCase = true)
     if (!web || ' ' in url) return null
     return url.takeIf { sanitizeAgentText(it, MAX_EARLIER_SOURCE_URL_LENGTH) == it }
+  }
+
+  /**
+   * [device] as the agent reads it, such as "macOS aarch64", or `null` when it names nothing. A
+   * remote device reports its own system, so each part is one line and capped.
+   */
+  private fun deviceLabel(device: DiscoverDevice): String? {
+    val os = sanitizeAgentText(device.os, MAX_DEVICE_TEXT_LENGTH).let {
+      // The name a JVM gives every macOS version, which reads as an old one.
+      if (it.equals(JVM_MAC_NAME, ignoreCase = true)) "macOS" else it
+    }
+    val arch = sanitizeAgentText(device.arch, MAX_DEVICE_TEXT_LENGTH)
+    return listOf(os, arch).filter { it.isNotEmpty() }.joinToString(" ").ifEmpty { null }
   }
 
   /**
@@ -451,6 +466,12 @@ class ResourceDiscoveryService internal constructor(
     /** Discarded links listed to the agent; the rest are still dropped from its answer. */
     private const val MAX_EXCLUDED_IN_PROMPT = 100
 
+    /** Longest system or CPU name of a device shown to the agent, in characters. */
+    private const val MAX_DEVICE_TEXT_LENGTH = 60
+
+    /** The `os.name` of macOS on the JVM. */
+    private const val JVM_MAC_NAME = "Mac OS X"
+
     /**
      * Koog's iteration cap for an agent allowed [maxToolCalls] tool calls.
      *
@@ -515,6 +536,14 @@ class ResourceDiscoveryService internal constructor(
       |1. UNDERSTAND
       |   Analyze the request: what resource, expected file types, platform,
       |   version keywords.
+      |   The request may name the user's device and the downloading
+      |   device (the one that saves the files) with their system and CPU.
+      |   They are hints, often irrelevant: use them only when the files
+      |   come in builds per system or CPU and the request names neither.
+      |   The user runs apps on their own device. When the downloading
+      |   device differs, it is often a server: choose its builds for
+      |   software meant to run there, and when unsure include builds for
+      |   both. Say in each description which system and CPU a build is for.
       |   Call emitStep("Understanding", <your analysis>).
       |
       |2. PLAN

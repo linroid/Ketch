@@ -322,6 +322,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   candidate titles, descriptions and file names and source titles pass through
   `sanitizeAgentText` (one line of plain text; step details keep up to 12 lines), which the CLI
   applies again, as one line, when it prints
+- `DiscoverQuery.userDevice` / `downloadDevice` (`DiscoverDevice`: the system and CPU a device
+  reports) name the device the user searches from and the one that downloads, as hint lines in
+  the request; the agent uses them only for software built per platform when the request names
+  none. The apps pass the embedded device and the Discover target (else the active device) from
+  `DevicePresence` (`AppState.discoverDevices`), the CLI this machine for both
 - Discarding is per session, by `SiteNames.canonicalUrl`; discard, session delete and Clear
   history go through `PendingOps` (Undo). At most 3 turns run at once across sessions (the
   rest `Queued`), one per session; switching discovery off (provider `null`) stops them all,

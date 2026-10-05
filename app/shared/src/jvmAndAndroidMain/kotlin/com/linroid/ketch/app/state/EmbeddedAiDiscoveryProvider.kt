@@ -2,6 +2,7 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
+import com.linroid.ketch.ai.DiscoverDevice
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoverResult
 import com.linroid.ketch.ai.DiscoveryException
@@ -129,7 +130,11 @@ private fun AiDiscoverRequest.toQuery() = DiscoverQuery(
   },
   excludedUrls = excludedUrls,
   contentFilter = contentFilter,
+  userDevice = devices.user?.toEngine(),
+  downloadDevice = devices.download?.toEngine(),
 )
+
+private fun AiDevice.toEngine() = DiscoverDevice(os = os, arch = arch)
 
 /** Hands the steps of one search to [onStep], trimmed. */
 internal class RunStepListener(

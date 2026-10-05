@@ -35,6 +35,7 @@ data class AiCandidate(
  * @property history earlier turns of the conversation, oldest first; empty for a first search.
  * @property excludedUrls links the user discarded, which the search never returns.
  * @property contentFilter whether to hide results that look unsafe ([AiSettings.contentFilter]).
+ * @property devices the devices the search is for, which the agent may use to pick builds.
  */
 data class AiDiscoverRequest(
   val query: String,
@@ -44,6 +45,30 @@ data class AiDiscoverRequest(
   val history: List<AiDiscoverTurn> = emptyList(),
   val excludedUrls: Set<String> = emptySet(),
   val contentFilter: Boolean = true,
+  val devices: AiSearchDevices = AiSearchDevices(),
+)
+
+/**
+ * The devices a search is for, as hints the agent may ignore: it picks builds for their system
+ * and CPU when the request names none.
+ *
+ * @property user the device the user searches from, when known.
+ * @property download the device the results are added to, when known; it may be [user].
+ */
+data class AiSearchDevices(
+  val user: AiDevice? = null,
+  val download: AiDevice? = null,
+)
+
+/**
+ * A device as it reports its system.
+ *
+ * @property os its operating system, such as "Mac OS X" or "Android 15".
+ * @property arch its CPU architecture, such as "aarch64"; blank when unknown.
+ */
+data class AiDevice(
+  val os: String,
+  val arch: String = "",
 )
 
 /**

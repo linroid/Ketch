@@ -1,5 +1,6 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.ai.DiscoverDevice
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoverResult
 import com.linroid.ketch.ai.DiscoverTurn
@@ -8,10 +9,12 @@ import com.linroid.ketch.ai.PageAccessKind
 import com.linroid.ketch.ai.PageAccessRequest
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.app.state.AiCandidate
+import com.linroid.ketch.app.state.AiDevice
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverTurn
 import com.linroid.ketch.app.state.AiPageKind
 import com.linroid.ketch.app.state.AiPageRequest
+import com.linroid.ketch.app.state.AiSearchDevices
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
@@ -233,6 +236,22 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
       ),
       seen,
     )
+  }
+
+  @Test
+  fun `the devices a search is for reach the engine`() = runTest {
+    var seen: DiscoverQuery? = null
+    val engine = Engine { query, _, _ -> result(query).also { seen = query } }
+
+    val devices = AiSearchDevices(
+      user = AiDevice(os = "Android 15", arch = "aarch64"),
+      download = AiDevice(os = "Linux"),
+    )
+    engine.provider.discover(AiDiscoverRequest("vlc", devices = devices), {}, { true })
+
+    val query = assertNotNull(seen)
+    assertEquals(DiscoverDevice(os = "Android 15", arch = "aarch64"), query.userDevice)
+    assertEquals(DiscoverDevice(os = "Linux"), query.downloadDevice)
   }
 
   @Test

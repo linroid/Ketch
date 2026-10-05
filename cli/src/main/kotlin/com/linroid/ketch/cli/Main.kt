@@ -11,6 +11,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.ai.DiscoverDevice
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
@@ -594,11 +595,18 @@ private fun discover(args: List<String>, results: PrintStream): Int {
   System.err.println()
 
   return runBlocking {
+    // This machine searches, and downloads what `ketch <url>` is given.
+    val machine = DiscoverDevice(
+      os = System.getProperty("os.name").orEmpty(),
+      arch = System.getProperty("os.arch").orEmpty(),
+    )
     val discoverQuery = DiscoverQuery(
       query = options.query,
       sites = options.sites,
       maxResults = options.maxResults,
       contentFilter = settings.contentFilter && !options.noFilter,
+      userDevice = machine,
+      downloadDevice = machine,
     )
     val response = try {
       aiModule.discoveryService.discover(

@@ -35,6 +35,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -257,7 +258,7 @@ class AppState(
 
   /** AI discovery sessions, their searches and the requests to open websites they wait on. */
   val aiDiscover: AiDiscoverController =
-    AiDiscoverController(aiSettings, scope, discoverHistory, clock)
+    AiDiscoverController(aiSettings, scope, discoverHistory, clock, devices = ::discoverDevices)
 
   /** How many requests to open a website wait for the user's answer, for Discover's badge. */
   val discoverWaitingCount: Int get() = aiDiscover.approvals.size
@@ -771,6 +772,19 @@ class AppState(
           runInShell(KetchCommands.Discover)
         },
       ),
+    )
+  }
+
+  /**
+   * The devices a Discover search is for: this one, which runs the search, and the one its
+   * results go to, [targetId] or else the active one, as they last reported their systems.
+   */
+  private fun discoverDevices(targetId: String?): AiSearchDevices {
+    val target = instances.value.firstOrNull { it.deviceId == targetId } ?: activeInstance.value
+    val presence = instanceManager.presence.value
+    return AiSearchDevices(
+      user = presence.firstOrNull { it.entry is EmbeddedInstance }?.searchDevice(),
+      download = presence.firstOrNull { it.deviceId == target?.deviceId }?.searchDevice(),
     )
   }
 
@@ -2289,4 +2303,13 @@ private fun DownloadRequest.forDevice(): DownloadRequest {
     }
   }
   return copy(destination = portable, resolvedSource = null)
+}
+
+/**
+ * The device's system for a Discover search: from its last status, else, for a remote device not
+ * read since the app started, the system saved for it; `null` while unknown.
+ */
+private fun DevicePresence.searchDevice(): AiDevice? {
+  status?.system?.let { return AiDevice(os = it.os, arch = it.arch) }
+  return (entry as? RemoteInstance)?.remoteConfig?.os?.let { AiDevice(os = it) }
 }
