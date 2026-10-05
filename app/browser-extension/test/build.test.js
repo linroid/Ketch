@@ -31,8 +31,8 @@ describe('build', () => {
   const locales = readdirSync(new URL('../src/_locales/', import.meta.url));
   const outputs = build({ outDir });
 
-  test('builds for Chromium and Firefox', () => {
-    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox']);
+  test('builds for Chromium, Firefox and Safari', () => {
+    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox', 'safari']);
   });
 
   test('every build and zip has the messages of every language', () => {
@@ -53,4 +53,22 @@ describe('build', () => {
       }
     }
   });
+});
+
+test('Safari excludes capture and native-host permissions while retaining manual sending', () => {
+  const outDir = mkdtempSync(join(tmpdir(), 'ketch-safari-build-'));
+  try {
+    const safari = build({ outDir }).find((it) => it.browser === 'safari');
+    const manifest = JSON.parse(readFileSync(join(safari.dir, 'manifest.json'), 'utf8'));
+    for (const permission of ['downloads', 'nativeMessaging', 'notifications', 'webRequest']) {
+      assert.ok(!manifest.permissions.includes(permission));
+    }
+    for (const permission of ['storage', 'contextMenus', 'cookies', 'scripting', 'activeTab']) {
+      assert.ok(manifest.permissions.includes(permission));
+    }
+    assert.equal(manifest.key, undefined);
+    assert.equal(manifest.minimum_chrome_version, undefined);
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+  }
 });

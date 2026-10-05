@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "Esta revisión ya no está disponible. Comprueba las descargas pendientes en ajustes antes de volver a enviar."
+  },
+  "safari_detail": {
+    "message": "Safari envía enlaces revisados y recursos de páginas a un servidor Ketch configurado. Activa el uso compartido en Ketch e introduce aquí su dirección y token. No se permite capturar descargas automáticamente ni iniciar la app."
   }
 }

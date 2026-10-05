@@ -316,3 +316,42 @@ closing an unsent review resumes it in the browser. Acceptance removes the brows
 an uncertain send keeps it paused until you check pending downloads in settings. Reviews and
 receipts last only for the browser session. After restarting the browser, inspect Ketch and
 the browser's downloads before manually resuming a paused original.
+
+### Safari (limited macOS target)
+
+`npm run build` also writes `build/safari` and a Safari source zip. This target requires Safari
+16.4 or later for module background workers and session storage. It supports configured Ketch
+servers, reviewed context-menu links and magnets, pasted links, page resources, task controls,
+and diagnostics. It does not intercept browser downloads, launch the desktop app through a
+native host, or issue extension notifications. Every individual send opens the review page;
+batch sends are reviewed in the resource picker.
+
+Start sharing in Ketch or start `ketch server`, then enter its address and access token in the
+extension settings. Safari must allow website access both to source pages and to the configured
+server. Cookie forwarding still requires the global switch and a grant for that server.
+
+On macOS with Xcode installed:
+
+```sh
+npm run safari
+open "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj"
+```
+
+The script uses Apple's converter to generate a host app and extension under `build/`; it
+replaces only that generated project. Choose a signing team in Xcode, run the host and enable
+the extension in Safari settings. The source zip is not an installable Safari app. App Store
+signing, notarization, publishing, and iOS packaging are outside this target.
+
+To check compilation without signing:
+
+```sh
+xcodebuild -project "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj" \
+  -scheme "Ketch for Safari" -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath build/safari-derived CODE_SIGNING_ALLOWED=NO build
+```
+
+Some converter versions warn about the background `type` key despite module workers being
+supported in Safari 16.4+. See the [background compatibility data](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background)
+and [Apple's packaging guidance](https://developer.apple.com/documentation/safariservices/safari-web-extensions).
+Compilation and API-contract tests do not replace testing site permissions and downloads in
+a signed, enabled Safari extension.

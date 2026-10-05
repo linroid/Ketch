@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "Cette vérification n’est plus disponible. Consultez les téléchargements en attente dans les réglages avant de renvoyer."
+  },
+  "safari_detail": {
+    "message": "Safari envoie les liens vérifiés et les ressources de pages à un serveur Ketch configuré. Activez le partage dans Ketch, puis saisissez ici son adresse et son jeton. La capture automatique et le lancement de l’app ne sont pas disponibles."
   }
 }

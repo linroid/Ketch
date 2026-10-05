@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "此确认已不可用。再次发送前，请在设置中检查待确认的下载。"
+  },
+  "safari_detail": {
+    "message": "Safari 将确认过的链接和页面资源发送到已配置的 Ketch 服务器。在 Ketch 中开启共享，然后在此输入地址和访问令牌。不支持自动捕获下载或启动应用。"
   }
 }

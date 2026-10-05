@@ -1,7 +1,7 @@
 import { diagnosticReport, fingerprint, forgetSubmission, pendingSubmissions,
   receiptEndpoint, reconcileSubmissions, recordOutcome } from '../lib/submissions.js';
 import { withEndpoint } from '../lib/connection.js';
-import { ext } from '../lib/ext.js';
+import { ext, remoteOnly } from '../lib/ext.js';
 import { describeStatus, failureHint, withHint } from '../lib/format.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { KetchClient } from '../lib/ketch-client.js';
@@ -41,6 +41,16 @@ init().catch((error) => console.error('Ketch: could not load the settings page',
 
 async function init() {
   const settings = await loadSettings();
+  if (remoteOnly) {
+    $('browser-limits').hidden = false;
+    for (const id of ['intercept-downloads', 'min-file-size', 'capture-unknown-size',
+      'file-type-mode', 'file-extensions', 'excluded-hosts', 'confirm-downloads', 'notifications']) {
+      $(id).closest('label').hidden = true;
+    }
+    for (const key of ['options_help_this_computer', 'options_help_this_computer_detail']) {
+      document.querySelector(`[data-i18n="${key}"]`).hidden = true;
+    }
+  }
   for (const instance of settings.instances) {
     addCard(instance, instance.id === settings.defaultInstanceId);
   }
@@ -172,7 +182,7 @@ function updateInstanceButtons() {
   for (const card of cards) {
     card.querySelector('.remove').disabled = saved.length === 1 && saved[0] === card;
   }
-  $('add-app').hidden = cards.some((card) => card.dataset.type === 'app');
+  $('add-app').hidden = remoteOnly || cards.some((card) => card.dataset.type === 'app');
 }
 
 function updateNote(card) {

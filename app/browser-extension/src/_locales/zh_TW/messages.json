@@ -657,5 +657,8 @@
   },
   "review_unavailable": {
     "message": "此確認已無法使用。再次傳送前，請在設定中檢查待確認的下載。"
+  },
+  "safari_detail": {
+    "message": "Safari 將確認過的連結和頁面資源傳送到已設定的 Ketch 伺服器。在 Ketch 中開啟共享，然後在此輸入位址和存取權杖。不支援自動擷取下載或啟動應用程式。"
   }
 }
