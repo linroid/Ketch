@@ -27,6 +27,7 @@ function fakeDeps({
       siteCalls.push({ url, init });
       return siteResponse(init);
     }
+    if (url.endsWith('/api/status')) return Response.json({ features: [] });
     const body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     ketchCalls.push({ path: url.slice(instance.url.length), body });
     if (url.includes('/api/resolve/content')) {
@@ -214,3 +215,41 @@ describe('sendToKetch', () => {
     assert.deepEqual(ketchCalls, []);
   });
 });
+
+test('a restart after submission reconnects and reconciles the same receipt without another POST',
+  async () => {
+    for (const retained of [true, false]) {
+      const app = { id: 'local', type: 'app', name: 'App' };
+      const old = { url: 'http://127.0.0.1:10001', token: 'old' };
+      const fresh = { url: 'http://127.0.0.1:10002', token: 'new' };
+      let cached = old;
+      let submitted;
+      let writes = 0;
+      let reconnects = 0;
+      const deps = {
+        userAgent: 'Test', getCookies: async () => [],
+        connection: {
+          loadEndpoint: async () => cached,
+          saveEndpoint: async (value) => { cached = value; },
+          sendNativeMessage: async () => { reconnects++; return fresh; },
+        },
+        fetch: async (url, init) => {
+          if (url.endsWith('/api/status')) return Response.json({ features: ['task.requestId'] });
+          if (init.method === 'POST') {
+            writes++;
+            submitted = JSON.parse(init.body);
+            throw new TypeError('app restarted before the response');
+          }
+          if (url.startsWith(old.url)) throw new TypeError('old port closed');
+          assert.equal(init.headers.Authorization, 'Bearer new');
+          return Response.json({ tasks: retained ? [{ taskId: 'kept', request: submitted }] : [] });
+        },
+      };
+      const send = sendToKetch(app, { url: 'https://example.com/file' }, settings, { deps });
+      if (retained) assert.equal((await send).taskId, 'kept');
+      else await assert.rejects(send, { kind: 'uncertain' });
+      assert.equal(writes, 1);
+      assert.equal(reconnects, 1);
+      assert.ok(submitted.requestId);
+    }
+  });

@@ -523,6 +523,30 @@
   "options_help_command_line_detail": {
     "message": "Um <code>ketch server</code> auf diesem Computer oder Ketch aus einem als Flatpak oder Snap installierten Browser zu nutzen, der keine anderen Apps starten kann, füge es als Server unter <code>http://127.0.0.1:8642</code> hinzu."
   },
+  "options_diagnostics": {
+    "message": "Diagnose"
+  },
+  "diagnostics_detail": {
+    "message": "Prüfe unklare Übertragungen oder exportiere die letzten 100 Ergebnisse. Der Bericht enthält keine URLs, Dateinamen, Cookies oder Zugriffstoken."
+  },
+  "diagnostics_check": {
+    "message": "Ausstehende Downloads prüfen"
+  },
+  "diagnostics_export": {
+    "message": "Diagnose exportieren"
+  },
+  "diagnostics_clear": {
+    "message": "Diagnose löschen"
+  },
+  "diagnostics_checked": {
+    "message": "Keine ungeklärten Übertragungen."
+  },
+  "diagnostics_cleared": {
+    "message": "Diagnose gelöscht."
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketch hat diesen Download möglicherweise angenommen. Prüfe ausstehende Downloads in den Erweiterungseinstellungen, bevor du es erneut versuchst oder den Download im Browser fortsetzt."
+  },
   "popup_pause_capture": {
     "message": "Bis zum Fortsetzen pausieren"
   },

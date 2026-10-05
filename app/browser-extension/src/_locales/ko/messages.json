@@ -523,6 +523,30 @@
   "options_help_command_line_detail": {
     "message": "이 컴퓨터에서 <code>ketch server</code>를 사용하거나, 다른 앱을 시작할 수 없는 Flatpak 또는 Snap 브라우저에서 사용하려면 <code>http://127.0.0.1:8642</code>의 서버로 추가하세요."
   },
+  "options_diagnostics": {
+    "message": "진단"
+  },
+  "diagnostics_detail": {
+    "message": "결과가 불확실한 전송을 확인하거나 최근 100개 결과를 내보냅니다. 보고서에는 URL, 파일 이름, 쿠키 또는 액세스 토큰이 포함되지 않습니다."
+  },
+  "diagnostics_check": {
+    "message": "대기 중인 다운로드 확인"
+  },
+  "diagnostics_export": {
+    "message": "진단 내보내기"
+  },
+  "diagnostics_clear": {
+    "message": "진단 지우기"
+  },
+  "diagnostics_checked": {
+    "message": "미해결 전송이 없습니다."
+  },
+  "diagnostics_cleared": {
+    "message": "진단을 지웠습니다."
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketch가 이 다운로드를 수락했을 수 있습니다. 다시 시도하거나 브라우저에서 재개하기 전에 확장 프로그램 설정에서 대기 중인 다운로드를 확인하세요."
+  },
   "popup_pause_capture": {
     "message": "재개할 때까지 일시 중지"
   },

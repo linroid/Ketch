@@ -523,6 +523,30 @@
   "options_help_command_line_detail": {
     "message": "このコンピュータで<code>ketch server</code>を使う場合や、他のアプリを起動できないFlatpak版またはSnap版のブラウザから使う場合は、<code>http://127.0.0.1:8642</code>のサーバーとして追加してください。"
   },
+  "options_diagnostics": {
+    "message": "診断"
+  },
+  "diagnostics_detail": {
+    "message": "結果が不明な送信を確認するか、直近100件の結果をエクスポートします。レポートにURL、ファイル名、Cookie、アクセストークンは含まれません。"
+  },
+  "diagnostics_check": {
+    "message": "保留中のダウンロードを確認"
+  },
+  "diagnostics_export": {
+    "message": "診断をエクスポート"
+  },
+  "diagnostics_clear": {
+    "message": "診断を消去"
+  },
+  "diagnostics_checked": {
+    "message": "未解決の送信はありません。"
+  },
+  "diagnostics_cleared": {
+    "message": "診断を消去しました。"
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketchがこのダウンロードを受け付けた可能性があります。再試行やブラウザーでの再開の前に、拡張機能の設定で保留中のダウンロードを確認してください。"
+  },
   "popup_pause_capture": {
     "message": "再開するまで一時停止"
   },

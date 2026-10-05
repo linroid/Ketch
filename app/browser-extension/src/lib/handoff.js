@@ -4,6 +4,7 @@ import { withEndpoint } from './connection.js';
 import { ext } from './ext.js';
 import { t } from './i18n.js';
 import { KetchClient } from './ketch-client.js';
+import { receiptEndpoint, submitDownload } from './submissions.js';
 import {
   buildDownloadRequest,
   buildHeaders,
@@ -87,7 +88,15 @@ export async function sendToKetch(instance, download, settings, options = {}) {
       const resolved = await client.resolveContent(torrentContent, download.fileName || undefined);
       request = buildDownloadRequest({ url: resolved.url, resolvedSource: resolved });
     }
-    return client.createTask(request);
+    return submitDownload(client, receiptEndpoint(instance, endpoint), request, {
+      browserDownloadId: download.browserDownloadId, browserUrl: url,
+      recoverTasks: instance.type === 'app' ? () => withEndpoint(instance, (current) => {
+        const recovery = new KetchClient(current, {
+          fetch: deps.fetch, timeoutMs: options.timeoutMs,
+        });
+        return recovery.listTasks();
+      }, { deps: deps.connection }) : undefined,
+    });
   }, { deps: deps.connection });
 }
 

@@ -681,6 +681,38 @@
     "message": "To use <code>ketch server</code> on this computer, or from a browser installed as a Flatpak or Snap, which can't start other apps, add it as a server at <code>http://127.0.0.1:8642</code>.",
     "description": "Help text under options_help_command_line. Flatpak and Snap are Linux package formats. <b> and <code> mark bold text and code: keep the tags, and the text inside <code> as it is."
   },
+  "options_diagnostics": {
+    "message": "Diagnostics",
+    "description": "Browser extension handoff diagnostics: options_diagnostics"
+  },
+  "diagnostics_detail": {
+    "message": "Check uncertain submissions or export the last 100 outcomes. The report contains no URLs, file names, cookies or access tokens.",
+    "description": "Browser extension handoff diagnostics: diagnostics_detail"
+  },
+  "diagnostics_check": {
+    "message": "Check pending downloads",
+    "description": "Browser extension handoff diagnostics: diagnostics_check"
+  },
+  "diagnostics_export": {
+    "message": "Export diagnostics",
+    "description": "Browser extension handoff diagnostics: diagnostics_export"
+  },
+  "diagnostics_clear": {
+    "message": "Clear diagnostics",
+    "description": "Browser extension handoff diagnostics: diagnostics_clear"
+  },
+  "diagnostics_checked": {
+    "message": "No unresolved submissions.",
+    "description": "Browser extension handoff diagnostics: diagnostics_checked"
+  },
+  "diagnostics_cleared": {
+    "message": "Diagnostics cleared.",
+    "description": "Browser extension handoff diagnostics: diagnostics_cleared"
+  },
+  "error_handoff_uncertain": {
+    "message": "Ketch may have accepted this download. Check pending downloads in extension settings before trying again or resuming it in the browser.",
+    "description": "Browser extension handoff diagnostics: error_handoff_uncertain"
+  },
   "popup_pause_capture": {
     "message": "Pause until resumed",
     "description": "Popup button that pauses automatic download and magnet capture until the user resumes."
