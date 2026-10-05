@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,12 +29,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
+import com.linroid.ketch.app.input.onContextClick
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.localDeviceNoun
@@ -68,6 +73,7 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.downloads_retry_all_count
 import kotlinx.coroutines.flow.drop
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /** Width tiers of the window, which set how the app lays itself out. */
 enum class LayoutTier {
@@ -485,6 +491,32 @@ private fun finishedRows(state: AppState): List<TaskRow> {
 /** The content under the tabs: the rows, or what stands in for them. */
 @Composable
 private fun PageBody(
+  page: DownloadsPage,
+  view: TaskListView,
+  content: PageContent,
+  showsTable: Boolean,
+  phone: Boolean,
+) {
+  var menuAt by remember { mutableStateOf<Offset?>(null) }
+  Box(Modifier.fillMaxSize().onContextClick { menuAt = it }) {
+    PageBodyContent(page, view, content, showsTable, phone)
+    val at = menuAt
+    if (at != null) {
+      Box(Modifier.absoluteOffset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }) {
+        DownloadsMenu(
+          page = page,
+          showsTable = showsTable,
+          expanded = true,
+          onDismissRequest = { menuAt = null },
+          offset = DpOffset(0.dp, -KetchTheme.spacing.s1),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun PageBodyContent(
   page: DownloadsPage,
   view: TaskListView,
   content: PageContent,

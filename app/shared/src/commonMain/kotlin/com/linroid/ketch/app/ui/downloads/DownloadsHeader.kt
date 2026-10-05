@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.DevicePennant
@@ -373,15 +374,7 @@ private fun addLinks(page: DownloadsPage): Boolean {
  */
 @Composable
 private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
-  val state = page.state
-  val actions = page.actions
-  val runner = actions.runner
-  val rows by state.taskList.rows.collectAsState()
   var open by remember { mutableStateOf(false) }
-  val finishedRows = rows.filter { it.state is DownloadState.Completed }
-  LaunchedEffect(open) { if (open) runner.checkFiles(finishedRows) }
-  val visible = actions.rows
-  val auto = if (LocalShownDevices.current.several) setOf(TableColumn.Device) else emptySet()
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
@@ -389,72 +382,92 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
       onClick = { open = true },
       selected = open,
     )
-    KetchMenu(expanded = open, onDismissRequest = { open = false }) {
+    DownloadsMenu(page, showsTable, expanded = open, onDismissRequest = { open = false })
+  }
+}
+
+/** The same page actions for the header's overflow button and empty-space context menu. */
+@Composable
+internal fun DownloadsMenu(
+  page: DownloadsPage,
+  showsTable: Boolean,
+  expanded: Boolean,
+  onDismissRequest: () -> Unit,
+  offset: DpOffset = DpOffset.Zero,
+) {
+  val state = page.state
+  val actions = page.actions
+  val runner = actions.runner
+  val rows by state.taskList.rows.collectAsState()
+  val finishedRows = rows.filter { it.state is DownloadState.Completed }
+  LaunchedEffect(expanded) { if (expanded) runner.checkFiles(finishedRows) }
+  val visible = actions.rows
+  val auto = if (LocalShownDevices.current.several) setOf(TableColumn.Device) else emptySet()
+  KetchMenu(expanded = expanded, onDismissRequest = onDismissRequest, offset = offset) {
+    item(
+      command = KetchCommands.PauseAll,
+      onClick = { state.pauseAll() },
+      enabled = rows.any { it.state.isPausable },
+    )
+    item(
+      command = KetchCommands.ResumeAll,
+      onClick = { state.resumeAll() },
+      enabled = rows.any { it.state.isPausedUntilResumed },
+    )
+    item(
+      command = KetchCommands.RetryFailed,
+      onClick = { state.retryFailed() },
+      enabled = rows.any { it.state is DownloadState.Failed },
+    )
+    item(
+      label = clearFinishedLabel(finishedRows.size),
+      icon = KetchIcon.Trash,
+      onClick = { state.clearCompleted() },
+      enabled = finishedRows.isNotEmpty(),
+    )
+    if (runner.files != null) {
+      val missing = finishedRows.count(runner::isFileMissing)
       item(
-        command = KetchCommands.PauseAll,
-        onClick = { state.pauseAll() },
-        enabled = rows.any { it.state.isPausable },
+        label = clearMissingLabel(missing),
+        icon = KetchIcon.Warning,
+        caption = clearMissingCaption,
+        onClick = { runner.clearMissing(finishedRows) },
+        enabled = missing > 0,
       )
-      item(
-        command = KetchCommands.ResumeAll,
-        onClick = { state.resumeAll() },
-        enabled = rows.any { it.state.isPausedUntilResumed },
-      )
-      item(
-        command = KetchCommands.RetryFailed,
-        onClick = { state.retryFailed() },
-        enabled = rows.any { it.state is DownloadState.Failed },
-      )
-      item(
-        label = clearFinishedLabel(finishedRows.size),
-        icon = KetchIcon.Trash,
-        onClick = { state.clearCompleted() },
-        enabled = finishedRows.isNotEmpty(),
-      )
-      if (runner.files != null) {
-        val missing = finishedRows.count(runner::isFileMissing)
+    }
+    divider()
+    item(
+      command = KetchCommands.SelectAll,
+      onClick = { actions.selectAll() },
+      enabled = visible.isNotEmpty(),
+    )
+    item(
+      label = Res.string.downloads_copy_all_links.text(),
+      icon = KetchIcon.Copy,
+      onClick = { page.actions.runner.run(RowAction.CopyLink, visible) },
+      enabled = visible.isNotEmpty(),
+    )
+    divider()
+    submenu(
+      label = Res.string.downloads_columns.text(),
+      icon = KetchIcon.Columns,
+      enabled = showsTable,
+    ) {
+      columnChooser(page.tableLayout(state.statusFilter), autoColumns = auto, onLayoutChange = {
+        page.saveTableLayout(state.statusFilter, it)
+      })
+    }
+    submenu(
+      label = Res.string.downloads_row_density.text(),
+      icon = KetchIcon.Lanes,
+      enabled = showsTable,
+    ) {
+      for (density in RowDensity.entries) {
         item(
-          label = clearMissingLabel(missing),
-          icon = KetchIcon.Warning,
-          caption = clearMissingCaption,
-          onClick = { runner.clearMissing(finishedRows) },
-          enabled = missing > 0,
+          label = density.label,
+          checked = page.rowDensity == density,
+          onClick = { page.saveRowDensity(density) },
         )
-      }
-      divider()
-      item(
-        command = KetchCommands.SelectAll,
-        onClick = { actions.selectAll() },
-        enabled = visible.isNotEmpty(),
-      )
-      item(
-        label = Res.string.downloads_copy_all_links.text(),
-        icon = KetchIcon.Copy,
-        onClick = { page.actions.runner.run(RowAction.CopyLink, visible) },
-        enabled = visible.isNotEmpty(),
-      )
-      divider()
-      submenu(
-        label = Res.string.downloads_columns.text(),
-        icon = KetchIcon.Columns,
-        enabled = showsTable,
-      ) {
-        columnChooser(page.tableLayout(state.statusFilter), autoColumns = auto, onLayoutChange = {
-          page.saveTableLayout(state.statusFilter, it)
-        })
-      }
-      submenu(
-        label = Res.string.downloads_row_density.text(),
-        icon = KetchIcon.Lanes,
-        enabled = showsTable,
-      ) {
-        for (density in RowDensity.entries) {
-          item(
-            label = density.label,
-            checked = page.rowDensity == density,
-            onClick = { page.saveRowDensity(density) },
-          )
-        }
       }
     }
   }
