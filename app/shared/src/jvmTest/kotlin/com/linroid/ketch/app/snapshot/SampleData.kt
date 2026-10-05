@@ -552,12 +552,15 @@ internal class SampleEnvironment(
     },
     initialRemotes = data.remotes,
     configStore = RecordingConfigStore(config(data.config(theme, density))),
+    context = SnapshotHarness.ui,
   )
 
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     speedMode = speedMode?.invoke(checkNotNull(instanceManager.embedded), speedScope),
     clock = SampleData.CLOCK,
     discoverHistory = discoverHistory,

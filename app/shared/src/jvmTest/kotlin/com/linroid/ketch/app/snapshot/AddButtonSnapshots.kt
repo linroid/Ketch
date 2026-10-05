@@ -41,7 +41,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 /**
  * The Downloads header's Add button: plain, hovered (lanes and the ember gradient), offering a
@@ -280,7 +279,7 @@ private suspend fun AppScenario.captureFrames(
   count: Int,
   every: Duration,
 ) {
-  val begin = TimeSource.Monotonic.markNow()
+  val begin = SnapshotClock.timeSource.markNow()
   var next = 0
   while (next < count) {
     val image = scene.renderFrame()

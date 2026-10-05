@@ -41,7 +41,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
@@ -152,7 +151,7 @@ class AllDevicesSnapshots {
     for (theme in SnapshotTheme.entries) {
       withEnvironment({ AllDevicesEnvironment(theme, DensityMode.Compact) }) { environment ->
         val state = environment.controller.state
-        val presence = runBlocking(SnapshotHarness.ui) {
+        val presence = onUiThread {
           withTimeoutOrNull(START_TIMEOUT) {
             state.instanceManager.presence.first { list -> list.all { it.disk != null } }
           }.orEmpty()
@@ -227,11 +226,14 @@ private class AllDevicesEnvironment(
     ),
     initialRemotes = data.remotes,
     configStore = RecordingConfigStore(data.config(theme, density)),
+    context = SnapshotHarness.ui,
   )
 
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
+    listDispatcher = SnapshotHarness.ui,
+    timeSource = SnapshotClock.timeSource,
     clock = SampleData.CLOCK,
   )
 

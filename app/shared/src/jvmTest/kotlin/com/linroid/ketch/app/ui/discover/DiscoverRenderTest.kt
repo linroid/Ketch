@@ -24,6 +24,7 @@ import com.linroid.ketch.app.snapshot.BlenderSteps
 import com.linroid.ketch.app.snapshot.Candidates
 import com.linroid.ketch.app.snapshot.DiscoverScript
 import com.linroid.ketch.app.snapshot.SavedSessions
+import com.linroid.ketch.app.snapshot.SnapshotClock
 import com.linroid.ketch.app.snapshot.SnapshotScene
 import com.linroid.ketch.app.snapshot.SnapshotSize
 import com.linroid.ketch.app.snapshot.SnapshotTheme
@@ -253,7 +254,7 @@ class DiscoverRenderTest {
       // Before the search asks: Stop shows once the scene recomposes, and the agent waits for a
       // frame to run.
       Snapshot.sendApplyNotifications()
-      render(System.nanoTime())
+      render(SnapshotClock.nanos)
       nodes().first { it.ownText() == STOP }.focus()
       assertEquals(STOP, focusedText())
       frames(FRAMES)

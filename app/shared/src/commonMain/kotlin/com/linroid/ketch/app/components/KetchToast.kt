@@ -52,9 +52,9 @@ import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.theme.lightKetchColors
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_dismiss
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.time.Duration
@@ -128,15 +128,18 @@ fun KetchToast(
   val hovered = interactions.collectIsHoveredAsState()
   if (duration != null) {
     LaunchedEffect(duration) {
-      var remaining = duration
-      while (remaining.isPositive()) {
-        snapshotFlow { hovered.value }.first { !it }
+      var remaining: Duration = duration
+      // Counts down while the pointer is off the toast; hovering stops the count until it leaves.
+      snapshotFlow { hovered.value }.collectLatest { hovering ->
+        if (hovering) return@collectLatest
         val start = TimeSource.Monotonic.markNow()
-        val paused = withTimeoutOrNull(remaining) { snapshotFlow { hovered.value }.first { it } }
-        if (paused == null) break
-        remaining -= start.elapsedNow()
+        try {
+          delay(remaining)
+        } finally {
+          remaining -= start.elapsedNow()
+        }
+        currentDismiss()
       }
-      currentDismiss()
     }
   }
   val swipe = remember { Animatable(0f) }

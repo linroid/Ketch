@@ -8,6 +8,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.instance.InstanceManager
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
+import kotlin.time.TimeSource
 
 /**
  * Owns the app's state outside of any composition, so the window, the tray, the menu bar and
@@ -35,6 +37,9 @@ import kotlin.time.Clock
  *   `config.toml`, which the app reports to the user once.
  * @param discoverHistory keeps the Discover sessions between runs; the host owns it, one per
  *   process, and closes it after this controller.
+ * @param listDispatcher where the task list samples task changes and builds its rows, off the
+ *   main thread by default.
+ * @param timeSource clock that measures the rate of each connection.
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -45,6 +50,8 @@ class AppController(
   clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
+  listDispatcher: CoroutineDispatcher = Dispatchers.Default,
+  timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -74,6 +81,8 @@ class AppController(
     clock = clock,
     unreadableFiles = unreadableFiles,
     discoverHistory = discoverHistory,
+    listDispatcher = listDispatcher,
+    timeSource = timeSource,
   )
 
   init {

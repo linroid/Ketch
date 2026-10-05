@@ -34,7 +34,6 @@ import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.IntakePreferences
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Instant
@@ -208,7 +207,7 @@ class IntakeSheetSnapshots {
     val size = SnapshotSize(DROP_WIDTH, DROP_HEIGHT, KetchDensity.Compact)
     for (theme in SnapshotTheme.entries) {
       withEnvironment({ intakeEnvironment(theme, DensityMode.Compact) }) { environment ->
-        val session = runBlocking(SnapshotHarness.ui) {
+        val session = onUiThread {
           environment.controller.state.intake.start(IntakeRequest())
         }
         snapshot("intake-drop", size, theme) {

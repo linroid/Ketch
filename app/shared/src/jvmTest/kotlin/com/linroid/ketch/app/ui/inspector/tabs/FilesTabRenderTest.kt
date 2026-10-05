@@ -85,7 +85,7 @@ class FilesTabRenderTest {
         }
       },
     ) {
-      frames(FRAMES) { it * FRAME_NANOS }
+      frames(FRAMES)
       nodes().flatMap { it.texts() }
     }
     return Rendered(height, texts)
@@ -105,6 +105,5 @@ class FilesTabRenderTest {
     const val DEFAULT_MAX_HEIGHT = 360
     const val FILL_HEIGHT = 700
     const val FRAMES = 10
-    const val FRAME_NANOS = 16_000_000L
   }
 }

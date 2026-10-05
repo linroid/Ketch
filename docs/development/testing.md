@@ -122,6 +122,16 @@ pressing keys or hovering through its `scene`. Tests run in English; add
 `-PsnapshotLocale=de-DE` (any BCP 47 tag) to render the snapshots in another language and check
 that its text fits.
 
+Snapshots and the render tests in `app/shared/src/jvmTest` (`withScene`) run on `SnapshotClock`:
+the AWT event thread on virtual time. Each frame a scene renders lets 16 ms pass, a `delay` in a
+test lets that much time pass instead of sleeping, and the delays, debounces and Undo windows of
+the app and the scene wait for it, so no test waits for the wall clock. Environments hand the
+clock to `InstanceManager` (`context`) and `AppController` (`context`, `listDispatcher`,
+`timeSource`), and every string is read once per test JVM before the first scene, since a
+first read loads its file on another thread. Code that runs on another dispatcher, reads
+`TimeSource.Monotonic` or uses `withTimeout` in a composable (Compose times those out on the wall
+clock) still follows the wall clock.
+
 The README showcase (`art/showcase-light.png`, `art/showcase-dark.png`) is the
 `ShowcaseSnapshots` scenario: the desktop window, two phones and a terminal over brand-free
 `ShowcaseData`. `art/render-showcase.sh` renders it

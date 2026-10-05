@@ -156,6 +156,7 @@ import ketch.app.shared.generated.resources.notify_downloads_finished
 import ketch.app.shared.generated.resources.notify_on_device
 import ketch.app.shared.generated.resources.row_files
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -190,6 +191,7 @@ import org.jetbrains.compose.resources.StringResource
 import kotlin.reflect.KProperty
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 sealed interface DiscoveryState {
   data object Idle : DiscoveryState
@@ -232,6 +234,9 @@ val InstanceEntry.deviceId: String
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`; each is reported to the user once.
  * @param discoverHistory keeps the Discover sessions between runs of the app.
+ * @param listDispatcher where the task list samples task changes and builds its rows, off the
+ *   main thread by default.
+ * @param timeSource clock that measures the rate of each connection.
  * @property incoming downloads and pairing links opened from outside the app; the shell asks
  *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
@@ -248,6 +253,8 @@ class AppState(
   val clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
+  listDispatcher: CoroutineDispatcher = Dispatchers.Default,
+  timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -492,10 +499,12 @@ class AppState(
     frozen = frozenState.flow,
     shown = shownScope(),
     clock = clock,
+    dispatcher = listDispatcher,
   )
 
   /** Speed of each task of every device once a second, for the inspector's Activity chart. */
-  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.allRows, scope, clock)
+  val speedHistory: SpeedHistoryStore =
+    SpeedHistoryStore(taskList.allRows, scope, clock, timeSource)
 
   /**
    * The add sheet's sessions. They run in the app scope, so adding, or a torrent's file list

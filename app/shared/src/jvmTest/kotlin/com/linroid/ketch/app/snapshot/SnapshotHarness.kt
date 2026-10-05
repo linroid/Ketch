@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
@@ -35,10 +36,8 @@ import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -51,7 +50,6 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * Renders the app's UI to PNG files without a window, to look at it while working on it.
@@ -70,7 +68,8 @@ import kotlin.time.TimeSource
  *
  * Snapshots render at [SCALE] pixels per dp, with motion reduced and the clock fixed at
  * [SampleData.NOW] in UTC. Frames advance until the UI has been still for a few of them, which
- * gives rows, fonts and effects time to settle.
+ * gives rows, fonts and effects time to settle. Scenes and the app run on [SnapshotClock], so
+ * each frame lets [SnapshotClock.FRAME] of virtual time pass and none waits for the wall clock.
  */
 internal object SnapshotHarness {
   /** Whether snapshot scenarios run, from the `ketch.snapshots` system property. */
@@ -84,7 +83,7 @@ internal object SnapshotHarness {
 
   /**
    * The one thread that composes, renders and runs the app's commands: the AWT event thread, as
-   * in the desktop app.
+   * in the desktop app, with delays on the virtual time of [SnapshotClock].
    *
    * Compose posts work to that thread whichever thread drives the scene: a frame that lays out
    * nodes asks for its `RectManager` to dispatch, 16 ms later, the callbacks of node bounds and
@@ -93,7 +92,16 @@ internal object SnapshotHarness {
    * change the list at once: a node's bounds go missing, and a later layout or disposal fails
    * with "LayoutNode … not found in RectList".
    */
-  val ui: CoroutineDispatcher = Dispatchers.Swing
+  val ui: CoroutineDispatcher = SnapshotClock
+
+  /**
+   * Reads every string once per test JVM, before the first scene or environment. A first read
+   * loads its file on another thread, on the wall clock, which virtual time would outrun.
+   */
+  private val stringsRead: Unit by lazy { runBlocking { warmStrings() } }
+
+  /** Gets ready to run a scene or an environment on [SnapshotClock]. */
+  fun warmUp() = stringsRead
 
   init {
     if (enabled) {
@@ -162,14 +170,18 @@ internal object SnapshotHarness {
 
 /**
  * Runs [block] on [SnapshotHarness.ui] and waits for it, for a test that creates, drives and
- * closes an [ImageComposeScene] of its own.
+ * closes an [ImageComposeScene] of its own. Its delays let virtual time pass; see
+ * [SnapshotClock].
  */
-internal fun <T> onUiThread(block: suspend CoroutineScope.() -> T): T =
-  runBlocking(SnapshotHarness.ui, block)
+internal fun <T> onUiThread(block: suspend CoroutineScope.() -> T): T {
+  SnapshotHarness.warmUp()
+  return runBlocking(SnapshotClock.driving, block)
+}
 
 /**
  * Composes [content] in a [width] by [height] pixel scene at [density] on [SnapshotHarness.ui],
- * runs [test] on it and closes it.
+ * runs [test] on it and closes it. The delays of [test] let virtual time pass; see
+ * [SnapshotClock].
  */
 internal fun <T> withScene(
   width: Int,
@@ -177,35 +189,38 @@ internal fun <T> withScene(
   density: Density = Density(1f),
   content: @Composable () -> Unit,
   test: suspend ImageComposeScene.() -> T,
-): T = runBlocking(SnapshotHarness.ui) {
-  // Compose logs an exception thrown while recomposing and carries on, so a broken composition
-  // would still render a picture; the handler collects it to fail the scene instead.
-  val errors = ConcurrentLinkedQueue<Throwable>()
-  val scene = ImageComposeScene(
-    width = width,
-    height = height,
-    density = density,
-    coroutineContext = SnapshotHarness.ui +
-      CoroutineExceptionHandler { _, error -> errors += error },
-    content = content,
-  )
-  try {
-    scene.test().also {
-      errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+): T {
+  SnapshotHarness.warmUp()
+  return runBlocking(SnapshotClock.driving) {
+    // Compose logs an exception thrown while recomposing and carries on, so a broken composition
+    // would still render a picture; the handler collects it to fail the scene instead.
+    val errors = ConcurrentLinkedQueue<Throwable>()
+    val scene = ImageComposeScene(
+      width = width,
+      height = height,
+      density = density,
+      coroutineContext = SnapshotHarness.ui +
+        CoroutineExceptionHandler { _, error -> errors += error },
+      content = content,
+    )
+    try {
+      scene.test().also {
+        errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+      }
+    } finally {
+      scene.close()
     }
-  } finally {
-    scene.close()
   }
 }
 
-/** Renders [count] frames 16 ms apart, each at the time [clock] gives for its index. */
-internal suspend fun ImageComposeScene.frames(
-  count: Int,
-  clock: (Int) -> Long = { System.nanoTime() },
-) {
-  repeat(count) { frame ->
-    render(clock(frame))
-    delay(16.milliseconds)
+/**
+ * Renders [count] frames, letting [SnapshotClock.FRAME] of virtual time pass after each, so the
+ * scene and the app run what each one starts.
+ */
+internal suspend fun ImageComposeScene.frames(count: Int) {
+  repeat(count) {
+    render(SnapshotClock.nanos)
+    delay(SnapshotClock.FRAME)
   }
 }
 
@@ -284,18 +299,16 @@ internal class SnapshotScene(
   private val scene: ImageComposeScene,
   private val scale: Float = SnapshotHarness.SCALE,
 ) {
-  private val start = TimeSource.Monotonic.markNow()
-
   /**
    * Renders frames until nothing has changed for a few of them, at least [minimum] and at most
-   * [maximum] long.
+   * [maximum] of virtual time long.
    */
   suspend fun settle(minimum: Duration = MINIMUM_SETTLE, maximum: Duration = MAXIMUM_SETTLE) {
-    val begin = TimeSource.Monotonic.markNow()
+    val begin = SnapshotClock.timeSource.markNow()
     var quiet = 0
     while (true) {
       renderFrame()
-      delay(FRAME)
+      delay(SnapshotClock.FRAME)
       Snapshot.sendApplyNotifications()
       quiet = if (scene.hasInvalidations()) 0 else quiet + 1
       val elapsed = begin.elapsedNow()
@@ -315,7 +328,7 @@ internal class SnapshotScene(
 
   /** Moves the pointer to [x], [y] from the top left, for hover states. */
   suspend fun hover(x: Dp, y: Dp) {
-    scene.sendPointerEvent(PointerEventType.Move, offset(x, y))
+    scene.sendPointerEvent(PointerEventType.Move, offset(x, y), timeMillis = SnapshotClock.millis)
     settle(minimum = INTERACTION_SETTLE)
   }
 
@@ -328,6 +341,7 @@ internal class SnapshotScene(
       eventType = PointerEventType.Scroll,
       position = offset(x, y),
       scrollDelta = Offset(0f, ticks),
+      timeMillis = SnapshotClock.millis,
     )
     settle(minimum = INTERACTION_SETTLE)
   }
@@ -357,16 +371,18 @@ internal class SnapshotScene(
   /** Clicks the primary button at [x], [y] from the top left. */
   suspend fun click(x: Dp, y: Dp) {
     val position = offset(x, y)
-    scene.sendPointerEvent(PointerEventType.Move, position)
+    scene.sendPointerEvent(PointerEventType.Move, position, timeMillis = SnapshotClock.millis)
     scene.sendPointerEvent(
       eventType = PointerEventType.Press,
       position = position,
+      timeMillis = SnapshotClock.millis,
       buttons = PointerButtons(isPrimaryPressed = true),
       button = PointerButton.Primary,
     )
     scene.sendPointerEvent(
       eventType = PointerEventType.Release,
       position = position,
+      timeMillis = SnapshotClock.millis,
       buttons = PointerButtons(),
       button = PointerButton.Primary,
     )
@@ -389,23 +405,30 @@ internal class SnapshotScene(
     val from = offset(fromX, fromY)
     val to = offset(toX, toY)
     val pressed = PointerButtons(isPrimaryPressed = true)
-    scene.sendPointerEvent(PointerEventType.Move, from)
+    scene.sendPointerEvent(PointerEventType.Move, from, timeMillis = SnapshotClock.millis)
     scene.sendPointerEvent(
       eventType = PointerEventType.Press,
       position = from,
+      timeMillis = SnapshotClock.millis,
       buttons = pressed,
       button = PointerButton.Primary,
     )
     for (step in 1..steps) {
-      delay(FRAME)
+      delay(SnapshotClock.FRAME)
       val position = from + (to - from) * (step.toFloat() / steps)
-      scene.sendPointerEvent(PointerEventType.Move, position, buttons = pressed)
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Move,
+        position = position,
+        timeMillis = SnapshotClock.millis,
+        buttons = pressed,
+      )
       renderFrame()
     }
     if (release) {
       scene.sendPointerEvent(
         eventType = PointerEventType.Release,
         position = to,
+        timeMillis = SnapshotClock.millis,
         buttons = PointerButtons(),
         button = PointerButton.Primary,
       )
@@ -414,12 +437,11 @@ internal class SnapshotScene(
   }
 
   /** Renders the current frame. */
-  fun renderFrame(): Image = scene.render(start.elapsedNow().inWholeNanoseconds)
+  fun renderFrame(): Image = scene.render(SnapshotClock.nanos)
 
   private fun offset(x: Dp, y: Dp): Offset = Offset(x.value * scale, y.value * scale)
 
   private companion object {
-    val FRAME = 16.milliseconds
     val MINIMUM_SETTLE = 600.milliseconds
     val MAXIMUM_SETTLE = 4.seconds
     val INTERACTION_SETTLE = 150.milliseconds
@@ -559,23 +581,25 @@ internal interface SnapshotEnvironment {
 }
 
 /**
- * Creates the environment [create] makes, starts it within [timeout], runs [block] with it and
- * closes it; the environment is created, started and closed on [SnapshotHarness.ui].
+ * Creates the environment [create] makes, starts it within [timeout] of virtual time, runs
+ * [block] with it and closes it; the environment is created, started and closed on
+ * [SnapshotHarness.ui].
  */
 internal fun <E : SnapshotEnvironment, T> withEnvironment(
   create: () -> E,
   timeout: Duration = START_TIMEOUT,
   block: (E) -> T,
 ): T {
-  val environment = runBlocking(SnapshotHarness.ui) { create() }
+  SnapshotHarness.warmUp()
+  val environment = runBlocking(SnapshotClock.driving) { create() }
   try {
-    runBlocking(SnapshotHarness.ui) {
+    runBlocking(SnapshotClock.driving) {
       withTimeoutOrNull(timeout) { environment.start() }
         ?: error("${environment::class.simpleName} never got ready")
     }
     return block(environment)
   } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+    runBlocking(SnapshotClock.driving) { environment.close() }
   }
 }
 

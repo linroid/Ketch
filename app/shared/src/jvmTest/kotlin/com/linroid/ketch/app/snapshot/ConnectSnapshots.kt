@@ -362,20 +362,27 @@ private fun webSnapshot(
   val states = remotes.associate { (config, state) -> config.host to state }
   val data = SampleData(tasks = emptyList(), remotes = remotes.map { it.first })
   val density = size.density.toMode()
-  val (manager, controller) = runBlocking(SnapshotHarness.ui) {
+  val (manager, controller) = onUiThread {
     val manager = InstanceManager(
       factory = InstanceFactory(
         remoteFactory = { config -> sampleRemote(config, states.getValue(config.host)) },
       ),
       initialRemotes = data.remotes,
       configStore = RecordingConfigStore(data.config(theme, density)),
+      context = SnapshotHarness.ui,
     )
-    manager to AppController(manager, context = SnapshotHarness.ui, clock = SampleData.CLOCK)
+    manager to AppController(
+      instanceManager = manager,
+      context = SnapshotHarness.ui,
+      clock = SampleData.CLOCK,
+      listDispatcher = SnapshotHarness.ui,
+      timeSource = SnapshotClock.timeSource,
+    )
   }
   try {
     return SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) { App(controller) }
   } finally {
-    runBlocking(SnapshotHarness.ui) {
+    onUiThread {
       controller.close()
       manager.close()
     }

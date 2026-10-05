@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.snapshot.SampleData
+import com.linroid.ketch.app.snapshot.SnapshotClock
 import com.linroid.ketch.app.snapshot.SnapshotTheme
 import com.linroid.ketch.app.snapshot.frames
 import com.linroid.ketch.app.snapshot.nodes
@@ -38,6 +39,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.math.ceil
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -238,7 +240,7 @@ class InspectorRenderTest {
   }
 
   private suspend fun frames(scene: ImageComposeScene, duration: Duration) =
-    scene.frames((duration / FRAME).toInt().coerceAtLeast(1))
+    scene.frames(ceil(duration / SnapshotClock.FRAME).toInt().coerceAtLeast(1))
 
   private fun ImageComposeScene.press(at: Offset) {
     sendPointerEvent(PointerEventType.Move, at)
@@ -273,7 +275,6 @@ class InspectorRenderTest {
     const val POPOVER_SCENE_HEIGHT = 480
     const val QUEUED = "blender-4.2-macos-arm64.dmg"
     const val SCHEDULED = "llama-3.1-8b-instruct-q4_k_m.gguf"
-    val FRAME = 16.milliseconds
     val PRIMARY = PointerButtons(isPrimaryPressed = true)
   }
 }

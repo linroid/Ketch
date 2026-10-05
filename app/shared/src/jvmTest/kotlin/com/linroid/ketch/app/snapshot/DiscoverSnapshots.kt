@@ -41,7 +41,6 @@ import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.test.BeforeTest
@@ -492,7 +491,7 @@ class DiscoverSnapshots {
       discovery(theme, size, DiscoverScript.Results, DiscoverScript.Results, configured = false)
     },
   ) { env ->
-    runBlocking(SnapshotHarness.ui) { open(env) }
+    onUiThread { open(env) }
     snapshot(name, size, theme) {
       CardFrame(windowWidth = WindowWidths.getValue(size)) { DiscoverScreen(env.controller.state) }
     }

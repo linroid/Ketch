@@ -65,9 +65,10 @@ import com.linroid.ketch.app.ui.pulse.speedModeLabelText
 import com.linroid.ketch.app.ui.pulse.totalHistory
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.TimeZone
 import kotlin.math.PI
@@ -203,7 +204,18 @@ class PulseUiSnapshots {
           name = "pulse-card-remote",
           size = SnapshotSize.Desktop,
           theme = theme,
-          interact = { delay(CONNECTING_GRACE + 500.milliseconds) },
+          interact = {
+            // The sample NAS is never reachable, and its client finds that out on the wall clock,
+            // which the virtual one would otherwise outrun.
+            withContext(Dispatchers.Default) {
+              withTimeout(10.seconds) {
+                state.pulse.state.first { pulse ->
+                  pulse.devices.firstOrNull()?.health != DeviceHealth.Connecting
+                }
+              }
+            }
+            delay(CONNECTING_GRACE + 500.milliseconds)
+          },
         ) {
           PulseCard(state, SnapshotSize.Desktop.width)
         }
@@ -500,7 +512,7 @@ private fun withPulseApp(
     )
   }
   withEnvironment(environment) {
-    runBlocking(SnapshotHarness.ui) { it.controller.state.setup() }
+    onUiThread { it.controller.state.setup() }
     // The harness renders on the UI thread itself, so the snapshot is taken from this one.
     render(it.controller.state)
   }
