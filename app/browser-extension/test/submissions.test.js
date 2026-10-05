@@ -84,3 +84,20 @@ test('diagnostics are bounded and discard arbitrary fields and unknown outcomes'
   assert.equal(report.length, 100);
   assert.deepEqual(Object.keys(report[0]), ['at', 'outcome']);
 });
+
+test('media playlists require the advertised engine capability before a write', async () => {
+  let writes = 0;
+  const client = {
+    status: async () => ({ features: [] }),
+    createTask: async (request) => { writes++; return { taskId: 'media', request }; },
+  };
+  const media = { url: 'https://example.com/clip.m3u8?token=123' };
+  const journal = storage();
+  await assert.rejects(submitDownload(client, endpoint, media, { storage: journal }),
+    { kind: 'rejected' });
+  assert.equal(writes, 0);
+  assert.deepEqual(await pendingSubmissions(journal), []);
+  client.status = async () => ({ features: ['media.finite'] });
+  await submitDownload(client, endpoint, media, { storage: journal });
+  assert.equal(writes, 1);
+});

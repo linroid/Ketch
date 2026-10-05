@@ -88,6 +88,10 @@ export async function submitDownload(client, endpoint, request, options = {}) {
     throw uncertainError();
   }
   const status = await client.status();
+  if (/\.(m3u8|mpd)(?:[?#]|$)/i.test(request.url) &&
+    !status.features?.includes('media.finite')) {
+    throw new KetchRequestError(FailureKind.REJECTED, t('error_media_unsupported'));
+  }
   const supported = status.features?.includes('task.requestId');
   const id = crypto.randomUUID();
   const submitted = supported ? { ...request, requestId: id } : request;

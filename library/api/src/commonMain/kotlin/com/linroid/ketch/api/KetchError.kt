@@ -106,13 +106,15 @@ sealed class KetchError(
    * Error originating from a pluggable source.
    *
    * @property sourceType identifier of the source that failed
+   * @property detail optional explanation, safe to display and persist without credentials
    */
   @Serializable
   @SerialName("source")
   data class SourceError(
     val sourceType: String,
     @Transient override val cause: Throwable? = null,
-  ) : KetchError("Source '$sourceType' error", cause)
+    val detail: String? = null,
+  ) : KetchError(detail ?: "Source '$sourceType' error", cause)
 
   /**
    * Authentication failed (e.g., FTP 530 "Not logged in").

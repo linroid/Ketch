@@ -34,9 +34,9 @@ test('scanning inspects rendered media and downloadable links without fetching',
   ] };
   try {
     const resources = collectPageResources();
-    assert.deepEqual(resources.map((it) => it.kind), ['image', 'file', 'audio']);
+    assert.deepEqual(resources.map((it) => it.kind), ['image', 'file', 'stream', 'audio']);
     assert.equal(resources[1].name, 'report.pdf');
-    assert.equal(resources[2].url, 'https://cdn.example.com/song.mp3?token=abc');
+    assert.equal(resources[3].url, 'https://cdn.example.com/song.mp3?token=abc');
   } finally {
     delete globalThis.document;
     delete globalThis.location;

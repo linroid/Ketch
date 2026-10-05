@@ -53,6 +53,20 @@ interface HttpEngine {
     onData: suspend (ByteArray) -> Unit,
   )
 
+  /**
+   * Streams a complete resource and returns its final URL for resolving relative references.
+   * Engines following redirects must override this method with the effective response URL.
+   * The default is suitable for engines which do not redirect.
+   */
+  suspend fun downloadResource(
+    url: String,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ): String {
+    download(url, null, headers, onData)
+    return url
+  }
+
   /** Releases underlying resources (e.g., the HTTP client). */
   fun close()
 }
