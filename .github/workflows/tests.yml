@@ -55,14 +55,12 @@ jobs:
         run: python3 -m unittest discover -s tools/torrent -p 'test_*.py'
 
       # allJvmTests also runs `test` in the JVM-only modules. The CLI tests do not read the web app
-      # the CLI bundles, so a prebuiltWebDir that does not exist skips its wasm build. The
-      # publication metadata compiles in the same build to share its configuration.
-      - name: Run JVM tests and compile publication metadata
+      # the CLI bundles, so a prebuiltWebDir that does not exist skips its wasm build.
+      - name: Run JVM tests
         env:
           TRANSMISSION_DAEMON: ${{ runner.temp }}/ketch-transmission/build/daemon/transmission-daemon
         run: |
           ./gradlew allJvmTests :library:torrent:verifyNoNativeTorrentRuntime \
-            compileCommonMainKotlinMetadata \
             -PtorrentConformance=true -PprebuiltWebDir=build/no-web-app
 
       - name: Require executed interoperability scenarios
@@ -85,6 +83,26 @@ jobs:
         with:
           name: test-results-jvm-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
+
+  # Compiling the metadata downloads and commonizes the Kotlin/Native distribution, so it has a
+  # job of its own rather than taking CPU from the JVM tests.
+  publication-metadata:
+    name: Publication Metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Compile publication metadata
+        run: ./gradlew compilePublishedMetadata
 
   android-tests:
     name: Android Unit Tests
@@ -308,7 +326,7 @@ jobs:
   required-checks:
     name: Required Checks
     runs-on: ubuntu-24.04
-    needs: [ jvm-tests, android-tests, ios-tests, js-tests, extension-tests, torrent-desktop-tests, desktop-windows-tests, torrent-device-tests, publish-results ]
+    needs: [ jvm-tests, publication-metadata, android-tests, ios-tests, js-tests, extension-tests, torrent-desktop-tests, desktop-windows-tests, torrent-device-tests, publish-results ]
     if: always()
     steps:
       - name: Require every test job to succeed on this revision

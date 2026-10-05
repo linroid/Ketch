@@ -57,3 +57,20 @@ subprojects {
     allJvmTests.configure { dependsOn(tests) }
   }
 }
+
+// Publishing compiles each published library's common code for metadata, which the JVM and
+// Android compilations never check. CI runs this task to catch that before a release, without
+// compiling the apps' metadata, which is never published.
+val compilePublishedMetadata = tasks.register("compilePublishedMetadata") {
+  group = LifecycleBasePlugin.VERIFICATION_GROUP
+  description = "Compiles the common metadata of every published multiplatform library."
+}
+
+subprojects {
+  pluginManager.withPlugin("com.vanniktech.maven.publish") {
+    pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
+      val metadata = tasks.named { it == "compileCommonMainKotlinMetadata" }
+      compilePublishedMetadata.configure { dependsOn(metadata) }
+    }
+  }
+}

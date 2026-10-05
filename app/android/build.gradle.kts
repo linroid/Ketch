@@ -21,8 +21,9 @@ android {
     minSdk = libs.versions.android.minSdk.get().toInt()
     targetSdk = libs.versions.android.targetSdk.get().toInt()
     versionName = providers.gradleProperty("VERSION_NAME").get()
-    versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER")
-      .orElse("1").get().toInt()
+    // A property rather than GITHUB_RUN_NUMBER, which changes on every CI run and so would
+    // keep any build from reusing its configuration cache. The release workflow passes it.
+    versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
   }
 
   signingConfigs {

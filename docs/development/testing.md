@@ -143,7 +143,14 @@ commit.
   test builds: omit it when packaging or publishing so `KetchApi.REVISION` identifies the real
   Git revision. The iOS job also preserves `~/.konan` across compatible Kotlin and Xcode
   toolchains, and with a `GRADLE_ENCRYPTION_KEY` secret every job keeps its configuration
-  cache between runs.
+  cache between runs. Build scripts must not read values that change on every run, such as
+  `GITHUB_RUN_NUMBER`, while configuring: the release workflow passes the Android
+  `versionCode` as `-PversionCode` instead.
+- `./gradlew compilePublishedMetadata` compiles the common metadata of the published libraries,
+  as publishing does; CI runs it in a job of its own, since it fetches Kotlin/Native
+- `app:shared:jvmTest` runs its test classes in parallel JVMs. A string read for the first time
+  lets a test's virtual time run, so tests that read strings during an Undo window call
+  `warmStrings()` first
 - The browser extension has its own unit tests: `npm test` (`node --test`, Node 22.3+) in
   `app/browser-extension`
 - Torrent interoperability (Transmission, libtorrent), the opt-in public swarm test
