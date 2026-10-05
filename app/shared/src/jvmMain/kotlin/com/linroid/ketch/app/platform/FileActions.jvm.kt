@@ -57,8 +57,9 @@ internal sealed interface OpenCommand {
 internal fun openCommand(os: DesktopOs, file: File, canOpen: Boolean): OpenCommand = when {
   // AWT rejects executable types on Windows with "Unsupported URI content", even when
   // OPEN is supported. Explorer handles file associations and installer elevation itself.
-  // Pass an absolute path as one argument, without a command shell interpreting the filename.
-  os == DesktopOs.Windows -> OpenCommand.Run(listOf("explorer.exe", file.absolutePath))
+  // Explorer also treats commas as delimiters. Quote the absolute path explicitly because
+  // ProcessBuilder does not quote paths containing commas alone. No command shell is involved.
+  os == DesktopOs.Windows -> OpenCommand.Run(listOf("explorer.exe", "\"${file.absolutePath}\""))
   canOpen -> OpenCommand.Desktop(file)
   os == DesktopOs.Linux -> OpenCommand.Run(listOf("xdg-open", file.path))
   else -> throw FileActionException("This computer can't open ${file.name}")

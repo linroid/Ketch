@@ -8,6 +8,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class FileActionsJvmTest {
   private val dir = createTempDirectory().toFile()
@@ -25,7 +26,7 @@ class FileActionsJvmTest {
 
       for (canOpen in listOf(true, false)) {
         assertEquals(
-          OpenCommand.Run(listOf("explorer.exe", target.absolutePath)),
+          OpenCommand.Run(listOf("explorer.exe", "\"${target.absolutePath}\"")),
           openCommand(DesktopOs.Windows, target, canOpen)
         )
       }
@@ -37,7 +38,19 @@ class FileActionsJvmTest {
     val target = File("Downloads/安装 O'Brien & 100% ! (1), setup.exe")
 
     assertEquals(
-      OpenCommand.Run(listOf("explorer.exe", target.absolutePath)),
+      OpenCommand.Run(listOf("explorer.exe", "\"${target.absolutePath}\"")),
+      openCommand(DesktopOs.Windows, target, canOpen = true)
+    )
+  }
+
+  @Test
+  fun openCommand_windows_quotesCommaPathWithoutWhitespace() {
+    // Root-relative keeps the path free of whitespace even if the user's home contains spaces.
+    val target = File("${File.separator}Downloads${File.separator}release,1.exe")
+    assertFalse(target.absolutePath.any { it.isWhitespace() })
+
+    assertEquals(
+      OpenCommand.Run(listOf("explorer.exe", "\"${target.absolutePath}\"")),
       openCommand(DesktopOs.Windows, target, canOpen = true)
     )
   }
@@ -45,7 +58,7 @@ class FileActionsJvmTest {
   @Test
   fun openCommand_windows_opensFoldersThroughExplorer() {
     assertEquals(
-      OpenCommand.Run(listOf("explorer.exe", dir.absolutePath)),
+      OpenCommand.Run(listOf("explorer.exe", "\"${dir.absolutePath}\"")),
       openCommand(DesktopOs.Windows, dir, canOpen = true)
     )
   }
