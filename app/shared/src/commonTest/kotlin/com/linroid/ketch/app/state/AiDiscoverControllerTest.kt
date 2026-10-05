@@ -1017,6 +1017,42 @@ class AiDiscoverControllerTest {
   }
 
   @Test
+  fun close_withoutUsingDiscover_doesNotLoadOrOverwriteHistory() = runTest {
+    val history = object : DiscoverHistoryStore {
+      override fun load(): List<DiscoverSession> = error("History should stay on disk")
+      override fun save(sessions: List<DiscoverSession>) = error("History should stay on disk")
+    }
+    val controller = controller(AiSettingsController(), history)
+    runCurrent() // The disabled-provider observer must not load history either.
+
+    controller.close()
+  }
+
+  @Test
+  fun firstSearch_loadsHistoryOnceAndPreservesSavedSessions() = runTest {
+    val saved = savedSession("earlier", ListFixtures.START - 1.minutes)
+    val store = InMemoryDiscoverHistoryStore(listOf(saved))
+    var loads = 0
+    val history = object : DiscoverHistoryStore by store {
+      override fun load(): List<DiscoverSession> {
+        loads++
+        return store.load()
+      }
+    }
+    val controller = controller(FakeAiProvider(), history = history)
+    runCurrent()
+    assertEquals(0, loads)
+
+    controller.say("new search")
+    runCurrent()
+    controller.close()
+
+    assertEquals(1, loads)
+    assertTrue(store.load().any { it.id == saved.id })
+    assertEquals(2, controller.sessions.size)
+  }
+
+  @Test
   fun load_turnsThatWereRunning_readAsStopped() = runTest {
     val start = ListFixtures.START
     val history = InMemoryDiscoverHistoryStore(

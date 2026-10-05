@@ -66,6 +66,23 @@ runs on Windows; CI runs it in a Windows job of its own:
 ./gradlew :app:desktop:test --tests '*WindowsPortableScriptTest*'
 ```
 
+## Desktop Startup Memory
+
+The desktop launcher uses `-Xms32m -Xmx512m`. The limit covers the Java heap, not native
+Skia/Metal allocations, thread stacks, class metadata or compiled code. Compare the app process
+itself, excluding Gradle and Kotlin daemons, and use a packaged release for release measurements.
+
+Measure at launch and after a fixed idle interval with the same window size and data. Include a
+configured Discover provider, saved history, and `--background`: clients should initialize only
+on a search or connection check, history only when first needed, and a background launch with a
+tray should create its window only when shown. Closing an unused app must leave its saved history
+intact. After first use, hide and reopen the window and verify its UI state is retained.
+
+For heap diagnostics use `jcmd <pid> GC.heap_info`. A separate diagnostic launch with
+`-XX:NativeMemoryTracking=summary` enables `jcmd <pid> VM.native_memory summary`; this tracks JVM
+memory, not every native allocation. Do not force GC when comparing ordinary idle footprints.
+Exercise concurrent HTTP and torrent downloads as well as Discover before lowering the heap cap.
+
 ## Public HTTP Download Smoke Tests
 
 Run the desktop app with `./gradlew :app:desktop:run`.

@@ -64,7 +64,7 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
     )
     val provider = factory.create(settings)
     assertNotNull(provider)
-    // Closing releases the engine's HTTP clients; it must not throw.
+    // Closing before first use must not create the engine or its HTTP clients.
     provider.close()
   }
 
@@ -118,8 +118,12 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
     val search: suspend (DiscoverQuery, DiscoveryStepListener, PageAccessApprover) ->
       DiscoverResult = { query, _, _ -> result(query) },
   ) {
+    var created = 0
     var released = 0
-    val provider = EmbeddedAiDiscoveryProvider(search, verifyConnection = { "OK" }) { released++ }
+    val provider = EmbeddedAiDiscoveryProvider {
+      created++
+      EmbeddedAiDiscoveryProvider.Engine(search, verify = { "OK" }, close = { released++ })
+    }
   }
 
   @Test
@@ -275,8 +279,9 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
   }
 
   @Test
-  fun `closing an idle provider releases the engine at once`() {
+  fun `closing an initialized idle provider releases the engine at once`() = runTest {
     val engine = Engine()
+    engine.provider.verify()
 
     engine.provider.close()
 
@@ -297,8 +302,78 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
     }
 
     assertFalse(searched)
+    assertEquals(0, engine.created)
+    assertEquals(0, engine.released)
+  }
+
+  @Test
+  fun `closing an unused provider never creates the engine`() {
+    val engine = Engine()
+    assertEquals(0, engine.created)
+
+    engine.provider.close()
+    engine.provider.close()
+
+    assertEquals(0, engine.created)
+    assertEquals(0, engine.released)
+  }
+
+  @Test
+  fun `connection checks and searches share one lazily created engine`() = runTest {
+    val engine = Engine()
+    assertEquals(0, engine.created)
+
+    assertEquals("OK", engine.provider.verify())
+    engine.provider.discover(AiDiscoverRequest("a"), {}, { true })
+    engine.provider.verify()
+    engine.provider.close()
+
+    assertEquals(1, engine.created)
     assertEquals(1, engine.released)
   }
+
+  @Test
+  fun `closing during a connection check waits for it to finish`() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    var released = 0
+    val provider = EmbeddedAiDiscoveryProvider {
+      EmbeddedAiDiscoveryProvider.Engine(
+        search = { query, _, _ -> result(query) },
+        verify = { gate.await(); "OK" },
+        close = { released++ },
+      )
+    }
+    val checking = async { provider.verify() }
+    runCurrent()
+
+    provider.close()
+    assertEquals(0, released)
+    assertFailsWith<IllegalStateException> { provider.verify() }
+    gate.complete(Unit)
+    assertEquals("OK", checking.await())
+    provider.close()
+    assertEquals(1, released)
+  }
+
+  @Test
+  fun `failed engine creation can be retried and closed`() = runTest {
+    var attempts = 0
+    var released = 0
+    val provider = EmbeddedAiDiscoveryProvider {
+      check(++attempts > 1) { "Cannot initialize" }
+      EmbeddedAiDiscoveryProvider.Engine(
+        search = { query, _, _ -> result(query) },
+        verify = { "OK" },
+        close = { released++ },
+      )
+    }
+
+    assertFailsWith<IllegalStateException> { provider.verify() }
+    assertEquals("OK", provider.verify())
+    provider.close()
+    assertEquals(1, released)
+  }
+
 }
 
 private fun result(query: DiscoverQuery, summary: String = "", title: String = "") =

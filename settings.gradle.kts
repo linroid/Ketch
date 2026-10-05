@@ -62,3 +62,8 @@ include(":app:android")
 include(":app:desktop")
 include(":app:web")
 include(":cli")
+
+// Isolated Native Image experiment; normal desktop builds keep their existing host.
+if (providers.gradleProperty("nativeDesktop").orNull == "true") {
+  include(":app:desktop-native")
+}
