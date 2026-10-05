@@ -143,7 +143,7 @@ internal fun DiscoverAddBar(
         addNow(Modifier)
         AddOptions(state, selected, busy)
       } else {
-        TargetChip(state)
+        DiscoverTargetChip(state)
         if (!stacked) {
           addNow(Modifier)
           review(Modifier)
@@ -239,9 +239,12 @@ private fun AddOptions(state: AppState, selected: List<AiCandidate>, busy: Boole
   }
 }
 
-/** "On: (NB) NAS-Basement ▾", shown when there is more than one device to add to. */
+/**
+ * "On: (NB) NAS-Basement ▾", shown when there is more than one device to add to. The device it
+ * names is also the one a search started then picks builds for.
+ */
 @Composable
-private fun TargetChip(state: AppState) {
+internal fun DiscoverTargetChip(state: AppState) {
   val presence = remember(state) { state.instanceManager.presence }
   val devices by presence.collectAsState()
   if (devices.size < 2) return

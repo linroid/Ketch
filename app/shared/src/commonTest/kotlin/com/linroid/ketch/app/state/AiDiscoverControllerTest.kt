@@ -507,6 +507,29 @@ class AiDiscoverControllerTest {
   }
 
   @Test
+  fun send_deviceTargeted_asksForThatDevicesBuilds() = runTest {
+    val provider = FakeAiProvider()
+    val targets = mutableListOf<String?>()
+    val controller = AiDiscoverController(
+      aiSettings = settingsWith(provider),
+      scope = backgroundScope,
+      devices = { target ->
+        targets += target
+        AiSearchDevices(user = AiDevice("Mac OS X", "aarch64"), download = AiDevice("Linux"))
+      },
+    )
+    controller.target = "nas"
+
+    controller.say("jellyfin")
+    runCurrent()
+
+    assertEquals(listOf<String?>("nas"), targets)
+    val devices = provider.requests.single().devices
+    assertEquals(AiDevice("Mac OS X", "aarch64"), devices.user)
+    assertEquals(AiDevice("Linux"), devices.download)
+  }
+
+  @Test
   fun clearSelection_resultsOfSeveralTurns_deselectsThemAll() = runTest {
     val (first, later) = candidate("a.dmg") to candidate("b.dmg")
     val saved = savedSession("blender", ListFixtures.START, found = listOf(first)).let {

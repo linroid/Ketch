@@ -22,6 +22,11 @@ package com.linroid.ketch.ai
  *   shorteners or download aggregators, piracy, look-alike websites and installers over plain
  *   HTTP; [DiscoverResult.filtered] counts them. Private and local addresses, sites outside
  *   [sites] and [excludedUrls] are dropped either way
+ * @param userDevice the device the user searches from, when known. Like [downloadDevice], it is
+ *   a hint the agent may use to pick builds for that system and CPU when the request names
+ *   none, never a limit
+ * @param downloadDevice the device that downloads the files, when known, such as a server the
+ *   app adds them to; it may be the same as [userDevice]
  */
 data class DiscoverQuery(
   val query: String,
@@ -31,6 +36,19 @@ data class DiscoverQuery(
   val history: List<DiscoverTurn> = emptyList(),
   val excludedUrls: Set<String> = emptySet(),
   val contentFilter: Boolean = true,
+  val userDevice: DiscoverDevice? = null,
+  val downloadDevice: DiscoverDevice? = null,
+)
+
+/**
+ * A device a discovery request is for, as it reports its system.
+ *
+ * @param os its operating system, such as "Mac OS X", "Windows 11" or "Android 15"
+ * @param arch its CPU architecture, such as "aarch64" or "amd64"; blank when unknown
+ */
+data class DiscoverDevice(
+  val os: String,
+  val arch: String = "",
 )
 
 /**

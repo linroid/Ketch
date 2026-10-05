@@ -71,6 +71,8 @@ data class DiscoverFound(val sessionId: String, val turnId: String, val count: I
  * @param history keeps the sessions between runs of the app.
  * @param clock when turns start and end and approvals were asked.
  * @param newId makes the ids of sessions, turns and approvals.
+ * @param devices the devices a search is for, given the id of the device results go to
+ *   ([target]); read as each turn starts.
  */
 class AiDiscoverController(
   private val aiSettings: AiSettingsController,
@@ -78,6 +80,7 @@ class AiDiscoverController(
   private val history: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   private val clock: Clock = Clock.System,
   private val newId: () -> String = { Uuid.random().toString() },
+  private val devices: (targetId: String?) -> AiSearchDevices = { AiSearchDevices() },
 ) {
   /** A turn's search; [job] stays `null` while it waits for a slot. */
   private class Run(val sessionId: String, val turnId: String) {
@@ -556,7 +559,8 @@ class AiDiscoverController(
 
   /**
    * The search for [turn]: every earlier turn of [session] as history, the first and the latest
-   * ones when there are many, with the results of those that finished, and the discarded links.
+   * ones when there are many, with the results of those that finished, the discarded links and
+   * the devices it is for.
    */
   private fun requestFor(session: DiscoverSession, turn: DiscoverTurn): AiDiscoverRequest {
     val earlier = session.turns.takeWhile { it.id != turn.id }
@@ -579,6 +583,7 @@ class AiDiscoverController(
       },
       excludedUrls = session.discarded,
       contentFilter = aiSettings.settings.contentFilter,
+      devices = devices(target),
     )
   }
 

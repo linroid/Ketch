@@ -1,7 +1,10 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.ui.text.input.TextFieldValue
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.app.FakeAiProvider
+import com.linroid.ketch.app.FakeInstanceFactory
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.AppMessage
@@ -12,7 +15,10 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.settleSnapshots
+import com.linroid.ketch.app.testStatus
+import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.RemoteConfig
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -53,6 +59,27 @@ class AppStateDiscoverTest {
     )
   }
 
+  /** This Mac and a NAS running Linux, each reporting its system. */
+  private fun TestScope.fleetState(provider: AiDiscoveryProvider): AppState {
+    val mac = object : KetchApi by FakeKetchApi() {
+      override suspend fun status(): KetchStatus =
+        testStatus("This Mac", system = testSystem(os = "Mac OS X", arch = "aarch64"))
+    }
+    val manager = InstanceManager(
+      factory = FakeInstanceFactory(embeddedFactory = { mac }).factory,
+      initialRemotes = listOf(RemoteConfig(host = "nas.local")),
+      context = backgroundScope.coroutineContext,
+      clock = ListFixtures.clock(this),
+    )
+    return AppState(
+      instanceManager = manager,
+      scope = backgroundScope,
+      aiSettings = AiSettingsController(factory = { provider }).apply {
+        save(AiSettings(enabled = true))
+      },
+    )
+  }
+
   private fun AppState.say(message: String) {
     aiDiscover.draft.text = TextFieldValue(message)
     aiDiscover.send()
@@ -80,6 +107,26 @@ class AppStateDiscoverTest {
   private fun asksToOpen(host: String) = FakeAiProvider(
     pages = listOf(AiPageRequest(url = "https://$host/", host = host, kind = AiPageKind.Page)),
   )
+
+  @Test
+  fun search_targetChosen_namesThisDeviceAndTheTarget() = runTest {
+    val provider = FakeAiProvider()
+    val state = fleetState(provider)
+    state.instanceManager.presence
+    runCurrent()
+
+    state.say("jellyfin")
+    settleSnapshots()
+    state.aiDiscover.target = "nas.local:8642"
+    state.aiDiscover.newSession()
+    state.say("jellyfin server")
+    settleSnapshots()
+
+    val (local, nas) = provider.requests.map { it.devices }
+    val mac = AiDevice(os = "Mac OS X", arch = "aarch64")
+    assertEquals(AiSearchDevices(user = mac, download = mac), local)
+    assertEquals(AiSearchDevices(user = mac, download = AiDevice("Linux", "x64")), nas)
+  }
 
   @Test
   fun approvalWaiting_sessionNotOnScreen_postsAToastThatReviewsIt() = runTest {

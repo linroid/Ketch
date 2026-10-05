@@ -116,7 +116,8 @@ returned.
 ## Data Flow
 
 ```
-DiscoverQuery (query, sites, maxResults, fileTypes, history, excludedUrls)
+DiscoverQuery (query, sites, maxResults, fileTypes, history, excludedUrls,
+               contentFilter, userDevice, downloadDevice)
          │
          ▼
 ResourceDiscoveryService.discover(query, stepListener, approver)
@@ -180,6 +181,19 @@ the conversation of at most six words in the user's language (`DiscoverResult.ti
 makes it one line of at most 60 characters, drops quotes around it and a trailing period, and
 leaves it blank when the agent gives none, as it may for a follow-up, or answers with a bare
 array or text.
+
+### Devices
+
+`DiscoverQuery.userDevice` is the device the user searches from and `downloadDevice` the one
+that downloads the files, each a `DiscoverDevice` with the system and CPU it reports (`os.name`
+and `os.arch` on the JVM, `KetchStatus.system` for an app's devices); either may be `null`, and
+they may be the same. The request names each known one on a line of its own, such as
+`User's device: macOS aarch64` and `Downloading device: Linux amd64`, one line of at most 60
+characters per part, since a remote device reports its own; the JVM's `Mac OS X` reads as
+`macOS`. The system prompt calls them hints, often irrelevant: the agent uses them only when the
+files come in builds per system or CPU and the request names neither, picks the downloading
+device's builds for software meant to run there (it is often a server), includes builds for both
+when unsure, and says in each description which system and CPU a build is for.
 
 ## Security
 

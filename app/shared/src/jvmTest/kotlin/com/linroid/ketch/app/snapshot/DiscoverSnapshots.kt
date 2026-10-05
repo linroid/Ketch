@@ -98,6 +98,20 @@ class DiscoverSnapshots {
   }
 
   @Test
+  fun search_beforeTheFirstSearchWithTwoDevices_showsTheTargetChip() {
+    discoverSnapshot(
+      name = "discover-idle-nas",
+      size = SnapshotSize.Desktop,
+      theme = SnapshotTheme.Light,
+      script = DiscoverScript.Results,
+      twoDevices = true,
+    ) {
+      state.runInShell(KetchCommands.Discover)
+      state.aiDiscover.target = NAS_ID
+    }
+  }
+
+  @Test
   fun search_running_showsTheAgentsSteps() {
     for (size in listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
       for (theme in SnapshotTheme.entries) {
