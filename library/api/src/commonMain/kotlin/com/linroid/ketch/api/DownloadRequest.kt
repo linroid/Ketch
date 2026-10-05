@@ -57,7 +57,10 @@ import kotlinx.serialization.Serializable
  *   across restarts.
  * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
  *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
- *   is retained, including after restart. Reusing an ID with different options is rejected.
+ *   is retained, including after restart. Reusing an ID with different source, destination,
+ *   headers, properties or file selection is rejected. Mutable task controls (connections,
+ *   speed limit, priority and schedule) and transient metadata/conditions are not compared;
+ *   a repeated submission leaves the existing task's current settings unchanged.
  */
 @Serializable
 data class DownloadRequest(
