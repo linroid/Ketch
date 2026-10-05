@@ -31,7 +31,7 @@
     <item quantity="other">연결 %1$d개</item>
   </plurals>
   <string name="row_speed_limit">제한 %1$s</string>
-  <string name="row_limited_by_slow_lane">저속 차로로 제한됨</string>
+  <string name="row_limited_by_slow_lane">저속 모드로 제한됨</string>
   <string name="row_starts_today">오늘 %1$s에 시작</string>
   <string name="row_starts_tomorrow">내일 %1$s에 시작</string>
   <string name="row_starts_on">%1$s %2$s에 시작</string>

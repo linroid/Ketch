@@ -16,7 +16,7 @@
   <string name="settings_category_downloads">다운로드</string>
   <string name="settings_category_downloads_description">다운로드 위치, 대기열, 재시도</string>
   <string name="settings_category_speed">속도</string>
-  <string name="settings_category_speed_description">속도 모드, 저속 차로, 자동 규칙</string>
+  <string name="settings_category_speed_description">속도 모드, 저속 모드, 자동 규칙</string>
   <string name="settings_category_network">네트워크</string>
   <string name="settings_category_network_description">다운로드를 분산할 네트워크</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
@@ -47,16 +47,16 @@
   <string name="settings_summary_extension">확장 프로그램 ✓</string>
   <string name="settings_summary_extension_missing">확장 프로그램 설정 안 됨</string>
   <string name="settings_summary_clipboard_fill">복사한 링크 자동 입력</string>
-  <string name="settings_summary_clipboard_suggest">복사한 링크 제안</string>
-  <string name="settings_summary_clipboard_off">클립보드 꺼짐</string>
+  <string name="settings_summary_clipboard_suggest">복사한 링크의 다운로드 제안</string>
+  <string name="settings_summary_clipboard_off">클립보드 읽기 꺼짐</string>
   <string name="settings_summary_discover_search">%1$s · %2$s 검색</string>
   <string name="settings_summary_downloads_all">%1$s · 모두 동시에</string>
   <plurals name="settings_summary_downloads_count">
     <item quantity="other">%1$s · 한 번에 %2$d개</item>
   </plurals>
   <string name="settings_summary_speed_capped">최대 속도 · %1$s</string>
-  <string name="settings_summary_speed_slow_lane">저속 차로 · %1$s</string>
-  <string name="settings_summary_speed_auto_slow_lane">자동 · 저속 차로 %1$s</string>
+  <string name="settings_summary_speed_slow_lane">저속 모드 · %1$s</string>
+  <string name="settings_summary_speed_auto_slow_lane">자동 · 저속 모드 %1$s</string>
   <string name="settings_summary_speed_auto_full">자동 · 최대 속도</string>
   <string name="settings_summary_no_limit">제한 없음</string>
   <string name="settings_summary_limit">제한 %1$s</string>
@@ -150,8 +150,8 @@
   <string name="settings_notifications_success_sound_hint">부드러운 알림음.</string>
   <string name="settings_notifications_success_vibration">진동</string>
   <string name="settings_notifications_success_vibration_hint">짧은 진동. 진동 모드에서도 울립니다.</string>
-  <string name="settings_notifications_success_footer">다운로드가 끝나거나 찾기에서 다운로드를 찾았을 때.</string>
-  <string name="settings_notifications_success_footer_phone">다운로드가 끝나거나 찾기에서 다운로드를 찾았을 때. 무음 모드와 방해 금지 모드에서는 꺼지며, 백그라운드 알림은 자체 소리를 사용합니다.</string>
+  <string name="settings_notifications_success_footer">다운로드가 완료되거나 찾기에서 파일을 찾으면 알려 줍니다.</string>
+  <string name="settings_notifications_success_footer_phone">다운로드가 완료되거나 찾기에서 파일을 찾으면 소리로 알려 드립니다. 무음 모드나 방해 금지 모드에서는 소리가 나지 않습니다. 백그라운드 알림은 별도의 알림 소리를 사용합니다.</string>
   <string name="settings_notifications_browser">브라우저 알림</string>
   <string name="settings_notifications_allowed">알림이 허용됨</string>
   <string name="settings_notifications_allowed_hint">Ketch 탭이 백그라운드에 있을 때 표시됩니다.</string>
@@ -177,12 +177,12 @@
   <string name="settings_integration_magnet_failed">Ketch를 마그넷 링크의 기본 앱으로 설정할 수 없음: %1$s</string>
   <string name="settings_integration_torrent_failed">Ketch를 .torrent 파일의 기본 앱으로 설정할 수 없음: %1$s</string>
   <string name="settings_integration_clipboard">클립보드</string>
-  <string name="settings_integration_clipboard_suggest">클립보드의 링크 제안</string>
+  <string name="settings_integration_clipboard_suggest">클립보드 링크의 다운로드 제안</string>
   <string name="settings_integration_clipboard_fill">자동 입력</string>
   <string name="settings_integration_clipboard_suggest_choice">제안</string>
   <string name="settings_integration_clipboard_off">끔</string>
   <string name="settings_integration_clipboard_fill_hint">복사한 링크가 추가 시트에 자동으로 입력됩니다.</string>
-  <string name="settings_integration_clipboard_suggest_hint">탭할 때만 클립보드를 읽습니다.</string>
+  <string name="settings_integration_clipboard_suggest_hint">다운로드 제안을 선택할 때만 클립보드를 읽습니다.</string>
   <string name="settings_integration_clipboard_off_hint">Ketch는 클립보드를 읽지 않습니다.</string>
   <string name="settings_integration_quick_add">붙여넣은 링크 바로 추가</string>
   <string name="settings_integration_quick_add_key_hint">%1$s 키로 링크 하나를 붙여넣으면 바로 추가되며, 실행 취소할 수 있습니다.</string>
@@ -252,7 +252,7 @@
   <string name="settings_ai_access_trusted_none">아직 없습니다. 찾기가 물을 때 ‘항상 허용’을 선택하거나 여기에 사이트를 추가하세요.</string>
   <string name="settings_ai_access_add">ubuntu.com 같은 사이트 추가</string>
   <string name="settings_ai_access_add_invalid">ubuntu.com 같은 웹사이트 이름을 입력하세요.</string>
-  <string name="settings_ai_access_footer">특정 웹사이트로 제한한 검색은 묻지 않습니다. 직접 선택한 사이트이기 때문입니다.</string>
+  <string name="settings_ai_access_footer">검색 대상으로 직접 지정한 웹사이트는 묻지 않고 엽니다.</string>
 
   <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다. Ketch는 돛처럼 모든 다운로드를 여러 레인으로 나눕니다.</string>
   <string name="settings_about_discover_elsewhere">찾기는 데스크톱 및 Android 앱에서 사용할 수 있습니다.</string>
@@ -282,7 +282,7 @@
   <string name="settings_about_update_current_hint">%1$s이(가) 최신 릴리스입니다.</string>
   <string name="settings_about_update_available">Ketch %1$s 사용 가능</string>
   <string name="settings_about_update_available_hint">현재 버전은 %1$s입니다.</string>
-  <string name="settings_about_update_source_hint">이 사본은 소스에서 실행 중입니다. 설치 프로그램은 릴리스 페이지에 있습니다.</string>
+  <string name="settings_about_update_source_hint">소스 코드로 빌드한 버전을 실행 중입니다. 릴리스 페이지에서 설치 프로그램을 다운로드하세요.</string>
   <string name="settings_about_update_downloading">Ketch %1$s 다운로드 중…</string>
   <string name="settings_about_update_progress">%1$s / %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s 설치 준비 완료</string>
@@ -292,7 +292,7 @@
   <string name="settings_about_update_download_failed">업데이트를 다운로드할 수 없음</string>
   <string name="settings_about_update_install_failed">업데이트를 설치할 수 없음</string>
   <string name="settings_about_update_auto">자동으로 업데이트 확인</string>
-  <string name="settings_about_update_auto_hint">하루에 한 번, GitHub의 Ketch 릴리스에서 확인합니다.</string>
+  <string name="settings_about_update_auto_hint">하루에 한 번 GitHub에서 Ketch의 새 버전을 확인합니다.</string>
   <string name="settings_about_update_notes">%1$s의 새로운 기능</string>
   <string name="settings_about_update_check">지금 확인</string>
   <string name="settings_about_update_install">업데이트</string>
@@ -307,14 +307,14 @@
   <string name="settings_logs_share_subject">Ketch 로그</string>
 
   <string name="settings_downloads_folder">다운로드 폴더</string>
-  <string name="settings_downloads_remote">%1$s에서 다시 시작할 때까지 저장됩니다.</string>
+  <string name="settings_downloads_remote">설정은 %1$s 기기에 적용되며, 해당 기기를 다시 시작하면 초기화됩니다.</string>
   <string name="settings_loading_from">%1$s에서 설정을 불러오는 중…</string>
   <string name="settings_downloads_save_to">저장 위치</string>
   <string name="settings_downloads_save_to_row">다운로드 저장 위치</string>
   <string name="settings_downloads_path_placeholder">%1$s의 폴더 경로</string>
   <string name="settings_downloads_private_folder">이 폴더는 Ketch만 볼 수 있습니다. Download 같은 폴더를 선택하세요.</string>
   <string name="settings_downloads_choose_folder">폴더 선택</string>
-  <string name="settings_downloads_torrents_own_folder">토렌트는 계속 Ketch 전용 폴더에 저장됩니다.</string>
+  <string name="settings_downloads_torrents_own_folder">토렌트로 다운로드한 파일은 계속 Ketch 전용 폴더에 저장됩니다.</string>
   <string name="settings_downloads_change">변경…</string>
   <string name="settings_downloads_enter_path">경로 입력…</string>
   <string name="settings_downloads_use_default">다운로드 폴더 사용</string>
@@ -354,36 +354,36 @@
   <string name="settings_downloads_retries_more">재시도 늘리기</string>
 
   <string name="settings_speed_mode_full">최대 속도</string>
-  <string name="settings_speed_mode_slow_lane">저속 차로</string>
+  <string name="settings_speed_mode_slow_lane">저속 모드</string>
   <string name="settings_speed_mode_auto">자동</string>
-  <string name="settings_speed_remote">%1$s에서 다시 시작할 때까지 저장됩니다. 이 기기에서는 아직 저속 차로와 자동을 사용할 수 없습니다.</string>
+  <string name="settings_speed_remote">설정은 %1$s 기기에 적용되며, 해당 기기를 다시 시작하면 초기화됩니다. 이 기기는 아직 저속 모드와 자동 모드를 지원하지 않습니다.</string>
   <string name="settings_speed_limit_group">제한</string>
   <string name="settings_speed_limit">속도 제한</string>
   <string name="settings_speed_limit_hint">모든 다운로드가 나눠 씁니다. 다운로드별 제한은 이보다 낮게 설정할 수 있습니다.</string>
   <string name="settings_speed_mode_group">모드</string>
   <string name="settings_speed_mode">속도 모드</string>
-  <string name="settings_speed_full_unlimited">다운로드가 낼 수 있는 최대 속도를 모두 사용합니다.</string>
-  <string name="settings_speed_full_capped">다운로드는 모두 합쳐 최대 %1$s까지 사용합니다.</string>
-  <string name="settings_speed_slow_lane_summary">다운로드는 모두 합쳐 최대 %1$s까지 사용해 통화에 쓸 여유를 남겨 둡니다.</string>
-  <string name="settings_speed_auto_no_rules">아래에 규칙을 추가하면 저속 차로가 자동으로 켜집니다.</string>
+  <string name="settings_speed_full_unlimited">네트워크에서 가능한 최대 속도로 다운로드합니다.</string>
+  <string name="settings_speed_full_capped">모든 다운로드의 합산 속도를 %1$s 이하로 제한합니다.</string>
+  <string name="settings_speed_slow_lane_summary">모든 다운로드의 합산 속도를 %1$s 이하로 제한해 통화에 필요한 대역폭을 확보합니다.</string>
+  <string name="settings_speed_auto_no_rules">아래에 규칙을 추가하면 저속 모드가 자동으로 켜집니다.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">제한</string>
   <string name="settings_speed_full_cap">최대 속도 상한</string>
-  <string name="settings_speed_full_cap_hint">저속 차로가 아닐 때 모든 다운로드가 함께 쓰는 최대 속도입니다.</string>
-  <string name="settings_speed_slow_lane">저속 차로 속도</string>
+  <string name="settings_speed_full_cap_hint">저속 모드가 꺼져 있을 때 모든 다운로드에 적용되는 합산 속도 상한입니다.</string>
+  <string name="settings_speed_slow_lane">저속 모드 속도</string>
   <string name="settings_speed_slow_lane_suggested">≈ %1$s 권장, 이번 주에 확인된 최고 속도의 %2$d%입니다.</string>
   <string name="settings_speed_slow_lane_unknown">Ketch가 이 연결의 속도를 파악할 때까지는 %1$s입니다.</string>
   <string name="settings_speed_slow_lane_capped">최대 속도 상한(%1$s)이 더 낮아서 대신 적용됩니다.</string>
   <string name="settings_speed_rules">자동 규칙</string>
-  <string name="settings_speed_rules_footer_auto">규칙은 이 기기의 시계를 따릅니다.</string>
-  <string name="settings_speed_rules_footer">규칙은 자동 모드에서 이 기기의 시계에 따라 적용됩니다.</string>
+  <string name="settings_speed_rules_footer_auto">규칙은 이 기기의 현지 시간에 따라 적용됩니다.</string>
+  <string name="settings_speed_rules_footer">자동 모드에서는 이 기기의 현지 시간에 따라 규칙이 적용됩니다.</string>
   <string name="settings_speed_rule_add">규칙 추가</string>
   <plurals name="settings_speed_rules_max">
     <item quantity="other">최대 %1$d개 규칙</item>
   </plurals>
   <string name="settings_speed_rules_empty">아직 규칙이 없습니다</string>
   <string name="settings_speed_rules_empty_hint">예를 들어 근무 시간에는 다운로드 속도를 낮출 수 있습니다.</string>
-  <string name="settings_speed_rule_slow_lane_on">저속 차로 켜기</string>
+  <string name="settings_speed_rule_slow_lane_on">저속 모드 켜기</string>
   <string name="settings_speed_rule_start">시작</string>
   <string name="settings_speed_rule_end">종료</string>
   <string name="settings_speed_rule_remove">규칙 제거</string>
@@ -407,7 +407,7 @@
   <string name="settings_speed_connections_hint">HTTP와 FTP에 적용되며, 다운로드가 시작되거나 재개될 때 반영됩니다.</string>
   <string name="settings_speed_switch_failed">%1$s 모드로 전환할 수 없음</string>
   <string name="settings_speed_cap_failed">최대 속도 상한을 변경할 수 없음</string>
-  <string name="settings_speed_slow_lane_failed">저속 차로 속도를 변경할 수 없음</string>
+  <string name="settings_speed_slow_lane_failed">저속 모드 속도를 변경할 수 없음</string>
   <string name="settings_speed_rules_failed">자동 규칙을 변경할 수 없음</string>
 
   <string name="settings_network_system_default">시스템 기본값</string>
@@ -553,12 +553,12 @@
   <string name="settings_search_per_server">한 웹사이트에서 동시에 받는 다운로드 수</string>
   <string name="settings_search_per_server_keywords">호스트, 웹사이트, 사이트, 대기열, 제한</string>
   <string name="settings_search_retries_keywords">재시도, 다시 시도, 시도 횟수, 오류</string>
-  <string name="settings_search_speed_mode">최대 속도, 저속 차로 또는 자동</string>
+  <string name="settings_search_speed_mode">최대 속도, 저속 모드 또는 자동</string>
   <string name="settings_search_speed_mode_keywords">제한, 대역폭, 속도 제한, 스로틀</string>
   <string name="settings_search_full_speed_cap">모든 다운로드가 함께 쓰는 속도 제한</string>
   <string name="settings_search_full_speed_cap_keywords">속도 제한, 대역폭, 스로틀, 최대</string>
   <string name="settings_search_slow_lane_keywords">제한, 대역폭, 속도 제한, 스로틀</string>
-  <string name="settings_search_rules">정해진 시간에 저속 차로 켜기</string>
+  <string name="settings_search_rules">정해진 시간에 저속 모드 켜기</string>
   <string name="settings_search_rules_keywords">예약, 일정, 근무 시간, 평일, 시간</string>
   <string name="settings_search_connections_keywords">세그먼트, 스레드, 병렬, 분할, 연결</string>
   <string name="settings_search_networks">다운로드에 사용할 네트워크</string>
@@ -582,9 +582,9 @@
   <string name="settings_rule_weekdays">평일</string>
   <string name="settings_rule_weekends">주말</string>
 
-  <string name="settings_auto_slow_lane_until">%1$s까지 저속 차로 켜짐</string>
+  <string name="settings_auto_slow_lane_until">%1$s까지 저속 모드 켜짐</string>
   <string name="settings_auto_full_speed_until">%1$s까지 최대 속도</string>
-  <string name="settings_auto_slow_lane_all_week">일주일 내내 저속 차로 켜짐</string>
+  <string name="settings_auto_slow_lane_all_week">일주일 내내 저속 모드 켜짐</string>
   <string name="settings_auto_full_speed_all_week">최대 속도, 이번 주에 시작되는 규칙 없음</string>
   <string name="settings_auto_tomorrow_at">내일 %1$s</string>
   <string name="settings_auto_day_at">%1$s요일 %2$s</string>

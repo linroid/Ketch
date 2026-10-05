@@ -25,7 +25,7 @@
   <string name="shell_device_connecting">Connexion</string>
   <string name="shell_device_connecting_now">Connexion…</string>
   <string name="shell_device_idle">Inactif</string>
-  <string name="shell_device_slow_lane">Voie lente</string>
+  <string name="shell_device_slow_lane">Vitesse réduite</string>
   <plurals name="shell_device_active">
     <item quantity="one">%1$d actif</item>
     <item quantity="other">%1$d actifs</item>
@@ -51,7 +51,7 @@
   <string name="sidebar_menu_speed">Vitesse</string>
   <string name="sidebar_menu_settings">Réglages de cet appareil…</string>
   <string name="sidebar_menu_full_speed">Pleine vitesse</string>
-  <string name="sidebar_menu_slow_lane">Voie lente · %1$s</string>
+  <string name="sidebar_menu_slow_lane">Vitesse réduite · %1$s</string>
   <string name="sidebar_menu_no_limit">Aucune limite</string>
 
   <string name="switcher_overview">Vue d'ensemble</string>
@@ -131,11 +131,11 @@
   <string name="palette_add_with_options">Ajouter avec des options…</string>
   <string name="palette_add_with_options_detail">Dossier, vitesse, priorité et heure de démarrage</string>
   <string name="palette_limit_to">Limiter les téléchargements à %1$s</string>
-  <string name="palette_slow_lane_to">Régler la Voie lente sur %1$s</string>
-  <string name="palette_slow_lane_turns_on">Active la Voie lente</string>
-  <string name="palette_slow_lane_is_on">La Voie lente est activée</string>
+  <string name="palette_slow_lane_to">Régler la vitesse réduite sur %1$s</string>
+  <string name="palette_slow_lane_turns_on">Active la vitesse réduite</string>
+  <string name="palette_slow_lane_is_on">La vitesse réduite est activée</string>
   <string name="palette_slow_lane_now">Actuellement %1$s</string>
-  <string name="palette_limit_while_off">S'applique quand la Voie lente est désactivée</string>
+  <string name="palette_limit_while_off">S'applique quand la vitesse réduite est désactivée</string>
 
   <plurals name="palette_pause_count">
     <item quantity="one">Mettre en pause %1$d téléchargement</item>
@@ -152,11 +152,11 @@
     <item quantity="other">Réessayer %1$d téléchargements en échec</item>
   </plurals>
   <string name="palette_nothing_failed">Aucun échec</string>
-  <string name="palette_slow_lane_off">Désactiver la Voie lente</string>
-  <string name="palette_slow_lane_on">Activer la Voie lente</string>
+  <string name="palette_slow_lane_off">Désactiver la vitesse réduite</string>
+  <string name="palette_slow_lane_on">Activer la vitesse réduite</string>
   <string name="palette_nothing_to_undo">Rien à annuler</string>
   <string name="palette_full_speed">Pleine vitesse</string>
-  <string name="palette_full_speed_slow_lane">Désactive la Voie lente</string>
+  <string name="palette_full_speed_slow_lane">Désactive la vitesse réduite</string>
   <string name="palette_full_speed_rules">Désactive les règles de vitesse</string>
   <string name="palette_full_speed_cap">Lève la limite de %1$s</string>
   <string name="palette_full_speed_already">Déjà à pleine vitesse</string>

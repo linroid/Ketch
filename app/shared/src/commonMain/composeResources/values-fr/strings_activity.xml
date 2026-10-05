@@ -22,9 +22,9 @@
   <string name="notify_sharing_device">Partage de cet appareil</string>
   <string name="notify_server_on_port">Serveur sur le port %1$d</string>
   <string name="notify_discovering">Découvrir recherche des téléchargements</string>
-  <string name="notify_slow_lane_on">Voie lente</string>
+  <string name="notify_slow_lane_on">Vitesse réduite</string>
   <string name="notify_action_pause_all">Tout mettre en pause</string>
-  <string name="notify_action_slow_lane">Voie lente</string>
+  <string name="notify_action_slow_lane">Vitesse réduite</string>
   <string name="notify_action_full_speed">Pleine vitesse</string>
   <plurals name="notify_more_files">
     <item quantity="one">+%1$d autre</item>

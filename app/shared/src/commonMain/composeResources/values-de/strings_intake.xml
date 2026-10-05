@@ -185,7 +185,7 @@
   <string name="intake_start">Start</string>
   <string name="intake_peer_limit">Peer-Limit</string>
   <string name="intake_single_connection">Dieser Server erlaubt 1 Verbindung</string>
-  <string name="intake_auto_device">Bei „Automatisch“ entscheidet das Gerät</string>
+  <string name="intake_auto_device">„Automatisch“ verwendet das voreingestellte Peer-Limit des Geräts</string>
   <string name="intake_auto_setting">„Automatisch“ verwendet die Einstellung des Geräts: %1$d</string>
   <string name="intake_priority_low_caption">Läuft, wenn sonst nichts wartet</string>
   <string name="intake_priority_normal_caption">Normale Reihenfolge</string>
@@ -215,7 +215,7 @@
   <string name="intake_pin">%1$s anheften</string>
   <string name="intake_choose_folder">Ordner wählen…</string>
   <string name="intake_folder_on">Ordner auf %1$s</string>
-  <string name="intake_torrents_app_folder">Torrents werden im App-Ordner gespeichert: In „Dateien“ gewählte Ordner gelten nur für Links</string>
+  <string name="intake_torrents_app_folder">Per Torrent heruntergeladene Dateien werden im App-Ordner gespeichert. In der Dateien-App gewählte Ordner gelten nur für Downloads über normale Links</string>
 
   <string name="intake_advanced">Erweitert</string>
   <string name="intake_hide">Ausblenden</string>

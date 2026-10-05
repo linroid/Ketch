@@ -1,5 +1,5 @@
 /* Ketch's Info.plist strings in Traditional Chinese. */
 
-"NSLocalNetworkUsageDescription" = "Ketch 會在這個網路上尋找你其他執行 Ketch 的裝置，讓你可以新增它們並控制其下載項目。";
+"NSLocalNetworkUsageDescription" = "Ketch 需要存取區域網路，以尋找其他執行 Ketch 的裝置，方便新增裝置並管理其下載項目。";
 
 "BitTorrent File" = "BitTorrent 檔案";

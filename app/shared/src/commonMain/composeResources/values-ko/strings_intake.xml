@@ -167,7 +167,7 @@
   <string name="intake_start">시작</string>
   <string name="intake_peer_limit">피어 제한</string>
   <string name="intake_single_connection">이 서버는 연결을 1개만 허용합니다</string>
-  <string name="intake_auto_device">자동으로 두면 기기가 결정합니다</string>
+  <string name="intake_auto_device">자동을 선택하면 기기의 기본 피어 수 제한을 사용합니다</string>
   <string name="intake_auto_setting">자동은 기기 설정을 따릅니다: %1$d</string>
   <string name="intake_priority_low_caption">대기 중인 다른 다운로드가 없을 때 실행</string>
   <string name="intake_priority_normal_caption">기본 순서</string>
@@ -195,7 +195,7 @@
   <string name="intake_pin">%1$s 고정</string>
   <string name="intake_choose_folder">폴더 선택…</string>
   <string name="intake_folder_on">%1$s의 폴더</string>
-  <string name="intake_torrents_app_folder">토렌트는 앱 폴더에 저장됩니다. 파일 앱에서 고른 폴더에는 링크로 받은 파일만 저장됩니다</string>
+  <string name="intake_torrents_app_folder">토렌트로 다운로드한 파일은 앱 폴더에 저장됩니다. 파일 앱에서 선택한 폴더는 일반 링크로 다운로드할 때만 사용됩니다</string>
 
   <string name="intake_advanced">고급</string>
   <string name="intake_hide">숨기기</string>

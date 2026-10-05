@@ -81,8 +81,8 @@
   <string name="message_restart">Перезапустить</string>
   <string name="message_open_installer">Открыть установщик</string>
   <string name="message_whats_new">Что нового</string>
-  <string name="message_slow_lane_on">Медленная полоса включена на устройстве «%1$s» · %2$s</string>
-  <string name="message_slow_lane_off">Медленная полоса выключена на устройстве «%1$s»</string>
+  <string name="message_slow_lane_on">Режим низкой скорости включён на устройстве «%1$s» · %2$s</string>
+  <string name="message_slow_lane_off">Режим низкой скорости выключен на устройстве «%1$s»</string>
   <string name="message_speed_follows_rules">Скорость на устройстве «%1$s» задаётся вашими правилами</string>
   <string name="message_speed_limit_failed">Не удалось задать ограничение скорости на устройстве «%1$s»</string>
   <string name="message_reconnect_failed">Не удалось переподключиться к %1$s</string>

@@ -13,7 +13,7 @@
   <string name="command_pause_all">Alle pausieren</string>
   <string name="command_resume_all">Alle fortsetzen</string>
   <string name="command_retry_failed">Alle fehlgeschlagenen erneut versuchen</string>
-  <string name="command_slow_lane">Kriechspur</string>
+  <string name="command_slow_lane">Drosselung</string>
   <string name="command_inspector_show">Informationen einblenden</string>
   <string name="command_sidebar_toggle">Seitenleiste ein-/ausblenden</string>
   <string name="command_activity">Aktivität</string>

@@ -100,7 +100,7 @@
   <string name="device_rename_local_hint">他のデバイスには、再起動後にこの名前が表示されます。</string>
   <string name="device_rename_name">名前</string>
   <string name="device_remove_title">%1$sを削除しますか？</string>
-  <string name="device_remove_body">このデバイスのダウンロードはここに表示されなくなります。ダウンロードは%1$sで引き続き実行され、あとで再び追加できます。</string>
+  <string name="device_remove_body">このデバイスのダウンロードはここに表示されなくなります。%1$sでのダウンロードは続行され、デバイスはあとで再び追加できます。</string>
 
   <string name="device_speed_of">%1$sの速度</string>
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="shell_destination_downloads">下载</string>
-  <string name="shell_destination_discover">发现</string>
+  <string name="shell_destination_discover">搜索</string>
   <string name="shell_destination_devices">设备</string>
   <string name="shell_settings">设置</string>
   <string name="shell_devices">设备</string>
@@ -24,7 +24,7 @@
   <string name="shell_device_connecting">正在连接</string>
   <string name="shell_device_connecting_now">正在连接…</string>
   <string name="shell_device_idle">空闲</string>
-  <string name="shell_device_slow_lane">慢车道</string>
+  <string name="shell_device_slow_lane">低速模式</string>
   <plurals name="shell_device_active">
     <item quantity="other">%1$d 个进行中</item>
   </plurals>
@@ -40,14 +40,14 @@
   <string name="sidebar_all_devices_tooltip">所有设备的下载</string>
   <string name="sidebar_add_device">添加设备</string>
   <string name="sidebar_device_menu">设备菜单</string>
-  <string name="sidebar_menu_pause_all">暂停这里的全部下载</string>
-  <string name="sidebar_menu_resume_all">继续这里的全部下载</string>
-  <string name="sidebar_menu_retry_failed">重试这里失败的下载</string>
-  <string name="sidebar_menu_retry_failed_count">重试这里失败的下载（%1$d）</string>
+  <string name="sidebar_menu_pause_all">暂停此设备上的全部下载</string>
+  <string name="sidebar_menu_resume_all">继续此设备上的全部下载</string>
+  <string name="sidebar_menu_retry_failed">重试此设备上失败的下载</string>
+  <string name="sidebar_menu_retry_failed_count">重试此设备上失败的下载（%1$d）</string>
   <string name="sidebar_menu_speed">速度</string>
   <string name="sidebar_menu_settings">这台设备的设置…</string>
   <string name="sidebar_menu_full_speed">全速</string>
-  <string name="sidebar_menu_slow_lane">慢车道 · %1$s</string>
+  <string name="sidebar_menu_slow_lane">低速模式 · %1$s</string>
   <string name="sidebar_menu_no_limit">不限速</string>
 
   <string name="switcher_overview">概览</string>
@@ -65,7 +65,7 @@
   <plurals name="shell_search_download_links_on">
     <item quantity="other">在 %2$s 上下载 %1$d 个链接</item>
   </plurals>
-  <string name="shell_discover_query">用“发现”搜索“%1$s”</string>
+  <string name="shell_discover_query">搜索“%1$s”</string>
 
   <plurals name="shell_activity_unread">
     <item quantity="other">%1$d 条未读</item>
@@ -92,7 +92,7 @@
   <string name="drop_send_it">发送到这里</string>
   <string name="drop_move_count">将 %1$d 个移到这里</string>
   <string name="drop_send_count">将 %1$d 个发送到这里</string>
-  <string name="drop_key_moves">按 %1$s 改为移动</string>
+  <string name="drop_key_moves">按住 %1$s 改为移动</string>
   <string name="berth_drop_on">拖放到 %1$s</string>
   <string name="berth_ready">就绪</string>
 
@@ -104,7 +104,7 @@
   <string name="palette_hint_move">选择</string>
   <string name="palette_hint_run">执行</string>
   <string name="palette_hint_alternate">备选</string>
-  <string name="palette_hint_discover">发现</string>
+  <string name="palette_hint_discover">搜索</string>
   <string name="palette_hint_close">关闭</string>
   <string name="palette_section_recent">最近</string>
   <string name="palette_section_links">下载</string>
@@ -121,14 +121,14 @@
   <string name="palette_download">下载 %1$s</string>
   <string name="palette_on_device">在 %1$s 上</string>
   <string name="palette_verb_download">下载</string>
-  <string name="palette_add_with_options">使用选项添加…</string>
+  <string name="palette_add_with_options">设置下载选项…</string>
   <string name="palette_add_with_options_detail">文件夹、速度、优先级和开始时间</string>
   <string name="palette_limit_to">将下载限速为 %1$s</string>
-  <string name="palette_slow_lane_to">将慢车道设为 %1$s</string>
-  <string name="palette_slow_lane_turns_on">开启慢车道</string>
-  <string name="palette_slow_lane_is_on">慢车道已开启</string>
+  <string name="palette_slow_lane_to">将低速模式设为 %1$s</string>
+  <string name="palette_slow_lane_turns_on">开启低速模式</string>
+  <string name="palette_slow_lane_is_on">低速模式已开启</string>
   <string name="palette_slow_lane_now">当前为 %1$s</string>
-  <string name="palette_limit_while_off">在慢车道关闭时生效</string>
+  <string name="palette_limit_while_off">在低速模式关闭时生效</string>
 
   <plurals name="palette_pause_count">
     <item quantity="other">暂停 %1$d 个下载</item>
@@ -142,11 +142,11 @@
     <item quantity="other">重试 %1$d 个失败的下载</item>
   </plurals>
   <string name="palette_nothing_failed">没有失败的下载</string>
-  <string name="palette_slow_lane_off">关闭慢车道</string>
-  <string name="palette_slow_lane_on">开启慢车道</string>
+  <string name="palette_slow_lane_off">关闭低速模式</string>
+  <string name="palette_slow_lane_on">开启低速模式</string>
   <string name="palette_nothing_to_undo">没有可撤销的操作</string>
   <string name="palette_full_speed">全速</string>
-  <string name="palette_full_speed_slow_lane">关闭慢车道</string>
+  <string name="palette_full_speed_slow_lane">关闭低速模式</string>
   <string name="palette_full_speed_rules">关闭速度规则</string>
   <string name="palette_full_speed_cap">解除 %1$s 的限速</string>
   <string name="palette_full_speed_already">已经是全速</string>
@@ -163,5 +163,5 @@
   <plurals name="palette_matches">
     <item quantity="other">%1$d 个匹配项</item>
   </plurals>
-  <string name="palette_discover_detail">在网络上查找下载</string>
+  <string name="palette_discover_detail">在网上查找可下载的文件</string>
 </resources>

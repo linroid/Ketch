@@ -14,8 +14,8 @@
   <string name="pulse_connecting">正在连接 %1$s</string>
   <string name="pulse_needs_token">%1$s 需要令牌</string>
   <string name="pulse_offline">%1$s 已离线 · 正在重试</string>
-  <string name="pulse_slow_lane">慢车道</string>
-  <string name="pulse_slow_lane_until">慢车道至 %1$s</string>
+  <string name="pulse_slow_lane">低速模式</string>
+  <string name="pulse_slow_lane_until">低速模式至 %1$s</string>
   <string name="pulse_disk_tooltip">%2$s：%1$s · %3$s</string>
   <string name="pulse_downloading_count">%1$d 个正在下载</string>
   <string name="pulse_tab_progress">↓ %1$s</string>
@@ -34,7 +34,7 @@
   <string name="pulse_speed_downloading">正在以 %1$s 下载，显示最近5分钟</string>
   <string name="pulse_speed_idle">空闲，显示最近5分钟</string>
   <string name="pulse_idle">空闲</string>
-  <string name="pulse_disk_short">不足以容纳等待中的下载</string>
+  <string name="pulse_disk_short">剩余空间不足以保存等待中的下载</string>
   <plurals name="pulse_activity_unread">
     <item quantity="other">动态，%1$d 条未读</item>
   </plurals>
@@ -53,7 +53,7 @@
   <string name="pulse_mode_full">全速</string>
   <string name="pulse_mode_auto_name">自动</string>
   <string name="pulse_mode_capped">限速 · %1$s</string>
-  <string name="pulse_mode_slow_lane">慢车道 · %1$s</string>
+  <string name="pulse_mode_slow_lane">低速模式 · %1$s</string>
   <string name="pulse_mode_auto">自动 · %1$s</string>
   <string name="pulse_full_speed_until">全速至 %1$s</string>
   <string name="pulse_mode_full_short">全速</string>
@@ -71,31 +71,31 @@
   <string name="pulse_no_limit">不限速</string>
   <string name="pulse_limit">限速 %1$s</string>
 
-  <string name="pulse_slow_lane_turn_on">开启慢车道</string>
-  <string name="pulse_slow_lane_turn_off">关闭慢车道</string>
+  <string name="pulse_slow_lane_turn_on">开启低速模式</string>
+  <string name="pulse_slow_lane_turn_off">关闭低速模式</string>
   <string name="pulse_speed_limit">限速</string>
   <string name="pulse_limited">已限速</string>
   <string name="pulse_not_limited">未限速</string>
   <string name="pulse_speed_options">速度选项</string>
   <string name="pulse_speed_mode">速度模式</string>
-  <string name="pulse_slow_lane_speed">慢车道速度</string>
-  <string name="pulse_use_as_slow_lane">用作慢车道速度</string>
+  <string name="pulse_slow_lane_speed">低速模式限速</string>
+  <string name="pulse_use_as_slow_lane">设为低速模式的限速</string>
   <string name="pulse_speed_settings">速度设置…</string>
   <string name="pulse_update_failed">无法更新%1$s · %2$s</string>
   <string name="pulse_caption_full">下载将以网络允许的最快速度进行。</string>
   <string name="pulse_caption_capped">下载速度上限为 %1$s。</string>
-  <string name="pulse_caption_slow_lane">下载共享 %1$s，为其他应用留出带宽。</string>
+  <string name="pulse_caption_slow_lane">所有下载的总速度不超过 %1$s，为其他应用留出带宽。</string>
   <string name="pulse_caption_no_rules">尚无速度规则。可在速度设置中添加。</string>
-  <string name="pulse_caption_rule_slow_lane">一条规则正使慢车道保持开启。</string>
-  <string name="pulse_caption_rule_full">全速运行，直到某条规则开启慢车道。</string>
-  <string name="pulse_caption_slow_lane_until">慢车道持续到 %1$s，之后由规则决定。</string>
-  <string name="pulse_caption_full_until">全速持续到 %1$s，之后由规则决定。</string>
-  <string name="pulse_limit_for_slow_lane">开启慢车道时使用。</string>
+  <string name="pulse_caption_rule_slow_lane">已按规则开启低速模式。</string>
+  <string name="pulse_caption_rule_full">当前为全速，规则生效时将开启低速模式。</string>
+  <string name="pulse_caption_slow_lane_until">低速模式将持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_caption_full_until">全速模式将持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_limit_for_slow_lane">开启低速模式时使用。</string>
   <string name="pulse_limit_for_device">适用于%1$s上的所有下载。</string>
-  <string name="pulse_limit_after_slow_lane">慢车道关闭后生效。</string>
+  <string name="pulse_limit_after_slow_lane">低速模式关闭后生效。</string>
 
-  <string name="pulse_slow_lane_on">慢车道已开启 · %1$s</string>
-  <string name="pulse_slow_lane_off">慢车道已关闭</string>
+  <string name="pulse_slow_lane_on">低速模式已开启 · %1$s</string>
+  <string name="pulse_slow_lane_off">低速模式已关闭</string>
   <string name="pulse_speed_follows_rules">速度按规则调整</string>
   <string name="pulse_switch_failed">无法切换到%1$s</string>
   <string name="pulse_limit_failed">无法设置限速</string>

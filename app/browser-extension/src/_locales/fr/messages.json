@@ -55,7 +55,7 @@
     "message": "Ketch ne peut pas télécharger ceci"
   },
   "notify_unsupported_stream": {
-    "message": "La page diffuse elle-même ce média, il n'y a donc aucun lien à télécharger."
+    "message": "Ce média est diffusé en streaming sur la page. Aucun lien de téléchargement direct n'est disponible."
   },
   "notify_unsupported_scheme": {
     "message": "Seuls les liens http, https, ftp et magnet peuvent être envoyés à Ketch."
@@ -361,7 +361,7 @@
     "message": "Par défaut"
   },
   "instance_app_detail": {
-    "message": "L'app Ketch sur cet ordinateur. L'extension l'ouvre quand un téléchargement en a besoin."
+    "message": "L'app Ketch sur cet ordinateur. L'extension ouvre automatiquement Ketch lorsque vous lui envoyez un téléchargement."
   },
   "instance_address": {
     "message": "Adresse"
@@ -470,7 +470,7 @@
     "message": "Laisser les petits fichiers au navigateur"
   },
   "options_min_size_detail": {
-    "message": "Les fichiers plus petits restent dans le navigateur. Les fichiers de taille inconnue vont toujours à Ketch. 0 envoie tout."
+    "message": "Les fichiers plus petits que cette taille sont téléchargés par le navigateur. Les fichiers de taille inconnue sont toujours envoyés à Ketch. Indiquez 0 pour tout envoyer."
   },
   "options_min_size_unit": {
     "message": "Mo"
@@ -485,7 +485,7 @@
     "message": "Envoyer les cookies et le référent"
   },
   "options_cookies_detail": {
-    "message": "Permet à Ketch de télécharger les fichiers qui exigent d'être connecté. Ketch les enregistre avec la tâche pour pouvoir la reprendre plus tard."
+    "message": "Permet à Ketch de télécharger les fichiers qui nécessitent une connexion à un compte. Les cookies et l'adresse de la page d'origine sont enregistrés avec la tâche pour pouvoir reprendre le téléchargement plus tard."
   },
   "options_links_notifications": {
     "message": "Liens et notifications"

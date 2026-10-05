@@ -55,7 +55,7 @@
     "message": "Ketchではダウンロードできません"
   },
   "notify_unsupported_stream": {
-    "message": "このメディアはページ自体がストリーミングしているため、ダウンロードできるリンクがありません。"
+    "message": "このメディアはページ上でストリーミング配信されているため、直接ダウンロードできるリンクがありません。"
   },
   "notify_unsupported_scheme": {
     "message": "Ketchに送信できるのは、http、https、ftp、マグネットリンクのみです。"
@@ -114,7 +114,7 @@
     "message": "Ketchは実行されていません"
   },
   "error_app_connect_failed": {
-    "message": "Ketchアプリが接続できませんでした"
+    "message": "Ketchアプリへの接続に失敗しました"
   },
   "error_app_invalid_reply": {
     "message": "Ketchアプリから無効な応答が返されました"
@@ -361,7 +361,7 @@
     "message": "デフォルト"
   },
   "instance_app_detail": {
-    "message": "このコンピュータのKetchアプリです。ダウンロードが必要になると、拡張機能が自動的に開きます。"
+    "message": "このコンピュータのKetchアプリです。ダウンロードを送信すると、拡張機能がKetchを自動的に開きます。"
   },
   "instance_address": {
     "message": "アドレス"
@@ -485,7 +485,7 @@
     "message": "Cookieとリファラーを送信"
   },
   "options_cookies_detail": {
-    "message": "サインインが必要なファイルもKetchでダウンロードできるようにします。Ketchは後で再開できるよう、これらをタスクと一緒に保存します。"
+    "message": "ログインが必要なファイルもKetchでダウンロードできるようにします。後からダウンロードを再開できるよう、Cookieとリファラーはタスクと一緒に保存されます。"
   },
   "options_links_notifications": {
     "message": "リンクと通知"

@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="discover_title">发现</string>
-  <string name="discover_settings">发现设置</string>
-  <string name="discover_hero_title">描述一下，Ketch 帮你找到下载。</string>
-  <string name="discover_intro_body">“发现”会让 %1$s 搜索网络并阅读找到的网页，然后列出它信任的文件。在你添加之前，不会下载任何内容。</string>
+  <string name="discover_title">搜索</string>
+  <string name="discover_settings">搜索设置</string>
+  <string name="discover_hero_title">说说想下载什么，Ketch 帮你找。</string>
+  <string name="discover_intro_body">“搜索”会通过 %1$s 搜索网络、阅读网页，并列出它认为可信的文件。只有手动添加后才会开始下载。</string>
   <string name="discover_example_blender">适用于 Apple 芯片的 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 服务器版 ISO</string>
   <string name="discover_example_footage">公有领域的 4K 自然风光视频素材</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">“发现”会让 AI 模型搜索网络并阅读找到的网页，然后列出它信任的文件。搜索内容会发送给你选择的服务商。</string>
-  <string name="discover_setup_unsupported">“发现”可在电脑或 Android 手机上的 Ketch 应用中使用。</string>
-  <string name="discover_setup_pending">设置好“发现”后，会立即搜索“%1$s”。</string>
+  <string name="discover_setup_body">“搜索”会通过 AI 模型搜索网络、阅读网页，并列出它认为可信的文件。搜索内容会发送给所选的服务商。</string>
+  <string name="discover_setup_unsupported">“搜索”可在电脑或 Android 手机上的 Ketch 应用中使用。</string>
+  <string name="discover_setup_pending">完成搜索设置后，会立即搜索“%1$s”。</string>
   <string name="discover_setup_choose_model">选择模型</string>
   <string name="discover_setup_local_provider">%1$s · 本地运行，无需密钥</string>
   <string name="discover_setup_finish">完成 %1$s 的设置</string>
@@ -50,9 +50,9 @@
 
   <string name="discover_approval_page">打开 %1$s？</string>
   <string name="discover_approval_file">检查 %1$s 上的文件？</string>
-  <string name="discover_approval_redirect">跟随重定向到 %1$s？</string>
+  <string name="discover_approval_redirect">允许跳转到 %1$s？</string>
   <string name="discover_approval_redirect_from">从 %1$s 重定向而来</string>
-  <string name="discover_approval_reason">“发现”说明：%1$s</string>
+  <string name="discover_approval_reason">访问原因：%1$s</string>
   <string name="discover_approval_allow">允许</string>
   <string name="discover_approval_allow_once">允许一次</string>
   <string name="discover_approval_deny">拒绝</string>
@@ -61,7 +61,7 @@
   <string name="discover_approval_allow_all">在此对话中允许所有网站</string>
   <string name="discover_approval_allow_caption">在此对话中允许 %1$s 及其子域名</string>
   <string name="discover_approval_settings">网页访问设置</string>
-  <string name="discover_approval_pane">“发现”想要打开 %1$s</string>
+  <string name="discover_approval_pane">“搜索”想要打开 %1$s</string>
   <string name="discover_approval_jump">需要你确认</string>
 
   <string name="discover_select_all">全选</string>
@@ -72,12 +72,12 @@
   <string name="discover_match">匹配度 %1$s</string>
   <string name="discover_match_tooltip">与搜索内容的匹配程度</string>
   <string name="discover_not_encrypted">未加密</string>
-  <string name="discover_error_title">“发现”未能完成此次搜索</string>
-  <string name="discover_failed">发现失败</string>
-  <string name="discover_none_title">未找到下载</string>
-  <string name="discover_none_body">“发现”只列出来自可信来源的文件。可以试着写明版本、平台或发布它的网站。</string>
+  <string name="discover_error_title">未能完成此次搜索</string>
+  <string name="discover_failed">搜索失败</string>
+  <string name="discover_none_title">未找到可下载的文件</string>
+  <string name="discover_none_body">“搜索”只列出来自可信来源的文件。试着补充版本、平台或文件的发布网站。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">内容过滤器隐藏了 %1$d 个看起来不安全的结果。可以在“发现设置”中关闭过滤器。</item>
+    <item quantity="other">内容过滤器隐藏了 %1$d 个看起来不安全的结果。可以在“搜索设置”中关闭过滤器。</item>
   </plurals>
   <string name="discover_search_everywhere">搜索整个网络</string>
   <string name="discover_stopped">已停止</string>
@@ -101,7 +101,7 @@
   <string name="discover_undo_discard">撤销丢弃结果</string>
   <string name="discover_undo_delete">撤销删除搜索</string>
   <string name="discover_undo_clear_history">撤销清除历史记录</string>
-  <string name="discover_needs_ok">“发现”需要你确认后才能打开 %1$s</string>
+  <string name="discover_needs_ok">“搜索”需要你确认后才能打开 %1$s</string>
 
   <string name="discover_select_to_add">选择要添加的下载</string>
   <plurals name="discover_selected">
@@ -111,20 +111,20 @@
     <item quantity="other">%1$d 个来自之前的消息</item>
   </plurals>
   <string name="discover_add_now">立即添加</string>
-  <string name="discover_add_options">更多添加方式</string>
+  <string name="discover_add_options">更多添加选项</string>
   <string name="discover_add_to">添加到</string>
-  <string name="discover_review_add">检查并添加</string>
-  <string name="discover_review_add_count">检查并添加 %1$d 个</string>
+  <string name="discover_review_add">确认并添加</string>
+  <string name="discover_review_add_count">确认并添加 %1$d 个</string>
 
-  <string name="discover_history">历史记录</string>
-  <string name="discover_history_show">显示历史记录</string>
-  <string name="discover_history_hide">隐藏历史记录</string>
+  <string name="discover_history">搜索历史</string>
+  <string name="discover_history_show">显示搜索历史</string>
+  <string name="discover_history_hide">隐藏搜索历史</string>
   <string name="discover_new_search">新建搜索</string>
   <string name="discover_delete_search">删除此搜索</string>
-  <string name="discover_history_clear">清除历史记录</string>
-  <string name="discover_turn_off">关闭发现</string>
-  <string name="discover_turned_off">发现已关闭</string>
-  <string name="discover_turned_off_detail">可在“设置”的“发现”中重新开启。</string>
+  <string name="discover_history_clear">清除搜索历史</string>
+  <string name="discover_turn_off">关闭搜索</string>
+  <string name="discover_turned_off">搜索已关闭</string>
+  <string name="discover_turned_off_detail">可在“设置”的“搜索”中重新开启。</string>
   <string name="discover_history_filter">搜索历史记录</string>
   <string name="discover_history_empty">你进行的搜索会显示在这里。</string>
   <string name="discover_history_no_match">没有与“%1$s”匹配的搜索</string>
@@ -146,7 +146,7 @@
   <plurals name="discover_nav_waiting">
     <item quantity="other">%1$s，%2$d 项等待你确认</item>
   </plurals>
-  <string name="discover_setup_to_continue">设置“发现”以继续</string>
+  <string name="discover_setup_to_continue">完成搜索设置以继续</string>
 
   <string name="command_discover_send">发送消息</string>
   <string name="command_discover_stop">停止搜索</string>

@@ -33,7 +33,7 @@
     <item quantity="other">%1$d 個停滯</item>
   </plurals>
 
-  <string name="component_limit_applies">%1$s %2$s 適用於所有下載</string>
+  <string name="component_limit_applies">所有下載皆受%1$s限制（%2$s）</string>
   <string name="component_limit_custom">自訂…</string>
   <string name="component_limit_custom_hint">例如 750k 或 1.5m</string>
   <string name="component_limit_unit_tooltip">未加 k 或 m 的數字所用的單位</string>
@@ -48,8 +48,8 @@
   </plurals>
   <string name="component_stepper_connections_auto">連線數：自動</string>
   <string name="component_stepper_connections_auto_count">連線數：自動（%1$d）</string>
-  <string name="component_stepper_fewer_peers">減少對等端</string>
-  <string name="component_stepper_more_peers">增加對等端</string>
+  <string name="component_stepper_fewer_peers">減少對等端數量</string>
+  <string name="component_stepper_more_peers">增加對等端數量</string>
   <plurals name="component_stepper_peers">
     <item quantity="other">%1$d 個對等端</item>
   </plurals>

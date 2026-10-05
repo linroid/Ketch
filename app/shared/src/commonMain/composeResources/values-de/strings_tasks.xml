@@ -33,7 +33,7 @@
     <item quantity="other">%1$d Verbindungen</item>
   </plurals>
   <string name="row_speed_limit">Limit %1$s</string>
-  <string name="row_limited_by_slow_lane">durch die Kriechspur begrenzt</string>
+  <string name="row_limited_by_slow_lane">durch die Drosselung begrenzt</string>
   <string name="row_starts_today">Startet heute um %1$s</string>
   <string name="row_starts_tomorrow">Startet morgen um %1$s</string>
   <string name="row_starts_on">Startet am %1$s um %2$s</string>

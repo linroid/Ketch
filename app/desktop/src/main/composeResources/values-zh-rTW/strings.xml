@@ -55,7 +55,7 @@
   <string name="message_try_again">再試一次</string>
   <string name="message_undo">復原</string>
   <string name="message_update_available">Ketch %1$s 現已推出</string>
-  <string name="message_update_ready">Ketch %1$s 已可安裝</string>
+  <string name="message_update_ready">Ketch %1$s 已準備好安裝</string>
   <string name="message_update_installed">已更新到 Ketch %1$s</string>
   <string name="message_update_failed">無法更新到 Ketch %1$s</string>
   <string name="message_update_failed_hint">記錄檔資料夾中的 update.log 記錄了出錯原因。</string>
@@ -63,8 +63,8 @@
   <string name="message_restart">重新啟動</string>
   <string name="message_open_installer">開啟安裝程式</string>
   <string name="message_whats_new">新功能</string>
-  <string name="message_slow_lane_on">已為 %1$s 開啟慢車道 · %2$s</string>
-  <string name="message_slow_lane_off">已為 %1$s 關閉慢車道</string>
+  <string name="message_slow_lane_on">已為 %1$s 開啟低速模式 · %2$s</string>
+  <string name="message_slow_lane_off">已為 %1$s 關閉低速模式</string>
   <string name="message_speed_follows_rules">%1$s 的速度將依照你的規則調整</string>
   <string name="message_speed_limit_failed">無法設定 %1$s 的速度限制</string>
   <string name="message_reconnect_failed">無法重新連線至 %1$s</string>

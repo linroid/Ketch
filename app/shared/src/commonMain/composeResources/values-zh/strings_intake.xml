@@ -23,7 +23,7 @@
   <string name="intake_choose_files">选择文件</string>
 
   <string name="intake_title_add">添加下载</string>
-  <string name="intake_title_retry">使用选项重试</string>
+  <string name="intake_title_retry">调整选项后重试</string>
   <string name="intake_title_edit">下载选项</string>
 
   <string name="intake_drop_to_add">松开以添加</string>
@@ -37,9 +37,9 @@
   <string name="intake_offer_paste">粘贴 %1$s</string>
   <string name="intake_offer_paste_clipboard">从剪贴板粘贴 %1$s</string>
   <string name="intake_offer_paste_copied">粘贴已复制的链接</string>
-  <string name="intake_discover_offer">这里没有链接。要用“发现”搜索“%1$s”吗？</string>
+  <string name="intake_discover_offer">这里没有链接。要搜索“%1$s”吗？</string>
   <string name="intake_no_links">这里没有链接。请粘贴链接、磁力链接或 cURL 命令。</string>
-  <string name="intake_discover">发现</string>
+  <string name="intake_discover">搜索</string>
 
   <string name="intake_notice_no_curl">剪贴板中没有 cURL 命令。请在浏览器的网络面板中右键点击该请求，然后选择“复制为 cURL”。</string>
   <string name="intake_notice_close_first">关闭此面板后才能添加其他下载</string>
@@ -133,7 +133,7 @@
   <string name="intake_problem_file_unreadable">无法读取此文件</string>
   <string name="intake_problem_sign_in">需要登录</string>
   <string name="intake_action_sign_in">登录</string>
-  <string name="intake_action_paste_curl">粘贴为 cURL</string>
+  <string name="intake_action_paste_curl">粘贴 cURL 命令</string>
   <string name="intake_action_add_headers">添加请求头</string>
   <string name="intake_action_find_mirror">查找可用的镜像</string>
   <string name="intake_action_keep_waiting">继续等待</string>
@@ -167,8 +167,8 @@
   <string name="intake_start">开始时间</string>
   <string name="intake_peer_limit">节点上限</string>
   <string name="intake_single_connection">此服务器只允许 1 个连接</string>
-  <string name="intake_auto_device">“自动”由设备决定</string>
-  <string name="intake_auto_setting">“自动”使用设备的设置：%1$d</string>
+  <string name="intake_auto_device">“自动”使用设备的默认节点上限</string>
+  <string name="intake_auto_setting">“自动”使用设备的默认连接数：%1$d</string>
   <string name="intake_priority_low_caption">没有其他下载等待时才运行</string>
   <string name="intake_priority_normal_caption">默认顺序</string>
   <string name="intake_priority_high_caption">排在普通和低优先级之前</string>
@@ -195,7 +195,7 @@
   <string name="intake_pin">固定 %1$s</string>
   <string name="intake_choose_folder">选择文件夹…</string>
   <string name="intake_folder_on">%1$s 上的文件夹</string>
-  <string name="intake_torrents_app_folder">种子会保存到应用文件夹：在“文件”中选择的文件夹只用于链接下载</string>
+  <string name="intake_torrents_app_folder">通过种子下载的文件会保存在应用文件夹中；在“文件”中选择的文件夹仅用于普通链接下载</string>
 
   <string name="intake_advanced">高级</string>
   <string name="intake_hide">隐藏</string>
@@ -236,7 +236,7 @@
   <string name="intake_submit_no_files">未选择文件</string>
   <string name="intake_submit_nothing">没有可添加的内容</string>
   <string name="intake_hint_download">按 %1$s 下载</string>
-  <string name="intake_hint_schedule">按 %1$s 计划</string>
+  <string name="intake_hint_schedule">按 %1$s 设置开始时间</string>
   <string name="intake_hint_retry">按 %1$s 重试</string>
   <string name="intake_hint_start_over">按 %1$s 重新开始</string>
   <string name="intake_hint_apply">按 %1$s 应用</string>
@@ -292,11 +292,11 @@
   <string name="intake_file_empty">该文件为空</string>
   <string name="intake_file_too_large">该文件大于 %1$d MiB</string>
 
-  <string name="intake_tracker_too_long">太长。</string>
-  <string name="intake_tracker_spaces">包含空格。</string>
+  <string name="intake_tracker_too_long">地址过长。</string>
+  <string name="intake_tracker_spaces">地址不能包含空格。</string>
   <string name="intake_tracker_scheme">请以 http://、https:// 或 udp:// 开头。</string>
   <string name="intake_tracker_no_host">缺少主机名。</string>
   <string name="intake_tracker_udp_user_info">UDP Tracker 不能包含用户名或密码。</string>
-  <string name="intake_tracker_udp_port">UDP Tracker 需要端口。</string>
+  <string name="intake_tracker_udp_port">UDP Tracker 地址必须指定端口。</string>
   <string name="intake_tracker_port">请使用 1 到 65535 之间的端口。</string>
 </resources>

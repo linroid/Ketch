@@ -55,7 +55,7 @@
     "message": "O Ketch não pode baixar isto"
   },
   "notify_unsupported_stream": {
-    "message": "A própria página transmite esta mídia, então não há link para baixar."
+    "message": "Esta mídia é transmitida por streaming na página. Não há um link para download direto."
   },
   "notify_unsupported_scheme": {
     "message": "Só é possível enviar links http, https, ftp e magnet para o Ketch."
@@ -361,7 +361,7 @@
     "message": "Padrão"
   },
   "instance_app_detail": {
-    "message": "O app Ketch neste computador. A extensão o abre quando um download precisa dele."
+    "message": "O app Ketch neste computador. A extensão abre o Ketch automaticamente quando você envia um download."
   },
   "instance_address": {
     "message": "Endereço"
@@ -485,7 +485,7 @@
     "message": "Enviar cookies e página de origem"
   },
   "options_cookies_detail": {
-    "message": "Permite que o Ketch baixe arquivos que exigem login. O Ketch os guarda com a tarefa para poder retomá-la depois."
+    "message": "Permite que o Ketch baixe arquivos que exigem login. Os cookies e o endereço da página de origem são salvos com a tarefa para que o download possa ser retomado depois."
   },
   "options_links_notifications": {
     "message": "Links e notificações"

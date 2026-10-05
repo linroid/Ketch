@@ -51,7 +51,7 @@
   <string name="error_http_sign_in_hint_server_short">el servidor pide que inicies sesión</string>
   <string name="error_http_forbidden">Acceso denegado (403)</string>
   <string name="error_http_forbidden_hint">Puede que el enlace haya caducado.</string>
-  <string name="error_http_forbidden_hint_browser">Puede que el enlace haya caducado. ¿Lo capturaste desde %1$s? Vuelve a capturarlo desde la página.</string>
+  <string name="error_http_forbidden_hint_browser">Puede que el enlace haya caducado. Si lo enviaste desde %1$s, vuelve a enviarlo a Ketch desde la página original.</string>
   <string name="error_http_forbidden_hint_short">puede que el enlace haya caducado</string>
   <string name="error_browser_yours">tu navegador</string>
   <string name="error_http_not_found">Archivo no encontrado (%1$d)</string>

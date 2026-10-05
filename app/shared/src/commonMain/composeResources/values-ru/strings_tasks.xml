@@ -37,7 +37,7 @@
     <item quantity="other">%1$d подключения</item>
   </plurals>
   <string name="row_speed_limit">ограничение %1$s</string>
-  <string name="row_limited_by_slow_lane">ограничена медленной полосой</string>
+  <string name="row_limited_by_slow_lane">ограничена режимом низкой скорости</string>
   <string name="row_starts_today">Начнётся сегодня в %1$s</string>
   <string name="row_starts_tomorrow">Начнётся завтра в %1$s</string>
   <string name="row_starts_on">Начнётся %1$s в %2$s</string>

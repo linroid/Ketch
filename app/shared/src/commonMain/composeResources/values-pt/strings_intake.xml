@@ -185,7 +185,7 @@
   <string name="intake_start">Início</string>
   <string name="intake_peer_limit">Limite de peers</string>
   <string name="intake_single_connection">Este servidor permite 1 conexão</string>
-  <string name="intake_auto_device">Auto deixa o dispositivo decidir</string>
+  <string name="intake_auto_device">“Auto” usa o limite padrão de pares do dispositivo</string>
   <string name="intake_auto_setting">Auto usa a configuração do dispositivo: %1$d</string>
   <string name="intake_priority_low_caption">Roda quando nada mais está aguardando</string>
   <string name="intake_priority_normal_caption">Ordem padrão</string>
@@ -215,7 +215,7 @@
   <string name="intake_pin">Fixar %1$s</string>
   <string name="intake_choose_folder">Escolher pasta…</string>
   <string name="intake_folder_on">Pasta em %1$s</string>
-  <string name="intake_torrents_app_folder">Os torrents são salvos na pasta do app: pastas escolhidas no app Arquivos só recebem links</string>
+  <string name="intake_torrents_app_folder">Os arquivos baixados por torrent são salvos na pasta do app. As pastas escolhidas no app Arquivos só são usadas para downloads por links comuns</string>
 
   <string name="intake_advanced">Avançado</string>
   <string name="intake_hide">Ocultar</string>

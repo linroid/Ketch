@@ -79,17 +79,17 @@
   <string name="downloads_empty_add">添加链接</string>
   <string name="downloads_empty_link_missing">此链接不在下载列表中</string>
   <string name="downloads_empty_links_missing">这些链接不在下载列表中</string>
-  <string name="downloads_empty_add_it_to">可以改为添加到 %1$s。</string>
-  <string name="downloads_empty_add_them_to">可以改为将它们添加到 %1$s。</string>
+  <string name="downloads_empty_add_it_to">可以将此链接添加到 %1$s。</string>
+  <string name="downloads_empty_add_them_to">可以将这些链接添加到 %1$s。</string>
   <string name="downloads_empty_no_match">没有与“%1$s”匹配的下载</string>
   <string name="downloads_empty_no_match_hint">搜索范围包括名称、网站、文件夹和错误信息。</string>
   <string name="downloads_empty_all">暂无下载</string>
   <string name="downloads_empty_downloading">没有正在进行的下载</string>
   <string name="downloads_empty_downloading_hint">正在进行的下载会显示在这里。</string>
   <string name="downloads_empty_waiting">没有等待中的下载</string>
-  <string name="downloads_empty_waiting_hint_one">%1$s 一次只运行一个下载。</string>
+  <string name="downloads_empty_waiting_hint_one">%1$s 同时只能进行一个下载任务。</string>
   <plurals name="downloads_empty_waiting_hint">
-    <item quantity="other">%1$s 一次运行 %2$d 个下载。</item>
+    <item quantity="other">%1$s 最多可同时进行 %2$d 个下载任务。</item>
   </plurals>
   <string name="downloads_empty_paused">没有已暂停的下载</string>
   <string name="downloads_empty_paused_hint">暂停的下载会显示在这里。</string>
@@ -103,8 +103,8 @@
   <string name="downloads_empty_remote">%1$s 上的下载将显示在这里</string>
   <string name="downloads_empty_unauthorized">%1$s 需要新的访问令牌</string>
   <string name="downloads_empty_offline">无法连接 %1$s</string>
-  <string name="downloads_empty_offline_hint">连接后，它的下载会显示在这里。</string>
-  <string name="downloads_empty_loading">正在加载下载</string>
+  <string name="downloads_empty_offline_hint">连接后，该设备的下载列表会显示在这里。</string>
+  <string name="downloads_empty_loading">正在加载下载列表</string>
 
   <string name="launchpad_title">暂无下载</string>
   <string name="launchpad_subtitle">粘贴链接、拖入文件，或从浏览器发送。</string>
@@ -126,7 +126,7 @@
   <string name="launchpad_browser_get">%1$s：获取</string>
   <string name="launchpad_pair_title">控制电脑上的下载</string>
   <string name="launchpad_pair_hint">连接电脑上的 Ketch，即可从这里添加下载。</string>
-  <string name="launchpad_discover">或描述你想要的内容 · 发现</string>
+  <string name="launchpad_discover">或描述你想要的内容 · 搜索</string>
   <string name="launchpad_checklist_title">设置 Ketch</string>
   <string name="launchpad_checklist_close">关闭设置清单</string>
   <string name="launchpad_checklist_folder">下载保存到 %1$s</string>
@@ -165,8 +165,8 @@
   <plurals name="downloads_discard_title_many">
     <item quantity="other">丢弃 %1$d 个下载的进度？</item>
   </plurals>
-  <string name="downloads_discard_body">此后将无法继续下载 %1$s。</string>
-  <string name="downloads_discard_body_many">此后将无法继续下载它们。</string>
+  <string name="downloads_discard_body">%1$s 的下载进度将被丢弃，再次下载需从头开始。</string>
+  <string name="downloads_discard_body_many">这些下载的进度将被丢弃，再次下载需从头开始。</string>
   <string name="downloads_discard_keep">保留</string>
   <string name="downloads_discard_confirm">丢弃进度</string>
   <string name="downloads_speed_title">限速</string>
@@ -178,7 +178,7 @@
     <item quantity="other">分别限制 %1$d 个下载的速度；全局限速仍然适用。</item>
   </plurals>
   <string name="downloads_speed_limit">限速</string>
-  <string name="downloads_speed_limit_each">每个的限速</string>
+  <string name="downloads_speed_limit_each">每个下载的限速</string>
   <string name="downloads_send_title">将 %1$s 发送到 %2$s？</string>
   <string name="downloads_move_title">将 %1$s 移到 %2$s？</string>
   <string name="downloads_send_confirm">发送</string>
@@ -224,7 +224,7 @@
   <string name="downloads_failed_speed_limit">无法在 %2$s 上设置 %1$s 的限速</string>
   <string name="downloads_failed_priority">无法在 %2$s 上设置 %1$s 的优先级</string>
   <string name="downloads_failed_connections">无法在 %2$s 上设置 %1$s 的连接数</string>
-  <string name="downloads_failed_reschedule">无法在 %2$s 上重新计划 %1$s</string>
+  <string name="downloads_failed_reschedule">无法更改 %2$s 上 %1$s 的开始时间</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">已暂停 %1$d 个下载</item>

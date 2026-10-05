@@ -14,30 +14,30 @@
 
   <string name="inspector_reason_reconnect">重新連線</string>
   <string name="inspector_reason_full_speed">全速</string>
-  <string name="inspector_reason_remove_limit">移除限制</string>
+  <string name="inspector_reason_remove_limit">移除速度限制</string>
   <string name="inspector_reason_speed_settings">速度設定</string>
   <string name="inspector_reason_paused_resumes">已暫停 · 會從中斷處繼續</string>
   <string name="inspector_reason_paused_restarts">已暫停 · 繼續時將從頭開始</string>
   <string name="inspector_file_missing">檔案已移動或刪除</string>
-  <string name="inspector_reason_slow_lane">受慢車道限制（%1$s）</string>
-  <string name="inspector_reason_global_limit">受全域限制（%1$s）</string>
-  <string name="inspector_reason_own_limit">限制為 %1$s</string>
+  <string name="inspector_reason_slow_lane">受低速模式限制（%1$s）</string>
+  <string name="inspector_reason_global_limit">受全域速度限制（%1$s）</string>
+  <string name="inspector_reason_own_limit">速度上限 %1$s</string>
 
   <string name="inspector_source_magnet">BitTorrent · 磁力連結</string>
   <string name="inspector_source_torrent_file">BitTorrent · 種子檔案</string>
   <string name="inspector_source_link">連結</string>
 
   <string name="inspector_origin_browser">來自瀏覽器</string>
-  <string name="inspector_origin_discover">來自「探索」</string>
+  <string name="inspector_origin_discover">來自「搜尋」</string>
   <string name="inspector_origin_agent">來自 AI 代理程式</string>
   <string name="inspector_origin_app">在 Ketch 中新增</string>
   <string name="inspector_origin_cli">來自命令列</string>
   <string name="inspector_with_cookies">附帶 Cookie</string>
-  <string name="inspector_with_referrer">附帶 Referrer</string>
-  <string name="inspector_with_cookies_referrer">附帶 Cookie 和 Referrer</string>
+  <string name="inspector_with_referrer">附帶來源網頁網址</string>
+  <string name="inspector_with_cookies_referrer">附帶 Cookie 和來源網頁網址</string>
   <string name="inspector_with_cookies_alone">附帶 Cookie</string>
-  <string name="inspector_with_referrer_alone">附帶 Referrer</string>
-  <string name="inspector_with_cookies_referrer_alone">附帶 Cookie 和 Referrer</string>
+  <string name="inspector_with_referrer_alone">附帶來源網頁網址</string>
+  <string name="inspector_with_cookies_referrer_alone">附帶 Cookie 和來源網頁網址</string>
   <string name="inspector_captured">%1$s，%2$s</string>
 
   <string name="inspector_urgent_note">立即開始；可能會暫停「%1$s」（%2$s）</string>
@@ -53,7 +53,7 @@
     <item quantity="other">以及另外 %1$d 個</item>
   </plurals>
   <plurals name="inspector_controls_apply_to">
-    <item quantity="other">控制項僅套用於 %2$d 個中的 %1$d 個；其他已結束。</item>
+    <item quantity="other">變更僅對 %2$d 個下載項目中的 %1$d 個生效，其餘項目已結束。</item>
   </plurals>
 
   <string name="inspector_close">關閉詳細面板</string>
@@ -70,12 +70,12 @@
   <string name="inspector_control_peer_limit">對等端上限</string>
   <string name="inspector_control_priority">優先順序</string>
   <string name="inspector_control_start">開始時間</string>
-  <string name="inspector_global_slow_lane">慢車道</string>
-  <string name="inspector_global_limit">全域限制</string>
+  <string name="inspector_global_slow_lane">低速模式</string>
+  <string name="inspector_global_limit">全域速度限制</string>
   <string name="inspector_limit_marker">%1$s %2$s</string>
   <string name="inspector_speed_limit">速度限制</string>
   <string name="inspector_speed_more">其他速度限制</string>
-  <string name="inspector_mixed_limits">這些下載項目的限制各不相同</string>
+  <string name="inspector_mixed_limits">這些下載項目的速度限制各不相同</string>
   <string name="inspector_mixed_priorities">這些下載項目的優先順序各不相同</string>
   <string name="inspector_server_one_connection">此伺服器只允許 1 個連線</string>
   <string name="inspector_remote_schedule">尚不支援為遠端下載排程</string>
@@ -92,7 +92,7 @@
   <string name="inspector_detail_size">大小</string>
   <string name="inspector_detail_added">新增時間</string>
   <string name="inspector_detail_finished">完成時間</string>
-  <string name="inspector_detail_time">花費時間</string>
+  <string name="inspector_detail_time">耗時</string>
   <string name="inspector_detail_average">平均速度</string>
   <string name="inspector_detail_connections">連線數</string>
   <string name="inspector_detail_device">裝置</string>
@@ -109,7 +109,7 @@
   <string name="inspector_copy_failed_size">無法複製大小</string>
   <string name="inspector_copy_failed_added">無法複製新增時間</string>
   <string name="inspector_copy_failed_finished">無法複製完成時間</string>
-  <string name="inspector_copy_failed_time">無法複製花費時間</string>
+  <string name="inspector_copy_failed_time">無法複製下載耗時</string>
   <string name="inspector_copy_failed_average">無法複製平均速度</string>
   <string name="inspector_copy_failed_connections">無法複製連線數</string>
   <string name="inspector_copy_failed_device">無法複製裝置</string>
@@ -152,8 +152,8 @@
     <item quantity="other">%1$d 個已完成 · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">單一連線</string>
-  <string name="inspector_connections_live">變更數量後，剩餘的位元組會立即重新分配。</string>
-  <string name="inspector_connections_on_resume">變更的數量會在下載繼續時套用。</string>
+  <string name="inspector_connections_live">變更連線數後，尚未下載的部分會立即重新分配。</string>
+  <string name="inspector_connections_on_resume">新的連線數會在繼續下載時生效。</string>
   <string name="inspector_lane_description">連線 %1$d，%2$s，%3$s</string>
   <string name="inspector_percent_spoken">百分之 %1$d</string>
 

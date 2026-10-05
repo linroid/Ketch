@@ -124,7 +124,7 @@
   <string name="launchpad_paste_hint_plain">Copia un enlace y pégalo en cualquier parte de Ketch.</string>
   <string name="launchpad_torrent_title">Suelta un enlace, un magnet o un .torrent</string>
   <string name="launchpad_torrent_title_phone">Abre un archivo .torrent</string>
-  <string name="launchpad_torrent_hint">En cualquier parte de esta ventana, o elige un archivo .torrent.</string>
+  <string name="launchpad_torrent_hint">Arrastra enlaces o archivos a esta ventana, o elige un archivo .torrent.</string>
   <string name="launchpad_torrent_hint_phone">O abre un enlace magnet desde tu navegador.</string>
   <string name="launchpad_browser_title">Captura desde tu navegador</string>
   <string name="launchpad_browser_none">Envía descargas a Ketch desde Chrome, Edge o Firefox.</string>
@@ -174,8 +174,8 @@
     <item quantity="one">¿Descartar el progreso de %1$d descarga?</item>
     <item quantity="other">¿Descartar el progreso de %1$d descargas?</item>
   </plurals>
-  <string name="downloads_discard_body">%1$s no se podrá reanudar después.</string>
-  <string name="downloads_discard_body_many">No se podrán reanudar después.</string>
+  <string name="downloads_discard_body">Se perderá el progreso de %1$s. Si vuelves a descargarlo, empezará desde cero.</string>
+  <string name="downloads_discard_body_many">Se perderá el progreso. Si vuelves a descargar estos archivos, empezarán desde cero.</string>
   <string name="downloads_discard_keep">Conservar</string>
   <string name="downloads_discard_confirm">Descartar el progreso</string>
   <string name="downloads_speed_title">Límite de velocidad</string>

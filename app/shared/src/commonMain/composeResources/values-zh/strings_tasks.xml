@@ -31,7 +31,7 @@
     <item quantity="other">%1$d 个连接</item>
   </plurals>
   <string name="row_speed_limit">限速 %1$s</string>
-  <string name="row_limited_by_slow_lane">受慢车道限制</string>
+  <string name="row_limited_by_slow_lane">受低速模式限制</string>
   <string name="row_starts_today">今天 %1$s 开始</string>
   <string name="row_starts_tomorrow">明天 %1$s 开始</string>
   <string name="row_starts_on">%1$s %2$s 开始</string>
@@ -82,7 +82,7 @@
   <string name="group_in_start_order">按开始顺序</string>
 
   <string name="origin_browser">浏览器</string>
-  <string name="origin_discover">发现</string>
+  <string name="origin_discover">搜索</string>
   <string name="origin_agent">智能体</string>
   <string name="origin_app">应用</string>
   <string name="origin_cli">命令行</string>
@@ -120,7 +120,7 @@
   <string name="action_row_copy_path">复制文件路径</string>
   <string name="action_row_download_again">重新下载</string>
   <string name="action_row_retry">重试</string>
-  <string name="action_row_retry_with_options">使用选项重试…</string>
+  <string name="action_row_retry_with_options">调整选项后重试…</string>
   <string name="action_row_edit_link">编辑链接…</string>
   <string name="action_row_enter_credentials">输入登录信息…</string>
   <string name="action_row_find_another_source">查找其他来源</string>
@@ -172,8 +172,8 @@
   <string name="bar_discard">丢弃进度…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
-  <string name="bar_tooltip_counted">%1$s已选 %3$d 个中的 %2$d 个</string>
-  <string name="bar_tooltip_partial">%1$s · 已选 %3$d 个中的 %2$d 个</string>
+  <string name="bar_tooltip_counted">%1$s所选下载中的 %2$d 个（共 %3$d 个）</string>
+  <string name="bar_tooltip_partial">%1$s · 适用于所选下载中的 %2$d 个（共 %3$d 个）</string>
   <plurals name="bar_tooltip_remove">
     <item quantity="other">移除 %1$d 个下载…</item>
   </plurals>

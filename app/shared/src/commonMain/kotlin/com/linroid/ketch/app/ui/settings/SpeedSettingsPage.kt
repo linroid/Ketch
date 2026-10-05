@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -223,6 +225,8 @@ private fun ModeGroup(
         onSelect = model::setMode,
         label = { stringResource(it.label) },
         icon = { it.icon },
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        revealInitialSelection = true,
       )
     }
   }

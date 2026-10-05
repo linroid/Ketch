@@ -165,8 +165,8 @@
   <plurals name="downloads_discard_title_many">
     <item quantity="other">%1$d件のダウンロードの進捗を破棄しますか？</item>
   </plurals>
-  <string name="downloads_discard_body">この操作のあとは%1$sを再開できません。</string>
-  <string name="downloads_discard_body_many">この操作のあとは再開できません。</string>
+  <string name="downloads_discard_body">%1$sのダウンロード済みのデータは破棄されます。再度ダウンロードする場合は最初からになります。</string>
+  <string name="downloads_discard_body_many">ダウンロード済みのデータは破棄されます。再度ダウンロードする場合は最初からになります。</string>
   <string name="downloads_discard_keep">残す</string>
   <string name="downloads_discard_confirm">進捗を破棄</string>
   <string name="downloads_speed_title">速度制限</string>

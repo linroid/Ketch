@@ -16,7 +16,7 @@
 
 
   <string name="tray_devices">デバイス</string>
-  <string name="tray_recent">最近</string>
+  <string name="tray_recent">最近のダウンロード</string>
   <string name="tray_show_ketch">Ketchを表示</string>
   <string name="tray_speed">速度</string>
   <string name="tray_show">表示</string>
@@ -32,7 +32,7 @@
   <string name="tray_not_connected">未接続</string>
   <string name="tray_offline">オフライン</string>
   <string name="tray_connecting">接続中</string>
-  <string name="tray_idle">アイドル</string>
+  <string name="tray_idle">待機中</string>
   <plurals name="tray_active">
     <item quantity="other">%1$d件実行中</item>
   </plurals>
@@ -63,8 +63,8 @@
   <string name="message_restart">再起動</string>
   <string name="message_open_installer">インストーラを開く</string>
   <string name="message_whats_new">新機能</string>
-  <string name="message_slow_lane_on">%1$sのスローレーンをオンにしました · %2$s</string>
-  <string name="message_slow_lane_off">%1$sのスローレーンをオフにしました</string>
+  <string name="message_slow_lane_on">%1$sの低速モードをオンにしました · %2$s</string>
+  <string name="message_slow_lane_off">%1$sの低速モードをオフにしました</string>
   <string name="message_speed_follows_rules">%1$sの速度はルールに従います</string>
   <string name="message_speed_limit_failed">%1$sの速度制限を設定できませんでした</string>
   <string name="message_reconnect_failed">%1$sに再接続できませんでした</string>

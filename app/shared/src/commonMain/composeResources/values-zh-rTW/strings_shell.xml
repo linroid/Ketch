@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="shell_destination_downloads">下載</string>
-  <string name="shell_destination_discover">探索</string>
+  <string name="shell_destination_discover">搜尋</string>
   <string name="shell_destination_devices">裝置</string>
   <string name="shell_settings">設定</string>
   <string name="shell_devices">裝置</string>
@@ -24,7 +24,7 @@
   <string name="shell_device_connecting">正在連線</string>
   <string name="shell_device_connecting_now">正在連線…</string>
   <string name="shell_device_idle">閒置</string>
-  <string name="shell_device_slow_lane">慢車道</string>
+  <string name="shell_device_slow_lane">低速模式</string>
   <plurals name="shell_device_active">
     <item quantity="other">%1$d 個進行中</item>
   </plurals>
@@ -47,7 +47,7 @@
   <string name="sidebar_menu_speed">速度</string>
   <string name="sidebar_menu_settings">此裝置的設定…</string>
   <string name="sidebar_menu_full_speed">全速</string>
-  <string name="sidebar_menu_slow_lane">慢車道 · %1$s</string>
+  <string name="sidebar_menu_slow_lane">低速模式 · %1$s</string>
   <string name="sidebar_menu_no_limit">無限制</string>
 
   <string name="switcher_overview">總覽</string>
@@ -65,7 +65,7 @@
   <plurals name="shell_search_download_links_on">
     <item quantity="other">在 %2$s 上下載 %1$d 個連結</item>
   </plurals>
-  <string name="shell_discover_query">探索「%1$s」</string>
+  <string name="shell_discover_query">搜尋「%1$s」</string>
 
   <plurals name="shell_activity_unread">
     <item quantity="other">%1$d 則未讀</item>
@@ -104,7 +104,7 @@
   <string name="palette_hint_move">移動</string>
   <string name="palette_hint_run">執行</string>
   <string name="palette_hint_alternate">替代動作</string>
-  <string name="palette_hint_discover">探索</string>
+  <string name="palette_hint_discover">搜尋</string>
   <string name="palette_hint_close">關閉</string>
   <string name="palette_section_recent">最近使用</string>
   <string name="palette_section_links">下載</string>
@@ -121,14 +121,14 @@
   <string name="palette_download">下載 %1$s</string>
   <string name="palette_on_device">在 %1$s 上</string>
   <string name="palette_verb_download">下載</string>
-  <string name="palette_add_with_options">使用選項新增…</string>
+  <string name="palette_add_with_options">設定下載選項…</string>
   <string name="palette_add_with_options_detail">資料夾、速度、優先順序和開始時間</string>
   <string name="palette_limit_to">將下載速度限制為 %1$s</string>
-  <string name="palette_slow_lane_to">將慢車道設為 %1$s</string>
-  <string name="palette_slow_lane_turns_on">會開啟慢車道</string>
-  <string name="palette_slow_lane_is_on">慢車道已開啟</string>
+  <string name="palette_slow_lane_to">將低速模式設為 %1$s</string>
+  <string name="palette_slow_lane_turns_on">會開啟低速模式</string>
+  <string name="palette_slow_lane_is_on">低速模式已開啟</string>
   <string name="palette_slow_lane_now">目前為 %1$s</string>
-  <string name="palette_limit_while_off">慢車道關閉時套用</string>
+  <string name="palette_limit_while_off">低速模式關閉時套用</string>
 
   <plurals name="palette_pause_count">
     <item quantity="other">暫停 %1$d 個下載項目</item>
@@ -142,11 +142,11 @@
     <item quantity="other">重試 %1$d 個失敗的下載項目</item>
   </plurals>
   <string name="palette_nothing_failed">沒有失敗的項目</string>
-  <string name="palette_slow_lane_off">關閉慢車道</string>
-  <string name="palette_slow_lane_on">開啟慢車道</string>
+  <string name="palette_slow_lane_off">關閉低速模式</string>
+  <string name="palette_slow_lane_on">開啟低速模式</string>
   <string name="palette_nothing_to_undo">沒有可復原的動作</string>
   <string name="palette_full_speed">全速</string>
-  <string name="palette_full_speed_slow_lane">會關閉慢車道</string>
+  <string name="palette_full_speed_slow_lane">會關閉低速模式</string>
   <string name="palette_full_speed_rules">會關閉速度規則</string>
   <string name="palette_full_speed_cap">解除 %1$s 的限制</string>
   <string name="palette_full_speed_already">已是全速</string>
@@ -163,5 +163,5 @@
   <plurals name="palette_matches">
     <item quantity="other">%1$d 個符合項目</item>
   </plurals>
-  <string name="palette_discover_detail">在網路上尋找下載</string>
+  <string name="palette_discover_detail">在網路上尋找可下載的檔案</string>
 </resources>

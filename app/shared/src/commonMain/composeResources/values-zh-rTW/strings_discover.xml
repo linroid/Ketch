@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="discover_title">探索</string>
-  <string name="discover_settings">探索設定</string>
-  <string name="discover_hero_title">說出你要什麼，Ketch 幫你找到下載。</string>
-  <string name="discover_intro_body">「探索」會請 %1$s 搜尋網路並閱讀找到的網頁，再列出它信任的檔案。在你新增之前，不會下載任何內容。</string>
+  <string name="discover_title">搜尋</string>
+  <string name="discover_settings">搜尋設定</string>
+  <string name="discover_hero_title">說說想下載什麼，Ketch 幫你找。</string>
+  <string name="discover_intro_body">「搜尋」會透過 %1$s 搜尋網路、閱讀網頁，並列出它認為可信的檔案。手動新增後才會開始下載。</string>
   <string name="discover_example_blender">適用於 Apple 晶片的 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 伺服器版 ISO</string>
   <string name="discover_example_footage">公有領域的 4K 自然景觀影片</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">「探索」會請 AI 模型搜尋網路並閱讀找到的網頁，再列出它信任的檔案。你的搜尋內容會傳送給你選擇的供應商。</string>
-  <string name="discover_setup_unsupported">「探索」可在電腦或 Android 手機上的 Ketch 中使用。</string>
-  <string name="discover_setup_pending">設定好「探索」後，就會立即搜尋「%1$s」。</string>
+  <string name="discover_setup_body">「搜尋」會透過 AI 模型搜尋網路、閱讀網頁，並列出它認為可信的檔案。搜尋內容會傳送給所選的服務供應商。</string>
+  <string name="discover_setup_unsupported">「搜尋」可在電腦或 Android 手機上的 Ketch 中使用。</string>
+  <string name="discover_setup_pending">完成搜尋設定後，就會立即搜尋「%1$s」。</string>
   <string name="discover_setup_choose_model">選擇模型</string>
   <string name="discover_setup_local_provider">%1$s · 在本機執行，不需金鑰</string>
   <string name="discover_setup_finish">完成 %1$s 的設定</string>
@@ -38,7 +38,7 @@
   <string name="discover_limited_to">僅限 %1$s</string>
   <string name="discover_queued">正在等待其他搜尋完成</string>
   <string name="discover_show_more">顯示更多</string>
-  <string name="discover_show_less">顯示較少</string>
+  <string name="discover_show_less">收合</string>
   <plurals name="discover_access_allowed">
     <item quantity="other">已允許 %1$d 個網站</item>
   </plurals>
@@ -52,7 +52,7 @@
   <string name="discover_approval_file">要檢查 %1$s 上的檔案嗎？</string>
   <string name="discover_approval_redirect">要重新導向至 %1$s 嗎？</string>
   <string name="discover_approval_redirect_from">從 %1$s 重新導向而來</string>
-  <string name="discover_approval_reason">「探索」表示：%1$s</string>
+  <string name="discover_approval_reason">存取原因：%1$s</string>
   <string name="discover_approval_allow">允許</string>
   <string name="discover_approval_allow_once">允許一次</string>
   <string name="discover_approval_deny">拒絕</string>
@@ -61,7 +61,7 @@
   <string name="discover_approval_allow_all">在此對話中允許所有網站</string>
   <string name="discover_approval_allow_caption">在此對話中允許 %1$s 及其子網域</string>
   <string name="discover_approval_settings">網頁存取設定</string>
-  <string name="discover_approval_pane">「探索」想要開啟 %1$s</string>
+  <string name="discover_approval_pane">「搜尋」想要開啟 %1$s</string>
   <string name="discover_approval_jump">需要你確認</string>
 
   <string name="discover_select_all">全選</string>
@@ -70,14 +70,14 @@
     <item quantity="other">%1$d 個下載項目</item>
   </plurals>
   <string name="discover_match">符合度 %1$s</string>
-  <string name="discover_match_tooltip">與你的搜尋的符合程度</string>
+  <string name="discover_match_tooltip">與搜尋內容的符合程度</string>
   <string name="discover_not_encrypted">未加密</string>
-  <string name="discover_error_title">「探索」無法完成這次搜尋</string>
-  <string name="discover_failed">探索失敗</string>
-  <string name="discover_none_title">找不到下載項目</string>
-  <string name="discover_none_body">「探索」只會列出來自可信來源的檔案。試著指明版本或平台，或發布它的網站。</string>
+  <string name="discover_error_title">無法完成這次搜尋</string>
+  <string name="discover_failed">搜尋失敗</string>
+  <string name="discover_none_title">找不到可下載的檔案</string>
+  <string name="discover_none_body">「搜尋」只列出來自可信來源的檔案。試著補充版本、平台或檔案的發布網站。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">內容過濾器隱藏了 %1$d 個看起來不安全的結果。可以在「探索設定」中關閉過濾器。</item>
+    <item quantity="other">內容過濾器隱藏了 %1$d 個看起來不安全的結果。可以在「搜尋設定」中關閉過濾器。</item>
   </plurals>
   <string name="discover_search_everywhere">搜尋整個網路</string>
   <string name="discover_stopped">已停止</string>
@@ -101,7 +101,7 @@
   <string name="discover_undo_discard">復原捨棄結果</string>
   <string name="discover_undo_delete">復原刪除搜尋</string>
   <string name="discover_undo_clear_history">復原清除歷史記錄</string>
-  <string name="discover_needs_ok">「探索」需要你確認才能開啟 %1$s</string>
+  <string name="discover_needs_ok">「搜尋」需要你確認才能開啟 %1$s</string>
 
   <string name="discover_select_to_add">選擇要新增的下載項目</string>
   <plurals name="discover_selected">
@@ -111,20 +111,20 @@
     <item quantity="other">%1$d 個來自先前的訊息</item>
   </plurals>
   <string name="discover_add_now">立即新增</string>
-  <string name="discover_add_options">更多新增方式</string>
+  <string name="discover_add_options">更多新增選項</string>
   <string name="discover_add_to">新增至</string>
   <string name="discover_review_add">檢視並新增</string>
   <string name="discover_review_add_count">檢視並新增 %1$d 個</string>
 
-  <string name="discover_history">歷史記錄</string>
-  <string name="discover_history_show">顯示歷史記錄</string>
-  <string name="discover_history_hide">隱藏歷史記錄</string>
+  <string name="discover_history">搜尋歷史</string>
+  <string name="discover_history_show">顯示搜尋歷史</string>
+  <string name="discover_history_hide">隱藏搜尋歷史</string>
   <string name="discover_new_search">新搜尋</string>
   <string name="discover_delete_search">刪除此搜尋</string>
-  <string name="discover_history_clear">清除歷史記錄</string>
-  <string name="discover_turn_off">關閉探索</string>
-  <string name="discover_turned_off">探索已關閉</string>
-  <string name="discover_turned_off_detail">可在「設定」的「探索」中重新開啟。</string>
+  <string name="discover_history_clear">清除搜尋歷史</string>
+  <string name="discover_turn_off">關閉搜尋</string>
+  <string name="discover_turned_off">搜尋已關閉</string>
+  <string name="discover_turned_off_detail">可在「設定」的「搜尋」中重新開啟。</string>
   <string name="discover_history_filter">搜尋歷史記錄</string>
   <string name="discover_history_empty">你執行過的搜尋會顯示在這裡。</string>
   <string name="discover_history_no_match">沒有符合「%1$s」的搜尋</string>
@@ -146,7 +146,7 @@
   <plurals name="discover_nav_waiting">
     <item quantity="other">%1$s，%2$d 個要求等待你確認</item>
   </plurals>
-  <string name="discover_setup_to_continue">設定「探索」以繼續</string>
+  <string name="discover_setup_to_continue">完成搜尋設定以繼續</string>
 
   <string name="command_discover_send">傳送訊息</string>
   <string name="command_discover_stop">停止搜尋</string>

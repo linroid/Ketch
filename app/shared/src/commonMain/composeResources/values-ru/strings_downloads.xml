@@ -136,7 +136,7 @@
   <string name="launchpad_paste_hint_plain">Скопируйте ссылку и вставьте её в любом месте Ketch.</string>
   <string name="launchpad_torrent_title">Перетащите ссылку, magnet или .torrent</string>
   <string name="launchpad_torrent_title_phone">Откройте файл .torrent</string>
-  <string name="launchpad_torrent_hint">В любое место этого окна, или выберите файл .torrent.</string>
+  <string name="launchpad_torrent_hint">Перетащите ссылки или файлы в это окно либо выберите файл .torrent.</string>
   <string name="launchpad_torrent_hint_phone">Или откройте magnet-ссылку из браузера.</string>
   <string name="launchpad_browser_title">Перехват из браузера</string>
   <string name="launchpad_browser_none">Отправляйте загрузки в Ketch из Chrome, Edge или Firefox.</string>
@@ -192,8 +192,8 @@
     <item quantity="many">Сбросить прогресс %1$d загрузок?</item>
     <item quantity="other">Сбросить прогресс %1$d загрузки?</item>
   </plurals>
-  <string name="downloads_discard_body">После этого %1$s нельзя будет возобновить.</string>
-  <string name="downloads_discard_body_many">После этого их нельзя будет возобновить.</string>
+  <string name="downloads_discard_body">Прогресс загрузки %1$s будет потерян. При повторной загрузке придётся начать с нуля.</string>
+  <string name="downloads_discard_body_many">Прогресс загрузок будет потерян. При повторной загрузке придётся начать с нуля.</string>
   <string name="downloads_discard_keep">Оставить</string>
   <string name="downloads_discard_confirm">Сбросить прогресс</string>
   <string name="downloads_speed_title">Ограничение скорости</string>

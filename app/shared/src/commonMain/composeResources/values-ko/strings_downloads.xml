@@ -165,8 +165,8 @@
   <plurals name="downloads_discard_title_many">
     <item quantity="other">다운로드 %1$d개의 진행 상황을 삭제할까요?</item>
   </plurals>
-  <string name="downloads_discard_body">이후에는 %1$s을(를) 재개할 수 없습니다.</string>
-  <string name="downloads_discard_body_many">이후에는 재개할 수 없습니다.</string>
+  <string name="downloads_discard_body">%1$s의 다운로드 진행 상황이 삭제됩니다. 다시 다운로드하면 처음부터 시작합니다.</string>
+  <string name="downloads_discard_body_many">다운로드 진행 상황이 삭제됩니다. 다시 다운로드하면 처음부터 시작합니다.</string>
   <string name="downloads_discard_keep">유지</string>
   <string name="downloads_discard_confirm">진행 상황 삭제</string>
   <string name="downloads_speed_title">속도 제한</string>

@@ -24,7 +24,7 @@
   <string name="shell_device_connecting">接続中</string>
   <string name="shell_device_connecting_now">接続中…</string>
   <string name="shell_device_idle">アイドル</string>
-  <string name="shell_device_slow_lane">スローレーン</string>
+  <string name="shell_device_slow_lane">低速モード</string>
   <plurals name="shell_device_active">
     <item quantity="other">%1$d件実行中</item>
   </plurals>
@@ -47,7 +47,7 @@
   <string name="sidebar_menu_speed">速度</string>
   <string name="sidebar_menu_settings">このデバイスの設定…</string>
   <string name="sidebar_menu_full_speed">フルスピード</string>
-  <string name="sidebar_menu_slow_lane">スローレーン · %1$s</string>
+  <string name="sidebar_menu_slow_lane">低速モード · %1$s</string>
   <string name="sidebar_menu_no_limit">制限なし</string>
 
   <string name="switcher_overview">概要</string>
@@ -124,11 +124,11 @@
   <string name="palette_add_with_options">オプションを指定して追加…</string>
   <string name="palette_add_with_options_detail">フォルダ、速度、優先度、開始時刻</string>
   <string name="palette_limit_to">ダウンロード速度を%1$sに制限</string>
-  <string name="palette_slow_lane_to">スローレーンを%1$sに設定</string>
-  <string name="palette_slow_lane_turns_on">スローレーンをオンにします</string>
-  <string name="palette_slow_lane_is_on">スローレーンはオンです</string>
+  <string name="palette_slow_lane_to">低速モードを%1$sに設定</string>
+  <string name="palette_slow_lane_turns_on">低速モードをオンにします</string>
+  <string name="palette_slow_lane_is_on">低速モードはオンです</string>
   <string name="palette_slow_lane_now">現在%1$s</string>
-  <string name="palette_limit_while_off">スローレーンがオフのときに適用されます</string>
+  <string name="palette_limit_while_off">低速モードがオフのときに適用されます</string>
 
   <plurals name="palette_pause_count">
     <item quantity="other">%1$d件のダウンロードを一時停止</item>
@@ -142,11 +142,11 @@
     <item quantity="other">失敗した%1$d件のダウンロードを再試行</item>
   </plurals>
   <string name="palette_nothing_failed">失敗したものはありません</string>
-  <string name="palette_slow_lane_off">スローレーンをオフにする</string>
-  <string name="palette_slow_lane_on">スローレーンをオンにする</string>
+  <string name="palette_slow_lane_off">低速モードをオフにする</string>
+  <string name="palette_slow_lane_on">低速モードをオンにする</string>
   <string name="palette_nothing_to_undo">取り消すものはありません</string>
   <string name="palette_full_speed">フルスピード</string>
-  <string name="palette_full_speed_slow_lane">スローレーンをオフにします</string>
+  <string name="palette_full_speed_slow_lane">低速モードをオフにします</string>
   <string name="palette_full_speed_rules">速度ルールをオフにします</string>
   <string name="palette_full_speed_cap">%1$sの制限を解除します</string>
   <string name="palette_full_speed_already">すでにフルスピードです</string>

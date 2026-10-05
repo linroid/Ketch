@@ -22,7 +22,7 @@
   <string name="tray_show">Mostrar</string>
   <string name="tray_enter_token">Introducir token…</string>
   <string name="tray_retry_now">Reintentar ahora</string>
-  <string name="tray_stay_connected">Mantener conectado</string>
+  <string name="tray_stay_connected">Mantener la conexión</string>
   <plurals name="tray_retry_failed">
     <item quantity="one">Reintentar %1$d fallida</item>
     <item quantity="other">Reintentar %1$d fallidas</item>
@@ -69,8 +69,8 @@
   <string name="message_restart">Reiniciar</string>
   <string name="message_open_installer">Abrir instalador</string>
   <string name="message_whats_new">Novedades</string>
-  <string name="message_slow_lane_on">Carril lento activado en %1$s · %2$s</string>
-  <string name="message_slow_lane_off">Carril lento desactivado en %1$s</string>
+  <string name="message_slow_lane_on">Modo lento activado en %1$s · %2$s</string>
+  <string name="message_slow_lane_off">Modo lento desactivado en %1$s</string>
   <string name="message_speed_follows_rules">La velocidad de %1$s sigue tus reglas</string>
   <string name="message_speed_limit_failed">No se pudo establecer el límite de velocidad en %1$s</string>
   <string name="message_reconnect_failed">No se pudo volver a conectar con %1$s</string>

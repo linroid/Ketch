@@ -31,7 +31,7 @@
     <item quantity="other">%1$d 個連線</item>
   </plurals>
   <string name="row_speed_limit">限速 %1$s</string>
-  <string name="row_limited_by_slow_lane">受慢車道限制</string>
+  <string name="row_limited_by_slow_lane">受低速模式限制</string>
   <string name="row_starts_today">今天 %1$s 開始</string>
   <string name="row_starts_tomorrow">明天 %1$s 開始</string>
   <string name="row_starts_on">%1$s %2$s 開始</string>
@@ -64,7 +64,7 @@
   <string name="group_device">裝置</string>
   <string name="group_site">網站</string>
   <string name="group_type">類型</string>
-  <string name="group_none">無</string>
+  <string name="group_none">不分組</string>
   <string name="group_title_downloading">下載中</string>
   <string name="group_title_waiting">等待中</string>
   <string name="group_title_paused">已暫停</string>
@@ -82,7 +82,7 @@
   <string name="group_in_start_order">依開始順序</string>
 
   <string name="origin_browser">瀏覽器</string>
-  <string name="origin_discover">探索</string>
+  <string name="origin_discover">搜尋</string>
   <string name="origin_agent">AI 代理程式</string>
   <string name="origin_app">應用程式</string>
   <string name="origin_cli">CLI</string>
@@ -172,8 +172,8 @@
   <string name="bar_discard">捨棄進度…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
-  <string name="bar_tooltip_counted">%1$s所選 %3$d 個中的 %2$d 個</string>
-  <string name="bar_tooltip_partial">%1$s · 適用於所選 %3$d 個中的 %2$d 個</string>
+  <string name="bar_tooltip_counted">%1$s所選下載中的 %2$d 個（共 %3$d 個）</string>
+  <string name="bar_tooltip_partial">%1$s · 適用於所選下載中的 %2$d 個（共 %3$d 個）</string>
   <plurals name="bar_tooltip_remove">
     <item quantity="other">移除 %1$d 個下載項目…</item>
   </plurals>

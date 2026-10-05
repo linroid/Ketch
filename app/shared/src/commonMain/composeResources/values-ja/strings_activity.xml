@@ -21,9 +21,9 @@
   <string name="notify_sharing_device">このデバイスを共有中</string>
   <string name="notify_server_on_port">ポート%1$dでサーバーを実行中</string>
   <string name="notify_discovering">ディスカバーでダウンロードを検索中</string>
-  <string name="notify_slow_lane_on">スローレーン</string>
+  <string name="notify_slow_lane_on">低速モード</string>
   <string name="notify_action_pause_all">すべて一時停止</string>
-  <string name="notify_action_slow_lane">スローレーン</string>
+  <string name="notify_action_slow_lane">低速モード</string>
   <string name="notify_action_full_speed">フルスピード</string>
   <plurals name="notify_more_files">
     <item quantity="other">ほか%1$d件</item>

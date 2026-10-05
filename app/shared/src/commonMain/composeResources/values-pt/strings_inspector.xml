@@ -19,7 +19,7 @@
   <string name="inspector_reason_paused_resumes">Pausado · retoma de onde parou</string>
   <string name="inspector_reason_paused_restarts">Pausado · ao retomar, começa do zero</string>
   <string name="inspector_file_missing">Arquivo movido ou apagado</string>
-  <string name="inspector_reason_slow_lane">Limitado pela Faixa lenta (%1$s)</string>
+  <string name="inspector_reason_slow_lane">Limitado pelo modo lento (%1$s)</string>
   <string name="inspector_reason_global_limit">Limitado pelo limite global (%1$s)</string>
   <string name="inspector_reason_own_limit">Limitado a %1$s</string>
 
@@ -74,7 +74,7 @@
   <string name="inspector_control_peer_limit">Limite de peers</string>
   <string name="inspector_control_priority">Prioridade</string>
   <string name="inspector_control_start">Início</string>
-  <string name="inspector_global_slow_lane">Faixa lenta</string>
+  <string name="inspector_global_slow_lane">Modo lento</string>
   <string name="inspector_global_limit">Limite global</string>
   <string name="inspector_limit_marker">%1$s %2$s</string>
   <string name="inspector_speed_limit">Limite de velocidade</string>

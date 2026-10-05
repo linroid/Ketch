@@ -53,7 +53,7 @@
   <string name="error_http_sign_in_hint_server_short">сервер требует входа в аккаунт</string>
   <string name="error_http_forbidden">Доступ запрещён (403)</string>
   <string name="error_http_forbidden_hint">Возможно, срок действия ссылки истёк.</string>
-  <string name="error_http_forbidden_hint_browser">Возможно, срок действия ссылки истёк. Загрузка перехвачена из %1$s? Перехватите её снова со страницы.</string>
+  <string name="error_http_forbidden_hint_browser">Возможно, срок действия ссылки истёк. Если она получена из %1$s, отправьте её в Ketch ещё раз с исходной страницы.</string>
   <string name="error_http_forbidden_hint_short">возможно, срок действия ссылки истёк</string>
   <string name="error_browser_yours">вашего браузера</string>
   <string name="error_http_not_found">Файл не найден (%1$d)</string>

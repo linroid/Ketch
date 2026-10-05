@@ -4,11 +4,11 @@
   <string name="onboarding_loading">Загрузка Ketch</string>
 
   <string name="onboarding_files_title">Ваши загрузки — в «Файлах»</string>
-  <string name="onboarding_files_body">Ketch сохраняет скачанное туда, где приложение «Файлы» может это открыть, отправить и переместить.</string>
+  <string name="onboarding_files_body">Ketch сохраняет скачанные файлы так, чтобы их можно было открыть, отправить или переместить через приложение «Файлы».</string>
   <string name="onboarding_files_path">На %1$s › Ketch › Downloads</string>
 
   <string name="onboarding_folder_title">Куда сохранять&#160;загрузки?</string>
-  <string name="onboarding_folder_body">Другие приложения не могут открыть собственную папку Ketch. Сохраняйте в Download, и ваши файлы будут доступны везде.</string>
+  <string name="onboarding_folder_body">Другие приложения не имеют доступа к папке Ketch. Сохраняйте файлы в Download, чтобы открывать их в других приложениях.</string>
   <string name="onboarding_folder_use_download">Использовать папку Download</string>
   <string name="onboarding_folder_not_now">Не сейчас</string>
   <string name="onboarding_folder_choose_another">Выбрать другую папку</string>
@@ -16,8 +16,8 @@
   <string name="onboarding_folder_torrents">Торренты остаются в папке Ketch.</string>
   <string name="onboarding_folder_error">Не удалось использовать эту папку. Выберите другую.</string>
 
-  <string name="onboarding_use_title">Как вы будете пользоваться Ketch&#160;здесь?</string>
-  <string name="onboarding_use_body">Выберите вариант для начала. Другой всегда можно попробовать позже.</string>
+  <string name="onboarding_use_title">Как вы хотите использовать Ketch на этом устройстве?</string>
+  <string name="onboarding_use_body">Выберите, с чего начать. Второй вариант останется доступен.</string>
   <string name="onboarding_use_download">Скачивать %1$s</string>
   <string name="onboarding_use_download_ios">Загрузки могут приостанавливаться, пока Ketch работает в фоне.</string>
   <string name="onboarding_use_download_android">Загрузки продолжаются, пока вы пользуетесь другими приложениями.</string>
@@ -33,9 +33,9 @@
   <string name="onboarding_intake_select">Выделите ссылку</string>
   <string name="onboarding_intake_select_body">Выберите «Скачать через Ketch» в меню над выделенным текстом.</string>
   <string name="onboarding_intake_copy">Скопируйте ссылку</string>
-  <string name="onboarding_intake_copy_body">Вернитесь в Ketch, и он предложит скачать ссылку.</string>
+  <string name="onboarding_intake_copy_body">Когда вы вернётесь в Ketch, приложение предложит скачать файл по скопированной ссылке.</string>
   <string name="onboarding_intake_torrents">Открывайте magnet-ссылки и файлы .torrent</string>
   <string name="onboarding_intake_torrents_body">Они открываются в Ketch, где можно выбрать нужные файлы.</string>
   <string name="onboarding_intake_notify">Узнавайте о завершении загрузок</string>
-  <string name="onboarding_intake_notify_body">Ketch сообщит, когда загрузка завершится или прервётся с ошибкой; что именно, можно выбрать в Настройках.</string>
+  <string name="onboarding_intake_notify_body">Ketch сообщит, когда загрузка завершится или произойдёт ошибка. Выберите нужные уведомления в настройках.</string>
 </resources>

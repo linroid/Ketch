@@ -164,7 +164,7 @@
   <string name="connect_approval_denied">%1$s não permitiu este dispositivo. Peça de novo ou digite o código de acesso.</string>
   <string name="connect_approval_expired">Ninguém respondeu em %1$s. Peça de novo ou digite o código de acesso.</string>
   <string name="connect_approval_busy">%1$s ainda está decidindo sobre outro pedido deste dispositivo. Peça de novo daqui a pouco ou digite o código de acesso.</string>
-  <string name="connect_approval_ask_again">Pedir de novo</string>
+  <string name="connect_approval_ask_again">Solicitar acesso novamente</string>
   <string name="connect_added_badge">Adicionado</string>
   <string name="connect_share_instead">Quer controlar %1$s de outro dispositivo?</string>
   <string name="connect_show_pairing_code">Mostrar o código de pareamento</string>

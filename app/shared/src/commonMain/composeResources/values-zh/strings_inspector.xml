@@ -19,7 +19,7 @@
   <string name="inspector_reason_paused_resumes">已暂停 · 将从中断处继续</string>
   <string name="inspector_reason_paused_restarts">已暂停 · 继续时将从头开始</string>
   <string name="inspector_file_missing">文件已移动或删除</string>
-  <string name="inspector_reason_slow_lane">受慢车道限制（%1$s）</string>
+  <string name="inspector_reason_slow_lane">受低速模式限制（%1$s）</string>
   <string name="inspector_reason_global_limit">受全局限速限制（%1$s）</string>
   <string name="inspector_reason_own_limit">限速 %1$s</string>
 
@@ -28,16 +28,16 @@
   <string name="inspector_source_link">链接</string>
 
   <string name="inspector_origin_browser">来自浏览器</string>
-  <string name="inspector_origin_discover">来自“发现”</string>
+  <string name="inspector_origin_discover">来自“搜索”</string>
   <string name="inspector_origin_agent">来自 AI 智能体</string>
   <string name="inspector_origin_app">在 Ketch 中添加</string>
   <string name="inspector_origin_cli">来自命令行</string>
   <string name="inspector_with_cookies">附带 Cookie</string>
-  <string name="inspector_with_referrer">附带引用页</string>
-  <string name="inspector_with_cookies_referrer">附带 Cookie 和引用页</string>
+  <string name="inspector_with_referrer">附带来源页地址</string>
+  <string name="inspector_with_cookies_referrer">附带 Cookie 和来源页地址</string>
   <string name="inspector_with_cookies_alone">附带 Cookie</string>
-  <string name="inspector_with_referrer_alone">附带引用页</string>
-  <string name="inspector_with_cookies_referrer_alone">附带 Cookie 和引用页</string>
+  <string name="inspector_with_referrer_alone">附带来源页地址</string>
+  <string name="inspector_with_cookies_referrer_alone">附带 Cookie 和来源页地址</string>
   <string name="inspector_captured">%1$s，%2$s</string>
 
   <string name="inspector_urgent_note">立即开始；可能会暂停“%1$s”（%2$s）</string>
@@ -53,7 +53,7 @@
     <item quantity="other">及另外 %1$d 个</item>
   </plurals>
   <plurals name="inspector_controls_apply_to">
-    <item quantity="other">控制项仅适用于其中 %1$d 个（共 %2$d 个），其余已结束。</item>
+    <item quantity="other">更改仅对 %2$d 个下载中的 %1$d 个生效，其余下载已结束。</item>
   </plurals>
 
   <string name="inspector_close">关闭详情面板</string>
@@ -70,7 +70,7 @@
   <string name="inspector_control_peer_limit">节点上限</string>
   <string name="inspector_control_priority">优先级</string>
   <string name="inspector_control_start">开始时间</string>
-  <string name="inspector_global_slow_lane">慢车道</string>
+  <string name="inspector_global_slow_lane">低速模式</string>
   <string name="inspector_global_limit">全局限速</string>
   <string name="inspector_limit_marker">%1$s %2$s</string>
   <string name="inspector_speed_limit">限速</string>
@@ -83,7 +83,7 @@
   <plurals name="inspector_start_count_now">
     <item quantity="other">立即开始 %1$d 个</item>
   </plurals>
-  <string name="inspector_reschedule">重新计划</string>
+  <string name="inspector_reschedule">更改开始时间</string>
 
   <string name="inspector_section_details">详细信息</string>
   <string name="inspector_detail_source">来源</string>

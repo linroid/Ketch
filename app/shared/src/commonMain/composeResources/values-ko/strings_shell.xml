@@ -24,7 +24,7 @@
   <string name="shell_device_connecting">연결 중</string>
   <string name="shell_device_connecting_now">연결 중…</string>
   <string name="shell_device_idle">유휴</string>
-  <string name="shell_device_slow_lane">저속 차로</string>
+  <string name="shell_device_slow_lane">저속 모드</string>
   <plurals name="shell_device_active">
     <item quantity="other">%1$d개 진행 중</item>
   </plurals>
@@ -47,7 +47,7 @@
   <string name="sidebar_menu_speed">속도</string>
   <string name="sidebar_menu_settings">이 기기 설정…</string>
   <string name="sidebar_menu_full_speed">최대 속도</string>
-  <string name="sidebar_menu_slow_lane">저속 차로 · %1$s</string>
+  <string name="sidebar_menu_slow_lane">저속 모드 · %1$s</string>
   <string name="sidebar_menu_no_limit">제한 없음</string>
 
   <string name="switcher_overview">개요</string>
@@ -124,11 +124,11 @@
   <string name="palette_add_with_options">옵션을 지정해 추가…</string>
   <string name="palette_add_with_options_detail">폴더, 속도, 우선순위, 시작 시간</string>
   <string name="palette_limit_to">다운로드를 %1$s 이하로 제한</string>
-  <string name="palette_slow_lane_to">저속 차로 속도를 %1$s(으)로 설정</string>
-  <string name="palette_slow_lane_turns_on">저속 차로가 켜집니다</string>
-  <string name="palette_slow_lane_is_on">저속 차로 켜져 있음</string>
+  <string name="palette_slow_lane_to">저속 모드 속도를 %1$s(으)로 설정</string>
+  <string name="palette_slow_lane_turns_on">저속 모드가 켜집니다</string>
+  <string name="palette_slow_lane_is_on">저속 모드 켜져 있음</string>
   <string name="palette_slow_lane_now">현재 %1$s</string>
-  <string name="palette_limit_while_off">저속 차로가 꺼져 있을 때 적용</string>
+  <string name="palette_limit_while_off">저속 모드가 꺼져 있을 때 적용</string>
 
   <plurals name="palette_pause_count">
     <item quantity="other">다운로드 %1$d개 일시정지</item>
@@ -142,11 +142,11 @@
     <item quantity="other">실패한 다운로드 %1$d개 재시도</item>
   </plurals>
   <string name="palette_nothing_failed">실패한 항목 없음</string>
-  <string name="palette_slow_lane_off">저속 차로 끄기</string>
-  <string name="palette_slow_lane_on">저속 차로 켜기</string>
+  <string name="palette_slow_lane_off">저속 모드 끄기</string>
+  <string name="palette_slow_lane_on">저속 모드 켜기</string>
   <string name="palette_nothing_to_undo">실행 취소할 항목 없음</string>
   <string name="palette_full_speed">최대 속도</string>
-  <string name="palette_full_speed_slow_lane">저속 차로가 꺼집니다</string>
+  <string name="palette_full_speed_slow_lane">저속 모드가 꺼집니다</string>
   <string name="palette_full_speed_rules">속도 규칙이 꺼집니다</string>
   <string name="palette_full_speed_cap">%1$s 제한이 해제됩니다</string>
   <string name="palette_full_speed_already">이미 최대 속도입니다</string>

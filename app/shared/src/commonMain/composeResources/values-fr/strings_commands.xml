@@ -13,7 +13,7 @@
   <string name="command_pause_all">Tout mettre en pause</string>
   <string name="command_resume_all">Tout reprendre</string>
   <string name="command_retry_failed">Réessayer tous les échecs</string>
-  <string name="command_slow_lane">Voie lente</string>
+  <string name="command_slow_lane">Vitesse réduite</string>
   <string name="command_inspector_show">Afficher les détails</string>
   <string name="command_sidebar_toggle">Afficher/masquer la barre latérale</string>
   <string name="command_activity">Activité</string>

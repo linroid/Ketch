@@ -21,9 +21,9 @@
   <string name="notify_sharing_device">이 기기 공유 중</string>
   <string name="notify_server_on_port">서버 실행 중(포트 %1$d)</string>
   <string name="notify_discovering">찾기에서 다운로드 검색 중</string>
-  <string name="notify_slow_lane_on">저속 차로</string>
+  <string name="notify_slow_lane_on">저속 모드</string>
   <string name="notify_action_pause_all">모두 일시정지</string>
-  <string name="notify_action_slow_lane">저속 차로</string>
+  <string name="notify_action_slow_lane">저속 모드</string>
   <string name="notify_action_full_speed">최대 속도</string>
   <plurals name="notify_more_files">
     <item quantity="other">+%1$d개 더</item>

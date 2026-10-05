@@ -25,7 +25,7 @@
   <string name="shell_device_connecting">Conectando</string>
   <string name="shell_device_connecting_now">Conectando…</string>
   <string name="shell_device_idle">Inactivo</string>
-  <string name="shell_device_slow_lane">Carril lento</string>
+  <string name="shell_device_slow_lane">Modo lento</string>
   <plurals name="shell_device_active">
     <item quantity="one">%1$d activa</item>
     <item quantity="other">%1$d activas</item>
@@ -51,7 +51,7 @@
   <string name="sidebar_menu_speed">Velocidad</string>
   <string name="sidebar_menu_settings">Ajustes de este dispositivo…</string>
   <string name="sidebar_menu_full_speed">Velocidad máxima</string>
-  <string name="sidebar_menu_slow_lane">Carril lento · %1$s</string>
+  <string name="sidebar_menu_slow_lane">Modo lento · %1$s</string>
   <string name="sidebar_menu_no_limit">Sin límite</string>
 
   <string name="switcher_overview">Resumen</string>
@@ -131,11 +131,11 @@
   <string name="palette_add_with_options">Añadir con opciones…</string>
   <string name="palette_add_with_options_detail">Carpeta, velocidad, prioridad y hora de inicio</string>
   <string name="palette_limit_to">Limitar las descargas a %1$s</string>
-  <string name="palette_slow_lane_to">Poner el Carril lento a %1$s</string>
-  <string name="palette_slow_lane_turns_on">Activa el Carril lento</string>
-  <string name="palette_slow_lane_is_on">El Carril lento está activado</string>
+  <string name="palette_slow_lane_to">Poner el modo lento a %1$s</string>
+  <string name="palette_slow_lane_turns_on">Activa el modo lento</string>
+  <string name="palette_slow_lane_is_on">El Modo lento está activado</string>
   <string name="palette_slow_lane_now">Ahora: %1$s</string>
-  <string name="palette_limit_while_off">Se aplica mientras el Carril lento está desactivado</string>
+  <string name="palette_limit_while_off">Se aplica mientras el modo lento está desactivado</string>
 
   <plurals name="palette_pause_count">
     <item quantity="one">Pausar %1$d descarga</item>
@@ -152,11 +152,11 @@
     <item quantity="other">Reintentar %1$d descargas fallidas</item>
   </plurals>
   <string name="palette_nothing_failed">Ninguna con error</string>
-  <string name="palette_slow_lane_off">Desactivar el Carril lento</string>
-  <string name="palette_slow_lane_on">Activar el Carril lento</string>
+  <string name="palette_slow_lane_off">Desactivar el modo lento</string>
+  <string name="palette_slow_lane_on">Activar el modo lento</string>
   <string name="palette_nothing_to_undo">Nada que deshacer</string>
   <string name="palette_full_speed">Velocidad máxima</string>
-  <string name="palette_full_speed_slow_lane">Desactiva el Carril lento</string>
+  <string name="palette_full_speed_slow_lane">Desactiva el modo lento</string>
   <string name="palette_full_speed_rules">Desactiva las reglas de velocidad</string>
   <string name="palette_full_speed_cap">Quita el límite de %1$s</string>
   <string name="palette_full_speed_already">Ya está a velocidad máxima</string>

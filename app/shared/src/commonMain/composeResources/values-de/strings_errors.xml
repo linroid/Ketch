@@ -51,7 +51,7 @@
   <string name="error_http_sign_in_hint_server_short">der Server verlangt eine Anmeldung</string>
   <string name="error_http_forbidden">Zugriff verweigert (403)</string>
   <string name="error_http_forbidden_hint">Der Link ist möglicherweise abgelaufen.</string>
-  <string name="error_http_forbidden_hint_browser">Der Link ist möglicherweise abgelaufen. Aus %1$s abgefangen? Fange ihn auf der Seite erneut ab.</string>
+  <string name="error_http_forbidden_hint_browser">Der Link ist möglicherweise abgelaufen. Wenn er aus %1$s stammt, sende ihn von der ursprünglichen Seite erneut an Ketch.</string>
   <string name="error_http_forbidden_hint_short">der Link ist möglicherweise abgelaufen</string>
   <string name="error_browser_yours">deinem Browser</string>
   <string name="error_http_not_found">Datei nicht gefunden (%1$d)</string>

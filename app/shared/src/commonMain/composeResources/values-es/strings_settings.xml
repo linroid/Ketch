@@ -16,7 +16,7 @@
   <string name="settings_category_downloads">Descargas</string>
   <string name="settings_category_downloads_description">Dónde van las descargas, la cola y los reintentos</string>
   <string name="settings_category_speed">Velocidad</string>
-  <string name="settings_category_speed_description">Modos de velocidad, Carril lento y reglas de Automático</string>
+  <string name="settings_category_speed_description">Modos de velocidad, Modo lento y reglas de Automático</string>
   <string name="settings_category_network">Red</string>
   <string name="settings_category_network_description">Las redes entre las que se reparten las descargas</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
@@ -58,8 +58,8 @@
     <item quantity="other">%1$s · %2$d a la vez</item>
   </plurals>
   <string name="settings_summary_speed_capped">Velocidad máxima · %1$s</string>
-  <string name="settings_summary_speed_slow_lane">Carril lento · %1$s</string>
-  <string name="settings_summary_speed_auto_slow_lane">Automático · Carril lento %1$s</string>
+  <string name="settings_summary_speed_slow_lane">Modo lento · %1$s</string>
+  <string name="settings_summary_speed_auto_slow_lane">Automático · Modo lento %1$s</string>
   <string name="settings_summary_speed_auto_full">Automático · Velocidad máxima</string>
   <string name="settings_summary_no_limit">Sin límite</string>
   <string name="settings_summary_limit">Límite: %1$s</string>
@@ -130,7 +130,7 @@
   <string name="settings_general_badge_off">Nada</string>
 
   <string name="settings_notifications_downloads">Descargas</string>
-  <string name="settings_notifications_footer">Notificar usa las notificaciones del sistema. Solo en la app se queda dentro de Ketch.</string>
+  <string name="settings_notifications_footer">«Notificar» usa las notificaciones del sistema. «Solo en la app» muestra los avisos dentro de Ketch.</string>
   <string name="settings_notifications_finished">Descarga terminada</string>
   <string name="settings_notifications_failed">Descarga fallida</string>
   <string name="settings_notifications_mode_notify">Notificar</string>
@@ -154,8 +154,8 @@
   <string name="settings_notifications_success_sound_hint">Un tono suave.</string>
   <string name="settings_notifications_success_vibration">Vibración</string>
   <string name="settings_notifications_success_vibration_hint">Una vibración breve, también en modo vibración.</string>
-  <string name="settings_notifications_success_footer">Cuando termina una descarga o Descubrir encuentra descargas.</string>
-  <string name="settings_notifications_success_footer_phone">Cuando termina una descarga o Descubrir encuentra descargas. El modo silencio y No molestar lo silencian, y las notificaciones en segundo plano usan su propio sonido.</string>
+  <string name="settings_notifications_success_footer">Cuando termina una descarga o Descubrir encuentra archivos.</string>
+  <string name="settings_notifications_success_footer_phone">Cuando termina una descarga o Descubrir encuentra archivos. No se reproduce ningún sonido en los modos Silencio y No molestar. Las notificaciones en segundo plano usan su propio sonido.</string>
   <string name="settings_notifications_browser">Notificaciones del navegador</string>
   <string name="settings_notifications_allowed">Las notificaciones están permitidas</string>
   <string name="settings_notifications_allowed_hint">Se muestran mientras la pestaña de Ketch está en segundo plano.</string>
@@ -185,8 +185,8 @@
   <string name="settings_integration_clipboard_fill">Rellenar automáticamente</string>
   <string name="settings_integration_clipboard_suggest_choice">Sugerir</string>
   <string name="settings_integration_clipboard_off">Desactivado</string>
-  <string name="settings_integration_clipboard_fill_hint">Un enlace copiado rellena el panel de añadir.</string>
-  <string name="settings_integration_clipboard_suggest_hint">Solo lee el portapapeles cuando tocas.</string>
+  <string name="settings_integration_clipboard_fill_hint">El enlace copiado se pega en el panel para añadir descargas.</string>
+  <string name="settings_integration_clipboard_suggest_hint">Solo se lee el portapapeles cuando pulsas la sugerencia.</string>
   <string name="settings_integration_clipboard_off_hint">Ketch nunca lee el portapapeles.</string>
   <string name="settings_integration_quick_add">Añadir al momento los enlaces pegados</string>
   <string name="settings_integration_quick_add_key_hint">Al pegar un enlace con %1$s, se añade enseguida, con opción de deshacer.</string>
@@ -256,7 +256,7 @@
   <string name="settings_ai_access_trusted_none">Ninguno todavía. Elige Permitir siempre cuando Descubrir pregunte, o añade un sitio aquí.</string>
   <string name="settings_ai_access_add">Añade un sitio, como ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">Escribe el nombre de un sitio web, como ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Las búsquedas que limitas a sitios web nunca preguntan: esos sitios los elegiste tú.</string>
+  <string name="settings_ai_access_footer">Los sitios que indiques como destinos de búsqueda no requieren otra autorización de acceso.</string>
 
   <string name="settings_about_name_line">Un ketch es un velero de dos mástiles. Ketch divide cada descarga en carriles, como sus velas.</string>
   <string name="settings_about_discover_elsewhere">Descubrir funciona en las apps de escritorio y Android.</string>
@@ -286,7 +286,7 @@
   <string name="settings_about_update_current_hint">%1$s es la última versión.</string>
   <string name="settings_about_update_available">Ketch %1$s está disponible</string>
   <string name="settings_about_update_available_hint">Tienes la %1$s.</string>
-  <string name="settings_about_update_source_hint">Esta copia se ejecuta desde el código fuente. Los instaladores están en la página de la versión.</string>
+  <string name="settings_about_update_source_hint">Esta versión se ha compilado a partir del código fuente. Encontrarás los instaladores en la página de la versión.</string>
   <string name="settings_about_update_downloading">Descargando Ketch %1$s…</string>
   <string name="settings_about_update_progress">%1$s de %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s está listo para instalarse</string>
@@ -296,7 +296,7 @@
   <string name="settings_about_update_download_failed">No se pudo descargar la actualización</string>
   <string name="settings_about_update_install_failed">No se pudo instalar la actualización</string>
   <string name="settings_about_update_auto">Buscar actualizaciones automáticamente</string>
-  <string name="settings_about_update_auto_hint">Una vez al día, en las versiones de Ketch en GitHub.</string>
+  <string name="settings_about_update_auto_hint">Comprueba cada día si hay una nueva versión de Ketch disponible en GitHub.</string>
   <string name="settings_about_update_notes">Novedades de %1$s</string>
   <string name="settings_about_update_check">Buscar ahora</string>
   <string name="settings_about_update_install">Actualizar</string>
@@ -311,14 +311,14 @@
   <string name="settings_logs_share_subject">Registros de Ketch</string>
 
   <string name="settings_downloads_folder">Carpeta de descargas</string>
-  <string name="settings_downloads_remote">Se guarda en %1$s hasta que se reinicie.</string>
+  <string name="settings_downloads_remote">Estos ajustes se aplican a %1$s hasta su próximo reinicio.</string>
   <string name="settings_loading_from">Cargando los ajustes de %1$s…</string>
   <string name="settings_downloads_save_to">Guardar en</string>
   <string name="settings_downloads_save_to_row">Guardar las descargas en</string>
   <string name="settings_downloads_path_placeholder">Ruta de una carpeta en %1$s</string>
   <string name="settings_downloads_private_folder">Solo Ketch puede ver esta carpeta. Elige otra, como Download.</string>
   <string name="settings_downloads_choose_folder">Elegir carpeta</string>
-  <string name="settings_downloads_torrents_own_folder">Los torrents se siguen guardando en la carpeta propia de Ketch.</string>
+  <string name="settings_downloads_torrents_own_folder">Los archivos descargados por torrent se siguen guardando en la carpeta de Ketch.</string>
   <string name="settings_downloads_change">Cambiar…</string>
   <string name="settings_downloads_enter_path">Escribir ruta…</string>
   <string name="settings_downloads_use_default">Usar la carpeta Descargas</string>
@@ -329,7 +329,7 @@
   <string name="settings_downloads_unpin">Dejar de fijar %1$s</string>
   <string name="settings_downloads_pin">Fijar</string>
   <string name="settings_downloads_queue">Cola</string>
-  <string name="settings_downloads_queue_footer">Al bajar un límite, las descargas en curso terminan igualmente. Los reintentos se aplican cuando las descargas empiezan o se reanudan.</string>
+  <string name="settings_downloads_queue_footer">Reducir un límite no interrumpe las descargas en curso. El número de reintentos se aplica al iniciar o reanudar una descarga.</string>
   <string name="settings_count_unlimited">Sin límite</string>
   <string name="settings_downloads_run_at_once">Simultáneas</string>
   <string name="settings_downloads_run_at_once_hint">Las demás esperan en la cola, por prioridad.</string>
@@ -361,29 +361,29 @@
   <string name="settings_downloads_retries_more">Más reintentos</string>
 
   <string name="settings_speed_mode_full">Velocidad máxima</string>
-  <string name="settings_speed_mode_slow_lane">Carril lento</string>
+  <string name="settings_speed_mode_slow_lane">Modo lento</string>
   <string name="settings_speed_mode_auto">Automático</string>
-  <string name="settings_speed_remote">Se guarda en %1$s hasta que se reinicie. Todavía no tiene Carril lento ni Automático.</string>
+  <string name="settings_speed_remote">Estos ajustes se aplican a %1$s hasta su próximo reinicio. El modo lento y el modo Automático aún no están disponibles en este dispositivo.</string>
   <string name="settings_speed_limit_group">Límite</string>
   <string name="settings_speed_limit">Límite de velocidad</string>
   <string name="settings_speed_limit_hint">Todas las descargas lo comparten; el límite propio de una descarga puede ser menor.</string>
   <string name="settings_speed_mode_group">Modo</string>
   <string name="settings_speed_mode">Modo de velocidad</string>
   <string name="settings_speed_full_unlimited">Las descargas usan toda la velocidad disponible.</string>
-  <string name="settings_speed_full_capped">Las descargas comparten hasta %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Las descargas comparten como máximo %1$s y dejan margen para las llamadas.</string>
-  <string name="settings_speed_auto_no_rules">Añade una regla abajo para que el Carril lento se active solo.</string>
+  <string name="settings_speed_full_capped">La velocidad total de las descargas está limitada a %1$s.</string>
+  <string name="settings_speed_slow_lane_summary">La velocidad total de las descargas está limitada a %1$s para dejar ancho de banda para las llamadas.</string>
+  <string name="settings_speed_auto_no_rules">Añade una regla abajo para que el modo lento se active solo.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Límites</string>
   <string name="settings_speed_full_cap">Límite de la velocidad máxima</string>
-  <string name="settings_speed_full_cap_hint">Lo máximo que comparten las descargas fuera del Carril lento.</string>
-  <string name="settings_speed_slow_lane">Velocidad del Carril lento</string>
+  <string name="settings_speed_full_cap_hint">La velocidad total máxima de las descargas cuando el modo lento está desactivado.</string>
+  <string name="settings_speed_slow_lane">Velocidad del modo lento</string>
   <string name="settings_speed_slow_lane_suggested">Se sugiere ≈ %1$s, el %2$d % de la velocidad más alta vista esta semana.</string>
   <string name="settings_speed_slow_lane_unknown">%1$s hasta que Ketch vea qué velocidad alcanza esta conexión.</string>
   <string name="settings_speed_slow_lane_capped">El límite de la velocidad máxima, %1$s, es menor y se aplica en su lugar.</string>
   <string name="settings_speed_rules">Reglas de Automático</string>
-  <string name="settings_speed_rules_footer_auto">Las reglas siguen el reloj de este dispositivo.</string>
-  <string name="settings_speed_rules_footer">Las reglas se aplican en modo Automático, según el reloj de este dispositivo.</string>
+  <string name="settings_speed_rules_footer_auto">Las reglas siguen la hora local de este dispositivo.</string>
+  <string name="settings_speed_rules_footer">En el modo Automático, las reglas siguen la hora local de este dispositivo.</string>
   <string name="settings_speed_rule_add">Añadir regla</string>
   <plurals name="settings_speed_rules_max">
     <item quantity="one">Hasta %1$d regla</item>
@@ -391,7 +391,7 @@
   </plurals>
   <string name="settings_speed_rules_empty">Aún no hay reglas</string>
   <string name="settings_speed_rules_empty_hint">Por ejemplo, ralentiza las descargas en horario laboral.</string>
-  <string name="settings_speed_rule_slow_lane_on">Carril lento activado</string>
+  <string name="settings_speed_rule_slow_lane_on">Modo lento activado</string>
   <string name="settings_speed_rule_start">Inicio</string>
   <string name="settings_speed_rule_end">Fin</string>
   <string name="settings_speed_rule_remove">Quitar regla</string>
@@ -415,7 +415,7 @@
   <string name="settings_speed_connections_hint">Para HTTP y FTP; se aplica cuando las descargas empiezan o se reanudan.</string>
   <string name="settings_speed_switch_failed">No se pudo cambiar a %1$s</string>
   <string name="settings_speed_cap_failed">No se pudo cambiar el límite de la velocidad máxima</string>
-  <string name="settings_speed_slow_lane_failed">No se pudo cambiar la velocidad del Carril lento</string>
+  <string name="settings_speed_slow_lane_failed">No se pudo cambiar la velocidad del modo lento</string>
   <string name="settings_speed_rules_failed">No se pudieron cambiar las reglas de Automático</string>
 
   <string name="settings_network_system_default">Predeterminada del sistema</string>
@@ -564,12 +564,12 @@
   <string name="settings_search_per_server">Descargas a la vez desde un mismo sitio web</string>
   <string name="settings_search_per_server_keywords">host, sitio web, cola, límite</string>
   <string name="settings_search_retries_keywords">reintentar, intentos, errores</string>
-  <string name="settings_search_speed_mode">Velocidad máxima, Carril lento o Automático</string>
+  <string name="settings_search_speed_mode">Velocidad máxima, Modo lento o Automático</string>
   <string name="settings_search_speed_mode_keywords">límite, ancho de banda, limitar, velocidad</string>
   <string name="settings_search_full_speed_cap">El límite de velocidad que comparten todas las descargas</string>
   <string name="settings_search_full_speed_cap_keywords">límite de velocidad, ancho de banda, limitar, máximo</string>
   <string name="settings_search_slow_lane_keywords">límite, ancho de banda, limitar</string>
-  <string name="settings_search_rules">Activa el Carril lento a horas fijas</string>
+  <string name="settings_search_rules">Activa el modo lento a horas fijas</string>
   <string name="settings_search_rules_keywords">programar, horario, horario laboral, días laborables, hora</string>
   <string name="settings_search_connections_keywords">segmentos, hilos, paralelo, dividir, conexiones</string>
   <string name="settings_search_networks">Las redes que usan las descargas</string>
@@ -593,9 +593,9 @@
   <string name="settings_rule_weekdays">Días laborables</string>
   <string name="settings_rule_weekends">Fines de semana</string>
 
-  <string name="settings_auto_slow_lane_until">Carril lento activado hasta %1$s</string>
+  <string name="settings_auto_slow_lane_until">Modo lento activado hasta %1$s</string>
   <string name="settings_auto_full_speed_until">Velocidad máxima hasta %1$s</string>
-  <string name="settings_auto_slow_lane_all_week">Carril lento activado toda la semana</string>
+  <string name="settings_auto_slow_lane_all_week">Modo lento activado toda la semana</string>
   <string name="settings_auto_full_speed_all_week">Velocidad máxima; ninguna regla empieza esta semana</string>
   <string name="settings_auto_tomorrow_at">mañana %1$s</string>
   <string name="settings_auto_day_at">%1$s %2$s</string>

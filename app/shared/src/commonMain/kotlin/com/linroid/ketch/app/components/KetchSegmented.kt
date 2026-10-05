@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
  * @param fill whether the control takes the full width, sharing it equally.
  * @param description what screen readers say for an option instead of its label, such as for
  *   one that shows only its [icon].
+ * @param revealInitialSelection scroll to the initial selection when hosted in a scroller.
  */
 @Composable
 fun <T> KetchSegmented(
@@ -71,6 +72,7 @@ fun <T> KetchSegmented(
   shortcut: (T) -> String? = { null },
   fill: Boolean = false,
   description: @Composable (T) -> String? = { null },
+  revealInitialSelection: Boolean = false,
 ) {
   val colors = KetchTheme.colors
   val motion = KetchTheme.motion
@@ -93,9 +95,11 @@ fun <T> KetchSegmented(
     }
   }
   val requesters = remember(options.size) { List(options.size) { BringIntoViewRequester() } }
-  var shownIndex by remember { mutableIntStateOf(selectedIndex) }
+  var shownIndex by remember {
+    mutableIntStateOf(if (revealInitialSelection) -1 else selectedIndex)
+  }
   LaunchedEffect(selectedIndex, target) {
-    // A selection made elsewhere, such as by a shortcut, scrolls a cut-off option into view.
+    // Show the initial selection and selections made elsewhere, such as by a shortcut.
     if (selectedIndex == shownIndex || target == null) return@LaunchedEffect
     shownIndex = selectedIndex
     requesters.getOrNull(selectedIndex)?.bringIntoView()
