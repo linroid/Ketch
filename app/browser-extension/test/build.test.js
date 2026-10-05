@@ -68,6 +68,7 @@ test('Safari excludes capture and native-host permissions while retaining manual
     }
     assert.equal(manifest.key, undefined);
     assert.equal(manifest.minimum_chrome_version, undefined);
+    assert.deepEqual(manifest.browser_specific_settings, { safari: { strict_min_version: '16.4' } });
   } finally {
     rmSync(outDir, { recursive: true, force: true });
   }

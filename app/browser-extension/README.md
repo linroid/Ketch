@@ -1,7 +1,9 @@
 # Ketch browser extension
 
 Hands downloads from your browser to Ketch: the Ketch app on this computer, which the extension
-opens when it needs it, or a Ketch server elsewhere, such as a NAS.
+opens when it needs it, or a Ketch server elsewhere, such as a NAS. Chromium and Firefox
+support automatic capture and native app launching. The limited Safari target sends reviewed
+links and page resources to a configured server.
 
 - **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
   can't be reached, the browser downloads them as usual.
@@ -28,14 +30,18 @@ opens when it needs it, or a Ketch server elsewhere, such as a NAS.
 |---|---|---|
 | Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers | Chromium 116 | `build/chrome` |
 | Firefox (desktop) | 128 | `build/firefox` |
+| Safari (macOS, limited features) | 16.4 | `build/safari` |
 
-Safari has no downloads API for extensions, so it isn't supported.
+Safari supports manual links, magnets, page resources and task controls, with review before
+sending. Automatic browser-download capture, native app launching and extension notifications
+are unavailable. See [Safari packaging](#safari-limited-macos-target).
 
 ## Installing
 
 Each [GitHub release](https://github.com/linroid/Ketch/releases) includes
-`ketch-extension-<version>-chrome.zip` and `ketch-extension-<version>-firefox.zip`. Until the
-extension is in the browser stores:
+`ketch-extension-<version>-chrome.zip`, `ketch-extension-<version>-firefox.zip` and
+`ketch-extension-<version>-safari.zip`. The Safari archive contains extension sources, not an
+installable app. Until the extension is in the browser stores:
 
 - **Chromium browsers**: unzip the Chrome package, open `chrome://extensions` (or
   `edge://extensions`), turn on **Developer mode**, choose **Load unpacked** and select the
@@ -46,14 +52,18 @@ extension is in the browser stores:
   Temporary Add-on**, or install it in Firefox Developer Edition or Nightly with
   `xpinstall.signatures.required` set to `false` in `about:config`.
 
+- **Safari**: package the Safari source archive with Xcode, sign the generated host app and
+  enable the extension in Safari. See [Safari packaging](#safari-limited-macos-target) for
+  the converter command and setup instructions.
+
 ## Setting up Ketch
 
-- **Ketch app on this computer**: install the desktop app and open it once. It registers itself
+- **Ketch app on this computer (Chromium/Firefox)**: install the desktop app and open it once. It registers itself
   with the browsers you have used (Chrome, Chromium, Edge, Brave, Vivaldi, Arc and Firefox), and
   the extension is set up for it out of the box. From then on the extension opens Ketch when a
   download needs it; there is no server to turn on or token to copy. For a browser installed
   after Ketch, open Ketch once more.
-- **CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
+- **Safari, CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
   `ketch server`, or in the app open **Settings → Sharing** and choose **Allow another device**.
   Then choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
   Sharing from the app always has an access code: enter the one under **Advanced** as the access

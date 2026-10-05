@@ -90,6 +90,7 @@ function safariManifest(base) {
   return {
     ...rest,
     options_ui: { page: base.options_ui.page },
+    browser_specific_settings: { safari: { strict_min_version: '16.4' } },
     permissions: base.permissions.filter((permission) =>
       !['downloads', 'nativeMessaging', 'notifications', 'webRequest'].includes(permission)),
   };
