@@ -175,6 +175,9 @@ tasks.named<Test>("jvmTest") {
   outputs.upToDateWhen { !updateTokenAllowlist }
   outputs.cacheIf { !updateTokenAllowlist }
   systemProperty("updateTokenAllowlist", updateTokenAllowlist.toString())
+  // The render tests pace their frames in real time, so one JVM spends minutes mostly waiting.
+  // Test classes share no state, and each fork starts its own Compose scenes.
+  maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
   // Tests read the English strings and format numbers the English way, whatever the machine's
   // language and region. `-PsnapshotLocale=de-DE` renders the snapshots in another language
   // instead; tests that assert English text then fail, so run only the snapshots with it.

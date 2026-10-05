@@ -142,7 +142,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:android:assembleRelease -PVERSION_NAME=${KETCH_VERSION#v}
+        run: |
+          ./gradlew :app:android:assembleRelease -PVERSION_NAME=${KETCH_VERSION#v} \
+            -PversionCode=${{ github.run_number }}
 
       - name: Rename APK
         run: |

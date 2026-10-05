@@ -9,6 +9,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -34,6 +35,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -41,6 +43,9 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceActionsTest {
+  // Loading a string for the first time lets virtual time run, which would end Undo windows.
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
 
   /** The embedded engine: it keeps the config it is given. */
   private class Engine : KetchApi by FakeKetchApi() {

@@ -8,6 +8,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
@@ -18,6 +19,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,6 +29,10 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RowActionRunnerTest {
+  // Loading a string for the first time lets virtual time run, which would end Undo windows.
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
+
   private val downloading = DownloadState.Downloading(DownloadProgress(10, 100, 5))
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 100)
 
