@@ -356,6 +356,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
+- The agent runs Koog's single-run loop with one change
+  (`ResourceDiscoveryService.discoveryStrategy`): a reply with neither tool calls nor a JSON
+  answer, such as a model narrating its next step, is answered with a reminder to call a tool or
+  answer, at most twice a run, instead of ending the run with no results
 - Content filter (`AiSettings.contentFilter`, `[ai] contentFilter`, on by default;
   `DiscoverQuery.contentFilter`, CLI `--no-filter`): `DeviceSafetyFilter` drops shorteners,
   aggregators, piracy signals, look-alikes of its trusted hosts, URLs with user info and

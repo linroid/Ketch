@@ -86,6 +86,12 @@ internal class AgentOutputParser(
   }
 
   /**
+   * Whether [agentOutput] holds a JSON answer [parse] reads, even one that finds nothing. Prose
+   * without one, such as a note on what the agent will do next, holds none.
+   */
+  fun hasAnswer(agentOutput: String): Boolean = decode(agentOutput) != null
+
+  /**
    * The agent's [title] for the search as one line of plain text of at most
    * [MAX_SEARCH_TITLE_LENGTH] characters, without the quotes around it or a period at its end.
    */

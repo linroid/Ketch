@@ -12,6 +12,8 @@ import ai.koog.prompt.message.Message.Role
 import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
+import com.linroid.ketch.ai.ResourceDiscoveryService.Companion.ANSWER_REMINDER
+import com.linroid.ketch.ai.ResourceDiscoveryService.Companion.MAX_ANSWER_REMINDERS
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.SafeFetcher
@@ -229,6 +231,56 @@ class ResourceDiscoveryServiceTest {
 
     assertTrue(error.message.startsWith("The agent ran out of steps"))
     assertEquals(listOf(1), executors.map { it.closeCount })
+  }
+
+  @Test
+  fun discover_agentNarratesWithoutCallingATool_isRemindedAndAnswers() = runTest {
+    val prompts = mutableListOf<Prompt>()
+    val service = service(mutableListOf()) { prompt ->
+      prompts += prompt
+      when (toolResults(prompt)) {
+        0 -> toolCall(prompt, "fetchPage", """{"url": "https://example.com/notes"}""")
+        else -> if (prompt.messages.last().textContent() == ANSWER_REMINDER) {
+          answer("""[{"name": "Tool", "url": "https://example.com/tool.zip"}]""")
+        } else {
+          answer("The notes page works. Now let me check the downloads page.")
+        }
+      }
+    }
+
+    val result = service.discover(DiscoverQuery(query = "tool release"))
+
+    assertEquals(listOf("https://example.com/tool.zip"), result.candidates.map { it.url })
+    assertEquals(3, prompts.size)
+  }
+
+  @Test
+  fun discover_agentNeverAnswers_endsWithItsTextAfterTheReminders() = runTest {
+    var requests = 0
+    val service = service(mutableListOf()) { _ ->
+      requests++
+      answer("Now let me check the downloads page.")
+    }
+
+    val result = service.discover(DiscoverQuery(query = "tool release"))
+
+    assertTrue(result.candidates.isEmpty())
+    assertEquals("Now let me check the downloads page.", result.summary)
+    assertEquals(1 + MAX_ANSWER_REMINDERS, requests)
+  }
+
+  @Test
+  fun discover_agentAnswersWithNoCandidates_isNotReminded() = runTest {
+    var requests = 0
+    val service = service(mutableListOf()) { _ ->
+      requests++
+      answer("""{"summary": "Nothing matches.", "candidates": []}""")
+    }
+
+    val result = service.discover(DiscoverQuery(query = "tool release"))
+
+    assertEquals("Nothing matches.", result.summary)
+    assertEquals(1, requests)
   }
 
   @Test
