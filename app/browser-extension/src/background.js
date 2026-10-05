@@ -5,6 +5,11 @@
  */
 
 import { FailureKind } from './lib/ketch-client.js';
+import {
+  CAPTURE_PAUSED_KEY,
+  loadCapturePause,
+  setCapturePaused,
+} from './lib/capture-pause.js';
 import { ext } from './lib/ext.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
@@ -33,6 +38,13 @@ ext.runtime.onInstalled.addListener(async ({ reason }) => {
 ext.runtime.onStartup.addListener(async () => rebuildMenus(await loadSettings()));
 
 onSettingsChanged((settings) => rebuildMenus(settings));
+
+ext.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes[CAPTURE_PAUSED_KEY]) return;
+  loadSettings().then(rebuildMenus).catch((error) => {
+    console.error('Ketch: could not update the capture menu', error);
+  });
+});
 
 ext.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((error) => console.error('Ketch: menu action failed', error));
@@ -85,13 +97,14 @@ async function captureDownload(item, gate) {
     console.error('Ketch: could not give the download back to the browser', error);
   });
   let settings;
+  let capturePaused;
   try {
-    settings = await loadSettings();
+    [settings, capturePaused] = await Promise.all([loadSettings(), loadCapturePause()]);
   } catch (error) {
     console.error('Ketch: could not load settings', error);
     return release();
   }
-  const decision = captureDecision(item, settings, ext.runtime.id);
+  const decision = captureDecision(item, settings, ext.runtime.id, capturePaused);
   if (!decision.capture) {
     console.debug(`Ketch: leaving download ${item.id} to the browser: ${decision.reason}`);
     return release();
@@ -134,6 +147,7 @@ async function removeBrowserDownload(downloadId) {
 }
 
 async function handleMagnet(url) {
+  if (await loadCapturePause()) return { handled: false };
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
   const instance = findInstance(settings);
@@ -142,13 +156,21 @@ async function handleMagnet(url) {
     notifySent(settings, instance, taskName(task));
     return { handled: true };
   } catch (error) {
-    notifyFailure(t(error.kind === FailureKind.UNCERTAIN
-      ? 'options_diagnostics' : 'notify_fallback_magnet'), instance, error);
+    notifyFailure(error.kind === FailureKind.UNCERTAIN
+      ? t('options_diagnostics') : t('notify_fallback_magnet'), instance, error);
     return { handled: error.kind === FailureKind.UNCERTAIN };
   }
 }
 
 async function handleMenuClick(info, tab) {
+  if (info.menuItemId === 'pause-capture') {
+    await setCapturePaused(info.checked);
+    return;
+  }
+  if (info.menuItemId === 'download-directly') {
+    await downloadDirectly(info, tab);
+    return;
+  }
   const target = parseMenuId(String(info.menuItemId));
   if (!target) return;
   const settings = await loadSettings();
@@ -172,6 +194,30 @@ async function handleMenuClick(info, tab) {
   }
 }
 
+/** Starts a browser download; its byExtensionId keeps it out of automatic capture. */
+async function downloadDirectly(info, tab) {
+  const url = info.linkUrl || info.srcUrl;
+  const firefox = !ext.downloads.onDeterminingFilename;
+  // Chromium's spanning background cannot select a private download context. Leave that
+  // case to the browser's native save command instead of using the regular cookie store.
+  if (!/^https?:\/\//i.test(url ?? '') || (tab?.incognito && !firefox)) {
+    notify(t('notify_direct_failed'), t('notify_direct_hint'));
+    return;
+  }
+  const options = { url };
+  if (firefox) {
+    if (tab?.cookieStoreId) options.cookieStoreId = tab.cookieStoreId;
+    if (tab?.incognito) options.incognito = true;
+  }
+  try {
+    // Let the browser choose the name, cookies and whether to show its Save As dialog.
+    await ext.downloads.download(options);
+  } catch {
+    console.warn('Ketch: could not start the browser download');
+    notify(t('notify_direct_failed'), t('notify_direct_hint'));
+  }
+}
+
 let menuUpdate = Promise.resolve();
 
 /**
@@ -181,13 +227,35 @@ let menuUpdate = Promise.resolve();
  */
 function rebuildMenus(settings) {
   menuUpdate = menuUpdate.then(async () => {
+    const capturePaused = await loadCapturePause();
     await ext.contextMenus.removeAll();
+    await createMenu({ id: 'ketch', title: 'Ketch', contexts: ['all'] });
+    await createMenu({
+      id: 'pause-capture',
+      parentId: 'ketch',
+      title: t('menu_pause_capture'),
+      type: 'checkbox',
+      checked: capturePaused,
+      contexts: ['all'],
+    });
+    await createMenu({
+      id: 'download-directly',
+      parentId: 'ketch',
+      title: t('menu_download_directly'),
+      contexts: ['link', 'image', 'video', 'audio'],
+      targetUrlPatterns: ['http://*/*', 'https://*/*'],
+    });
     const instances = [
       ...settings.instances.filter((it) => it.id === settings.defaultInstanceId),
       ...settings.instances.filter((it) => it.id !== settings.defaultInstanceId),
     ];
     for (const menu of MENUS) {
-      await createMenu({ id: menu.kind, title: menu.title, contexts: menu.contexts });
+      await createMenu({
+        id: menu.kind,
+        parentId: 'ketch',
+        title: menu.title,
+        contexts: menu.contexts,
+      });
       if (instances.length < 2) continue;
       for (const instance of instances) {
         const isDefault = instance.id === settings.defaultInstanceId;

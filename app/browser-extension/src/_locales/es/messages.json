@@ -546,5 +546,32 @@
   },
   "error_handoff_uncertain": {
     "message": "Es posible que Ketch haya aceptado esta descarga. Comprueba las descargas pendientes en los ajustes de la extensión antes de reintentar o reanudarla en el navegador."
+  },
+  "popup_pause_capture": {
+    "message": "Pausar hasta reanudar"
+  },
+  "popup_resume_capture": {
+    "message": "Reanudar ahora"
+  },
+  "popup_pause_detail": {
+    "message": "Dejar temporalmente las descargas y los enlaces magnet al navegador."
+  },
+  "popup_capture_pause_failed": {
+    "message": "No se pudo cambiar la pausa. Inténtalo de nuevo."
+  },
+  "popup_capture_paused": {
+    "message": "La captura automática está pausada hasta que la reanudes."
+  },
+  "menu_pause_capture": {
+    "message": "Pausar la captura automática"
+  },
+  "menu_download_directly": {
+    "message": "Descargar directamente"
+  },
+  "notify_direct_failed": {
+    "message": "No se pudo iniciar la descarga en el navegador"
+  },
+  "notify_direct_hint": {
+    "message": "Usa la opción de guardar del navegador para este elemento."
   }
 }

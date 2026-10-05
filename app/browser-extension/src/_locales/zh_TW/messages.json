@@ -546,5 +546,32 @@
   },
   "error_handoff_uncertain": {
     "message": "Ketch可能已接受此下載。請先在擴充功能設定中檢查待確認的下載，再重試或在瀏覽器中繼續。"
+  },
+  "popup_pause_capture": {
+    "message": "暫停直到手動恢復"
+  },
+  "popup_resume_capture": {
+    "message": "立即恢復"
+  },
+  "popup_pause_detail": {
+    "message": "暫時由瀏覽器處理下載和磁力連結。"
+  },
+  "popup_capture_pause_failed": {
+    "message": "無法變更暫停狀態，請重試。"
+  },
+  "popup_capture_paused": {
+    "message": "自動擷取已暫停，直到您手動恢復。"
+  },
+  "menu_pause_capture": {
+    "message": "暫停自動擷取"
+  },
+  "menu_download_directly": {
+    "message": "直接下載"
+  },
+  "notify_direct_failed": {
+    "message": "無法啟動瀏覽器下載"
+  },
+  "notify_direct_hint": {
+    "message": "請使用瀏覽器內建的儲存功能儲存此項目。"
   }
 }

@@ -546,5 +546,32 @@
   },
   "error_handoff_uncertain": {
     "message": "Ketchがこのダウンロードを受け付けた可能性があります。再試行やブラウザーでの再開の前に、拡張機能の設定で保留中のダウンロードを確認してください。"
+  },
+  "popup_pause_capture": {
+    "message": "再開するまで一時停止"
+  },
+  "popup_resume_capture": {
+    "message": "今すぐ再開"
+  },
+  "popup_pause_detail": {
+    "message": "ダウンロードとマグネットリンクの処理を一時的にブラウザーに任せます。"
+  },
+  "popup_capture_pause_failed": {
+    "message": "一時停止を変更できませんでした。もう一度お試しください。"
+  },
+  "popup_capture_paused": {
+    "message": "再開するまで自動キャプチャは一時停止されます。"
+  },
+  "menu_pause_capture": {
+    "message": "自動キャプチャを一時停止"
+  },
+  "menu_download_directly": {
+    "message": "直接ダウンロード"
+  },
+  "notify_direct_failed": {
+    "message": "ブラウザーでダウンロードを開始できませんでした"
+  },
+  "notify_direct_hint": {
+    "message": "この項目はブラウザーの保存機能で保存してください。"
   }
 }

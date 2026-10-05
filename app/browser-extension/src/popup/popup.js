@@ -1,3 +1,8 @@
+import {
+  CAPTURE_PAUSED_KEY,
+  loadCapturePause,
+  setCapturePaused,
+} from '../lib/capture-pause.js';
 import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
 import { describeStatus, describeTaskState, failureHint, taskName } from '../lib/format.js';
@@ -24,6 +29,7 @@ let settings;
 let instance;
 let online = false;
 let refreshTimer;
+let capturePaused = false;
 /** Bumped when the shown instance changes, so late responses for the old one are dropped. */
 let generation = 0;
 
@@ -35,6 +41,15 @@ async function init() {
   const stored = await ext.storage.local.get(SHOWN_INSTANCE_KEY);
   showInstance(findInstance(settings, stored[SHOWN_INSTANCE_KEY]).id);
   renderCapture();
+  capturePaused = await loadCapturePause();
+  renderCapturePause();
+  $('capture-pause').disabled = false;
+  $('capture-pause').addEventListener('click', onCapturePause);
+  ext.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[CAPTURE_PAUSED_KEY]) return;
+    capturePaused = changes[CAPTURE_PAUSED_KEY].newValue === true;
+    renderCapturePause();
+  });
 
   $('instance-picker').addEventListener('change', (event) => {
     showInstance(event.target.value);
@@ -158,6 +173,27 @@ async function onCaptureChanged(event) {
   const latest = await loadSettings();
   settings = await saveSettings({ ...latest, interceptDownloads: event.target.checked });
   renderCapture();
+}
+
+function renderCapturePause() {
+  $('capture-pause').textContent = capturePaused
+    ? t('popup_resume_capture') : t('popup_pause_capture');
+  const status = $('capture-pause-status');
+  status.hidden = !capturePaused;
+  status.textContent = capturePaused ? t('popup_capture_paused') : '';
+}
+
+async function onCapturePause() {
+  $('capture-pause').disabled = true;
+  try {
+    capturePaused = await setCapturePaused(!capturePaused);
+    renderCapturePause();
+  } catch {
+    $('capture-pause-status').hidden = false;
+    $('capture-pause-status').textContent = t('popup_capture_pause_failed');
+  } finally {
+    $('capture-pause').disabled = false;
+  }
 }
 
 async function onAdd(event) {
