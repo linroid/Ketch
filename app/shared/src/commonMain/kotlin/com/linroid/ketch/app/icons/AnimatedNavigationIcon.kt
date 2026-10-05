@@ -24,10 +24,10 @@ internal const val DEVICES_PHONE =
   "M13.7 8h3.1A1.2 1.2 0 0 1 18 9.2v7.1a1.2 1.2 0 0 1 -1.2 1.2h-3.1a1.2 1.2 0 0 1 -1.2-1.2" +
     "V9.2A1.2 1.2 0 0 1 13.7 8z"
 
-private val DownloadArrow by lazy { IconData.strokes(DOWNLOAD_ARROW).toImageVector("DownloadArrow") }
-private val DownloadTray by lazy { IconData.strokes(DOWNLOAD_TRAY).toImageVector("DownloadTray") }
-private val DevicesDisplay by lazy { IconData.strokes(DEVICES_DISPLAY).toImageVector("DevicesDisplay") }
-private val DevicesPhone by lazy { IconData.strokes(DEVICES_PHONE).toImageVector("DevicesPhone") }
+private val DownloadArrow by lazy { IconData.strokes(DOWNLOAD_ARROW).toImageVector("downloadArrow") }
+private val DownloadTray by lazy { IconData.strokes(DOWNLOAD_TRAY).toImageVector("downloadTray") }
+private val DevicesDisplay by lazy { IconData.strokes(DEVICES_DISPLAY).toImageVector("devicesDisplay") }
+private val DevicesPhone by lazy { IconData.strokes(DEVICES_PHONE).toImageVector("devicesPhone") }
 
 /** A delivery bounce, a phone greeting or a searching sweep, followed by a long rest. */
 @Composable

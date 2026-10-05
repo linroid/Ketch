@@ -21,11 +21,11 @@ internal const val DISCOVER_SPARK =
   "M16.5 1C16.8 2.8 17.2 3.2 19 3.5C17.2 3.8 16.8 4.2 16.5 6" +
     "C16.2 4.2 15.8 3.8 14 3.5C15.8 3.2 16.2 2.8 16.5 1z"
 
-private val Stand by lazy { IconData.strokes(DISCOVER_STAND).toImageVector("DiscoverStand") }
+private val Stand by lazy { IconData.strokes(DISCOVER_STAND).toImageVector("discoverStand") }
 private val Barrel by lazy {
-  IconData.strokes(DISCOVER_BARREL, DISCOVER_EYEPIECE).toImageVector("DiscoverBarrel")
+  IconData.strokes(DISCOVER_BARREL, DISCOVER_EYEPIECE).toImageVector("discoverBarrel")
 }
-private val Spark by lazy { IconData.fills(DISCOVER_SPARK).toImageVector("DiscoverSpark") }
+private val Spark by lazy { IconData.fills(DISCOVER_SPARK).toImageVector("discoverSpark") }
 
 /** Scans once, catches a star, then rests. Reduced motion uses the complete static vector. */
 @Composable
