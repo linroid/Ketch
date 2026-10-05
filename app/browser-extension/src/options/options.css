@@ -69,6 +69,7 @@ section > .muted {
 
 .add-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -145,6 +146,7 @@ section > .muted {
 
 .instance-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -175,6 +177,10 @@ section > h2 + .row {
 
 .row-text small {
   font-size: 12px;
+}
+
+.row > select {
+  flex: 1;
 }
 
 .size-field {

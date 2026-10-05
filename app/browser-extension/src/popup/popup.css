@@ -59,6 +59,11 @@ body {
   padding: 10px 12px 0;
 }
 
+.add > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 .add-message {
   margin: 6px 12px 0;
 }
