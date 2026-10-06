@@ -1,9 +1,9 @@
 # Updates
 
-The desktop app and the native `ketch` command update themselves from the project's
-[GitHub releases](https://github.com/linroid/Ketch/releases). Android, iOS, the web app and the
-browser extension do not: they update through their stores, the hosted page or a new release
-download.
+The desktop app, direct Android build and native `ketch` command update themselves from the
+project's [GitHub releases](https://github.com/linroid/Ketch/releases). The Google Play and iOS
+builds, web app and browser extension update through their stores, the hosted page or a new
+release download.
 
 The shared code lives in the `updater` module (`com.linroid.ketch.updater`), including
 `extractArchive` (`Archives.kt`), which unpacks the command's archives and the portable Windows
@@ -19,8 +19,8 @@ scripts in `src/main/resources/update/`, `install-update-windows-portable.ps1` a
 - Versions come from the tag (`v0.0.1-rc15`) and compare as releases do: a pre-release before
   its release, and `rc9` before `rc15` (`ReleaseVersion`).
 - A release can be published before the workflow uploads its files. Until this system's file is
-  there, the desktop app treats the release as not out yet and the command says to try again
-  later.
+  there, the desktop and direct Android apps treat the release as not out yet; the command says
+  to try again later.
 - `Release.asset` picks the file of this system by the names the release workflow gives them:
   `ketch-cli-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows),
   `ketch-desktop-<version>-<os>-<arch>.dmg`, `.msi` or `.deb`, and
@@ -29,7 +29,8 @@ scripts in `src/main/resources/update/`, `install-update-windows-portable.ps1` a
   `.github/workflows/release.yml` breaks updates of every installed copy.
 - `ReleaseDownloader` downloads the file with a Ketch engine of its own and checks it against the
   SHA-256 digest GitHub computes for each uploaded asset. A file without a digest is refused.
-  Nothing is signed beyond that: the trust comes from GitHub's TLS, as for the install script.
+  The release metadata is trusted through GitHub's TLS. Android also enforces APK signing when
+  replacing the installed app.
 
 ## The command
 
@@ -61,6 +62,37 @@ See the [CLI README](../cli/README.md#update) for the options.
 | Windows | `msiexec /i … /passive`, which upgrades the installed app | Windows asks to allow the change |
 | Windows (portable) | The `-portable.zip` is unpacked while downloading; the script renames the old files aside and the new ones into the app's folder | Needs a writable folder, otherwise the `.zip` opens in Explorer. See [the portable Windows app](#the-portable-windows-app) |
 | Linux | `pkexec dpkg -i` | Asks for the user's password. Without `pkexec` or `dpkg` the `.deb` opens in the system's installer |
+
+## The Android app
+
+Android has two `distribution` flavors with the same application ID:
+
+- **`direct`** is the APK distributed on GitHub. Settings → About → Updates checks for newer
+  releases, downloads the universal `ketch-android-<version>.apk` and verifies GitHub's SHA-256
+  digest. The APK must name this package and release and have a higher Android `versionCode`.
+  Only after validation does Open installer become available. Android checks the signing
+  certificate and asks the user to confirm the update.
+- **`play`** relies on Google Play. It has no updater dependency, update UI, installation
+  activity, update file provider or `REQUEST_INSTALL_PACKAGES` permission, even if sideloaded.
+
+The direct release build checks 30 seconds after the main screen opens and then daily while
+that screen's model lives. It shows a toast for a newer release and another when its download
+is ready. Debug builds check only when asked. The About-page automatic-check switch reuses
+`[desktop] checkForUpdates` for compatibility with the existing shared UI and config schema.
+Checks never download or install without the user choosing to do so.
+
+The APK is saved as `cache/updates/ketch-update.apk`, outside backups, and shared with Android's
+installer through a private FileProvider with a temporary read grant. If Ketch cannot request
+installs yet, it opens Android's **Allow from this source** setting; returning after granting
+permission continues to the installer. Denying permission or canceling installation leaves the
+update ready to retry. If Android clears the cached file, About offers to download it again.
+Rotation keeps an active download; process death requires checking and downloading again.
+
+Build the GitHub APK with `:app:android:assembleDirectRelease`, and the Play bundle with
+`:app:android:bundlePlayRelease`. The release workflow ships the direct APK under its existing
+asset name. Keep the existing application ID, signing key and increasing `-PversionCode` so
+already-installed APKs can upgrade. A debug-signed build cannot install the release-signed APK
+as an update. See [Google Play signing](app-store-listing.md#google-play) for channel changes.
 
 ## The portable Windows app
 
@@ -123,7 +155,7 @@ product with the same UpgradeCode, so changing it would leave installed copies b
 
 ## Limitations
 
-- The builds are not signed or notarized. macOS may ask again for permissions it ties to the
+- The desktop builds are not signed or notarized. macOS may ask again for permissions it ties to the
   app's signature, such as notifications, after an update, and may refuse to let the app replace
   itself (System Settings → Privacy & Security → App Management); the install then leaves the old
   app in place and `update.log` says why.

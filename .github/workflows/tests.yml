@@ -121,9 +121,9 @@ jobs:
 
       - name: Run Android unit tests
         run: >-
-          ./gradlew testDebugUnitTest :library:torrent:testAndroidHostTest
-          :library:core:testAndroidHostTest :library:hls:testAndroidHostTest
-          :library:dash:testAndroidHostTest
+          ./gradlew :app:android:testDirectDebugUnitTest :app:android:testPlayDebugUnitTest
+          :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
+          :library:hls:testAndroidHostTest :library:dash:testAndroidHostTest
 
       - name: Upload test results
         if: always()

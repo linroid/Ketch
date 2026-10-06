@@ -8,6 +8,17 @@ class ReleaseTest {
   private val version = ReleaseVersion(0, 0, 2, "rc1")
 
   @Test
+  fun androidAsset_selectsOnlyThisVersionsUniversalApk() {
+    val release = release(
+      "ketch-android-0.0.1.apk",
+      "ketch-android-0.0.2-rc1-mapping.zip",
+      "ketch-android-0.0.2-rc1.apk",
+    )
+    assertEquals("ketch-android-0.0.2-rc1.apk", release.androidAsset()?.name)
+    assertNull(release("ketch-android-0.0.1.apk").androidAsset())
+  }
+
+  @Test
   fun asset_desktop_usesTheInstallerOfEachSystem() {
     val release = release(
       "ketch-desktop-0.0.2-rc1-macos-arm64.dmg",

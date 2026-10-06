@@ -45,7 +45,7 @@ library/
   server/     # Ktor-based daemon server with REST API, SSE events and mDNS (JVM only)
   mcp/        # MCP server exposing KetchApi as tools for AI agents (JVM only)
 config/       # Multiplatform TOML-based configuration (server, download, remotes, AI, ...)
-updater/      # Self-update from GitHub releases for the desktop app and the CLI (JVM only)
+updater/      # GitHub release updates for desktop, direct Android and CLI (JVM module)
 ai/
   discover/   # LLM agent-driven resource discovery (JVM only, Koog framework)
 app/
@@ -118,7 +118,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `PriorityRequest`, `ConnectionsRequest`, `PairingRequest`, `PairingTicket`, `PairingStatus`,
   `PairingState`
 
-### `updater` (JVM only)
+### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
   `ReleasePlatform`, `ReleaseFeed`, `GitHubReleases`, `ReleaseDownloader`, `UpdateException`,
   `extractArchive()`
@@ -512,6 +512,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   is no tray). The tray lists every device with its own actions, and the macOS menu bar, the
   tray and the Dock menu are generated from `KetchCommands` (`DesktopMenuBar`, `DesktopTray`,
   `TaskbarFeedback` for the Dock and taskbar badge and progress)
+- Self-update (Android): `direct` and `play` distribution flavors; only `direct` supplies
+  `AndroidUpdater` through `LocalAppUpdates` in Settings → About. It reuses `GitHubReleases`
+  and `ReleaseDownloader`, checks the APK package, release version and increasing version code,
+  and hands installation to Android through a private activity and FileProvider. Only this
+  flavor declares `REQUEST_INSTALL_PACKAGES`. Release builds check daily while the main screen's
+  model lives, using the existing `[desktop] checkForUpdates`; debug builds only check manually.
+  GitHub ships `assembleDirectRelease`; Play uses `bundlePlayRelease`. See [updates](docs/updates.md).
 - Self-update (desktop): `DesktopUpdater` implements the shared `AppUpdates`
   (`LocalAppUpdates`, shown in Settings → About and the macOS Help menu); it checks GitHub daily
   while `[desktop] checkForUpdates` is on, downloads this system's installer with the `updater`
@@ -597,8 +604,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   provider to verify changes
 
 ### Self-update (`updater`)
-- Shared by the desktop app and the CLI: `GitHubReleases` reads the latest (or a tagged) release
-  from the GitHub API, `Release.asset` picks the file by the release workflow's names, and
+- Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest (or a tagged)
+  release from the GitHub API, `Release.asset` / `androidAsset` pick the file by the workflow's
+  names, and
   `ReleaseDownloader` downloads it with a private Ketch engine and checks the SHA-256 digest
   GitHub publishes per asset (files without one are refused). Pass it the process's logger:
   every `Ketch` installs its logger globally

@@ -67,8 +67,8 @@ sealed interface AppUpdateState {
 }
 
 /**
- * The app updating itself to the latest release. Only the desktop app provides it, through
- * [LocalAppUpdates]; app stores update the other apps.
+ * The app updating itself to the latest release. The desktop and direct Android builds provide it
+ * through [LocalAppUpdates]; app stores update the other builds.
  */
 interface AppUpdates {
   /** Where the update stands. */

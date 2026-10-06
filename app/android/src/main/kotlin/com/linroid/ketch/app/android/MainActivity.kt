@@ -20,6 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.withStarted
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -39,6 +41,7 @@ import com.linroid.ketch.app.feedback.MessageTap
 import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
@@ -121,11 +124,13 @@ class MainActivity : ComponentActivity() {
         MessageNotifications.open(controller.messages, tap.id, tap.postedAt)
         messageTap = null
       }
-      App(
-        controller,
-        activityEvents = svc.activityEvents,
-        fileLogger = ketchApplication.fileLogger,
-      )
+      CompositionLocalProvider(LocalAppUpdates provides model.updates) {
+        App(
+          controller,
+          activityEvents = svc.activityEvents,
+          fileLogger = ketchApplication.fileLogger,
+        )
+      }
     }
   }
 
@@ -285,6 +290,15 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
       log.d { "Couldn't read the appearance for the splash: ${e.describeCauses()}" }
       AppearanceConfig()
     }
+  }
+
+  /** Only the direct distribution supplies updates; retained across activity recreation. */
+  val updates by lazy {
+    createAppUpdates(
+      scope = viewModelScope,
+      app = getApplication<KetchApplication>(),
+      messages = checkNotNull(controller).messages,
+    )
   }
 
   private var bound = false

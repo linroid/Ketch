@@ -26,6 +26,12 @@ android {
     versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
   }
 
+  flavorDimensions += "distribution"
+  productFlavors {
+    create("direct") { dimension = "distribution" }
+    create("play") { dimension = "distribution" }
+  }
+
   signingConfigs {
     val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
     if (keystoreFile != null) {
@@ -59,6 +65,7 @@ android {
 
   buildFeatures {
     compose = true
+    buildConfig = true
   }
 
   // Android 13+ lists the languages of res/values-* in Ketch's language setting. Each translation
@@ -92,11 +99,14 @@ android {
 // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the app does not
 // use (reflective tool sets and schemas, loading server modules by name). Its R8 rules keep most
 // of it, so release builds leave it out.
-configurations.matching { it.name == "releaseRuntimeClasspath" }.configureEach {
+configurations.matching { it.name.endsWith("ReleaseRuntimeClasspath") }.configureEach {
   exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
 dependencies {
+  "directImplementation"(projects.updater)
+  testImplementation(libs.kotlin.testJunit)
+  testImplementation(libs.kotlinx.coroutines.test)
   implementation(projects.config)
   implementation(projects.app.shared)
   implementation(projects.ai.discover)
