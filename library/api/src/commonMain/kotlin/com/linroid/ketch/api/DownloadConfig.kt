@@ -5,6 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * Global download configuration.
  *
+ * Defaults allow four downloads at once, at most sixteen per host, and four connections per
+ * HTTP(S) or FTP(S) download. The per-host limit counts tasks, not their individual connections.
+ *
  * Can be replaced at runtime with [KetchApi.updateConfig]. [speedLimit],
  * [maxConcurrentDownloads] and [maxConnectionsPerHost] apply immediately. Every other field
  * is read when a download starts or resumes, so a running download keeps the values it
@@ -45,14 +48,14 @@ import kotlinx.serialization.Serializable
 data class DownloadConfig(
   val defaultDirectory: String? = null,
   val retryCount: Int = 3,
-  val retryDelayMs: Long = 1000,
+  val retryDelayMs: Long = 1_000,
   val progressIntervalMs: Long = 200,
-  val saveIntervalMs: Long = 5000,
-  val bufferSize: Int = 8192,
+  val saveIntervalMs: Long = 5_000,
+  val bufferSize: Int = 8 * 1024,
   val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
-  val maxConcurrentDownloads: Int = 2,
+  val maxConcurrentDownloads: Int = 4,
   val maxConnectionsPerDownload: Int = 4,
-  val maxConnectionsPerHost: Int = 8,
+  val maxConnectionsPerHost: Int = 16,
 ) {
   init {
     require(retryCount >= 0) { "retryCount must be non-negative" }
@@ -66,6 +69,7 @@ data class DownloadConfig(
   }
 
   companion object {
-    val Default = DownloadConfig()
+    /** Default settings shared by the engine and its clients. */
+    val Default: DownloadConfig = DownloadConfig()
   }
 }

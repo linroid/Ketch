@@ -35,8 +35,9 @@ port = 8642
 # defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
-maxConcurrentDownloads = 2
-maxConnectionsPerHost = 8
+# Queue limits count downloads, not individual connections; 0 means unlimited.
+maxConcurrentDownloads = 4
+maxConnectionsPerHost = 16
 
 # Advanced settings (defaults are usually fine):
 # retryCount = 3

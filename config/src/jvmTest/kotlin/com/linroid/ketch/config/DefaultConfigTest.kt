@@ -1,5 +1,6 @@
 package com.linroid.ketch.config
 
+import com.linroid.ketch.api.DownloadConfig
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -13,6 +14,7 @@ class DefaultConfigTest {
       KetchConfig.serializer(),
       DEFAULT_CONFIG_CONTENT,
     )
+    assertEquals(DownloadConfig.Default, decoded.download)
     assertEquals(TorrentSettings(), decoded.torrent)
     assertEquals(8642, decoded.server.port)
   }
@@ -29,6 +31,10 @@ class DefaultConfigTest {
 
       val home = System.getProperty("user.home").trimEnd('/', '\\')
       assertEquals("$home/Downloads", config.download.defaultDirectory)
+      assertEquals(
+        DownloadConfig.Default.copy(defaultDirectory = "$home/Downloads"),
+        config.download,
+      )
       // Ktor's CORS allowHost rejects a scheme in the host, failing server startup
       assertEquals(listOf("localhost:3000"), config.server.corsAllowedHosts)
       assertEquals(listOf("$home/Media"), config.server.allowedDirectories)

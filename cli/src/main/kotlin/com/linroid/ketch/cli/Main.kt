@@ -116,10 +116,6 @@ private fun runDownload(args: DownloadArgs.Download) {
   println()
 
   val config = DownloadConfig(
-    maxConnectionsPerDownload = 4,
-    retryCount = 3,
-    retryDelayMs = 1000,
-    progressIntervalMs = 200,
     maxConcurrentDownloads = args.maxConcurrent,
   )
 
