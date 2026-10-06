@@ -37,7 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>下载</b></a> ·
-  <a href="https://youtu.be/l8RCUYQfRrc"><b>观看演示</b></a> ·
+  <a href="https://www.bilibili.com/video/BV1pLHb6GEFT"><b>观看演示</b></a> ·
   <a href="#features"><b>功能</b></a> ·
   <a href="#getting-started"><b>快速上手</b></a> ·
   <a href="docs/developers.md"><b>开发者指南</b></a>
@@ -54,7 +54,7 @@
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ 观看 Ketch 实际演示</b></a>
+  <a href="https://www.bilibili.com/video/BV1pLHb6GEFT"><b>▶ 观看 Ketch 实际演示</b></a>
 </p>
 
 Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连接的进度。
