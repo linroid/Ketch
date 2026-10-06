@@ -146,6 +146,8 @@ dependencies {
   implementation(projects.library.sqlite)
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
+  implementation(projects.library.hls)
+  implementation(projects.library.dash)
   implementation(projects.library.torrent)
   implementation(projects.updater)
   implementation(libs.kotlinx.coroutines.core)

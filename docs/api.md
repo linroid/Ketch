@@ -19,6 +19,8 @@ ketch-sqlite = { module = "com.linroid.ketch:sqlite", version.ref = "ketch" }
 ketch-kermit = { module = "com.linroid.ketch:kermit", version.ref = "ketch" }
 ketch-remote = { module = "com.linroid.ketch:remote", version.ref = "ketch" }
 ketch-ftp = { module = "com.linroid.ketch:ftp", version.ref = "ketch" }
+ketch-hls = { module = "com.linroid.ketch:hls", version.ref = "ketch" }
+ketch-dash = { module = "com.linroid.ketch:dash", version.ref = "ketch" }
 ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
 ```
 
@@ -43,8 +45,8 @@ kotlin {
 }
 ```
 
-`core` targets Android, iOS, JVM, JavaScript (Node.js) and WasmWasi; `ktor`, `sqlite`, `ftp` and
-`torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to control a daemon
+`core`, `hls` and `dash` target Android, iOS, JVM, JavaScript (Node.js) and WasmWasi; `ktor`,
+`sqlite`, `ftp` and `torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to control a daemon
 instead of running the engine in-process.
 
 The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
@@ -178,7 +180,9 @@ val ketch = Ketch(
 ketch.start()
 ```
 
-HTTP(S) is always handled by the built-in source. `additionalSources` adds other protocols:
+The built-in HTTP(S) source is the fallback. `additionalSources` adds other protocols:
+`HlsDownloadSource(httpEngine)` from `library:hls` and `DashDownloadSource(httpEngine)` from
+`library:dash` add [finite media downloads](media.md), sharing `Ketch`'s HTTP engine.
 `FtpDownloadSource` from `library:ftp` and `TorrentDownloadSource` from `library:torrent` (see
 [BitTorrent downloads](torrent.md)), or your own `DownloadSource`. The first source whose
 `canHandle(url)` matches is used. `fileNameResolver` and `dispatchers` can also be replaced.

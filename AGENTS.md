@@ -35,6 +35,8 @@ library/
   core/       # In-process download engine (Android, iOS, JVM, JS/Node, WasmWasi) -- published
   ktor/       # Ktor-based HttpEngine implementation (Android, iOS, JVM) -- published SDK module
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
+  hls/        # Finite HLS DownloadSource (same targets as core) -- published SDK module
+  dash/       # Finite DASH DownloadSource (same targets as core) -- published SDK module
   torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM, iOS) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
@@ -97,6 +99,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.ftp` -- `FtpDownloadSource` (implements `DownloadSource`), `FtpClient`,
   `RealFtpClient`, `FtpUrl`, `FtpReply`, `FtpError`, `FtpResumeState`, `tlsUpgrade()`
   (expect/actual)
+
+### `library:hls`, `library:dash`
+- `com.linroid.ketch.hls` -- `HlsDownloadSource` (`.m3u8`)
+- `com.linroid.ketch.dash` -- `DashDownloadSource` (`.mpd`)
+- Both depend on core's `com.linroid.ketch.core.media` helpers for bounded manifest fetching,
+  URL/header handling and sequential transfer; each owns its parser and tests
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
@@ -208,7 +216,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   reason is not persisted: a `PAUSED` record is a user pause
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
   `DOWNLOADING` records, so the next `start()` resumes them
-- `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`)
+- `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
+  including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
+  plus the legacy `media.finite` when both are present. `DownloadSource.previousTypes` lets
+  stored tasks with the old `media` type route to the matching protocol by URL
 - Retry with exponential backoff for transient errors
 - Persistent task metadata via `TaskStore` interface
 - Unreadable storage never stops a start: `SqliteTaskStore.loadAll` skips (and logs) rows it
@@ -262,7 +273,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### Pluggable Download Sources (`DownloadSource`)
 - `SourceResolver` routes URLs to the appropriate source
 - `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
-- `MediaDownloadSource` is built into core ahead of HTTP: finite, unencrypted `.m3u8` HLS and
+- `HlsDownloadSource` (`library:hls`) and `DashDownloadSource` (`library:dash`) are optional
+  sources, registered by the apps and CLI ahead of HTTP: finite, unencrypted `.m3u8` HLS and
   `.mpd` DASH streams are concatenated into one media file. HLS masters choose the
   highest-bandwidth variant; byte ranges and initialization segments are supported. Transfers
   are sequential and pause/retry restarts from zero. Live streams, encryption and separate
@@ -790,7 +802,7 @@ Planned features not yet implemented:
 
 1. **Metalink** - Multi-source downloads with mirrors, checksums, and chunk verification
 2. **WebDAV** - Download from WebDAV servers with resume support
-3. **More HLS and DASH formats** - Extend the built-in finite media source with variant selection
+3. **More HLS and DASH formats** - Extend the optional HLS/DASH sources with variant selection
    (the reserved `FileSelectionMode.SINGLE`), matching separate audio/video tracks and AES-128
    HLS encryption. Finite, unencrypted single-stream playlists and byte ranges already work
 4. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,

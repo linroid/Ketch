@@ -62,9 +62,10 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
     throw KetchError.Unsupported()
   }
 
-  fun resolveByType(type: String): DownloadSource {
+  fun resolveByType(type: String, url: String? = null): DownloadSource {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.type == type }
+      ?: sources.firstOrNull { url != null && type in it.previousTypes && it.canHandle(url) }
     if (source != null) return source
     log.e { "No source found for type: $type" }
     throw KetchError.Unsupported()

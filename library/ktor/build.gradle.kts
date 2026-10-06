@@ -47,6 +47,8 @@ kotlin {
       implementation(libs.ktor.client.okhttp)
     }
     jvmTest.dependencies {
+      implementation(projects.library.hls)
+      implementation(projects.library.dash)
       implementation(projects.library.sqlite)
       implementation(libs.sqldelight.runtime)
     }

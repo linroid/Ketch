@@ -186,7 +186,8 @@ and write its shortcuts with that platform's keys (`KeyboardPlatform.override`).
 
 ## Other Suites
 
-- iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless
+- iOS simulator tests of `library:core`, `library:ftp`, `library:hls`, `library:dash` and
+  `library:torrent` are skipped unless
   `-PenableIosSimulatorTests=true` is passed to `iosSimulatorArm64Test`; JS tests run on Node.js
   with `jsNodeTest`
 - Test CI sets `testBuildRevision=ci-test` in every job (`ORG_GRADLE_PROJECT_testBuildRevision`).

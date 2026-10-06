@@ -1,9 +1,12 @@
 # Finite media downloads
 
-The core engine recognizes HTTP(S) URLs ending in `.m3u8` or `.mpd` (before query parameters)
-and downloads supported media segments into one file. The browser extension's page resource
-picker includes these playlists. It checks for the instance's `media.finite` capability before
-submitting them. Signed URL query strings are preserved.
+The optional `hls` and `dash` libraries recognize HTTP(S) URLs ending in `.m3u8` and `.mpd`,
+respectively (before query parameters), and download supported segments into one file. The apps
+and CLI register both sources. SDK consumers can install either source independently; core alone
+handles these URLs as ordinary HTTP files. Signed URL query strings are preserved.
+
+The browser extension's page resource picker checks `hls.finite` or `dash.finite` before submitting
+playlists. Instances with both sources also advertise `media.finite` for older clients.
 
 ## Download an m3u8 playlist
 
@@ -16,10 +19,27 @@ ketch 'https://example.com/video/index.m3u8'
 Use a destination directory to keep the media extension chosen by Ketch. An explicit file
 destination is used as given; naming it `.mp4` does not convert a transport stream to MP4.
 
-The SDK uses the same `DownloadRequest` as a regular HTTP download; no additional source or
-external executable is required:
+For the SDK, add either or both dependencies (Android, iOS, JVM, JS/Node.js and WasmWasi):
 
 ```kotlin
+implementation("com.linroid.ketch:hls:<latest-version>")
+implementation("com.linroid.ketch:dash:<latest-version>")
+```
+
+Register the sources with the same HTTP engine supplied to `Ketch`. No external executable is
+required. The example uses `KtorHttpEngine` on Android, iOS or JVM; Node.js and WasmWasi require
+a custom `HttpEngine`.
+
+```kotlin
+import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.dash.DashDownloadSource
+
+val httpEngine = KtorHttpEngine()
+val ketch = Ketch(
+  httpEngine = httpEngine,
+  additionalSources = listOf(HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)),
+)
+ketch.start()
 val task = ketch.download(DownloadRequest(
   url = "https://example.com/video/index.m3u8",
   destination = Destination("downloads/"),
@@ -59,8 +79,11 @@ references cannot downgrade to HTTP.
 
 Custom `HttpEngine` implementations that follow redirects must override `downloadResource`
 and return the final response URL. Relative manifest references resolve against that URL.
-The supplied Ktor engine and network wrappers implement this. Custom download sources still
-take precedence over the built-in media source.
+The supplied Ktor engine and network wrappers implement this. Sources are checked in registration
+order, before the built-in HTTP fallback. Both sources share bounded fetching, URL validation
+and sequential transfer helpers in core; each protocol owns its parser and tests in its own
+module. Existing tasks saved with the former `media` source type route by URL to the installed
+HLS or DASH source when restored.
 
 The common parser tests cover ranges, URL resolution, manifest bounds, timeline expansion,
 credential scoping and unsupported formats. The Ktor integration test downloads self-generated

@@ -11,6 +11,8 @@ dependencies {
   implementation(projects.app.shared)
   implementation(projects.library.core)
   implementation(projects.library.ktor)
+  implementation(projects.library.hls)
+  implementation(projects.library.dash)
   implementation(compose.desktop.currentOs)
   implementation("dev.nucleusframework:nucleus.nucleus-application:2.5.0")
   implementation("dev.nucleusframework:nucleus.decorated-window-tao:2.5.0")

@@ -1,5 +1,9 @@
-package com.linroid.ketch.core.media
+package com.linroid.ketch.dash
 
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.media.MediaPart
+import com.linroid.ketch.core.media.MediaPlan
+import com.linroid.ketch.core.media.mediaUrl
 import kotlin.math.ceil
 
 /** Static, single-adaptation MP4 DASH. Separate tracks must not silently lose their audio. */
@@ -24,7 +28,7 @@ internal fun parseDash(text: String, url: String): MediaPlan {
   for (level in levels) {
     val bases = level.children.filter { it.name == "BaseURL" }
     mediaRequire(bases.size <= 1, "Multiple DASH base URLs are not supported")
-    bases.singleOrNull()?.let { base = mediaUrl(base, it.text.toString().trim()) }
+    bases.singleOrNull()?.let { base = mediaUrl("dash", base, it.text.toString().trim()) }
   }
   val mime = representation.attributes["mimeType"] ?: adaptation.attributes["mimeType"]
   mediaRequire(mime in setOf("video/mp4", "audio/mp4", "application/mp4"),
@@ -34,11 +38,13 @@ internal fun parseDash(text: String, url: String): MediaPlan {
     val list = lists.last()
     val init = list.child("Initialization")
     mediaRequire(init != null, "DASH requires an initialization segment")
-    val parts = mutableListOf(MediaPart(mediaUrl(base, init!!.attributes["sourceURL"].orEmpty()),
-      dashRange(init.attributes["range"])))
+    val parts = mutableListOf(MediaPart(
+      mediaUrl("dash", base, init!!.attributes["sourceURL"].orEmpty()),
+      dashRange(init.attributes["range"])
+    ))
     for (segment in list.children.filter { it.name == "SegmentURL" }) {
       val media = segment.attributes["media"].orEmpty()
-      parts += MediaPart(mediaUrl(base, media), dashRange(segment.attributes["mediaRange"]))
+      parts += MediaPart(mediaUrl("dash", base, media), dashRange(segment.attributes["mediaRange"]))
       mediaRequire(parts.size <= 10_000, "Too many media segments")
     }
     mediaRequire(parts.size > 1, "DASH contains no segments")
@@ -68,11 +74,12 @@ internal fun parseDash(text: String, url: String): MediaPlan {
   }
   var number = attrs["startNumber"]?.toLongOrNull() ?: 1
   mediaRequire(number >= 0, "Invalid DASH start number")
-  val parts = mutableListOf(MediaPart(mediaUrl(base,
+  val parts = mutableListOf(MediaPart(mediaUrl("dash", base,
     expand(initialization!!, representation.attributes, number, 0))))
   fun add(time: Long) {
     mediaRequire(parts.size < 10_000 && number < Long.MAX_VALUE, "Too many media segments")
-    parts += MediaPart(mediaUrl(base, expand(media!!, representation.attributes, number++, time)))
+    parts += MediaPart(mediaUrl("dash", base,
+      expand(media!!, representation.attributes, number++, time)))
   }
   val timeline = templates.lastOrNull { it.child("SegmentTimeline") != null }
     ?.child("SegmentTimeline")
@@ -162,4 +169,8 @@ private fun expand(template: String, attrs: Map<String, String>, number: Long, t
     }
   mediaRequire('$' !in expanded, "Unsupported DASH template variable")
   return expanded.replace('\u0000', '$')
+}
+
+internal fun mediaRequire(value: Boolean, message: String) {
+  if (!value) throw KetchError.SourceError("dash", detail = message)
 }

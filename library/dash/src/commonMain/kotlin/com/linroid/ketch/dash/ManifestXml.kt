@@ -1,4 +1,4 @@
-package com.linroid.ketch.core.media
+package com.linroid.ketch.dash
 
 internal class XmlElement(val qualifiedName: String, val attributes: Map<String, String>) {
   val name: String = qualifiedName.substringAfter(':')

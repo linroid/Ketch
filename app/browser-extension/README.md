@@ -320,7 +320,8 @@ language, copy a translation's folder under the language's
 [locale code](https://developer.chrome.com/docs/extensions/reference/api/i18n#locales), translate
 it and set `language_tag` to the language's tag, such as `pt-BR`.
 
-Streaming playlists in the resource picker require a server advertising `media.finite`.
+Streaming playlists in the resource picker require `hls.finite` for HLS or `dash.finite` for
+DASH. The combined `media.finite` capability is also accepted for older servers.
 Finite, unencrypted, single-stream HLS and static MP4 DASH are supported within the
 [media engine's documented limits](../../docs/media.md). Live or encrypted streams and
 separate tracks that require merging are rejected by the engine.
