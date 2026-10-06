@@ -9,6 +9,15 @@
 <h1 align="center">Ketch</h1>
 
 <p align="center">
+  <b>English</b> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.es.md">Español</a> ·
+  <a href="README.ja.md">日本語</a> ·
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
+
+<p align="center">
   <b>A fast, open-source download manager for every device you own.</b><br>
   macOS · Windows · Linux · Android · iOS · Web · Command line<br>
   A Kotlin Multiplatform library you can embed in your own application.

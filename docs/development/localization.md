@@ -34,6 +34,16 @@ Simplified Chinese set up with a Hong Kong region still reads Simplified; see
 
 Right-to-left languages are not supported yet: nothing has been checked in mirrored layouts.
 
+## README translations
+
+The root `README.md` is the English source. Full translations live beside it in
+`README.zh-CN.md`, `README.es.md`, `README.ja.md`, `README.de.md` and `README.fr.md`.
+Each README links to all the others at the top, with language names written in their own language.
+
+When changing the README, keep the translations in sync, including feature limits and roadmap items.
+Use the glossary and existing UI labels, preserve command examples and link destinations, and keep
+the explicit navigation anchors in translated files. Linked technical documentation remains in English.
+
 ## Where text lives
 
 - **Shared UI** (`app/shared`): `src/commonMain/composeResources/values/strings_<area>.xml`, one
