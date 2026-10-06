@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>Download</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>Watch demo</b></a> ·
   <a href="#features"><b>Features</b></a> ·
   <a href="#getting-started"><b>Getting started</b></a> ·
   <a href="docs/developers.md"><b>For developers</b></a>
@@ -48,6 +49,10 @@
     <source media="(prefers-color-scheme: light)" srcset="art/showcase-light.png">
     <img alt="Ketch on the desktop, Android, iOS and the command line: the downloads table with each download split into live connection lanes, the devices on Android, a download's connections on iOS, and ketch in a terminal" src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Watch Ketch in action</b></a>
 </p>
 
 Ketch splits every download across parallel connections, and shows each one as a live lane. It

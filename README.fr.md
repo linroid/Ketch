@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>Télécharger</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>Voir la démo</b></a> ·
   <a href="#features"><b>Fonctionnalités</b></a> ·
   <a href="#getting-started"><b>Premiers pas</b></a> ·
   <a href="docs/developers.md"><b>Pour les développeurs</b></a>
@@ -50,6 +51,10 @@
       alt="Ketch sur ordinateur, Android, iOS et en ligne de commande : tableau des téléchargements avec les connexions en temps réel, appareils sur Android, connexions sur iOS et ketch dans un terminal"
       src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Voir Ketch en action</b></a>
 </p>
 
 Ketch répartit chaque téléchargement entre plusieurs connexions parallèles et affiche chacune en

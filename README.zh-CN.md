@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>下载</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>观看演示</b></a> ·
   <a href="#features"><b>功能</b></a> ·
   <a href="#getting-started"><b>快速上手</b></a> ·
   <a href="docs/developers.md"><b>开发者指南</b></a>
@@ -50,6 +51,10 @@
       alt="Ketch 桌面端、Android、iOS 和命令行：下载列表中的实时连接通道、Android 上的设备、iOS 上的下载连接以及终端中的 ketch"
       src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ 观看 Ketch 实际演示</b></a>
 </p>
 
 Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连接的进度。
