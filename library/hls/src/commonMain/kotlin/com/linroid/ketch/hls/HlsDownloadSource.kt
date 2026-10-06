@@ -41,7 +41,7 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource {
     helper.buildResumeState()
 
   private suspend fun plan(original: String, headers: Map<String, String>): MediaPlan {
-    var url = mediaUrl(original, original)
+    var url = mediaUrl("hls", original, original)
     var requestHeaders = headers
     val visited = mutableSetOf<String>()
     repeat(4) {

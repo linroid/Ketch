@@ -2,12 +2,14 @@ package com.linroid.ketch.core.media
 
 import com.linroid.ketch.api.KetchError
 
-internal fun mediaRequire(value: Boolean, message: String) {
-  if (!value) throw KetchError.SourceError("media", detail = message)
-}
-
-/** Resolve HTTP references without interpreting query parameters or decoding signed paths. */
-fun mediaUrl(base: String, reference: String): String {
+/**
+ * Resolves HTTP references without interpreting query parameters or decoding signed paths.
+ * Invalid references throw [KetchError.SourceError] identifying [sourceType].
+ */
+fun mediaUrl(sourceType: String, base: String, reference: String): String {
+  fun mediaRequire(value: Boolean, message: String) {
+    if (!value) throw KetchError.SourceError(sourceType, detail = message)
+  }
   val ref = reference.trim().substringBefore('#')
   mediaRequire(ref.length <= 8192 && ref.none { it <= ' ' || it == '\\' }, "Invalid media URL")
   val root = HTTP_URL.matchEntire(base.substringBefore('#'))

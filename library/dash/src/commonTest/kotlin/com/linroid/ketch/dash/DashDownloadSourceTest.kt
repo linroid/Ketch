@@ -36,6 +36,36 @@ class DashDownloadSourceTest {
   }
 
   @Test
+  fun resolve_invalidUrls_reportProtocolType() = runTest {
+    val manifest = MediaEngine().manifest
+    for (url in listOf(
+      "https://example.com/bad path.mpd",
+      "https://user:secret@example.com/index.mpd",
+      "file:///index.mpd"
+    )) {
+      val source = DashDownloadSource(MediaEngine())
+      val error = assertFailsWith<KetchError.SourceError> { source.resolve(url) }
+      assertEquals("dash", error.sourceType)
+    }
+    for (reference in listOf(
+      "https://example.com/bad path",
+      "https://user:secret@example.com/part",
+      "file:///part",
+      "http://example.com/part"
+    )) {
+      val engines = listOf(
+        MediaEngine(responseUrl = reference),
+        MediaEngine(manifest = manifest.replace("a.mp4", reference))
+      )
+      for (engine in engines) {
+        val source = DashDownloadSource(engine)
+        val error = assertFailsWith<KetchError.SourceError> { source.resolve(engine.url) }
+        assertEquals("dash", error.sourceType)
+      }
+    }
+  }
+
+  @Test
   fun download_redirectedPlaylist_joinsSegmentsAndScopesCredentials() = runTest {
     val engine = MediaEngine()
     val source = DashDownloadSource(engine)
@@ -84,6 +114,7 @@ class DashDownloadSourceTest {
         <SegmentList><Initialization sourceURL="a.mp4"/><SegmentURL media="b.m4s"/></SegmentList>
       </Representation></AdaptationSet></Period></MPD>
     """.trimIndent(),
+    val responseUrl: String = "https://cdn.example/media/list.mpd",
   ) : HttpEngine {
     val url = "https://example.com/index.mpd"
     val parts = mutableListOf<Pair<String, Map<String, String>>>()
@@ -95,7 +126,7 @@ class DashDownloadSourceTest {
       onData: suspend (ByteArray) -> Unit,
     ): String {
       onData(manifest.encodeToByteArray())
-      return "https://cdn.example/media/list.mpd"
+      return responseUrl
     }
     override suspend fun download(
       url: String,

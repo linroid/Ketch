@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
@@ -7,6 +8,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -27,6 +29,8 @@ class KetchFeaturesTest {
       }
       val ketch = Ketch(
         httpEngine = engine,
+        // Android host tests have no application context to resolve the default folder.
+        config = DownloadConfig(defaultDirectory = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.toString()),
         additionalSources = sources,
         dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
       )

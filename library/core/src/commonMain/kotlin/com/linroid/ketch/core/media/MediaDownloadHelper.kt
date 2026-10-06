@@ -66,13 +66,13 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
 
   /** Fetches at most 1 MiB and retains the final URL and headers safe for that origin. */
   suspend fun fetchManifest(url: String, headers: Map<String, String>): MediaManifest {
-    val checked = mediaUrl(url, url)
+    val checked = mediaUrl(type, url, url)
     val buffer = Buffer()
     val effective = http.downloadResource(checked, headers) { bytes ->
       mediaRequire(buffer.size + bytes.size <= 1024 * 1024, "Media manifest exceeds 1 MiB")
       buffer.write(bytes)
     }
-    val base = mediaUrl(checked, effective)
+    val base = mediaUrl(type, checked, effective)
     return MediaManifest(buffer.readUtf8(), base, mediaHeaders(checked, base, headers))
   }
 

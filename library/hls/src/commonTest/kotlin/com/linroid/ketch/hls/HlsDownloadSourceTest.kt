@@ -36,6 +36,36 @@ class HlsDownloadSourceTest {
   }
 
   @Test
+  fun resolve_invalidUrls_reportProtocolType() = runTest {
+    val manifest = MediaEngine().manifest
+    for (url in listOf(
+      "https://example.com/bad path.m3u8",
+      "https://user:secret@example.com/index.m3u8",
+      "file:///index.m3u8"
+    )) {
+      val source = HlsDownloadSource(MediaEngine())
+      val error = assertFailsWith<KetchError.SourceError> { source.resolve(url) }
+      assertEquals("hls", error.sourceType)
+    }
+    for (reference in listOf(
+      "https://example.com/bad path",
+      "https://user:secret@example.com/part",
+      "file:///part",
+      "http://example.com/part"
+    )) {
+      val engines = listOf(
+        MediaEngine(responseUrl = reference),
+        MediaEngine(manifest = manifest.replace("a.ts", reference))
+      )
+      for (engine in engines) {
+        val source = HlsDownloadSource(engine)
+        val error = assertFailsWith<KetchError.SourceError> { source.resolve(engine.url) }
+        assertEquals("hls", error.sourceType)
+      }
+    }
+  }
+
+  @Test
   fun download_redirectedPlaylist_joinsSegmentsAndScopesCredentials() = runTest {
     val engine = MediaEngine()
     val source = HlsDownloadSource(engine)
@@ -80,6 +110,7 @@ class HlsDownloadSourceTest {
 
   private class MediaEngine(
     val manifest: String = "#EXTM3U\n#EXTINF:1,\na.ts\n#EXTINF:1,\nb.ts\n#EXT-X-ENDLIST",
+    val responseUrl: String = "https://cdn.example/media/list.m3u8",
   ) : HttpEngine {
     val url = "https://example.com/index.m3u8"
     val parts = mutableListOf<Pair<String, Map<String, String>>>()
@@ -91,7 +122,7 @@ class HlsDownloadSourceTest {
       onData: suspend (ByteArray) -> Unit,
     ): String {
       onData(manifest.encodeToByteArray())
-      return "https://cdn.example/media/list.m3u8"
+      return responseUrl
     }
     override suspend fun download(
       url: String,

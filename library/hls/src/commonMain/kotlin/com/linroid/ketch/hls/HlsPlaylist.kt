@@ -37,7 +37,7 @@ internal fun parseHls(text: String, base: String): HlsPlaylist {
         val attrs = attributes(line.substringAfter(':'))
         val uri = attrs["URI"]
         mediaRequire(uri != null, "Missing HLS initialization URL")
-        val part = MediaPart(mediaUrl(base, uri!!), attrs["BYTERANGE"]?.let {
+        val part = MediaPart(mediaUrl("hls", base, uri!!), attrs["BYTERANGE"]?.let {
           hlsRange(it, null)
         })
         mediaRequire(previous == null || init != null, "Late HLS initialization is not supported")
@@ -48,7 +48,7 @@ internal fun parseHls(text: String, base: String): HlsPlaylist {
       line.startsWith("#EXTINF:") -> duration = true
       line.isEmpty() || line.startsWith('#') -> Unit
       else -> {
-        val url = mediaUrl(base, line)
+        val url = mediaUrl("hls", base, line)
         val variant = stream
         if (variant != null) {
           variants += HlsVariant(url, variant["BANDWIDTH"]?.toLongOrNull() ?: 0)
