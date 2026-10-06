@@ -9,7 +9,9 @@ import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.hls.HlsDownloadSource
 import dev.nucleusframework.application.DecoratedWindow
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.nucleusApplication
@@ -20,7 +22,13 @@ fun main(args: Array<String>): Unit = nucleusApplication(args = args, backend = 
     InstanceManager(
       factory = InstanceFactory(
         deviceName = "Native Image prototype",
-        embeddedFactory = { Ketch(httpEngine = KtorHttpEngine()) },
+        embeddedFactory = {
+          val httpEngine = KtorHttpEngine()
+          Ketch(
+            httpEngine = httpEngine,
+            additionalSources = listOf(HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)),
+          )
+        },
       ),
     )
   }

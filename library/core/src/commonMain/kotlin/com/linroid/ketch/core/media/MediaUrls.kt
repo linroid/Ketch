@@ -7,7 +7,7 @@ internal fun mediaRequire(value: Boolean, message: String) {
 }
 
 /** Resolve HTTP references without interpreting query parameters or decoding signed paths. */
-internal fun mediaUrl(base: String, reference: String): String {
+fun mediaUrl(base: String, reference: String): String {
   val ref = reference.trim().substringBefore('#')
   mediaRequire(ref.length <= 8192 && ref.none { it <= ' ' || it == '\\' }, "Invalid media URL")
   val root = HTTP_URL.matchEntire(base.substringBefore('#'))
@@ -42,7 +42,8 @@ internal fun mediaUrl(base: String, reference: String): String {
     segments.joinToString("/") + suffix + parsed.groupValues[4]
 }
 
-internal fun mediaHeaders(
+/** Keeps credentials on the same origin and only safe headers when crossing origins. */
+fun mediaHeaders(
   from: String,
   to: String,
   headers: Map<String, String>,

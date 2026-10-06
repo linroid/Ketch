@@ -26,6 +26,16 @@ interface DownloadSource {
   /** Unique identifier for this source type (e.g., "http", "torrent"). */
   val type: String
 
+  /** Optional capabilities contributed to the instance's status by this source. */
+  val features: Set<String> get() = emptySet()
+
+  /**
+   * Former source type names accepted for stored or pre-resolved tasks.
+   * A former type matches only when [canHandle] also accepts the task URL.
+   * An exact type match takes precedence over these migration aliases.
+   */
+  val previousTypes: Set<String> get() = emptySet()
+
   /**
    * Whether this source manages its own file I/O instead of using
    * [DownloadContext.fileAccessor]. When `true`, the download engine

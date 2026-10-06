@@ -88,7 +88,9 @@ export async function submitDownload(client, endpoint, request, options = {}) {
     throw uncertainError();
   }
   const status = await client.status();
-  if (/\.(m3u8|mpd)(?:[?#]|$)/i.test(request.url) &&
+  const playlist = /\.(m3u8|mpd)(?:[?#]|$)/i.exec(request.url);
+  const feature = playlist?.[1].toLowerCase() === 'm3u8' ? 'hls.finite' : 'dash.finite';
+  if (playlist && !status.features?.includes(feature) &&
     !status.features?.includes('media.finite')) {
     throw new KetchRequestError(FailureKind.REJECTED, t('error_media_unsupported'));
   }

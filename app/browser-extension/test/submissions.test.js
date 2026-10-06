@@ -101,3 +101,25 @@ test('media playlists require the advertised engine capability before a write', 
   await submitDownload(client, endpoint, media, { storage: journal });
   assert.equal(writes, 1);
 });
+
+for (const [extension, feature, otherFeature] of [
+  ['m3u8', 'hls.finite', 'dash.finite'],
+  ['mpd', 'dash.finite', 'hls.finite'],
+]) {
+  test(`${extension} requires its own capability when sources are installed separately`, async () => {
+    let writes = 0;
+    const client = {
+      status: async () => ({ features: [otherFeature] }),
+      createTask: async (request) => { writes++; return { taskId: 'stream', request }; },
+    };
+    const request = { url: `https://example.com/clip.${extension}?token=123` };
+    const journal = storage();
+    await assert.rejects(submitDownload(client, endpoint, request, { storage: journal }),
+      { kind: 'rejected' });
+    assert.equal(writes, 0);
+    assert.deepEqual(await pendingSubmissions(journal), []);
+    client.status = async () => ({ features: [feature] });
+    await submitDownload(client, endpoint, request, { storage: journal });
+    assert.equal(writes, 1);
+  });
+}

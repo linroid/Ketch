@@ -91,7 +91,9 @@ import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
@@ -576,13 +578,17 @@ private fun createInstanceManager(
     factory = InstanceFactory(
       deviceName = instanceName,
       embeddedFactory = {
+        val httpEngine = KtorHttpEngine.withNetworkInterfaces()
         Ketch(
-          httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+          httpEngine = httpEngine,
           taskStore = taskStore,
           config = config.download,
           name = instanceName,
           logger = launch.logger,
-          additionalSources = listOf(FtpDownloadSource(), torrentSource),
+          additionalSources = listOf(
+            FtpDownloadSource(), torrentSource,
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+          ),
         ).also(launch.extensionServer::attach)
       },
       localServerFactory = { ketchApi, pairingRequests ->

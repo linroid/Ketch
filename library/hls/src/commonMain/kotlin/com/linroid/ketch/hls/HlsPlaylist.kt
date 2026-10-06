@@ -1,7 +1,9 @@
-package com.linroid.ketch.core.media
+package com.linroid.ketch.hls
 
-internal data class MediaPart(val url: String, val range: LongRange? = null)
-internal data class MediaPlan(val parts: List<MediaPart>, val extension: String)
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.media.MediaPart
+import com.linroid.ketch.core.media.MediaPlan
+import com.linroid.ketch.core.media.mediaUrl
 internal data class HlsVariant(val url: String, val bandwidth: Long)
 internal data class HlsPlaylist(val plan: MediaPlan?, val variants: List<HlsVariant>)
 
@@ -107,4 +109,8 @@ private fun attributes(value: String): Map<String, String> {
     offset = match.range.last + 1
   }
   return result
+}
+
+internal fun mediaRequire(value: Boolean, message: String) {
+  if (!value) throw KetchError.SourceError("hls", detail = message)
 }

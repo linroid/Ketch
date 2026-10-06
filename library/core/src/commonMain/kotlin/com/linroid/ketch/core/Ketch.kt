@@ -53,7 +53,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import com.linroid.ketch.core.media.MediaDownloadSource
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -107,8 +106,18 @@ class Ketch(
   private val httpSource = HttpDownloadSource(httpEngine)
 
   private val sourceResolver = SourceResolver(
-    additionalSources + listOf(MediaDownloadSource(httpEngine), httpSource),
+    additionalSources + httpSource,
   )
+
+  private val features: Set<String> = buildSet {
+    add(KetchFeatures.AUTO_CONNECTIONS)
+    add(KetchFeatures.QUEUE_POSITION)
+    add(KetchFeatures.REQUEST_ID)
+    additionalSources.forEach { addAll(it.features) }
+    if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
+      add(KetchFeatures.FINITE_MEDIA)
+    }
+  }
 
   override val backendLabel: String = "Core"
 
@@ -253,7 +262,7 @@ class Ketch(
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = config,
       system = currentSystemInfo(config.defaultDirectory),
-      features = KetchFeatures.ALL,
+      features = features,
     )
   }
 

@@ -1,5 +1,9 @@
-package com.linroid.ketch.core.media
+package com.linroid.ketch.dash
 
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.media.MediaPart
+import com.linroid.ketch.core.media.MediaPlan
+import com.linroid.ketch.core.media.mediaUrl
 import kotlin.math.ceil
 
 /** Static, single-adaptation MP4 DASH. Separate tracks must not silently lose their audio. */
@@ -162,4 +166,8 @@ private fun expand(template: String, attrs: Map<String, String>, number: Long, t
     }
   mediaRequire('$' !in expanded, "Unsupported DASH template variable")
   return expanded.replace('\u0000', '$')
+}
+
+internal fun mediaRequire(value: Boolean, message: String) {
+  if (!value) throw KetchError.SourceError("dash", detail = message)
 }
