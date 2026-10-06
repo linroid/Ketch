@@ -43,8 +43,10 @@ iconutil -c icns "$tmp/icon.iconset" -o icon.icns
 render icon-square.svg 1024 "$root/app/ios/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
 
 # Browser extension
+mkdir -p browser-extension
 for size in 16 32 48 128; do
-  render icon-app.svg "$size" "$root/app/browser-extension/src/icons/icon-$size.png"
+  render icon-app.svg "$size" "browser-extension/icon-$size.png"
+  cp "browser-extension/icon-$size.png" "$root/app/browser-extension/src/icons/icon-$size.png"
 done
 
 # Web app

@@ -56,6 +56,17 @@ installable app. Until the extension is in the browser stores:
   enable the extension in Safari. See [Safari packaging](#safari-limited-macos-target) for
   the converter command and setup instructions.
 
+### Store submission
+
+Run `npm run build` and upload `build/ketch-extension-<version>-chrome-store.zip` to the
+Chrome Web Store or Edge Add-ons. Release CI also attaches this package to each GitHub release.
+Its manifest omits the development `key`, which the Chrome Web Store rejects on upload.
+The ordinary `chrome.zip` is for unpacked installation and keeps that key.
+
+After the store assigns an extension ID, add it to
+`NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in `app/desktop` before publishing a desktop
+release that supports the store extension's native app launching.
+
 ## Setting up Ketch
 
 - **Ketch app on this computer (Chromium/Firefox)**: install the desktop app and open it once. It registers itself
@@ -237,18 +248,20 @@ Chromium build, so it can be loaded as is while developing:
 
 ```shell
 npm test        # unit tests, with Node's built-in test runner (Node 22.3+)
-npm run build   # build/chrome, build/firefox and a zip of each
+npm run build   # build/chrome, build/chrome-store, build/firefox, build/safari and their zips
 ```
 
 The `key` in `src/manifest.json` pins the Chromium extension id to
 `kddcjkhnjcjhekohejnehplbnjclbdbl`, whether it is loaded unpacked or from a release zip, because
 the Ketch app only lets the ids it lists start its host (`NativeHostRegistration` in
 `app/desktop`). Extension stores assign their own id: add it there when publishing, and leave the
-`key` out of a store upload. Firefox identifies the add-on by its gecko id instead.
+`key` out of a store upload by using `chrome-store.zip`. Firefox identifies the add-on by its
+gecko id instead.
 
-The build copies `src/`, rewrites the manifest for Firefox (an event page instead of a service
-worker, its add-on id, and no `key`), checks that every file the manifest names exists, and zips
-each build. Keep `version` in `package.json` and `src/manifest.json` the same; the build fails
+The build copies `src/`, removes the `key` for the Chromium store target, rewrites the manifest
+for Firefox (an event page instead of a service worker, its add-on id, and no `key`), checks that
+every file the manifest names exists, and zips each build. Keep `version` in `package.json` and
+`src/manifest.json` the same; the build fails
 otherwise. The icons are rendered from the repository's `art/icon-app.svg` by
 `art/render-icons.sh`.
 

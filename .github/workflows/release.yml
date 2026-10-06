@@ -350,6 +350,7 @@ jobs:
 
       # Manifests only take numeric versions: the run number keeps each release newer than the
       # last one, and Chromium displays the tag's version.
+      # Includes chrome-store.zip without the development key for store submissions.
       - name: Build browser extension packages
         run: node build.mjs --version "${KETCH_VERSION#v}" --build "${{ github.run_number }}"
 

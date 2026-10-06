@@ -3,6 +3,7 @@
  * Builds the extension for each browser family from `src/`:
  *
  *   build/chrome/    Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers
+ *   build/chrome-store/   Chromium store upload without the development key
  *   build/firefox/   Firefox
  *   build/ketch-extension-<version>-<browser>.zip   packages for releases and extension stores
  *
@@ -61,7 +62,14 @@ export function releaseVersion(release, build) {
 function targetManifests({ version: manifestVersion, versionName }) {
   const base = { ...manifest, version: manifestVersion };
   const chrome = versionName === manifestVersion ? base : { ...base, version_name: versionName };
-  return { chrome, firefox: firefoxManifest(base), safari: safariManifest(base) };
+  // Store uploads must omit the key; local installs need it for native host authorization.
+  const { key: _key, ...chromeStore } = chrome;
+  return {
+    chrome,
+    'chrome-store': chromeStore,
+    firefox: firefoxManifest(base),
+    safari: safariManifest(base),
+  };
 }
 
 /**

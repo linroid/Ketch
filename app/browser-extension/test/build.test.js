@@ -3,6 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
+import { inflateRawSync } from 'node:zlib';
 import { build, releaseVersion } from '../build.mjs';
 
 describe('releaseVersion', () => {
@@ -32,7 +33,23 @@ describe('build', () => {
   const outputs = build({ outDir });
 
   test('builds for Chromium, Firefox and Safari', () => {
-    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox', 'safari']);
+    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'chrome-store', 'firefox', 'safari']);
+  });
+
+  test('store zip omits the development key while the local zip keeps it', () => {
+    const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+    assert.ok(source.key);
+    const manifests = {};
+    for (const browser of ['chrome', 'chrome-store']) {
+      const { dir, zip } = outputs.find((it) => it.browser === browser);
+      const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
+      assert.deepEqual(packaged, JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
+      manifests[browser] = packaged;
+    }
+    assert.equal(manifests.chrome.key, source.key);
+    assert.ok(!Object.hasOwn(manifests['chrome-store'], 'key'));
+    const { key: _key, ...local } = manifests.chrome;
+    assert.deepEqual(manifests['chrome-store'], local);
   });
 
   test('every build and zip has the messages of every language', () => {
@@ -54,6 +71,42 @@ describe('build', () => {
     }
   });
 });
+
+test('store and local packages use the same release version', () => {
+  const outDir = mkdtempSync(join(tmpdir(), 'ketch-store-build-'));
+  try {
+    const outputs = build({ outDir, release: '1.2.3-rc1', buildNumber: '57' });
+    for (const browser of ['chrome', 'chrome-store']) {
+      const { zip } = outputs.find((it) => it.browser === browser);
+      assert.equal(zip, join(outDir, `ketch-extension-1.2.3-rc1-${browser}.zip`));
+      const manifest = JSON.parse(zipEntry(zip, 'manifest.json'));
+      assert.equal(manifest.version, '1.2.3.57');
+      assert.equal(manifest.version_name, '1.2.3-rc1');
+      assert.equal(Object.hasOwn(manifest, 'key'), browser === 'chrome');
+    }
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+/** Reads an entry from the build's deflated ZIP, including its root-relative file name. */
+function zipEntry(path, name) {
+  const zip = readFileSync(path);
+  let offset = 0;
+  while (zip.readUInt32LE(offset) === 0x04034b50) {
+    const size = zip.readUInt32LE(offset + 18);
+    const nameLength = zip.readUInt16LE(offset + 26);
+    const extraLength = zip.readUInt16LE(offset + 28);
+    const entryName = zip.toString('utf8', offset + 30, offset + 30 + nameLength);
+    const start = offset + 30 + nameLength + extraLength;
+    if (entryName === name) {
+      assert.equal(zip.readUInt16LE(offset + 8), 8, 'entry uses deflate');
+      return inflateRawSync(zip.subarray(start, start + size)).toString('utf8');
+    }
+    offset = start + size;
+  }
+  assert.fail(`Missing ZIP entry: ${name}`);
+}
 
 test('Safari excludes capture and native-host permissions while retaining manual sending', () => {
   const outDir = mkdtempSync(join(tmpdir(), 'ketch-safari-build-'));
