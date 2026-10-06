@@ -71,7 +71,7 @@ available on Maven Central. [Start integrating Ketch →](docs/developers.md#qui
 | Linux (x64, ARM64) | `.deb` from the [latest release][release] |
 | Android 8.0+ | `.apk` from the [latest release][release] |
 | iOS 18+ | Build from source with Xcode ([`app/ios`](app/ios/)) |
-| Web | [linroid.com/Ketch](https://linroid.com/Ketch/), to control Ketch running on another device |
+| Web | [linroid.github.io/Ketch](http://linroid.github.io/Ketch), to control Ketch running on another device |
 | Browser extension | Chrome, Edge, Brave, Firefox and others: `.zip` from the [latest release][release] ([how to install](app/browser-extension/README.md#installing)) |
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |
 
