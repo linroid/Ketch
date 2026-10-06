@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>Descargar</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>Ver demo</b></a> ·
   <a href="#features"><b>Funciones</b></a> ·
   <a href="#getting-started"><b>Primeros pasos</b></a> ·
   <a href="docs/developers.md"><b>Para desarrolladores</b></a>
@@ -50,6 +51,10 @@
       alt="Ketch en escritorio, Android, iOS y la línea de comandos: tabla de descargas con canales de conexión en tiempo real, dispositivos en Android, conexiones de una descarga en iOS y ketch en una terminal"
       src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Ver Ketch en acción</b></a>
 </p>
 
 Ketch divide cada descarga entre conexiones paralelas y muestra cada una como un canal en tiempo

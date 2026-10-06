@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>ダウンロード</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>デモを見る</b></a> ·
   <a href="#features"><b>機能</b></a> ·
   <a href="#getting-started"><b>使い方</b></a> ·
   <a href="docs/developers.md"><b>開発者向け</b></a>
@@ -50,6 +51,10 @@
       alt="デスクトップ、Android、iOS、コマンドラインの Ketch：接続ごとの進捗を表示するダウンロード一覧、Android のデバイス一覧、iOS の接続一覧、ターミナルの ketch"
       src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Ketch の動作を見る</b></a>
 </p>
 
 Ketch はダウンロードを複数の並列接続に分割し、それぞれの進捗をリアルタイムで表示します。

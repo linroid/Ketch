@@ -37,6 +37,7 @@
 
 <p align="center">
   <a href="#download"><b>Herunterladen</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>Demo ansehen</b></a> ·
   <a href="#features"><b>Funktionen</b></a> ·
   <a href="#getting-started"><b>Erste Schritte</b></a> ·
   <a href="docs/developers.md"><b>Für Entwickler</b></a>
@@ -50,6 +51,10 @@
       alt="Ketch auf Desktop, Android, iOS und in der Kommandozeile: Downloadtabelle mit Live-Verbindungsspuren, Geräte auf Android, Verbindungen eines Downloads auf iOS und ketch im Terminal"
       src="art/showcase-light.png" width="100%">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Ketch in Aktion ansehen</b></a>
 </p>
 
 Ketch verteilt jeden Download auf parallele Verbindungen und zeigt jede als Spur mit
