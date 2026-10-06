@@ -15,6 +15,11 @@ data class Release(
   val pageUrl: String,
   val assets: List<ReleaseAsset>,
 ) {
+  /** The universal Android APK published by the release workflow, or `null` before upload. */
+  fun androidAsset(): ReleaseAsset? = assets.firstOrNull {
+    it.name == "ketch-android-$version.apk"
+  }
+
   /** The file of [product] for [platform], or `null` when this release has none. */
   fun asset(product: ReleaseProduct, platform: ReleasePlatform): ReleaseAsset? =
     product.fileNames(version, platform).firstNotNullOfOrNull { name ->

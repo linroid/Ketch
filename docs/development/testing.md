@@ -66,6 +66,23 @@ runs on Windows; CI runs it in a Windows job of its own:
 ./gradlew :app:desktop:test --tests '*WindowsPortableScriptTest*'
 ```
 
+## Android distributions
+
+```shell
+./gradlew :app:android:testDirectDebugUnitTest :app:android:testPlayDebugUnitTest \
+  :app:android:assembleDirectDebug :app:android:assemblePlayDebug
+```
+
+The direct flavor's tests cover update selection, progress, retries, automatic checks, and APK
+package/version validation. Shared checksum and release-feed tests run with `:updater:test`.
+Check the merged manifests when changing distribution wiring: only `direct` may contain
+`REQUEST_INSTALL_PACKAGES`, `UpdateInstallActivity` and `UpdateFileProvider`.
+
+For an installation smoke test, use two direct release APKs signed with the same key and a higher
+`versionCode` in the update. Exercise permission denial and grant, rotation on the permission
+screen, canceling and retrying the installer, and a successful update retaining settings/tasks.
+Debug signing cannot replace a release-signed installation. See [updates](../updates.md).
+
 ## Desktop Startup Memory
 
 The desktop launcher uses `-Xms32m -Xmx512m`. The limit covers the Java heap, not native

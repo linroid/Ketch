@@ -38,7 +38,7 @@ enum class DockBadgeMode {
 /**
  * Desktop app behavior, persisted under `[desktop]`.
  *
- * Only the desktop app reads this section.
+ * The direct Android build also uses [checkForUpdates], keeping the existing update preference.
  *
  * @property closeAction what closing the main window does.
  * @property openAtLogin whether the user asked for Ketch to open at login; the
