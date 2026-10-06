@@ -91,7 +91,7 @@ command exits when the download completes or fails.
 |---|---|
 | `--speed-limit <value>` | Limit download speed (e.g., `500k`, `1m`, `10m`) |
 | `--priority <level>` | Set download priority: `low`, `normal`, `high`, `urgent` |
-| `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
+| `--max-concurrent <n>` | Max simultaneous downloads (default: 4) |
 | `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
 | `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
 | `--referer <url>` | Send this `Referer` |
@@ -468,8 +468,9 @@ port = 8642
 # defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
-maxConcurrentDownloads = 2
-maxConnectionsPerHost = 8
+# Queue limits count downloads, not individual connections; 0 means unlimited.
+maxConcurrentDownloads = 4
+maxConnectionsPerHost = 16
 
 # Advanced settings (defaults are usually fine):
 # retryCount = 3
@@ -519,8 +520,8 @@ maxConnectionsPerHost = 8
 | `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home folder |
 | `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
-| `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
-| `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
+| `maxConcurrentDownloads` | int | `4` | Max simultaneous downloads (`0` = unlimited) |
+| `maxConnectionsPerHost` | int | `16` | Max simultaneous downloads per host (`0` = unlimited) |
 | `retryCount` | int | `3` | Max automatic retries after a retryable failure |
 | `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
 | `progressIntervalMs` | long | `200` | Progress update throttle interval |

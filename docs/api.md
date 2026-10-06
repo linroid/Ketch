@@ -235,8 +235,8 @@ DownloadConfig(
   saveIntervalMs = 5000,          // how often segment progress is persisted
   bufferSize = 8192,              // FTP read buffer size
   speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
-  maxConcurrentDownloads = 2,     // max simultaneous downloads (0 = unlimited)
-  maxConnectionsPerHost = 8,      // max simultaneous downloads per host (0 = unlimited)
+  maxConcurrentDownloads = 4,     // max simultaneous downloads (0 = unlimited)
+  maxConnectionsPerHost = 16,     // max simultaneous downloads per host (0 = unlimited)
 )
 ```
 
@@ -252,7 +252,10 @@ downloads that start or resume afterwards; pause and resume a running download t
 A changed `defaultDirectory` that does not exist or is not a folder is rejected with
 `IllegalArgumentException`, and the previous configuration stays in effect.
 
-The per-host limit counts downloads by URL host (case-insensitive, ignoring user info and port).
+The per-host limit counts downloads by URL host (case-insensitive, ignoring user info and port),
+not their individual connections. With the defaults, the global limit of four downloads applies
+before the per-host limit of sixteen. Explicit values in an existing configuration are kept;
+omitted fields use the current defaults.
 Magnet links, `torrent:` identifiers and local files are not counted.
 
 `maxConnectionsPerDownload` and `DownloadRequest.connections` split HTTP(S) and FTP(S)

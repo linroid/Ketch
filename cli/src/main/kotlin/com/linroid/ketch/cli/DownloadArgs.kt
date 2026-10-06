@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.SpeedLimit
@@ -21,7 +22,7 @@ internal sealed interface DownloadArgs {
     val destination: String?,
     val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
     val priority: DownloadPriority = DownloadPriority.NORMAL,
-    val maxConcurrent: Int = 3,
+    val maxConcurrent: Int = DownloadConfig.Default.maxConcurrentDownloads,
     val headers: Map<String, String> = emptyMap(),
   ) : DownloadArgs
 }
@@ -45,7 +46,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var destination: String? = null
   var speedLimit = SpeedLimit.Unlimited
   var priority = DownloadPriority.NORMAL
-  var maxConcurrent = 3
+  var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
   val headers = LinkedHashMap<String, String>()
   // Header names ignore case, so a later option replaces an earlier one however it is spelled.
   fun setHeader(name: String, value: String) {

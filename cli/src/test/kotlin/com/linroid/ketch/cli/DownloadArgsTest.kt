@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.SpeedLimit
 import java.io.File
@@ -9,6 +10,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class DownloadArgsTest {
+
+  @Test
+  fun parseDownloadArgs_withoutQueueOverride_usesSharedDownloadDefault() {
+    val parsed = parseDownloadArgs(listOf("https://example.com/a.zip"))
+
+    assertEquals(
+      DownloadConfig.Default.maxConcurrentDownloads,
+      assertIs<DownloadArgs.Download>(parsed).maxConcurrent,
+    )
+  }
 
   @Test
   fun `help flags print usage instead of downloading`() {
