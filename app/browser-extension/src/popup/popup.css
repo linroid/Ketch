@@ -89,6 +89,14 @@ body {
   flex-direction: column;
 }
 
+#page-resources {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  text-align: start;
+}
+
 .recent h2 {
   margin: 14px 12px 4px;
   color: var(--text-sec);

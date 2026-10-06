@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ketch — Chrome Web Store screenshot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 1280px;
+      height: 800px;
+      overflow: hidden;
+      color: #33251e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at 84% 32%, #ffdfbd, transparent 62%), #fff8f0;
+    }
+    .brand { position: absolute; top: 64px; left: 76px; display: flex; align-items: center;
+      gap: 15px; font-size: 27px; font-weight: 700; letter-spacing: -0.8px; }
+    .brand img { width: 48px; height: 48px; }
+    main { position: absolute; left: 76px; top: 200px; width: 500px; }
+    .eyebrow { color: #aa502e; font-size: 13px; font-weight: 700; letter-spacing: 2px; }
+    h1 { margin: 22px 0; font-size: 66px; line-height: 1.04; letter-spacing: -3.5px;
+      font-weight: 750; }
+    html[lang="zh-CN"] h1 { font-size: 60px; line-height: 1.25; letter-spacing: -1.5px; }
+    .intro { max-width: 445px; margin: 26px 0 36px; color: #766358;
+      font-size: 23px; line-height: 1.5; }
+    .features { display: flex; flex-direction: column; gap: 15px; font-size: 18px; }
+    .features div { display: flex; align-items: center; gap: 12px; }
+    .check { color: #b95128; font-weight: 600; }
+    .popup { position: absolute; left: 690px; top: 80px; width: 486px;
+      overflow: hidden; border: 1px solid #e3c9b3; border-radius: 16px;
+      background: #fff; box-shadow: 0 26px 70px #68371326, 0 4px 14px #68371312; }
+    iframe { display: block; width: 360px; height: 440px; border: 0; zoom: 1.35; }
+    footer { position: absolute; left: 76px; bottom: 49px; color: #87766a; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="brand"><img src="icon-128.png" alt="">Ketch</div>
+  <main>
+    <div class="eyebrow" data-copy="eyebrow">YOUR BROWSER. YOUR DOWNLOADS.</div>
+    <h1><span data-copy="headlineFirst">Send it</span><br>
+      <span data-copy="headlineSecond">to Ketch.</span></h1>
+    <p class="intro"><span data-copy="introFirst">Download on your computer</span><br>
+      <span data-copy="introSecond">or a server you control.</span></p>
+    <div class="features">
+      <div><span class="check">✓</span>
+        <span data-copy="capture">Capture downloads from Chrome</span></div>
+      <div><span class="check">✓</span>
+        <span data-copy="send">Send links, files and magnets</span></div>
+      <div><span class="check">✓</span>
+        <span data-copy="manage">Pause and resume from the popup</span></div>
+    </div>
+  </main>
+  <div class="popup"><iframe src="/extension/popup/popup.html" title="Ketch popup"></iframe></div>
+  <footer data-copy="footer">Open source · Requires the Ketch app or server</footer>
+</body>
+</html>
