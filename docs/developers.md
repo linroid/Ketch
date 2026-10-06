@@ -28,6 +28,8 @@ published on Maven Central under `com.linroid.ketch`. You can use it to:
 | `ktor` | `KtorHttpEngine`, the default HTTP engine for `core` | Android, iOS, JVM |
 | `sqlite` | `SqliteTaskStore`, which keeps tasks across restarts | Android, iOS, JVM |
 | `ftp` | FTP and FTPS downloads | Android, iOS, JVM |
+| `hls` | Finite HLS downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
+| `dash` | Finite DASH downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `torrent` | BitTorrent and magnet downloads ([details](torrent.md)) | Android, iOS, JVM |
 | `remote` | `RemoteKetch`, a `KetchApi` that controls a Ketch server | Android, iOS, JVM, WasmJs |
 | `endpoints` | REST resource and wire model definitions shared by the server and `remote` | Android, iOS, JVM, WasmJs |
@@ -85,7 +87,8 @@ Every task can be paused, resumed, canceled or removed, and its speed limit, con
 priority and schedule changed while it runs. Tasks are kept in memory by default; pass
 `taskStore = createSqliteTaskStore(driverFactory)` from `sqlite` to resume them after a restart.
 Add `FtpDownloadSource()` or `TorrentDownloadSource()` to `additionalSources` for FTP or
-BitTorrent.
+BitTorrent. Add `HlsDownloadSource(httpEngine)` or `DashDownloadSource(httpEngine)` from
+`hls` or `dash` for [finite streaming media](media.md), sharing the engine passed to `Ketch`.
 
 The [API reference](api.md) covers configuration, priorities and scheduling, speed limits, errors
 and logging; [multiple networks](multiple-networks.md) shows how to spread a download over several

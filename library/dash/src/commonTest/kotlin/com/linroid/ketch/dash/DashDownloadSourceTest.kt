@@ -1,4 +1,4 @@
-package com.linroid.ketch.core.media
+package com.linroid.ketch.dash
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
@@ -12,12 +12,63 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
-class MediaDownloadSourceTest {
+class DashDownloadSourceTest {
+  @Test
+  fun canHandle_onlyOwnProtocol_acceptsQueryAndFragment() {
+    val source = DashDownloadSource(MediaEngine())
+    assertTrue(source.canHandle("HTTPS://example.com/INDEX.MPD?token=x#fragment"))
+    assertFalse(source.canHandle("https://example.com/index.m3u8"))
+    assertFalse(source.canHandle("ftp://example.com/index.mpd"))
+    assertFalse(source.canHandle("https://example.com/file?name=index.mpd"))
+  }
+
+  @Test
+  fun resolve_reportsProtocolTypeAndOutputName() = runTest {
+    val engine = MediaEngine()
+    val source = DashDownloadSource(engine)
+    val resolved = source.resolve(engine.url)
+    assertEquals("dash", resolved.sourceType)
+    assertEquals("index.mp4", resolved.suggestedFileName)
+    assertEquals("dash", source.buildResumeState(resolved, 0).sourceType)
+  }
+
+  @Test
+  fun resolve_invalidUrls_reportProtocolType() = runTest {
+    val manifest = MediaEngine().manifest
+    for (url in listOf(
+      "https://example.com/bad path.mpd",
+      "https://user:secret@example.com/index.mpd",
+      "file:///index.mpd"
+    )) {
+      val source = DashDownloadSource(MediaEngine())
+      val error = assertFailsWith<KetchError.SourceError> { source.resolve(url) }
+      assertEquals("dash", error.sourceType)
+    }
+    for (reference in listOf(
+      "https://example.com/bad path",
+      "https://user:secret@example.com/part",
+      "file:///part",
+      "http://example.com/part"
+    )) {
+      val engines = listOf(
+        MediaEngine(responseUrl = reference),
+        MediaEngine(manifest = manifest.replace("a.mp4", reference))
+      )
+      for (engine in engines) {
+        val source = DashDownloadSource(engine)
+        val error = assertFailsWith<KetchError.SourceError> { source.resolve(engine.url) }
+        assertEquals("dash", error.sourceType)
+      }
+    }
+  }
+
   @Test
   fun download_redirectedPlaylist_joinsSegmentsAndScopesCredentials() = runTest {
     val engine = MediaEngine()
-    val source = MediaDownloadSource(engine)
+    val source = DashDownloadSource(engine)
     val file = MemoryFile()
     var throttled = 0
     val context = DownloadContext(
@@ -33,7 +84,7 @@ class MediaDownloadSourceTest {
     source.download(context)
     assertEquals("firstsecond", file.bytes.decodeToString())
     assertEquals(11, throttled)
-    assertEquals(listOf("https://cdn.example/media/a.ts", "https://cdn.example/media/b.ts"),
+    assertEquals(listOf("https://cdn.example/media/a.mp4", "https://cdn.example/media/b.m4s"),
       engine.parts.map { it.first })
     assertEquals(listOf(mapOf("User-Agent" to "Ketch"), mapOf("User-Agent" to "Ketch")),
       engine.parts.map { it.second })
@@ -43,10 +94,10 @@ class MediaDownloadSourceTest {
   }
 
   @Test
-  fun download_oversizedManifestAndLivePlaylist_neverWriteOutput() = runTest {
-    for (text in listOf("x".repeat(1024 * 1024 + 1), "#EXTM3U\n#EXTINF:1,\na.ts")) {
+  fun download_oversizedManifestAndDynamicManifest_neverWriteOutput() = runTest {
+    for (text in listOf("x".repeat(1024 * 1024 + 1), "<MPD type='dynamic'/>")) {
       val engine = MediaEngine(text)
-      val source = MediaDownloadSource(engine)
+      val source = DashDownloadSource(engine)
       val file = MemoryFile()
       file.bytes = "existing".encodeToByteArray()
       val context = DownloadContext("id", engine.url, DownloadRequest(engine.url), file,
@@ -58,9 +109,14 @@ class MediaDownloadSourceTest {
   }
 
   private class MediaEngine(
-    val manifest: String = "#EXTM3U\n#EXTINF:1,\na.ts\n#EXTINF:1,\nb.ts\n#EXT-X-ENDLIST",
+    val manifest: String = """
+      <MPD><Period><AdaptationSet mimeType="video/mp4"><Representation id="v">
+        <SegmentList><Initialization sourceURL="a.mp4"/><SegmentURL media="b.m4s"/></SegmentList>
+      </Representation></AdaptationSet></Period></MPD>
+    """.trimIndent(),
+    val responseUrl: String = "https://cdn.example/media/list.mpd",
   ) : HttpEngine {
-    val url = "https://example.com/index.m3u8"
+    val url = "https://example.com/index.mpd"
     val parts = mutableListOf<Pair<String, Map<String, String>>>()
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
       error("Media does not require HEAD")
@@ -70,7 +126,7 @@ class MediaDownloadSourceTest {
       onData: suspend (ByteArray) -> Unit,
     ): String {
       onData(manifest.encodeToByteArray())
-      return "https://cdn.example/media/list.m3u8"
+      return responseUrl
     }
     override suspend fun download(
       url: String,
@@ -79,7 +135,7 @@ class MediaDownloadSourceTest {
       onData: suspend (ByteArray) -> Unit,
     ) {
       parts += url to headers
-      val content = if (url.endsWith("a.ts")) "first" else "second"
+      val content = if (url.endsWith("a.mp4")) "first" else "second"
       onData(content.encodeToByteArray())
     }
     override fun close() {}

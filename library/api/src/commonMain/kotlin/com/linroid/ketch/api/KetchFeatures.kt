@@ -13,6 +13,14 @@ object KetchFeatures {
   /** Finite, clear single-stream HLS and DASH downloads, with restart rather than byte resume. */
   const val FINITE_MEDIA: String = "media.finite"
 
-  /** Every feature this version of Ketch supports. */
-  val ALL: Set<String> = setOf(AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, FINITE_MEDIA)
+  /** Finite, unencrypted HLS downloads that restart on resume. */
+  const val FINITE_HLS: String = "hls.finite"
+
+  /** Finite, unencrypted DASH downloads that restart on resume. */
+  const val FINITE_DASH: String = "dash.finite"
+
+  /** Every feature this version of Ketch supports, including optional sources. */
+  val ALL: Set<String> = setOf(
+    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, FINITE_MEDIA, FINITE_HLS, FINITE_DASH
+  )
 }

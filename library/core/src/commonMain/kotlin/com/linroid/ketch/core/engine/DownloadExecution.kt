@@ -163,7 +163,7 @@ internal class DownloadExecution(
         "Using pre-resolved info for taskId=$taskId: url=${redactUrl(request.url)}, " +
           "source=${resolved.sourceType}"
       }
-      source = sourceResolver.resolveByType(resolved.sourceType)
+      source = sourceResolver.resolveByType(resolved.sourceType, resolved.url)
       resolvedUrl = resolved
     } else {
       source = sourceResolver.resolve(request.url)
@@ -246,7 +246,7 @@ internal class DownloadExecution(
           "No sourceType for taskId=${taskRecord.taskId}",
         ),
       )
-    val source = sourceResolver.resolveByType(sourceType)
+    val source = sourceResolver.resolveByType(sourceType, taskRecord.request.url)
     log.i {
       "Resuming download for taskId=$taskId via " +
         "source '${source.type}'"

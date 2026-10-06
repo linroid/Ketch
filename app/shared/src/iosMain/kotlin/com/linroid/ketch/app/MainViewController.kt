@@ -30,7 +30,9 @@ import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
@@ -207,13 +209,17 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
     factory = InstanceFactory(
       deviceName = instanceName,
       embeddedFactory = {
+        val httpEngine = KtorHttpEngine()
         Ketch(
-          httpEngine = KtorHttpEngine(),
+          httpEngine = httpEngine,
           taskStore = taskStore,
           config = download,
           name = instanceName,
           logger = appLogger,
-          additionalSources = listOf(FtpDownloadSource(), torrentSource),
+          additionalSources = listOf(
+            FtpDownloadSource(), torrentSource,
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+          ),
         )
       },
       applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },

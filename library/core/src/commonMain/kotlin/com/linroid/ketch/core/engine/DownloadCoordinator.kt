@@ -322,7 +322,7 @@ internal class DownloadCoordinator(
   private fun managesOwnFileIo(record: TaskRecord): Boolean {
     val sourceType = record.sourceType ?: return false
     return try {
-      sourceResolver.resolveByType(sourceType).managesOwnFileIo
+      sourceResolver.resolveByType(sourceType, record.request.url).managesOwnFileIo
     } catch (_: KetchError) {
       false
     }
@@ -349,7 +349,7 @@ internal class DownloadCoordinator(
     val record = handle.record.value
     val sourceType = record.sourceType ?: return
     val source = try {
-      sourceResolver.resolveByType(sourceType)
+      sourceResolver.resolveByType(sourceType, record.request.url)
     } catch (e: KetchError) {
       log.w(e) { "Skipping release for taskId=${handle.taskId}: unknown source '$sourceType'" }
       return
@@ -375,7 +375,7 @@ internal class DownloadCoordinator(
       return
     }
     val source = try {
-      sourceResolver.resolveByType(sourceType)
+      sourceResolver.resolveByType(sourceType, record.request.url)
     } catch (e: KetchError) {
       log.w(e) {
         "Skipping cleanup for taskId=${handle.taskId}: " +

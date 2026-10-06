@@ -13,6 +13,8 @@ library:api          (public interfaces and models, no dependencies)
   |      +--- library:ktor      (Ktor-based HttpEngine)
   |      +--- library:sqlite    (SQLite-backed TaskStore)
   |      +--- library:ftp       (FTP/FTPS DownloadSource)
+  |      +--- library:hls       (finite HLS DownloadSource)
+  |      +--- library:dash      (finite DASH DownloadSource)
   |      +--- library:torrent   (BitTorrent DownloadSource, also uses ktor)
   |      +--- library:server    (Ktor REST API + SSE daemon, also uses endpoints)
   |
@@ -24,10 +26,10 @@ library:api          (public interfaces and models, no dependencies)
          ^
          +--- ai:discover  (LLM-driven resource discovery)
 
-cli                  (JVM CLI: core, ktor, sqlite, ftp, torrent, server, mcp, config, ai:discover)
+cli                  (JVM CLI: core, ktor, sqlite, ftp, hls, dash, torrent, server, mcp, config, ai:discover)
 app/shared           (Compose Multiplatform UI: config + remote on every platform; core, ktor,
-                      ftp, torrent on Android, iOS and desktop)
-app/desktop          (JVM entry point: shared, core, ktor, ftp, torrent, sqlite, server,
+                      ftp, hls, dash, torrent on Android, iOS and desktop)
+app/desktop          (JVM entry point: shared, core, ktor, ftp, hls, dash, torrent, sqlite, server,
                       ai:discover)
 app/android          (Android entry point: same modules as app/desktop)
 app/web              (WasmJs entry point: shared, remote-only)
@@ -44,6 +46,8 @@ Ketch is split into published SDK modules that you add as dependencies:
 | `library:ktor` | Ktor-based `HttpEngine` implementation (the default engine for `core`) | Android, iOS, Desktop |
 | `library:sqlite` | SQLite-backed `TaskStore` for persistent resume | Android, iOS, Desktop |
 | `library:ftp` | FTP/FTPS `DownloadSource` | Android, iOS, Desktop |
+| `library:hls` | Finite HLS `DownloadSource` | Android, iOS, Desktop, JS (Node.js), WasmWasi |
+| `library:dash` | Finite DASH `DownloadSource` | Android, iOS, Desktop, JS (Node.js), WasmWasi |
 | `library:torrent` | BitTorrent and magnet `DownloadSource` ([details](torrent.md)) | Android, iOS, Desktop |
 | `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | Android, iOS, Desktop, JS, WasmJs |
 | `library:remote` | Remote client -- control a Ketch daemon server from any platform | Android, iOS, Desktop, WasmJs |
@@ -86,7 +90,7 @@ user-swappable components:
 | `HttpEngine` | HTTP HEAD/GET with range support | `KtorHttpEngine` (library:ktor), `MultiNetworkHttpEngine` (one engine per network) |
 | `TaskStore` | Persist task metadata for resume | `InMemoryTaskStore`, `SqliteTaskStore` |
 | `Logger` | Diagnostic logging | `Logger.None`, `Logger.console()`, `Logger.combine()`, `KermitLogger` |
-| `DownloadSource` | Protocol-level download handling | `HttpDownloadSource` (built-in), `FtpDownloadSource`, `TorrentDownloadSource` |
+| `DownloadSource` | Protocol-level download handling | `HttpDownloadSource` (built-in), `FtpDownloadSource`, `HlsDownloadSource`, `DashDownloadSource`, `TorrentDownloadSource` |
 | `FileNameResolver` | File name when the source suggests none | `DefaultFileNameResolver` |
 
 ### Expect/Actual

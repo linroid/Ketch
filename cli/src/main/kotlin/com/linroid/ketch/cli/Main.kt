@@ -30,7 +30,9 @@ import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -121,11 +123,15 @@ private fun runDownload(args: DownloadArgs.Download) {
     maxConcurrentDownloads = args.maxConcurrent,
   )
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     config = config,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(readDefaultConfig().torrent)),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(readDefaultConfig().torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
 
   runBlocking {
@@ -416,13 +422,17 @@ private fun runServer(args: Array<String>) {
   val dbPath = defaultDbPath()
   val taskStore = openTaskStore(dbPath)
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     taskStore = taskStore,
     config = downloadConfig,
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
   val server = KetchServer(
     ketch,
@@ -782,12 +792,16 @@ private fun runMcp(args: List<String>) {
 
   val taskStore = openTaskStore(defaultDbPath())
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
 
   Runtime.getRuntime().addShutdownHook(Thread {

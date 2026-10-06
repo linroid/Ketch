@@ -117,6 +117,25 @@ class SourceResolverTest {
   }
 
   @Test
+  fun resolveByType_sharedPreviousType_usesUrlAndPrefersExactType() {
+    fun renamed(type: String) = object : DownloadSource by fakeSource {
+      override val type: String = type
+      override val previousTypes: Set<String> = setOf("old")
+      override fun canHandle(url: String): Boolean = url.startsWith("$type:")
+    }
+    val first = renamed("first")
+    val second = renamed("second")
+    val resolver = SourceResolver(listOf(first, second))
+    assertEquals(first, resolver.resolveByType("old", "first:file"))
+    assertEquals(second, resolver.resolveByType("old", "second:file"))
+    assertFailsWith<KetchError.Unsupported> { resolver.resolveByType("old", "other:file") }
+    assertFailsWith<KetchError.Unsupported> { resolver.resolveByType("old") }
+    val exact = renamed("old")
+    assertEquals(exact,
+      SourceResolver(listOf(first, exact)).resolveByType("old", "first:file"))
+  }
+
+  @Test
   fun resolveByType_unknownType_throwsUnsupported() {
     val resolver = SourceResolver(listOf(httpSource))
     assertFailsWith<KetchError.Unsupported> {
