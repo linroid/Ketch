@@ -124,8 +124,12 @@ class RowContentTest {
   @Test
   fun rowContent_queued_explainsWait() = runTest {
     val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
+    val fullQueue = context.copy(
+      config = DownloadConfig(maxConcurrentDownloads = 2),
+      running = running,
+    )
 
-    val waiting = rowContent(request, DownloadState.Queued, now, context.copy(running = running))
+    val waiting = rowContent(request, DownloadState.Queued, now, fullQueue)
     val unknown = rowContent(request, DownloadState.Queued, now, context.copy(config = null))
 
     assertEquals("Waiting for a free slot (2 of 2 in use)", waiting.detail.load())
@@ -146,7 +150,11 @@ class RowContentTest {
   @Test
   fun rowContent_queuedWithPositionThree_saysTwoAhead() = runTest {
     val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
-    val capable = context.copy(running = running, features = KetchFeatures.ALL)
+    val capable = context.copy(
+      config = DownloadConfig(maxConcurrentDownloads = 2),
+      running = running,
+      features = KetchFeatures.ALL,
+    )
 
     val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = 3)
 
