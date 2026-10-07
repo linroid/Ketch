@@ -11,6 +11,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -445,11 +446,13 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     onDispose { remove() }
   }
 
-  // The window composes its content once it is first shown, so what must work while it is
-  // hidden lives out here.
+  // The window exists only while it shows, so what must work while it is hidden lives out here.
+  // Disposing it returns the GPU memory and UI it would otherwise keep in the background; what
+  // its content saves, such as the page, the filter and scroll positions, is kept here meanwhile.
+  val windowStates = rememberSaveableStateHolder()
   var mainWindow by remember { mutableStateOf<ComposeWindow?>(null) }
   var windowFocused by remember { mutableStateOf(false) }
-  // A hidden window stops composing, so the focus it last reported only counts while it shows.
+  // The focus the window last reported only counts while it shows.
   fun mainInFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
   // Toasts show in the main window, which stays in view beside the Settings window.
   fun inFront() = behavior.windowVisible && !windowState.isMinimized &&
@@ -493,11 +496,10 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val icon = painterResource("icon.svg")
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
-    if (behavior.windowCreated) {
+    if (behavior.windowVisible) {
       Window(
         onCloseRequest = behavior::closeWindow,
         state = windowState,
-        visible = behavior.windowVisible,
         title = windowTitle(status.pulse).resolve(),
         icon = icon,
         onPreviewKeyEvent = { event ->
@@ -513,10 +515,14 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       ) {
         LaunchedEffect(Unit) {
           window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
-          mainWindow = window
+          bringToFront(window)
         }
-        LaunchedEffect(behavior.windowVisible) {
-          if (behavior.windowVisible) bringToFront(window)
+        DisposableEffect(window) {
+          mainWindow = window
+          onDispose {
+            mainWindow = null
+            windowFocused = false
+          }
         }
         LaunchedEffect(behavior) {
           behavior.frontRequests.collect { bringToFront(window) }
@@ -536,7 +542,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
           LocalAppUpdates provides updater,
         ) {
           val app = @Composable {
-            App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+            windowStates.SaveableStateProvider(MAIN_WINDOW_STATE) {
+              App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+            }
           }
           if (fullWindowContent) TitleBarArea(windowState, app) else app()
         }
@@ -996,6 +1004,7 @@ private const val LOGS_DIR = "logs"
 private const val UPDATES_DIR = "updates"
 private const val UPDATE_LOG = "update.log"
 private const val DISCOVER_HISTORY_FILE = "discover-history.json"
+private const val MAIN_WINDOW_STATE = "main-window"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds

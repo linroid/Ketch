@@ -229,12 +229,12 @@ internal class CloseBehavior(
   private val onFirstHide: () -> Unit,
   private val quit: (QuitResponse?) -> Unit,
 ) {
-  /** Whether the main window is shown; it stays alive, and keeps its state, while hidden. */
+  /**
+   * Whether the main window is shown. The window exists only while it shows: hidden, it is
+   * disposed, which returns its graphics memory, and its content comes back with the state it
+   * saves.
+   */
   var windowVisible: Boolean by mutableStateOf(!startHidden || !traySupported)
-    private set
-
-  /** Create the window only when first needed, then retain it so hiding preserves UI state. */
-  var windowCreated: Boolean by mutableStateOf(windowVisible)
     private set
 
   /**
@@ -270,7 +270,6 @@ internal class CloseBehavior(
   /** Shows the main window and brings it to the front. */
   fun showWindow() {
     if (quitting) return
-    windowCreated = true
     windowVisible = true
     windowState.isMinimized = false
     fronts.tryEmit(Unit)
