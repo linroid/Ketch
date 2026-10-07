@@ -1,0 +1,47 @@
+name: "日本語"
+description: "バグ報告、改善案、質問を送信します。"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        可能であれば英語で記入してください。他の言語での Issue も歓迎します。
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Issue の種類"
+      options:
+        - "バグ報告"
+        - "機能リクエスト"
+        - "質問"
+        - "その他"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "説明"
+      description: "発生したこと、期待した動作、または追加してほしい内容を記入してください。"
+      placeholder: "問題の内容や関連する情報を記入してください。"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "再現手順"
+      description: "バグ報告の場合は、問題を再現する手順を記入してください。"
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: environment
+    attributes:
+      label: "環境"
+      description: "必要に応じて、Ketch のバージョンとプラットフォームを記入してください。"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: "ログ"
+      description: "バグ報告には、可能であれば関連するログファイルをコメントに添付するか、抜粋をここに貼り付けてください。先にパスワード、トークンなどの機密情報を削除してください。"
+      placeholder: "関連するログの抜粋を貼り付けてください。Issue の送信後、コメントにログファイルを添付できます。"
+    validations:
+      required: false
