@@ -1,10 +1,6 @@
 name: "Français"
 description: "Signalez un bug, suggérez une amélioration ou posez une question."
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Si possible, rédigez votre issue en anglais. Les issues dans d’autres langues sont également les bienvenues.
   - type: dropdown
     id: type
     attributes:
