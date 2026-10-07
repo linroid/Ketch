@@ -296,7 +296,7 @@ internal fun isTrackerListUrl(url: String): Boolean {
 
 /**
  * Announce URLs in a tracker list: one per line, blank lines and `#` comments skipped. URLs the
- * engine cannot announce to, such as WebTorrent's `wss`, are dropped; at most 64 are kept.
+ * engine cannot announce to, such as WebTorrent's `wss`, are dropped; at most 128 are kept.
  */
 internal fun parseTrackerList(text: String): List<String> = text.lineSequence()
   .map { it.trim() }

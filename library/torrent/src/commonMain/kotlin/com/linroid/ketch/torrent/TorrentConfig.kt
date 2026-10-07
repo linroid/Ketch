@@ -67,7 +67,7 @@ data class TorrentConfig(
   /**
    * Extra `http`, `https` or `udp` announce URLs for public torrents, announced alongside each
    * torrent's own trackers rather than after them. Private torrents and tracker-only discovery
-   * never contact them. Invalid URLs are ignored, and at most 64 are used.
+   * never contact them. Invalid URLs are ignored, and at most 128 are used.
    */
   val additionalTrackers: List<String> = emptyList(),
   /**

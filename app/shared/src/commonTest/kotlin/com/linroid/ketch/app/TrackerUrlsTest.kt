@@ -2,6 +2,7 @@ package com.linroid.ketch.app
 
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.parseTrackers
@@ -142,8 +143,8 @@ class TrackerUrlsTest {
   }
 
   @Test
-  fun `list trackers past the 64 the engine uses are unused with extra trackers counted first`() {
-    val extra = List(60) { "udp://extra$it.example:6969/announce" }
+  fun `list trackers past the limit the engine uses are unused with extra trackers counted first`() {
+    val extra = List(MAX_EXTRA_TRACKERS - 4) { "udp://extra$it.example:6969/announce" }
     val listed = listOf(extra[0]) + List(6) { "udp://listed$it.example:6969/announce" }
     assertEquals(
       setOf("udp://listed4.example:6969/announce", "udp://listed5.example:6969/announce"),

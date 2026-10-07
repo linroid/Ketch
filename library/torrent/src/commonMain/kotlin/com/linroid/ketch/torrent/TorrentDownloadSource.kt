@@ -170,7 +170,7 @@ class TorrentDownloadSource(
   /** Download the subscribed tracker lists now rather than at their next daily refresh. */
   fun refreshTrackerLists() = trackerListSubscription.refresh()
 
-  /** The trackers set by hand, then the list's; the engine uses the first 64 usable ones. */
+  /** The trackers set by hand, then the list's; the engine uses the first 128 usable ones. */
   internal fun extraTrackers(): List<String> =
     (additionalTrackers.load() + listedTrackers.load()).distinct()
 

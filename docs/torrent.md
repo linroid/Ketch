@@ -88,7 +88,7 @@ including a development run, hands its files to the running app instead of openi
   a task as Starting, "Finding peers", once it holds a download slot.
 - `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
   `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
-  and at most 64 are used. Each one is announced alongside the torrent's own trackers rather than
+  and at most 128 are used. Each one is announced alongside the torrent's own trackers rather than
   as a later tier, so it helps when a network blocks the torrent's trackers. Private torrents and
   tracker-only discovery never contact them. `TorrentDownloadSource.setAdditionalTrackers` changes
   the list for torrents started or resumed later. The apps edit the embedded instance's list under
@@ -98,10 +98,10 @@ including a development run, hands its files to the running app instead of openi
   tracker lists, one announce URL per line: by default ngosang's
   [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's
   [`best.txt`](https://github.com/XIU2/TrackersListCollection) (`DEFAULT_TRACKER_LISTS`). The
-  source downloads each when created and daily after, at most 256 KiB and 64 usable trackers
+  source downloads each when created and daily after, at most 256 KiB and 128 usable trackers
   (others, such as `wss`, are dropped), from its jsDelivr mirror when a `raw.githubusercontent.com`
   download fails, and uses their trackers, in list order and without repeats, like
-  `additionalTrackers`, after them, within the same 64. Each list keeps a copy in
+  `additionalTrackers`, after them, within the same 128. Each list keeps a copy in
   `stateDirectory` (`tracker-list-<hash>.txt`), used on restart without downloading while it is
   under a day old; a failed download keeps it and retries after an hour, and a list with no
   usable trackers counts as failed. Until ngosang's list first downloads,

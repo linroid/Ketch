@@ -54,10 +54,10 @@ class TrackerListTest {
   }
 
   @Test
-  fun parseTrackerList_keepsAtMost64() {
-    val text = (1..100).joinToString("\n") { "udp://tracker$it.example:1337/announce" }
+  fun parseTrackerList_keepsAtMostTheExtraTrackerLimit() {
+    val text = (1..200).joinToString("\n") { "udp://tracker$it.example:1337/announce" }
     val parsed = parseTrackerList(text)
-    assertEquals(64, parsed.size)
+    assertEquals(MAX_ADDITIONAL_TRACKERS, parsed.size)
     assertEquals("udp://tracker1.example:1337/announce", parsed.first())
   }
 

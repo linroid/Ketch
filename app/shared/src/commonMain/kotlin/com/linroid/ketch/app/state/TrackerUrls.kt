@@ -21,7 +21,7 @@ import ketch.app.shared.generated.resources.settings_torrent_list_updating
 import kotlin.time.Instant
 
 /** Extra trackers the torrent engine uses at most; later ones are ignored. */
-const val MAX_EXTRA_TRACKERS = 64
+const val MAX_EXTRA_TRACKERS = 128
 
 private val TRACKER_SCHEMES = setOf("http", "https", "udp")
 private val WHITESPACE = Regex("\\s+")
