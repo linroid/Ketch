@@ -1,0 +1,86 @@
+name: Issue / Problem / Problema / Problème / Issue / 问题
+description: >-
+  Report a bug, suggest an improvement, or ask a question. / Melde einen Fehler, schlage eine
+  Verbesserung vor oder stelle eine Frage. / Informa de un error, sugiere una mejora o haz una
+  pregunta. / Signalez un bug, suggérez une amélioration ou posez une question. /
+  バグ報告、改善案、質問を送信します。 / 报告问题、提出改进建议或提问。
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If possible, please write in English. Issues in other languages are welcome.
+
+        Wenn möglich, verfasse dein Issue bitte auf Englisch. Issues in anderen Sprachen sind ebenfalls willkommen.
+
+        Si es posible, escribe el issue en inglés. También aceptamos issues en otros idiomas.
+
+        Si possible, rédigez votre issue en anglais. Les issues dans d’autres langues sont également les bienvenus.
+
+        可能であれば英語で記入してください。他の言語での Issue も歓迎します。
+
+        如果方便，请尽量使用英文；也欢迎使用其他语言提交 issue。
+  - type: dropdown
+    id: type
+    attributes:
+      label: >-
+        Issue type / Art des Problems / Tipo de issue / Type d’issue / Issue の種類 / Issue 类型
+      options:
+        - >-
+          Bug report / Fehlerbericht / Informe de error / Rapport de bug / バグ報告 / 问题报告
+        - >-
+          Feature request / Funktionsvorschlag / Solicitud de función / Demande de fonctionnalité /
+          機能リクエスト / 功能建议
+        - Question / Frage / Pregunta / Question / 質問 / 问题
+        - Other / Sonstiges / Otro / Autre / その他 / 其他
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description / Beschreibung / Descripción / Description / 説明 / 描述
+      description: |
+        What happened, what did you expect, or what would you like to see?
+        Was ist passiert, was hast du erwartet oder was möchtest du sehen?
+        ¿Qué ocurrió, qué esperabas o qué te gustaría ver?
+        Que s’est-il passé, à quoi vous attendiez-vous ou que souhaiteriez-vous voir ?
+        発生したこと、期待した動作、または追加してほしい内容を記入してください。
+        请描述实际情况、预期结果或你希望新增的功能。
+      placeholder: >-
+        Describe the issue with any relevant context. / Beschreibe das Problem mit relevantem
+        Kontext. / Describe el problema y el contexto relevante. / Décrivez le problème et le
+        contexte utile. / 問題の内容や関連する情報を記入してください。 / 请描述问题及相关背景。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: >-
+        Steps to reproduce / Schritte zur Reproduktion / Pasos para reproducir / Étapes de
+        reproduction / 再現手順 / 复现步骤
+      description: |
+        For bug reports, list the steps that reproduce the problem.
+        Gib bei Fehlerberichten die Schritte an, mit denen sich das Problem reproduzieren lässt.
+        En los informes de errores, indica los pasos para reproducir el problema.
+        Pour les rapports de bug, indiquez les étapes permettant de reproduire le problème.
+        バグ報告の場合は、問題を再現する手順を記入してください。
+        如果是问题报告，请列出复现问题的步骤。
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / Umgebung / Entorno / Environnement / 環境 / 环境
+      description: |
+        Include your Ketch version and platform when relevant.
+        Gib bei Bedarf deine Ketch-Version und Plattform an.
+        Indica la versión de Ketch y la plataforma cuando sea relevante.
+        Indiquez la version de Ketch et la plateforme si nécessaire.
+        必要に応じて、Ketch のバージョンとプラットフォームを記入してください。
+        如有需要，请提供 Ketch 版本和平台信息。
+      placeholder: >-
+        Ketch version, operating system, device, etc. / Ketch-Version, Betriebssystem, Gerät usw. /
+        Versión de Ketch, sistema operativo, dispositivo, etc. / Version de Ketch, système
+        d’exploitation, appareil, etc. / Ketch のバージョン、OS、デバイスなど / Ketch 版本、操作系统、设备等
+    validations:
+      required: false
