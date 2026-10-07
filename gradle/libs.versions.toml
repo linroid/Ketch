@@ -19,6 +19,7 @@ kotlin = "2.4.20"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.11.0"
 okio = "3.18.2"
+jna = "5.19.1"
 kotlinx-datetime = "0.8.0"
 kermit = "2.1.0"
 koog = "1.2.0"
@@ -65,6 +66,7 @@ kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.re
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 okio-wasifilesystem = { module = "com.squareup.okio:okio-wasifilesystem", version.ref = "okio" }
 okio-nodefilesystem = { module = "com.squareup.okio:okio-nodefilesystem", version.ref = "okio" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
