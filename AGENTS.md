@@ -509,9 +509,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   translations against English
 - Desktop: closing the window follows `[desktop] closeAction` (asks the first time while
   downloads run, then keeps Ketch in the menu bar or notification area; minimizes where there
-  is no tray). The tray lists every device with its own actions, and the macOS menu bar, the
-  tray and the Dock menu are generated from `KetchCommands` (`DesktopMenuBar`, `DesktopTray`,
-  `TaskbarFeedback` for the Dock and taskbar badge and progress)
+  is no tray). The main window exists only while it shows: hidden, it is disposed with its GPU
+  memory, and its content comes back with what it saves (`rememberSaveable`, kept in a
+  `SaveableStateHolder` outside the window), such as the page, the filter and scroll
+  positions. The tray lists every device with its own actions, and the
+  macOS menu bar, the tray and the Dock menu are generated from `KetchCommands`
+  (`DesktopMenuBar`, `DesktopTray`, `TaskbarFeedback` for the Dock and taskbar badge and
+  progress)
 - Self-update (Android): `direct` and `play` distribution flavors; only `direct` supplies
   `AndroidUpdater` through `LocalAppUpdates` in Settings → About. It reuses `GitHubReleases`
   and `ReleaseDownloader`, checks the APK package, release version and increasing version code,

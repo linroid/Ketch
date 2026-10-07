@@ -93,7 +93,25 @@ Measure at launch and after a fixed idle interval with the same window size and 
 configured Discover provider, saved history, and `--background`: clients should initialize only
 on a search or connection check, history only when first needed, and a background launch with a
 tray should create its window only when shown. Closing an unused app must leave its saved history
-intact. After first use, hide and reopen the window and verify its UI state is retained.
+intact. Closing the window to the tray disposes it, so the process then owns no window; reopen it
+and verify the page, filter, search and scroll positions come back.
+
+On macOS, measure the physical footprint (`footprint -p <pid>`, Activity Monitor's Memory), not
+RSS, which leaves out GPU memory. Most of a shown window's cost is graphics: about 170 MB of GPU
+memory and five to seven frame buffers (16 MB each for a 1280 × 800 window on a Retina display).
+macOS keeps the frame buffers after the window closes and reuses them when it opens again, so a
+closed window still costs about 80 to 110 MB more than a `--background` launch that never showed
+one. The JDK's `LWWindowPeer.lastCommonMouseEventPeer` also keeps a closed window's UI objects
+until another window gets a mouse event; it holds no native resources. Measured on Apple Silicon
+(1280 × 800, empty list, idle): about 175 MB never shown, 530 to 590 MB shown, and 365 to 440 MB
+closed to the tray, against 405 to 460 MB when the window was only hidden: GPU memory fell to
+about 25 MB instead of 60 MB, and the window's other graphics memory to about 1 MB instead of
+18 MB.
+
+While a window draws, Skiko calls `System.gc()` every 30 seconds so that Skia objects are freed,
+so GC logs show `Pause Full (System.gc())` then. The serial collector used about 20 MB less idle
+but paused far longer while downloading at full speed (95th percentile 32 ms against 3.5 ms), so
+the launcher keeps G1.
 
 For heap diagnostics use `jcmd <pid> GC.heap_info`. A separate diagnostic launch with
 `-XX:NativeMemoryTracking=summary` enables `jcmd <pid> VM.native_memory summary`; this tracks JVM

@@ -166,7 +166,6 @@ class CloseBehaviorTest {
     val behavior = behavior(startHidden = true, traySupported = false)
 
     assertTrue(behavior.windowVisible)
-    assertTrue(behavior.windowCreated)
     assertTrue(windowState.isMinimized)
   }
 
@@ -182,17 +181,15 @@ class CloseBehaviorTest {
   }
 
   @Test
-  fun backgroundLaunch_defersWindowUntilShownAndRetainsItWhenHiddenAgain() {
+  fun backgroundLaunch_createsTheWindowOnlyWhileItShows() {
     val behavior = behavior(startHidden = true)
-    assertFalse(behavior.windowCreated)
+    assertFalse(behavior.windowVisible)
 
     behavior.showWindow()
-    assertTrue(behavior.windowCreated)
     assertTrue(behavior.windowVisible)
 
     behavior.closeWindow()
     assertFalse(behavior.windowVisible)
-    assertTrue(behavior.windowCreated)
   }
 
   @Test
