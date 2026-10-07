@@ -9,7 +9,7 @@ body:
     id: type
     attributes:
       label: "问题类型"
-      options
+      options:
         - "问题报告"
         - "功能建议"
         - "提问"
