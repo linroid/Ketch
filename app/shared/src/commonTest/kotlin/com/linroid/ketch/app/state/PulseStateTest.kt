@@ -296,7 +296,7 @@ class PulseStateTest {
     assertEquals(1, local.statusCalls)
     assertNull(model.state.value.devices.single().disk)
     assertFalse(model.state.value.isDiskShort)
-    assertEquals("All quiet", model.state.value.sentence(now, TimeZone.UTC).load())
+    assertEquals("Idle", model.state.value.sentence(now, TimeZone.UTC).load())
   }
 
   @Test
@@ -332,7 +332,7 @@ class PulseStateTest {
     val disk = DiskSpace(usableBytes = 412 * gb, totalBytes = 1000 * gb, directory = "/d")
     val state = PulseState(listOf(device(disk = disk)))
 
-    assertEquals("All quiet · 412 GB free on This Mac", state.sentenceAtNow())
+    assertEquals("Idle · 412 GB free on This Mac", state.sentenceAtNow())
   }
 
   @Test
@@ -344,12 +344,12 @@ class PulseStateTest {
       allDevices = true,
     )
 
-    assertEquals("All quiet · 8.2 GB free on NAS-Basement", state.sentenceAtNow())
+    assertEquals("Idle · 8.2 GB free on NAS-Basement", state.sentenceAtNow())
   }
 
   @Test
   fun sentence_idleWithoutDisk_isAllQuiet() = runTest {
-    assertEquals("All quiet", PulseState(listOf(device())).sentenceAtNow())
+    assertEquals("Idle", PulseState(listOf(device())).sentenceAtNow())
   }
 
   @Test
@@ -459,7 +459,7 @@ class PulseStateTest {
   fun sentence_onlyCanceledTasks_isAllQuiet() = runTest {
     val state = PulseState(listOf(device(counts = PulseCounts(failed = 1), failures = 0)))
 
-    assertEquals("All quiet", state.sentenceAtNow())
+    assertEquals("Idle", state.sentenceAtNow())
   }
 
   @Test
@@ -488,7 +488,7 @@ class PulseStateTest {
   fun sentence_slowLaneByHand_appendsSlowLane() = runTest {
     val state = PulseState(listOf(device()), mode = SpeedMode.SlowLane)
 
-    assertEquals("All quiet · Slow lane", state.sentenceAtNow())
+    assertEquals("Idle · Slow lane", state.sentenceAtNow())
   }
 
   @Test
@@ -503,7 +503,7 @@ class PulseStateTest {
   fun sentence_autoOutsideRule_appendsNothing() = runTest {
     val mode = SpeedMode.Auto(slowLane = false, until = Instant.parse("2026-10-01T18:00:00Z"))
 
-    assertEquals("All quiet", PulseState(listOf(device()), mode = mode).sentenceAtNow())
+    assertEquals("Idle", PulseState(listOf(device()), mode = mode).sentenceAtNow())
   }
 
   @Test

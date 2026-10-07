@@ -60,10 +60,10 @@
   <!-- HTTP failures. %1$d is the HTTP status code. -->
   <string name="error_http_sign_in">Sign-in required (%1$d)</string>
   <!-- %1$s is a host name. -->
-  <string name="error_http_sign_in_hint">%1$s wants you signed in. Send it from the Ketch browser extension so your cookies come along.</string>
-  <string name="error_http_sign_in_hint_short">%1$s wants you signed in</string>
-  <string name="error_http_sign_in_hint_server">The server wants you signed in. Send it from the Ketch browser extension so your cookies come along.</string>
-  <string name="error_http_sign_in_hint_server_short">the server wants you signed in</string>
+  <string name="error_http_sign_in_hint">%1$s requires sign-in. Add it from the Ketch browser extension to send your cookies.</string>
+  <string name="error_http_sign_in_hint_short">%1$s requires sign-in</string>
+  <string name="error_http_sign_in_hint_server">The server requires sign-in. Add it from the Ketch browser extension to send your cookies.</string>
+  <string name="error_http_sign_in_hint_server_short">the server requires sign-in</string>
   <string name="error_http_forbidden">Access denied (403)</string>
   <string name="error_http_forbidden_hint">The link may have expired.</string>
   <!-- %1$s is a browser, such as Chrome, or error_browser_yours. -->

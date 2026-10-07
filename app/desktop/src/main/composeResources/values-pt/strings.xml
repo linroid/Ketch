@@ -64,7 +64,7 @@
   <string name="message_update_ready">Ketch %1$s pronto para instalar</string>
   <string name="message_update_installed">Ketch atualizado para %1$s</string>
   <string name="message_update_failed">Não foi possível atualizar para o Ketch %1$s</string>
-  <string name="message_update_failed_hint">O update.log, na pasta de logs, explica o que deu errado.</string>
+  <string name="message_update_failed_hint">Veja o update.log na pasta de logs.</string>
   <string name="message_update">Atualizar</string>
   <string name="message_restart">Reiniciar</string>
   <string name="message_open_installer">Abrir instalador</string>

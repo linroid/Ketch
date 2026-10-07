@@ -2,16 +2,16 @@
 <resources>
   <string name="discover_title">Поиск</string>
   <string name="discover_settings">Настройки поиска</string>
-  <string name="discover_hero_title">Опишите, что ищете. Ketch найдёт нужные файлы.</string>
-  <string name="discover_intro_body">Поиск использует %1$s для поиска в интернете и просмотра найденных страниц, а затем предлагает файлы из надёжных источников. Загрузка начнётся только после того, как вы её добавите.</string>
+  <string name="discover_hero_title">Что вы хотите скачать?</string>
+  <string name="discover_intro_body">%1$s ищет в интернете и показывает найденные загрузки. Загрузка начнётся, только когда вы её добавите.</string>
   <string name="discover_example_blender">Blender для Apple silicon</string>
   <string name="discover_example_ubuntu">Серверный ISO Ubuntu 24.04</string>
   <string name="discover_example_footage">Видео природы в 4K, общественное достояние</string>
   <string name="discover_example_quoted">«%1$s»</string>
 
-  <string name="discover_setup_body">Поиск использует ИИ-модель для поиска в интернете и просмотра найденных страниц, а затем предлагает файлы из надёжных источников. Ваши запросы отправляются выбранному провайдеру.</string>
+  <string name="discover_setup_body">Поиск с помощью ИИ-модели ищет в интернете и показывает найденные загрузки. Ваши запросы отправляются выбранному провайдеру.</string>
   <string name="discover_setup_unsupported">Поиск работает в приложении Ketch на компьютере или телефоне Android.</string>
-  <string name="discover_setup_pending">Ваш запрос «%1$s» выполнится, как только поиск будет настроен.</string>
+  <string name="discover_setup_pending">Запрос «%1$s» выполнится, когда Поиск будет настроен.</string>
   <string name="discover_setup_choose_model">Выберите модель</string>
   <string name="discover_setup_local_provider">%1$s · работает локально, без ключа</string>
   <string name="discover_setup_finish">Завершить настройку %1$s</string>
@@ -90,12 +90,12 @@
   <string name="discover_error_title">Не удалось завершить этот поиск</string>
   <string name="discover_failed">Ошибка поиска</string>
   <string name="discover_none_title">Файлы не найдены</string>
-  <string name="discover_none_body">Показываются только файлы из надёжных источников. Попробуйте указать версию, платформу или сайт, который публикует файл.</string>
+  <string name="discover_none_body">Попробуйте указать версию, платформу или сайт.</string>
   <plurals name="discover_none_filtered">
-    <item quantity="one">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
-    <item quantity="few">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
-    <item quantity="many">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
-    <item quantity="other">Фильтр содержимого скрыл небезопасные на вид результаты: %1$d. Его можно выключить в настройках поиска.</item>
+    <item quantity="one">Фильтр содержимого скрыл результаты: %1$d. Выключить его можно в настройках поиска.</item>
+    <item quantity="few">Фильтр содержимого скрыл результаты: %1$d. Выключить его можно в настройках поиска.</item>
+    <item quantity="many">Фильтр содержимого скрыл результаты: %1$d. Выключить его можно в настройках поиска.</item>
+    <item quantity="other">Фильтр содержимого скрыл результаты: %1$d. Выключить его можно в настройках поиска.</item>
   </plurals>
   <string name="discover_search_everywhere">Искать по всему интернету</string>
   <string name="discover_stopped">Остановлено</string>
@@ -160,7 +160,7 @@
   <string name="discover_history_clear">Очистить историю</string>
   <string name="discover_turn_off">Отключить поиск</string>
   <string name="discover_turned_off">Поиск отключён</string>
-  <string name="discover_turned_off_detail">Включить его снова можно в настройках, в разделе «Поиск».</string>
+  <string name="discover_turned_off_detail">Включить его снова можно в разделе «Настройки › Поиск».</string>
   <string name="discover_history_filter">Поиск по истории</string>
   <string name="discover_history_empty">Здесь появятся ваши запросы.</string>
   <string name="discover_history_no_match">Нет запросов, содержащих «%1$s»</string>

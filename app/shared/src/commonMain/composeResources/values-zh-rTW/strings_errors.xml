@@ -44,10 +44,10 @@
   <string name="error_source">%1$s 伺服器回報錯誤</string>
 
   <string name="error_http_sign_in">需要登入（%1$d）</string>
-  <string name="error_http_sign_in_hint">%1$s 要求你登入。請改從 Ketch 瀏覽器擴充功能傳送，以一併帶上你的 Cookie。</string>
-  <string name="error_http_sign_in_hint_short">%1$s 要求你登入</string>
-  <string name="error_http_sign_in_hint_server">伺服器要求你登入。請改從 Ketch 瀏覽器擴充功能傳送，以一併帶上你的 Cookie。</string>
-  <string name="error_http_sign_in_hint_server_short">伺服器要求你登入</string>
+  <string name="error_http_sign_in_hint">%1$s 需要登入。請從 Ketch 瀏覽器擴充功能新增，以傳送你的 Cookie。</string>
+  <string name="error_http_sign_in_hint_short">%1$s 需要登入</string>
+  <string name="error_http_sign_in_hint_server">伺服器需要登入。請從 Ketch 瀏覽器擴充功能新增，以傳送你的 Cookie。</string>
+  <string name="error_http_sign_in_hint_server_short">伺服器需要登入</string>
   <string name="error_http_forbidden">拒絕存取（403）</string>
   <string name="error_http_forbidden_hint">連結可能已過期。</string>
   <string name="error_http_forbidden_hint_browser">連結可能已過期。如果連結來自 %1$s，請回到原網頁重新傳送到 Ketch。</string>

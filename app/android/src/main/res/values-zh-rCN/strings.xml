@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">没有可下载的链接</string>
 
   <string name="notifications_offer_title">接收下载和“搜索”的通知</string>
-  <string name="notifications_offer_message">使用其他应用时，也能收到下载完成或失败的通知，以及“搜索”的网站访问确认请求。</string>
+  <string name="notifications_offer_message">使用其他应用时，也能收到下载完成或失败的通知，以及“搜索”的确认请求。</string>
   <string name="notifications_offer_allow">允许</string>
   <string name="notifications_offer_not_now">以后再说</string>
 </resources>

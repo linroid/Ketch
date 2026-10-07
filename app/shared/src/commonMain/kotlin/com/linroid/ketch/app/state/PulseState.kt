@@ -276,7 +276,7 @@ data class PulseState(
 
   /**
    * One line about what the scope is doing, such as "Downloading 3 files on 2 devices · all
-   * done ≈ 14:32" or "All quiet · 412 GB free on This Mac".
+   * done ≈ 14:32" or "Idle · 412 GB free on This Mac".
    *
    * Downloads come first, then a device that is not online, then failures. Clock times are
    * local to [timeZone]; ones on another day than [now] name the weekday.

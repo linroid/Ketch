@@ -42,9 +42,9 @@
   <string name="device_not_connected">Non connecté</string>
 
   <string name="device_problem_unauthorized">Nouveau jeton d'accès requis</string>
-  <string name="device_problem_token_rejected">L'appareil a refusé le jeton d'accès enregistré pour lui.</string>
-  <string name="device_problem_over_limit">Ketch ne garde que quelques appareils connectés à la fois. Il se connecte à celui-ci quand il est affiché.</string>
-  <string name="device_problem_not_kept">Ketch s'y connecte quand il est affiché ou s'il doit rester connecté.</string>
+  <string name="device_problem_token_rejected">Le jeton d'accès enregistré a été refusé.</string>
+  <string name="device_problem_over_limit">Ketch se connecte à quelques appareils à la fois. Celui-ci se connecte quand il est affiché.</string>
+  <string name="device_problem_not_kept">Se connecte quand il est affiché, ou si Rester connecté est activé.</string>
   <string name="device_problem_connecting">Connexion…</string>
   <string name="device_problem_offline_for">Hors ligne depuis %1$s · nouvelle tentative</string>
   <string name="device_problem_offline">Hors ligne · nouvelle tentative</string>
@@ -106,7 +106,7 @@
   <string name="device_rename_local_hint">Vos autres appareils verront ce nom après un redémarrage.</string>
   <string name="device_rename_name">Nom</string>
   <string name="device_remove_title">Retirer %1$s ?</string>
-  <string name="device_remove_body">Ketch n'affichera plus les téléchargements de cet appareil ici. Ils continueront sur %1$s. Vous pourrez ajouter à nouveau l'appareil plus tard.</string>
+  <string name="device_remove_body">Ses téléchargements continuent sur %1$s. Vous pourrez l'ajouter à nouveau plus tard.</string>
 
   <string name="device_speed_of">Vitesse de %1$s</string>
 
@@ -163,7 +163,7 @@
   <string name="connect_approval_enter_code">Saisir plutôt son code d'accès</string>
   <string name="connect_approval_denied">%1$s n'a pas autorisé cet appareil. Redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_expired">Personne n'a répondu sur %1$s. Redemandez, ou saisissez son code d'accès.</string>
-  <string name="connect_approval_busy">%1$s examine encore une autre demande de cet appareil. Redemandez dans un instant, ou saisissez son code d'accès.</string>
+  <string name="connect_approval_busy">%1$s répond à une autre demande de cet appareil. Réessayez dans un instant, ou saisissez son code d'accès.</string>
   <string name="connect_approval_ask_again">Redemander</string>
   <string name="connect_added_badge">Ajouté</string>
   <string name="connect_share_instead">Vous voulez contrôler %1$s depuis un autre appareil ?</string>
@@ -186,7 +186,7 @@
   <string name="connect_pairing_has_code">Le lien inclut son code d'accès.</string>
   <string name="pairing_request_title">Autoriser %1$s à contrôler %2$s ?</string>
   <string name="pairing_request_check">N'autorisez que si %1$s affiche ce code :</string>
-  <string name="pairing_request_note">Il pourra alors ajouter, mettre en pause et supprimer des téléchargements ici. Pour lui retirer l'accès plus tard, choisissez Nouveau code dans Réglages › Partage.</string>
+  <string name="pairing_request_note">Il pourra ajouter, mettre en pause et supprimer des téléchargements ici. Pour révoquer l'accès, choisissez Nouveau code dans Réglages › Partage.</string>
   <string name="pairing_request_allow">Autoriser</string>
   <string name="pairing_request_deny">Refuser</string>
 

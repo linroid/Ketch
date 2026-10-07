@@ -81,7 +81,7 @@
   </plurals>
   <!--
     The main window's title and the tray icon's tooltip. %1$s is what the downloads are doing,
-    such as "3 downloading · 45%" or "All quiet".
+    such as "3 downloading · 45%" or "Idle".
   -->
   <string name="app_title_status">Ketch — %1$s</string>
 
@@ -99,7 +99,7 @@
   <string name="message_update_installed">Updated to Ketch %1$s</string>
   <!-- Toast after a restart that should have installed version %1$s did not. -->
   <string name="message_update_failed">Couldn't update to Ketch %1$s</string>
-  <string name="message_update_failed_hint">update.log in the log folder says what went wrong.</string>
+  <string name="message_update_failed_hint">See update.log in the log folder.</string>
   <string name="message_update">Update</string>
   <!-- Button: quits Ketch, installs the update and opens Ketch again. -->
   <string name="message_restart">Restart</string>

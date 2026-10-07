@@ -43,8 +43,8 @@
 
   <string name="device_problem_unauthorized">新しいアクセストークンが必要です</string>
   <string name="device_problem_token_rejected">保存されているアクセストークンが拒否されました。</string>
-  <string name="device_problem_over_limit">Ketchが同時に接続できるデバイスは数台までです。このデバイスには表示中のみ接続します。</string>
-  <string name="device_problem_not_kept">Ketchは、このデバイスを表示している間、または接続を維持している間に接続します。</string>
+  <string name="device_problem_over_limit">Ketchが同時に接続するデバイスは数台までです。このデバイスには表示中に接続します。</string>
+  <string name="device_problem_not_kept">表示中、または「接続を維持」がオンのときに接続します。</string>
   <string name="device_problem_connecting">接続中…</string>
   <string name="device_problem_offline_for">%1$s前からオフライン · 再試行中</string>
   <string name="device_problem_offline">オフライン · 再試行中</string>
@@ -100,7 +100,7 @@
   <string name="device_rename_local_hint">他のデバイスには、再起動後にこの名前が表示されます。</string>
   <string name="device_rename_name">名前</string>
   <string name="device_remove_title">%1$sを削除しますか？</string>
-  <string name="device_remove_body">このデバイスのダウンロードはここに表示されなくなります。%1$sでのダウンロードは続行され、デバイスはあとで再び追加できます。</string>
+  <string name="device_remove_body">%1$sでのダウンロードは続行されます。あとで再び追加できます。</string>
 
   <string name="device_speed_of">%1$sの速度</string>
 
@@ -157,7 +157,7 @@
   <string name="connect_approval_enter_code">代わりにアクセスコードを入力</string>
   <string name="connect_approval_denied">%1$sでこのデバイスは許可されませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_expired">%1$sで応答がありませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
-  <string name="connect_approval_busy">%1$sではこのデバイスからの別のリクエストをまだ確認中です。少し待ってからもう一度依頼するか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_busy">%1$sはこのデバイスからの別のリクエストに対応中です。しばらくしてからもう一度試すか、アクセスコードを入力してください。</string>
   <string name="connect_approval_ask_again">もう一度依頼</string>
   <string name="connect_added_badge">追加済み</string>
   <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_has_code">このリンクにはアクセスコードが含まれています。</string>
   <string name="pairing_request_title">%1$sに%2$sの操作を許可しますか？</string>
   <string name="pairing_request_check">%1$sにこのコードが表示されている場合のみ許可してください：</string>
-  <string name="pairing_request_note">許可すると、ここでダウンロードの追加、一時停止、削除ができるようになります。後で取り消すには、「設定 › 共有」で「新しいコード」を選んでください。</string>
+  <string name="pairing_request_note">ここでダウンロードの追加、一時停止、削除ができます。アクセスを取り消すには、「設定 › 共有」で「新しいコード」を選んでください。</string>
   <string name="pairing_request_allow">許可</string>
   <string name="pairing_request_deny">許可しない</string>
 

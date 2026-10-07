@@ -45,9 +45,9 @@
   <string name="error_source">Der %1$s-Server hat einen Fehler gemeldet</string>
 
   <string name="error_http_sign_in">Anmeldung erforderlich (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s verlangt eine Anmeldung. Sende den Download über die Ketch-Browsererweiterung, damit deine Cookies mitgesendet werden.</string>
+  <string name="error_http_sign_in_hint">%1$s verlangt eine Anmeldung. Füge den Download über die Ketch-Browsererweiterung hinzu, um deine Cookies mitzusenden.</string>
   <string name="error_http_sign_in_hint_short">%1$s verlangt eine Anmeldung</string>
-  <string name="error_http_sign_in_hint_server">Der Server verlangt eine Anmeldung. Sende den Download über die Ketch-Browsererweiterung, damit deine Cookies mitgesendet werden.</string>
+  <string name="error_http_sign_in_hint_server">Der Server verlangt eine Anmeldung. Füge den Download über die Ketch-Browsererweiterung hinzu, um deine Cookies mitzusenden.</string>
   <string name="error_http_sign_in_hint_server_short">der Server verlangt eine Anmeldung</string>
   <string name="error_http_forbidden">Zugriff verweigert (403)</string>
   <string name="error_http_forbidden_hint">Der Link ist möglicherweise abgelaufen.</string>

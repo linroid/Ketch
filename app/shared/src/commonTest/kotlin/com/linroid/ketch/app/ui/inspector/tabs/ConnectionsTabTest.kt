@@ -147,11 +147,11 @@ class ConnectionsTabTest {
       connectionsCaption(1, serverLimited = true, editable = true, downloading = true).load()
     )
     assertEquals(
-      "A new count re-splits the remaining bytes live.",
+      "Applies right away.",
       connectionsCaption(4, serverLimited = false, editable = true, downloading = true).load()
     )
     assertEquals(
-      "A new count applies when the download resumes.",
+      "Applies when the download resumes.",
       connectionsCaption(4, serverLimited = false, editable = true, downloading = false).load()
     )
     assertNull(connectionsCaption(4, serverLimited = false, editable = false, downloading = false))

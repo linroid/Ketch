@@ -6,11 +6,11 @@
   <string name="settings_category_general">一般</string>
   <string name="settings_category_general_description">外觀、啟動和此裝置的名稱</string>
   <string name="settings_category_notifications">通知</string>
-  <string name="settings_category_notifications_description">Ketch 要通知你哪些事，以及如何通知</string>
+  <string name="settings_category_notifications_description">下載、裝置和音效</string>
   <string name="settings_category_integration">整合</string>
   <string name="settings_category_integration_description">瀏覽器擴充功能、磁力連結和剪貼簿</string>
   <string name="settings_category_discover">搜尋</string>
-  <string name="settings_category_discover_description">AI 模型、網頁搜尋和可開啟的網站</string>
+  <string name="settings_category_discover_description">AI 模型、網頁搜尋和網頁存取</string>
   <string name="settings_category_about">關於</string>
   <string name="settings_category_about_description">版本、授權和記錄檔</string>
   <string name="settings_category_downloads">下載</string>
@@ -18,7 +18,7 @@
   <string name="settings_category_speed">速度</string>
   <string name="settings_category_speed_description">速度限制、低速模式和自動規則</string>
   <string name="settings_category_network">網路</string>
-  <string name="settings_category_network_description">同時使用多個網路下載</string>
+  <string name="settings_category_network_description">下載使用的網路</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">公開種子的額外 Tracker</string>
   <string name="settings_category_sharing">共享</string>
@@ -95,8 +95,8 @@
   <string name="settings_density_compact">緊湊</string>
   <string name="settings_density_comfortable">寬鬆</string>
   <string name="settings_general_reduce_motion">減少動態效果</string>
-  <string name="settings_general_reduce_motion_on">連線通道和面板會直接變化，不顯示動畫。</string>
-  <string name="settings_general_reduce_motion_system">你的系統已減少動態效果，Ketch 也會跟著減少。</string>
+  <string name="settings_general_reduce_motion_on">關閉動畫。</string>
+  <string name="settings_general_reduce_motion_system">已在系統設定中開啟。</string>
   <string name="settings_general_reduce_motion_auto">「自動」會依照系統的設定。</string>
   <string name="settings_general_language">語言</string>
   <string name="settings_general_language_current">繁體中文</string>
@@ -137,7 +137,7 @@
   <string name="settings_notifications_all_finished_off">依照「下載完成」的設定，目前為關閉。</string>
   <string name="settings_notifications_background">僅在 Ketch 於背景執行時</string>
   <string name="settings_notifications_background_none">沒有項目設為「通知」。</string>
-  <string name="settings_notifications_background_on">Ketch 在前景時，通知會顯示在應用程式內。</string>
+  <string name="settings_notifications_background_on">Ketch 在前景時，顯示在應用程式內。</string>
   <string name="settings_notifications_background_off">Ketch 在前景時也會顯示通知。</string>
   <string name="settings_notifications_devices_group">裝置</string>
   <string name="settings_notifications_offline">裝置離線</string>
@@ -151,7 +151,7 @@
   <string name="settings_notifications_success_vibration">震動</string>
   <string name="settings_notifications_success_vibration_hint">短暫震動，震動模式下也會生效。</string>
   <string name="settings_notifications_success_footer">下載完成或搜尋到可下載的檔案時提醒。</string>
-  <string name="settings_notifications_success_footer_phone">下載完成或搜尋到可下載的檔案時提醒。靜音或勿擾模式下不提醒；背景通知使用系統通知的提示音。</string>
+  <string name="settings_notifications_success_footer_phone">下載完成或搜尋到可下載的檔案時提醒。靜音或勿擾模式下不會響。</string>
   <string name="settings_notifications_browser">瀏覽器通知</string>
   <string name="settings_notifications_allowed">已允許通知</string>
   <string name="settings_notifications_allowed_hint">在 Ketch 分頁位於背景時顯示。</string>
@@ -172,8 +172,8 @@
   <string name="settings_integration_torrent">使用 Ketch 開啟 .torrent 檔案</string>
   <string name="settings_integration_is_default">Ketch 已是預設應用程式</string>
   <string name="settings_integration_make_default">設為預設</string>
-  <string name="settings_integration_magnet_refused">Ketch 無法將自己設為磁力連結的預設應用程式。請在系統設定中選擇它。</string>
-  <string name="settings_integration_torrent_refused">Ketch 無法將自己設為 .torrent 檔案的預設應用程式。請在系統設定中選擇它。</string>
+  <string name="settings_integration_magnet_refused">無法將 Ketch 設為磁力連結的預設應用程式。請在系統設定中選擇。</string>
+  <string name="settings_integration_torrent_refused">無法將 Ketch 設為 .torrent 檔案的預設應用程式。請在系統設定中選擇。</string>
   <string name="settings_integration_magnet_failed">無法讓 Ketch 開啟磁力連結：%1$s</string>
   <string name="settings_integration_torrent_failed">無法讓 Ketch 開啟 .torrent 檔案：%1$s</string>
   <string name="settings_integration_clipboard">剪貼簿</string>
@@ -190,7 +190,7 @@
 
   <string name="settings_ai_discovery">AI 搜尋</string>
   <string name="settings_ai_content_filter">內容過濾器</string>
-  <string name="settings_ai_content_filter_hint">隱藏看起來不安全的結果：短網址、下載彙整網站、盜版、仿冒網站，以及透過未加密 HTTP 提供的安裝程式。指向你自己網路的連結一律隱藏。</string>
+  <string name="settings_ai_content_filter_hint">隱藏短網址、下載彙整網站、盜版、仿冒網站，以及透過未加密 HTTP 提供的安裝程式。指向你自己網路的連結一律隱藏。</string>
   <string name="settings_ai_provider">服務供應商</string>
   <string name="settings_ai_api_key">API 金鑰</string>
   <string name="settings_ai_model">模型</string>
@@ -201,7 +201,7 @@
   <string name="settings_ai_status_unsupported">可在桌面版和 Android 應用程式中使用。</string>
   <string name="settings_ai_status_needs_provider">請選擇服務供應商，並在下方輸入 API 金鑰。</string>
   <string name="settings_ai_status_needs_search">請新增缺少的網頁搜尋憑證。</string>
-  <string name="settings_ai_status_off">開啟搜尋，尋找可下載的檔案。</string>
+  <string name="settings_ai_status_off">描述想要的內容，尋找可下載的檔案。</string>
   <string name="settings_ai_status_ready">就緒 · %1$s · %2$s</string>
   <string name="settings_ai_model_group">模型</string>
   <string name="settings_ai_provider_ollama">Ollama · 在本機執行，不需金鑰</string>
@@ -244,7 +244,7 @@
   <string name="settings_ai_access_allow">自動允許</string>
   <string name="settings_ai_access_allow_hint">直接開啟搜尋所需的任何網站，不會詢問。</string>
   <string name="settings_ai_access_ask_site">每個新網站都詢問</string>
-  <string name="settings_ai_access_ask_site_hint">每次對話中首次存取某個網站時詢問。選擇「一律允許」後，日後存取該網站不需再次確認。</string>
+  <string name="settings_ai_access_ask_site_hint">每次對話中每個網站詢問一次，除非選擇「一律允許」。</string>
   <string name="settings_ai_access_ask">每次都詢問</string>
   <string name="settings_ai_access_ask_hint">每次開啟網頁或檢查檔案前都會詢問。</string>
   <string name="settings_ai_access_trusted">一律允許的網站</string>
@@ -252,9 +252,9 @@
   <string name="settings_ai_access_trusted_none">尚無網站。可在「搜尋」詢問時選擇「一律允許」，或在這裡新增網站。</string>
   <string name="settings_ai_access_add">新增網站，例如 ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">請輸入網域名稱，例如 ubuntu.com。</string>
-  <string name="settings_ai_access_footer">搜尋時指定的網站不需再次確認即可存取。</string>
+  <string name="settings_ai_access_footer">限定在你指定網站的搜尋不會詢問。</string>
 
-  <string name="settings_about_name_line">Ketch 是一種雙桅帆船的名稱。如同多面船帆協力航行，Ketch 透過多路連線同時下載。</string>
+  <string name="settings_about_name_line">Ketch 是一種雙桅帆船。</string>
   <string name="settings_about_discover_elsewhere">「搜尋」可在桌面版和 Android 應用程式中使用。</string>
   <string name="settings_about_version">版本</string>
   <string name="settings_about_build">組建</string>
@@ -268,10 +268,10 @@
   <string name="settings_about_getting_started">入門</string>
   <string name="settings_about_checklist">顯示設定清單</string>
   <string name="settings_about_checklist_hint">空白「下載」頁面上的設定步驟。</string>
-  <string name="settings_about_checklist_done">完成。下載清單為空時就會顯示。</string>
+  <string name="settings_about_checklist_done">下載清單為空時顯示。</string>
   <string name="settings_about_welcome">再次顯示歡迎畫面</string>
   <string name="settings_about_welcome_hint">下載位置，以及你在此裝置上使用 Ketch 的方式。</string>
-  <string name="settings_about_welcome_done">完成。下次開啟 Ketch 時會顯示歡迎畫面。</string>
+  <string name="settings_about_welcome_done">下次開啟 Ketch 時顯示。</string>
   <string name="settings_about_troubleshooting">疑難排解</string>
   <string name="settings_about_logs_footer">記錄檔包含下載名稱和連結，張貼前請先檢查。</string>
   <string name="settings_about_updates">更新</string>
@@ -282,7 +282,7 @@
   <string name="settings_about_update_current_hint">%1$s 是最新版本。</string>
   <string name="settings_about_update_available">Ketch %1$s 現已推出</string>
   <string name="settings_about_update_available_hint">目前版本為 %1$s。</string>
-  <string name="settings_about_update_source_hint">目前執行的是從原始碼建置的版本，請前往發行頁面下載安裝程式。</string>
+  <string name="settings_about_update_source_hint">從原始碼建置的版本。請至發行頁面下載安裝程式。</string>
   <string name="settings_about_update_downloading">正在下載 Ketch %1$s…</string>
   <string name="settings_about_update_progress">%1$s / %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s 已準備好安裝</string>
@@ -362,17 +362,17 @@
   <string name="settings_speed_limit_hint">所有下載的總速度受此限制；個別下載可設定更低的速度上限。</string>
   <string name="settings_speed_mode_group">模式</string>
   <string name="settings_speed_mode">速度模式</string>
-  <string name="settings_speed_full_unlimited">以目前網路可達到的最高速度下載。</string>
+  <string name="settings_speed_full_unlimited">不限速。</string>
   <string name="settings_speed_full_capped">所有下載的總速度不超過 %1$s。</string>
-  <string name="settings_speed_slow_lane_summary">所有下載的總速度不超過 %1$s，為通話保留頻寬。</string>
-  <string name="settings_speed_auto_no_rules">在下方新增規則，讓低速模式自動開啟。</string>
+  <string name="settings_speed_slow_lane_summary">所有下載共用最多 %1$s。</string>
+  <string name="settings_speed_auto_no_rules">新增規則以排程低速模式。</string>
   <string name="settings_speed_auto_summary">%1$s。</string>
   <string name="settings_speed_limits_group">限制</string>
   <string name="settings_speed_full_cap">全速上限</string>
-  <string name="settings_speed_full_cap_hint">未開啟低速模式時，所有下載的總速度上限。</string>
+  <string name="settings_speed_full_cap_hint">低速模式以外的共用上限。</string>
   <string name="settings_speed_slow_lane">低速模式的速度上限</string>
   <string name="settings_speed_slow_lane_suggested">建議約 %1$s，即本週觀察到的最高速度的 %2$d%。</string>
-  <string name="settings_speed_slow_lane_unknown">尚未測得此網路的下載速度，暫用 %1$s。</string>
+  <string name="settings_speed_slow_lane_unknown">Ketch 測得此網路速度前，暫用 %1$s。</string>
   <string name="settings_speed_slow_lane_capped">全速上限 %1$s 較低，因此改用該上限。</string>
   <string name="settings_speed_rules">自動規則</string>
   <string name="settings_speed_rules_footer_auto">規則依照此裝置的本地時間執行。</string>
@@ -530,7 +530,7 @@
   <string name="settings_search_start_hidden_keywords">啟動, 背景, 選單列, 系統匣, 隱藏</string>
   <string name="settings_search_badge">Dock 或工作列圖示顯示的內容</string>
   <string name="settings_search_badge_keywords">數字, 標記, 徽章, dock, 工作列</string>
-  <string name="settings_search_shortcuts">Ketch 中的所有快速鍵</string>
+  <string name="settings_search_shortcuts">所有快速鍵</string>
   <string name="settings_search_shortcuts_keywords">按鍵, 快速鍵, 熱鍵, 鍵盤</string>
   <string name="settings_search_finished_keywords">完成, 下載完成, 提醒</string>
   <string name="settings_search_failed_keywords">錯誤, 失敗, 提醒</string>

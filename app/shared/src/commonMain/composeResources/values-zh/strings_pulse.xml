@@ -9,8 +9,8 @@
   <plurals name="pulse_attention">
     <item quantity="other">%1$d 个下载需要处理</item>
   </plurals>
-  <string name="pulse_all_quiet">一切正常</string>
-  <string name="pulse_all_quiet_free">一切正常 · %2$s 上可用 %1$s</string>
+  <string name="pulse_all_quiet">空闲</string>
+  <string name="pulse_all_quiet_free">空闲 · %2$s 上可用 %1$s</string>
   <string name="pulse_connecting">正在连接 %1$s</string>
   <string name="pulse_needs_token">%1$s 需要令牌</string>
   <string name="pulse_offline">%1$s 已离线 · 正在重试</string>
@@ -82,14 +82,14 @@
   <string name="pulse_use_as_slow_lane">设为低速模式的限速</string>
   <string name="pulse_speed_settings">速度设置…</string>
   <string name="pulse_update_failed">无法更新%1$s · %2$s</string>
-  <string name="pulse_caption_full">下载将以网络允许的最快速度进行。</string>
+  <string name="pulse_caption_full">不限速。</string>
   <string name="pulse_caption_capped">下载速度上限为 %1$s。</string>
-  <string name="pulse_caption_slow_lane">所有下载的总速度不超过 %1$s，为其他应用留出带宽。</string>
+  <string name="pulse_caption_slow_lane">所有下载共享 %1$s。</string>
   <string name="pulse_caption_no_rules">尚无速度规则。可在速度设置中添加。</string>
   <string name="pulse_caption_rule_slow_lane">已按规则开启低速模式。</string>
   <string name="pulse_caption_rule_full">当前为全速，规则生效时将开启低速模式。</string>
-  <string name="pulse_caption_slow_lane_until">低速模式将持续到 %1$s，之后按规则调整。</string>
-  <string name="pulse_caption_full_until">全速模式将持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_caption_slow_lane_until">低速模式持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_caption_full_until">全速持续到 %1$s，之后按规则调整。</string>
   <string name="pulse_limit_for_slow_lane">开启低速模式时使用。</string>
   <string name="pulse_limit_for_device">适用于%1$s上的所有下载。</string>
   <string name="pulse_limit_after_slow_lane">低速模式关闭后生效。</string>

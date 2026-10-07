@@ -162,8 +162,8 @@
     <item quantity="other">%1$d terminées · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">Connexion unique</string>
-  <string name="inspector_connections_live">Un nouveau nombre redistribue en direct les octets restants.</string>
-  <string name="inspector_connections_on_resume">Un nouveau nombre s'applique à la reprise du téléchargement.</string>
+  <string name="inspector_connections_live">S'applique immédiatement.</string>
+  <string name="inspector_connections_on_resume">S'applique à la reprise du téléchargement.</string>
   <string name="inspector_lane_description">Connexion %1$d, %2$s, %3$s</string>
   <string name="inspector_percent_spoken">%1$d pour cent</string>
 

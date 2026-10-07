@@ -12,11 +12,11 @@
   <string name="settings_category_general">General</string>
   <string name="settings_category_general_description">Appearance, startup and the name of this device</string>
   <string name="settings_category_notifications">Notifications</string>
-  <string name="settings_category_notifications_description">What Ketch tells you about, and how</string>
+  <string name="settings_category_notifications_description">Downloads, devices and sounds</string>
   <string name="settings_category_integration">Integration</string>
   <string name="settings_category_integration_description">Browser extension, magnet links and the clipboard</string>
   <string name="settings_category_discover">Discover</string>
-  <string name="settings_category_discover_description">The AI model, web search and the websites it may open</string>
+  <string name="settings_category_discover_description">AI model, web search and page access</string>
   <string name="settings_category_about">About</string>
   <string name="settings_category_about_description">Version, licenses and logs</string>
   <string name="settings_category_downloads">Downloads</string>
@@ -24,7 +24,7 @@
   <string name="settings_category_speed">Speed</string>
   <string name="settings_category_speed_description">Speed modes, Slow lane and Auto rules</string>
   <string name="settings_category_network">Network</string>
-  <string name="settings_category_network_description">The networks downloads are spread across</string>
+  <string name="settings_category_network_description">Networks downloads use</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Extra trackers for public torrents</string>
   <string name="settings_category_sharing">Sharing</string>
@@ -131,8 +131,8 @@
   <string name="settings_density_compact">Compact</string>
   <string name="settings_density_comfortable">Comfortable</string>
   <string name="settings_general_reduce_motion">Reduce motion</string>
-  <string name="settings_general_reduce_motion_on">Lanes and panels change without animating.</string>
-  <string name="settings_general_reduce_motion_system">Your system reduces motion, so Ketch does too.</string>
+  <string name="settings_general_reduce_motion_on">Turns off animations.</string>
+  <string name="settings_general_reduce_motion_system">On in your system settings.</string>
   <string name="settings_general_reduce_motion_auto">Auto follows your system's setting.</string>
   <string name="settings_general_language">Language</string>
   <!-- The language the app shows, named in that language itself: English, Deutsch, 日本語. -->
@@ -185,7 +185,7 @@
   <string name="settings_notifications_all_finished_off">Follows Download finished, which is off.</string>
   <string name="settings_notifications_background">Only when Ketch is in the background</string>
   <string name="settings_notifications_background_none">Nothing is set to Notify.</string>
-  <string name="settings_notifications_background_on">While Ketch is in front, they show inside it.</string>
+  <string name="settings_notifications_background_on">Shown inside Ketch while it's in front.</string>
   <string name="settings_notifications_background_off">Notifications also show while Ketch is in front.</string>
   <!-- The group of what Ketch reports about devices. -->
   <string name="settings_notifications_devices_group">Devices</string>
@@ -203,7 +203,7 @@
   <string name="settings_notifications_success_vibration_hint">A short buzz, also in vibrate mode.</string>
   <string name="settings_notifications_success_footer">When a download finishes or Discover finds downloads.</string>
   <!-- The footer on phones; Do Not Disturb as the system names it. -->
-  <string name="settings_notifications_success_footer_phone">When a download finishes or Discover finds downloads. Silent mode and Do Not Disturb mute it, and notifications in the background use their own sound.</string>
+  <string name="settings_notifications_success_footer_phone">When a download finishes or Discover finds downloads. Muted in silent mode and Do Not Disturb.</string>
   <!-- The web app: whether the browser lets Ketch notify. -->
   <string name="settings_notifications_browser">Browser notifications</string>
   <string name="settings_notifications_allowed">Notifications are allowed</string>
@@ -228,8 +228,8 @@
   <string name="settings_integration_is_default">Ketch is the default</string>
   <string name="settings_integration_make_default">Make default</string>
   <!-- Under Default apps when the system did not make Ketch the default. -->
-  <string name="settings_integration_magnet_refused">Ketch couldn't make itself open magnet links. Choose it in your system's settings.</string>
-  <string name="settings_integration_torrent_refused">Ketch couldn't make itself open .torrent files. Choose it in your system's settings.</string>
+  <string name="settings_integration_magnet_refused">Couldn't make Ketch the default for magnet links. Choose it in your system settings.</string>
+  <string name="settings_integration_torrent_refused">Couldn't make Ketch the default for .torrent files. Choose it in your system settings.</string>
   <!-- Under Default apps when asking the system failed. %1$s is why. -->
   <string name="settings_integration_magnet_failed">Couldn't make Ketch open magnet links: %1$s</string>
   <string name="settings_integration_torrent_failed">Couldn't make Ketch open .torrent files: %1$s</string>
@@ -250,7 +250,7 @@
   <!-- Discover: AI discovery's model, web search and page access. -->
   <string name="settings_ai_discovery">AI discovery</string>
   <string name="settings_ai_content_filter">Content filter</string>
-  <string name="settings_ai_content_filter_hint">Hides results that look unsafe: shortened links, download aggregators, piracy, look-alike websites and installers over plain HTTP. Links into your own network stay hidden either way.</string>
+  <string name="settings_ai_content_filter_hint">Hides shortened links, download aggregators, piracy, look-alike sites and installers over plain HTTP. Links into your own network are always hidden.</string>
   <string name="settings_ai_provider">Provider</string>
   <string name="settings_ai_api_key">API key</string>
   <!-- The row with the model's id. -->
@@ -263,7 +263,7 @@
   <string name="settings_ai_status_unsupported">Runs in the desktop and Android apps.</string>
   <string name="settings_ai_status_needs_provider">Choose a provider and add its key below.</string>
   <string name="settings_ai_status_needs_search">Add the missing web search credentials.</string>
-  <string name="settings_ai_status_off">Lets Discover find downloads for you.</string>
+  <string name="settings_ai_status_off">Find downloads by describing them.</string>
   <!-- %1$s is the provider, such as Anthropic, %2$s the model, such as claude-sonnet-5. -->
   <string name="settings_ai_status_ready">Ready · %1$s · %2$s</string>
   <!-- The group of the provider, key, model and endpoint. -->
@@ -324,7 +324,7 @@
   <string name="settings_ai_access_allow_hint">Opens any website a search needs without asking.</string>
   <string name="settings_ai_access_ask_site">Ask for each new site</string>
   <!-- A chat is one Discover search with its follow-ups. Always allow is a choice Discover offers when it asks. -->
-  <string name="settings_ai_access_ask_site_hint">Asks the first time a chat opens a site. Always allow remembers a site.</string>
+  <string name="settings_ai_access_ask_site_hint">Asks once per site in each chat, unless you choose Always allow.</string>
   <string name="settings_ai_access_ask">Ask every time</string>
   <string name="settings_ai_access_ask_hint">Asks before every page and file check.</string>
   <!-- The row listing the websites Discover opens without asking, each with its subdomains. -->
@@ -335,11 +335,11 @@
   <string name="settings_ai_access_add">Add a site, such as ubuntu.com</string>
   <!-- Under that field when what was typed is not a website's name, such as a word without a dot. -->
   <string name="settings_ai_access_add_invalid">Enter a website's name, such as ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Searches you limit to websites never ask: you chose those sites yourself.</string>
+  <string name="settings_ai_access_footer">Searches limited to websites you name never ask.</string>
 
   <!-- About. -->
   <!-- Under the app's name: what the name means. -->
-  <string name="settings_about_name_line">A ketch is a two-masted sailboat. Ketch splits every download into lanes, like its sails.</string>
+  <string name="settings_about_name_line">A ketch is a two-masted sailboat.</string>
   <!-- On the web and iOS, which have no Discover page. -->
   <string name="settings_about_discover_elsewhere">Discover runs in the desktop and Android apps.</string>
   <string name="settings_about_version">Version</string>
@@ -356,10 +356,10 @@
   <string name="settings_about_getting_started">Getting started</string>
   <string name="settings_about_checklist">Show setup checklist</string>
   <string name="settings_about_checklist_hint">The setup steps on an empty Downloads page.</string>
-  <string name="settings_about_checklist_done">Done. It shows while the Downloads list is empty.</string>
+  <string name="settings_about_checklist_done">Shows while the Downloads list is empty.</string>
   <string name="settings_about_welcome">Show welcome again</string>
   <string name="settings_about_welcome_hint">Where downloads go, and how you use Ketch on this device.</string>
-  <string name="settings_about_welcome_done">Done. The welcome screens show next time you open Ketch.</string>
+  <string name="settings_about_welcome_done">Shows next time you open Ketch.</string>
   <string name="settings_about_troubleshooting">Troubleshooting</string>
   <string name="settings_about_logs_footer">Logs include download names and links. Check them before posting.</string>
   <!-- Updates of the desktop app itself, on the About page. -->
@@ -375,7 +375,7 @@
   <!-- %1$s is the running version. -->
   <string name="settings_about_update_available_hint">You have %1$s.</string>
   <!-- When the app runs from source code and cannot install the update itself. -->
-  <string name="settings_about_update_source_hint">This copy runs from source. The release page has the installers.</string>
+  <string name="settings_about_update_source_hint">Built from source. Get installers from the release page.</string>
   <string name="settings_about_update_downloading">Downloading Ketch %1$s…</string>
   <!-- Downloaded and total size of the update, such as "12.4 MB of 70.1 MB". -->
   <string name="settings_about_update_progress">%1$s of %2$s</string>
@@ -486,20 +486,20 @@
   <string name="settings_speed_mode_group">Mode</string>
   <string name="settings_speed_mode">Speed mode</string>
   <!-- Under Speed mode: what the mode does now. %1$s is a speed limit, such as 20 MB/s. -->
-  <string name="settings_speed_full_unlimited">Downloads use all the speed they can get.</string>
+  <string name="settings_speed_full_unlimited">No speed limit.</string>
   <string name="settings_speed_full_capped">Downloads share up to %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Downloads share at most %1$s, leaving room for calls.</string>
-  <string name="settings_speed_auto_no_rules">Add a rule below to turn the Slow lane on by itself.</string>
+  <string name="settings_speed_slow_lane_summary">Downloads share at most %1$s.</string>
+  <string name="settings_speed_auto_no_rules">Add a rule to schedule the Slow lane.</string>
   <!-- %1$s is what Auto mode does now, such as "Slow lane on until 18:00". -->
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Limits</string>
   <string name="settings_speed_full_cap">Full speed cap</string>
-  <string name="settings_speed_full_cap_hint">The most downloads share outside the Slow lane.</string>
+  <string name="settings_speed_full_cap_hint">Shared limit outside the Slow lane.</string>
   <string name="settings_speed_slow_lane">Slow lane speed</string>
   <!-- %1$s is the suggested speed, such as 1.5 MB/s; %2$d the share of the top speed it is. -->
   <string name="settings_speed_slow_lane_suggested">≈ %1$s suggested, %2$d% of the top speed seen this week.</string>
   <!-- %1$s is the speed used until then, such as 1 MB/s. -->
-  <string name="settings_speed_slow_lane_unknown">%1$s until Ketch has seen how fast this connection goes.</string>
+  <string name="settings_speed_slow_lane_unknown">%1$s until Ketch measures this connection.</string>
   <!-- %1$s is the full speed cap, such as 1 MB/s. -->
   <string name="settings_speed_slow_lane_capped">The full speed cap of %1$s is lower and applies instead.</string>
   <string name="settings_speed_rules">Auto rules</string>
@@ -723,7 +723,7 @@
   <string name="settings_search_start_hidden_keywords">startup, background, menu bar, tray</string>
   <string name="settings_search_badge">What the Dock or taskbar icon shows</string>
   <string name="settings_search_badge_keywords">count, dock, taskbar</string>
-  <string name="settings_search_shortcuts">Every shortcut in Ketch</string>
+  <string name="settings_search_shortcuts">All keyboard shortcuts</string>
   <string name="settings_search_shortcuts_keywords">keys, hotkeys, keybindings</string>
   <string name="settings_search_finished_keywords">complete, done, alert</string>
   <string name="settings_search_failed_keywords">error, alert</string>

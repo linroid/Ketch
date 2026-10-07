@@ -2,16 +2,16 @@
 <resources>
   <string name="discover_title">Descobrir</string>
   <string name="discover_settings">Configurações do Descobrir</string>
-  <string name="discover_hero_title">Descreva o que você procura. O Ketch encontra os arquivos.</string>
-  <string name="discover_intro_body">O Descobrir usa %1$s para pesquisar na web e consultar as páginas encontradas. Depois, mostra arquivos de fontes confiáveis. Nenhum download começa até você adicioná-lo.</string>
+  <string name="discover_hero_title">O que você quer baixar?</string>
+  <string name="discover_intro_body">%1$s pesquisa na web e lista os downloads encontrados. Nenhum download começa até você adicioná-lo.</string>
   <string name="discover_example_blender">Blender para Apple silicon</string>
   <string name="discover_example_ubuntu">ISO do Ubuntu 24.04 Server</string>
   <string name="discover_example_footage">Vídeos de natureza em 4K de domínio público</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">O Descobrir usa um modelo de IA para pesquisar na web e consultar as páginas encontradas. Depois, mostra arquivos de fontes confiáveis. Suas pesquisas são enviadas ao provedor escolhido.</string>
+  <string name="discover_setup_body">O Descobrir usa um modelo de IA para pesquisar na web e listar os downloads encontrados. Suas pesquisas vão para o provedor escolhido.</string>
   <string name="discover_setup_unsupported">O Descobrir funciona no app Ketch em um computador ou em um celular Android.</string>
-  <string name="discover_setup_pending">Sua pesquisa por “%1$s” começa assim que o Descobrir for configurado.</string>
+  <string name="discover_setup_pending">“%1$s” começa assim que o Descobrir for configurado.</string>
   <string name="discover_setup_choose_model">Escolha um modelo</string>
   <string name="discover_setup_local_provider">%1$s · roda localmente, sem chave</string>
   <string name="discover_setup_finish">Terminar de configurar %1$s</string>
@@ -80,10 +80,10 @@
   <string name="discover_error_title">O Descobrir não conseguiu concluir esta pesquisa</string>
   <string name="discover_failed">Falha na busca</string>
   <string name="discover_none_title">Nenhum download encontrado</string>
-  <string name="discover_none_body">O Descobrir lista apenas arquivos de fontes em que confia. Tente indicar a versão ou a plataforma, ou o site que publica o arquivo.</string>
+  <string name="discover_none_body">Tente incluir uma versão, plataforma ou site.</string>
   <plurals name="discover_none_filtered">
-    <item quantity="one">O filtro de conteúdo ocultou %1$d resultado que parecia inseguro. Você pode desativar o filtro nas Configurações do Descobrir.</item>
-    <item quantity="other">O filtro de conteúdo ocultou %1$d resultados que pareciam inseguros. Você pode desativar o filtro nas Configurações do Descobrir.</item>
+    <item quantity="one">O filtro de conteúdo ocultou %1$d resultado. Desative-o nas Configurações do Descobrir.</item>
+    <item quantity="other">O filtro de conteúdo ocultou %1$d resultados. Desative-o nas Configurações do Descobrir.</item>
   </plurals>
   <string name="discover_search_everywhere">Pesquisar em toda a web</string>
   <string name="discover_stopped">Interrompida</string>
@@ -136,7 +136,7 @@
   <string name="discover_history_clear">Limpar histórico</string>
   <string name="discover_turn_off">Desativar o Descobrir</string>
   <string name="discover_turned_off">O Descobrir está desativado</string>
-  <string name="discover_turned_off_detail">Ative-o novamente em Configurações, em Descobrir.</string>
+  <string name="discover_turned_off_detail">Ative-o novamente em Configurações › Descobrir.</string>
   <string name="discover_history_filter">Pesquisar no histórico</string>
   <string name="discover_history_empty">As pesquisas que você fizer aparecem aqui.</string>
   <string name="discover_history_no_match">Nenhuma pesquisa corresponde a “%1$s”</string>

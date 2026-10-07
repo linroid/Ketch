@@ -45,9 +45,9 @@
   <string name="error_source">O servidor %1$s informou um erro</string>
 
   <string name="error_http_sign_in">Login necessário (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s exige login. Envie pela extensão do navegador do Ketch para que seus cookies sigam junto.</string>
+  <string name="error_http_sign_in_hint">%1$s exige login. Adicione pela extensão do navegador do Ketch para enviar seus cookies.</string>
   <string name="error_http_sign_in_hint_short">%1$s exige login</string>
-  <string name="error_http_sign_in_hint_server">O servidor exige login. Envie pela extensão do navegador do Ketch para que seus cookies sigam junto.</string>
+  <string name="error_http_sign_in_hint_server">O servidor exige login. Adicione pela extensão do navegador do Ketch para enviar seus cookies.</string>
   <string name="error_http_sign_in_hint_server_short">o servidor exige login</string>
   <string name="error_http_forbidden">Acesso negado (403)</string>
   <string name="error_http_forbidden_hint">O link pode ter expirado.</string>

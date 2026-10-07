@@ -6,11 +6,11 @@
   <string name="settings_category_general">General</string>
   <string name="settings_category_general_description">Aspecto, inicio y el nombre de este dispositivo</string>
   <string name="settings_category_notifications">Notificaciones</string>
-  <string name="settings_category_notifications_description">De qué te avisa Ketch y cómo</string>
+  <string name="settings_category_notifications_description">Descargas, dispositivos y sonidos</string>
   <string name="settings_category_integration">Integración</string>
   <string name="settings_category_integration_description">Extensión del navegador, enlaces magnet y el portapapeles</string>
   <string name="settings_category_discover">Descubrir</string>
-  <string name="settings_category_discover_description">El modelo de IA, la búsqueda web y los sitios web que puede abrir</string>
+  <string name="settings_category_discover_description">Modelo de IA, búsqueda web y acceso a páginas</string>
   <string name="settings_category_about">Acerca de</string>
   <string name="settings_category_about_description">Versión, licencias y registros</string>
   <string name="settings_category_downloads">Descargas</string>
@@ -18,7 +18,7 @@
   <string name="settings_category_speed">Velocidad</string>
   <string name="settings_category_speed_description">Modos de velocidad, Modo lento y reglas de Automático</string>
   <string name="settings_category_network">Red</string>
-  <string name="settings_category_network_description">Las redes entre las que se reparten las descargas</string>
+  <string name="settings_category_network_description">Redes que usan las descargas</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Trackers adicionales para torrents públicos</string>
   <string name="settings_category_sharing">Compartir</string>
@@ -99,8 +99,8 @@
   <string name="settings_density_compact">Compacta</string>
   <string name="settings_density_comfortable">Cómoda</string>
   <string name="settings_general_reduce_motion">Reducir movimiento</string>
-  <string name="settings_general_reduce_motion_on">Los carriles y los paneles cambian sin animaciones.</string>
-  <string name="settings_general_reduce_motion_system">Tu sistema reduce el movimiento, así que Ketch también.</string>
+  <string name="settings_general_reduce_motion_on">Desactiva las animaciones.</string>
+  <string name="settings_general_reduce_motion_system">Activado en los ajustes del sistema.</string>
   <string name="settings_general_reduce_motion_auto">Automático sigue el ajuste de tu sistema.</string>
   <string name="settings_general_language">Idioma</string>
   <string name="settings_general_language_current">Español</string>
@@ -141,7 +141,7 @@
   <string name="settings_notifications_all_finished_off">Sigue a Descarga terminada, que está desactivado.</string>
   <string name="settings_notifications_background">Solo cuando Ketch está en segundo plano</string>
   <string name="settings_notifications_background_none">Nada está configurado como Notificar.</string>
-  <string name="settings_notifications_background_on">Cuando Ketch está en primer plano, se muestran dentro de la app.</string>
+  <string name="settings_notifications_background_on">Se muestran dentro de Ketch mientras está en primer plano.</string>
   <string name="settings_notifications_background_off">Las notificaciones también se muestran con Ketch en primer plano.</string>
   <string name="settings_notifications_devices_group">Dispositivos</string>
   <string name="settings_notifications_offline">Dispositivos que se desconectan</string>
@@ -155,7 +155,7 @@
   <string name="settings_notifications_success_vibration">Vibración</string>
   <string name="settings_notifications_success_vibration_hint">Una vibración breve, también en modo vibración.</string>
   <string name="settings_notifications_success_footer">Cuando termina una descarga o Descubrir encuentra archivos.</string>
-  <string name="settings_notifications_success_footer_phone">Cuando termina una descarga o Descubrir encuentra archivos. No se reproduce ningún sonido en los modos Silencio y No molestar. Las notificaciones en segundo plano usan su propio sonido.</string>
+  <string name="settings_notifications_success_footer_phone">Cuando termina una descarga o Descubrir encuentra descargas. Se silencia en los modos Silencio y No molestar.</string>
   <string name="settings_notifications_browser">Notificaciones del navegador</string>
   <string name="settings_notifications_allowed">Las notificaciones están permitidas</string>
   <string name="settings_notifications_allowed_hint">Se muestran mientras la pestaña de Ketch está en segundo plano.</string>
@@ -176,8 +176,8 @@
   <string name="settings_integration_torrent">Abrir archivos .torrent con Ketch</string>
   <string name="settings_integration_is_default">Ketch es la predeterminada</string>
   <string name="settings_integration_make_default">Establecer como predeterminada</string>
-  <string name="settings_integration_magnet_refused">Ketch no pudo configurarse para abrir enlaces magnet. Elígela en los ajustes del sistema.</string>
-  <string name="settings_integration_torrent_refused">Ketch no pudo configurarse para abrir archivos .torrent. Elígela en los ajustes del sistema.</string>
+  <string name="settings_integration_magnet_refused">No se pudo hacer de Ketch la app predeterminada para enlaces magnet. Elígela en los ajustes del sistema.</string>
+  <string name="settings_integration_torrent_refused">No se pudo hacer de Ketch la app predeterminada para archivos .torrent. Elígela en los ajustes del sistema.</string>
   <string name="settings_integration_magnet_failed">No se pudo configurar Ketch para abrir enlaces magnet: %1$s</string>
   <string name="settings_integration_torrent_failed">No se pudo configurar Ketch para abrir archivos .torrent: %1$s</string>
   <string name="settings_integration_clipboard">Portapapeles</string>
@@ -194,7 +194,7 @@
 
   <string name="settings_ai_discovery">Búsqueda con IA</string>
   <string name="settings_ai_content_filter">Filtro de contenido</string>
-  <string name="settings_ai_content_filter_hint">Oculta los resultados que parecen inseguros: enlaces acortados, agregadores de descargas, piratería, sitios que imitan a otros e instaladores por HTTP sin cifrar. Los enlaces a tu propia red se ocultan siempre.</string>
+  <string name="settings_ai_content_filter_hint">Oculta enlaces acortados, agregadores de descargas, piratería, sitios que imitan a otros e instaladores por HTTP sin cifrar. Los enlaces a tu propia red se ocultan siempre.</string>
   <string name="settings_ai_provider">Proveedor</string>
   <string name="settings_ai_api_key">Clave de API</string>
   <string name="settings_ai_model">Modelo</string>
@@ -205,7 +205,7 @@
   <string name="settings_ai_status_unsupported">Funciona en las apps de escritorio y Android.</string>
   <string name="settings_ai_status_needs_provider">Elige un proveedor y añade su clave abajo.</string>
   <string name="settings_ai_status_needs_search">Añade las credenciales de búsqueda web que faltan.</string>
-  <string name="settings_ai_status_off">Permite que Descubrir encuentre descargas por ti.</string>
+  <string name="settings_ai_status_off">Encuentra descargas describiéndolas.</string>
   <string name="settings_ai_status_ready">Listo · %1$s · %2$s</string>
   <string name="settings_ai_model_group">Modelo</string>
   <string name="settings_ai_provider_ollama">Ollama · se ejecuta en local, sin clave</string>
@@ -248,7 +248,7 @@
   <string name="settings_ai_access_allow">Permitir automáticamente</string>
   <string name="settings_ai_access_allow_hint">Abre sin preguntar cualquier sitio web que necesite una búsqueda.</string>
   <string name="settings_ai_access_ask_site">Preguntar por cada sitio nuevo</string>
-  <string name="settings_ai_access_ask_site_hint">Pregunta la primera vez que un chat abre un sitio. Si eliges Permitir siempre, se recuerda el sitio.</string>
+  <string name="settings_ai_access_ask_site_hint">Pregunta una vez por sitio en cada chat, salvo que elijas Permitir siempre.</string>
   <string name="settings_ai_access_ask">Preguntar siempre</string>
   <string name="settings_ai_access_ask_hint">Pregunta antes de cada página y de cada comprobación de archivo.</string>
   <string name="settings_ai_access_trusted">Siempre permitidos</string>
@@ -256,9 +256,9 @@
   <string name="settings_ai_access_trusted_none">Ninguno todavía. Elige Permitir siempre cuando Descubrir pregunte, o añade un sitio aquí.</string>
   <string name="settings_ai_access_add">Añade un sitio, como ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">Escribe el nombre de un sitio web, como ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Los sitios que indiques como destinos de búsqueda no requieren otra autorización de acceso.</string>
+  <string name="settings_ai_access_footer">Las búsquedas limitadas a sitios web que indiques nunca preguntan.</string>
 
-  <string name="settings_about_name_line">Un ketch es un velero de dos mástiles. Ketch divide cada descarga en carriles, como sus velas.</string>
+  <string name="settings_about_name_line">Un ketch es un velero de dos mástiles.</string>
   <string name="settings_about_discover_elsewhere">Descubrir funciona en las apps de escritorio y Android.</string>
   <string name="settings_about_version">Versión</string>
   <string name="settings_about_build">Compilación</string>
@@ -272,10 +272,10 @@
   <string name="settings_about_getting_started">Primeros pasos</string>
   <string name="settings_about_checklist">Mostrar la lista de configuración</string>
   <string name="settings_about_checklist_hint">Los pasos de configuración en una página Descargas vacía.</string>
-  <string name="settings_about_checklist_done">Listo. Se muestra mientras la lista de Descargas está vacía.</string>
+  <string name="settings_about_checklist_done">Se muestra mientras la lista de Descargas está vacía.</string>
   <string name="settings_about_welcome">Volver a mostrar la bienvenida</string>
   <string name="settings_about_welcome_hint">Dónde van las descargas y cómo usas Ketch en este dispositivo.</string>
-  <string name="settings_about_welcome_done">Listo. Las pantallas de bienvenida se mostrarán la próxima vez que abras Ketch.</string>
+  <string name="settings_about_welcome_done">Se mostrará la próxima vez que abras Ketch.</string>
   <string name="settings_about_troubleshooting">Solución de problemas</string>
   <string name="settings_about_logs_footer">Los registros incluyen nombres y enlaces de descargas. Revísalos antes de publicarlos.</string>
   <string name="settings_about_updates">Actualizaciones</string>
@@ -286,7 +286,7 @@
   <string name="settings_about_update_current_hint">%1$s es la última versión.</string>
   <string name="settings_about_update_available">Ketch %1$s está disponible</string>
   <string name="settings_about_update_available_hint">Tienes la %1$s.</string>
-  <string name="settings_about_update_source_hint">Esta versión se ha compilado a partir del código fuente. Encontrarás los instaladores en la página de la versión.</string>
+  <string name="settings_about_update_source_hint">Compilada desde el código fuente. Descarga los instaladores en la página de la versión.</string>
   <string name="settings_about_update_downloading">Descargando Ketch %1$s…</string>
   <string name="settings_about_update_progress">%1$s de %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s está listo para instalarse</string>
@@ -369,17 +369,17 @@
   <string name="settings_speed_limit_hint">Todas las descargas lo comparten; el límite propio de una descarga puede ser menor.</string>
   <string name="settings_speed_mode_group">Modo</string>
   <string name="settings_speed_mode">Modo de velocidad</string>
-  <string name="settings_speed_full_unlimited">Las descargas usan toda la velocidad disponible.</string>
+  <string name="settings_speed_full_unlimited">Sin límite de velocidad.</string>
   <string name="settings_speed_full_capped">La velocidad total de las descargas está limitada a %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">La velocidad total de las descargas está limitada a %1$s para dejar ancho de banda para las llamadas.</string>
-  <string name="settings_speed_auto_no_rules">Añade una regla abajo para que el modo lento se active solo.</string>
+  <string name="settings_speed_slow_lane_summary">Las descargas comparten como máximo %1$s.</string>
+  <string name="settings_speed_auto_no_rules">Añade una regla para programar el modo lento.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Límites</string>
   <string name="settings_speed_full_cap">Límite de la velocidad máxima</string>
-  <string name="settings_speed_full_cap_hint">La velocidad total máxima de las descargas cuando el modo lento está desactivado.</string>
+  <string name="settings_speed_full_cap_hint">Límite compartido fuera del modo lento.</string>
   <string name="settings_speed_slow_lane">Velocidad del modo lento</string>
   <string name="settings_speed_slow_lane_suggested">Se sugiere ≈ %1$s, el %2$d % de la velocidad más alta vista esta semana.</string>
-  <string name="settings_speed_slow_lane_unknown">%1$s hasta que Ketch vea qué velocidad alcanza esta conexión.</string>
+  <string name="settings_speed_slow_lane_unknown">%1$s hasta que Ketch mida esta conexión.</string>
   <string name="settings_speed_slow_lane_capped">El límite de la velocidad máxima, %1$s, es menor y se aplica en su lugar.</string>
   <string name="settings_speed_rules">Reglas de Automático</string>
   <string name="settings_speed_rules_footer_auto">Las reglas siguen la hora local de este dispositivo.</string>
@@ -545,7 +545,7 @@
   <string name="settings_search_start_hidden_keywords">inicio, arranque, segundo plano, barra de menús, bandeja, oculto</string>
   <string name="settings_search_badge">Lo que muestra el icono del Dock o de la barra de tareas</string>
   <string name="settings_search_badge_keywords">contador, dock, barra de tareas, globo, insignia</string>
-  <string name="settings_search_shortcuts">Todos los atajos de Ketch</string>
+  <string name="settings_search_shortcuts">Todos los atajos de teclado</string>
   <string name="settings_search_shortcuts_keywords">teclas, atajos, combinaciones de teclas, teclado</string>
   <string name="settings_search_finished_keywords">completada, terminada, aviso, alerta</string>
   <string name="settings_search_failed_keywords">error, fallo, aviso, alerta</string>

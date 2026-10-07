@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">Kein Link zum Herunterladen</string>
 
   <string name="notifications_offer_title">Benachrichtigungen zu Downloads und Entdecken</string>
-  <string name="notifications_offer_message">Ketch benachrichtigt dich, wenn ein Download fertig ist oder fehlschlägt. Auch wenn Entdecken deine Erlaubnis für den Zugriff auf eine Website braucht, erhältst du eine Nachricht – selbst während du andere Apps nutzt.</string>
+  <string name="notifications_offer_message">Lass dich benachrichtigen, wenn Downloads fertig sind oder fehlschlagen oder Entdecken deine Erlaubnis braucht – auch während du andere Apps nutzt.</string>
   <string name="notifications_offer_allow">Erlauben</string>
   <string name="notifications_offer_not_now">Nicht jetzt</string>
 </resources>

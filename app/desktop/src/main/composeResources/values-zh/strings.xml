@@ -58,7 +58,7 @@
   <string name="message_update_ready">Ketch %1$s 已准备好安装</string>
   <string name="message_update_installed">已更新到 Ketch %1$s</string>
   <string name="message_update_failed">无法更新到 Ketch %1$s</string>
-  <string name="message_update_failed_hint">日志文件夹中的 update.log 记录了出错原因。</string>
+  <string name="message_update_failed_hint">请查看日志文件夹中的 update.log。</string>
   <string name="message_update">更新</string>
   <string name="message_restart">重新启动</string>
   <string name="message_open_installer">打开安装程序</string>

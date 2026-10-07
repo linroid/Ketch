@@ -58,7 +58,7 @@
   <string name="message_update_ready">Ketch %1$s 설치 준비 완료</string>
   <string name="message_update_installed">Ketch %1$s 버전으로 업데이트됨</string>
   <string name="message_update_failed">Ketch %1$s 버전으로 업데이트할 수 없음</string>
-  <string name="message_update_failed_hint">로그 폴더의 update.log에서 원인을 확인할 수 있습니다.</string>
+  <string name="message_update_failed_hint">로그 폴더의 update.log를 확인하세요.</string>
   <string name="message_update">업데이트</string>
   <string name="message_restart">재시작</string>
   <string name="message_open_installer">설치 프로그램 열기</string>

@@ -152,8 +152,8 @@
     <item quantity="other">%1$d개 완료 · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">단일 연결</string>
-  <string name="inspector_connections_live">연결 수를 바꾸면 남은 바이트를 즉시 다시 나눕니다.</string>
-  <string name="inspector_connections_on_resume">바꾼 연결 수는 다운로드를 재개할 때 적용됩니다.</string>
+  <string name="inspector_connections_live">바로 적용됩니다.</string>
+  <string name="inspector_connections_on_resume">다운로드를 재개할 때 적용됩니다.</string>
   <string name="inspector_lane_description">연결 %1$d, %2$s, %3$s</string>
   <string name="inspector_percent_spoken">%1$d퍼센트</string>
 

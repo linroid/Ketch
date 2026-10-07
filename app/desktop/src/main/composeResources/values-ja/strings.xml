@@ -58,7 +58,7 @@
   <string name="message_update_ready">Ketch %1$sをインストールする準備ができました</string>
   <string name="message_update_installed">Ketch %1$sにアップデートしました</string>
   <string name="message_update_failed">Ketch %1$sにアップデートできませんでした</string>
-  <string name="message_update_failed_hint">ログフォルダのupdate.logに原因が記録されています。</string>
+  <string name="message_update_failed_hint">ログフォルダのupdate.logを確認してください。</string>
   <string name="message_update">アップデート</string>
   <string name="message_restart">再起動</string>
   <string name="message_open_installer">インストーラを開く</string>

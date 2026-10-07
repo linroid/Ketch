@@ -12,8 +12,8 @@
     <item quantity="one">%1$d download precisa de atenção</item>
     <item quantity="other">%1$d downloads precisam de atenção</item>
   </plurals>
-  <string name="pulse_all_quiet">Tudo tranquilo</string>
-  <string name="pulse_all_quiet_free">Tudo tranquilo · %2$s: %1$s livres</string>
+  <string name="pulse_all_quiet">Ocioso</string>
+  <string name="pulse_all_quiet_free">Ocioso · %2$s: %1$s livres</string>
   <string name="pulse_connecting">Conectando a %1$s</string>
   <string name="pulse_needs_token">%1$s precisa de um token</string>
   <string name="pulse_offline">%1$s está offline · tentando novamente</string>
@@ -91,14 +91,14 @@
   <string name="pulse_use_as_slow_lane">Usar como velocidade do modo lento</string>
   <string name="pulse_speed_settings">Configurações de velocidade…</string>
   <string name="pulse_update_failed">Não foi possível atualizar %1$s · %2$s</string>
-  <string name="pulse_caption_full">Os downloads usam toda a velocidade que a rede permite.</string>
+  <string name="pulse_caption_full">Sem limite de velocidade.</string>
   <string name="pulse_caption_capped">Os downloads estão limitados a %1$s.</string>
-  <string name="pulse_caption_slow_lane">A velocidade total dos downloads é limitada a %1$s para deixar banda disponível para outros apps.</string>
+  <string name="pulse_caption_slow_lane">Os downloads compartilham %1$s.</string>
   <string name="pulse_caption_no_rules">Nenhuma regra de velocidade ainda. Adicione nas Configurações de velocidade.</string>
   <string name="pulse_caption_rule_slow_lane">Uma regra mantém o modo lento ativado.</string>
   <string name="pulse_caption_rule_full">Velocidade máxima até uma regra ativar o modo lento.</string>
-  <string name="pulse_caption_slow_lane_until">Modo lento até %1$s; depois, suas regras decidem.</string>
-  <string name="pulse_caption_full_until">Velocidade máxima até %1$s; depois, suas regras decidem.</string>
+  <string name="pulse_caption_slow_lane_until">Modo lento até %1$s; depois, valem suas regras.</string>
+  <string name="pulse_caption_full_until">Velocidade máxima até %1$s; depois, valem suas regras.</string>
   <string name="pulse_limit_for_slow_lane">Usado sempre que o modo lento está ativado.</string>
   <string name="pulse_limit_for_device">Vale para todos os downloads feitos por %1$s.</string>
   <string name="pulse_limit_after_slow_lane">Vale assim que o modo lento for desativado.</string>

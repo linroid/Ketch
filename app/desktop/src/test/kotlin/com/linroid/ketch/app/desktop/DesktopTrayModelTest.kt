@@ -99,7 +99,7 @@ class DesktopTrayModelTest {
     val idleHeader = trayMenu(tray(idle)).first() as MenuEntry.Header
     val failingHeader = trayMenu(tray(failing)).first() as MenuEntry.Header
 
-    assertEquals("All quiet", idleHeader.text.load())
+    assertEquals("Idle", idleHeader.text.load())
     assertEquals("1 download needs attention", failingHeader.text.load())
     assertEquals(MenuEntry.Header(failing.sentence(now = now)), failingHeader)
   }
@@ -315,7 +315,7 @@ class DesktopTrayModelTest {
 
   @Test
   fun trayTooltip_idle_showsTheSentence() = runTest {
-    assertEquals("Ketch — All quiet", trayTooltip(pulse(PulseCounts()), now).load())
+    assertEquals("Ketch — Idle", trayTooltip(pulse(PulseCounts()), now).load())
   }
 
   @Test

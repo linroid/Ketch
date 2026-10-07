@@ -45,9 +45,9 @@
   <string name="error_source">Le serveur %1$s a signalé une erreur</string>
 
   <string name="error_http_sign_in">Connexion requise (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s exige que vous soyez connecté. Envoyez le lien depuis l'extension de navigateur Ketch pour transmettre vos cookies.</string>
+  <string name="error_http_sign_in_hint">%1$s exige que vous soyez connecté. Ajoutez le téléchargement depuis l'extension de navigateur Ketch pour envoyer vos cookies.</string>
   <string name="error_http_sign_in_hint_short">%1$s exige que vous soyez connecté</string>
-  <string name="error_http_sign_in_hint_server">Le serveur exige que vous soyez connecté. Envoyez le lien depuis l'extension de navigateur Ketch pour transmettre vos cookies.</string>
+  <string name="error_http_sign_in_hint_server">Le serveur exige que vous soyez connecté. Ajoutez le téléchargement depuis l'extension de navigateur Ketch pour envoyer vos cookies.</string>
   <string name="error_http_sign_in_hint_server_short">le serveur exige que vous soyez connecté</string>
   <string name="error_http_forbidden">Accès refusé (403)</string>
   <string name="error_http_forbidden_hint">Le lien a peut-être expiré.</string>

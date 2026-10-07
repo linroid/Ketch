@@ -200,7 +200,7 @@ class DeviceTextTest {
 
     assertEquals(ProblemKind.NotConnected, problem?.kind)
     assertEquals(
-      "Ketch keeps only a few devices connected at once. It connects to this one while it shows.",
+      "Ketch connects to a few devices at a time. This one connects while it's shown.",
       problem?.detail.load()
     )
   }
