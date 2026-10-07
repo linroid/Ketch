@@ -17,6 +17,7 @@ import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.feedback.reportActivity
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FolderBookmarks
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -45,6 +46,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okio.FileSystem
 import okio.IOException
@@ -203,6 +205,7 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
     TorrentConfig(
       stateDirectory = "$supportDir/torrent-state",
       additionalTrackers = config.torrent.trackers,
+      trackerListUrl = config.torrent.subscribedTrackerList,
     ),
   )
   return InstanceManager(
@@ -222,7 +225,14 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
           ),
         )
       },
-      applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
+      applyTorrentSettings = {
+        torrentSource.setAdditionalTrackers(it.trackers)
+        torrentSource.setTrackerList(it.subscribedTrackerList)
+      },
+      trackerList = torrentSource.trackerList.map {
+        TrackerListStatus(it.trackers.size, it.updatedAt, it.failed, it.updating)
+      },
+      refreshTrackerList = torrentSource::refreshTrackerList,
     ),
     initialRemotes = config.remotes,
     configStore = configStore,

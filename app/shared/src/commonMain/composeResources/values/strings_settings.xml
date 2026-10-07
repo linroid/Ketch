@@ -595,6 +595,40 @@
     <item quantity="one">and %1$d more.</item>
     <item quantity="other">and %1$d more.</item>
   </plurals>
+  <!-- The group for a tracker list the device downloads, such as ngosang's trackers_best.txt. -->
+  <string name="settings_torrent_list">Tracker list</string>
+  <string name="settings_torrent_list_subscribe">Subscribe to a tracker list</string>
+  <string name="settings_torrent_list_subscribe_hint">Public torrents also announce to the trackers it lists, after the extra trackers. Updated daily.</string>
+  <string name="settings_torrent_list_url">List address</string>
+  <!-- Under the address while the subscription is off. -->
+  <string name="settings_torrent_list_url_hint">A text file with one announce URL per line.</string>
+  <!-- Under the address field when what was typed is not a web address. -->
+  <string name="settings_torrent_list_url_invalid">Enter an http or https address.</string>
+  <!-- Puts back ngosang's trackers_best.txt as the address. -->
+  <string name="settings_torrent_list_default">Use default</string>
+  <string name="settings_torrent_list_update">Update now</string>
+  <string name="settings_torrent_list_updating">Downloading the list…</string>
+  <!-- %1$d is how many trackers the list holds, %2$s how long ago it was downloaded, such as "3h 12m". -->
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d tracker · updated %2$s ago</item>
+    <item quantity="other">%1$d trackers · updated %2$s ago</item>
+  </plurals>
+  <!-- Before the first download of the default list, which Ketch ships a copy of. -->
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">Using %1$d built-in tracker until the list downloads.</item>
+    <item quantity="other">Using %1$d built-in trackers until the list downloads.</item>
+  </plurals>
+  <!-- %1$d is how many trackers the older copy holds, %2$s how long ago it was downloaded. -->
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Couldn't update the list. Using %1$d tracker from %2$s ago.</item>
+    <item quantity="other">Couldn't update the list. Using %1$d trackers from %2$s ago.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Couldn't download the list. Using %1$d built-in tracker.</item>
+    <item quantity="other">Couldn't download the list. Using %1$d built-in trackers.</item>
+  </plurals>
+  <string name="settings_torrent_list_failed">Couldn't download the list.</string>
+  <string name="settings_torrent_list_footer">The list's website sees this device's IP address when it downloads.</string>
 
   <!-- Sharing. -->
   <!-- On the page of a device that is not this one, %1$s. "ketch server" is a command. -->

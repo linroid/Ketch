@@ -84,6 +84,19 @@ including a development run, hands its files to the running app instead of openi
   the list for torrents started or resumed later. The apps edit the embedded instance's list under
   Settings → BitTorrent and apply it this way; a remote instance's list can only be changed on
   that device.
+- `trackerListUrl` (`[torrent] trackerList = true` with `trackerListUrl`, by default ngosang's
+  [`trackers_best.txt`](https://github.com/ngosang/trackerslist)) subscribes to a plain-text
+  tracker list, one announce URL per line. The source downloads it when created and daily after,
+  at most 256 KiB and 64 usable trackers (others, such as `wss`, are dropped), and uses them like
+  `additionalTrackers`, after them, within the same 64. A copy in `stateDirectory`
+  (`tracker-list.txt`) is used on restart, without downloading while it is under a day old; a
+  failed download keeps it and retries after an hour, and a list with no usable trackers counts
+  as failed. Until the default list first downloads, `TorrentConfig.BEST_TRACKERS`, the copy Ketch
+  ships, stands in. The apps and CLI subscribe by default (`[torrent] trackerList = false` turns it
+  off), so magnets without trackers still find peers where DHT cannot bootstrap; downloading the
+  list shows its host this device's IP address. `TorrentConfig.trackerListUrl` itself defaults to
+  `null` for SDK users. `setTrackerList` and `refreshTrackerList` change or update it at runtime,
+  `trackerList` reports it; the apps show it under Settings → BitTorrent → Tracker list.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not

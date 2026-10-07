@@ -274,6 +274,12 @@ class InstanceManager(
     factory.applyTorrentSettings?.invoke(settings)
   }
 
+  /** What the embedded instance's subscribed tracker list holds; `null` without torrents. */
+  val trackerList: Flow<TrackerListStatus>? get() = factory.trackerList
+
+  /** Downloads the embedded instance's subscribed tracker list again now. */
+  fun refreshTrackerList() = factory.refreshTrackerList()
+
   /**
    * Replaces [old] with a new remote instance that reaches it over HTTPS when [secure] or HTTP
    * otherwise, with [token] when it brings one or the code it has, then starts the connection.

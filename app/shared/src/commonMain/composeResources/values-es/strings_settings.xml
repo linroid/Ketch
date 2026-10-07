@@ -452,6 +452,33 @@
     <item quantity="one">y %1$d más.</item>
     <item quantity="other">y %1$d más.</item>
   </plurals>
+  <string name="settings_torrent_list">Lista de trackers</string>
+  <string name="settings_torrent_list_subscribe">Suscribirse a una lista de trackers</string>
+  <string name="settings_torrent_list_subscribe_hint">Los torrents públicos también se anuncian en los trackers de la lista, después de los adicionales. Se actualiza a diario.</string>
+  <string name="settings_torrent_list_url">Dirección de la lista</string>
+  <string name="settings_torrent_list_url_hint">Un archivo de texto con una URL de anuncio por línea.</string>
+  <string name="settings_torrent_list_url_invalid">Escribe una dirección http o https.</string>
+  <string name="settings_torrent_list_default">Usar la predeterminada</string>
+  <string name="settings_torrent_list_update">Actualizar ahora</string>
+  <string name="settings_torrent_list_updating">Descargando la lista…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d tracker · actualizada hace %2$s</item>
+    <item quantity="other">%1$d trackers · actualizada hace %2$s</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">Se usa %1$d tracker integrado hasta que se descargue la lista.</item>
+    <item quantity="other">Se usan %1$d trackers integrados hasta que se descargue la lista.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">No se pudo actualizar la lista. Se usa %1$d tracker de hace %2$s.</item>
+    <item quantity="other">No se pudo actualizar la lista. Se usan %1$d trackers de hace %2$s.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">No se pudo descargar la lista. Se usa %1$d tracker integrado.</item>
+    <item quantity="other">No se pudo descargar la lista. Se usan %1$d trackers integrados.</item>
+  </plurals>
+  <string name="settings_torrent_list_failed">No se pudo descargar la lista.</string>
+  <string name="settings_torrent_list_footer">Al descargarla, el sitio de la lista ve la dirección IP de este dispositivo.</string>
 
   <string name="settings_sharing_remote">Configura el uso compartido directamente en %1$s, en Ketch o con ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s no puede compartir sus descargas con otros dispositivos.</string>

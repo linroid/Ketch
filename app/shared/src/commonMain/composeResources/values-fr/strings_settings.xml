@@ -452,6 +452,33 @@
     <item quantity="one">et %1$d autre.</item>
     <item quantity="other">et %1$d autres.</item>
   </plurals>
+  <string name="settings_torrent_list">Liste de trackers</string>
+  <string name="settings_torrent_list_subscribe">S'abonner à une liste de trackers</string>
+  <string name="settings_torrent_list_subscribe_hint">Les torrents publics s'annoncent aussi auprès des trackers de la liste, après les trackers supplémentaires. Mise à jour quotidienne.</string>
+  <string name="settings_torrent_list_url">Adresse de la liste</string>
+  <string name="settings_torrent_list_url_hint">Un fichier texte avec une URL d'annonce par ligne.</string>
+  <string name="settings_torrent_list_url_invalid">Saisissez une adresse http ou https.</string>
+  <string name="settings_torrent_list_default">Utiliser la valeur par défaut</string>
+  <string name="settings_torrent_list_update">Mettre à jour</string>
+  <string name="settings_torrent_list_updating">Téléchargement de la liste…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d tracker · mis à jour il y a %2$s</item>
+    <item quantity="other">%1$d trackers · mis à jour il y a %2$s</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">%1$d tracker intégré est utilisé en attendant le téléchargement de la liste.</item>
+    <item quantity="other">%1$d trackers intégrés sont utilisés en attendant le téléchargement de la liste.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Impossible de mettre à jour la liste. Utilisation de %1$d tracker d'il y a %2$s.</item>
+    <item quantity="other">Impossible de mettre à jour la liste. Utilisation de %1$d trackers d'il y a %2$s.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Impossible de télécharger la liste. Utilisation de %1$d tracker intégré.</item>
+    <item quantity="other">Impossible de télécharger la liste. Utilisation de %1$d trackers intégrés.</item>
+  </plurals>
+  <string name="settings_torrent_list_failed">Impossible de télécharger la liste.</string>
+  <string name="settings_torrent_list_footer">Le site de la liste voit l'adresse IP de cet appareil lors du téléchargement.</string>
 
   <string name="settings_sharing_remote">Configurez le partage sur %1$s lui-même, dans Ketch ou avec ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s ne peut pas partager ses téléchargements avec d'autres appareils.</string>

@@ -11,6 +11,7 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsCategory
@@ -40,6 +41,7 @@ import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 /**
  * The device pages of Settings (Downloads, Speed, Network, BitTorrent and Sharing) on their own,
@@ -308,6 +310,7 @@ private class DeviceEnvironment(
       deviceName = data.deviceName,
       embeddedFactory = { api },
       localServerFactory = PretendServer,
+      trackerList = MutableStateFlow(TrackerListStatus(20, SampleData.NOW - 3.hours)),
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(

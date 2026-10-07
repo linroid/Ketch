@@ -108,7 +108,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
-  `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TorrentMetadata`,
+  `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
   `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`
 
 ### `library:endpoints`
@@ -306,6 +306,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
+- Extra trackers and a daily-updated tracker list, on by default (ngosang's `trackers_best.txt` by
+  default, with a copy shipped for before its first download) for public torrents
 - Verified selected-file storage, ownership journal, restart rehash, live limits and explicit
   seeding
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
@@ -414,9 +416,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
   Settings (app-only; CLI and server ignore it)
-- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`),
-  edited on the embedded instance's BitTorrent settings page and applied to torrents as they
-  start or resume; a remote instance's trackers are only editable on that device
+- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`) and
+  a tracker list subscription, on by default (`trackerList`, `trackerListUrl`, default ngosang's
+  `trackers_best.txt`; `TorrentConfig.trackerListUrl`), edited on the embedded instance's
+  BitTorrent settings page and applied to torrents as they start or resume; a remote instance's
+  trackers are only editable on that device
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
@@ -772,7 +776,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "RemoteKetch", "RemoteTask", "RemotePairing", "TokenBucket", "SqliteStore",
+  "TorrentTracker", "TrackerList", "RemoteKetch", "RemoteTask", "RemotePairing", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes",
   "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")

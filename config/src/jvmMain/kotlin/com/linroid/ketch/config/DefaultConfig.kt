@@ -51,6 +51,10 @@ maxConnectionsPerHost = 16
 # apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+# Subscribe to a list of public trackers (one announce URL per line), downloaded
+# daily and used after the trackers above.
+# trackerList = true
+# trackerListUrl = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
 
 # Pre-configured remote servers. The apps show `name` (or the name the server
 # announces) and stay connected to a device while another is shown unless

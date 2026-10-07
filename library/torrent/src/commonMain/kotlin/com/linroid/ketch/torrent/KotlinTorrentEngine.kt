@@ -967,7 +967,7 @@ internal class KotlinTorrentEngine(
 }
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
-private const val MAX_ADDITIONAL_TRACKERS = 64
+internal const val MAX_ADDITIONAL_TRACKERS = 64
 private const val DHT_REFRESH_MS = 15 * 60_000L
 
 private val attemptLog = KetchLogger("TorrentEngine")

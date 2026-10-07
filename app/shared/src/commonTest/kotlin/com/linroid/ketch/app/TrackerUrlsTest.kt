@@ -1,15 +1,23 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.addTrackers
+import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.parseTrackers
 import com.linroid.ketch.app.state.trackerHost
+import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.trackerUrlError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class TrackerUrlsTest {
 
@@ -85,5 +93,45 @@ class TrackerUrlsTest {
     assertEquals("tracker.example", trackerHost("udp://user@tracker.example:1337/announce"))
     assertEquals("2001:db8::1", trackerHost("udp://[2001:db8::1]:6969"))
     assertEquals("udp://[2001:db8::1", trackerHost("udp://[2001:db8::1"))
+  }
+
+  @Test
+  fun `tracker list addresses are http or https urls with a host`() {
+    assertTrue(isTrackerListUrl("https://raw.githubusercontent.com/ngosang/trackerslist/x.txt"))
+    assertTrue(isTrackerListUrl("HTTP://lists.example:8080/best.txt"))
+    assertFalse(isTrackerListUrl("udp://tracker.example:1337/announce"))
+    assertFalse(isTrackerListUrl("https:///best.txt"))
+    assertFalse(isTrackerListUrl("https://lists.example/best list.txt"))
+    assertFalse(isTrackerListUrl("lists.example/best.txt"))
+  }
+
+  @Test
+  fun `tracker list status says what the list holds and how old it is`() = runTest {
+    val now = Instant.fromEpochMilliseconds(1_790_000_000_000)
+    val updated = now - 3.hours - 12.minutes
+    assertEquals(
+      "20 trackers · updated 3h 12m ago",
+      trackerListStatusText(TrackerListStatus(20, updated), now).load(),
+    )
+    assertEquals(
+      "Couldn't update the list. Using 1 tracker from 3h 12m ago.",
+      trackerListStatusText(TrackerListStatus(1, updated, failed = true), now).load(),
+    )
+    assertEquals(
+      "Using 20 built-in trackers until the list downloads.",
+      trackerListStatusText(TrackerListStatus(20), now).load(),
+    )
+    assertEquals(
+      "Couldn't download the list. Using 20 built-in trackers.",
+      trackerListStatusText(TrackerListStatus(20, failed = true), now).load(),
+    )
+    assertEquals(
+      "Couldn't download the list.",
+      trackerListStatusText(TrackerListStatus(failed = true), now).load(),
+    )
+    assertEquals(
+      "Downloading the list…",
+      trackerListStatusText(TrackerListStatus(20, updated, updating = true), now).load(),
+    )
   }
 }

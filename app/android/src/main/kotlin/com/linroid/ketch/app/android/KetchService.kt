@@ -31,6 +31,7 @@ import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
@@ -71,6 +72,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -156,6 +158,7 @@ class KetchService : Service() {
       TorrentConfig(
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,
         additionalTrackers = config.torrent.trackers,
+        trackerListUrl = config.torrent.subscribedTrackerList,
       ),
     )
     instanceManager = InstanceManager(
@@ -215,7 +218,14 @@ class KetchService : Service() {
             }
           }
         },
-        applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
+        applyTorrentSettings = {
+          torrentSource.setAdditionalTrackers(it.trackers)
+          torrentSource.setTrackerList(it.subscribedTrackerList)
+        },
+        trackerList = torrentSource.trackerList.map {
+          TrackerListStatus(it.trackers.size, it.updatedAt, it.failed, it.updating)
+        },
+        refreshTrackerList = torrentSource::refreshTrackerList,
       ),
       initialRemotes = config.remotes,
       configStore = configStore,

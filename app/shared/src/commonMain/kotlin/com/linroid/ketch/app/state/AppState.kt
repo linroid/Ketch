@@ -612,6 +612,8 @@ class AppState(
         local = appSettings.takeIf { entry is EmbeddedInstance },
         scope = scope,
         applyTorrent = instanceManager::applyTorrentSettings,
+        trackerList = instanceManager.trackerList,
+        refreshTrackerList = instanceManager::refreshTrackerList,
         savedSpeedLimit = { config -> standingCap(config.speedLimit) },
       )
     }
