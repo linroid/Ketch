@@ -462,6 +462,8 @@
   <plurals name="settings_torrent_list_fallback">
     <item quantity="other">목록을 다운로드할 수 없습니다. 내장 트래커 %1$d개를 사용합니다.</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">목록의 트래커</string>
+  <string name="settings_torrent_list_hide">숨기기</string>
   <string name="settings_torrent_list_failed">목록을 다운로드할 수 없습니다.</string>
   <string name="settings_torrent_list_footer">목록을 다운로드할 때 해당 사이트에 이 기기의 IP 주소가 표시됩니다.</string>
 

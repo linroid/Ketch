@@ -223,7 +223,7 @@ class KetchService : Service() {
           torrentSource.setTrackerList(it.subscribedTrackerList)
         },
         trackerList = torrentSource.trackerList.map {
-          TrackerListStatus(it.trackers.size, it.updatedAt, it.failed, it.updating)
+          TrackerListStatus(it.trackers, it.updatedAt, it.failed, it.updating)
         },
         refreshTrackerList = torrentSource::refreshTrackerList,
       ),

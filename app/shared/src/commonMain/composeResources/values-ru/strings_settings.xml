@@ -507,6 +507,8 @@
     <item quantity="many">Не удалось загрузить список. Используются %1$d встроенных трекеров.</item>
     <item quantity="other">Не удалось загрузить список. Используются %1$d встроенного трекера.</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">Трекеры из списка</string>
+  <string name="settings_torrent_list_hide">Скрыть</string>
   <string name="settings_torrent_list_failed">Не удалось загрузить список.</string>
   <string name="settings_torrent_list_footer">При загрузке сайт списка видит IP-адрес этого устройства.</string>
 

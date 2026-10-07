@@ -477,6 +477,8 @@
     <item quantity="one">Impossible de télécharger la liste. Utilisation de %1$d tracker intégré.</item>
     <item quantity="other">Impossible de télécharger la liste. Utilisation de %1$d trackers intégrés.</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">Trackers de la liste</string>
+  <string name="settings_torrent_list_hide">Masquer</string>
   <string name="settings_torrent_list_failed">Impossible de télécharger la liste.</string>
   <string name="settings_torrent_list_footer">Le site de la liste voit l'adresse IP de cet appareil lors du téléchargement.</string>
 

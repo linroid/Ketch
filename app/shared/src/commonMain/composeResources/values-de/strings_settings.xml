@@ -477,6 +477,8 @@
     <item quantity="one">Die Liste konnte nicht geladen werden. %1$d integrierter Tracker wird verwendet.</item>
     <item quantity="other">Die Liste konnte nicht geladen werden. %1$d integrierte Tracker werden verwendet.</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">Tracker der Liste</string>
+  <string name="settings_torrent_list_hide">Ausblenden</string>
   <string name="settings_torrent_list_failed">Die Liste konnte nicht geladen werden.</string>
   <string name="settings_torrent_list_footer">Beim Laden sieht die Website der Liste die IP-Adresse dieses Geräts.</string>
 

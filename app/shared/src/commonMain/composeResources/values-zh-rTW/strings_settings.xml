@@ -462,6 +462,8 @@
   <plurals name="settings_torrent_list_fallback">
     <item quantity="other">無法下載清單。正在使用 %1$d 個內建 Tracker。</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">清單中的 Tracker</string>
+  <string name="settings_torrent_list_hide">隱藏</string>
   <string name="settings_torrent_list_failed">無法下載清單。</string>
   <string name="settings_torrent_list_footer">下載清單時，其網站會看到此裝置的 IP 位址。</string>
 

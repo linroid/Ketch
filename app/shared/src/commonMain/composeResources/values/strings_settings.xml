@@ -627,6 +627,9 @@
     <item quantity="one">Couldn't download the list. Using %1$d built-in tracker.</item>
     <item quantity="other">Couldn't download the list. Using %1$d built-in trackers.</item>
   </plurals>
+    <!-- A row that shows or hides the trackers the downloaded list holds. -->
+  <string name="settings_torrent_list_trackers">Trackers in the list</string>
+  <string name="settings_torrent_list_hide">Hide</string>
   <string name="settings_torrent_list_failed">Couldn't download the list.</string>
   <string name="settings_torrent_list_footer">The list's website sees this device's IP address when it downloads.</string>
 

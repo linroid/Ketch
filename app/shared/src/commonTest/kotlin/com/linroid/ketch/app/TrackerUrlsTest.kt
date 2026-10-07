@@ -7,6 +7,7 @@ import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.parseTrackers
 import com.linroid.ketch.app.state.trackerHost
 import com.linroid.ketch.app.state.trackerListStatusText
+import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.state.trackerUrlError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -109,21 +110,22 @@ class TrackerUrlsTest {
   fun `tracker list status says what the list holds and how old it is`() = runTest {
     val now = Instant.fromEpochMilliseconds(1_790_000_000_000)
     val updated = now - 3.hours - 12.minutes
+    val twenty = List(20) { "udp://tracker$it.example:6969/announce" }
     assertEquals(
       "20 trackers · updated 3h 12m ago",
-      trackerListStatusText(TrackerListStatus(20, updated), now).load(),
+      trackerListStatusText(TrackerListStatus(twenty, updated), now).load(),
     )
     assertEquals(
       "Couldn't update the list. Using 1 tracker from 3h 12m ago.",
-      trackerListStatusText(TrackerListStatus(1, updated, failed = true), now).load(),
+      trackerListStatusText(TrackerListStatus(twenty.take(1), updated, failed = true), now).load(),
     )
     assertEquals(
       "Using 20 built-in trackers until the list downloads.",
-      trackerListStatusText(TrackerListStatus(20), now).load(),
+      trackerListStatusText(TrackerListStatus(twenty), now).load(),
     )
     assertEquals(
       "Couldn't download the list. Using 20 built-in trackers.",
-      trackerListStatusText(TrackerListStatus(20, failed = true), now).load(),
+      trackerListStatusText(TrackerListStatus(twenty, failed = true), now).load(),
     )
     assertEquals(
       "Couldn't download the list.",
@@ -131,7 +133,18 @@ class TrackerUrlsTest {
     )
     assertEquals(
       "Downloading the list…",
-      trackerListStatusText(TrackerListStatus(20, updated, updating = true), now).load(),
+      trackerListStatusText(TrackerListStatus(twenty, updated, updating = true), now).load(),
     )
+  }
+
+  @Test
+  fun `list trackers past the 64 the engine uses are unused, counting extra trackers first`() {
+    val extra = List(60) { "udp://extra$it.example:6969/announce" }
+    val listed = listOf(extra[0]) + List(6) { "udp://listed$it.example:6969/announce" }
+    assertEquals(
+      setOf("udp://listed4.example:6969/announce", "udp://listed5.example:6969/announce"),
+      unusedListedTrackers(extra, listed),
+    )
+    assertEquals(emptySet(), unusedListedTrackers(emptyList(), listed))
   }
 }

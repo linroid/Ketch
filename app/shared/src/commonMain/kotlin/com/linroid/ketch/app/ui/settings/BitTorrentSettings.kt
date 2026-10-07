@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,10 +32,12 @@ import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.trackerHost
 import com.linroid.ketch.app.state.trackerListStatusText
+import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.TorrentSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_add
+import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.settings_torrent_add
 import ketch.app.shared.generated.resources.settings_torrent_add_hint
@@ -43,8 +46,10 @@ import ketch.app.shared.generated.resources.settings_torrent_footer_first_only
 import ketch.app.shared.generated.resources.settings_torrent_list
 import ketch.app.shared.generated.resources.settings_torrent_list_default
 import ketch.app.shared.generated.resources.settings_torrent_list_footer
+import ketch.app.shared.generated.resources.settings_torrent_list_hide
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe_hint
+import ketch.app.shared.generated.resources.settings_torrent_list_trackers
 import ketch.app.shared.generated.resources.settings_torrent_list_update
 import ketch.app.shared.generated.resources.settings_torrent_list_url
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
@@ -181,7 +186,8 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
 
 /**
  * The tracker list subscription: a switch, the list's address, which starts as ngosang's
- * `trackers_best.txt`, and while subscribed, what the list holds from [status].
+ * `trackers_best.txt`, and while subscribed, what the list holds from [status], with its
+ * trackers behind Show.
  */
 @Composable
 private fun TrackerListGroup(
@@ -257,6 +263,45 @@ private fun TrackerListGroup(
         }
       }
     }
+    val listed = subscribed?.trackers.orEmpty()
+    if (listed.isNotEmpty()) ListedTrackers(listed, unusedListedTrackers(settings.trackers, listed))
+  }
+}
+
+/** The [trackers] a subscribed list holds, read-only and hidden until shown; [unused] get a badge. */
+@Composable
+private fun ListedTrackers(trackers: List<String>, unused: Set<String>) {
+  var shown by rememberSaveable { mutableStateOf(false) }
+  SettingsRow(
+    title = stringResource(Res.string.settings_torrent_list_trackers),
+    trailing = {
+      KetchButton(
+        text = stringResource(
+          if (shown) Res.string.settings_torrent_list_hide else Res.string.action_show,
+        ),
+        onClick = { shown = !shown },
+        variant = KetchButtonVariant.Ghost,
+        size = KetchButtonSize.Small,
+        leadingIcon = if (shown) KetchIcon.ChevronUp else KetchIcon.ChevronDown,
+      )
+    },
+  )
+  if (!shown) return
+  for (url in trackers) {
+    SettingsRow(
+      title = trackerHost(url),
+      description = url,
+      trailing = if (url in unused) {
+        {
+          KetchBadge(
+            text = stringResource(Res.string.settings_torrent_unused),
+            tone = KetchBadgeTone.Warning,
+          )
+        }
+      } else {
+        null
+      },
+    )
   }
 }
 

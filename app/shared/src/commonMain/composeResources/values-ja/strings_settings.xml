@@ -462,6 +462,8 @@
   <plurals name="settings_torrent_list_fallback">
     <item quantity="other">リストをダウンロードできませんでした。内蔵の%1$d件のトラッカーを使用しています。</item>
   </plurals>
+    <string name="settings_torrent_list_trackers">リストのトラッカー</string>
+  <string name="settings_torrent_list_hide">隠す</string>
   <string name="settings_torrent_list_failed">リストをダウンロードできませんでした。</string>
   <string name="settings_torrent_list_footer">リストをダウンロードすると、そのサイトにこのデバイスのIPアドレスが知られます。</string>
 

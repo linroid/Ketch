@@ -78,6 +78,15 @@ fun trackerUrlError(url: String): UiText? {
   return if (valid) null else Res.string.intake_tracker_port.text()
 }
 
+/**
+ * The [listed] trackers of a subscribed list that torrents skip: the engine uses the [extra]
+ * trackers, then the list's, up to [MAX_EXTRA_TRACKERS] usable ones in all.
+ */
+fun unusedListedTrackers(extra: List<String>, listed: List<String>): Set<String> {
+  val used = (extra + listed).distinct().filter { trackerUrlError(it) == null }
+  return used.drop(MAX_EXTRA_TRACKERS).toSet() - extra.toSet()
+}
+
 /** Whether [url] can be a tracker list's address: `http` or `https` with a host, no spaces. */
 fun isTrackerListUrl(url: String): Boolean {
   val scheme = url.substringBefore("://", "").lowercase()
@@ -92,7 +101,7 @@ fun isTrackerListUrl(url: String): Boolean {
  */
 fun trackerListStatusText(status: TrackerListStatus, now: Instant): UiText {
   val updatedAt = status.updatedAt
-  val count = status.trackers
+  val count = status.trackers.size
   return when {
     status.updating -> Res.string.settings_torrent_list_updating.text()
     updatedAt != null -> {
