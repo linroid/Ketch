@@ -36,6 +36,7 @@ import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.isPausedUntilResumed
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import ketch.app.shared.generated.resources.Res
@@ -87,11 +88,19 @@ internal class ListActions(
     if (!click.touch) keyboard.focus()
   }
 
-  /** A double-click on [row]: opens a finished file, otherwise shows the row in the inspector. */
+  /**
+   * A double-click on [row]: pauses a downloading task and resumes a paused one, opens a finished
+   * file, and shows any other row in the inspector.
+   */
   fun doubleClick(row: TaskRow) {
-    val open = RowAction.Open.takeIf { row.state is DownloadState.Completed }
-      ?.takeIf { it in runner.menu(row) }
-    if (open != null) runner.run(open, listOf(row)) else runner.inspect(row.key)
+    val action = when (val state = row.state) {
+      is DownloadState.Downloading -> RowAction.Pause
+      // Paused for an urgent download, it still waits in the queue: Resume would do nothing.
+      is DownloadState.Paused -> RowAction.Resume.takeIf { state.isPausedUntilResumed }
+      is DownloadState.Completed -> RowAction.Open
+      else -> null
+    }?.takeIf { it in runner.menu(row) }
+    if (action != null) runner.run(action, listOf(row)) else runner.inspect(row.key)
   }
 
   /** A right-click on [row] at [position] in it: opens the menu of the rows it acts on. */
@@ -187,9 +196,10 @@ internal data class RowFrameState(
  * It draws the row's hover, selected and keyboard-focused states (`surfaceHover`; `rowSelected`
  * with a 2 dp accent bar, `rowSelectedFocused` while the list has the focus) and wires the
  * pointer through [actions]: a click selects and inspects, ⌘-click toggles, ⇧-click selects a
- * range, a double-click opens, a right-click opens the menu at the pointer, a long-press enters
- * selection mode on touch, and with a pointer the row can be dragged out. [content] gets the
- * row's [RowFrameState], for [HoverActions] and [SelectionCheckbox].
+ * range, a double-click pauses, resumes or opens (see [ListActions.doubleClick]), a right-click
+ * opens the menu at the pointer, a long-press enters selection mode on touch, and with a pointer
+ * the row can be dragged out. [content] gets the row's [RowFrameState], for [HoverActions] and
+ * [SelectionCheckbox].
  *
  * @param shape the row's shape: square in the table, rounded and inset in the list.
  */
