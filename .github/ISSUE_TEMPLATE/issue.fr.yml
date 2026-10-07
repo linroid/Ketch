@@ -9,7 +9,7 @@ body:
     id: type
     attributes:
       label: "Type d’issue"
-      options
+      options:
         - "Rapport de bug"
         - "Demande de fonctionnalité"
         - "Question"
