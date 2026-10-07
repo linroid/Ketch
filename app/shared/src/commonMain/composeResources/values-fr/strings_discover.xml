@@ -3,13 +3,13 @@
   <string name="discover_title">Découvrir</string>
   <string name="discover_settings">Réglages de Découvrir</string>
   <string name="discover_hero_title">Que voulez-vous télécharger ?</string>
-  <string name="discover_intro_body">%1$s cherche sur le web et liste les téléchargements de sources fiables. Rien n'est téléchargé tant que vous ne l'ajoutez pas.</string>
+  <string name="discover_intro_body">%1$s cherche sur le web et liste les téléchargements trouvés. Rien n'est téléchargé tant que vous ne l'ajoutez pas.</string>
   <string name="discover_example_blender">Blender pour Apple silicon</string>
   <string name="discover_example_ubuntu">ISO Ubuntu Server 24.04</string>
   <string name="discover_example_footage">Vidéos de nature 4K du domaine public</string>
   <string name="discover_example_quoted">« %1$s »</string>
 
-  <string name="discover_setup_body">Découvrir utilise un modèle d'IA pour chercher sur le web et lister les téléchargements de sources fiables. Vos recherches sont envoyées au fournisseur choisi.</string>
+  <string name="discover_setup_body">Découvrir utilise un modèle d'IA pour chercher sur le web et lister les téléchargements trouvés. Vos recherches sont envoyées au fournisseur choisi.</string>
   <string name="discover_setup_unsupported">Découvrir fonctionne dans l'app Ketch sur un ordinateur ou un téléphone Android.</string>
   <string name="discover_setup_pending">La recherche « %1$s » démarrera une fois Découvrir configuré.</string>
   <string name="discover_setup_choose_model">Choisir un modèle</string>

@@ -3,13 +3,13 @@
   <string name="discover_title">ディスカバー</string>
   <string name="discover_settings">ディスカバーの設定</string>
   <string name="discover_hero_title">何をダウンロードしますか？</string>
-  <string name="discover_intro_body">%1$sがWebを検索し、信頼できるソースのダウンロードを表示します。追加するまでダウンロードは始まりません。</string>
+  <string name="discover_intro_body">%1$sがWebを検索し、見つかったダウンロードを表示します。追加するまでダウンロードは始まりません。</string>
   <string name="discover_example_blender">Appleシリコン版Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 サーバー版ISO</string>
   <string name="discover_example_footage">パブリックドメインの4K自然映像</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、信頼できるソースのダウンロードを表示します。検索内容は選択したプロバイダに送信されます。</string>
+  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、見つかったダウンロードを表示します。検索内容は選択したプロバイダに送信されます。</string>
   <string name="discover_setup_unsupported">ディスカバーは、コンピュータまたはAndroidスマートフォンのKetchアプリで利用できます。</string>
   <string name="discover_setup_pending">「%1$s」はディスカバーの設定後に実行されます。</string>
   <string name="discover_setup_choose_model">モデルを選択</string>

@@ -3,13 +3,13 @@
   <string name="discover_title">찾기</string>
   <string name="discover_settings">찾기 설정</string>
   <string name="discover_hero_title">무엇을 다운로드할까요?</string>
-  <string name="discover_intro_body">%1$s(으)로 웹을 검색해 신뢰할 수 있는 출처의 다운로드를 보여 줍니다. 직접 추가하기 전에는 다운로드되지 않습니다.</string>
+  <string name="discover_intro_body">%1$s(으)로 웹을 검색해 찾은 다운로드를 보여 줍니다. 직접 추가하기 전에는 다운로드되지 않습니다.</string>
   <string name="discover_example_blender">Apple 실리콘용 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 서버 ISO</string>
   <string name="discover_example_footage">퍼블릭 도메인 4K 자연 영상</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">찾기는 AI 모델로 웹을 검색해 신뢰할 수 있는 출처의 다운로드를 보여 줍니다. 검색 내용은 선택한 제공업체로 전송됩니다.</string>
+  <string name="discover_setup_body">찾기는 AI 모델로 웹을 검색해 찾은 다운로드를 보여 줍니다. 검색 내용은 선택한 제공업체로 전송됩니다.</string>
   <string name="discover_setup_unsupported">찾기는 컴퓨터나 Android 휴대폰의 Ketch 앱에서 사용할 수 있습니다.</string>
   <string name="discover_setup_pending">찾기 설정이 끝나면 “%1$s” 검색이 실행됩니다.</string>
   <string name="discover_setup_choose_model">모델 선택</string>

@@ -10,7 +10,7 @@
   <string name="discover_settings">Discover settings</string>
   <string name="discover_hero_title">What do you want to download?</string>
   <!-- %1$s is the model provider, such as Anthropic or Gemini. -->
-  <string name="discover_intro_body">%1$s searches the web and lists downloads from trusted sources. Nothing downloads until you add it.</string>
+  <string name="discover_intro_body">%1$s searches the web and lists the downloads it finds. Nothing downloads until you add it.</string>
   <!-- Searches to try, which run as they are written. -->
   <string name="discover_example_blender">Blender for Apple silicon</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 server ISO</string>
@@ -19,7 +19,7 @@
   <string name="discover_example_quoted">“%1$s”</string>
 
   <!-- The page before Discover is set up. -->
-  <string name="discover_setup_body">Discover uses an AI model to search the web and list downloads from trusted sources. Your searches go to the provider you choose.</string>
+  <string name="discover_setup_body">Discover uses an AI model to search the web and list the downloads it finds. Your searches go to the provider you choose.</string>
   <string name="discover_setup_unsupported">Discover runs in the Ketch app on a computer or an Android phone.</string>
   <!-- %1$s is the search the user asked for before setting up. -->
   <string name="discover_setup_pending">“%1$s” runs once Discover is set up.</string>

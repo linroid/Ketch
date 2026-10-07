@@ -3,13 +3,13 @@
   <string name="discover_title">Entdecken</string>
   <string name="discover_settings">Einstellungen für Entdecken</string>
   <string name="discover_hero_title">Was möchtest du herunterladen?</string>
-  <string name="discover_intro_body">%1$s durchsucht das Web und zeigt Downloads aus vertrauenswürdigen Quellen. Erst wenn du etwas hinzufügst, wird es heruntergeladen.</string>
+  <string name="discover_intro_body">%1$s durchsucht das Web und zeigt die gefundenen Downloads. Erst wenn du etwas hinzufügst, wird es heruntergeladen.</string>
   <string name="discover_example_blender">Blender für Apple Silicon</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 Server-ISO</string>
   <string name="discover_example_footage">Gemeinfreie 4K-Naturaufnahmen</string>
   <string name="discover_example_quoted">„%1$s“</string>
 
-  <string name="discover_setup_body">Entdecken durchsucht mit einem KI-Modell das Web und zeigt Downloads aus vertrauenswürdigen Quellen. Deine Suchanfragen gehen an den gewählten Anbieter.</string>
+  <string name="discover_setup_body">Entdecken durchsucht mit einem KI-Modell das Web und zeigt die gefundenen Downloads. Deine Suchanfragen gehen an den gewählten Anbieter.</string>
   <string name="discover_setup_unsupported">Entdecken läuft in der Ketch-App auf einem Computer oder einem Android-Telefon.</string>
   <string name="discover_setup_pending">„%1$s“ startet, sobald Entdecken eingerichtet ist.</string>
   <string name="discover_setup_choose_model">Modell wählen</string>

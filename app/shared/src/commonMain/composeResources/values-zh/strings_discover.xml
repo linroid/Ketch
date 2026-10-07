@@ -3,13 +3,13 @@
   <string name="discover_title">搜索</string>
   <string name="discover_settings">搜索设置</string>
   <string name="discover_hero_title">想下载什么？</string>
-  <string name="discover_intro_body">%1$s 会搜索网络，并列出来自可信来源的可下载的文件。只有添加后才会开始下载。</string>
+  <string name="discover_intro_body">%1$s 会搜索网络，并列出找到的可下载文件。只有添加后才会开始下载。</string>
   <string name="discover_example_blender">适用于 Apple 芯片的 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 服务器版 ISO</string>
   <string name="discover_example_footage">公有领域的 4K 自然风光视频素材</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">“搜索”使用 AI 模型搜索网络，并列出来自可信来源的可下载的文件。搜索内容会发送给所选的服务商。</string>
+  <string name="discover_setup_body">“搜索”使用 AI 模型搜索网络，并列出找到的可下载文件。搜索内容会发送给所选的服务商。</string>
   <string name="discover_setup_unsupported">“搜索”可在电脑或 Android 手机上的 Ketch 应用中使用。</string>
   <string name="discover_setup_pending">设置好“搜索”后，会立即搜索“%1$s”。</string>
   <string name="discover_setup_choose_model">选择模型</string>

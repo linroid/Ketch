@@ -3,13 +3,13 @@
   <string name="discover_title">Поиск</string>
   <string name="discover_settings">Настройки поиска</string>
   <string name="discover_hero_title">Что вы хотите скачать?</string>
-  <string name="discover_intro_body">%1$s ищет в интернете и предлагает загрузки из надёжных источников. Загрузка начнётся, только когда вы её добавите.</string>
+  <string name="discover_intro_body">%1$s ищет в интернете и показывает найденные загрузки. Загрузка начнётся, только когда вы её добавите.</string>
   <string name="discover_example_blender">Blender для Apple silicon</string>
   <string name="discover_example_ubuntu">Серверный ISO Ubuntu 24.04</string>
   <string name="discover_example_footage">Видео природы в 4K, общественное достояние</string>
   <string name="discover_example_quoted">«%1$s»</string>
 
-  <string name="discover_setup_body">Поиск с помощью ИИ-модели ищет в интернете и предлагает загрузки из надёжных источников. Ваши запросы отправляются выбранному провайдеру.</string>
+  <string name="discover_setup_body">Поиск с помощью ИИ-модели ищет в интернете и показывает найденные загрузки. Ваши запросы отправляются выбранному провайдеру.</string>
   <string name="discover_setup_unsupported">Поиск работает в приложении Ketch на компьютере или телефоне Android.</string>
   <string name="discover_setup_pending">Запрос «%1$s» выполнится, когда Поиск будет настроен.</string>
   <string name="discover_setup_choose_model">Выберите модель</string>
