@@ -265,7 +265,9 @@ val proguardRules by tasks.registering {
  * An archive only works with the JVM that wrote it, so the image's own launcher dumps it. It holds
  * the classes of [classList], recorded from an unobfuscated build by `recordCdsClassList`; for a
  * release image, [mapping], ProGuard's mapping, gives them their obfuscated names. Classes the list
- * misses load from the jars as usual.
+ * misses load from the jars as usual. The JVM checks that the jars have the sizes they had then,
+ * not their paths or timestamps, so an app moved elsewhere or unpacked from the portable zip, whose
+ * entries carry a fixed time, still uses it.
  *
  * @param name the launcher's name, the package name.
  * @param os the host system, `mac`, `windows` or `linux`: the image runs only there.
