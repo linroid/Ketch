@@ -18,8 +18,8 @@
     <item quantity="many">%1$d загрузок требуют внимания</item>
     <item quantity="other">%1$d загрузки требуют внимания</item>
   </plurals>
-  <string name="pulse_all_quiet">Всё спокойно</string>
-  <string name="pulse_all_quiet_free">Всё спокойно · %2$s: %1$s свободно</string>
+  <string name="pulse_all_quiet">Нет активных загрузок</string>
+  <string name="pulse_all_quiet_free">Нет активных загрузок · %2$s: %1$s свободно</string>
   <string name="pulse_connecting">Подключение к %1$s</string>
   <string name="pulse_needs_token">%1$s: нужен токен</string>
   <string name="pulse_offline">%1$s не в сети · повторная попытка</string>
@@ -109,14 +109,14 @@
   <string name="pulse_use_as_slow_lane">Использовать для режима низкой скорости</string>
   <string name="pulse_speed_settings">Настройки скорости…</string>
   <string name="pulse_update_failed">Не удалось настроить %1$s · %2$s</string>
-  <string name="pulse_caption_full">Загрузки идут так быстро, как позволяет сеть.</string>
+  <string name="pulse_caption_full">Без ограничения скорости.</string>
   <string name="pulse_caption_capped">Скорость загрузок ограничена до %1$s.</string>
-  <string name="pulse_caption_slow_lane">Общая скорость загрузок ограничена до %1$s, чтобы оставить пропускную способность для других приложений.</string>
+  <string name="pulse_caption_slow_lane">Общая скорость загрузок — до %1$s.</string>
   <string name="pulse_caption_no_rules">Правил скорости пока нет. Добавьте их в настройках скорости.</string>
   <string name="pulse_caption_rule_slow_lane">Режим низкой скорости включён по правилу.</string>
   <string name="pulse_caption_rule_full">Полная скорость до включения режима низкой скорости по правилу.</string>
-  <string name="pulse_caption_slow_lane_until">Низкая скорость до %1$s, дальше решают ваши правила.</string>
-  <string name="pulse_caption_full_until">Полная скорость до %1$s, дальше решают ваши правила.</string>
+  <string name="pulse_caption_slow_lane_until">Низкая скорость до %1$s, затем действуют ваши правила.</string>
+  <string name="pulse_caption_full_until">Полная скорость до %1$s, затем действуют ваши правила.</string>
   <string name="pulse_limit_for_slow_lane">Действует в режиме низкой скорости.</string>
   <string name="pulse_limit_for_device">Действует для всех загрузок на устройстве «%1$s».</string>
   <string name="pulse_limit_after_slow_lane">Действует после выключения режима низкой скорости.</string>

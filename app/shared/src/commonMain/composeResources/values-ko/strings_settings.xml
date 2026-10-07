@@ -6,11 +6,11 @@
   <string name="settings_category_general">일반</string>
   <string name="settings_category_general_description">모양, 시작, 이 기기의 이름</string>
   <string name="settings_category_notifications">알림</string>
-  <string name="settings_category_notifications_description">Ketch가 알려 주는 내용과 방식</string>
+  <string name="settings_category_notifications_description">다운로드, 기기, 소리</string>
   <string name="settings_category_integration">연동</string>
   <string name="settings_category_integration_description">브라우저 확장 프로그램, 마그넷 링크, 클립보드</string>
   <string name="settings_category_discover">찾기</string>
-  <string name="settings_category_discover_description">AI 모델, 웹 검색, 열 수 있는 웹사이트</string>
+  <string name="settings_category_discover_description">AI 모델, 웹 검색, 페이지 접근</string>
   <string name="settings_category_about">정보</string>
   <string name="settings_category_about_description">버전, 라이선스, 로그</string>
   <string name="settings_category_downloads">다운로드</string>
@@ -18,7 +18,7 @@
   <string name="settings_category_speed">속도</string>
   <string name="settings_category_speed_description">속도 모드, 저속 모드, 자동 규칙</string>
   <string name="settings_category_network">네트워크</string>
-  <string name="settings_category_network_description">다운로드를 분산할 네트워크</string>
+  <string name="settings_category_network_description">다운로드에 사용할 네트워크</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">공개 토렌트용 추가 트래커</string>
   <string name="settings_category_sharing">공유</string>
@@ -95,8 +95,8 @@
   <string name="settings_density_compact">촘촘하게</string>
   <string name="settings_density_comfortable">여유 있게</string>
   <string name="settings_general_reduce_motion">동작 줄이기</string>
-  <string name="settings_general_reduce_motion_on">레인과 패널이 애니메이션 없이 바뀝니다.</string>
-  <string name="settings_general_reduce_motion_system">시스템에서 동작 줄이기를 사용 중이므로 Ketch도 동작을 줄입니다.</string>
+  <string name="settings_general_reduce_motion_on">애니메이션을 끕니다.</string>
+  <string name="settings_general_reduce_motion_system">시스템 설정에서 켜져 있습니다.</string>
   <string name="settings_general_reduce_motion_auto">자동은 시스템 설정을 따릅니다.</string>
   <string name="settings_general_language">언어</string>
   <string name="settings_general_language_current">한국어</string>
@@ -151,7 +151,7 @@
   <string name="settings_notifications_success_vibration">진동</string>
   <string name="settings_notifications_success_vibration_hint">짧은 진동. 진동 모드에서도 울립니다.</string>
   <string name="settings_notifications_success_footer">다운로드가 완료되거나 찾기에서 파일을 찾으면 알려 줍니다.</string>
-  <string name="settings_notifications_success_footer_phone">다운로드가 완료되거나 찾기에서 파일을 찾으면 소리로 알려 드립니다. 무음 모드나 방해 금지 모드에서는 소리가 나지 않습니다. 백그라운드 알림은 별도의 알림 소리를 사용합니다.</string>
+  <string name="settings_notifications_success_footer_phone">다운로드가 완료되거나 찾기에서 다운로드를 찾으면 재생됩니다. 무음 모드와 방해 금지 모드에서는 소리가 나지 않습니다.</string>
   <string name="settings_notifications_browser">브라우저 알림</string>
   <string name="settings_notifications_allowed">알림이 허용됨</string>
   <string name="settings_notifications_allowed_hint">Ketch 탭이 백그라운드에 있을 때 표시됩니다.</string>
@@ -190,7 +190,7 @@
 
   <string name="settings_ai_discovery">AI 찾기</string>
   <string name="settings_ai_content_filter">콘텐츠 필터</string>
-  <string name="settings_ai_content_filter_hint">안전하지 않아 보이는 결과를 숨깁니다: 단축 링크, 다운로드 모음 사이트, 불법 복제, 사칭 웹사이트, 암호화되지 않은 HTTP 설치 파일. 내 네트워크로 연결되는 링크는 항상 숨깁니다.</string>
+  <string name="settings_ai_content_filter_hint">단축 링크, 다운로드 모음 사이트, 불법 복제, 사칭 사이트, 암호화되지 않은 HTTP 설치 파일을 숨깁니다. 내 네트워크로 연결되는 링크는 항상 숨깁니다.</string>
   <string name="settings_ai_provider">제공업체</string>
   <string name="settings_ai_api_key">API 키</string>
   <string name="settings_ai_model">모델</string>
@@ -201,7 +201,7 @@
   <string name="settings_ai_status_unsupported">데스크톱 및 Android 앱에서 실행됩니다.</string>
   <string name="settings_ai_status_needs_provider">제공업체를 선택하고 아래에 키를 추가하세요.</string>
   <string name="settings_ai_status_needs_search">누락된 웹 검색 자격 증명을 추가하세요.</string>
-  <string name="settings_ai_status_off">찾기가 다운로드를 대신 찾아 줍니다.</string>
+  <string name="settings_ai_status_off">원하는 것을 설명하면 다운로드를 찾아 줍니다.</string>
   <string name="settings_ai_status_ready">준비됨 · %1$s · %2$s</string>
   <string name="settings_ai_model_group">모델</string>
   <string name="settings_ai_provider_ollama">Ollama · 로컬에서 실행, 키 불필요</string>
@@ -244,7 +244,7 @@
   <string name="settings_ai_access_allow">자동으로 허용</string>
   <string name="settings_ai_access_allow_hint">검색에 필요한 웹사이트를 묻지 않고 엽니다.</string>
   <string name="settings_ai_access_ask_site">새 사이트마다 묻기</string>
-  <string name="settings_ai_access_ask_site_hint">대화에서 사이트를 처음 열 때 묻습니다. ‘항상 허용’을 선택하면 사이트를 기억합니다.</string>
+  <string name="settings_ai_access_ask_site_hint">대화마다 사이트별로 한 번 묻습니다. ‘항상 허용’을 선택하면 묻지 않습니다.</string>
   <string name="settings_ai_access_ask">매번 묻기</string>
   <string name="settings_ai_access_ask_hint">페이지를 열거나 파일을 확인할 때마다 묻습니다.</string>
   <string name="settings_ai_access_trusted">항상 허용된 사이트</string>
@@ -252,9 +252,9 @@
   <string name="settings_ai_access_trusted_none">아직 없습니다. 찾기가 물을 때 ‘항상 허용’을 선택하거나 여기에 사이트를 추가하세요.</string>
   <string name="settings_ai_access_add">ubuntu.com 같은 사이트 추가</string>
   <string name="settings_ai_access_add_invalid">ubuntu.com 같은 웹사이트 이름을 입력하세요.</string>
-  <string name="settings_ai_access_footer">검색 대상으로 직접 지정한 웹사이트는 묻지 않고 엽니다.</string>
+  <string name="settings_ai_access_footer">직접 지정한 웹사이트로 제한한 검색은 묻지 않습니다.</string>
 
-  <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다. Ketch는 돛처럼 모든 다운로드를 여러 레인으로 나눕니다.</string>
+  <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다.</string>
   <string name="settings_about_discover_elsewhere">찾기는 데스크톱 및 Android 앱에서 사용할 수 있습니다.</string>
   <string name="settings_about_version">버전</string>
   <string name="settings_about_build">빌드</string>
@@ -268,10 +268,10 @@
   <string name="settings_about_getting_started">시작하기</string>
   <string name="settings_about_checklist">설정 체크리스트 보기</string>
   <string name="settings_about_checklist_hint">빈 다운로드 페이지에 표시되는 설정 단계입니다.</string>
-  <string name="settings_about_checklist_done">완료. 다운로드 목록이 비어 있는 동안 표시됩니다.</string>
+  <string name="settings_about_checklist_done">다운로드 목록이 비어 있는 동안 표시됩니다.</string>
   <string name="settings_about_welcome">환영 화면 다시 보기</string>
   <string name="settings_about_welcome_hint">다운로드 위치와 이 기기에서 Ketch를 사용하는 방법.</string>
-  <string name="settings_about_welcome_done">완료. 다음에 Ketch를 열면 환영 화면이 표시됩니다.</string>
+  <string name="settings_about_welcome_done">다음에 Ketch를 열 때 표시됩니다.</string>
   <string name="settings_about_troubleshooting">문제 해결</string>
   <string name="settings_about_logs_footer">로그에는 다운로드 이름과 링크가 포함됩니다. 게시하기 전에 확인하세요.</string>
   <string name="settings_about_updates">업데이트</string>
@@ -282,7 +282,7 @@
   <string name="settings_about_update_current_hint">%1$s이(가) 최신 릴리스입니다.</string>
   <string name="settings_about_update_available">Ketch %1$s 사용 가능</string>
   <string name="settings_about_update_available_hint">현재 버전은 %1$s입니다.</string>
-  <string name="settings_about_update_source_hint">소스 코드로 빌드한 버전을 실행 중입니다. 릴리스 페이지에서 설치 프로그램을 다운로드하세요.</string>
+  <string name="settings_about_update_source_hint">소스에서 빌드한 버전입니다. 설치 프로그램은 릴리스 페이지에서 받으세요.</string>
   <string name="settings_about_update_downloading">Ketch %1$s 다운로드 중…</string>
   <string name="settings_about_update_progress">%1$s / %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s 설치 준비 완료</string>
@@ -362,17 +362,17 @@
   <string name="settings_speed_limit_hint">모든 다운로드가 나눠 씁니다. 다운로드별 제한은 이보다 낮게 설정할 수 있습니다.</string>
   <string name="settings_speed_mode_group">모드</string>
   <string name="settings_speed_mode">속도 모드</string>
-  <string name="settings_speed_full_unlimited">네트워크에서 가능한 최대 속도로 다운로드합니다.</string>
+  <string name="settings_speed_full_unlimited">속도 제한 없음.</string>
   <string name="settings_speed_full_capped">모든 다운로드의 합산 속도를 %1$s 이하로 제한합니다.</string>
-  <string name="settings_speed_slow_lane_summary">모든 다운로드의 합산 속도를 %1$s 이하로 제한해 통화에 필요한 대역폭을 확보합니다.</string>
-  <string name="settings_speed_auto_no_rules">아래에 규칙을 추가하면 저속 모드가 자동으로 켜집니다.</string>
+  <string name="settings_speed_slow_lane_summary">모든 다운로드의 합산 속도를 %1$s 이하로 제한합니다.</string>
+  <string name="settings_speed_auto_no_rules">규칙을 추가해 저속 모드를 예약하세요.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">제한</string>
   <string name="settings_speed_full_cap">최대 속도 상한</string>
-  <string name="settings_speed_full_cap_hint">저속 모드가 꺼져 있을 때 모든 다운로드에 적용되는 합산 속도 상한입니다.</string>
+  <string name="settings_speed_full_cap_hint">저속 모드가 아닐 때의 합산 속도 제한입니다.</string>
   <string name="settings_speed_slow_lane">저속 모드 속도</string>
   <string name="settings_speed_slow_lane_suggested">≈ %1$s 권장, 이번 주에 확인된 최고 속도의 %2$d%입니다.</string>
-  <string name="settings_speed_slow_lane_unknown">Ketch가 이 연결의 속도를 파악할 때까지는 %1$s입니다.</string>
+  <string name="settings_speed_slow_lane_unknown">Ketch가 이 연결의 속도를 측정할 때까지 %1$s입니다.</string>
   <string name="settings_speed_slow_lane_capped">최대 속도 상한(%1$s)이 더 낮아서 대신 적용됩니다.</string>
   <string name="settings_speed_rules">자동 규칙</string>
   <string name="settings_speed_rules_footer_auto">규칙은 이 기기의 현지 시간에 따라 적용됩니다.</string>
@@ -505,7 +505,7 @@
   <string name="settings_search_start_hidden_keywords">시작 프로그램, 백그라운드, 메뉴 막대, 트레이, 숨김</string>
   <string name="settings_search_badge">Dock 또는 작업 표시줄 아이콘에 표시할 내용</string>
   <string name="settings_search_badge_keywords">개수, 배지, Dock, 독, 작업 표시줄</string>
-  <string name="settings_search_shortcuts">Ketch의 모든 단축키</string>
+  <string name="settings_search_shortcuts">모든 키보드 단축키</string>
   <string name="settings_search_shortcuts_keywords">키, 단축키, 핫키, 키 바인딩</string>
   <string name="settings_search_finished_keywords">완료, 끝남, 알림</string>
   <string name="settings_search_failed_keywords">오류, 에러, 알림</string>

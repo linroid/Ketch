@@ -47,9 +47,9 @@
   <string name="error_source">Сервер %1$s сообщил об ошибке</string>
 
   <string name="error_http_sign_in">Требуется вход (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint">%1$s требует входа в аккаунт. Добавьте загрузку из расширения браузера Ketch, чтобы передать cookie.</string>
   <string name="error_http_sign_in_hint_short">%1$s требует входа в аккаунт</string>
-  <string name="error_http_sign_in_hint_server">Сервер требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint_server">Сервер требует входа в аккаунт. Добавьте загрузку из расширения браузера Ketch, чтобы передать cookie.</string>
   <string name="error_http_sign_in_hint_server_short">сервер требует входа в аккаунт</string>
   <string name="error_http_forbidden">Доступ запрещён (403)</string>
   <string name="error_http_forbidden_hint">Возможно, срок действия ссылки истёк.</string>

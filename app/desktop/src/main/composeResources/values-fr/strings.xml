@@ -64,7 +64,7 @@
   <string name="message_update_ready">Ketch %1$s est prêt à être installé</string>
   <string name="message_update_installed">Ketch a été mis à jour vers la version %1$s</string>
   <string name="message_update_failed">Impossible de passer à Ketch %1$s</string>
-  <string name="message_update_failed_hint">Le fichier update.log du dossier des journaux indique ce qui n'a pas fonctionné.</string>
+  <string name="message_update_failed_hint">Consultez update.log dans le dossier des journaux.</string>
   <string name="message_update">Mettre à jour</string>
   <string name="message_restart">Redémarrer</string>
   <string name="message_open_installer">Ouvrir le programme d'installation</string>

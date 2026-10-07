@@ -45,10 +45,10 @@
   <string name="error_source">El servidor %1$s devolvió un error</string>
 
   <string name="error_http_sign_in">Hay que iniciar sesión (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
-  <string name="error_http_sign_in_hint_short">%1$s pide que inicies sesión</string>
-  <string name="error_http_sign_in_hint_server">El servidor pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
-  <string name="error_http_sign_in_hint_server_short">el servidor pide que inicies sesión</string>
+  <string name="error_http_sign_in_hint">%1$s requiere iniciar sesión. Añádela desde la extensión del navegador de Ketch para enviar tus cookies.</string>
+  <string name="error_http_sign_in_hint_short">%1$s requiere iniciar sesión</string>
+  <string name="error_http_sign_in_hint_server">El servidor requiere iniciar sesión. Añádela desde la extensión del navegador de Ketch para enviar tus cookies.</string>
+  <string name="error_http_sign_in_hint_server_short">el servidor requiere iniciar sesión</string>
   <string name="error_http_forbidden">Acceso denegado (403)</string>
   <string name="error_http_forbidden_hint">Puede que el enlace haya caducado.</string>
   <string name="error_http_forbidden_hint_browser">Puede que el enlace haya caducado. Si lo enviaste desde %1$s, vuelve a enviarlo a Ketch desde la página original.</string>

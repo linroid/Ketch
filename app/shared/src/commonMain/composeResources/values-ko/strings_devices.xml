@@ -42,9 +42,9 @@
   <string name="device_not_connected">연결되지 않음</string>
 
   <string name="device_problem_unauthorized">새 액세스 토큰 필요</string>
-  <string name="device_problem_token_rejected">이 기기에 저장된 액세스 토큰이 거부되었습니다.</string>
-  <string name="device_problem_over_limit">Ketch는 한 번에 몇 대의 기기만 연결해 둡니다. 이 기기는 화면에 표시되는 동안 연결됩니다.</string>
-  <string name="device_problem_not_kept">Ketch는 이 기기가 화면에 표시되는 동안이나 연결 유지가 켜져 있을 때 연결합니다.</string>
+  <string name="device_problem_token_rejected">저장된 액세스 토큰이 거부되었습니다.</string>
+  <string name="device_problem_over_limit">Ketch는 한 번에 몇 대의 기기만 연결합니다. 이 기기는 화면에 표시되는 동안 연결됩니다.</string>
+  <string name="device_problem_not_kept">화면에 표시되는 동안이나 연결 유지가 켜져 있을 때 연결됩니다.</string>
   <string name="device_problem_connecting">연결 중…</string>
   <string name="device_problem_offline_for">%1$s째 오프라인 · 재시도 중</string>
   <string name="device_problem_offline">오프라인 · 재시도 중</string>
@@ -100,7 +100,7 @@
   <string name="device_rename_local_hint">다른 기기에서는 다시 시작한 후에 이 이름이 표시됩니다.</string>
   <string name="device_rename_name">이름</string>
   <string name="device_remove_title">%1$s 기기를 제거할까요?</string>
-  <string name="device_remove_body">이 기기의 다운로드가 여기에 더 이상 표시되지 않습니다. %1$s에서는 다운로드가 계속되며, 기기는 나중에 다시 추가할 수 있습니다.</string>
+  <string name="device_remove_body">이 기기의 다운로드는 %1$s에서 계속됩니다. 나중에 다시 추가할 수 있습니다.</string>
 
   <string name="device_speed_of">%1$s 속도</string>
 
@@ -157,7 +157,7 @@
   <string name="connect_approval_enter_code">대신 액세스 코드 입력</string>
   <string name="connect_approval_denied">%1$s에서 이 기기를 허용하지 않았습니다. 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_expired">%1$s에서 응답이 없었습니다. 다시 요청하거나 액세스 코드를 입력하세요.</string>
-  <string name="connect_approval_busy">%1$s에서 이 기기의 다른 요청을 아직 확인하고 있습니다. 잠시 후 다시 요청하거나 액세스 코드를 입력하세요.</string>
+  <string name="connect_approval_busy">%1$s에서 이 기기의 다른 요청에 응답하는 중입니다. 잠시 후 다시 시도하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_ask_again">다시 요청</string>
   <string name="connect_added_badge">추가됨</string>
   <string name="connect_share_instead">다른 기기에서 %1$s을(를) 제어하고 싶나요?</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_has_code">링크에 액세스 코드가 포함되어 있습니다.</string>
   <string name="pairing_request_title">%1$s이(가) %2$s을(를) 제어하도록 허용할까요?</string>
   <string name="pairing_request_check">%1$s에 이 코드가 표시될 때만 허용하세요:</string>
-  <string name="pairing_request_note">허용하면 여기에서 다운로드를 추가, 일시 정지, 삭제할 수 있습니다. 나중에 차단하려면 설정 › 공유에서 새 코드를 선택하세요.</string>
+  <string name="pairing_request_note">여기에서 다운로드를 추가, 일시정지, 제거할 수 있습니다. 접근 권한을 취소하려면 설정 › 공유에서 새 코드를 선택하세요.</string>
   <string name="pairing_request_allow">허용</string>
   <string name="pairing_request_deny">허용 안 함</string>
 

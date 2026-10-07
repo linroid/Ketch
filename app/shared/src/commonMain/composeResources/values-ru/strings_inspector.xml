@@ -182,8 +182,8 @@
     <item quantity="other">%1$d завершённых · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">Одно подключение</string>
-  <string name="inspector_connections_live">Новое число подключений сразу перераспределяет оставшиеся байты.</string>
-  <string name="inspector_connections_on_resume">Новое число подключений применится при возобновлении загрузки.</string>
+  <string name="inspector_connections_live">Применяется сразу.</string>
+  <string name="inspector_connections_on_resume">Применится при возобновлении загрузки.</string>
   <string name="inspector_lane_description">Подключение %1$d, %2$s, %3$s</string>
   <string name="inspector_percent_spoken">%1$d %</string>
 

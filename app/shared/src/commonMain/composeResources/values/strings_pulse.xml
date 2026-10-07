@@ -18,9 +18,9 @@
     <item quantity="one">%1$d download needs attention</item>
     <item quantity="other">%1$d downloads need attention</item>
   </plurals>
-  <string name="pulse_all_quiet">All quiet</string>
+  <string name="pulse_all_quiet">Idle</string>
   <!-- %1$s is free space, such as "412 GB", %2$s a device name. -->
-  <string name="pulse_all_quiet_free">All quiet · %1$s free on %2$s</string>
+  <string name="pulse_all_quiet_free">Idle · %1$s free on %2$s</string>
   <!-- %1$s is a device name. -->
   <string name="pulse_connecting">Connecting to %1$s</string>
   <string name="pulse_needs_token">%1$s needs a token</string>
@@ -133,15 +133,15 @@
   <!-- %1$s is a device inside a sentence, %2$s why its settings could not be changed. -->
   <string name="pulse_update_failed">Couldn't update %1$s · %2$s</string>
   <!-- What the speed mode does now, under the mode control. %1$s is a speed limit. -->
-  <string name="pulse_caption_full">Downloads run as fast as the network allows.</string>
+  <string name="pulse_caption_full">No speed limit.</string>
   <string name="pulse_caption_capped">Downloads are capped at %1$s.</string>
-  <string name="pulse_caption_slow_lane">Downloads share %1$s, leaving bandwidth for everything else.</string>
+  <string name="pulse_caption_slow_lane">Downloads share %1$s.</string>
   <string name="pulse_caption_no_rules">No speed rules yet. Add them in Speed settings.</string>
   <string name="pulse_caption_rule_slow_lane">A rule keeps the Slow lane on.</string>
   <string name="pulse_caption_rule_full">Full speed until a rule turns on the Slow lane.</string>
   <!-- %1$s is a time, such as 18:00 or "Tue 09:00". -->
-  <string name="pulse_caption_slow_lane_until">Slow lane until %1$s, then your rules decide.</string>
-  <string name="pulse_caption_full_until">Full speed until %1$s, then your rules decide.</string>
+  <string name="pulse_caption_slow_lane_until">Slow lane until %1$s, then your rules apply.</string>
+  <string name="pulse_caption_full_until">Full speed until %1$s, then your rules apply.</string>
   <!-- What the speed limit applies to, under it. %1$s is a device inside a sentence. -->
   <string name="pulse_limit_for_slow_lane">Used whenever the Slow lane is on.</string>
   <string name="pulse_limit_for_device">Applies to every download on %1$s.</string>

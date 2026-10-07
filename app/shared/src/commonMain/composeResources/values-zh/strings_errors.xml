@@ -44,9 +44,9 @@
   <string name="error_source">%1$s 服务器报告了错误</string>
 
   <string name="error_http_sign_in">需要登录（%1$d）</string>
-  <string name="error_http_sign_in_hint">%1$s 要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint">%1$s 要求登录。请通过 Ketch 浏览器扩展添加，以便带上 Cookie。</string>
   <string name="error_http_sign_in_hint_short">%1$s 要求登录</string>
-  <string name="error_http_sign_in_hint_server">服务器要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint_server">服务器要求登录。请通过 Ketch 浏览器扩展添加，以便带上 Cookie。</string>
   <string name="error_http_sign_in_hint_server_short">服务器要求登录</string>
   <string name="error_http_forbidden">拒绝访问（403）</string>
   <string name="error_http_forbidden_hint">链接可能已过期。</string>

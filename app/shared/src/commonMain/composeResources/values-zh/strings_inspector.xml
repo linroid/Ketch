@@ -152,8 +152,8 @@
     <item quantity="other">%1$d 个已完成 · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">单连接</string>
-  <string name="inspector_connections_live">更改连接数后，剩余部分会立即重新分配。</string>
-  <string name="inspector_connections_on_resume">新的连接数将在下载继续时生效。</string>
+  <string name="inspector_connections_live">立即生效。</string>
+  <string name="inspector_connections_on_resume">下载继续时生效。</string>
   <string name="inspector_lane_description">连接 %1$d，%2$s，%3$s</string>
   <string name="inspector_percent_spoken">百分之 %1$d</string>
 

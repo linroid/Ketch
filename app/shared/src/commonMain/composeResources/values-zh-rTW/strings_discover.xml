@@ -2,16 +2,16 @@
 <resources>
   <string name="discover_title">搜尋</string>
   <string name="discover_settings">搜尋設定</string>
-  <string name="discover_hero_title">說說想下載什麼，Ketch 幫你找。</string>
-  <string name="discover_intro_body">「搜尋」會透過 %1$s 搜尋網路、閱讀網頁，並列出它認為可信的檔案。手動新增後才會開始下載。</string>
+  <string name="discover_hero_title">想下載什麼？</string>
+  <string name="discover_intro_body">%1$s 會搜尋網路，列出來自可信來源的可下載檔案。手動新增後才會開始下載。</string>
   <string name="discover_example_blender">適用於 Apple 晶片的 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 伺服器版 ISO</string>
   <string name="discover_example_footage">公有領域的 4K 自然景觀影片</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">「搜尋」會透過 AI 模型搜尋網路、閱讀網頁，並列出它認為可信的檔案。搜尋內容會傳送給所選的服務供應商。</string>
+  <string name="discover_setup_body">「搜尋」使用 AI 模型搜尋網路，列出來自可信來源的可下載檔案。搜尋內容會傳送給你選擇的服務供應商。</string>
   <string name="discover_setup_unsupported">「搜尋」可在電腦或 Android 手機上的 Ketch 中使用。</string>
-  <string name="discover_setup_pending">完成搜尋設定後，就會立即搜尋「%1$s」。</string>
+  <string name="discover_setup_pending">完成搜尋設定後就會搜尋「%1$s」。</string>
   <string name="discover_setup_choose_model">選擇模型</string>
   <string name="discover_setup_local_provider">%1$s · 在本機執行，不需金鑰</string>
   <string name="discover_setup_finish">完成 %1$s 的設定</string>
@@ -75,9 +75,9 @@
   <string name="discover_error_title">無法完成這次搜尋</string>
   <string name="discover_failed">搜尋失敗</string>
   <string name="discover_none_title">找不到可下載的檔案</string>
-  <string name="discover_none_body">「搜尋」只列出來自可信來源的檔案。試著補充版本、平台或檔案的發布網站。</string>
+  <string name="discover_none_body">試著補充版本、平台或網站。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">內容過濾器隱藏了 %1$d 個看起來不安全的結果。可以在「搜尋設定」中關閉過濾器。</item>
+    <item quantity="other">內容過濾器隱藏了 %1$d 個結果。可在「搜尋設定」中關閉。</item>
   </plurals>
   <string name="discover_search_everywhere">搜尋整個網路</string>
   <string name="discover_stopped">已停止</string>
@@ -124,7 +124,7 @@
   <string name="discover_history_clear">清除搜尋歷史</string>
   <string name="discover_turn_off">關閉搜尋</string>
   <string name="discover_turned_off">搜尋已關閉</string>
-  <string name="discover_turned_off_detail">可在「設定」的「搜尋」中重新開啟。</string>
+  <string name="discover_turned_off_detail">可在「設定 › 搜尋」中重新開啟。</string>
   <string name="discover_history_filter">搜尋歷史記錄</string>
   <string name="discover_history_empty">你執行過的搜尋會顯示在這裡。</string>
   <string name="discover_history_no_match">沒有符合「%1$s」的搜尋</string>

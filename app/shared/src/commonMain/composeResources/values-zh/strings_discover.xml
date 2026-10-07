@@ -2,16 +2,16 @@
 <resources>
   <string name="discover_title">搜索</string>
   <string name="discover_settings">搜索设置</string>
-  <string name="discover_hero_title">说说想下载什么，Ketch 帮你找。</string>
-  <string name="discover_intro_body">“搜索”会通过 %1$s 搜索网络、阅读网页，并列出它认为可信的文件。只有手动添加后才会开始下载。</string>
+  <string name="discover_hero_title">想下载什么？</string>
+  <string name="discover_intro_body">%1$s 会搜索网络，并列出来自可信来源的可下载的文件。只有添加后才会开始下载。</string>
   <string name="discover_example_blender">适用于 Apple 芯片的 Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 服务器版 ISO</string>
   <string name="discover_example_footage">公有领域的 4K 自然风光视频素材</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">“搜索”会通过 AI 模型搜索网络、阅读网页，并列出它认为可信的文件。搜索内容会发送给所选的服务商。</string>
+  <string name="discover_setup_body">“搜索”使用 AI 模型搜索网络，并列出来自可信来源的可下载的文件。搜索内容会发送给所选的服务商。</string>
   <string name="discover_setup_unsupported">“搜索”可在电脑或 Android 手机上的 Ketch 应用中使用。</string>
-  <string name="discover_setup_pending">完成搜索设置后，会立即搜索“%1$s”。</string>
+  <string name="discover_setup_pending">设置好“搜索”后，会立即搜索“%1$s”。</string>
   <string name="discover_setup_choose_model">选择模型</string>
   <string name="discover_setup_local_provider">%1$s · 本地运行，无需密钥</string>
   <string name="discover_setup_finish">完成 %1$s 的设置</string>
@@ -75,9 +75,9 @@
   <string name="discover_error_title">未能完成此次搜索</string>
   <string name="discover_failed">搜索失败</string>
   <string name="discover_none_title">未找到可下载的文件</string>
-  <string name="discover_none_body">“搜索”只列出来自可信来源的文件。试着补充版本、平台或文件的发布网站。</string>
+  <string name="discover_none_body">试着补充版本、平台或网站。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">内容过滤器隐藏了 %1$d 个看起来不安全的结果。可以在“搜索设置”中关闭过滤器。</item>
+    <item quantity="other">内容过滤器隐藏了 %1$d 个结果。可在“搜索设置”中关闭。</item>
   </plurals>
   <string name="discover_search_everywhere">搜索整个网络</string>
   <string name="discover_stopped">已停止</string>
@@ -124,7 +124,7 @@
   <string name="discover_history_clear">清除搜索历史</string>
   <string name="discover_turn_off">关闭搜索</string>
   <string name="discover_turned_off">搜索已关闭</string>
-  <string name="discover_turned_off_detail">可在“设置”的“搜索”中重新开启。</string>
+  <string name="discover_turned_off_detail">可在“设置 › 搜索”中重新开启。</string>
   <string name="discover_history_filter">搜索历史记录</string>
   <string name="discover_history_empty">你进行的搜索会显示在这里。</string>
   <string name="discover_history_no_match">没有与“%1$s”匹配的搜索</string>

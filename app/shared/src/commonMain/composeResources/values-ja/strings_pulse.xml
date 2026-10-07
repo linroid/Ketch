@@ -82,9 +82,9 @@
   <string name="pulse_use_as_slow_lane">低速モードの速度として使用</string>
   <string name="pulse_speed_settings">速度の設定…</string>
   <string name="pulse_update_failed">%1$sを更新できませんでした · %2$s</string>
-  <string name="pulse_caption_full">ネットワークが許す限りの速度でダウンロードします。</string>
+  <string name="pulse_caption_full">速度制限なし。</string>
   <string name="pulse_caption_capped">ダウンロード速度は%1$sに制限されています。</string>
-  <string name="pulse_caption_slow_lane">すべてのダウンロードの合計速度を%1$s以下に抑え、ほかのアプリに必要な帯域を確保します。</string>
+  <string name="pulse_caption_slow_lane">すべてのダウンロードの合計速度を%1$s以下に抑えます。</string>
   <string name="pulse_caption_no_rules">速度ルールはまだありません。速度の設定で追加してください。</string>
   <string name="pulse_caption_rule_slow_lane">ルールにより低速モードがオンになっています。</string>
   <string name="pulse_caption_rule_full">ルールで低速モードがオンになるまでフルスピードです。</string>

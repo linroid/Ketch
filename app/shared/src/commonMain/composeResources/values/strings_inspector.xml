@@ -217,8 +217,8 @@
   </plurals>
   <!-- The note under the lanes. -->
   <string name="inspector_single_connection">Single connection</string>
-  <string name="inspector_connections_live">A new count re-splits the remaining bytes live.</string>
-  <string name="inspector_connections_on_resume">A new count applies when the download resumes.</string>
+  <string name="inspector_connections_live">Applies right away.</string>
+  <string name="inspector_connections_on_resume">Applies when the download resumes.</string>
   <!-- A lane to a screen reader: "Connection 3, 1.4–2.1 GB, 1.3 MB/s". %1$d is its number,
        %2$s its byte range, %3$s its speed, a stall or how much of it is done. -->
   <string name="inspector_lane_description">Connection %1$d, %2$s, %3$s</string>

@@ -8,9 +8,9 @@
   <!-- The page's title. -->
   <string name="discover_title">Discover</string>
   <string name="discover_settings">Discover settings</string>
-  <string name="discover_hero_title">Describe it. Ketch finds the download.</string>
+  <string name="discover_hero_title">What do you want to download?</string>
   <!-- %1$s is the model provider, such as Anthropic or Gemini. -->
-  <string name="discover_intro_body">Discover asks %1$s to search the web and read the pages it finds, then lists the files it trusts. Nothing downloads until you add it.</string>
+  <string name="discover_intro_body">%1$s searches the web and lists downloads from trusted sources. Nothing downloads until you add it.</string>
   <!-- Searches to try, which run as they are written. -->
   <string name="discover_example_blender">Blender for Apple silicon</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 server ISO</string>
@@ -19,10 +19,10 @@
   <string name="discover_example_quoted">“%1$s”</string>
 
   <!-- The page before Discover is set up. -->
-  <string name="discover_setup_body">Discover asks an AI model to search the web and read the pages it finds, then lists the files it trusts. Your searches go to the provider you choose.</string>
+  <string name="discover_setup_body">Discover uses an AI model to search the web and list downloads from trusted sources. Your searches go to the provider you choose.</string>
   <string name="discover_setup_unsupported">Discover runs in the Ketch app on a computer or an Android phone.</string>
   <!-- %1$s is the search the user asked for before setting up. -->
-  <string name="discover_setup_pending">Your search for “%1$s” runs as soon as Discover is set up.</string>
+  <string name="discover_setup_pending">“%1$s” runs once Discover is set up.</string>
   <string name="discover_setup_choose_model">Choose a model</string>
   <!-- A provider's button. %1$s is Ollama, which runs on the user's own computer. -->
   <string name="discover_setup_local_provider">%1$s · runs locally, no key</string>
@@ -118,11 +118,11 @@
   <string name="discover_error_title">Discover couldn't finish this search</string>
   <string name="discover_failed">Discovery failed</string>
   <string name="discover_none_title">No downloads found</string>
-  <string name="discover_none_body">Discover lists only files from sources it trusts. Try naming the version or platform, or the website that publishes it.</string>
+  <string name="discover_none_body">Try adding a version, platform or website.</string>
   <!-- The body of discover_none_title when the content filter hid everything the search found. The button under it opens Discover settings, where the filter can be turned off. -->
   <plurals name="discover_none_filtered">
-    <item quantity="one">The content filter hid %1$d result that looked unsafe. You can turn the filter off in Discover settings.</item>
-    <item quantity="other">The content filter hid %1$d results that looked unsafe. You can turn the filter off in Discover settings.</item>
+    <item quantity="one">The content filter hid %1$d result. Turn it off in Discover settings.</item>
+    <item quantity="other">The content filter hid %1$d results. Turn it off in Discover settings.</item>
   </plurals>
   <string name="discover_search_everywhere">Search the whole web</string>
   <!-- A search the user stopped, or that was running when the app closed. -->
@@ -194,7 +194,7 @@
   <!-- Switches Discover off and hides it, from the page's menu and its setup page; then its toast. -->
   <string name="discover_turn_off">Turn off Discover</string>
   <string name="discover_turned_off">Discover is off</string>
-  <string name="discover_turned_off_detail">Turn it back on in Settings, under Discover.</string>
+  <string name="discover_turned_off_detail">Turn it back on in Settings › Discover.</string>
   <!-- The filter over the history, which matches the searches' messages. -->
   <string name="discover_history_filter">Search history</string>
   <string name="discover_history_empty">Searches you run show here.</string>

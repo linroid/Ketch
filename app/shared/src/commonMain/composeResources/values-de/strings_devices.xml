@@ -42,9 +42,9 @@
   <string name="device_not_connected">Nicht verbunden</string>
 
   <string name="device_problem_unauthorized">Neues Zugriffstoken nötig</string>
-  <string name="device_problem_token_rejected">Das dafür gespeicherte Zugriffstoken wurde abgelehnt.</string>
-  <string name="device_problem_over_limit">Ketch hält nur wenige Geräte gleichzeitig verbunden. Mit diesem verbindet es sich, solange es angezeigt wird.</string>
-  <string name="device_problem_not_kept">Ketch verbindet sich damit, solange es angezeigt wird oder „Verbunden bleiben“ an ist.</string>
+  <string name="device_problem_token_rejected">Das gespeicherte Zugriffstoken wurde abgelehnt.</string>
+  <string name="device_problem_over_limit">Ketch verbindet sich nur mit wenigen Geräten gleichzeitig. Dieses verbindet sich, solange es angezeigt wird.</string>
+  <string name="device_problem_not_kept">Verbindet sich, solange es angezeigt wird oder „Verbunden bleiben“ an ist.</string>
   <string name="device_problem_connecting">Verbindung wird hergestellt…</string>
   <string name="device_problem_offline_for">Seit %1$s offline · neuer Versuch läuft</string>
   <string name="device_problem_offline">Offline · neuer Versuch läuft</string>
@@ -106,7 +106,7 @@
   <string name="device_rename_local_hint">Deine anderen Geräte sehen diesen Namen nach einem Neustart.</string>
   <string name="device_rename_name">Name</string>
   <string name="device_remove_title">%1$s entfernen?</string>
-  <string name="device_remove_body">Ketch zeigt die Downloads dieses Geräts hier nicht mehr an. Auf %1$s laufen sie weiter. Du kannst das Gerät später wieder hinzufügen.</string>
+  <string name="device_remove_body">Seine Downloads laufen auf %1$s weiter. Du kannst es später wieder hinzufügen.</string>
 
   <string name="device_speed_of">Geschwindigkeit von %1$s</string>
 
@@ -163,7 +163,7 @@
   <string name="connect_approval_enter_code">Stattdessen Zugriffscode eingeben</string>
   <string name="connect_approval_denied">%1$s hat dieses Gerät nicht erlaubt. Frag erneut oder gib den Zugriffscode ein.</string>
   <string name="connect_approval_expired">Auf %1$s hat niemand geantwortet. Frag erneut oder gib den Zugriffscode ein.</string>
-  <string name="connect_approval_busy">%1$s entscheidet noch über eine andere Anfrage von diesem Gerät. Frag gleich erneut oder gib den Zugriffscode ein.</string>
+  <string name="connect_approval_busy">%1$s beantwortet gerade eine andere Anfrage von diesem Gerät. Versuch es gleich erneut oder gib den Zugriffscode ein.</string>
   <string name="connect_approval_ask_again">Erneut fragen</string>
   <string name="connect_added_badge">Hinzugefügt</string>
   <string name="connect_share_instead">Möchtest du %1$s von einem anderen Gerät aus steuern?</string>
@@ -186,7 +186,7 @@
   <string name="connect_pairing_has_code">Der Link enthält den Zugriffscode.</string>
   <string name="pairing_request_title">%1$s erlauben, %2$s zu steuern?</string>
   <string name="pairing_request_check">Erlaube es nur, wenn %1$s diesen Code anzeigt:</string>
-  <string name="pairing_request_note">Es kann dann hier Downloads hinzufügen, anhalten und entfernen. Um es später wieder auszuschließen, wähle „Neuer Code“ unter Einstellungen › Freigabe.</string>
+  <string name="pairing_request_note">Es kann hier Downloads hinzufügen, pausieren und entfernen. Um den Zugriff zu widerrufen, wähle „Neuer Code“ unter Einstellungen › Freigabe.</string>
   <string name="pairing_request_allow">Erlauben</string>
   <string name="pairing_request_deny">Nicht erlauben</string>
 

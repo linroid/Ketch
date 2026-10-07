@@ -6,7 +6,7 @@
   <string name="settings_category_general">一般</string>
   <string name="settings_category_general_description">外観、起動、このデバイスの名前</string>
   <string name="settings_category_notifications">通知</string>
-  <string name="settings_category_notifications_description">Ketchが知らせる内容と方法</string>
+  <string name="settings_category_notifications_description">ダウンロード、デバイス、サウンド</string>
   <string name="settings_category_integration">連携</string>
   <string name="settings_category_integration_description">ブラウザ拡張機能、マグネットリンク、クリップボード</string>
   <string name="settings_category_discover">ディスカバー</string>
@@ -18,7 +18,7 @@
   <string name="settings_category_speed">速度</string>
   <string name="settings_category_speed_description">速度モード、低速モード、自動ルール</string>
   <string name="settings_category_network">ネットワーク</string>
-  <string name="settings_category_network_description">ダウンロードを分散させるネットワーク</string>
+  <string name="settings_category_network_description">ダウンロードに使うネットワーク</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">公開トレント用の追加トラッカー</string>
   <string name="settings_category_sharing">共有</string>
@@ -95,8 +95,8 @@
   <string name="settings_density_compact">コンパクト</string>
   <string name="settings_density_comfortable">ゆったり</string>
   <string name="settings_general_reduce_motion">動きを減らす</string>
-  <string name="settings_general_reduce_motion_on">レーンやパネルはアニメーションなしで切り替わります。</string>
-  <string name="settings_general_reduce_motion_system">システムで動きを減らす設定がオンのため、Ketchも動きを減らします。</string>
+  <string name="settings_general_reduce_motion_on">アニメーションをオフにします。</string>
+  <string name="settings_general_reduce_motion_system">システム設定でオンになっています。</string>
   <string name="settings_general_reduce_motion_auto">「自動」ではシステムの設定に従います。</string>
   <string name="settings_general_language">言語</string>
   <string name="settings_general_language_current">日本語</string>
@@ -137,7 +137,7 @@
   <string name="settings_notifications_all_finished_off">「ダウンロード完了」に従います（現在オフ）。</string>
   <string name="settings_notifications_background">Ketchがバックグラウンドにあるときのみ</string>
   <string name="settings_notifications_background_none">「通知」に設定された項目はありません。</string>
-  <string name="settings_notifications_background_on">Ketchが前面にあるときは、Ketchの中に表示されます。</string>
+  <string name="settings_notifications_background_on">Ketchが前面にあるときは、Ketch内に表示します。</string>
   <string name="settings_notifications_background_off">Ketchが前面にあるときも通知が表示されます。</string>
   <string name="settings_notifications_devices_group">デバイス</string>
   <string name="settings_notifications_offline">デバイスのオフライン</string>
@@ -151,7 +151,7 @@
   <string name="settings_notifications_success_vibration">バイブレーション</string>
   <string name="settings_notifications_success_vibration_hint">短い振動。マナーモード中も振動します。</string>
   <string name="settings_notifications_success_footer">ダウンロードが完了したときや、ディスカバーでファイルが見つかったときに通知します。</string>
-  <string name="settings_notifications_success_footer_phone">ダウンロードが完了したときや、ディスカバーでファイルが見つかったときに通知します。マナーモードやサイレントモード中は鳴りません。バックグラウンドではシステム通知の音を使います。</string>
+  <string name="settings_notifications_success_footer_phone">ダウンロードが完了したときや、ディスカバーでダウンロードが見つかったときに鳴ります。マナーモードやサイレントモード中は鳴りません。</string>
   <string name="settings_notifications_browser">ブラウザの通知</string>
   <string name="settings_notifications_allowed">通知は許可されています</string>
   <string name="settings_notifications_allowed_hint">Ketchのタブがバックグラウンドにあるときに表示されます。</string>
@@ -172,8 +172,8 @@
   <string name="settings_integration_torrent">.torrentファイルをKetchで開く</string>
   <string name="settings_integration_is_default">Ketchがデフォルトです</string>
   <string name="settings_integration_make_default">デフォルトにする</string>
-  <string name="settings_integration_magnet_refused">Ketchをマグネットリンクのデフォルトにできませんでした。システムの設定でKetchを選択してください。</string>
-  <string name="settings_integration_torrent_refused">Ketchを.torrentファイルのデフォルトにできませんでした。システムの設定でKetchを選択してください。</string>
+  <string name="settings_integration_magnet_refused">Ketchをマグネットリンクのデフォルトにできませんでした。システム設定でKetchを選択してください。</string>
+  <string name="settings_integration_torrent_refused">Ketchを.torrentファイルのデフォルトにできませんでした。システム設定でKetchを選択してください。</string>
   <string name="settings_integration_magnet_failed">マグネットリンクをKetchで開くように設定できませんでした：%1$s</string>
   <string name="settings_integration_torrent_failed">.torrentファイルをKetchで開くように設定できませんでした：%1$s</string>
   <string name="settings_integration_clipboard">クリップボード</string>
@@ -190,7 +190,7 @@
 
   <string name="settings_ai_discovery">AIディスカバー</string>
   <string name="settings_ai_content_filter">コンテンツフィルタ</string>
-  <string name="settings_ai_content_filter_hint">安全でないと思われる結果を非表示にします：短縮リンク、ダウンロードまとめサイト、海賊版、なりすましサイト、暗号化されていない HTTP のインストーラ。自分のネットワーク内へのリンクは常に非表示です。</string>
+  <string name="settings_ai_content_filter_hint">短縮リンク、ダウンロードまとめサイト、海賊版、なりすましサイト、暗号化されていないHTTPのインストーラを非表示にします。自分のネットワーク内へのリンクは常に非表示です。</string>
   <string name="settings_ai_provider">プロバイダ</string>
   <string name="settings_ai_api_key">APIキー</string>
   <string name="settings_ai_model">モデル</string>
@@ -201,7 +201,7 @@
   <string name="settings_ai_status_unsupported">デスクトップ版とAndroid版のアプリで利用できます。</string>
   <string name="settings_ai_status_needs_provider">プロバイダを選択し、そのキーを下に追加してください。</string>
   <string name="settings_ai_status_needs_search">不足しているWeb検索の認証情報を追加してください。</string>
-  <string name="settings_ai_status_off">ディスカバーでダウンロードを探せるようになります。</string>
+  <string name="settings_ai_status_off">説明するだけでダウンロードを探せます。</string>
   <string name="settings_ai_status_ready">準備完了 · %1$s · %2$s</string>
   <string name="settings_ai_model_group">モデル</string>
   <string name="settings_ai_provider_ollama">Ollama · ローカルで実行、キー不要</string>
@@ -244,7 +244,7 @@
   <string name="settings_ai_access_allow">自動的に許可</string>
   <string name="settings_ai_access_allow_hint">検索に必要なWebサイトを確認せずに開きます。</string>
   <string name="settings_ai_access_ask_site">新しいサイトごとに確認</string>
-  <string name="settings_ai_access_ask_site_hint">チャットで初めてサイトを開くときに確認します。「常に許可」を選ぶと、そのサイトを記憶します。</string>
+  <string name="settings_ai_access_ask_site_hint">「常に許可」を選ばない限り、チャットごとに各サイトで1回確認します。</string>
   <string name="settings_ai_access_ask">毎回確認</string>
   <string name="settings_ai_access_ask_hint">ページを開く前とファイルを調べる前に、毎回確認します。</string>
   <string name="settings_ai_access_trusted">常に許可</string>
@@ -252,9 +252,9 @@
   <string name="settings_ai_access_trusted_none">まだありません。ディスカバーに確認されたときに「常に許可」を選ぶか、ここでサイトを追加してください。</string>
   <string name="settings_ai_access_add">サイトを追加（例：ubuntu.com）</string>
   <string name="settings_ai_access_add_invalid">ubuntu.comのように、Webサイトのドメイン名を入力してください。</string>
-  <string name="settings_ai_access_footer">検索対象として指定したWebサイトは、確認せずに開きます。</string>
+  <string name="settings_ai_access_footer">検索対象として指定したWebサイトは確認しません。</string>
 
-  <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。Ketchはその帆のように、すべてのダウンロードをレーンに分けます。</string>
+  <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。</string>
   <string name="settings_about_discover_elsewhere">ディスカバーは、デスクトップ版とAndroid版のアプリで利用できます。</string>
   <string name="settings_about_version">バージョン</string>
   <string name="settings_about_build">ビルド</string>
@@ -268,10 +268,10 @@
   <string name="settings_about_getting_started">はじめに</string>
   <string name="settings_about_checklist">セットアップのチェックリストを表示</string>
   <string name="settings_about_checklist_hint">空のダウンロードページに表示されるセットアップ手順です。</string>
-  <string name="settings_about_checklist_done">完了しました。ダウンロードリストが空の間、表示されます。</string>
+  <string name="settings_about_checklist_done">ダウンロードリストが空の間、表示されます。</string>
   <string name="settings_about_welcome">ようこそ画面をもう一度表示</string>
   <string name="settings_about_welcome_hint">ダウンロードの保存先と、このデバイスでのKetchの使い方。</string>
-  <string name="settings_about_welcome_done">完了しました。次にKetchを開くと、ようこそ画面が表示されます。</string>
+  <string name="settings_about_welcome_done">次にKetchを開くと表示されます。</string>
   <string name="settings_about_troubleshooting">トラブルシューティング</string>
   <string name="settings_about_logs_footer">ログにはダウンロードの名前とリンクが含まれます。公開する前に内容を確認してください。</string>
   <string name="settings_about_updates">アップデート</string>
@@ -282,7 +282,7 @@
   <string name="settings_about_update_current_hint">%1$sが最新リリースです。</string>
   <string name="settings_about_update_available">Ketch %1$sを利用できます</string>
   <string name="settings_about_update_available_hint">現在のバージョンは%1$sです。</string>
-  <string name="settings_about_update_source_hint">ソースコードからビルドしたバージョンを実行しています。インストーラはリリースページからダウンロードしてください。</string>
+  <string name="settings_about_update_source_hint">ソースからビルドされています。インストーラはリリースページから入手してください。</string>
   <string name="settings_about_update_downloading">Ketch %1$sをダウンロード中…</string>
   <string name="settings_about_update_progress">%1$s / %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$sをインストールする準備ができました</string>
@@ -362,17 +362,17 @@
   <string name="settings_speed_limit_hint">すべてのダウンロードで共有します。各ダウンロードの制限でさらに低くできます。</string>
   <string name="settings_speed_mode_group">モード</string>
   <string name="settings_speed_mode">速度モード</string>
-  <string name="settings_speed_full_unlimited">ネットワークで利用できる最大速度でダウンロードします。</string>
+  <string name="settings_speed_full_unlimited">速度制限なし。</string>
   <string name="settings_speed_full_capped">すべてのダウンロードの合計速度を%1$s以下に制限します。</string>
-  <string name="settings_speed_slow_lane_summary">すべてのダウンロードの合計速度を%1$s以下に抑え、通話に必要な帯域を確保します。</string>
-  <string name="settings_speed_auto_no_rules">下にルールを追加すると、低速モードが自動的にオンになります。</string>
+  <string name="settings_speed_slow_lane_summary">すべてのダウンロードの合計速度を%1$s以下に抑えます。</string>
+  <string name="settings_speed_auto_no_rules">ルールを追加すると、低速モードをスケジュールできます。</string>
   <string name="settings_speed_auto_summary">%1$s。</string>
   <string name="settings_speed_limits_group">制限</string>
   <string name="settings_speed_full_cap">フルスピードの上限</string>
-  <string name="settings_speed_full_cap_hint">低速モードがオフのときの、ダウンロード全体の速度上限です。</string>
+  <string name="settings_speed_full_cap_hint">低速モード以外での、ダウンロード全体の速度上限です。</string>
   <string name="settings_speed_slow_lane">低速モードの速度</string>
   <string name="settings_speed_slow_lane_suggested">推奨値は約%1$s（今週の最高速度の%2$d%）。</string>
-  <string name="settings_speed_slow_lane_unknown">この接続の速度が分かるまでは%1$sを使います。</string>
+  <string name="settings_speed_slow_lane_unknown">この接続の速度を測定するまでは%1$sを使います。</string>
   <string name="settings_speed_slow_lane_capped">フルスピードの上限（%1$s）の方が低いため、そちらが適用されます。</string>
   <string name="settings_speed_rules">自動ルール</string>
   <string name="settings_speed_rules_footer_auto">ルールはこのデバイスの現地時刻に合わせて実行されます。</string>
@@ -505,7 +505,7 @@
   <string name="settings_search_start_hidden_keywords">起動, バックグラウンド, メニューバー, トレイ, 常駐</string>
   <string name="settings_search_badge">Dockやタスクバーのアイコンに表示する内容</string>
   <string name="settings_search_badge_keywords">件数, Dock, タスクバー, バッジ</string>
-  <string name="settings_search_shortcuts">Ketchのすべてのショートカット</string>
+  <string name="settings_search_shortcuts">すべてのキーボードショートカット</string>
   <string name="settings_search_shortcuts_keywords">キー, ホットキー, キーボード, キー割り当て</string>
   <string name="settings_search_finished_keywords">完了, 終了, アラート, お知らせ</string>
   <string name="settings_search_failed_keywords">エラー, 失敗, アラート</string>

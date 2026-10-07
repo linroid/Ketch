@@ -152,8 +152,8 @@
     <item quantity="other">完了%1$d · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">単一接続</string>
-  <string name="inspector_connections_live">数を変更すると、残りのバイトがその場で再分割されます。</string>
-  <string name="inspector_connections_on_resume">数の変更は、ダウンロードの再開時に適用されます。</string>
+  <string name="inspector_connections_live">すぐに適用されます。</string>
+  <string name="inspector_connections_on_resume">ダウンロードの再開時に適用されます。</string>
   <string name="inspector_lane_description">接続%1$d、%2$s、%3$s</string>
   <string name="inspector_percent_spoken">%1$dパーセント</string>
 

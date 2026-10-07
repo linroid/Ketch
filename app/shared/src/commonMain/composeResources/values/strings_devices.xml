@@ -62,9 +62,9 @@
 
   <!-- What the card of a device that is not online says instead of its numbers. -->
   <string name="device_problem_unauthorized">Needs a new access token</string>
-  <string name="device_problem_token_rejected">It turned down the access token saved for it.</string>
-  <string name="device_problem_over_limit">Ketch keeps only a few devices connected at once. It connects to this one while it shows.</string>
-  <string name="device_problem_not_kept">Ketch connects to it while it shows, or while it stays connected.</string>
+  <string name="device_problem_token_rejected">The saved access token was rejected.</string>
+  <string name="device_problem_over_limit">Ketch connects to a few devices at a time. This one connects while it's shown.</string>
+  <string name="device_problem_not_kept">Connects while it's shown, or when Stay connected is on.</string>
   <string name="device_problem_connecting">Connecting…</string>
   <!-- %1$s is how long the device has been offline, such as "2 h". -->
   <string name="device_problem_offline_for">Offline for %1$s · retrying</string>
@@ -144,7 +144,7 @@
   <string name="device_rename_name">Name</string>
   <!-- Removing a remote device. %1$s is its name. -->
   <string name="device_remove_title">Remove %1$s?</string>
-  <string name="device_remove_body">Ketch stops showing its downloads here. They keep running on %1$s, and you can add it again later.</string>
+  <string name="device_remove_body">Its downloads keep running on %1$s. You can add it again later.</string>
 
   <!-- The speed popover of a device card. %1$s is the device's name. -->
   <string name="device_speed_of">Speed of %1$s</string>
@@ -225,7 +225,7 @@
   <!-- %1$s is the name of the device that was asked. -->
   <string name="connect_approval_denied">%1$s didn't allow this device. Ask again, or enter its access code.</string>
   <string name="connect_approval_expired">No one answered on %1$s. Ask again, or enter its access code.</string>
-  <string name="connect_approval_busy">%1$s is still deciding about another request from this device. Ask again in a moment, or enter its access code.</string>
+  <string name="connect_approval_busy">%1$s is answering another request from this device. Try again shortly, or enter its access code.</string>
   <string name="connect_approval_ask_again">Ask again</string>
   <!-- At the end of a device found on the network that is added already. -->
   <string name="connect_added_badge">Added</string>
@@ -261,7 +261,7 @@
   <string name="pairing_request_title">Allow %1$s to control %2$s?</string>
   <!-- %1$s is the other device's name; four digits show under it. -->
   <string name="pairing_request_check">Allow it only if %1$s shows this code:</string>
-  <string name="pairing_request_note">It can then add, pause and remove downloads here. To turn it away later, choose New code in Settings › Sharing.</string>
+  <string name="pairing_request_note">It can add, pause and remove downloads here. To revoke access, choose New code in Settings › Sharing.</string>
   <string name="pairing_request_allow">Allow</string>
   <string name="pairing_request_deny">Don't allow</string>
 

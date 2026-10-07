@@ -192,6 +192,6 @@ class DeviceWorkTest {
 
     val sentence = fleetSentence(listOf(mac, nas), emptyMap(), SpeedMode.Full, now, TimeZone.UTC)
 
-    assertEquals("All quiet", sentence.load())
+    assertEquals("Idle", sentence.load())
   }
 }

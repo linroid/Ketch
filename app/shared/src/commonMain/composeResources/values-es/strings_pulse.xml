@@ -12,8 +12,8 @@
     <item quantity="one">%1$d descarga requiere atención</item>
     <item quantity="other">%1$d descargas requieren atención</item>
   </plurals>
-  <string name="pulse_all_quiet">Todo tranquilo</string>
-  <string name="pulse_all_quiet_free">Todo tranquilo · %1$s libres en %2$s</string>
+  <string name="pulse_all_quiet">Inactivo</string>
+  <string name="pulse_all_quiet_free">Inactivo · %1$s libres en %2$s</string>
   <string name="pulse_connecting">Conectando con %1$s</string>
   <string name="pulse_needs_token">%1$s necesita un token</string>
   <string name="pulse_offline">%1$s está sin conexión · reintentando</string>
@@ -91,14 +91,14 @@
   <string name="pulse_use_as_slow_lane">Usar como velocidad del modo lento</string>
   <string name="pulse_speed_settings">Ajustes de velocidad…</string>
   <string name="pulse_update_failed">No se pudo actualizar %1$s · %2$s</string>
-  <string name="pulse_caption_full">Las descargas van tan rápido como lo permite la red.</string>
+  <string name="pulse_caption_full">Sin límite de velocidad.</string>
   <string name="pulse_caption_capped">Las descargas están limitadas a %1$s.</string>
-  <string name="pulse_caption_slow_lane">La velocidad total de las descargas está limitada a %1$s para dejar ancho de banda para otras apps.</string>
+  <string name="pulse_caption_slow_lane">Las descargas comparten %1$s.</string>
   <string name="pulse_caption_no_rules">Aún no hay reglas de velocidad. Añádelas en Ajustes de velocidad.</string>
   <string name="pulse_caption_rule_slow_lane">Una regla mantiene activado el modo lento.</string>
   <string name="pulse_caption_rule_full">Velocidad máxima hasta que una regla active el modo lento.</string>
-  <string name="pulse_caption_slow_lane_until">Modo lento hasta %1$s; después deciden tus reglas.</string>
-  <string name="pulse_caption_full_until">Velocidad máxima hasta %1$s; después deciden tus reglas.</string>
+  <string name="pulse_caption_slow_lane_until">Modo lento hasta %1$s; después se aplican tus reglas.</string>
+  <string name="pulse_caption_full_until">Velocidad máxima hasta %1$s; después se aplican tus reglas.</string>
   <string name="pulse_limit_for_slow_lane">Se usa siempre que el modo lento está activado.</string>
   <string name="pulse_limit_for_device">Se aplica a todas las descargas de %1$s.</string>
   <string name="pulse_limit_after_slow_lane">Se aplica cuando se desactiva el modo lento.</string>

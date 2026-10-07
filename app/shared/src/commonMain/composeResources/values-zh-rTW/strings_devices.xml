@@ -42,9 +42,9 @@
   <string name="device_not_connected">未連線</string>
 
   <string name="device_problem_unauthorized">需要新的存取權杖</string>
-  <string name="device_problem_token_rejected">該裝置不接受已儲存的存取權杖。</string>
-  <string name="device_problem_over_limit">Ketch 同時只會與少數幾台裝置保持連線。切換至這台裝置時會自動連線。</string>
-  <string name="device_problem_not_kept">切換至這台裝置或開啟「保持連線」後，Ketch 會自動連線。</string>
+  <string name="device_problem_token_rejected">已儲存的存取權杖遭到拒絕。</string>
+  <string name="device_problem_over_limit">Ketch 同時只連線少數幾台裝置。顯示這台裝置時才會連線。</string>
+  <string name="device_problem_not_kept">顯示時或開啟「保持連線」時連線。</string>
   <string name="device_problem_connecting">正在連線…</string>
   <string name="device_problem_offline_for">已離線 %1$s · 正在重試</string>
   <string name="device_problem_offline">離線 · 正在重試</string>
@@ -100,7 +100,7 @@
   <string name="device_rename_local_hint">你的其他裝置會在重新啟動後看到這個名稱。</string>
   <string name="device_rename_name">名稱</string>
   <string name="device_remove_title">要移除 %1$s 嗎？</string>
-  <string name="device_remove_body">移除後，這裡將不再顯示該裝置的下載項目。下載會繼續在 %1$s 上進行，之後可隨時重新新增該裝置。</string>
+  <string name="device_remove_body">該裝置的下載會繼續在 %1$s 上進行。之後可再次新增。</string>
 
   <string name="device_speed_of">%1$s 的速度</string>
 
@@ -157,7 +157,7 @@
   <string name="connect_approval_enter_code">改為輸入存取碼</string>
   <string name="connect_approval_denied">%1$s 拒絕了配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_expired">%1$s 未及時回應配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
-  <string name="connect_approval_busy">%1$s 仍在處理此裝置的另一個配對要求。請稍後重試，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_busy">%1$s 正在回應此裝置的另一個要求。請稍後再試，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_ask_again">重新傳送要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s嗎？</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_has_code">此連結包含它的存取碼。</string>
   <string name="pairing_request_title">要允許 %1$s 控制%2$s嗎？</string>
   <string name="pairing_request_check">請確認 %1$s 上顯示的配對碼與下方一致，再允許連線：</string>
-  <string name="pairing_request_note">允許後，該裝置可以新增、暫停和移除這裡的下載項目。若要撤銷存取權限，請在「設定 › 共享」中選擇「新存取碼」。</string>
+  <string name="pairing_request_note">該裝置可以新增、暫停和移除這裡的下載。若要撤銷存取權，請在「設定 › 共享」中選擇「新存取碼」。</string>
   <string name="pairing_request_allow">允許</string>
   <string name="pairing_request_deny">不允許</string>
 

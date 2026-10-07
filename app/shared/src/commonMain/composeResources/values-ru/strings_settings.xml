@@ -6,11 +6,11 @@
   <string name="settings_category_general">Общие</string>
   <string name="settings_category_general_description">Оформление, запуск и имя этого устройства</string>
   <string name="settings_category_notifications">Уведомления</string>
-  <string name="settings_category_notifications_description">О чём и как сообщает Ketch</string>
+  <string name="settings_category_notifications_description">Загрузки, устройства и звуки</string>
   <string name="settings_category_integration">Интеграция</string>
   <string name="settings_category_integration_description">Расширение браузера, magnet-ссылки и буфер обмена</string>
   <string name="settings_category_discover">Поиск</string>
-  <string name="settings_category_discover_description">ИИ-модель, веб-поиск и сайты, которые можно открывать</string>
+  <string name="settings_category_discover_description">ИИ-модель, веб-поиск и доступ к страницам</string>
   <string name="settings_category_about">О программе</string>
   <string name="settings_category_about_description">Версия, лицензии и журналы</string>
   <string name="settings_category_downloads">Загрузки</string>
@@ -18,7 +18,7 @@
   <string name="settings_category_speed">Скорость</string>
   <string name="settings_category_speed_description">Режимы скорости и правила автоматического переключения</string>
   <string name="settings_category_network">Сеть</string>
-  <string name="settings_category_network_description">Сети, по которым распределяются загрузки</string>
+  <string name="settings_category_network_description">Сети для загрузок</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Дополнительные трекеры для публичных торрентов</string>
   <string name="settings_category_sharing">Общий доступ</string>
@@ -107,8 +107,8 @@
   <string name="settings_density_compact">Компактная</string>
   <string name="settings_density_comfortable">Просторная</string>
   <string name="settings_general_reduce_motion">Уменьшение движения</string>
-  <string name="settings_general_reduce_motion_on">Дорожки и панели меняются без анимации.</string>
-  <string name="settings_general_reduce_motion_system">В системе включено уменьшение движения, поэтому в Ketch тоже.</string>
+  <string name="settings_general_reduce_motion_on">Отключает анимацию.</string>
+  <string name="settings_general_reduce_motion_system">Включено в настройках системы.</string>
   <string name="settings_general_reduce_motion_auto">«Авто» следует настройке системы.</string>
   <string name="settings_general_language">Язык</string>
   <string name="settings_general_language_current">Русский</string>
@@ -149,7 +149,7 @@
   <string name="settings_notifications_all_finished_off">Следует настройке «Загрузка завершена», которая выключена.</string>
   <string name="settings_notifications_background">Только когда Ketch в фоне</string>
   <string name="settings_notifications_background_none">Ни для чего не выбрано «Уведомлять».</string>
-  <string name="settings_notifications_background_on">Когда Ketch на переднем плане, уведомления показываются внутри него.</string>
+  <string name="settings_notifications_background_on">Пока Ketch на переднем плане, показываются внутри него.</string>
   <string name="settings_notifications_background_off">Уведомления показываются, даже когда Ketch на переднем плане.</string>
   <string name="settings_notifications_devices_group">Устройства</string>
   <string name="settings_notifications_offline">Отключение устройств</string>
@@ -163,7 +163,7 @@
   <string name="settings_notifications_success_vibration">Вибрация</string>
   <string name="settings_notifications_success_vibration_hint">Короткая вибрация, также в режиме вибрации.</string>
   <string name="settings_notifications_success_footer">Когда загрузка завершается или Поиск находит файлы.</string>
-  <string name="settings_notifications_success_footer_phone">Когда загрузка завершается или Поиск находит файлы. В беззвучном режиме и режиме «Не беспокоить» сигнал отключён. Для фоновых уведомлений используется собственный звук.</string>
+  <string name="settings_notifications_success_footer_phone">Когда загрузка завершается или Поиск находит файлы. Без звука в беззвучном режиме и режиме «Не беспокоить».</string>
   <string name="settings_notifications_browser">Уведомления браузера</string>
   <string name="settings_notifications_allowed">Уведомления разрешены</string>
   <string name="settings_notifications_allowed_hint">Показываются, когда вкладка Ketch в фоне.</string>
@@ -184,8 +184,8 @@
   <string name="settings_integration_torrent">Открывать файлы .torrent в Ketch</string>
   <string name="settings_integration_is_default">Ketch используется по умолчанию</string>
   <string name="settings_integration_make_default">Сделать по умолчанию</string>
-  <string name="settings_integration_magnet_refused">Ketch не удалось назначить себя для открытия magnet-ссылок. Выберите его в настройках системы.</string>
-  <string name="settings_integration_torrent_refused">Ketch не удалось назначить себя для открытия файлов .torrent. Выберите его в настройках системы.</string>
+  <string name="settings_integration_magnet_refused">Не удалось назначить Ketch приложением по умолчанию для magnet-ссылок. Выберите его в настройках системы.</string>
+  <string name="settings_integration_torrent_refused">Не удалось назначить Ketch приложением по умолчанию для файлов .torrent. Выберите его в настройках системы.</string>
   <string name="settings_integration_magnet_failed">Не удалось назначить Ketch для открытия magnet-ссылок: %1$s</string>
   <string name="settings_integration_torrent_failed">Не удалось назначить Ketch для открытия файлов .torrent: %1$s</string>
   <string name="settings_integration_clipboard">Буфер обмена</string>
@@ -202,7 +202,7 @@
 
   <string name="settings_ai_discovery">ИИ-поиск</string>
   <string name="settings_ai_content_filter">Фильтр содержимого</string>
-  <string name="settings_ai_content_filter_hint">Скрывает результаты, которые выглядят небезопасно: короткие ссылки, сборники загрузок, пиратство, сайты-подделки и установщики по незашифрованному HTTP. Ссылки в вашу собственную сеть скрываются всегда.</string>
+  <string name="settings_ai_content_filter_hint">Скрывает короткие ссылки, сборники загрузок, пиратство, сайты-подделки и установщики по незашифрованному HTTP. Ссылки в вашу собственную сеть скрываются всегда.</string>
   <string name="settings_ai_provider">Провайдер</string>
   <string name="settings_ai_api_key">Ключ API</string>
   <string name="settings_ai_model">Модель</string>
@@ -213,7 +213,7 @@
   <string name="settings_ai_status_unsupported">Работает в настольном приложении и в приложении для Android.</string>
   <string name="settings_ai_status_needs_provider">Выберите провайдера и добавьте его ключ ниже.</string>
   <string name="settings_ai_status_needs_search">Добавьте недостающие учётные данные веб-поиска.</string>
-  <string name="settings_ai_status_off">Поиск будет находить загрузки за вас.</string>
+  <string name="settings_ai_status_off">Находите загрузки по описанию.</string>
   <string name="settings_ai_status_ready">Готово · %1$s · %2$s</string>
   <string name="settings_ai_model_group">Модель</string>
   <string name="settings_ai_provider_ollama">Ollama · работает локально, без ключа</string>
@@ -256,7 +256,7 @@
   <string name="settings_ai_access_allow">Разрешать автоматически</string>
   <string name="settings_ai_access_allow_hint">Открывает любой сайт, нужный для поиска, не спрашивая.</string>
   <string name="settings_ai_access_ask_site">Спрашивать для каждого нового сайта</string>
-  <string name="settings_ai_access_ask_site_hint">Спрашивает, когда чат впервые открывает сайт. «Всегда разрешать» запоминает сайт.</string>
+  <string name="settings_ai_access_ask_site_hint">Спрашивает один раз для каждого сайта в каждом чате, если не выбрать «Всегда разрешать».</string>
   <string name="settings_ai_access_ask">Спрашивать каждый раз</string>
   <string name="settings_ai_access_ask_hint">Спрашивает перед открытием каждой страницы и проверкой каждого файла.</string>
   <string name="settings_ai_access_trusted">Всегда разрешены</string>
@@ -264,9 +264,9 @@
   <string name="settings_ai_access_trusted_none">Пока нет. Выберите «Всегда разрешать», когда Поиск спросит, или добавьте сайт здесь.</string>
   <string name="settings_ai_access_add">Добавьте сайт, например ubuntu.com</string>
   <string name="settings_ai_access_add_invalid">Введите адрес сайта, например ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Доступ к сайтам, которые вы укажете для поиска, не требует дополнительного разрешения.</string>
+  <string name="settings_ai_access_footer">Запросы только по указанным вами сайтам разрешения не требуют.</string>
 
-  <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно. Ketch делит каждую загрузку на дорожки, как его паруса.</string>
+  <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно.</string>
   <string name="settings_about_discover_elsewhere">Поиск работает в настольном приложении и в приложении для Android.</string>
   <string name="settings_about_version">Версия</string>
   <string name="settings_about_build">Сборка</string>
@@ -280,10 +280,10 @@
   <string name="settings_about_getting_started">Начало работы</string>
   <string name="settings_about_checklist">Показать список настройки</string>
   <string name="settings_about_checklist_hint">Шаги настройки на пустой странице «Загрузки».</string>
-  <string name="settings_about_checklist_done">Готово. Он показывается, пока список загрузок пуст.</string>
+  <string name="settings_about_checklist_done">Показывается, пока список загрузок пуст.</string>
   <string name="settings_about_welcome">Показать приветствие снова</string>
   <string name="settings_about_welcome_hint">Куда сохраняются загрузки и как вы пользуетесь Ketch на этом устройстве.</string>
-  <string name="settings_about_welcome_done">Готово. Приветствие появится при следующем запуске Ketch.</string>
+  <string name="settings_about_welcome_done">Появится при следующем запуске Ketch.</string>
   <string name="settings_about_troubleshooting">Устранение неполадок</string>
   <string name="settings_about_logs_footer">Журналы содержат названия загрузок и ссылки. Проверьте их перед публикацией.</string>
   <string name="settings_about_updates">Обновления</string>
@@ -294,7 +294,7 @@
   <string name="settings_about_update_current_hint">%1$s — последний выпуск.</string>
   <string name="settings_about_update_available">Доступен Ketch %1$s</string>
   <string name="settings_about_update_available_hint">У вас %1$s.</string>
-  <string name="settings_about_update_source_hint">Эта версия собрана из исходного кода. Установочные файлы доступны на странице выпуска.</string>
+  <string name="settings_about_update_source_hint">Собрано из исходного кода. Установщики — на странице выпуска.</string>
   <string name="settings_about_update_downloading">Загрузка Ketch %1$s…</string>
   <string name="settings_about_update_progress">%1$s из %2$s</string>
   <string name="settings_about_update_ready">Ketch %1$s готов к установке</string>
@@ -383,17 +383,17 @@
   <string name="settings_speed_limit_hint">Общее для всех загрузок; собственное ограничение загрузки может быть ниже.</string>
   <string name="settings_speed_mode_group">Режим</string>
   <string name="settings_speed_mode">Режим скорости</string>
-  <string name="settings_speed_full_unlimited">Загрузки используют всю доступную скорость.</string>
+  <string name="settings_speed_full_unlimited">Без ограничения скорости.</string>
   <string name="settings_speed_full_capped">Общая скорость загрузок ограничена до %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Общая скорость загрузок ограничена до %1$s, чтобы оставить пропускную способность для звонков.</string>
-  <string name="settings_speed_auto_no_rules">Добавьте правило ниже, чтобы низкая скорость включалась сама.</string>
+  <string name="settings_speed_slow_lane_summary">Общая скорость загрузок — не более %1$s.</string>
+  <string name="settings_speed_auto_no_rules">Добавьте правило, чтобы включать низкую скорость по расписанию.</string>
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Ограничения</string>
   <string name="settings_speed_full_cap">Предел полной скорости</string>
-  <string name="settings_speed_full_cap_hint">Максимальная общая скорость загрузок, когда режим низкой скорости выключен.</string>
+  <string name="settings_speed_full_cap_hint">Общий лимит вне режима низкой скорости.</string>
   <string name="settings_speed_slow_lane">Лимит в режиме низкой скорости</string>
   <string name="settings_speed_slow_lane_suggested">Рекомендуется ≈ %1$s — %2$d % от максимальной скорости за эту неделю.</string>
-  <string name="settings_speed_slow_lane_unknown">%1$s, пока Ketch не узнает, насколько быстро это подключение.</string>
+  <string name="settings_speed_slow_lane_unknown">%1$s, пока Ketch не измерит это подключение.</string>
   <string name="settings_speed_slow_lane_capped">Предел полной скорости (%1$s) ниже, поэтому действует он.</string>
   <string name="settings_speed_rules">Правила «Авто»</string>
   <string name="settings_speed_rules_footer_auto">Правила используют местное время этого устройства.</string>
@@ -538,7 +538,7 @@
   <string name="settings_search_start_hidden_keywords">автозапуск, фон, свернуть, строка меню, трей</string>
   <string name="settings_search_badge">Что показывает значок в Dock или на панели задач</string>
   <string name="settings_search_badge_keywords">счётчик, наклейка, dock, панель задач</string>
-  <string name="settings_search_shortcuts">Все сочетания клавиш в Ketch</string>
+  <string name="settings_search_shortcuts">Все сочетания клавиш</string>
   <string name="settings_search_shortcuts_keywords">клавиши, горячие клавиши, быстрые клавиши</string>
   <string name="settings_search_finished_keywords">завершено, готово, оповещение</string>
   <string name="settings_search_failed_keywords">ошибка, сбой, оповещение</string>

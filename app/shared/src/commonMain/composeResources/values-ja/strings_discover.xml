@@ -2,16 +2,16 @@
 <resources>
   <string name="discover_title">ディスカバー</string>
   <string name="discover_settings">ディスカバーの設定</string>
-  <string name="discover_hero_title">欲しいファイルを伝えるだけ。Ketchが探します。</string>
-  <string name="discover_intro_body">ディスカバーは%1$sを使ってWebを検索し、見つかったページを読んで信頼できると判断したファイルを表示します。追加するまでダウンロードは始まりません。</string>
+  <string name="discover_hero_title">何をダウンロードしますか？</string>
+  <string name="discover_intro_body">%1$sがWebを検索し、信頼できるソースのダウンロードを表示します。追加するまでダウンロードは始まりません。</string>
   <string name="discover_example_blender">Appleシリコン版Blender</string>
   <string name="discover_example_ubuntu">Ubuntu 24.04 サーバー版ISO</string>
   <string name="discover_example_footage">パブリックドメインの4K自然映像</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、ページを調べて信頼できるファイルを探します。検索内容は選択したプロバイダに送信されます。</string>
+  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、信頼できるソースのダウンロードを表示します。検索内容は選択したプロバイダに送信されます。</string>
   <string name="discover_setup_unsupported">ディスカバーは、コンピュータまたはAndroidスマートフォンのKetchアプリで利用できます。</string>
-  <string name="discover_setup_pending">「%1$s」の検索は、ディスカバーの設定が完了するとすぐに実行されます。</string>
+  <string name="discover_setup_pending">「%1$s」はディスカバーの設定後に実行されます。</string>
   <string name="discover_setup_choose_model">モデルを選択</string>
   <string name="discover_setup_local_provider">%1$s · ローカルで実行、キー不要</string>
   <string name="discover_setup_finish">%1$sの設定を完了</string>
@@ -75,9 +75,9 @@
   <string name="discover_error_title">ディスカバーはこの検索を完了できませんでした</string>
   <string name="discover_failed">検索に失敗しました</string>
   <string name="discover_none_title">ダウンロードできるファイルが見つかりません</string>
-  <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
+  <string name="discover_none_body">バージョン、プラットフォーム、Webサイトを追加してみてください。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">安全でないと思われる%1$d件の結果をコンテンツフィルタが非表示にしました。フィルタはディスカバーの設定でオフにできます。</item>
+    <item quantity="other">コンテンツフィルタで%1$d件の結果を非表示にしました。ディスカバーの設定でオフにできます。</item>
   </plurals>
   <string name="discover_search_everywhere">Web全体を検索</string>
   <string name="discover_stopped">停止しました</string>
@@ -124,7 +124,7 @@
   <string name="discover_history_clear">履歴を消去</string>
   <string name="discover_turn_off">ディスカバーをオフにする</string>
   <string name="discover_turned_off">ディスカバーをオフにしました</string>
-  <string name="discover_turned_off_detail">「設定」の「ディスカバー」でもう一度オンにできます。</string>
+  <string name="discover_turned_off_detail">「設定 › ディスカバー」でもう一度オンにできます。</string>
   <string name="discover_history_filter">履歴を検索</string>
   <string name="discover_history_empty">実行した検索がここに表示されます。</string>
   <string name="discover_history_no_match">「%1$s」に一致する検索はありません</string>

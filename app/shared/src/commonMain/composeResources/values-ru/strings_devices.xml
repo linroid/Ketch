@@ -42,9 +42,9 @@
   <string name="device_not_connected">Не подключено</string>
 
   <string name="device_problem_unauthorized">Нужен новый токен доступа</string>
-  <string name="device_problem_token_rejected">Устройство отклонило сохранённый для него токен доступа.</string>
-  <string name="device_problem_over_limit">Ketch держит подключёнными лишь несколько устройств одновременно. К этому он подключается, пока оно показано.</string>
-  <string name="device_problem_not_kept">Ketch подключается к нему, пока оно показано или пока оно остаётся подключённым.</string>
+  <string name="device_problem_token_rejected">Сохранённый токен доступа отклонён.</string>
+  <string name="device_problem_over_limit">Ketch подключается лишь к нескольким устройствам одновременно. К этому — пока оно показано.</string>
+  <string name="device_problem_not_kept">Подключается, пока показано или пока включено «Оставаться подключённым».</string>
   <string name="device_problem_connecting">Подключение…</string>
   <string name="device_problem_offline_for">Не в сети %1$s · повторная попытка</string>
   <string name="device_problem_offline">Не в сети · повторная попытка</string>
@@ -118,7 +118,7 @@
   <string name="device_rename_local_hint">Другие ваши устройства увидят это имя после перезапуска.</string>
   <string name="device_rename_name">Имя</string>
   <string name="device_remove_title">Удалить %1$s?</string>
-  <string name="device_remove_body">Ketch перестанет показывать здесь его загрузки. Они продолжат выполняться на устройстве «%1$s», а позже его можно будет добавить снова.</string>
+  <string name="device_remove_body">Его загрузки продолжат выполняться на устройстве «%1$s». Позже его можно добавить снова.</string>
 
   <string name="device_speed_of">Скорость: %1$s</string>
 
@@ -175,7 +175,7 @@
   <string name="connect_approval_enter_code">Ввести код доступа</string>
   <string name="connect_approval_denied">На %1$s не разрешили доступ этому устройству. Запросите снова или введите код доступа.</string>
   <string name="connect_approval_expired">На %1$s никто не ответил. Запросите снова или введите код доступа.</string>
-  <string name="connect_approval_busy">На %1$s ещё рассматривают другой запрос с этого устройства. Запросите снова чуть позже или введите код доступа.</string>
+  <string name="connect_approval_busy">%1$s отвечает на другой запрос с этого устройства. Повторите чуть позже или введите код доступа.</string>
   <string name="connect_approval_ask_again">Запросить снова</string>
   <string name="connect_added_badge">Добавлено</string>
   <string name="connect_share_instead">Хотите управлять загрузками %1$s с другого устройства?</string>
@@ -198,7 +198,7 @@
   <string name="connect_pairing_has_code">Ссылка содержит код доступа.</string>
   <string name="pairing_request_title">Разрешить %1$s управлять загрузками %2$s?</string>
   <string name="pairing_request_check">Разрешайте, только если на %1$s показан этот код:</string>
-  <string name="pairing_request_note">Устройство сможет добавлять, приостанавливать и удалять загрузки здесь. Чтобы потом отозвать доступ, выберите «Новый код» в разделе «Настройки › Общий доступ».</string>
+  <string name="pairing_request_note">Устройство сможет добавлять, приостанавливать и удалять загрузки здесь. Чтобы отозвать доступ, выберите «Новый код» в разделе «Настройки › Общий доступ».</string>
   <string name="pairing_request_allow">Разрешить</string>
   <string name="pairing_request_deny">Не разрешать</string>
 

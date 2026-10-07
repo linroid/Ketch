@@ -44,9 +44,9 @@
   <string name="error_source">%1$sサーバーがエラーを返しました</string>
 
   <string name="error_http_sign_in">サインインが必要です（%1$d）</string>
-  <string name="error_http_sign_in_hint">%1$sへのサインインが必要です。Cookieも一緒に送られるよう、Ketchのブラウザ拡張機能から送信してください。</string>
+  <string name="error_http_sign_in_hint">%1$sへのサインインが必要です。Cookieを送信するには、Ketchのブラウザ拡張機能から追加してください。</string>
   <string name="error_http_sign_in_hint_short">%1$sへのサインインが必要です</string>
-  <string name="error_http_sign_in_hint_server">サーバーへのサインインが必要です。Cookieも一緒に送られるよう、Ketchのブラウザ拡張機能から送信してください。</string>
+  <string name="error_http_sign_in_hint_server">サーバーへのサインインが必要です。Cookieを送信するには、Ketchのブラウザ拡張機能から追加してください。</string>
   <string name="error_http_sign_in_hint_server_short">サーバーへのサインインが必要です</string>
   <string name="error_http_forbidden">アクセスが拒否されました（403）</string>
   <string name="error_http_forbidden_hint">リンクの有効期限が切れている可能性があります。</string>

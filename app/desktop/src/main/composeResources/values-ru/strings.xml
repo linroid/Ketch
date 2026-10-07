@@ -76,7 +76,7 @@
   <string name="message_update_ready">Ketch %1$s готов к установке</string>
   <string name="message_update_installed">Ketch обновлён до %1$s</string>
   <string name="message_update_failed">Не удалось обновить Ketch до %1$s</string>
-  <string name="message_update_failed_hint">Причина записана в update.log в папке журналов.</string>
+  <string name="message_update_failed_hint">Подробности в update.log в папке журналов.</string>
   <string name="message_update">Обновить</string>
   <string name="message_restart">Перезапустить</string>
   <string name="message_open_installer">Открыть установщик</string>
