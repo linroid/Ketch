@@ -247,8 +247,10 @@ internal class TrackerLists(
     if (urls == current.map { it.first }) return@withLock
     val kept = current.toMap()
     current.filter { it.first !in urls }.forEach { it.second.subscribe(null) }
-    subscribed.value = urls.map { url -> url to (kept[url] ?: newList(url)) }
-    subscribed.value.forEach { (url, list) -> list.subscribe(url) }
+    val next = urls.map { url -> url to (kept[url] ?: newList(url)) }
+    // Subscribed before they are published, so [state] never shows a list without its URL.
+    next.forEach { (url, list) -> list.subscribe(url) }
+    subscribed.value = next
     publish()
     log.i { "Tracker lists: ${urls.size}" }
   }
