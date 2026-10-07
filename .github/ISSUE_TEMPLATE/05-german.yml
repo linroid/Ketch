@@ -1,10 +1,6 @@
 name: "Deutsch"
 description: "Melde Fehler, schlage Verbesserungen vor oder stelle Fragen."
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Wenn möglich, verfasse dein Issue auf Englisch. Issues in anderen Sprachen sind ebenfalls willkommen.
   - type: dropdown
     id: type
     attributes:

@@ -1,10 +1,6 @@
 name: "日本語"
 description: "バグ報告、改善案、質問を送信します。"
 body:
-  - type: markdown
-    attributes:
-      value: |
-        可能であれば英語で記入してください。他の言語での Issue も歓迎します。
   - type: dropdown
     id: type
     attributes:
