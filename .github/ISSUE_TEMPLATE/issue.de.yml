@@ -9,7 +9,7 @@ body:
     id: type
     attributes:
       label: "Art des Problems"
-      options
+      options:
         - "Fehlerbericht"
         - "Funktionswunsch"
         - "Frage"
