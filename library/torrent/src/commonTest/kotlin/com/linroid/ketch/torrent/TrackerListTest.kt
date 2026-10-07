@@ -170,6 +170,41 @@ class TrackerListTest {
   }
 
   @Test
+  fun subscribe_returnsWithTheSavedCopyPublished() = realTime {
+    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
+    published.clear()
+    body = null
+
+    val restarted = subscription()
+    restarted.subscribe(LIST)
+    assertEquals(listOf(UDP, HTTP), restarted.state.value.trackers)
+    assertEquals(listOf(UDP, HTTP), published.single())
+  }
+
+  @Test
+  fun subscribe_returnsWithTheShippedCopyPublished() = realTime {
+    body = null
+    val subscription = subscription()
+    subscription.subscribe(BUNDLED_LIST)
+    assertEquals(listOf(BUNDLED), subscription.state.value.trackers)
+    assertEquals(listOf(BUNDLED), published.single())
+  }
+
+  @Test
+  fun newSource_hasTheShippedTrackersBeforeAnyDownload() {
+    body = null
+    val source = TorrentDownloadSource(
+      TorrentConfig(dhtEnabled = false, trackerListUrl = TorrentConfig.BEST_TRACKERS_URL),
+      http,
+    )
+    try {
+      assertEquals(TorrentConfig.BEST_TRACKERS, source.extraTrackers())
+    } finally {
+      source.close()
+    }
+  }
+
+  @Test
   fun bestTrackers_areAllUsable() {
     val text = TorrentConfig.BEST_TRACKERS.joinToString("\n")
     assertEquals(TorrentConfig.BEST_TRACKERS, parseTrackerList(text))

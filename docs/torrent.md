@@ -96,7 +96,9 @@ including a development run, hands its files to the running app instead of openi
   (`tracker-list.txt`) is used on restart, without downloading while it is under a day old; a
   failed download keeps it and retries after an hour, and a list with no usable trackers counts
   as failed. Until the default list first downloads, `TorrentConfig.BEST_TRACKERS`, the copy Ketch
-  ships, stands in. The apps and CLI subscribe by default (`[torrent] trackerList = false` turns it
+  ships, stands in. The source has those trackers from the start, and the first torrent waits
+  up to 5 seconds for the saved copy to be read, so a magnet resolved right after launch already
+  announces to them. The apps and CLI subscribe by default (`[torrent] trackerList = false` turns it
   off), so magnets without trackers still find peers where DHT cannot bootstrap; downloading the
   list shows its host this device's IP address. `TorrentConfig.trackerListUrl` itself defaults to
   `null` for SDK users. `setTrackerList` and `refreshTrackerList` change or update it at runtime,

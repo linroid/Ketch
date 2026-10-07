@@ -68,7 +68,8 @@ internal class TrackerListSubscription(
 
   /**
    * Subscribes to the list at [url], or unsubscribes for `null` or a URL that is not `http` or
-   * `https`.
+   * `https`. Returns once the trackers it has without downloading, the saved copy or else the
+   * shipped one, are passed to `onTrackers`; downloads run afterwards.
    */
   suspend fun subscribe(requested: String?): Unit = mutex.withLock {
     val url = requested?.takeIf(::isTrackerListUrl)
@@ -76,14 +77,19 @@ internal class TrackerListSubscription(
     if (url == mutableState.value.url) return@withLock
     job?.cancelAndJoin()
     job = null
-    mutableState.value = TrackerListState(url)
-    onTrackers(emptyList())
     if (url == null) {
+      mutableState.value = TrackerListState()
+      onTrackers(emptyList())
       log.i { "Tracker list unsubscribed" }
       return@withLock
     }
+    val cached = readCache(url)
+    val trackers = cached?.trackers ?: bundled(url)
+    mutableState.value = TrackerListState(url, trackers, cached?.updatedAt)
+    onTrackers(trackers)
+    if (cached != null) log.d { "Tracker list restored: ${trackers.size} tracker(s)" }
     refreshRequests.tryReceive()
-    job = scope.launch { run(url) }
+    job = scope.launch { run(url, cached?.updatedAt) }
   }
 
   /** Downloads the subscribed list now instead of waiting for its next refresh. */
@@ -91,20 +97,9 @@ internal class TrackerListSubscription(
     refreshRequests.trySend(Unit)
   }
 
-  private suspend fun run(url: String) {
-    val cached = readCache(url)
-    if (cached != null) {
-      mutableState.update { it.copy(trackers = cached.trackers, updatedAt = cached.updatedAt) }
-      onTrackers(cached.trackers)
-      log.d { "Tracker list restored: ${cached.trackers.size} tracker(s)" }
-    } else {
-      val trackers = bundled(url)
-      if (trackers.isNotEmpty()) {
-        mutableState.update { it.copy(trackers = trackers) }
-        onTrackers(trackers)
-      }
-    }
-    var next = cached?.let { it.updatedAt + refreshInterval } ?: clock.now()
+  /** Downloads the list at [url] when the copy from [savedAt] is a day old, then daily. */
+  private suspend fun run(url: String, savedAt: Instant?) {
+    var next = savedAt?.let { it + refreshInterval } ?: clock.now()
     while (true) {
       val wait = next - clock.now()
       if (wait.isPositive()) withTimeoutOrNull(wait) { refreshRequests.receive() }
