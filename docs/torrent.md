@@ -76,6 +76,10 @@ including a development run, hands its files to the running app instead of openi
   support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
+- Magnet metadata is fetched from one peer at a time, as each is found, within
+  `metadataTimeout`. A peer that fails is asked again after 5, 15 and 30 seconds, behind peers
+  found meanwhile, so swarms of one or two briefly busy peers still resolve; why each peer was
+  given up is logged at debug.
 - `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
   `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
   and at most 64 are used. Each one is announced alongside the torrent's own trackers rather than
