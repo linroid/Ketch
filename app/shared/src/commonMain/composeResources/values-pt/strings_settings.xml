@@ -452,6 +452,35 @@
     <item quantity="one">e mais %1$d.</item>
     <item quantity="other">e mais %1$d.</item>
   </plurals>
+  <string name="settings_torrent_list">Lista de trackers</string>
+  <string name="settings_torrent_list_subscribe">Assinar uma lista de trackers</string>
+  <string name="settings_torrent_list_subscribe_hint">Os torrents públicos também anunciam para os trackers dela. Atualizada diariamente.</string>
+  <string name="settings_torrent_list_url">Endereço da lista</string>
+  <string name="settings_torrent_list_url_hint">Um URL de announce por linha.</string>
+  <string name="settings_torrent_list_url_invalid">Digite um endereço http ou https.</string>
+  <string name="settings_torrent_list_default">Usar o padrão</string>
+  <string name="settings_torrent_list_update">Atualizar agora</string>
+  <string name="settings_torrent_list_updating">Atualizando…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d tracker · atualizada há %2$s</item>
+    <item quantity="other">%1$d trackers · atualizada há %2$s</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">%1$d tracker integrado até a lista ser baixada.</item>
+    <item quantity="other">%1$d trackers integrados até a lista ser baixada.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Não foi possível atualizar a lista. Usando %1$d tracker de %2$s atrás.</item>
+    <item quantity="other">Não foi possível atualizar a lista. Usando %1$d trackers de %2$s atrás.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Não foi possível baixar a lista. Usando %1$d tracker integrado.</item>
+    <item quantity="other">Não foi possível baixar a lista. Usando %1$d trackers integrados.</item>
+  </plurals>
+    <string name="settings_torrent_list_trackers">Trackers da lista</string>
+  <string name="settings_torrent_list_hide">Ocultar</string>
+  <string name="settings_torrent_list_failed">Não foi possível baixar a lista.</string>
+  <string name="settings_torrent_list_footer">O servidor da lista vê o endereço IP deste dispositivo.</string>
 
   <string name="settings_sharing_remote">Configure o compartilhamento diretamente em %1$s, no Ketch ou com ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s não pode compartilhar os downloads com outros dispositivos.</string>

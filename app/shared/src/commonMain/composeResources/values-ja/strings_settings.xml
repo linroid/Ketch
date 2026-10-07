@@ -441,6 +441,31 @@
   <plurals name="settings_torrent_rejected_more">
     <item quantity="other">ほか%1$d件。</item>
   </plurals>
+  <string name="settings_torrent_list">トラッカーリスト</string>
+  <string name="settings_torrent_list_subscribe">トラッカーリストを購読</string>
+  <string name="settings_torrent_list_subscribe_hint">公開トレントはリストのトラッカーにもアナウンスします。毎日更新されます。</string>
+  <string name="settings_torrent_list_url">リストのアドレス</string>
+  <string name="settings_torrent_list_url_hint">1行に1つのアナウンスURL。</string>
+  <string name="settings_torrent_list_url_invalid">http または https のアドレスを入力してください。</string>
+  <string name="settings_torrent_list_default">デフォルトに戻す</string>
+  <string name="settings_torrent_list_update">今すぐ更新</string>
+  <string name="settings_torrent_list_updating">更新中…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="other">%1$d件のトラッカー · %2$s前に更新</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="other">リストをダウンロードするまで内蔵トラッカー%1$d件。</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="other">リストを更新できませんでした。%2$s前の%1$d件のトラッカーを使用しています。</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="other">リストをダウンロードできませんでした。内蔵の%1$d件のトラッカーを使用しています。</item>
+  </plurals>
+    <string name="settings_torrent_list_trackers">リストのトラッカー</string>
+  <string name="settings_torrent_list_hide">隠す</string>
+  <string name="settings_torrent_list_failed">リストをダウンロードできませんでした。</string>
+  <string name="settings_torrent_list_footer">リストのサーバーにはこのデバイスのIPアドレスが知られます。</string>
 
   <string name="settings_sharing_remote">共有は%1$s本体で、Ketchまたはketch serverを使って設定してください。</string>
   <string name="settings_sharing_unsupported">%1$sは他のデバイスとダウンロードを共有できません。</string>

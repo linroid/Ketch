@@ -246,28 +246,11 @@ internal class KotlinTorrentEngine(
           coroutineScope {
             val peers = Channel<PeerEndpoint>(256)
             val discovery = launch { discoverMagnet(magnet, peers) }
-            val attempted = mutableSetOf<PeerEndpoint>()
             try {
-              while (true) {
-                val endpoint = peers.receive()
-                if (!attempted.add(endpoint)) continue
-                if (attempted.size > 4096) error("Metadata peer limit exceeded")
-                tried = attempted.size
-                try {
-                  return@coroutineScope TorrentMetadataExchange(network, config.maxMetadataBytes,
-                    budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint)
-                    .also { log.d { "Metadata for $hash received from $endpoint" } }
-                } catch (e: PrivateTorrentMagnetException) {
-                  throw e
-                } catch (e: CancellationException) {
-                  if (!currentCoroutineContext().isActive) throw e
-                } catch (e: Exception) {
-                  // A bad peer must not prevent trying the remaining discovery candidates.
-                  log.v { "Metadata for $hash from $endpoint failed: ${e.describeWithoutUrls()}" }
-                }
+              fetchFromMetadataPeers("Metadata for $hash", peers, onPeer = { tried = it }) {
+                TorrentMetadataExchange(network, config.maxMetadataBytes,
+                  budget = exchangeBudgets.metadata).fetch(magnet.infoHash, it)
               }
-              @Suppress("UNREACHABLE_CODE")
-              error("No metadata peers")
             } finally { discovery.cancel(); peers.cancel() }
           }
         }.also {
@@ -350,7 +333,7 @@ internal class KotlinTorrentEngine(
             started = true
             interval = maxOf(interval, response.intervalSeconds)
             for (endpoint in response.peers.distinct()) {
-              check(++attempts <= 4096) { "Metadata peer limit exceeded" }
+              check(++attempts <= MAX_METADATA_PEERS) { "Metadata peer limit exceeded" }
               attempt { fetch(endpoint) }?.let { return@withTimeout it }
             }
           } finally {
@@ -369,24 +352,8 @@ internal class KotlinTorrentEngine(
     coroutineScope {
       val peers = Channel<PeerEndpoint>(256)
       val discovery = launch { discoverMagnet(magnet, peers, topic) }
-      val attempted = mutableSetOf<PeerEndpoint>()
       try {
-        while (true) {
-          val endpoint = peers.receive()
-          if (!attempted.add(endpoint)) continue
-          check(attempted.size <= 4096) { "Metadata peer limit exceeded" }
-          try { return@coroutineScope fetch(endpoint)
-          } catch (error: PrivateTorrentMagnetException) { throw error
-          } catch (error: Exception) {
-            currentCoroutineContext().ensureActive()
-            log.v {
-              "V2 metadata for ${topic.logHash()} from $endpoint failed: " +
-                error.describeWithoutUrls()
-            }
-          }
-        }
-        @Suppress("UNREACHABLE_CODE")
-        error("No metadata peers")
+        fetchFromMetadataPeers("V2 metadata for ${topic.logHash()}", peers) { fetch(it) }
       } finally {
         withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
       }
@@ -414,7 +381,7 @@ internal class KotlinTorrentEngine(
           contacted = true
           retrySeconds = maxOf(retrySeconds, result.intervalSeconds)
           for (endpoint in result.peers.distinct()) {
-            check(++attempts <= 4096) { "Metadata peer limit exceeded" }
+            check(++attempts <= MAX_METADATA_PEERS) { "Metadata peer limit exceeded" }
             try {
               return TorrentMetadataExchange(network, config.maxMetadataBytes,
                 budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint, trackerTiers,
@@ -967,7 +934,7 @@ internal class KotlinTorrentEngine(
 }
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
-private const val MAX_ADDITIONAL_TRACKERS = 64
+internal const val MAX_ADDITIONAL_TRACKERS = 64
 private const val DHT_REFRESH_MS = 15 * 60_000L
 
 private val attemptLog = KetchLogger("TorrentEngine")

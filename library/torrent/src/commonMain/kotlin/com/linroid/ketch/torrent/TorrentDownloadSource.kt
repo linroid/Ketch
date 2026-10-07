@@ -18,20 +18,26 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.io.encoding.Base64
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import okio.IOException
 import okio.Path.Companion.toPath
@@ -49,9 +55,22 @@ class TorrentDownloadSource(
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
+  private val listedTrackers = AtomicReference(emptyList<String>())
   internal var engineFactory: () -> TorrentEngine = {
-    KotlinTorrentEngine(config.copy(additionalTrackers = additionalTrackers.load()), http = http)
+    KotlinTorrentEngine(config.copy(additionalTrackers = extraTrackers()), http = http)
   }
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private val trackerListSubscription = TrackerListSubscription(
+    http = { http },
+    cacheFile = config.stateDirectory?.toPath()?.resolve(TRACKER_LIST_FILE),
+    scope = scope,
+    onTrackers = { trackers ->
+      engineMutex.withLock {
+        listedTrackers.store(trackers)
+        (engine.load() as? KotlinTorrentEngine)?.setAdditionalTrackers(extraTrackers())
+      }
+    },
+  )
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
   private val engineMutex = Mutex()
@@ -65,7 +84,25 @@ class TorrentDownloadSource(
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
 
-  private suspend fun getEngine(): TorrentEngine = engineMutex.withLock {
+  /** The subscribed tracker list ([TorrentConfig.trackerListUrl]) and its trackers. */
+  val trackerList: StateFlow<TrackerListState> get() = trackerListSubscription.state
+
+  // The configured list's trackers without downloading: the shipped copy at once, then the saved
+  // one, which the first engine waits for so the first magnet already announces to them.
+  private val initialTrackerList: Job? = config.trackerListUrl?.let { url ->
+    listedTrackers.store(bundledTrackers(url))
+    scope.launch { trackerListSubscription.subscribe(url) }
+  }
+
+  private suspend fun getEngine(): TorrentEngine {
+    // Outside engineMutex: restoring the list hands its trackers over under it.
+    if (engine.load() == null) {
+      initialTrackerList?.let { withTimeoutOrNull(TRACKER_LIST_RESTORE_MS) { it.join() } }
+    }
+    return startEngine()
+  }
+
+  private suspend fun startEngine(): TorrentEngine = engineMutex.withLock {
     check(!closed.load()) { "Torrent source is closed" }
     engine.load()?.let { return@withLock it }
     val created = engineFactory()
@@ -86,6 +123,7 @@ class TorrentDownloadSource(
   override fun close() {
     if (closed.compareAndSet(false, true)) {
       slots.close()
+      scope.cancel()
       engine.exchange(null)?.close()
       if (httpDelegate.isInitialized()) http.close()
     }
@@ -118,8 +156,21 @@ class TorrentDownloadSource(
     additionalTrackers.store(urls)
     val running = engine.load() as? KotlinTorrentEngine
     if (running == null) log.d { "Extra trackers saved for the next engine start: ${urls.size}" }
-    running?.setAdditionalTrackers(urls)
+    running?.setAdditionalTrackers(extraTrackers())
   }
+
+  /**
+   * Replace [TorrentConfig.trackerListUrl], or unsubscribe with `null`. A new list is downloaded
+   * at once; like [setAdditionalTrackers], its trackers reach torrents started or resumed after.
+   */
+  suspend fun setTrackerList(url: String?) = trackerListSubscription.subscribe(url)
+
+  /** Download the subscribed tracker list now rather than at its next daily refresh. */
+  fun refreshTrackerList() = trackerListSubscription.refresh()
+
+  /** The trackers set by hand, then the list's; the engine uses the first 64 usable ones. */
+  internal fun extraTrackers(): List<String> =
+    (additionalTrackers.load() + listedTrackers.load()).distinct()
 
   override fun canHandle(url: String): Boolean {
     val lower = url.lowercase()
@@ -692,6 +743,12 @@ internal expect fun createTorrentEngine(
 /** Peer caps accepted by v1 and v2 sessions. */
 internal const val MAX_V1_PEERS = 512
 internal const val MAX_V2_PEERS = 500
+
+/** Copy of the subscribed tracker list, in [TorrentConfig.stateDirectory]. */
+private const val TRACKER_LIST_FILE = "tracker-list.txt"
+
+/** How long the first engine start waits for the saved tracker list copy to be read. */
+private const val TRACKER_LIST_RESTORE_MS = 5_000L
 
 /**
  * Maps a task's connection setting onto its torrent peer cap. For torrents, Ketch's per-task

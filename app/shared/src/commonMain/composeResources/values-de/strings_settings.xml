@@ -452,6 +452,35 @@
     <item quantity="one">und %1$d weitere.</item>
     <item quantity="other">und %1$d weitere.</item>
   </plurals>
+  <string name="settings_torrent_list">Trackerliste</string>
+  <string name="settings_torrent_list_subscribe">Trackerliste abonnieren</string>
+  <string name="settings_torrent_list_subscribe_hint">Öffentliche Torrents melden sich auch bei ihren Trackern an. Täglich aktualisiert.</string>
+  <string name="settings_torrent_list_url">Adresse der Liste</string>
+  <string name="settings_torrent_list_url_hint">Eine Announce-URL pro Zeile.</string>
+  <string name="settings_torrent_list_url_invalid">Gib eine http- oder https-Adresse ein.</string>
+  <string name="settings_torrent_list_default">Standard verwenden</string>
+  <string name="settings_torrent_list_update">Jetzt aktualisieren</string>
+  <string name="settings_torrent_list_updating">Wird aktualisiert…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d Tracker · vor %2$s aktualisiert</item>
+    <item quantity="other">%1$d Tracker · vor %2$s aktualisiert</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">%1$d integrierter Tracker, bis die Liste geladen ist.</item>
+    <item quantity="other">%1$d integrierte Tracker, bis die Liste geladen ist.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Die Liste konnte nicht aktualisiert werden. %1$d Tracker von vor %2$s wird verwendet.</item>
+    <item quantity="other">Die Liste konnte nicht aktualisiert werden. %1$d Tracker von vor %2$s werden verwendet.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Die Liste konnte nicht geladen werden. %1$d integrierter Tracker wird verwendet.</item>
+    <item quantity="other">Die Liste konnte nicht geladen werden. %1$d integrierte Tracker werden verwendet.</item>
+  </plurals>
+    <string name="settings_torrent_list_trackers">Tracker der Liste</string>
+  <string name="settings_torrent_list_hide">Ausblenden</string>
+  <string name="settings_torrent_list_failed">Die Liste konnte nicht geladen werden.</string>
+  <string name="settings_torrent_list_footer">Der Server der Liste sieht die IP-Adresse dieses Geräts.</string>
 
   <string name="settings_sharing_remote">Richte die Freigabe direkt auf %1$s ein, in Ketch oder mit ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s kann Downloads nicht für andere Geräte freigeben.</string>

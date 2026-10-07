@@ -474,6 +474,43 @@
     <item quantity="many">и ещё %1$d.</item>
     <item quantity="other">и ещё %1$d.</item>
   </plurals>
+  <string name="settings_torrent_list">Список трекеров</string>
+  <string name="settings_torrent_list_subscribe">Подписаться на список трекеров</string>
+  <string name="settings_torrent_list_subscribe_hint">Публичные торренты также обращаются к его трекерам. Обновляется ежедневно.</string>
+  <string name="settings_torrent_list_url">Адрес списка</string>
+  <string name="settings_torrent_list_url_hint">Один адрес анонса в строке.</string>
+  <string name="settings_torrent_list_url_invalid">Введите адрес http или https.</string>
+  <string name="settings_torrent_list_default">По умолчанию</string>
+  <string name="settings_torrent_list_update">Обновить</string>
+  <string name="settings_torrent_list_updating">Обновление…</string>
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d трекер · обновлён %2$s назад</item>
+    <item quantity="few">%1$d трекера · обновлён %2$s назад</item>
+    <item quantity="many">%1$d трекеров · обновлён %2$s назад</item>
+    <item quantity="other">%1$d трекера · обновлён %2$s назад</item>
+  </plurals>
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">%1$d встроенный трекер, пока список не загружен.</item>
+    <item quantity="few">%1$d встроенных трекера, пока список не загружен.</item>
+    <item quantity="many">%1$d встроенных трекеров, пока список не загружен.</item>
+    <item quantity="other">%1$d встроенного трекера, пока список не загружен.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Не удалось обновить список. Используется %1$d трекер, загруженный %2$s назад.</item>
+    <item quantity="few">Не удалось обновить список. Используются %1$d трекера, загруженные %2$s назад.</item>
+    <item quantity="many">Не удалось обновить список. Используются %1$d трекеров, загруженных %2$s назад.</item>
+    <item quantity="other">Не удалось обновить список. Используются %1$d трекера, загруженные %2$s назад.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Не удалось загрузить список. Используется %1$d встроенный трекер.</item>
+    <item quantity="few">Не удалось загрузить список. Используются %1$d встроенных трекера.</item>
+    <item quantity="many">Не удалось загрузить список. Используются %1$d встроенных трекеров.</item>
+    <item quantity="other">Не удалось загрузить список. Используются %1$d встроенного трекера.</item>
+  </plurals>
+    <string name="settings_torrent_list_trackers">Трекеры из списка</string>
+  <string name="settings_torrent_list_hide">Скрыть</string>
+  <string name="settings_torrent_list_failed">Не удалось загрузить список.</string>
+  <string name="settings_torrent_list_footer">Сервер списка видит IP-адрес этого устройства.</string>
 
   <string name="settings_sharing_remote">Настройте общий доступ на самом устройстве «%1$s» — в Ketch или с помощью ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s не может открывать доступ к своим загрузкам другим устройствам.</string>

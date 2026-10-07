@@ -70,7 +70,14 @@ data class TorrentConfig(
    * never contact them. Invalid URLs are ignored, and at most 64 are used.
    */
   val additionalTrackers: List<String> = emptyList(),
-
+  /**
+   * `http` or `https` URL of a tracker list to subscribe to, such as [BEST_TRACKERS_URL]: plain
+   * text with one announce URL per line. It is downloaded when the source is created, unless
+   * [stateDirectory] holds a copy less than a day old, and again daily; its trackers are used like
+   * [additionalTrackers], after them. `null`, or a URL that is not `http` or `https`, subscribes
+   * to none.
+   */
+  val trackerListUrl: String? = null,
 ) {
   init {
     require(maxActiveTorrents in 1..64) { "maxActiveTorrents must be in 1..64" }
@@ -107,4 +114,36 @@ data class TorrentConfig(
   /** Metadata fetch timeout as a [Duration]. */
   val metadataTimeout: Duration
     get() = metadataTimeoutSeconds.seconds
+
+  companion object {
+    /** ngosang's list of the most reliable public trackers, refreshed daily. */
+    const val BEST_TRACKERS_URL: String =
+      "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+    /**
+     * [BEST_TRACKERS_URL] as of 2026-10-07, used for that list until its first download succeeds,
+     * so a subscription works offline and where GitHub is unreachable.
+     */
+    val BEST_TRACKERS: List<String> = listOf(
+      "udp://tracker.opentrackr.org:1337/announce",
+      "udp://open.stealth.si:80/announce",
+      "udp://tracker.torrent.eu.org:451/announce",
+      "udp://open.demonii.com:1337/announce",
+      "udp://exodus.desync.com:6969/announce",
+      "udp://tracker.skynetcloud.site:6969/announce",
+      "udp://tracker.qu.ax:6969/announce",
+      "udp://tracker.bittor.pw:1337/announce",
+      "udp://tracker.tryhackx.org:6969/announce",
+      "udp://tracker.nyaa.vc:6969/announce",
+      "udp://tracker.corpscorp.online:80/announce",
+      "udp://explodie.org:6969/announce",
+      "udp://tracker.theoks.net:6969/announce",
+      "udp://tracker-udp.gbitt.info:80/announce",
+      "udp://tracker.ducks.party:1984/announce",
+      "udp://tracker.gmi.gd:6969/announce",
+      "udp://tracker.dler.org:6969/announce",
+      "udp://tracker2.dler.org:80/announce",
+      "http://tracker.dler.com:6969/announce",
+      "udp://retracker01-msk-virt.corbina.net:80/announce",
+    )
+  }
 }

@@ -77,7 +77,8 @@ existing directory, or a path ending in a separator, keeps the file name from th
 path, including a bare file name such as `file.zip`, is the file path, relative to the current
 directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
-trackers of the default [config file](#config-file-locations).
+trackers, and the tracker list it subscribes to, of the default
+[config file](#config-file-locations).
 
 HTTP(S) `.m3u8` and `.mpd` URLs download finite, unencrypted HLS/DASH streams as one media file:
 `ketch 'https://example.com/video/index.m3u8'`. HLS master playlists choose the highest-bandwidth
@@ -484,6 +485,10 @@ maxConnectionsPerHost = 16
 # apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+# Subscribe to a list of public trackers (one announce URL per line), downloaded
+# daily and used after the trackers above.
+# trackerList = true
+# trackerListUrl = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
 
 # Pre-configured remote servers.
 # [[remotes]]
@@ -537,6 +542,8 @@ be negative.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `trackers` | string[] | `[]` | Extra `http`, `https` or `udp` trackers that public torrents also announce to |
+| `trackerList` | bool | `true` | Subscribe to the tracker list at `trackerListUrl`, downloaded daily; its trackers are used after `trackers` |
+| `trackerListUrl` | string | ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist) | `http` or `https` URL of a plain-text list, one announce URL per line |
 
 The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps
 also keep `[[remotes]]`, `[appearance]` and `server.autoStart` in this file; the CLI ignores them.

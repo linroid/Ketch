@@ -844,11 +844,14 @@ private fun printMcpUsage() {
   println("  }")
 }
 
-/** Torrent source that persists DHT state and adds the configured extra trackers. */
+/**
+ * Torrent source that persists DHT state and adds the configured extra trackers and tracker list.
+ */
 private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
   TorrentConfig(
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
+    trackerListUrl = settings.subscribedTrackerList,
   ),
 )
 
