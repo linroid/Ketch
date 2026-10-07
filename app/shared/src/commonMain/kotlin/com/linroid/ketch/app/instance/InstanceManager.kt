@@ -274,10 +274,10 @@ class InstanceManager(
     factory.applyTorrentSettings?.invoke(settings)
   }
 
-  /** What the embedded instance's subscribed tracker list holds; `null` without torrents. */
-  val trackerList: Flow<TrackerListStatus>? get() = factory.trackerList
+  /** What each of the embedded instance's subscribed tracker lists holds; `null` without torrents. */
+  val trackerList: Flow<List<TrackerListStatus>>? get() = factory.trackerList
 
-  /** Downloads the embedded instance's subscribed tracker list again now. */
+  /** Downloads the embedded instance's subscribed tracker lists again now. */
   fun refreshTrackerList() = factory.refreshTrackerList()
 
   /**

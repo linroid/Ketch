@@ -851,7 +851,7 @@ private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
   TorrentConfig(
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
-    trackerListUrl = settings.subscribedTrackerList,
+    trackerListUrls = settings.subscribedTrackerLists,
   ),
 )
 

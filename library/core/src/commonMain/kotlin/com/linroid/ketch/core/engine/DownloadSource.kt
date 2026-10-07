@@ -64,7 +64,8 @@ interface DownloadSource {
 
   /**
    * Resolves source metadata with the engine's current global [config].
-   * Ketch always calls this overload. Override it when the resolved
+   * Ketch calls this overload for a preview, such as `KetchApi.resolve`,
+   * and [resolveForDownload] for a task. Override it when the resolved
    * metadata depends on global defaults, for example when
    * [ResolvedSource.maxSegments] reports
    * [DownloadConfig.maxConnectionsPerDownload]. The default ignores
@@ -75,6 +76,20 @@ interface DownloadSource {
     properties: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource = resolve(url, properties)
+
+  /**
+   * Resolves source metadata for a task that is starting, which can wait
+   * where a preview would rather fail. Ketch calls this, inside its retries,
+   * before [download]. The default delegates to [resolve] with [config];
+   * a source whose metadata can take long to appear, such as a magnet link
+   * whose peers are offline, overrides it to keep looking until it succeeds
+   * or the task is paused or canceled.
+   */
+  suspend fun resolveForDownload(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = resolve(url, properties, config)
 
   /**
    * Returns true if this source can resolve caller-supplied file

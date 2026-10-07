@@ -10,6 +10,7 @@
   <string name="row_status_downloading">다운로드 중</string>
   <string name="row_status_stalled">멈춤</string>
   <string name="row_status_paused">일시정지됨</string>
+  <string name="row_status_starting">시작 중</string>
   <string name="row_status_queued">대기열</string>
   <string name="row_status_scheduled">예약됨</string>
   <string name="row_status_done">완료</string>
@@ -102,6 +103,7 @@
   <plurals name="queue_position_ahead">
     <item quantity="other">앞에 %1$d개</item>
   </plurals>
+  <string name="row_finding_peers">피어 찾는 중</string>
   <string name="queue_starting">시작 중</string>
 
   <string name="action_row_pause">일시정지</string>

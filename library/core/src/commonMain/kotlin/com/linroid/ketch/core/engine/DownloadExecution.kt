@@ -170,7 +170,9 @@ internal class DownloadExecution(
       log.d {
         "Resolved source '${source.type}' for taskId=$taskId: url=${redactUrl(request.url)}"
       }
-      resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers, config) }
+      resolvedUrl = downloadWithRetry {
+        source.resolveForDownload(request.url, request.headers, config)
+      }
     }
 
     val total = if (resolvedUrl.selectionMode == FileSelectionMode.MULTIPLE &&

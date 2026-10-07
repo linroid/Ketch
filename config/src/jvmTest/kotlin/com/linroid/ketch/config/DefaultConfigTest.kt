@@ -42,6 +42,7 @@ class DefaultConfigTest {
       val remote = RemoteConfig("192.168.1.100", apiToken = "token", name = "NAS")
       assertEquals(listOf(remote), config.remotes)
       assertEquals(1, config.torrent.trackers.size)
+      assertEquals(listOf("https://lists.example.org/trackers.txt"), config.torrent.trackerListUrls)
     } finally {
       dir.deleteRecursively()
     }

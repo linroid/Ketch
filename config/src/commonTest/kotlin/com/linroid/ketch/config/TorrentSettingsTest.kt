@@ -26,7 +26,7 @@ class TorrentSettingsTest {
       "https://t.example/announce?passkey=a1b2&info=\"x\"",
       "udp://[2001:db8::1]:6969/announce",
     )
-    val unsubscribed = TorrentSettings(trackerList = false, trackerListUrl = "https://l.example/t")
+    val unsubscribed = TorrentSettings(trackerList = false, trackerListUrls = listOf("https://l/t"))
     for (settings in listOf(TorrentSettings(trackers), TorrentSettings(), unsubscribed)) {
       val encoded = ConfigStore.toml
         .encodeToString(KetchConfig.serializer(), KetchConfig(torrent = settings))
@@ -36,16 +36,38 @@ class TorrentSettingsTest {
   }
 
   @Test
-  fun `tracker list is subscribed by default and only while switched on with a url`() {
-    assertEquals(
-      TorrentSettings.DEFAULT_TRACKER_LIST_URL,
-      TorrentSettings().subscribedTrackerList,
+  fun `tracker lists are subscribed by default and only while switched on`() {
+    assertEquals(TorrentSettings.DEFAULT_TRACKER_LISTS, TorrentSettings().subscribedTrackerLists)
+    assertEquals(emptyList(), TorrentSettings(trackerList = false).subscribedTrackerLists)
+    val custom = TorrentSettings(trackerListUrls = listOf(" https://l.example/t.txt ", "", " "))
+    assertEquals(listOf("https://l.example/t.txt"), custom.subscribedTrackerLists)
+  }
+
+  @Test
+  fun `a list saved by 0_3_0 is kept until the lists change`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[torrent]
+      |trackerList = true
+      |trackerListUrl = "https://l.example/mine.txt"
+      """.trimMargin(),
     )
-    assertEquals(null, TorrentSettings(trackerList = false).subscribedTrackerList)
-    val custom = TorrentSettings(trackerList = true, trackerListUrl = " https://l.example/t.txt ")
-    assertEquals("https://l.example/t.txt", custom.subscribedTrackerList)
-    val blank = TorrentSettings(trackerList = true, trackerListUrl = " ")
-    assertEquals(null, blank.subscribedTrackerList)
+    assertEquals(listOf("https://l.example/mine.txt"), decoded.torrent.subscribedTrackerLists)
+    val edited = decoded.torrent.withTrackerLists(listOf("https://l.example/other.txt"))
+    assertEquals(listOf("https://l.example/other.txt"), edited.subscribedTrackerLists)
+  }
+
+  @Test
+  fun `the default list saved by 0_3_0 subscribes to every default list`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[torrent]
+      |trackerListUrl = "${TorrentSettings.DEFAULT_TRACKER_LISTS.first()}"
+      """.trimMargin(),
+    )
+    assertEquals(TorrentSettings.DEFAULT_TRACKER_LISTS, decoded.torrent.subscribedTrackerLists)
   }
 
   @Test

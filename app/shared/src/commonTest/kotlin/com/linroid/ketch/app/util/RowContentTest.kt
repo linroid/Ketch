@@ -167,7 +167,20 @@ class RowContentTest {
 
     val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = null)
 
-    assertEquals("Starting", content.detail.load())
+    assertEquals(RowStatus.Downloading, content.status)
+    assertEquals("Starting", content.statusText.load())
+    assertEquals(urlHost(request.url), content.detail.load())
+  }
+
+  @Test
+  fun rowContent_magnetStarting_saysFindingPeers() = runTest {
+    val capable = context.copy(features = KetchFeatures.ALL)
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:45b3e332a3b991b3ff000513c4a135054775d73d")
+
+    val content = rowContent(magnet, DownloadState.Queued, now, capable, queuePosition = null)
+
+    assertEquals("Starting", content.statusText.load())
+    assertEquals("Finding peers", content.detail.load())
   }
 
   @Test

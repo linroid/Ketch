@@ -34,6 +34,7 @@ import ketch.app.shared.generated.resources.row_canceled
 import ketch.app.shared.generated.resources.row_completed
 import ketch.app.shared.generated.resources.row_connections
 import ketch.app.shared.generated.resources.row_files
+import ketch.app.shared.generated.resources.row_finding_peers
 import ketch.app.shared.generated.resources.row_limited_by_slow_lane
 import ketch.app.shared.generated.resources.row_missing_file
 import ketch.app.shared.generated.resources.row_paused
@@ -55,6 +56,7 @@ import ketch.app.shared.generated.resources.row_status_paused
 import ketch.app.shared.generated.resources.row_status_queued
 import ketch.app.shared.generated.resources.row_status_scheduled
 import ketch.app.shared.generated.resources.row_status_stalled
+import ketch.app.shared.generated.resources.row_status_starting
 import ketch.app.shared.generated.resources.row_took
 import ketch.app.shared.generated.resources.row_waiting_for_conditions
 import ketch.app.shared.generated.resources.size_progress
@@ -221,6 +223,20 @@ fun rowContent(
         progress = fraction(progress),
       )
     }
+    // A queued task out of the queue holds a slot and is resolving, such as a magnet link
+    // looking for its metadata; devices without queue positions cannot tell.
+    is DownloadState.Queued if KetchFeatures.QUEUE_POSITION in context.features &&
+      queuePosition == null -> RowContent(
+      status = RowStatus.Downloading,
+      statusText = Res.string.row_status_starting.text(),
+      detail = if (request.url.startsWith("magnet:", ignoreCase = true)) {
+        Res.string.row_finding_peers.text()
+      } else {
+        host?.let(::verbatim) ?: Res.string.queue_starting.text()
+      },
+      size = knownSize(request),
+      added = added,
+    )
     is DownloadState.Queued -> RowContent(
       status = RowStatus.Queued,
       statusText = Res.string.row_status_queued.text(),
@@ -277,8 +293,7 @@ internal val STALL_THRESHOLD: Duration = 5.seconds
 
 /**
  * Why a queued task waits and, on a device that reports positions, where it is in line: "Waiting
- * to start · next in line", "Waiting for a free slot (2 of 2 in use) · 2 ahead", or "Starting"
- * once it holds a slot.
+ * to start · next in line" or "Waiting for a free slot (2 of 2 in use) · 2 ahead".
  */
 private fun queuedDetail(
   request: DownloadRequest,
@@ -289,7 +304,7 @@ private fun queuedDetail(
     ?: QueueReason.Next).text
   return when {
     KetchFeatures.QUEUE_POSITION !in context.features -> reason
-    queuePosition == null -> Res.string.queue_starting.text()
+    queuePosition == null -> reason
     queuePosition == 1 -> listOf(reason, Res.string.queue_position_next.text()).joinText()
     else -> {
       val ahead = Res.plurals.queue_position_ahead.text(queuePosition - 1)

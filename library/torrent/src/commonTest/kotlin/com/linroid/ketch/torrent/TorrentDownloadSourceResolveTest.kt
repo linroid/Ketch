@@ -1,8 +1,10 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import kotlinx.coroutines.test.runTest
+import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -114,6 +116,28 @@ class TorrentDownloadSourceResolveTest {
     assertEquals("test.txt", resolved.metadata["name"])
     assertEquals("262144", resolved.metadata["pieceLength"])
     assertEquals("Test torrent", resolved.metadata["comment"])
+  }
+
+  @Test
+  fun resolveForDownload_magnetWithoutMetadata_looksAgainUntilFound() = runTest {
+    fakeEngine.fetchMetadataResults.addAll(listOf(null, null))
+    fakeEngine.fetchMetadataResult = singleFileMetadata()
+    val resolved = source.resolveForDownload(
+      "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
+    )
+    assertEquals("test.txt", resolved.suggestedFileName)
+    assertEquals(3, fakeEngine.fetchMetadataCalls)
+  }
+
+  @Test
+  fun resolveForDownload_magnetWithOtherNetworkError_fails() = runTest {
+    fakeEngine.fetchMetadataError = KetchError.Network(IOException("port in use"))
+    assertFailsWith<KetchError.Network> {
+      source.resolveForDownload(
+        "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
+      )
+    }
+    assertEquals(1, fakeEngine.fetchMetadataCalls)
   }
 
   @Test

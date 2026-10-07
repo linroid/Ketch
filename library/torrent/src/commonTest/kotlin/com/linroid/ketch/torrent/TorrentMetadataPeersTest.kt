@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -72,6 +73,36 @@ class TorrentMetadataPeersTest {
     }
     assertEquals(1, asked)
     assertEquals(listOf(1), found)
+  }
+
+  @Test
+  fun peerThatNeverAnswers_doesNotHoldUpTheNext() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED).apply { trySend(a); trySend(b) }
+    val result = fetchFromMetadataPeers("Metadata", peers) { endpoint ->
+      if (endpoint == a) awaitCancellation() else "from b at $currentTime"
+    }
+    assertEquals("from b at 0", result)
+  }
+
+  @Test
+  fun peersAreAskedAtMostParallelismAtOnce() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED)
+    repeat(6) { peers.trySend(PeerEndpoint("192.0.2.${it + 10}", 6881)) }
+    var asking = 0
+    var most = 0
+    withTimeoutOrNull(60_000) {
+      fetchFromMetadataPeers<String>("Metadata", peers, parallelism = 4) {
+        asking++
+        most = maxOf(most, asking)
+        try {
+          delay(10_000)
+          throw IOException("timed out")
+        } finally {
+          asking--
+        }
+      }
+    }
+    assertEquals(4, most)
   }
 
   @Test

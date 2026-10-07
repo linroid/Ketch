@@ -10,6 +10,7 @@
   <string name="row_status_downloading">ダウンロード中</string>
   <string name="row_status_stalled">停滞中</string>
   <string name="row_status_paused">一時停止中</string>
+  <string name="row_status_starting">開始中</string>
   <string name="row_status_queued">キュー待ち</string>
   <string name="row_status_scheduled">予約済み</string>
   <string name="row_status_done">完了</string>
@@ -102,6 +103,7 @@
   <plurals name="queue_position_ahead">
     <item quantity="other">前に%1$d件</item>
   </plurals>
+  <string name="row_finding_peers">ピアを検索中</string>
   <string name="queue_starting">開始中</string>
 
   <string name="action_row_pause">一時停止</string>

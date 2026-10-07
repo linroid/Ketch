@@ -24,9 +24,9 @@ import kotlinx.coroutines.flow.Flow
  * @param applyTorrentSettings applies changed torrent settings to the
  *   torrent source of the embedded instance, so they take effect without
  *   a restart. `null` when the embedded instance has no torrent support.
- * @param trackerList what the embedded instance's subscribed tracker list holds; `null` when it
+ * @param trackerList what each of the embedded instance's subscribed tracker lists holds; `null` when it
  *   has no torrent support.
- * @param refreshTrackerList downloads the subscribed tracker list again now.
+ * @param refreshTrackerList downloads the subscribed tracker lists again now.
  * @param remoteFactory creates a new, unconnected client for a remote device; a [RemoteKetch]
  *   by default. [InstanceManager] calls it each time it connects to the device again.
  */
@@ -35,7 +35,7 @@ class InstanceFactory(
   private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((KetchApi, PairingRequests) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
-  internal val trackerList: Flow<TrackerListStatus>? = null,
+  internal val trackerList: Flow<List<TrackerListStatus>>? = null,
   internal val refreshTrackerList: () -> Unit = {},
   private val remoteFactory: (RemoteConfig) -> RemoteInstance = ::remoteKetchInstance,
 ) {

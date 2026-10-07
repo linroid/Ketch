@@ -13,6 +13,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.Buffer
+import okio.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class TrackerTimeoutException : IllegalStateException("Tracker did not respond")
@@ -64,9 +65,9 @@ internal class TorrentTracker(
   private val network: TorrentNetwork,
   private val resolve: suspend (PeerEndpoint) -> PeerEndpoint = { endpoint ->
     withContext(Dispatchers.IO) {
-      PeerEndpoint(numericHost(checkNotNull(
-        InetSocketAddress(endpoint.host, endpoint.port).resolveAddress()
-      )), endpoint.port)
+      val address = InetSocketAddress(endpoint.host, endpoint.port).resolveAddress()
+        ?: throw IOException("Could not resolve the tracker's host")
+      PeerEndpoint(numericHost(address), endpoint.port)
     }
   },
   private val retryDelaysMs: List<Long> = listOf(15_000, 30_000, 60_000),

@@ -31,6 +31,7 @@ import com.linroid.ketch.app.state.RejectedTracker
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.trackerHost
+import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
@@ -44,14 +45,16 @@ import ketch.app.shared.generated.resources.settings_torrent_add_hint
 import ketch.app.shared.generated.resources.settings_torrent_footer
 import ketch.app.shared.generated.resources.settings_torrent_footer_first_only
 import ketch.app.shared.generated.resources.settings_torrent_list
+import ketch.app.shared.generated.resources.settings_torrent_list_add
 import ketch.app.shared.generated.resources.settings_torrent_list_default
 import ketch.app.shared.generated.resources.settings_torrent_list_footer
 import ketch.app.shared.generated.resources.settings_torrent_list_hide
+import ketch.app.shared.generated.resources.settings_torrent_list_none
+import ketch.app.shared.generated.resources.settings_torrent_list_remove
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe_hint
 import ketch.app.shared.generated.resources.settings_torrent_list_trackers
 import ketch.app.shared.generated.resources.settings_torrent_list_update
-import ketch.app.shared.generated.resources.settings_torrent_list_url
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
 import ketch.app.shared.generated.resources.settings_torrent_list_url_invalid
 import ketch.app.shared.generated.resources.settings_torrent_no_trackers
@@ -178,40 +181,45 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val listStatus = controller.trackerList?.collectAsState(initial = null)?.value
   TrackerListGroup(
     settings = torrent,
-    status = listStatus,
+    statuses = listStatus,
     onChange = controller::updateTorrent,
     onRefresh = controller::refreshTrackerList,
   )
 }
 
 /**
- * The tracker list subscription: a switch, the list's address, which starts as ngosang's
- * `trackers_best.txt`, and while subscribed, what the list holds from [status], with its
- * trackers behind Show.
+ * The tracker list subscription: a switch, the lists' addresses, which start as
+ * [TorrentSettings.DEFAULT_TRACKER_LISTS], and while subscribed, what each list holds from
+ * [statuses], with their trackers behind Show.
  */
 @Composable
 private fun TrackerListGroup(
   settings: TorrentSettings,
-  status: TrackerListStatus?,
+  statuses: List<TrackerListStatus>?,
   onChange: (TorrentSettings) -> Unit,
   onRefresh: () -> Unit,
 ) {
-  var address by remember(settings.trackerListUrl) { mutableStateOf(settings.trackerListUrl) }
-  val typed = address.trim()
-  val invalid = typed.isNotEmpty() && !isTrackerListUrl(typed)
-  val invalidText = stringResource(Res.string.settings_torrent_list_url_invalid)
-  val commit = {
-    when {
-      typed.isEmpty() -> address = settings.trackerListUrl
-      !invalid && typed != settings.trackerListUrl -> {
-        onChange(settings.copy(trackerListUrl = typed))
-      }
-    }
-  }
+  val lists = settings.trackerListAddresses
+  val save = { urls: List<String> -> onChange(settings.withTrackerLists(urls)) }
+  val subscribed = statuses.takeIf { settings.trackerList }.orEmpty()
   val now = LocalClock.current.now()
   SettingsGroup(
     title = stringResource(Res.string.settings_torrent_list),
     footer = stringResource(Res.string.settings_torrent_list_footer),
+    action = if (subscribed.isNotEmpty()) {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_list_update),
+          onClick = onRefresh,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+          leadingIcon = KetchIcon.Retry,
+          enabled = subscribed.none { it.updating },
+        )
+      }
+    } else {
+      null
+    },
   ) {
     SettingsSwitchRow(
       title = stringResource(Res.string.settings_torrent_list_subscribe),
@@ -219,52 +227,85 @@ private fun TrackerListGroup(
       checked = settings.trackerList,
       onCheckedChange = { onChange(settings.copy(trackerList = it)) },
     )
-    val subscribed = status.takeIf { settings.trackerList }
-    SettingsRow(
-      title = stringResource(Res.string.settings_torrent_list_url),
-      description = subscribed?.let { trackerListStatusText(it, now).resolve() }
-        ?: stringResource(Res.string.settings_torrent_list_url_hint),
-      trailing = subscribed?.let {
-        {
-          KetchButton(
-            text = stringResource(Res.string.settings_torrent_list_update),
-            onClick = onRefresh,
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            leadingIcon = KetchIcon.Retry,
-            enabled = !it.updating,
-          )
-        }
-      },
-    ) {
-      Row(
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-      ) {
-        SettingsTextField(
-          value = address,
-          onValueChange = { address = it },
-          modifier = Modifier.weight(1f),
-          placeholder = TorrentSettings.DEFAULT_TRACKER_LIST_URL,
-          error = invalidText.takeIf { invalid },
-          onDone = commit,
-          onFocusChange = { focused -> if (!focused) commit() },
-          mono = true,
-        )
-        if (settings.trackerListUrl != TorrentSettings.DEFAULT_TRACKER_LIST_URL) {
-          KetchButton(
-            text = stringResource(Res.string.settings_torrent_list_default),
-            onClick = {
-              address = TorrentSettings.DEFAULT_TRACKER_LIST_URL
-              onChange(settings.copy(trackerListUrl = TorrentSettings.DEFAULT_TRACKER_LIST_URL))
-            },
-            variant = KetchButtonVariant.Ghost,
-          )
-        }
-      }
+    AddTrackerListRow(
+      onAdd = { url -> if (url !in lists) save(lists + url) },
+      onDefaults = { save(TorrentSettings.DEFAULT_TRACKER_LISTS) }
+        .takeIf { lists != TorrentSettings.DEFAULT_TRACKER_LISTS },
+    )
+    if (lists.isEmpty()) {
+      SettingsRow(title = stringResource(Res.string.settings_torrent_list_none))
     }
-    val listed = subscribed?.trackers.orEmpty()
+    for (url in lists) {
+      val name = trackerListName(url)
+      SettingsRow(
+        title = name,
+        description = subscribed.firstOrNull { it.url == url }
+          ?.let { trackerListStatusText(it, now).resolve() } ?: url,
+        trailing = {
+          KetchIconButton(
+            icon = KetchIcon.Close,
+            onClick = { save(lists - url) },
+            size = KetchButtonSize.Small,
+            contentDescription = stringResource(Res.string.settings_torrent_list_remove, name),
+          )
+        },
+      )
+    }
+    val listed = subscribed.flatMap { it.trackers }.distinct()
     if (listed.isNotEmpty()) ListedTrackers(listed, unusedListedTrackers(settings.trackers, listed))
+  }
+}
+
+/**
+ * Field for a tracker list's address. [onAdd] gets a valid one; [onDefaults], when given, puts
+ * back the default lists.
+ */
+@Composable
+private fun AddTrackerListRow(onAdd: (String) -> Unit, onDefaults: (() -> Unit)?) {
+  var address by remember { mutableStateOf("") }
+  val typed = address.trim()
+  val invalid = typed.isNotEmpty() && !isTrackerListUrl(typed)
+  val invalidText = stringResource(Res.string.settings_torrent_list_url_invalid)
+  val add = {
+    if (typed.isNotEmpty() && !invalid) {
+      onAdd(typed)
+      address = ""
+    }
+  }
+  SettingsRow(
+    title = stringResource(Res.string.settings_torrent_list_add),
+    description = stringResource(Res.string.settings_torrent_list_url_hint),
+    trailing = onDefaults?.let {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_list_default),
+          onClick = it,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
+      }
+    },
+  ) {
+    Row(
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+    ) {
+      SettingsTextField(
+        value = address,
+        onValueChange = { address = it },
+        modifier = Modifier.weight(1f),
+        placeholder = "https://lists.example.org/trackers.txt",
+        error = invalidText.takeIf { invalid },
+        onDone = add,
+        mono = true,
+      )
+      KetchButton(
+        text = stringResource(Res.string.action_add),
+        onClick = add,
+        variant = KetchButtonVariant.Secondary,
+        enabled = typed.isNotEmpty() && !invalid,
+      )
+    }
   }
 }
 

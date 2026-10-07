@@ -87,6 +87,23 @@ fun unusedListedTrackers(extra: List<String>, listed: List<String>): Set<String>
   return used.drop(MAX_EXTRA_TRACKERS).toSet() - extra.toSet()
 }
 
+/**
+ * A short name for the tracker list at [url]: "ngosang/trackerslist · trackers_best.txt" for a
+ * file on GitHub, otherwise its host and file, such as "lists.example.org · best.txt".
+ */
+fun trackerListName(url: String): String {
+  val rest = url.substringAfter("://")
+  val host = rest.substringBefore('/')
+  val path = rest.substringAfter('/', "").substringBefore('?').substringBefore('#')
+    .split('/').filter { it.isNotEmpty() }
+  val file = path.lastOrNull() ?: return host
+  return if (host == "raw.githubusercontent.com" && path.size >= 4) {
+    "${path[0]}/${path[1]} · $file"
+  } else {
+    "$host · $file"
+  }
+}
+
 /** Whether [url] can be a tracker list's address: `http` or `https` with a host, no spaces. */
 fun isTrackerListUrl(url: String): Boolean {
   val scheme = url.substringBefore("://", "").lowercase()

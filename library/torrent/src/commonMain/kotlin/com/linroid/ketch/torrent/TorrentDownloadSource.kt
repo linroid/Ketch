@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
@@ -60,9 +61,9 @@ class TorrentDownloadSource(
     KotlinTorrentEngine(config.copy(additionalTrackers = extraTrackers()), http = http)
   }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val trackerListSubscription = TrackerListSubscription(
+  private val trackerListSubscription = TrackerLists(
     http = { http },
-    cacheFile = config.stateDirectory?.toPath()?.resolve(TRACKER_LIST_FILE),
+    stateDirectory = config.stateDirectory?.toPath(),
     scope = scope,
     onTrackers = { trackers ->
       engineMutex.withLock {
@@ -84,15 +85,16 @@ class TorrentDownloadSource(
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
 
-  /** The subscribed tracker list ([TorrentConfig.trackerListUrl]) and its trackers. */
-  val trackerList: StateFlow<TrackerListState> get() = trackerListSubscription.state
+  /** The subscribed tracker lists ([TorrentConfig.trackerListUrls]) and their trackers. */
+  val trackerLists: StateFlow<List<TrackerListState>> get() = trackerListSubscription.state
 
-  // The configured list's trackers without downloading: the shipped copy at once, then the saved
-  // one, which the first engine waits for so the first magnet already announces to them.
-  private val initialTrackerList: Job? = config.trackerListUrl?.let { url ->
-    listedTrackers.store(bundledTrackers(url))
-    scope.launch { trackerListSubscription.subscribe(url) }
-  }
+  // The configured lists' trackers without downloading: the shipped copies at once, then the
+  // saved ones, which the first engine waits for so the first magnet already announces to them.
+  private val initialTrackerList: Job? = config.trackerListUrls.takeIf { it.isNotEmpty() }
+    ?.let { urls ->
+      listedTrackers.store(urls.flatMap(::bundledTrackers).distinct())
+      scope.launch { trackerListSubscription.subscribe(urls) }
+    }
 
   private suspend fun getEngine(): TorrentEngine {
     // Outside engineMutex: restoring the list hands its trackers over under it.
@@ -160,13 +162,13 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Replace [TorrentConfig.trackerListUrl], or unsubscribe with `null`. A new list is downloaded
-   * at once; like [setAdditionalTrackers], its trackers reach torrents started or resumed after.
+   * Replace [TorrentConfig.trackerListUrls]; empty unsubscribes. New lists are downloaded at once;
+   * like [setAdditionalTrackers], their trackers reach torrents started or resumed after.
    */
-  suspend fun setTrackerList(url: String?) = trackerListSubscription.subscribe(url)
+  suspend fun setTrackerLists(urls: List<String>) = trackerListSubscription.subscribe(urls)
 
-  /** Download the subscribed tracker list now rather than at its next daily refresh. */
-  fun refreshTrackerList() = trackerListSubscription.refresh()
+  /** Download the subscribed tracker lists now rather than at their next daily refresh. */
+  fun refreshTrackerLists() = trackerListSubscription.refresh()
 
   /** The trackers set by hand, then the list's; the engine uses the first 64 usable ones. */
   internal fun extraTrackers(): List<String> =
@@ -261,6 +263,41 @@ class TorrentDownloadSource(
     }
   }
 
+  /**
+   * Resolves [url] for a task. A magnet keeps looking for its metadata, in lookups of
+   * [TorrentConfig.metadataTimeoutSeconds] each, until one finds it or the task stops: the peers
+   * of a small swarm may come online at any time. Other inputs resolve as [resolve] does.
+   */
+  override suspend fun resolveForDownload(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = resolveForTask(url, this.config.discoveryPrivacy, properties)
+
+  private suspend fun resolveForTask(
+    url: String,
+    privacy: TorrentDiscoveryPrivacy,
+    properties: Map<String, String>,
+  ): ResolvedSource {
+    if (!url.startsWith("magnet:", true)) return resolve(url, privacy, properties)
+    var lookups = 0
+    while (true) {
+      try {
+        return resolve(url, privacy, properties)
+      } catch (e: KetchError.Network) {
+        if (e.cause !is TimeoutCancellationException && e.cause !is MetadataNotFoundException) {
+          throw e
+        }
+        lookups++
+        log.i {
+          "No metadata for magnet ${logHash(MagnetUri.parse(url).infoHash.hex)} after " +
+            "$lookups lookup(s); looking again"
+        }
+        delay(MAGNET_LOOKUP_PAUSE_MS)
+      }
+    }
+  }
+
   private fun ResolvedSource.logged(origin: String): ResolvedSource = also {
     log.i {
       "Resolved torrent from $origin: ${logHash(metadata[META_INFO_HASH].orEmpty())} " +
@@ -274,8 +311,8 @@ class TorrentDownloadSource(
       val bytes = (getEngine() as KotlinTorrentEngine).fetchV2Metadata(url, privacy)
       return requireNotNull(resolveV2Metainfo(url, bytes, config, privacy))
     }
-    val fetched = getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
-      Exception("Torrent metadata resolution timed out"))
+    val fetched = getEngine().fetchMetadata(url, privacy)
+      ?: throw KetchError.Network(MetadataNotFoundException())
     if (!isHybridInfo(fetched.infoBytes)) return resolved(url, fetched, privacy)
     // A btih-only magnet found a hybrid torrent. Its v2 identity keys the task, so fetch the
     // piece layers under that topic instead of mixing v1 and v2 hashes.
@@ -327,7 +364,8 @@ class TorrentDownloadSource(
   }
 
   override suspend fun download(context: DownloadContext) = reportingFailures {
-    val resolved = context.preResolved ?: resolve(context.url, context.headers)
+    val resolved = context.preResolved
+      ?: resolveForTask(context.url, config.discoveryPrivacy, context.headers)
     execute(context, resolved, null)
   }
 
@@ -343,7 +381,7 @@ class TorrentDownloadSource(
     val resolved = when {
       state.metainfo.isNotEmpty() -> resolveMetainfo(decodeBase64(state.metainfo), privacy)
       checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
-      else -> resolve(context.url, privacy, context.headers)
+      else -> resolveForTask(context.url, privacy, context.headers)
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Resume torrent changed" }
     execute(context, resolved, state)
@@ -744,8 +782,11 @@ internal expect fun createTorrentEngine(
 internal const val MAX_V1_PEERS = 512
 internal const val MAX_V2_PEERS = 500
 
-/** Copy of the subscribed tracker list, in [TorrentConfig.stateDirectory]. */
-private const val TRACKER_LIST_FILE = "tracker-list.txt"
+/** A magnet's metadata lookup ended without finding it. */
+private class MetadataNotFoundException : Exception("Torrent metadata resolution timed out")
+
+/** Pause between a task's magnet lookups, so one that ends at once cannot spin. */
+private const val MAGNET_LOOKUP_PAUSE_MS = 1_000L
 
 /** How long the first engine start waits for the saved tracker list copy to be read. */
 private const val TRACKER_LIST_RESTORE_MS = 5_000L

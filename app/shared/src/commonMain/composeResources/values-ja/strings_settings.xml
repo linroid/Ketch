@@ -444,7 +444,9 @@
   <string name="settings_torrent_list">トラッカーリスト</string>
   <string name="settings_torrent_list_subscribe">トラッカーリストを購読</string>
   <string name="settings_torrent_list_subscribe_hint">公開トレントはリストのトラッカーにもアナウンスします。毎日更新されます。</string>
-  <string name="settings_torrent_list_url">リストのアドレス</string>
+  <string name="settings_torrent_list_add">リストを追加</string>
+  <string name="settings_torrent_list_remove">%1$s を削除</string>
+  <string name="settings_torrent_list_none">トラッカーリストはありません</string>
   <string name="settings_torrent_list_url_hint">1行に1つのアナウンスURL。</string>
   <string name="settings_torrent_list_url_invalid">http または https のアドレスを入力してください。</string>
   <string name="settings_torrent_list_default">デフォルトに戻す</string>

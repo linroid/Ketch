@@ -6,6 +6,7 @@ import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.parseTrackers
 import com.linroid.ketch.app.state.trackerHost
+import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.state.trackerUrlError
@@ -113,27 +114,30 @@ class TrackerUrlsTest {
     val twenty = List(20) { "udp://tracker$it.example:6969/announce" }
     assertEquals(
       "20 trackers · updated 3h 12m ago",
-      trackerListStatusText(TrackerListStatus(twenty, updated), now).load(),
+      trackerListStatusText(TrackerListStatus(LIST, twenty, updated), now).load(),
     )
     assertEquals(
       "Couldn't update the list. Using 1 tracker from 3h 12m ago.",
-      trackerListStatusText(TrackerListStatus(twenty.take(1), updated, failed = true), now).load(),
+      trackerListStatusText(
+        TrackerListStatus(LIST, twenty.take(1), updated, failed = true),
+        now,
+      ).load(),
     )
     assertEquals(
       "20 built-in trackers until the list downloads.",
-      trackerListStatusText(TrackerListStatus(twenty), now).load(),
+      trackerListStatusText(TrackerListStatus(LIST, twenty), now).load(),
     )
     assertEquals(
       "Couldn't download the list. Using 20 built-in trackers.",
-      trackerListStatusText(TrackerListStatus(twenty, failed = true), now).load(),
+      trackerListStatusText(TrackerListStatus(LIST, twenty, failed = true), now).load(),
     )
     assertEquals(
       "Couldn't download the list.",
-      trackerListStatusText(TrackerListStatus(failed = true), now).load(),
+      trackerListStatusText(TrackerListStatus(LIST, failed = true), now).load(),
     )
     assertEquals(
       "Updating…",
-      trackerListStatusText(TrackerListStatus(twenty, updated, updating = true), now).load(),
+      trackerListStatusText(TrackerListStatus(LIST, twenty, updated, updating = true), now).load(),
     )
   }
 
@@ -146,5 +150,18 @@ class TrackerUrlsTest {
       unusedListedTrackers(extra, listed),
     )
     assertEquals(emptySet(), unusedListedTrackers(emptyList(), listed))
+  }
+
+  @Test
+  fun `tracker lists are named by their GitHub repository or host and file`() {
+    val github = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+    assertEquals("ngosang/trackerslist · trackers_best.txt", trackerListName(github))
+    val other = "https://lists.example.org/a/best.txt?x=1"
+    assertEquals("lists.example.org · best.txt", trackerListName(other))
+    assertEquals("lists.example.org", trackerListName("https://lists.example.org/"))
+  }
+
+  private companion object {
+    const val LIST = "https://lists.example.org/best.txt"
   }
 }

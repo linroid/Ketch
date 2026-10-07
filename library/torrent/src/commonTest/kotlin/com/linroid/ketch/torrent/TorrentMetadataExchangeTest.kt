@@ -30,7 +30,7 @@ class TorrentMetadataExchangeTest {
   fun exchange_privateMetainfoRequiresExplicitInput() = runTest { exchange("private") }
 
   @Test
-  fun canceledHandshake_releasesMetadataReservationAndPreservesTransferReservation() = runTest {
+  fun handshake_reservesNoMetadataBufferAndCancelPreservesTransferReservation() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(5_000) {
         val budgets = TorrentExchangeBudgets(TorrentConfig())
@@ -52,7 +52,8 @@ class TorrentMetadataExchangeTest {
         }
         try {
           ready.await()
-          assertEquals(budgets.metadata.capacity, budgets.metadata.allocated)
+          // Peers that never answer the handshake must not hold the shared metadata buffer.
+          assertEquals(0, budgets.metadata.allocated)
           client.cancelAndJoin()
           assertEquals(0, budgets.metadata.allocated)
           assertEquals(budgets.transfer.capacity, budgets.allocated)

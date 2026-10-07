@@ -76,10 +76,16 @@ including a development run, hands its files to the running app instead of openi
   support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
-- Magnet metadata is fetched from one peer at a time, as each is found, within
-  `metadataTimeout`. A peer that fails is asked again after 5, 15 and 30 seconds, behind peers
-  found meanwhile, so swarms of one or two briefly busy peers still resolve; why each peer was
-  given up is logged at debug.
+- Magnet metadata is asked of up to four peers at once, as they are found, within
+  `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
+  so peers that never answer cannot hold up one that does. A peer that fails is asked again after
+  5, 15 and 30 seconds, behind peers found meanwhile, so swarms of one or two briefly busy peers
+  still resolve. Each failure and its reason is logged at debug, each exchange step at verbose.
+- A task keeps looking for a magnet's metadata (`DownloadSource.resolveForDownload`), one
+  `metadataTimeout` lookup after another, until it is found or the task is paused or canceled,
+  since the peers of a small swarm may come online later; each fruitless lookup is logged at
+  info. A preview such as `KetchApi.resolve` still gives up after one lookup. The apps show such
+  a task as Starting, "Finding peers", once it holds a download slot.
 - `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
   `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
   and at most 64 are used. Each one is announced alongside the torrent's own trackers rather than
@@ -88,21 +94,26 @@ including a development run, hands its files to the running app instead of openi
   the list for torrents started or resumed later. The apps edit the embedded instance's list under
   Settings → BitTorrent and apply it this way; a remote instance's list can only be changed on
   that device.
-- `trackerListUrl` (`[torrent] trackerList = true` with `trackerListUrl`, by default ngosang's
-  [`trackers_best.txt`](https://github.com/ngosang/trackerslist)) subscribes to a plain-text
-  tracker list, one announce URL per line. The source downloads it when created and daily after,
-  at most 256 KiB and 64 usable trackers (others, such as `wss`, are dropped), and uses them like
-  `additionalTrackers`, after them, within the same 64. A copy in `stateDirectory`
-  (`tracker-list.txt`) is used on restart, without downloading while it is under a day old; a
-  failed download keeps it and retries after an hour, and a list with no usable trackers counts
-  as failed. Until the default list first downloads, `TorrentConfig.BEST_TRACKERS`, the copy Ketch
-  ships, stands in. The source has those trackers from the start, and the first torrent waits
-  up to 5 seconds for the saved copy to be read, so a magnet resolved right after launch already
-  announces to them. The apps and CLI subscribe by default (`[torrent] trackerList = false` turns it
-  off), so magnets without trackers still find peers where DHT cannot bootstrap; downloading the
-  list shows its host this device's IP address. `TorrentConfig.trackerListUrl` itself defaults to
-  `null` for SDK users. `setTrackerList` and `refreshTrackerList` change or update it at runtime,
-  `trackerList` reports it; the apps show it under Settings → BitTorrent → Tracker list.
+- `trackerListUrls` (`[torrent] trackerList` and `trackerListUrls`) subscribes to plain-text
+  tracker lists, one announce URL per line: by default ngosang's
+  [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's
+  [`best.txt`](https://github.com/XIU2/TrackersListCollection) (`DEFAULT_TRACKER_LISTS`). The
+  source downloads each when created and daily after, at most 256 KiB and 64 usable trackers
+  (others, such as `wss`, are dropped), from its jsDelivr mirror when a `raw.githubusercontent.com`
+  download fails, and uses their trackers, in list order and without repeats, like
+  `additionalTrackers`, after them, within the same 64. Each list keeps a copy in
+  `stateDirectory` (`tracker-list-<hash>.txt`), used on restart without downloading while it is
+  under a day old; a failed download keeps it and retries after an hour, and a list with no
+  usable trackers counts as failed. Until ngosang's list first downloads,
+  `TorrentConfig.BEST_TRACKERS`, the copy Ketch ships, stands in. The source has the shipped
+  trackers from the start, and the first torrent waits up to 5 seconds for the saved copies to
+  be read, so a magnet resolved right after launch already announces to them. The apps and CLI
+  subscribe by default (`[torrent] trackerList = false` turns it off), so magnets without
+  trackers still find peers where DHT cannot bootstrap; downloading a list shows its host this
+  device's IP address. A custom `trackerListUrl` saved by Ketch 0.3.0 stays the only list until
+  the lists are changed. `TorrentConfig.trackerListUrls` itself is empty for SDK users.
+  `setTrackerLists` and `refreshTrackerLists` change or update them at runtime, `trackerLists`
+  reports each; the apps show them under Settings → BitTorrent → Tracker lists.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
