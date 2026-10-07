@@ -138,7 +138,7 @@ class TrackerUrlsTest {
   }
 
   @Test
-  fun `list trackers past the 64 the engine uses are unused, counting extra trackers first`() {
+  fun `list trackers past the 64 the engine uses are unused with extra trackers counted first`() {
     val extra = List(60) { "udp://extra$it.example:6969/announce" }
     val listed = listOf(extra[0]) + List(6) { "udp://listed$it.example:6969/announce" }
     assertEquals(
