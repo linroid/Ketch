@@ -31,6 +31,8 @@ dependencies {
   implementation(libs.compose.components.resources)
   implementation(libs.kotlinx.coroutinesSwing)
   implementation(libs.kotlinx.serialization.json)
+  // Hides the Dock icon on macOS while no window is open (MacDock).
+  implementation(libs.jna)
   // SLF4J backend for Ktor server and Koog; much smaller than Logback.
   runtimeOnly(libs.slf4j.simple)
 

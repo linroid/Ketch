@@ -513,7 +513,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   translations against English
 - Desktop: closing the window follows `[desktop] closeAction` (asks the first time while
   downloads run, then keeps Ketch in the menu bar or notification area; minimizes where there
-  is no tray). The main window exists only while it shows: hidden, it is disposed with its GPU
+  is no tray). On macOS Ketch leaves the Dock while none of its windows is open (`MacDock`, the
+  activation policy through JNA) and comes back with the window. The main window exists only
+  while it shows: hidden, it is disposed with its GPU
   memory, and its content comes back with what it saves (`rememberSaveable`, kept in a
   `SaveableStateHolder` outside the window), such as the page, the filter and scroll
   positions. The tray lists every device with its own actions, and the
