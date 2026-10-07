@@ -1,10 +1,6 @@
 name: "Español"
 description: "Informa de errores, sugiere mejoras o haz preguntas."
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Si es posible, escribe tu issue en inglés. También aceptamos issues en otros idiomas.
   - type: dropdown
     id: type
     attributes:
