@@ -1,0 +1,56 @@
+name: "日本語"
+description: "バグ報告、改善案、質問を送信します。"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        可能であれば英語で記入してください。他の言語での Issue も歓迎します。
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Issue の種類"
+      options:
+        - "バグ報告"
+        - "機能リクエスト"
+        - "質問"
+        - "その他"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "説明"
+      description: "発生したこと、期待した動作、または追加してほしい内容を記入してください。"
+      placeholder: "問題の内容や関連する情報を記入してください。"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "再現手順"
+      description: "バグ報告の場合は、問題を再現する手順を記入してください。"
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: environment
+    attributes:
+      label: "環境"
+      description: "必要に応じて、Ketch のバージョンとプラットフォームを記入してください。"
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        ログは **設定 → アプリについて → トラブルシューティング** から取得できます。
+        - **デスクトップ:** **ログフォルダーを開く** を選択します。
+        - **Android / iOS:** **ログを共有** を選択します。
+        - **Web:** ブラウザーの開発者コンソールを開きます。
+        - **CLI:** 関連するターミナル出力をコピーします。
+        詳しくは[ログガイド](https://github.com/linroid/Ketch/blob/main/docs/logging.md)を参照してください。
+  - type: textarea
+    id: logs
+    attributes:
+      label: "ログ"
+      description: "関連するログの抜粋を貼り付けるか、Issue の送信後にコメントでログファイルを添付してください。共有前に機密情報を削除してください。"
+      placeholder: "関連するログの抜粋を貼り付けてください。"
+    validations:
+      required: false
