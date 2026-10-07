@@ -1,9 +1,7 @@
 name: Issue / Problem / Problema / Problème / Issue / 问题
 description: >-
-  Report a bug, suggest an improvement, or ask a question. / Melde einen Fehler, schlage eine
-  Verbesserung vor oder stelle eine Frage. / Informa de un error, sugiere una mejora o haz una
-  pregunta. / Signalez un bug, suggérez une amélioration ou posez une question. /
-  バグ報告、改善案、質問を送信します。 / 报告问题、提出改进建议或提问。
+  Bugs, ideas, or questions. / Fehler, Ideen oder Fragen. / Errores, ideas o preguntas. /
+  Bugs, idées ou questions. / バグ・提案・質問。 / 问题、建议或提问。
 body:
   - type: markdown
     attributes:
@@ -25,12 +23,10 @@ body:
       label: >-
         Issue type / Art des Problems / Tipo de issue / Type d’issue / Issue の種類 / Issue 类型
       options:
+        - Bug / Fehler / Error / Bug / バグ / 问题
         - >-
-          Bug report / Fehlerbericht / Informe de error / Rapport de bug / バグ報告 / 问题报告
-        - >-
-          Feature request / Funktionsvorschlag / Solicitud de función / Demande de fonctionnalité /
-          機能リクエスト / 功能建议
-        - Question / Frage / Pregunta / Question / 質問 / 问题
+          Feature / Funktion / Función / Fonctionnalité / 機能 / 功能建议
+        - Question / Frage / Pregunta / Question / 質問 / 提问
         - Other / Sonstiges / Otro / Autre / その他 / 其他
     validations:
       required: true
@@ -82,5 +78,30 @@ body:
         Ketch version, operating system, device, etc. / Ketch-Version, Betriebssystem, Gerät usw. /
         Versión de Ketch, sistema operativo, dispositivo, etc. / Version de Ketch, système
         d’exploitation, appareil, etc. / Ketch のバージョン、OS、デバイスなど / Ketch 版本、操作系统、设备等
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Protokolle / Registros / Journaux / ログ / 日志
+      description: |
+        For bug reports, attach relevant log files if available, or paste relevant excerpts here.
+        Please remove passwords, tokens, and other sensitive information first.
+        Füge bei Fehlerberichten nach Möglichkeit relevante Protokolldateien bei oder füge Auszüge hier ein.
+        Entferne vorher Passwörter, Tokens und andere vertrauliche Informationen.
+        En los informes de errores, adjunta archivos de registro relevantes si es posible o pega fragmentos aquí.
+        Elimina antes las contraseñas, tokens y otros datos sensibles.
+        Pour les rapports de bug, joignez si possible les fichiers de journal pertinents ou collez des extraits ici.
+        Supprimez d’abord les mots de passe, jetons et autres informations sensibles.
+        バグ報告には、可能であれば関連するログファイルを添付するか、抜粋をここに貼り付けてください。
+        先にパスワード、トークンなどの機密情報を削除してください。
+        如果是问题报告，请尽量附上相关日志文件，或在此粘贴日志片段。
+        请先删除密码、令牌和其他敏感信息。
+      placeholder: >-
+        Paste relevant log excerpts here, or attach log files after submitting. / Füge relevante
+        Protokollauszüge hier ein oder hänge Dateien nach dem Absenden an. / Pega fragmentos
+        relevantes o adjunta archivos después de enviar el issue. / Collez des extraits pertinents
+        ou joignez les fichiers après l’envoi. / ログの抜粋を貼り付けるか、送信後にログファイルを添付してください。 /
+        请粘贴相关日志片段，或在提交后附上日志文件。
     validations:
       required: false
