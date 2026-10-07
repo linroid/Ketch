@@ -60,7 +60,7 @@ kotlin {
     }
     jvmMain.dependencies {
       // OS filesystem calls only; no torrent implementation or torrent native bindings.
-      implementation("net.java.dev.jna:jna:5.19.1")
+      implementation(libs.jna)
     }
     jvmTest.dependencies {
       implementation(projects.library.server)

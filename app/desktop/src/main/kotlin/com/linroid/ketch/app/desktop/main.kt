@@ -492,6 +492,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     }
   }
   CloseDialogs(behavior, controller.appSettings)
+  // Closed to the menu bar, Ketch leaves the Dock until a window opens again.
+  MacDockPresence(shown = behavior.windowVisible || settingsWindow.isOpen)
 
   val icon = painterResource("icon.svg")
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
