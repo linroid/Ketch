@@ -2,46 +2,55 @@ name: "Español"
 description: "Informa de errores, sugiere mejoras o haz preguntas."
 body:
   - type: markdown
-    attributes:
+    attributes
       value: |
         Si es posible, escribe tu issue en inglés. También aceptamos issues en otros idiomas.
   - type: dropdown
     id: type
-    attributes:
+    attributes
       label: "Tipo de issue"
-      options:
+      options
         - "Informe de error"
         - "Solicitud de función"
         - "Pregunta"
         - "Otro"
-    validations:
+    validations
       required: true
   - type: textarea
     id: description
-    attributes:
+    attributes
       label: "Descripción"
       description: "¿Qué ocurrió, qué esperabas o qué te gustaría ver?"
       placeholder: "Describe el problema y cualquier contexto relevante."
-    validations:
+    validations
       required: true
   - type: textarea
     id: steps
-    attributes:
+    attributes
       label: "Pasos para reproducir"
       description: "En los informes de errores, indica los pasos para reproducir el problema."
       placeholder: "1. ...\n2. ..."
   - type: textarea
     id: environment
-    attributes:
+    attributes
       label: "Entorno"
       description: "Indica la versión de Ketch y la plataforma cuando sea relevante."
-    validations:
+    validations
       required: false
+  - type: markdown
+    attributes
+      value: |
+        Recopila los registros desde **Ajustes → Acerca de → Solución de problemas**:
+        - **Escritorio:** Selecciona **Abrir carpeta de registros**.
+        - **Android o iOS:** Selecciona **Compartir registros**.
+        - **Web:** Abre la consola de desarrollador de tu navegador.
+        - **CLI:** Copia la salida relevante de la terminal.
+        Consulta la [guía de registros](https://github.com/linroid/Ketch/blob/main/docs/logging.md) para más detalles.
   - type: textarea
     id: logs
-    attributes:
+    attributes
       label: "Registros"
-      description: "En los informes de errores, adjunta archivos de registro relevantes en un comentario si es posible, o pega fragmentos aquí. Elimina antes las contraseñas, tokens y otros datos sensibles."
-      placeholder: "Pega aquí fragmentos de los registros. Después de enviar el issue, adjunta los archivos en un comentario."
-    validations:
+      description: "Pega aquí fragmentos relevantes o adjunta los archivos en un comentario después de enviar el issue. Elimina los datos sensibles antes de compartirlos."
+      placeholder: "Pega aquí fragmentos relevantes de los registros."
+    validations
       required: false
