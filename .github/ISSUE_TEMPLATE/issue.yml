@@ -5,7 +5,7 @@ body:
     id: type
     attributes:
       label: "Issue type"
-      options
+      options:
         - "Bug report"
         - "Feature request"
         - "Question"
