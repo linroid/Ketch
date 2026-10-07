@@ -100,6 +100,19 @@ For heap diagnostics use `jcmd <pid> GC.heap_info`. A separate diagnostic launch
 memory, not every native allocation. Do not force GC when comparing ordinary idle footprints.
 Exercise concurrent HTTP and torrent downloads as well as Discover before lowering the heap cap.
 
+Packaged app images carry a class data sharing archive, `ketch.jsa` beside the jars (`CdsArchive` in
+`app/desktop/build.gradle.kts`), dumped by the image's own launcher from
+`app/desktop/cds/app.classlist`, with ProGuard's names for release images. The JVM maps the classes
+from it instead of loading them, and its read-only part stays clean, shared memory. On Apple Silicon
+it took the release app from 167 to 117 MB in the background and from 575-583 to 512-513 MB with the
+window shown, and opened the window in 1.0 to 1.3 s instead of 1.5; it adds about 70 MB to the
+installed app and 15 MB to the DMG. To check that a launch uses it, add `-Xlog:class+load` (classes
+from `shared objects file`) and `-Xlog:cds` to `JAVA_TOOL_OPTIONS`: the archive should map at the
+address it was dumped for, not an alternative one, which writes to all of it. When what the first
+window loads changes much, such as after a Compose update, record the list again with
+`./gradlew :app:desktop:recordCdsClassList`, which opens the app with an empty profile until it is
+quit; classes the list misses still load, only from the jars.
+
 ## Public HTTP Download Smoke Tests
 
 Run the desktop app with `./gradlew :app:desktop:run`.
