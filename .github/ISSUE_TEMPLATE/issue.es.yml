@@ -1,0 +1,47 @@
+name: "Español"
+description: "Informa de errores, sugiere mejoras o haz preguntas."
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Si es posible, escribe tu issue en inglés. También aceptamos issues en otros idiomas.
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Tipo de issue"
+      options:
+        - "Informe de error"
+        - "Solicitud de función"
+        - "Pregunta"
+        - "Otro"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "Descripción"
+      description: "¿Qué ocurrió, qué esperabas o qué te gustaría ver?"
+      placeholder: "Describe el problema y cualquier contexto relevante."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Pasos para reproducir"
+      description: "En los informes de errores, indica los pasos para reproducir el problema."
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Entorno"
+      description: "Indica la versión de Ketch y la plataforma cuando sea relevante."
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Registros"
+      description: "En los informes de errores, adjunta archivos de registro relevantes en un comentario si es posible, o pega fragmentos aquí. Elimina antes las contraseñas, tokens y otros datos sensibles."
+      placeholder: "Pega aquí fragmentos de los registros. Después de enviar el issue, adjunta los archivos en un comentario."
+    validations:
+      required: false
