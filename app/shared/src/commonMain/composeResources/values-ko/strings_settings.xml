@@ -443,18 +443,18 @@
   </plurals>
   <string name="settings_torrent_list">트래커 목록</string>
   <string name="settings_torrent_list_subscribe">트래커 목록 구독</string>
-  <string name="settings_torrent_list_subscribe_hint">공개 토렌트는 추가 트래커 다음으로 목록의 트래커에도 알립니다. 매일 업데이트됩니다.</string>
+  <string name="settings_torrent_list_subscribe_hint">공개 토렌트는 목록의 트래커에도 알립니다. 매일 업데이트됩니다.</string>
   <string name="settings_torrent_list_url">목록 주소</string>
-  <string name="settings_torrent_list_url_hint">한 줄에 announce URL 하나씩 적힌 텍스트 파일.</string>
+  <string name="settings_torrent_list_url_hint">한 줄에 announce URL 하나.</string>
   <string name="settings_torrent_list_url_invalid">http 또는 https 주소를 입력하세요.</string>
   <string name="settings_torrent_list_default">기본값 사용</string>
   <string name="settings_torrent_list_update">지금 업데이트</string>
-  <string name="settings_torrent_list_updating">목록 다운로드 중…</string>
+  <string name="settings_torrent_list_updating">업데이트 중…</string>
   <plurals name="settings_torrent_list_status">
     <item quantity="other">트래커 %1$d개 · %2$s 전 업데이트</item>
   </plurals>
   <plurals name="settings_torrent_list_built_in">
-    <item quantity="other">목록을 다운로드할 때까지 내장 트래커 %1$d개를 사용합니다.</item>
+    <item quantity="other">목록을 다운로드할 때까지 내장 트래커 %1$d개.</item>
   </plurals>
   <plurals name="settings_torrent_list_stale">
     <item quantity="other">목록을 업데이트할 수 없습니다. %2$s 전의 트래커 %1$d개를 사용합니다.</item>
@@ -465,7 +465,7 @@
     <string name="settings_torrent_list_trackers">목록의 트래커</string>
   <string name="settings_torrent_list_hide">숨기기</string>
   <string name="settings_torrent_list_failed">목록을 다운로드할 수 없습니다.</string>
-  <string name="settings_torrent_list_footer">목록을 다운로드할 때 해당 사이트에 이 기기의 IP 주소가 표시됩니다.</string>
+  <string name="settings_torrent_list_footer">목록 서버에 이 기기의 IP 주소가 표시됩니다.</string>
 
   <string name="settings_sharing_remote">공유는 %1$s 기기에서 직접 Ketch나 ketch server로 설정하세요.</string>
   <string name="settings_sharing_unsupported">%1$s에서는 다른 기기와 다운로드를 공유할 수 없습니다.</string>

@@ -120,7 +120,7 @@ class TrackerUrlsTest {
       trackerListStatusText(TrackerListStatus(twenty.take(1), updated, failed = true), now).load(),
     )
     assertEquals(
-      "Using 20 built-in trackers until the list downloads.",
+      "20 built-in trackers until the list downloads.",
       trackerListStatusText(TrackerListStatus(twenty), now).load(),
     )
     assertEquals(
@@ -132,7 +132,7 @@ class TrackerUrlsTest {
       trackerListStatusText(TrackerListStatus(failed = true), now).load(),
     )
     assertEquals(
-      "Downloading the list…",
+      "Updating…",
       trackerListStatusText(TrackerListStatus(twenty, updated, updating = true), now).load(),
     )
   }
