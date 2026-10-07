@@ -9,7 +9,7 @@ body:
     id: type
     attributes:
       label: "Issue の種類"
-      options
+      options:
         - "バグ報告"
         - "機能リクエスト"
         - "質問"
