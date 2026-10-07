@@ -1,10 +1,6 @@
-name: "English"
+name: "English (Recommended)"
 description: "Report a bug, suggest an improvement, or ask a question."
 body:
-  - type: markdown
-    attributes:
-      value: |
-        If possible, please write in English. Issues in other languages are also welcome.
   - type: dropdown
     id: type
     attributes:
@@ -29,7 +25,7 @@ body:
     attributes:
       label: "Steps to reproduce"
       description: "For bug reports, list the steps that reproduce the problem."
-      placeholder: "1. ...\n2. ..."
+      placeholder: "1. ...\\n2. ..."
   - type: textarea
     id: environment
     attributes:
