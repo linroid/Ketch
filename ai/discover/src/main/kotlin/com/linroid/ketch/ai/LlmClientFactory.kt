@@ -20,6 +20,7 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import io.ktor.http.Url
 
 /**
  * An LLM client paired with the model it should be called with.
@@ -77,9 +78,7 @@ internal object LlmClientFactory {
       ?: customModel(LLMProvider.OpenAI, modelId, endpoint)
     val client = OpenAILLMClient(
       apiKey = apiKey,
-      settings = OpenAIClientSettings(
-        baseUrl = normalizeOpenAiBaseUrl(baseUrl),
-      ),
+      settings = openAiClientSettings(baseUrl),
     )
     return client to model
   }
@@ -157,18 +156,37 @@ internal object LlmClientFactory {
   )
 
   /**
-   * Normalizes an OpenAI-compatible endpoint to the API root.
+   * Splits an OpenAI-compatible [endpoint] into the client's base URL and
+   * the paths it appends to it.
    *
-   * Providers document their endpoint with the version segment
-   * included (`https://openrouter.ai/api/v1`), while the Koog client
-   * appends `v1/chat/completions` itself, so a trailing `/v1` is
-   * dropped to keep both spellings working.
+   * - A full request URL, ending in `/chat/completions`, is used as it is.
+   * - An endpoint whose path names an API version, the way providers
+   *   document theirs (`https://openrouter.ai/api/v1`,
+   *   `https://open.bigmodel.cn/api/paas/v4`,
+   *   `https://generativelanguage.googleapis.com/v1beta/openai`), is the
+   *   base that `chat/completions` follows, as in OpenAI's SDKs.
+   * - Any other endpoint is the server's root, which
+   *   `v1/chat/completions` follows.
    */
-  internal fun normalizeOpenAiBaseUrl(raw: String): String {
-    val trimmed = trimTrailingSlash(raw)
-    return trimmed.removeSuffix("/v1").ifBlank { trimmed }
+  internal fun openAiClientSettings(endpoint: String): OpenAIClientSettings {
+    val trimmed = trimTrailingSlash(endpoint)
+    val base = trimmed.removeSuffix("/$CHAT_COMPLETIONS_PATH")
+    // A full request URL or a versioned path already ends where the request paths start.
+    val isApiBase = base != trimmed || Url(base).segments.any { it.matches(API_VERSION_SEGMENT) }
+    val prefix = if (isApiBase) "" else "v1/"
+    return OpenAIClientSettings(
+      baseUrl = base,
+      chatCompletionsPath = prefix + CHAT_COMPLETIONS_PATH,
+      responsesAPIPath = prefix + RESPONSES_PATH,
+    )
   }
 
   private fun trimTrailingSlash(raw: String): String =
     raw.trim().trimEnd('/')
+
+  private const val CHAT_COMPLETIONS_PATH = "chat/completions"
+  private const val RESPONSES_PATH = "responses"
+
+  /** A path segment naming an API version: `v1`, `v4`, `v1beta`. */
+  private val API_VERSION_SEGMENT = Regex("v\\d+[a-z0-9.]*", RegexOption.IGNORE_CASE)
 }

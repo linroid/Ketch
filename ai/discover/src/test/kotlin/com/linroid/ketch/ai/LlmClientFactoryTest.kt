@@ -1,9 +1,17 @@
 package com.linroid.ketch.ai
 
+import ai.koog.http.client.ktor.KtorKoogHttpClient
+import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -176,23 +184,88 @@ class LlmClientFactoryTest {
   }
 
   @Test
-  fun `base url normalization drops a trailing version segment`() {
+  fun `a versioned endpoint is the base of chat completions`() = runTest {
     assertEquals(
-      "https://openrouter.ai/api",
-      LlmClientFactory.normalizeOpenAiBaseUrl("https://openrouter.ai/api/v1"),
+      "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      requestUrl("https://open.bigmodel.cn/api/paas/v4"),
     )
     assertEquals(
-      "http://localhost:1234",
-      LlmClientFactory.normalizeOpenAiBaseUrl("http://localhost:1234/v1/"),
+      "https://openrouter.ai/api/v1/chat/completions",
+      requestUrl("https://openrouter.ai/api/v1"),
     )
     assertEquals(
-      "https://api.deepseek.com",
-      LlmClientFactory.normalizeOpenAiBaseUrl(" https://api.deepseek.com "),
+      "http://localhost:1234/v1/chat/completions",
+      requestUrl("http://localhost:1234/v1/"),
+    )
+    assertEquals(
+      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      requestUrl("https://ark.cn-beijing.volces.com/api/v3"),
     )
   }
 
   @Test
-  fun `base url normalization keeps a bare version host`() {
-    assertEquals("/v1", LlmClientFactory.normalizeOpenAiBaseUrl("/v1"))
+  fun `a version earlier in the path is kept`() = runTest {
+    assertEquals(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      requestUrl("https://generativelanguage.googleapis.com/v1beta/openai/"),
+    )
+  }
+
+  @Test
+  fun `an endpoint without a version is the server root`() = runTest {
+    assertEquals(
+      "https://api.deepseek.com/v1/chat/completions",
+      requestUrl(" https://api.deepseek.com "),
+    )
+    assertEquals(
+      "https://openrouter.ai/api/v1/chat/completions",
+      requestUrl("https://openrouter.ai/api"),
+    )
+  }
+
+  @Test
+  fun `a full chat completions url is used as it is`() = runTest {
+    assertEquals(
+      "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      requestUrl("https://open.bigmodel.cn/api/paas/v4/chat/completions"),
+    )
+    assertEquals(
+      "https://api.perplexity.ai/chat/completions",
+      requestUrl("https://api.perplexity.ai/chat/completions/"),
+    )
+  }
+
+  @Test
+  fun `the responses api follows the same base`() = runTest {
+    assertEquals(
+      "https://api.openai.com/v1/responses",
+      requestUrl("https://api.openai.com", LLMCapability.OpenAIEndpoint.Responses),
+    )
+    assertEquals(
+      "https://proxy.internal/openai/v1/responses",
+      requestUrl("https://proxy.internal/openai/v1", LLMCapability.OpenAIEndpoint.Responses),
+    )
+  }
+
+  /** The URL an OpenAI client set up for [endpoint] sends a prompt to. */
+  private suspend fun requestUrl(
+    endpoint: String,
+    api: LLMCapability.OpenAIEndpoint = LLMCapability.OpenAIEndpoint.Completions,
+  ): String {
+    val urls = mutableListOf<String>()
+    val engine = MockEngine { request ->
+      urls += request.url.toString()
+      respondError(HttpStatusCode.NotFound)
+    }
+    val client = OpenAILLMClient(
+      apiKey = "key",
+      settings = LlmClientFactory.openAiClientSettings(endpoint),
+      httpClientFactory = KtorKoogHttpClient.Factory(HttpClient(engine)),
+    )
+    val model = LlmClientFactory.customModel(LLMProvider.OpenAI, "glm-5.3-flash", api)
+    client.use {
+      runCatching { it.execute(prompt("test") { user("hi") }, model, emptyList()) }
+    }
+    return urls.single()
   }
 }
