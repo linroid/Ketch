@@ -1,6 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
-import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -217,9 +216,6 @@ configurations.runtimeClasspath {
   exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
-// ProGuard's mapping of the release, under the build directory.
-val proguardMapping = "outputs/proguard/mapping.txt"
-
 // Rules for the release's ProGuard run, beside the files listed below:
 // - ProGuard renames classes and methods, so stack traces from a release can only be read with
 //   the mapping of that build. It is written to build/outputs/proguard/mapping.txt, which the
@@ -230,7 +226,7 @@ val proguardMapping = "outputs/proguard/mapping.txt"
 //   the name of its interface. proguard-rules.pro keeps the providers the app uses.
 val proguardRules by tasks.registering {
   val libraries = objects.fileCollection().from(configurations.runtimeClasspath)
-  val mapping = layout.buildDirectory.file(proguardMapping)
+  val mapping = layout.buildDirectory.file("outputs/proguard/mapping.txt")
   val rules = layout.buildDirectory.file("generated/proguard/rules.pro")
   inputs.files(libraries).withPropertyName("libraries")
   inputs.property("mapping", mapping.map { it.asFile.invariantSeparatorsPath })
@@ -256,242 +252,12 @@ val proguardRules by tasks.registering {
   }
 }
 
-/**
- * The class data sharing (AppCDS) archive of a desktop app image, [FILE_NAME] beside its jars: the
- * classes a launch loads, parsed and laid out at build time, which the JVM maps from the file
- * instead of loading them again. Its read-only part stays clean memory the system shares and can
- * drop, so the app uses about 50 to 65 MB less and opens its window about a third sooner. The
- * launcher's java-options point at it; a JVM that finds no archive there, as in `./gradlew run`,
- * loads the classes as before.
- *
- * An archive only works with the JVM that wrote it, so the image's own launcher dumps it. It holds
- * the classes of [classList], recorded from an unobfuscated build by `recordCdsClassList`; for a
- * release image, [mapping], ProGuard's mapping, gives them their obfuscated names. Classes the list
- * misses load from the jars as usual. The JVM checks that the jars have the sizes they had then,
- * not their timestamps, and accepts the app's folder having moved, so an app installed elsewhere or
- * unpacked from the portable zip, whose entries carry a fixed time, still uses it.
- *
- * @param name the launcher's name, the package name.
- * @param os the host system, `mac`, `windows` or `linux`: the image runs only there.
- * @param workDir where the class list given to the JVM, its log and the like are written.
- */
-class CdsArchive(
-  private val name: String,
-  private val os: String,
-  private val classList: File,
-  private val mapping: File?,
-  private val workDir: File,
-) {
-  /** Writes the archive into the app image in [destinationDir], replacing any there. */
-  fun dump(destinationDir: File) {
-    val appDir = appDir(destinationDir)
-    val archive = File(appDir, FILE_NAME)
-    archive.delete()
-    workDir.mkdirs()
-    val entries = classList.readLines()
-    val list = File(workDir, "app.classlist")
-    list.writeText(
-      (if (mapping == null) entries else obfuscated(entries, mapping)).joinToString("\n") + "\n",
-    )
-    val options = listOfNotNull(
-      "-Xshare:dump",
-      "-XX:SharedClassListFile=${list.absolutePath}",
-      "-XX:SharedArchiveFile=${archive.absolutePath}",
-      // The JVM's default address for the archive isn't free on recent macOS, so every launch would
-      // move the archive and write to all of it; this one is.
-      "-XX:SharedBaseAddress=0x7000000000".takeIf { os == "mac" },
-    )
-    val log = File(workDir, "dump.log")
-    val exit = launch(appDir, options.joinToString(" "), log, inheritIo = false)
-    if (exit != 0 || !archive.isFile) {
-      throw GradleException("Dumping the class data sharing archive failed ($exit); see $log")
-    }
-    if (os == "mac") seal(appDir.parentFile.parentFile)
-  }
-
-  /**
-   * Runs the app image in [destinationDir] with an empty profile in [home] until it is quit, and
-   * writes the classes it loaded to [output].
-   */
-  fun record(destinationDir: File, home: File, output: File) {
-    val appDir = appDir(destinationDir)
-    workDir.mkdirs()
-    val recorded = File(workDir, "recorded.classlist")
-    recorded.delete()
-    home.deleteRecursively()
-    home.mkdirs()
-    val options = "-Xshare:off -Duser.home=${home.absolutePath} " +
-      "-XX:DumpLoadedClassList=${recorded.absolutePath}"
-    launch(appDir, options, log = null, inheritIo = true) {
-      // Where Windows and Linux keep the app's data, so it opens with the empty profile there too.
-      it["APPDATA"] = File(home, "AppData/Roaming").absolutePath
-      it["XDG_CONFIG_HOME"] = File(home, ".config").absolutePath
-    }
-    if (recorded.length() == 0L) throw GradleException("The app recorded no classes")
-    recorded.copyTo(output, overwrite = true)
-  }
-
-  private fun appDir(destinationDir: File): File =
-    destinationDir.walk().firstOrNull { it.isFile && it.name == "$name.cfg" }?.parentFile
-      ?: throw GradleException("No app image with $name.cfg in $destinationDir")
-
-  // The image's launcher, which reads JAVA_TOOL_OPTIONS like any JVM. It splits them at spaces.
-  private fun launch(
-    appDir: File,
-    options: String,
-    log: File?,
-    inheritIo: Boolean,
-    environment: (MutableMap<String, String>) -> Unit = {},
-  ): Int {
-    val launcher = when (os) {
-      "mac" -> File(appDir.parentFile, "MacOS/$name")
-      "windows" -> File(appDir.parentFile, "$name.exe")
-      else -> File(appDir.parentFile.parentFile, "bin/$name")
-    }
-    if (!launcher.isFile) throw GradleException("No launcher at $launcher")
-    if (listOf(workDir, appDir).any { dir -> dir.absolutePath.any(Char::isWhitespace) }) {
-      throw GradleException("JAVA_TOOL_OPTIONS can't carry paths with spaces: $workDir, $appDir")
-    }
-    val builder = ProcessBuilder(launcher.path)
-    if (inheritIo) builder.inheritIO() else builder.redirectErrorStream(true).redirectOutput(log)
-    val env = builder.environment()
-    env.keys.removeAll(setOf("_JAVA_OPTIONS", "JDK_JAVA_OPTIONS"))
-    env["JAVA_TOOL_OPTIONS"] = options
-    environment(env)
-    return builder.start().waitFor()
-  }
-
-  // Adding a file to a signed bundle breaks its seal, and macOS calls such an app damaged. jpackage
-  // signs ad hoc, with the hardened runtime and entitlements, so the bundle is signed the same way
-  // again. A bundle signed with an identity would need it, so the archive must come first there.
-  private fun seal(bundle: File) {
-    val (signed, details) = run("codesign", "-dv", bundle.path)
-    if (!signed) return
-    if ("Signature=adhoc" !in details) {
-      throw GradleException("$bundle is signed with an identity; add $FILE_NAME before signing it")
-    }
-    val flags = Regex("""flags=\S*\(([^)]*)\)""").find(details)?.groupValues?.get(1).orEmpty()
-    val entitlements = File(workDir, "entitlements.plist")
-    entitlements.delete()
-    run("codesign", "-d", "--entitlements", entitlements.path, "--xml", bundle.path)
-    val command = buildList {
-      addAll(listOf("codesign", "--force", "--sign", "-"))
-      if ("runtime" in flags.split(',')) addAll(listOf("--options", "runtime"))
-      if (entitlements.length() > 0) addAll(listOf("--entitlements", entitlements.path))
-      add(bundle.path)
-    }
-    val (resigned, output) = run(*command.toTypedArray())
-    val (valid, problem) = run("codesign", "--verify", "--strict", bundle.path)
-    if (!resigned || !valid) throw GradleException("Couldn't sign $bundle again: $output$problem")
-  }
-
-  private fun run(vararg command: String): Pair<Boolean, String> {
-    val process = ProcessBuilder(*command).redirectErrorStream(true).start()
-    val output = process.inputStream.bufferedReader().readText()
-    return (process.waitFor() == 0) to output
-  }
-
-  companion object {
-    const val FILE_NAME = "ketch.jsa"
-
-    private val JDK = listOf(
-      "java/", "javax/", "jdk/", "sun/", "com/sun/", "com/apple/", "apple/", "org/w3c/", "org/xml/",
-      "org/ietf/", "org/jcp/",
-    )
-    private val PRIMITIVES = mapOf(
-      "void" to "V", "boolean" to "Z", "byte" to "B", "char" to "C", "short" to "S", "int" to "I",
-      "long" to "J", "float" to "F", "double" to "D",
-    )
-    // A method line: optional line numbers, return type, name(parameter types), new name.
-    private val METHOD =
-      Regex("""\s+(?:\d+:\d+:)?(\S+) ([^ (]+)\(([^)]*)\)(?::\d+(?::\d+)?)? -> (\S+)""")
-    private val CLASS_IN_DESCRIPTOR = Regex("""L([^;]+);""")
-
-    /**
-     * [entries], a class list of an unobfuscated build, with the names ProGuard gave the classes
-     * and methods in [mapping]. Classes ProGuard removed are left out, and so are lambdas whose
-     * classes or methods can't be named.
-     */
-    fun obfuscated(entries: List<String>, mapping: File): List<String> {
-      val classes = HashMap<String, String>()
-      val methods = HashMap<String, String>()
-      var current = ""
-      mapping.forEachLine { line ->
-        when {
-          line.isBlank() || line.startsWith("#") -> {}
-          !line.startsWith(" ") -> {
-            val (original, renamed) = line.removeSuffix(":").split(" -> ")
-            current = original.replace('.', '/')
-            classes[current] = renamed.replace('.', '/')
-          }
-          else -> METHOD.matchEntire(line)?.destructured?.let { (returns, method, args, renamed) ->
-            // Methods named with their class were inlined from it.
-            if ('.' !in method) {
-              val parameters = args.split(',').filter { it.isNotEmpty() }
-              val signature = parameters.joinToString("", "(", ")") { descriptor(it) }
-              methods.putIfAbsent("$current.$method$signature${descriptor(returns)}", renamed)
-            }
-          }
-        }
-      }
-      fun type(name: String): String? = if (JDK.any { name.startsWith(it) }) name else classes[name]
-      fun types(descriptor: String): String? {
-        var named = true
-        val renamed = CLASS_IN_DESCRIPTOR.replace(descriptor) { match ->
-          type(match.groupValues[1])?.let { "L$it;" } ?: match.value.also { named = false }
-        }
-        return renamed.takeIf { named }
-      }
-      return entries.mapNotNull { line ->
-        when {
-          line.startsWith("#") || line.startsWith("@lambda-form-invoker") -> line
-          line.startsWith("@lambda-proxy ") -> {
-            val parts = line.split(' ')
-            if (parts.size != 10) return@mapNotNull null
-            val (caller, invoked, invokedType, methodType) = parts.subList(1, 5)
-            val (kind, implClass, implMethod, implType) = parts.subList(5, 9)
-            // The interface method keeps its name unless ProGuard renamed its interface.
-            val iface = invokedType.substringAfterLast(")L", "").removeSuffix(";")
-            val ifaceRenamed = iface.isNotEmpty() && type(iface) != iface
-            val method = if (JDK.any { implClass.startsWith(it) }) {
-              implMethod
-            } else {
-              methods["$implClass.$implMethod$implType"]
-            }
-            val renamed = listOf(
-              type(caller), invoked.takeUnless { ifaceRenamed }, types(invokedType),
-              types(methodType), kind, type(implClass), method, types(implType), types(parts[9]),
-            )
-            if (renamed.all { it != null }) "@lambda-proxy " + renamed.joinToString(" ") else null
-          }
-          line.startsWith("@") -> null
-          else -> type(line.substringBefore(' '))?.let { it + " " + line.substringAfter(' ') }
-        }
-      }
-    }
-
-    private fun descriptor(javaType: String): String {
-      val base = javaType.replace("[]", "")
-      val dimensions = (javaType.length - base.length) / 2
-      return "[".repeat(dimensions) + (PRIMITIVES[base] ?: "L${base.replace('.', '/')};")
-    }
-  }
-}
-
 compose.desktop {
   application {
     mainClass = "com.linroid.ketch.app.desktop.MainKt"
     // Keep the initial heap small on high-memory desktops. Native graphics and JVM memory
     // sit outside this limit; downloads stream their contents rather than retaining files.
     jvmArgs += listOf("-Xms32m", "-Xmx512m")
-    // The class data sharing archive (CdsArchive). JDK 21 maps it at a random address by default,
-    // which moves every pointer in it and leaves little of it shared; mapped at the address it was
-    // dumped for, as JDK 19 and earlier did, it stays shared, and is moved only when that is taken.
-    jvmArgs += listOf(
-      "-XX:SharedArchiveFile=\$APPDIR/${CdsArchive.FILE_NAME}",
-      "-XX:+UnlockDiagnosticVMOptions",
-      "-XX:ArchiveRelocationMode=0",
-    )
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {
@@ -610,42 +376,6 @@ if (providers.systemProperty("os.name").get().startsWith("Windows")) {
       config.writeText(template.readText().trimEnd() + "\n\n# Added by Ketch\n" + sequences)
     }
   }
-}
-
-// Every app image gets its class data sharing archive, written as the image is created so that the
-// packages and the portable app carry it.
-val cdsClassList = layout.projectDirectory.file("cds/app.classlist")
-val appName = checkNotNull(compose.desktop.application.nativeDistributions.packageName)
-fun cdsArchive(task: String, mapping: File?) = CdsArchive(
-  name = appName,
-  os = hostOs.get(),
-  classList = cdsClassList.asFile,
-  mapping = mapping,
-  workDir = layout.buildDirectory.dir("cds/$task").get().asFile,
-)
-tasks.withType<AbstractJPackageTask>().configureEach {
-  val mapping = when (name) {
-    "createDistributable" -> null
-    "createReleaseDistributable" -> layout.buildDirectory.file(proguardMapping).get().asFile
-    else -> return@configureEach
-  }
-  val archive = cdsArchive(name, mapping)
-  inputs.file(cdsClassList).withPropertyName("cdsClassList")
-  doLast { archive.dump((this as AbstractJPackageTask).destinationDir.get().asFile) }
-}
-
-// Records the classes the app loads into cds/app.classlist: it opens with an empty profile of its
-// own, to be used as usual and quit. Record again when what the first window loads changes much,
-// such as after a Compose update; classes the list misses still load, only more slowly.
-tasks.register("recordCdsClassList") {
-  group = "compose desktop"
-  description = "Records the classes the desktop app loads, for its class data sharing archive."
-  dependsOn("createDistributable")
-  val image = tasks.named<AbstractJPackageTask>("createDistributable").flatMap { it.destinationDir }
-  val home = layout.buildDirectory.dir("cds/profile")
-  val output = cdsClassList.asFile
-  val archive = cdsArchive(name, mapping = null)
-  doLast { archive.record(image.get().asFile, home.get().asFile, output) }
 }
 
 // The portable Windows app: the release app folder with an empty data folder beside Ketch.exe,

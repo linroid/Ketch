@@ -118,18 +118,16 @@ For heap diagnostics use `jcmd <pid> GC.heap_info`. A separate diagnostic launch
 memory, not every native allocation. Do not force GC when comparing ordinary idle footprints.
 Exercise concurrent HTTP and torrent downloads as well as Discover before lowering the heap cap.
 
-Packaged app images carry a class data sharing archive, `ketch.jsa` beside the jars (`CdsArchive` in
-`app/desktop/build.gradle.kts`), dumped by the image's own launcher from
-`app/desktop/cds/app.classlist`, with ProGuard's names for release images. The JVM maps the classes
-from it instead of loading them, and its read-only part stays clean, shared memory. On Apple Silicon
-it took the release app from 167 to 117 MB in the background and from 575-583 to 512-513 MB with the
-window shown, and opened the window in 1.0 to 1.3 s instead of 1.5; it adds about 70 MB to the
-installed app and 15 MB to the DMG. To check that a launch uses it, add `-Xlog:class+load` (classes
-from `shared objects file`) and `-Xlog:cds` to `JAVA_TOOL_OPTIONS`: the archive should map at the
-address it was dumped for, not an alternative one, which writes to all of it. When what the first
-window loads changes much, such as after a Compose update, record the list again with
-`./gradlew :app:desktop:recordCdsClassList`, which opens the app with an empty profile until it is
-quit; classes the list misses still load, only from the jars.
+App images carry no class data sharing (AppCDS) archive. One dumped at build time never applied to
+an installed app: JDK 21 checks each jar the archive names at its absolute path on the build machine
+(`SharedClassPathEntry::validate` in `filemap.cpp`), and rejects the whole archive when that path is
+missing, before its "moved together" prefix match. JDK 25 checks the jars where they now are, but
+still compares their modification times, and jpackage resets those when it copies the image into
+the DMG (checked; the MSI and deb are built from a copy too). A copied image uses an archive only
+while the build folder it was dumped in still exists, so test with that folder renamed away. To see
+whether a launch maps classes from an archive, set
+`JAVA_TOOL_OPTIONS=-Xlog:class+load,cds:file=/tmp/ketch-cds.log` and count the classes from
+`shared objects file`.
 
 ## Public HTTP Download Smoke Tests
 
