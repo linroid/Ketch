@@ -38,14 +38,14 @@ are unavailable. See [Safari packaging](#safari-limited-macos-target).
 
 ## Installing
 
-Each [GitHub release](https://github.com/linroid/Ketch/releases) includes
-`ketch-extension-<version>-chrome.zip`, `ketch-extension-<version>-firefox.zip` and
-`ketch-extension-<version>-safari.zip`. The Safari archive contains extension sources, not an
-installable app. Until the extension is in the browser stores:
+- **Chrome, Edge, Brave and other Chromium browsers**: install Ketch from the
+  [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka).
 
-- **Chromium browsers**: unzip the Chrome package, open `chrome://extensions` (or
-  `edge://extensions`), turn on **Developer mode**, choose **Load unpacked** and select the
-  unzipped folder.
+Each [GitHub release](https://github.com/linroid/Ketch/releases) also includes
+`ketch-extension-<version>-chrome.zip` (the Chrome Web Store package),
+`ketch-extension-<version>-firefox.zip` and `ketch-extension-<version>-safari.zip`. The Safari
+archive contains extension sources, not an installable app. Until the other stores list it:
+
 - **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the
   Firefox package is what gets submitted to addons.mozilla.org for signing. Until it is signed,
   load it for the current session from `about:debugging#/runtime/this-firefox` with **Load
@@ -58,10 +58,9 @@ installable app. Until the extension is in the browser stores:
 
 ### Store submission
 
-Run `npm run build` and upload `build/ketch-extension-<version>-chrome-store.zip` to the
+Run `npm run build` and upload `build/ketch-extension-<version>-chrome.zip` to the
 Chrome Web Store or Edge Add-ons. Release CI also attaches this package to each GitHub release.
-Its manifest omits the development `key`, which the Chrome Web Store rejects on upload.
-The ordinary `chrome.zip` is for unpacked installation and keeps that key.
+Its manifest omits the development `key` of `src/`, which the Chrome Web Store rejects on upload.
 
 The Chrome Web Store item is
 [`flnjeochbgpaipiofdjmoijaeooemhka`](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka),
@@ -243,23 +242,23 @@ The extension is plain JavaScript modules with no dependencies or bundler. `src/
 Chromium build, so it can be loaded as is while developing:
 
 - **Chromium**: open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**
-  and select `src/` (or `build/chrome`).
+  and select `src/`. Not `build/chrome`: without the `key`, Chrome gives it an id the Ketch app
+  does not accept.
 - **Firefox**: run `npm run build`, open `about:debugging#/runtime/this-firefox`, choose **Load
   Temporary Add-on** and select `build/firefox/manifest.json`.
 
 ```shell
 npm test        # unit tests, with Node's built-in test runner (Node 22.3+)
-npm run build   # build/chrome, build/chrome-store, build/firefox, build/safari and their zips
+npm run build   # build/chrome, build/firefox, build/safari and their zips
 ```
 
 The `key` in `src/manifest.json` pins the Chromium extension id to
-`kddcjkhnjcjhekohejnehplbnjclbdbl`, whether it is loaded unpacked or from a release zip, because
-the Ketch app only lets the ids it lists start its host (`NativeHostRegistration` in
-`app/desktop`). Extension stores assign their own id: add it there when publishing, and leave the
-`key` out of a store upload by using `chrome-store.zip`. Firefox identifies the add-on by its
-gecko id instead.
+`kddcjkhnjcjhekohejnehplbnjclbdbl` when `src/` is loaded unpacked, because the Ketch app only lets
+the ids it lists start its host (`NativeHostRegistration` in `app/desktop`). Extension stores
+assign their own id, so the packaged builds leave the `key` out; add each store's id there when
+publishing. Firefox identifies the add-on by its gecko id instead.
 
-The build copies `src/`, removes the `key` for the Chromium store target, rewrites the manifest
+The build copies `src/`, removes the `key` from the Chromium build, rewrites the manifest
 for Firefox (an event page instead of a service worker, its add-on id, and no `key`), checks that
 every file the manifest names exists, and zips each build. Keep `version` in `package.json` and
 `src/manifest.json` the same; the build fails

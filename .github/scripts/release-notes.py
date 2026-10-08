@@ -59,7 +59,7 @@ def download_notes(artifacts, server_url, repository, tag):
     ("Your browser", "Download"),
     ("---", "---"),
     ("Chrome, Edge, Brave and other Chromium browsers",
-     download("Extension ZIP", "extension-{version}-chrome.zip")),
+     "[Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)"),
     ("Firefox", download("Unsigned extension ZIP", "extension-{version}-firefox.zip")),
     ("Safari (requires Xcode packaging and signing)",
      download("Extension source ZIP", "extension-{version}-safari.zip")),
