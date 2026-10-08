@@ -63,9 +63,10 @@ Chrome Web Store or Edge Add-ons. Release CI also attaches this package to each 
 Its manifest omits the development `key`, which the Chrome Web Store rejects on upload.
 The ordinary `chrome.zip` is for unpacked installation and keeps that key.
 
-After the store assigns an extension ID, add it to
-`NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in `app/desktop` before publishing a desktop
-release that supports the store extension's native app launching.
+The Chrome Web Store item is
+[`flnjeochbgpaipiofdjmoijaeooemhka`](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka),
+listed in `NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in `app/desktop` so the store extension
+can open the Ketch app. Add the Edge Add-ons id there once it is published.
 
 ## Setting up Ketch
 
