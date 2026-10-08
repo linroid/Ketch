@@ -713,12 +713,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Code they ship must not need it, so tools are `TextTool`s
 - Desktop packages keep only the build host's native libraries of sqlite-jdbc, Skiko and JNA
   (`StripForeignNatives` in `app/desktop/build.gradle.kts`)
-- Desktop app images carry a class data sharing archive, `ketch.jsa` (`CdsArchive` in
-  `app/desktop/build.gradle.kts`): the image's own launcher dumps it from
-  `app/desktop/cds/app.classlist` (ProGuard's names for release images; `recordCdsClassList`
-  records the list again), and macOS bundles are signed ad hoc again afterwards. It costs about
-  70 MB installed and 15 MB of the DMG, and saves 50 to 65 MB of memory and about a third of the
-  time to the first window; see [testing](docs/development/testing.md#desktop-startup-memory)
+- Desktop app images carry no class data sharing archive: JDK 21 rejects one whose jars are not at
+  their build-machine paths, and jpackage's packages reset the jars' modification times, which
+  JDK 25 still checks; see [testing](docs/development/testing.md#desktop-startup-memory)
 - Desktop release builds are obfuscated by ProGuard. A generated rules file (`proguardRules`) adds
   the rules libraries ship in `META-INF/proguard`, keeps the names of `META-INF/services`
   interfaces and writes `build/outputs/proguard/mapping.txt`, which the release workflow
