@@ -16,6 +16,8 @@
   <string name="row_status_downloading">Downloading</string>
   <string name="row_status_stalled">Stalled</string>
   <string name="row_status_paused">Paused</string>
+  <!-- A queued task that holds a download slot and is getting ready, such as a magnet link looking up its torrent. -->
+  <string name="row_status_starting">Starting</string>
   <string name="row_status_queued">Queued</string>
   <string name="row_status_scheduled">Scheduled</string>
   <string name="row_status_done">Done</string>
@@ -134,6 +136,8 @@
     <item quantity="other">%1$d ahead</item>
   </plurals>
   <!-- A queued task that has a download slot and is about to download. -->
+  <!-- The second line of a magnet link that is starting: it asks peers for the torrent's details. -->
+  <string name="row_finding_peers">Finding peers</string>
   <string name="queue_starting">Starting</string>
 
   <!-- Actions on a task, in menus, buttons and the command palette. -->

@@ -10,6 +10,7 @@
   <string name="row_status_downloading">下载中</string>
   <string name="row_status_stalled">停滞</string>
   <string name="row_status_paused">已暂停</string>
+  <string name="row_status_starting">正在开始</string>
   <string name="row_status_queued">排队中</string>
   <string name="row_status_scheduled">已计划</string>
   <string name="row_status_done">已完成</string>
@@ -102,6 +103,7 @@
   <plurals name="queue_position_ahead">
     <item quantity="other">前面还有 %1$d 个</item>
   </plurals>
+  <string name="row_finding_peers">正在寻找节点</string>
   <string name="queue_starting">即将开始</string>
 
   <string name="action_row_pause">暂停</string>

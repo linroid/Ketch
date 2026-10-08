@@ -10,6 +10,7 @@
   <string name="row_status_downloading">Загружается</string>
   <string name="row_status_stalled">Зависла</string>
   <string name="row_status_paused">Приостановлена</string>
+  <string name="row_status_starting">Запуск</string>
   <string name="row_status_queued">В очереди</string>
   <string name="row_status_scheduled">Запланирована</string>
   <string name="row_status_done">Готово</string>
@@ -111,6 +112,7 @@
     <item quantity="many">впереди %1$d</item>
     <item quantity="other">впереди %1$d</item>
   </plurals>
+  <string name="row_finding_peers">Поиск пиров</string>
   <string name="queue_starting">Запускается</string>
 
   <string name="action_row_pause">Приостановить</string>

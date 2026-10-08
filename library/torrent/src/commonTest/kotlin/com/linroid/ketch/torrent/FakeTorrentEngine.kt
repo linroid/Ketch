@@ -19,6 +19,11 @@ internal class FakeTorrentEngine : TorrentEngine {
 
   var fetchMetadataResult: TorrentMetadata? = null
   var fetchMetadataError: Exception? = null
+
+  /** Results of the next lookups, in order, before [fetchMetadataResult] applies. */
+  val fetchMetadataResults = ArrayDeque<TorrentMetadata?>()
+  var fetchMetadataCalls = 0
+    private set
   var addTorrentResult: FakeTorrentSession? = null
   var addTorrentError: Exception? = null
   var removedTorrents = mutableListOf<Pair<String, Boolean>>()
@@ -40,7 +45,9 @@ internal class FakeTorrentEngine : TorrentEngine {
   override suspend fun fetchMetadata(
     magnetUri: String,
   ): TorrentMetadata? {
+    fetchMetadataCalls++
     fetchMetadataError?.let { throw it }
+    if (fetchMetadataResults.isNotEmpty()) return fetchMetadataResults.removeFirst()
     return fetchMetadataResult
   }
 

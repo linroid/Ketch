@@ -474,10 +474,12 @@
     <item quantity="many">и ещё %1$d.</item>
     <item quantity="other">и ещё %1$d.</item>
   </plurals>
-  <string name="settings_torrent_list">Список трекеров</string>
-  <string name="settings_torrent_list_subscribe">Подписаться на список трекеров</string>
-  <string name="settings_torrent_list_subscribe_hint">Публичные торренты также обращаются к его трекерам. Обновляется ежедневно.</string>
-  <string name="settings_torrent_list_url">Адрес списка</string>
+  <string name="settings_torrent_list">Списки трекеров</string>
+  <string name="settings_torrent_list_subscribe">Подписаться на списки трекеров</string>
+  <string name="settings_torrent_list_subscribe_hint">Публичные торренты также обращаются к их трекерам. Обновляются ежедневно.</string>
+  <string name="settings_torrent_list_add">Добавить список</string>
+  <string name="settings_torrent_list_remove">Удалить %1$s</string>
+  <string name="settings_torrent_list_none">Нет списков трекеров</string>
   <string name="settings_torrent_list_url_hint">Один адрес анонса в строке.</string>
   <string name="settings_torrent_list_url_invalid">Введите адрес http или https.</string>
   <string name="settings_torrent_list_default">По умолчанию</string>
@@ -507,10 +509,10 @@
     <item quantity="many">Не удалось загрузить список. Используются %1$d встроенных трекеров.</item>
     <item quantity="other">Не удалось загрузить список. Используются %1$d встроенного трекера.</item>
   </plurals>
-    <string name="settings_torrent_list_trackers">Трекеры из списка</string>
+    <string name="settings_torrent_list_trackers">Трекеры из списков</string>
   <string name="settings_torrent_list_hide">Скрыть</string>
   <string name="settings_torrent_list_failed">Не удалось загрузить список.</string>
-  <string name="settings_torrent_list_footer">Сервер списка видит IP-адрес этого устройства.</string>
+  <string name="settings_torrent_list_footer">Серверы списков видят IP-адрес этого устройства.</string>
 
   <string name="settings_sharing_remote">Настройте общий доступ на самом устройстве «%1$s» — в Ketch или с помощью ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s не может открывать доступ к своим загрузкам другим устройствам.</string>

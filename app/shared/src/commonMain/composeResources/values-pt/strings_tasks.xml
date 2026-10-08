@@ -10,6 +10,7 @@
   <string name="row_status_downloading">Baixando</string>
   <string name="row_status_stalled">Parado</string>
   <string name="row_status_paused">Pausado</string>
+  <string name="row_status_starting">Iniciando</string>
   <string name="row_status_queued">Na fila</string>
   <string name="row_status_scheduled">Agendado</string>
   <string name="row_status_done">Concluído</string>
@@ -105,6 +106,7 @@
     <item quantity="one">%1$d à frente</item>
     <item quantity="other">%1$d à frente</item>
   </plurals>
+  <string name="row_finding_peers">Procurando pares</string>
   <string name="queue_starting">Iniciando</string>
 
   <string name="action_row_pause">Pausar</string>

@@ -310,15 +310,28 @@ private class DeviceEnvironment(
       deviceName = data.deviceName,
       embeddedFactory = { api },
       localServerFactory = PretendServer,
-      trackerList = MutableStateFlow(TrackerListStatus(
-          listOf(
-            "udp://tracker.opentrackr.org:1337/announce",
-            "udp://open.stealth.si:80/announce",
-            "udp://tracker.torrent.eu.org:451/announce",
-            "http://tracker.dler.com:6969/announce",
+      trackerList = MutableStateFlow(
+        listOf(
+          TrackerListStatus(
+            TorrentSettings.DEFAULT_TRACKER_LISTS[0],
+            listOf(
+              "udp://tracker.opentrackr.org:1337/announce",
+              "udp://open.stealth.si:80/announce",
+              "udp://tracker.torrent.eu.org:451/announce",
+            ),
+            SampleData.NOW - 3.hours,
           ),
-          SampleData.NOW - 3.hours,
-        ),),
+          TrackerListStatus(
+            TorrentSettings.DEFAULT_TRACKER_LISTS[1],
+            listOf(
+              "udp://tracker.opentrackr.org:1337/announce",
+              "http://tracker.dler.com:6969/announce",
+            ),
+            SampleData.NOW - 3.hours,
+            failed = true,
+          ),
+        ),
+      ),
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(

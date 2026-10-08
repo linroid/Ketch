@@ -10,6 +10,7 @@
   <string name="row_status_downloading">Lädt</string>
   <string name="row_status_stalled">Stockt</string>
   <string name="row_status_paused">Pausiert</string>
+  <string name="row_status_starting">Startet</string>
   <string name="row_status_queued">In Warteschlange</string>
   <string name="row_status_scheduled">Geplant</string>
   <string name="row_status_done">Fertig</string>
@@ -105,6 +106,7 @@
     <item quantity="one">%1$d davor</item>
     <item quantity="other">%1$d davor</item>
   </plurals>
+  <string name="row_finding_peers">Sucht Peers</string>
   <string name="queue_starting">Startet</string>
 
   <string name="action_row_pause">Pausieren</string>

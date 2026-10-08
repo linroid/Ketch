@@ -452,13 +452,15 @@
     <item quantity="one">et %1$d autre.</item>
     <item quantity="other">et %1$d autres.</item>
   </plurals>
-  <string name="settings_torrent_list">Liste de trackers</string>
-  <string name="settings_torrent_list_subscribe">S'abonner à une liste de trackers</string>
-  <string name="settings_torrent_list_subscribe_hint">Les torrents publics s'annoncent aussi auprès de ses trackers. Mise à jour quotidienne.</string>
-  <string name="settings_torrent_list_url">Adresse de la liste</string>
+  <string name="settings_torrent_list">Listes de trackers</string>
+  <string name="settings_torrent_list_subscribe">S'abonner à des listes de trackers</string>
+  <string name="settings_torrent_list_subscribe_hint">Les torrents publics s'annoncent aussi auprès de leurs trackers. Mise à jour quotidienne.</string>
+  <string name="settings_torrent_list_add">Ajouter une liste</string>
+  <string name="settings_torrent_list_remove">Retirer %1$s</string>
+  <string name="settings_torrent_list_none">Aucune liste de trackers</string>
   <string name="settings_torrent_list_url_hint">Une URL d'annonce par ligne.</string>
   <string name="settings_torrent_list_url_invalid">Saisissez une adresse http ou https.</string>
-  <string name="settings_torrent_list_default">Utiliser la valeur par défaut</string>
+  <string name="settings_torrent_list_default">Utiliser les valeurs par défaut</string>
   <string name="settings_torrent_list_update">Mettre à jour</string>
   <string name="settings_torrent_list_updating">Mise à jour…</string>
   <plurals name="settings_torrent_list_status">
@@ -477,10 +479,10 @@
     <item quantity="one">Impossible de télécharger la liste. Utilisation de %1$d tracker intégré.</item>
     <item quantity="other">Impossible de télécharger la liste. Utilisation de %1$d trackers intégrés.</item>
   </plurals>
-    <string name="settings_torrent_list_trackers">Trackers de la liste</string>
+    <string name="settings_torrent_list_trackers">Trackers des listes</string>
   <string name="settings_torrent_list_hide">Masquer</string>
   <string name="settings_torrent_list_failed">Impossible de télécharger la liste.</string>
-  <string name="settings_torrent_list_footer">Le serveur de la liste voit l'adresse IP de cet appareil.</string>
+  <string name="settings_torrent_list_footer">Les serveurs des listes voient l'adresse IP de cet appareil.</string>
 
   <string name="settings_sharing_remote">Configurez le partage sur %1$s lui-même, dans Ketch ou avec ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s ne peut pas partager ses téléchargements avec d'autres appareils.</string>

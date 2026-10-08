@@ -8,26 +8,50 @@ import kotlinx.serialization.Serializable
  * @property trackers extra tracker announce URLs (`http`, `https` or `udp`)
  *   that public torrents announce to alongside their own trackers. Private
  *   torrents and tracker-only discovery ignore them.
- * @property trackerList whether to subscribe to the tracker list at
- *   [trackerListUrl], downloaded daily, whose trackers are used like
+ * @property trackerList whether to subscribe to the tracker lists at
+ *   [trackerListUrls], downloaded daily, whose trackers are used like
  *   [trackers], after them. On by default, so magnets without trackers still
  *   find peers where DHT cannot bootstrap.
- * @property trackerListUrl `http` or `https` URL of a plain-text tracker
- *   list, one announce URL per line; ngosang's `trackers_best.txt` by default.
+ * @property trackerListUrls `http` or `https` URLs of plain-text tracker
+ *   lists, one announce URL per line; [DEFAULT_TRACKER_LISTS] by default.
+ * @property trackerListUrl the one list Ketch 0.3.0 subscribed to, read from
+ *   its config files: a custom one replaces the default [trackerListUrls]
+ *   until the lists are changed ([withTrackerLists]).
  */
 @Serializable
 data class TorrentSettings(
   val trackers: List<String> = emptyList(),
   val trackerList: Boolean = true,
-  val trackerListUrl: String = DEFAULT_TRACKER_LIST_URL,
+  val trackerListUrls: List<String> = DEFAULT_TRACKER_LISTS,
+  val trackerListUrl: String? = null,
 ) {
-  /** The tracker list subscribed to, or `null` when [trackerList] is off. */
-  val subscribedTrackerList: String?
-    get() = trackerListUrl.trim().takeIf { trackerList && it.isNotEmpty() }
+  /** The tracker lists configured, whether or not [trackerList] is on, without repeats. */
+  val trackerListAddresses: List<String>
+    get() {
+      val legacy = trackerListUrl?.trim()?.takeIf { it.isNotEmpty() && it != NGOSANG_BEST }
+      val urls = if (legacy != null && trackerListUrls == DEFAULT_TRACKER_LISTS) {
+        listOf(legacy)
+      } else {
+        trackerListUrls
+      }
+      return urls.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    }
+
+  /** The tracker lists subscribed to: [trackerListAddresses], none while [trackerList] is off. */
+  val subscribedTrackerLists: List<String>
+    get() = if (trackerList) trackerListAddresses else emptyList()
+
+  /** These settings with [urls] as the tracker lists, leaving the 0.3.0 [trackerListUrl] behind. */
+  fun withTrackerLists(urls: List<String>): TorrentSettings =
+    copy(trackerListUrls = urls, trackerListUrl = null)
 
   companion object {
-    /** ngosang's list of the most reliable public trackers. */
-    const val DEFAULT_TRACKER_LIST_URL: String =
+    private const val NGOSANG_BEST =
       "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+    private const val XIU2_BEST =
+      "https://raw.githubusercontent.com/XIU2/TrackersListCollection/master/best.txt"
+
+    /** ngosang's and XIU2's lists of the best public trackers, both refreshed daily. */
+    val DEFAULT_TRACKER_LISTS: List<String> = listOf(NGOSANG_BEST, XIU2_BEST)
   }
 }

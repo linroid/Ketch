@@ -284,7 +284,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source defines: `type`, `canHandle()`, `resolve()`, `download()`, `resume()`,
   `buildResumeState()`; optional `canHandleContent()` / `resolveContent()` accept file content
-  such as `.torrent` bytes (`KetchApi.resolveContent`)
+  such as `.torrent` bytes (`KetchApi.resolveContent`), and `resolveForDownload()` lets a task
+  wait where a preview (`resolve()`) would fail, as magnets whose peers are offline do
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support
@@ -306,8 +307,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
-- Extra trackers and a daily-updated tracker list, on by default (ngosang's `trackers_best.txt` by
-  default, with a copy shipped for before its first download) for public torrents
+- Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
+  XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
+  its first download) for public torrents
+- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; a task
+  keeps looking (`DownloadSource.resolveForDownload`) until found or stopped, while previews
+  give up after one `metadataTimeout`. The apps show it as Starting, "Finding peers"
 - Verified selected-file storage, ownership journal, restart rehash, live limits and explicit
   seeding
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
@@ -417,8 +422,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
   Settings (app-only; CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`) and
-  a tracker list subscription, on by default (`trackerList`, `trackerListUrl`, default ngosang's
-  `trackers_best.txt`; `TorrentConfig.trackerListUrl`), edited on the embedded instance's
+  tracker list subscriptions, on by default (`trackerList`, `trackerListUrls`, default ngosang's
+  and XIU2's best lists; `TorrentConfig.trackerListUrls`; a 0.3.0 `trackerListUrl` is still
+  read), edited on the embedded instance's
   BitTorrent settings page and applied to torrents as they start or resume; a remote instance's
   trackers are only editable on that device
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly

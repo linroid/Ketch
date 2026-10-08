@@ -158,7 +158,7 @@ class KetchService : Service() {
       TorrentConfig(
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,
         additionalTrackers = config.torrent.trackers,
-        trackerListUrl = config.torrent.subscribedTrackerList,
+        trackerListUrls = config.torrent.subscribedTrackerLists,
       ),
     )
     instanceManager = InstanceManager(
@@ -220,12 +220,14 @@ class KetchService : Service() {
         },
         applyTorrentSettings = {
           torrentSource.setAdditionalTrackers(it.trackers)
-          torrentSource.setTrackerList(it.subscribedTrackerList)
+          torrentSource.setTrackerLists(it.subscribedTrackerLists)
         },
-        trackerList = torrentSource.trackerList.map {
-          TrackerListStatus(it.trackers, it.updatedAt, it.failed, it.updating)
+        trackerList = torrentSource.trackerLists.map { lists ->
+          lists.map {
+            TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
+          }
         },
-        refreshTrackerList = torrentSource::refreshTrackerList,
+        refreshTrackerList = torrentSource::refreshTrackerLists,
       ),
       initialRemotes = config.remotes,
       configStore = configStore,

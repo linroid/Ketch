@@ -452,10 +452,12 @@
     <item quantity="one">und %1$d weitere.</item>
     <item quantity="other">und %1$d weitere.</item>
   </plurals>
-  <string name="settings_torrent_list">Trackerliste</string>
-  <string name="settings_torrent_list_subscribe">Trackerliste abonnieren</string>
-  <string name="settings_torrent_list_subscribe_hint">Öffentliche Torrents melden sich auch bei ihren Trackern an. Täglich aktualisiert.</string>
-  <string name="settings_torrent_list_url">Adresse der Liste</string>
+  <string name="settings_torrent_list">Trackerlisten</string>
+  <string name="settings_torrent_list_subscribe">Trackerlisten abonnieren</string>
+  <string name="settings_torrent_list_subscribe_hint">Öffentliche Torrents melden sich auch bei deren Trackern an. Täglich aktualisiert.</string>
+  <string name="settings_torrent_list_add">Liste hinzufügen</string>
+  <string name="settings_torrent_list_remove">%1$s entfernen</string>
+  <string name="settings_torrent_list_none">Keine Trackerlisten</string>
   <string name="settings_torrent_list_url_hint">Eine Announce-URL pro Zeile.</string>
   <string name="settings_torrent_list_url_invalid">Gib eine http- oder https-Adresse ein.</string>
   <string name="settings_torrent_list_default">Standard verwenden</string>
@@ -477,10 +479,10 @@
     <item quantity="one">Die Liste konnte nicht geladen werden. %1$d integrierter Tracker wird verwendet.</item>
     <item quantity="other">Die Liste konnte nicht geladen werden. %1$d integrierte Tracker werden verwendet.</item>
   </plurals>
-    <string name="settings_torrent_list_trackers">Tracker der Liste</string>
+    <string name="settings_torrent_list_trackers">Tracker der Listen</string>
   <string name="settings_torrent_list_hide">Ausblenden</string>
   <string name="settings_torrent_list_failed">Die Liste konnte nicht geladen werden.</string>
-  <string name="settings_torrent_list_footer">Der Server der Liste sieht die IP-Adresse dieses Geräts.</string>
+  <string name="settings_torrent_list_footer">Die Server der Listen sehen die IP-Adresse dieses Geräts.</string>
 
   <string name="settings_sharing_remote">Richte die Freigabe direkt auf %1$s ein, in Ketch oder mit ketch server.</string>
   <string name="settings_sharing_unsupported">%1$s kann Downloads nicht für andere Geräte freigeben.</string>

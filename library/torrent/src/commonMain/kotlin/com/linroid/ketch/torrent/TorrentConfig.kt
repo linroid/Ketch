@@ -67,17 +67,17 @@ data class TorrentConfig(
   /**
    * Extra `http`, `https` or `udp` announce URLs for public torrents, announced alongside each
    * torrent's own trackers rather than after them. Private torrents and tracker-only discovery
-   * never contact them. Invalid URLs are ignored, and at most 64 are used.
+   * never contact them. Invalid URLs are ignored, and at most 128 are used.
    */
   val additionalTrackers: List<String> = emptyList(),
   /**
-   * `http` or `https` URL of a tracker list to subscribe to, such as [BEST_TRACKERS_URL]: plain
-   * text with one announce URL per line. It is downloaded when the source is created, unless
-   * [stateDirectory] holds a copy less than a day old, and again daily; its trackers are used like
-   * [additionalTrackers], after them. `null`, or a URL that is not `http` or `https`, subscribes
-   * to none.
+   * `http` or `https` URLs of tracker lists to subscribe to, such as [DEFAULT_TRACKER_LISTS]:
+   * plain text with one announce URL per line. Each is downloaded when the source is created,
+   * unless [stateDirectory] holds a copy less than a day old, and again daily, from its jsDelivr
+   * mirror when a `raw.githubusercontent.com` URL fails. Their trackers, in list order, are used
+   * like [additionalTrackers], after them. Other URLs are ignored; empty subscribes to none.
    */
-  val trackerListUrl: String? = null,
+  val trackerListUrls: List<String> = emptyList(),
 ) {
   init {
     require(maxActiveTorrents in 1..64) { "maxActiveTorrents must be in 1..64" }
@@ -119,6 +119,13 @@ data class TorrentConfig(
     /** ngosang's list of the most reliable public trackers, refreshed daily. */
     const val BEST_TRACKERS_URL: String =
       "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+
+    /** XIU2's collection of the best public trackers, refreshed daily. */
+    const val XIU2_BEST_TRACKERS_URL: String =
+      "https://raw.githubusercontent.com/XIU2/TrackersListCollection/master/best.txt"
+
+    /** The tracker lists the apps and CLI subscribe to by default. */
+    val DEFAULT_TRACKER_LISTS: List<String> = listOf(BEST_TRACKERS_URL, XIU2_BEST_TRACKERS_URL)
     /**
      * [BEST_TRACKERS_URL] as of 2026-10-07, used for that list until its first download succeeds,
      * so a subscription works offline and where GitHub is unreachable.

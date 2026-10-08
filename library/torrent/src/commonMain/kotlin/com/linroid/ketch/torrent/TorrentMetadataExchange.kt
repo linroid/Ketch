@@ -1,11 +1,14 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
 
 /** BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification. */
+private val log = KetchLogger("TorrentEngine")
+
 internal class TorrentMetadataExchange(
   private val network: TorrentNetwork,
   private val maxBytes: Int = 4 * 1024 * 1024,
@@ -43,12 +46,9 @@ internal class TorrentMetadataExchange(
       "Tracker-only metadata requires supplied trackers"
     }
     var lease: TorrentBufferBudget.Lease? = null
-    while (lease == null) {
-      lease = budget.reserve(maxBytes * 4 + 256 * 1024)
-      if (lease == null) delay(10)
-    }
     var connection: TorrentConnection? = null
     try {
+      log.v { "Metadata exchange with $endpoint: connecting" }
       connection = network.connect(endpoint)
       val workspace = TorrentBufferBudget(256 * 1024)
       val handshake = PeerIdentityHandshake(identity, extensions = true).initiate(connection,
@@ -57,6 +57,13 @@ internal class TorrentMetadataExchange(
       val wire = PeerWire(connection)
       require(handshake.extensions) {
         "Peer does not support metadata exchange"
+      }
+      log.v { "Metadata exchange with $endpoint: handshake done, waiting for a metadata buffer" }
+      // Reserved only now, so peers that never answer do not hold the budget, which several
+      // lookups share, while others wait to connect.
+      while (lease == null) {
+        lease = budget.reserve(maxBytes * 4 + 256 * 1024)
+        if (lease == null) delay(10)
       }
       wire.send(PeerExtensions.handshake())
       val extensions = PeerExtensions()
@@ -73,6 +80,7 @@ internal class TorrentMetadataExchange(
           extensions.receive(message.payload, maxBytes)
           val size = extensions.metadataSize
           if (data == null && size != null && extensions.id("ut_metadata") != 0) {
+            log.v { "Metadata exchange with $endpoint: $size bytes to fetch" }
             data = ByteArray(size)
             received = BooleanArray((size + BLOCK_SIZE - 1) / BLOCK_SIZE)
           }
@@ -117,7 +125,7 @@ internal class TorrentMetadataExchange(
       error("Metadata exchange ended")
     } finally {
       connection?.close()
-      lease.close()
+      lease?.close()
     }
   }
 

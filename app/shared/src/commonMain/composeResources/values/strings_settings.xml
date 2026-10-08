@@ -595,17 +595,20 @@
     <item quantity="one">and %1$d more.</item>
     <item quantity="other">and %1$d more.</item>
   </plurals>
-  <!-- The group for a tracker list the device downloads, such as ngosang's trackers_best.txt. -->
-  <string name="settings_torrent_list">Tracker list</string>
-  <string name="settings_torrent_list_subscribe">Subscribe to a tracker list</string>
-  <string name="settings_torrent_list_subscribe_hint">Public torrents also announce to its trackers. Updates daily.</string>
-  <string name="settings_torrent_list_url">List address</string>
-  <!-- Under the address while the subscription is off. -->
+  <!-- The group for the tracker lists the device downloads, such as ngosang's trackers_best.txt. -->
+  <string name="settings_torrent_list">Tracker lists</string>
+  <string name="settings_torrent_list_subscribe">Subscribe to tracker lists</string>
+  <string name="settings_torrent_list_subscribe_hint">Public torrents also announce to their trackers. Updates daily.</string>
+  <string name="settings_torrent_list_add">Add a list</string>
+  <!-- %1$s names a tracker list, such as "ngosang/trackerslist · trackers_best.txt". -->
+  <string name="settings_torrent_list_remove">Remove %1$s</string>
+  <string name="settings_torrent_list_none">No tracker lists</string>
+  <!-- Under Add a list: what a tracker list holds. -->
   <string name="settings_torrent_list_url_hint">One announce URL per line.</string>
   <!-- Under the address field when what was typed is not a web address. -->
   <string name="settings_torrent_list_url_invalid">Enter an http or https address.</string>
-  <!-- Puts back ngosang's trackers_best.txt as the address. -->
-  <string name="settings_torrent_list_default">Use default</string>
+  <!-- Puts back the default lists, ngosang's and XIU2's best trackers. -->
+  <string name="settings_torrent_list_default">Use defaults</string>
   <string name="settings_torrent_list_update">Update now</string>
   <string name="settings_torrent_list_updating">Updating…</string>
   <!-- %1$d is how many trackers the list holds, %2$s how long ago it was downloaded, such as "3h 12m". -->
@@ -628,10 +631,10 @@
     <item quantity="other">Couldn't download the list. Using %1$d built-in trackers.</item>
   </plurals>
     <!-- A row that shows or hides the trackers the downloaded list holds. -->
-  <string name="settings_torrent_list_trackers">Trackers in the list</string>
+  <string name="settings_torrent_list_trackers">Trackers in the lists</string>
   <string name="settings_torrent_list_hide">Hide</string>
   <string name="settings_torrent_list_failed">Couldn't download the list.</string>
-  <string name="settings_torrent_list_footer">The list's server sees this device's IP address.</string>
+  <string name="settings_torrent_list_footer">The lists' servers see this device's IP address.</string>
 
   <!-- Sharing. -->
   <!-- On the page of a device that is not this one, %1$s. "ketch server" is a command. -->

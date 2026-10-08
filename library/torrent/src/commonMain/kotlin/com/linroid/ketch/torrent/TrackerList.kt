@@ -4,13 +4,19 @@ import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -26,7 +32,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
- * Trackers of the list [TorrentConfig.trackerListUrl] names.
+ * Trackers of one of the lists [TorrentConfig.trackerListUrls] names.
  *
  * @property url the subscribed list, or `null` when there is none.
  * @property trackers the usable announce URLs of the newest copy of the list, in its order.
@@ -105,10 +111,7 @@ internal class TrackerListSubscription(
       if (wait.isPositive()) withTimeoutOrNull(wait) { refreshRequests.receive() }
       mutableState.update { it.copy(updating = true) }
       next = try {
-        val trackers = parseTrackerList(
-          http().fetch(url, MAX_TRACKER_LIST_BYTES).decodeToString(),
-        )
-        check(trackers.isNotEmpty()) { "Tracker list has no usable trackers" }
+        val trackers = download(url)
         val now = clock.now()
         writeCache(url, trackers, now)
         mutableState.update {
@@ -125,6 +128,29 @@ internal class TrackerListSubscription(
         clock.now() + retryInterval
       }
     }
+  }
+
+  /**
+   * The usable trackers of the list at [url], from its jsDelivr mirror when GitHub cannot be
+   * reached or answers with no trackers.
+   */
+  private suspend fun download(url: String): List<String> {
+    val failure = try {
+      return fetchTrackers(url)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      e
+    }
+    val mirror = trackerListMirror(url) ?: throw failure
+    log.d { "Tracker list download failed, trying its mirror: ${failure.describeWithoutUrls()}" }
+    return fetchTrackers(mirror)
+  }
+
+  private suspend fun fetchTrackers(url: String): List<String> {
+    val trackers = parseTrackerList(http().fetch(url, MAX_TRACKER_LIST_BYTES).decodeToString())
+    check(trackers.isNotEmpty()) { "Tracker list has no usable trackers" }
+    return trackers
   }
 
   private class Cached(val trackers: List<String>, val updatedAt: Instant)
@@ -183,6 +209,82 @@ internal class TrackerListSubscription(
   }
 }
 
+/**
+ * Several tracker lists, each a [TrackerListSubscription] with its own copy in [stateDirectory],
+ * whose trackers [onTrackers] gets combined in list order, without repeats.
+ */
+internal class TrackerLists(
+  private val http: () -> TorrentHttp,
+  private val stateDirectory: Path?,
+  private val scope: CoroutineScope,
+  private val onTrackers: suspend (List<String>) -> Unit,
+  private val bundled: (url: String) -> List<String> = ::bundledTrackers,
+  private val clock: Clock = Clock.System,
+) {
+  private val log = KetchLogger("TrackerList")
+  private val mutex = Mutex()
+  private val subscribed = MutableStateFlow(emptyList<Pair<String, TrackerListSubscription>>())
+
+  /** Each subscribed list, in order. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val state: StateFlow<List<TrackerListState>> = subscribed
+    .flatMapLatest { lists ->
+      if (lists.isEmpty()) flowOf(emptyList()) else combine(lists.map { it.second.state }) {
+        it.toList()
+      }
+    }
+    .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+  /**
+   * Subscribes to the lists at [requested], in that order, keeping the ones already subscribed;
+   * URLs that are not `http` or `https` are skipped. Returns once every list's saved or shipped
+   * copy is passed to `onTrackers`.
+   */
+  suspend fun subscribe(requested: List<String>): Unit = mutex.withLock {
+    val urls = requested.map { it.trim() }.filter(::isTrackerListUrl).distinct()
+    if (urls.size < requested.size) log.d { "Ignoring ${requested.size - urls.size} list URL(s)" }
+    val current = subscribed.value
+    if (urls == current.map { it.first }) return@withLock
+    val kept = current.toMap()
+    current.filter { it.first !in urls }.forEach { it.second.subscribe(null) }
+    val next = urls.map { url -> url to (kept[url] ?: newList(url)) }
+    // Subscribed before they are published, so [state] never shows a list without its URL.
+    next.forEach { (url, list) -> list.subscribe(url) }
+    subscribed.value = next
+    publish()
+    log.i { "Tracker lists: ${urls.size}" }
+  }
+
+  /** Downloads every subscribed list now. */
+  fun refresh() {
+    subscribed.value.forEach { it.second.refresh() }
+  }
+
+  // Each list keeps its own copy, named after its URL.
+  private fun newList(url: String): TrackerListSubscription {
+    val hash = sha1Digest(url.encodeToByteArray()).toByteString().hex().take(12)
+    return TrackerListSubscription(http, stateDirectory?.resolve("tracker-list-$hash.txt"), scope,
+      onTrackers = { publish() }, bundled = bundled, clock = clock)
+  }
+
+  private suspend fun publish() {
+    onTrackers(subscribed.value.flatMap { it.second.state.value.trackers }.distinct())
+  }
+}
+
+/**
+ * The jsDelivr mirror of a `raw.githubusercontent.com` [url], which some networks reach when
+ * they cannot reach GitHub; `null` for other URLs.
+ */
+internal fun trackerListMirror(url: String): String? {
+  val prefix = "https://raw.githubusercontent.com/"
+  if (!url.startsWith(prefix)) return null
+  val parts = url.removePrefix(prefix).split('/')
+  if (parts.size < 4 || parts[2] == "refs" || parts.any { it.isEmpty() }) return null
+  val (owner, repo, ref) = parts
+  return "https://cdn.jsdelivr.net/gh/$owner/$repo@$ref/${parts.drop(3).joinToString("/")}"
+}
+
 /** The copy of the list at [url] that Ketch ships, if any: [TorrentConfig.BEST_TRACKERS]. */
 internal fun bundledTrackers(url: String): List<String> =
   if (url == TorrentConfig.BEST_TRACKERS_URL) TorrentConfig.BEST_TRACKERS else emptyList()
@@ -196,7 +298,7 @@ internal fun isTrackerListUrl(url: String): Boolean {
 
 /**
  * Announce URLs in a tracker list: one per line, blank lines and `#` comments skipped. URLs the
- * engine cannot announce to, such as WebTorrent's `wss`, are dropped; at most 64 are kept.
+ * engine cannot announce to, such as WebTorrent's `wss`, are dropped; at most 128 are kept.
  */
 internal fun parseTrackerList(text: String): List<String> = text.lineSequence()
   .map { it.trim() }

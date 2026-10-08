@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,6 +35,8 @@ class TrackerListTest {
     override fun now(): Instant = now
   }
   private var body: String? = "$UDP\n$HTTP\n"
+  // Bodies by URL, for lists that differ; others get [body].
+  private val bodies = mutableMapOf<String, String?>()
   private val requests = mutableListOf<String>()
   private val published = mutableListOf<List<String>>()
 
@@ -51,10 +54,10 @@ class TrackerListTest {
   }
 
   @Test
-  fun parseTrackerList_keepsAtMost64() {
-    val text = (1..100).joinToString("\n") { "udp://tracker$it.example:1337/announce" }
+  fun parseTrackerList_keepsAtMostTheExtraTrackerLimit() {
+    val text = (1..200).joinToString("\n") { "udp://tracker$it.example:1337/announce" }
     val parsed = parseTrackerList(text)
-    assertEquals(64, parsed.size)
+    assertEquals(MAX_ADDITIONAL_TRACKERS, parsed.size)
     assertEquals("udp://tracker1.example:1337/announce", parsed.first())
   }
 
@@ -194,7 +197,7 @@ class TrackerListTest {
   fun newSource_hasTheShippedTrackersBeforeAnyDownload() {
     body = null
     val source = TorrentDownloadSource(
-      TorrentConfig(dhtEnabled = false, trackerListUrl = TorrentConfig.BEST_TRACKERS_URL),
+      TorrentConfig(dhtEnabled = false, trackerListUrls = TorrentConfig.DEFAULT_TRACKER_LISTS),
       http,
     )
     try {
@@ -202,6 +205,54 @@ class TrackerListTest {
     } finally {
       source.close()
     }
+  }
+
+  @Test
+  fun trackerListMirror_mapsRawGitHubToJsDelivr() {
+    assertEquals(
+      "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_best.txt",
+      trackerListMirror(TorrentConfig.BEST_TRACKERS_URL),
+    )
+    assertEquals(
+      "https://cdn.jsdelivr.net/gh/XIU2/TrackersListCollection@master/best.txt",
+      trackerListMirror(TorrentConfig.XIU2_BEST_TRACKERS_URL),
+    )
+    assertNull(trackerListMirror(LIST))
+    assertNull(trackerListMirror("https://raw.githubusercontent.com/a/b/refs/heads/main/x.txt"))
+    assertNull(trackerListMirror("https://raw.githubusercontent.com/a/b/main"))
+  }
+
+  @Test
+  fun failedGitHubDownload_usesTheMirror() = realTime {
+    val mirror = checkNotNull(trackerListMirror(RAW_LIST))
+    bodies[RAW_LIST] = null
+    bodies[mirror] = "$HTTP\n"
+    val subscription = subscription()
+    subscription.subscribe(RAW_LIST)
+    val state = subscription.state.first { it.updatedAt != null }
+    assertEquals(listOf(HTTP), state.trackers)
+    assertEquals(listOf(RAW_LIST, mirror), requests)
+  }
+
+  @Test
+  fun severalLists_combineInOrderWithoutRepeats() = realTime {
+    bodies[LIST] = "$UDP\n$HTTP\n"
+    bodies[OTHER_LIST] = "$HTTP\n$OTHER\n"
+    val lists = lists()
+    lists.subscribe(listOf(LIST, OTHER_LIST))
+    lists.state.first { states -> states.size == 2 && states.all { it.updatedAt != null } }
+    published.waitFor { it == listOf(UDP, HTTP, OTHER) }
+
+    lists.subscribe(listOf(OTHER_LIST))
+    assertEquals(listOf(HTTP, OTHER), published.last())
+    assertEquals(listOf(OTHER_LIST), lists.state.first { it.size == 1 }.map { it.url })
+  }
+
+  @Test
+  fun lists_ignoreAddressesThatAreNotHttp() = realTime {
+    val lists = lists()
+    lists.subscribe(listOf("ftp://lists.example/x.txt", " ", LIST))
+    assertEquals(listOf(LIST), lists.state.first { it.isNotEmpty() }.map { it.url })
   }
 
   @Test
@@ -224,6 +275,20 @@ class TrackerListTest {
     withContext(Dispatchers.Default) { withTimeout(10_000) { block() } }
   }
 
+  private fun lists() = TrackerLists(
+    http = { TorrentHttp(http) },
+    stateDirectory = directory,
+    scope = scope,
+    onTrackers = { synchronizedAdd(published, it) },
+    bundled = { emptyList() },
+    clock = clock,
+  )
+
+  // Waits until a published list matches [predicate].
+  private suspend fun List<List<String>>.waitFor(predicate: (List<String>) -> Boolean) {
+    while (lock.withLock { none(predicate) }) delay(10)
+  }
+
   private fun subscription() = TrackerListSubscription(
     http = { TorrentHttp(http) },
     cacheFile = cacheFile,
@@ -244,7 +309,8 @@ class TrackerListTest {
       onData: suspend (ByteArray) -> Unit,
     ) {
       synchronizedAdd(requests, url)
-      onData((body ?: throw IOException("List unavailable")).encodeToByteArray())
+      val text = if (url in bodies) bodies[url] else body
+      onData((text ?: throw IOException("List unavailable")).encodeToByteArray())
     }
 
     override fun close() {}
@@ -261,6 +327,8 @@ class TrackerListTest {
     const val BUNDLED_LIST = "https://lists.example/bundled.txt"
     const val BUNDLED = "udp://bundled.example:80/announce"
     const val OTHER_LIST = "https://lists.example/trackers_all.txt"
+    const val RAW_LIST = "https://raw.githubusercontent.com/owner/lists/master/best.txt"
+    const val OTHER = "udp://other.example:6969/announce"
     const val UDP = "udp://tracker.example:1337/announce"
     const val HTTP = "http://tracker.example:6969/announce"
   }

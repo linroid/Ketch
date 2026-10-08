@@ -444,7 +444,9 @@
   <string name="settings_torrent_list">트래커 목록</string>
   <string name="settings_torrent_list_subscribe">트래커 목록 구독</string>
   <string name="settings_torrent_list_subscribe_hint">공개 토렌트는 목록의 트래커에도 알립니다. 매일 업데이트됩니다.</string>
-  <string name="settings_torrent_list_url">목록 주소</string>
+  <string name="settings_torrent_list_add">목록 추가</string>
+  <string name="settings_torrent_list_remove">%1$s 제거</string>
+  <string name="settings_torrent_list_none">트래커 목록 없음</string>
   <string name="settings_torrent_list_url_hint">한 줄에 announce URL 하나.</string>
   <string name="settings_torrent_list_url_invalid">http 또는 https 주소를 입력하세요.</string>
   <string name="settings_torrent_list_default">기본값 사용</string>

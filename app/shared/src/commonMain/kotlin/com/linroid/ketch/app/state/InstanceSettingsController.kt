@@ -43,8 +43,8 @@ import kotlinx.coroutines.sync.withLock
  * @param scope scope that runs the calls to [api].
  * @param applyTorrent hands saved torrent settings to the embedded
  *   instance, so they take effect without a restart.
- * @param trackerList what the embedded instance's subscribed tracker list holds.
- * @param refreshTrackerList downloads that list again now.
+ * @param trackerList what each of the embedded instance's subscribed tracker lists holds.
+ * @param refreshTrackerList downloads those lists again now.
  * @param savedSpeedLimit the speed limit saved with download settings the
  *   instance accepted: its standing cap, which a slow lane holding the
  *   instance back for now must not replace.
@@ -54,7 +54,7 @@ class InstanceSettingsController(
   private val local: AppSettingsController?,
   private val scope: CoroutineScope,
   private val applyTorrent: suspend (TorrentSettings) -> Unit = {},
-  trackerList: Flow<TrackerListStatus>? = null,
+  trackerList: Flow<List<TrackerListStatus>>? = null,
   private val refreshTrackerList: () -> Unit = {},
   private val savedSpeedLimit: (DownloadConfig) -> SpeedLimit = { it.speedLimit },
 ) {
@@ -81,10 +81,10 @@ class InstanceSettingsController(
   val torrent: TorrentSettings? get() = local?.config?.torrent
 
   /**
-   * What the subscribed tracker list holds, or `null` for a remote instance or one without
+   * What each subscribed tracker list holds, or `null` for a remote instance or one without
    * torrent support.
    */
-  val trackerList: Flow<TrackerListStatus>? = trackerList?.takeIf { local != null }
+  val trackerList: Flow<List<TrackerListStatus>>? = trackerList?.takeIf { local != null }
 
   /** Why the torrent settings could not be applied. */
   var torrentError by mutableStateOf<UiText?>(null)
@@ -196,7 +196,7 @@ class InstanceSettingsController(
     }
   }
 
-  /** Downloads the embedded instance's subscribed tracker list again now. */
+  /** Downloads the embedded instance's subscribed tracker lists again now. */
   fun refreshTrackerList() {
     if (local != null) refreshTrackerList.invoke()
   }

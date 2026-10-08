@@ -10,6 +10,7 @@
   <string name="row_status_downloading">En cours</string>
   <string name="row_status_stalled">Bloqué</string>
   <string name="row_status_paused">En pause</string>
+  <string name="row_status_starting">Démarrage</string>
   <string name="row_status_queued">En file d'attente</string>
   <string name="row_status_scheduled">Planifié</string>
   <string name="row_status_done">Terminé</string>
@@ -105,6 +106,7 @@
     <item quantity="one">%1$d devant</item>
     <item quantity="other">%1$d devant</item>
   </plurals>
+  <string name="row_finding_peers">Recherche de pairs</string>
   <string name="queue_starting">Démarrage</string>
 
   <string name="action_row_pause">Mettre en pause</string>
