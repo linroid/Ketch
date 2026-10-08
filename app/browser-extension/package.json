@@ -1,6 +1,6 @@
 {
   "name": "ketch-browser-extension",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "private": true,
   "description": "Browser extension that sends downloads to Ketch",
   "license": "Apache-2.0",

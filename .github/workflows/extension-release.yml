@@ -1,0 +1,68 @@
+name: Extension Release
+
+# The browser extension is released on its own, from tags such as `extension-v0.2.4`, so a store
+# review only follows changes to the extension. Bump `version` in package.json and
+# src/manifest.json first: the tag must match it.
+on:
+  push:
+    tags: ['extension-v*']
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+    working-directory: app/browser-extension
+
+jobs:
+  release:
+    name: Browser extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Check the tag matches the extension version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME#extension-v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "EXTENSION_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        run: node --test
+
+      # chrome.zip leaves out the development key, so it is the Chrome Web Store upload.
+      - name: Build browser extension packages
+        run: node build.mjs
+
+      - name: Write release notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'extension-v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)."
+            echo "The packages below are for store submission and testing; see the"
+            echo "[extension README](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/app/browser-extension/README.md#installing)."
+            echo
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s (%h)' ${previous:+"$previous.."}HEAD -- .
+          } > build/release-notes.md
+
+      # Never the latest release: the desktop and CLI updaters read releases/latest.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Browser extension ${{ env.EXTENSION_VERSION }}
+          body_path: app/browser-extension/build/release-notes.md
+          make_latest: false
+          files: app/browser-extension/build/ketch-extension-*.zip
+          fail_on_unmatched_files: true

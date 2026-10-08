@@ -56,13 +56,12 @@ def download_notes(artifacts, server_url, repository, tag):
     ("Linux", "ARM64", cli("linux", "arm64")),
   ])
   extensions = table([
-    ("Your browser", "Download"),
+    ("Your browser", "Install"),
     ("---", "---"),
     ("Chrome, Edge, Brave and other Chromium browsers",
      "[Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)"),
-    ("Firefox", download("Unsigned extension ZIP", "extension-{version}-firefox.zip")),
-    ("Safari (requires Xcode packaging and signing)",
-     download("Extension source ZIP", "extension-{version}-safari.zip")),
+    ("Firefox and Safari",
+     f"[Extension releases]({server_url}/{repository}/releases?q=extension-v&expanded=true)"),
   ])
   web = download("Download the web bundle", "web-{version}.zip")
   references = "\n".join(links)

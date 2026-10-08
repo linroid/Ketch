@@ -657,9 +657,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers, Firefox and a limited Safari target; plain JavaScript modules with no
-  dependencies. `src/` loads unpacked in Chromium; `node build.mjs` writes `build/chrome`,
-  `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
-  workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number).
+  dependencies. `src/` loads unpacked in Chromium, its `key` pinning the development id;
+  `node build.mjs` writes `build/chrome` (no `key`: the Chrome Web Store package, item
+  `flnjeochbgpaipiofdjmoijaeooemhka`), `build/firefox` (event page instead of service worker,
+  gecko id) and zips. It is released apart from the apps: an `extension-v<version>` tag, matching
+  `package.json`, runs `extension-release.yml`, whose GitHub release is never marked latest
+  (the updaters read the latest release).
   `build/safari` reaches configured servers only, with mandatory review and no download capture,
   native app launching or notifications. `npm run safari` generates an unsigned macOS Xcode host
   project; signing and Safari enablement are separate local/distribution steps

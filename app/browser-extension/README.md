@@ -41,7 +41,8 @@ are unavailable. See [Safari packaging](#safari-limited-macos-target).
 - **Chrome, Edge, Brave and other Chromium browsers**: install Ketch from the
   [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka).
 
-Each [GitHub release](https://github.com/linroid/Ketch/releases) also includes
+The extension has its own releases, tagged `extension-v<version>`
+([list](https://github.com/linroid/Ketch/releases?q=extension-v&expanded=true)). Each includes
 `ketch-extension-<version>-chrome.zip` (the Chrome Web Store package),
 `ketch-extension-<version>-firefox.zip` and `ketch-extension-<version>-safari.zip`. The Safari
 archive contains extension sources, not an installable app. Until the other stores list it:
@@ -59,7 +60,8 @@ archive contains extension sources, not an installable app. Until the other stor
 ### Store submission
 
 Run `npm run build` and upload `build/ketch-extension-<version>-chrome.zip` to the
-Chrome Web Store or Edge Add-ons. Release CI also attaches this package to each GitHub release.
+Chrome Web Store or Edge Add-ons. The extension release workflow also attaches it to the
+extension's GitHub release.
 Its manifest omits the development `key` of `src/`, which the Chrome Web Store rejects on upload.
 
 The Chrome Web Store item is
@@ -265,11 +267,17 @@ every file the manifest names exists, and zips each build. Keep `version` in `pa
 otherwise. The icons are rendered from the repository's `art/icon-app.svg` by
 `art/render-icons.sh`.
 
-For a release tag, the release workflow runs `node build.mjs --version <version> --build <run
-number>` and attaches the zips to the GitHub release. Browsers only accept versions made of
-numbers, so `0.0.1-rc12` becomes `0.0.1.<run number>` in the manifests, and Chromium shows
-`0.0.1-rc12` as the version name. The run number makes every release newer than the one before,
-including a final release after its release candidates, which the stores require for updates.
+The extension is released apart from the apps, so a store review only follows changes to the
+extension. To release it, bump `version` in `package.json` and `src/manifest.json` (above the
+version in the stores; the stores refuse an upload that is not newer), merge, and push a tag
+`extension-v<version>`. The `Extension Release` workflow (`.github/workflows/extension-release.yml`)
+checks that the tag matches, runs the tests, builds the packages and publishes them in a GitHub
+release that is never marked latest, since the desktop and CLI updaters read the latest release.
+Then upload `ketch-extension-<version>-chrome.zip` to the Chrome Web Store.
+
+`node build.mjs --version <version> --build <number>` still builds other versions: browsers only
+accept versions made of numbers, so `0.0.1-rc12` becomes `0.0.1.<number>` in the manifests, and
+Chromium shows `0.0.1-rc12` as the version name.
 
 | Path | Contents |
 |---|---|
