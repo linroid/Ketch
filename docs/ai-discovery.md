@@ -70,7 +70,7 @@ Two details Ketch handles for you:
 
 - **Endpoint.** The newest OpenAI models are served by the Responses
   API, so the OpenAI provider targets it for ids outside Koog's catalog;
-  the OpenAI-compatible provider targets `/v1/chat/completions`, which is
+  the OpenAI-compatible provider targets `chat/completions`, which is
   what third-party servers implement.
 - **Sampling.** Current frontier models (the Claude 5 family, OpenAI's
   newest) reject a `temperature`, so discovery only sends one to models
@@ -78,7 +78,17 @@ Two details Ketch handles for you:
 
 **OpenAI-compatible** covers OpenRouter, DeepSeek, LM Studio, vLLM and
 similar servers, as well as Gemini's OpenAI-compatible endpoint. Enter
-the endpoint with or without the trailing `/v1`; both work.
+the endpoint as the provider documents it, as you would for OpenAI's
+SDKs:
+
+- An endpoint whose path names an API version is the base that
+  `chat/completions` follows: `https://openrouter.ai/api/v1`,
+  `https://open.bigmodel.cn/api/paas/v4` or
+  `https://generativelanguage.googleapis.com/v1beta/openai`.
+- An endpoint without one is the server's root, which
+  `v1/chat/completions` follows: `https://api.deepseek.com` or
+  `http://localhost:1234`.
+- A full URL ending in `/chat/completions` is used as it is.
 
 ## Web search
 
