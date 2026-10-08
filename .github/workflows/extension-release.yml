@@ -1,11 +1,11 @@
 name: Extension Release
 
-# The browser extension is released on its own, from tags such as `extension-v0.2.4`, so a store
-# review only follows changes to the extension. Bump `version` in package.json and
-# src/manifest.json first: the tag must match it.
+# Releases the browser extension on its own, when it has changed, so a store review only follows
+# extension changes. Run it from the Actions tab. The extension takes the version of the latest
+# app release plus this workflow's run number (`0.3.1.7`), so every extension release is newer
+# than the last one, and Chromium shows the app version (`0.3.1`).
 on:
-  push:
-    tags: ['extension-v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,29 +28,26 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check the tag matches the extension version
+      - name: Take the version of the latest app release
         run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_REF_NAME#extension-v}" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
-          echo "EXTENSION_VERSION=$version" >> "$GITHUB_ENV"
+          app=$(git describe --tags --abbrev=0 --match 'v*')
+          echo "APP_VERSION=${app#v}" >> "$GITHUB_ENV"
+          echo "EXTENSION_TAG=extension-${app}.${{ github.run_number }}" >> "$GITHUB_ENV"
 
       - name: Run unit tests
         run: node --test
 
       # chrome.zip leaves out the development key, so it is the Chrome Web Store upload.
       - name: Build browser extension packages
-        run: node build.mjs
+        run: node build.mjs --version "$APP_VERSION" --build "${{ github.run_number }}"
 
       - name: Write release notes
         run: |
-          previous=$(git describe --tags --abbrev=0 --match 'extension-v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          previous=$(git describe --tags --abbrev=0 --match 'extension-v*' 2>/dev/null || true)
           {
             echo "Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)."
             echo "The packages below are for store submission and testing; see the"
-            echo "[extension README](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/app/browser-extension/README.md#installing)."
+            echo "[extension README](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/app/browser-extension/README.md#installing)."
             echo
             echo "## Changes"
             echo
@@ -61,7 +58,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Browser extension ${{ env.EXTENSION_VERSION }}
+          tag_name: ${{ env.EXTENSION_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Browser extension ${{ env.APP_VERSION }}.${{ github.run_number }}
           body_path: app/browser-extension/build/release-notes.md
           make_latest: false
           files: app/browser-extension/build/ketch-extension-*.zip

@@ -660,9 +660,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   dependencies. `src/` loads unpacked in Chromium, its `key` pinning the development id;
   `node build.mjs` writes `build/chrome` (no `key`: the Chrome Web Store package, item
   `flnjeochbgpaipiofdjmoijaeooemhka`), `build/firefox` (event page instead of service worker,
-  gecko id) and zips. It is released apart from the apps: an `extension-v<version>` tag, matching
-  `package.json`, runs `extension-release.yml`, whose GitHub release is never marked latest
-  (the updaters read the latest release).
+  gecko id) and zips. It is released apart from the apps, by running `extension-release.yml` by hand: the
+  version is the latest app tag plus the run number (`0.3.1.7`, shown as `0.3.1`), tagged
+  `extension-v0.3.1.7`, and the GitHub release is never marked latest (the updaters read the
+  latest release).
   `build/safari` reaches configured servers only, with mandatory review and no download capture,
   native app launching or notifications. `npm run safari` generates an unsigned macOS Xcode host
   project; signing and Safari enablement are separate local/distribution steps
