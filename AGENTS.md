@@ -672,7 +672,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `NativeHostRegistration`, `BrowserExtensionServer`). The host asks the running app over
   `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
   per-run token, separate from the Settings server. The app registers the host with installed
-  browsers on every launch; the Chromium extension id is pinned by the manifest `key`
+  browsers on every launch; the Chromium extension id is pinned by the manifest `key`. The
+  browser reads the host's stdout as length-prefixed messages, so nothing else may write there:
+  the launcher sends the JVM's own warnings to stderr (`-Xlog` in `app/desktop/build.gradle.kts`)
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks

@@ -258,6 +258,11 @@ compose.desktop {
     // Keep the initial heap small on high-memory desktops. Native graphics and JVM memory
     // sit outside this limit; downloads stream their contents rather than retaining files.
     jvmArgs += listOf("-Xms32m", "-Xmx512m")
+    // The JVM prints its own warnings to stdout, before main runs. As the browser extension's
+    // native messaging host (NativeMessagingHost), stdout carries length-prefixed messages, and a
+    // warning there breaks the reply, so they go to stderr. These come after JAVA_TOOL_OPTIONS, so
+    // diagnostic logging asked for there only reaches a file (`-Xlog:cds:file=cds.log`).
+    jvmArgs += listOf("-Xlog:all=off:stdout", "-Xlog:all=warning:stderr")
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {

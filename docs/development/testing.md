@@ -127,7 +127,9 @@ the DMG (checked; the MSI and deb are built from a copy too). A copied image use
 while the build folder it was dumped in still exists, so test with that folder renamed away. To see
 whether a launch maps classes from an archive, set
 `JAVA_TOOL_OPTIONS=-Xlog:class+load,cds:file=/tmp/ketch-cds.log` and count the classes from
-`shared objects file`.
+`shared objects file`. The launcher keeps the JVM's own logging off stdout, which the browser
+extension's native messaging host answers on, and at warnings on stderr, so other `-Xlog` outputs
+show nothing.
 
 ## Public HTTP Download Smoke Tests
 
