@@ -6,8 +6,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
@@ -271,8 +273,14 @@ class TrackerListTest {
     assertEquals(emptyList(), published.last())
   }
 
+  // Stops the lists before the test ends, so cleanUp never deletes the directory while a
+  // download is still saving its copy there.
   private fun realTime(block: suspend () -> Unit) = runTest {
-    withContext(Dispatchers.Default) { withTimeout(10_000) { block() } }
+    try {
+      withContext(Dispatchers.Default) { withTimeout(10_000) { block() } }
+    } finally {
+      scope.coroutineContext.job.cancelAndJoin()
+    }
   }
 
   private fun lists() = TrackerLists(
