@@ -46,7 +46,11 @@ internal class TorrentV2Fixture(
     store: TorrentV2PieceStore,
     pieces: Iterable<Int> = 0 until layout.pieceCount.toInt(),
   ) {
-    for (index in pieces) check(store.commit(index, v2Piece(index))) { "Piece $index rejected" }
+    for (index in pieces) {
+      check(store.commit(index, v2Piece(index)) == CommitOutcome.VERIFIED) {
+        "Piece $index rejected"
+      }
+    }
   }
 
   /**

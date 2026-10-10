@@ -65,7 +65,9 @@ class TorrentV2RecheckFlushTest {
       TorrentBufferBudget(65_536), Semaphore(1), provider)
     try {
       store.initialize()
-      pieces.forEachIndexed { index, bytes -> assertTrue(store.commit(index, bytes)) }
+      pieces.forEachIndexed { index, bytes ->
+        assertEquals(CommitOutcome.VERIFIED, store.commit(index, bytes))
+      }
       flushes = 0
       assertContentEquals(BooleanArray(4) { true }, store.recheck())
       assertEquals(1, flushes)

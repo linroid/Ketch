@@ -133,6 +133,8 @@ class TorrentV2UploadTest {
     val dial = Channel<TorrentV2DialTarget>(4)
     val failures = Channel<PeerV2Dialer.Failure<TorrentV2DialTarget>>(4)
     private val controls = Channel<TorrentV2SessionLoop.Control>(8)
+    /** Runs when a selection change leaves the complete loop with pieces to download. */
+    var onIncomplete: suspend () -> Unit = {}
     private val remotes = mutableListOf<Remote>()
     private var port = 40_000
     private val network = object : TorrentNetwork {
@@ -190,6 +192,13 @@ class TorrentV2UploadTest {
       check(controls.trySend(TorrentV2SessionLoop.Control.PolicyChanged).isSuccess)
     }
 
+    /** Tells the loop the store's selection changed; returns once the loop follows it. */
+    suspend fun select() {
+      val done = CompletableDeferred<Unit>()
+      controls.send(TorrentV2SessionLoop.Control.Select(done))
+      done.await()
+    }
+
     /** Moves the loop's clock [ms] on and wakes it to look again. */
     fun skip(ms: Long) {
       skipped.addAndFetch(ms)
@@ -206,13 +215,14 @@ class TorrentV2UploadTest {
           restricted = false, waitForPeers = true, discovered = discovered, dial = dial,
           dialFailures = failures, controls = controls, connectionLimit = { 8 },
           generation = { 0 }, serve = serve, sessionUploadRate = session,
-          onCompleted = onCompleted)
+          onCompleted = onCompleted, onIncomplete = { onIncomplete() })
       }
       val loop = async {
         PeerV2Pool.run(state, maxPeers = 8) { pool ->
           TorrentV2CommitWorker.run(store) { worker ->
             TorrentV2ServeWorker.run(store, uploads = uploads) { serve ->
-              TorrentV2SessionLoop.download(layout, emptySet(), store, pool, worker, buffers,
+              TorrentV2SessionLoop.download(layout, store.selectedIds(), store, pool, worker,
+                buffers,
                 state, maxPeers = 8, connections = connections,
                 nowMs = { clock() + skipped.load() }, swarm = swarm(serve))
             }
@@ -846,6 +856,78 @@ class TorrentV2UploadTest {
       policy.store(TorrentUploadPolicy.WHILE_DOWNLOADING)
       policyChanged()
       assertEquals(unchoke, peer.next())
+    }
+  }
+
+  @Test
+  fun revokedDeselectedPieceKeepsTheSession() = upload {
+    pure.seed(store)
+    // c, piece 3, is deselected and then changes on disk; peers still know we had it.
+    store.changeSelection(setOf("0", "1"))
+    torrentFileSystem.write(output / "c") { write(ByteArray(20_000)) }
+    run { loop ->
+      val peer = unchoked(1)
+      peer.send(PeerMessage.Request(3, 0, 16_384))
+      while (store.verifiedPieces()[3]) delay(10)
+      // The piece is gone, not the session: the same peer is served the rest.
+      peer.send(PeerMessage.Request(0, 0, 16_384))
+      val piece = peer.nextPiece()
+      assertEquals(0 to 0, piece.index to piece.begin)
+      assertFalse(loop.isCompleted)
+      assertFalse(peer.closed.isCompleted)
+      assertTrue(store.completed())
+    }
+  }
+
+  @Test
+  fun revokedWantedPieceStillFailsTheSession() = upload {
+    pure.seed(store)
+    store.changeSelection(setOf("2"))
+    torrentFileSystem.write(output / "c") { write(ByteArray(20_000)) }
+    val failure = assertFailsWith<TorrentStorageException> {
+      run { loop ->
+        val peer = unchoked(1)
+        peer.send(PeerMessage.Request(3, 0, 16_384))
+        loop.await()
+      }
+    }
+    assertTrue(failure.cause?.message.orEmpty().contains("piece 3"), "${failure.cause}")
+  }
+
+  @Test
+  fun selectionExpandInSeedModeUploadsWhileDownloadingAgain() {
+    val completions = AtomicInt(0)
+    // The first completion seeds; the second, under WHILE_DOWNLOADING, ends the loop.
+    upload(onCompleted = { completions.addAndFetch(1) == 1 }) {
+      pure.seed(store, listOf(0, 1, 2))
+      store.changeSelection(setOf("0", "1"))
+      val incomplete = CompletableDeferred<Unit>()
+      onIncomplete = { incomplete.complete(Unit) }
+      run { loop -> coroutineScope {
+        val leecher = unchoked(1)
+        assertEquals(1, completions.load())
+        store.changeSelection(setOf("0", "1", "2"))
+        select()
+        assertTrue(incomplete.isCompleted)
+        // Downloading again, so uploading while downloading is allowed again.
+        policy.store(TorrentUploadPolicy.WHILE_DOWNLOADING)
+        policyChanged()
+        assertServed(leecher, interest = false)
+        // A seed has c, which we fetch now.
+        val seed = connect(2)
+        seed.send(PeerMessage.Bitfield(all(pieceCount)))
+        seed.send(unchoke)
+        val answers = launch {
+          while (true) {
+            val request = seed.next { it is PeerMessage.Request } as PeerMessage.Request
+            seed.send(PeerMessage.Piece(request.index, request.begin, pure.v2Piece(request.index)
+              .copyOfRange(request.begin, request.begin + request.length)))
+          }
+        }
+        try { loop.await() } finally { answers.cancel() }
+        assertEquals(2, completions.load())
+        assertTrue(store.completed())
+      } }
     }
   }
 }

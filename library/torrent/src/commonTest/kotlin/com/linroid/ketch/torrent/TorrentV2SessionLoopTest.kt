@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -19,6 +20,7 @@ import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.IOException
 import okio.Path
+import kotlin.concurrent.Volatile
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -46,7 +48,9 @@ class TorrentV2SessionLoopTest {
     private val input = Channel<ByteArray>(Channel.UNLIMITED)
     private val pending = Buffer()
     val requests = mutableListOf<PeerMessage.Request>()
-    var closed = false
+    /** Every request as it is written, for tests that run in real time. */
+    val requested = Channel<PeerMessage.Request>(Channel.UNLIMITED)
+    @Volatile var closed = false
     var readers = 0
     var corruptOnce = false
     var failRequests = false
@@ -56,7 +60,7 @@ class TorrentV2SessionLoopTest {
     var responseSignal: CompletableDeferred<Unit>? = null
     var closeAfterResponses = Int.MAX_VALUE
     /** Keeps answers back until [flush], so requests stay in flight. */
-    var deferResponses = false
+    @Volatile var deferResponses = false
     private val deferred = mutableListOf<PeerMessage>()
     fun flush() {
       deferResponses = false
@@ -82,6 +86,7 @@ class TorrentV2SessionLoopTest {
       val message = PeerWire.decode(buffer.readByteArray(size.toLong()))
       if (message is PeerMessage.Request) {
         requests += message
+        requested.trySend(message)
         if (failRequests || requests.size > failAfterResponses) {
           throw IOException("Peer request write failed")
         }
@@ -138,9 +143,10 @@ class TorrentV2SessionLoopTest {
       clock: () -> Long,
       peerId: Int,
       generation: Long = 0,
+      bitfield: Int = 192,
       configure: (Connection) -> Unit = {},
     ): Pair<Connection, PeerV2Connector.Connected> {
-      val connection = Connection(192)
+      val connection = Connection(bitfield)
       configure(connection)
       connections += connection
       val transport = PeerHashTransport(connection, PeerHashExchange(buffers, { null }), buffers,
@@ -171,6 +177,9 @@ class TorrentV2SessionLoopTest {
     dialCapacity: Int = 4,
     val failures: Channel<PeerV2Dialer.Failure<TorrentV2DialTarget>> = Channel(4),
     discoveredCapacity: Int = Channel.RENDEZVOUS,
+    policy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED,
+    onCompleted: suspend () -> Boolean = { false },
+    onIncomplete: suspend () -> Unit = {},
   ) {
     val connections = Channel<PeerV2Connector.Connected>(Channel.UNLIMITED,
       onUndeliveredElement = { it.close() })
@@ -184,9 +193,15 @@ class TorrentV2SessionLoopTest {
       override fun close() = Unit
     }
     val swarm = TorrentV2Swarm(document, TorrentV2Runtime(network,
-      ByteArray(20) { 9 }.toByteString(), f.buffers, f.state), restricted = false,
-      waitForPeers = false, discovered = discovered, dial = dial, dialFailures = failures,
-      controls = controls, connectionLimit = { limit }, generation = { this.generation })
+      ByteArray(20) { 9 }.toByteString(), f.buffers, f.state, uploadPolicy = { policy }),
+      restricted = false, waitForPeers = false, discovered = discovered, dial = dial,
+      dialFailures = failures, controls = controls, connectionLimit = { limit },
+      generation = { this.generation }, onCompleted = onCompleted, onIncomplete = onIncomplete)
+
+    /** Tells the loop the store's selection changed; the result completes once it follows. */
+    suspend fun select(): CompletableDeferred<Unit> = CompletableDeferred<Unit>().also {
+      controls.send(TorrentV2SessionLoop.Control.Select(it))
+    }
 
     fun send(connected: PeerV2Connector.Connected) {
       check(connections.trySend(connected).isSuccess)
@@ -205,10 +220,11 @@ class TorrentV2SessionLoopTest {
     f: Fixture,
     swarm: Swarm,
     maxPeers: Int,
+    selected: Set<String> = setOf("0"),
   ) = async {
     PeerV2Pool.run(f.state, maxPeers = maxPeers) { pool ->
       TorrentV2CommitWorker.run(f.store, dispatcher = StandardTestDispatcher(testScheduler)) {
-        TorrentV2SessionLoop.download(layout, setOf("0"), f.store, pool, it, f.buffers, f.state,
+        TorrentV2SessionLoop.download(layout, selected, f.store, pool, it, f.buffers, f.state,
           maxPeers = maxPeers, connections = swarm.connections,
           nowMs = { testScheduler.currentTime }, swarm = swarm.swarm)
       }
@@ -628,7 +644,7 @@ class TorrentV2SessionLoopTest {
     val f = Fixture(setOf("1"))
     try {
       f.store.initialize()
-      assertTrue(f.store.commit(1, last))
+      assertEquals(CommitOutcome.VERIFIED, f.store.commit(1, last))
       PeerV2Pool.run(f.state, maxPeers = 1) { pool ->
         TorrentV2CommitWorker.run(
           store = f.store,
@@ -641,5 +657,177 @@ class TorrentV2SessionLoopTest {
       assertTrue(f.store.completed())
       f.checkReleased()
     } finally { f.store.cleanup() }
+  }
+
+  /**
+   * Runs [block] in real time: these loops write files while they run, and virtual time would
+   * expire their peers while a write is out on the I/O dispatcher.
+   */
+  private fun realTime(block: suspend CoroutineScope.() -> Unit) = runTest {
+    withContext(Dispatchers.Default) { withTimeout(20_000) { block() } }
+  }
+
+  private fun CoroutineScope.liveDownload(
+    f: Fixture,
+    swarm: Swarm,
+    selected: Set<String>,
+  ) = async {
+    PeerV2Pool.run(f.state, maxPeers = 2) { pool ->
+      TorrentV2CommitWorker.run(f.store) {
+        TorrentV2SessionLoop.download(layout, selected, f.store, pool, it, f.buffers, f.state,
+          maxPeers = 2, connections = swarm.connections, swarm = swarm.swarm)
+      }
+    }
+  }
+
+  @Test
+  fun selectControl_shrink_completesWithoutDeselectedPieces() = realTime {
+    val f = Fixture(setOf("0", "1"))
+    val s = Swarm(f, limit = 2)
+    try {
+      f.store.initialize()
+      val (peer, handle) = f.handle(monotonicClock(), peerId = 1) { it.deferResponses = true }
+      s.send(handle)
+      val download = liveDownload(f, s, setOf("0", "1"))
+      try {
+        // Both of a's blocks and b's are out, answers held back.
+        assertEquals(setOf(0, 1), List(3) { peer.requested.receive().index }.toSet())
+        // b is dropped while its block is on the way; the peer stays.
+        f.store.changeSelection(setOf("0"))
+        s.select().await()
+        assertFalse(peer.closed)
+        peer.flush()
+        download.await()
+      } finally { download.cancelAndJoin() }
+      assertTrue(f.store.completed())
+      assertContentEquals(booleanArrayOf(true, false), f.store.verifiedPieces())
+      // Its block arrived and was dropped unwritten; it was asked for once.
+      assertEquals(0L, torrentFileSystem.metadata(f.output / "b").size)
+      assertEquals(1, peer.requests.count { it.index == 1 })
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
+  }
+
+  @Test
+  fun selectControl_expandRacingLastCommit_keepsDownloading() = realTime {
+    val f = Fixture(setOf("0"))
+    val s = Swarm(f, limit = 2)
+    try {
+      f.store.initialize()
+      val (peer, handle) = f.handle(monotonicClock(), peerId = 1) { it.deferResponses = true }
+      s.send(handle)
+      val download = liveDownload(f, s, setOf("0"))
+      try {
+        assertEquals(listOf(0, 0), List(2) { peer.requested.receive().index })
+        // The store takes b before the loop hears of it, while a's last blocks are on the way:
+        // a's commit completes the loop's selection, but not the store's.
+        f.store.changeSelection(setOf("0", "1"))
+        peer.flush()
+        download.await()
+      } finally { download.cancelAndJoin() }
+      assertTrue(f.store.completed())
+      assertContentEquals(booleanArrayOf(true, true), f.store.verifiedPieces())
+      assertContentEquals(last, torrentFileSystem.read(f.output / "b") { readByteArray() })
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
+  }
+
+  @Test
+  fun selectionExpandInSeedMode_downloadsThenSeedsAgain() = realTime {
+    val f = Fixture(setOf("0"))
+    val completions = Channel<Unit>(Channel.UNLIMITED)
+    val incomplete = CompletableDeferred<Unit>()
+    val s = Swarm(f, limit = 2, policy = TorrentUploadPolicy.SEED_AFTER_COMPLETION,
+      onCompleted = {
+        completions.send(Unit)
+        true
+      },
+      onIncomplete = { check(incomplete.complete(Unit)) { "Incomplete twice" } })
+    try {
+      f.store.initialize()
+      assertEquals(CommitOutcome.VERIFIED, f.store.commit(0, bytes))
+      // A peer that dialed us and has b only: no seed, so the seed keeps it.
+      val (peer, handle) = f.handle(monotonicClock(), peerId = 1, bitfield = 64)
+      s.send(handle)
+      val download = liveDownload(f, s, setOf("0"))
+      try {
+        completions.receive()
+        assertTrue(peer.requests.isEmpty())
+        f.store.changeSelection(setOf("0", "1"))
+        s.select().await()
+        assertTrue(incomplete.isCompleted)
+        // It downloads b from the peer, then completes, and seeds, once more.
+        completions.receive()
+        assertTrue(f.store.completed())
+        assertEquals(1, peer.requested.receive().index)
+        assertFalse(download.isCompleted)
+        assertFalse(peer.closed)
+      } finally { download.cancelAndJoin() }
+      assertContentEquals(last, torrentFileSystem.read(f.output / "b") { readByteArray() })
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
+  }
+
+  @Test
+  fun selectControl_inSeedMode_keepsIncomingPeers() = realTime {
+    val f = Fixture(setOf("0", "1"))
+    val completed = CompletableDeferred<Unit>()
+    val s = Swarm(f, limit = 2, policy = TorrentUploadPolicy.SEED_AFTER_COMPLETION,
+      onCompleted = {
+        check(completed.complete(Unit)) { "Completed twice" }
+        true
+      },
+      onIncomplete = { error("A shrink never leaves a seed incomplete") })
+    try {
+      f.store.initialize()
+      assertEquals(CommitOutcome.VERIFIED, f.store.commit(0, bytes))
+      assertEquals(CommitOutcome.VERIFIED, f.store.commit(1, last))
+      val (first, one) = f.handle(monotonicClock(), peerId = 1, bitfield = 0)
+      val (second, two) = f.handle(monotonicClock(), peerId = 2, bitfield = 128)
+      s.send(one)
+      s.send(two)
+      val download = liveDownload(f, s, setOf("0", "1"))
+      try {
+        completed.await()
+        f.store.changeSelection(setOf("0"))
+        s.select().await()
+        // Still complete and seeding: nobody was dropped.
+        assertFalse(first.closed || second.closed)
+        assertFalse(download.isCompleted)
+      } finally { download.cancelAndJoin() }
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
+  }
+
+  @Test
+  fun selectControl_loopStopped_isNotAcknowledged() = runTest {
+    val f = Fixture(setOf("0"))
+    val clock = { testScheduler.currentTime }
+    val s = Swarm(f, limit = 2)
+    try {
+      f.store.initialize()
+      s.send(f.handle(clock, peerId = 1).second)
+      swarmDownload(f, s, maxPeers = 2).await()
+      // Nobody follows a change sent after the loop returned.
+      val done = s.select()
+      runCurrent()
+      assertFalse(done.isCompleted)
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
   }
 }

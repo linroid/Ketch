@@ -24,6 +24,9 @@ internal class TorrentV2CommitWorker private constructor(
     val ticket: Ticket
     data class Committed(override val ticket: Ticket, val verified: Boolean) : Completion
     data class Failed(override val ticket: Ticket, val cause: Throwable) : Completion
+
+    /** The selection no longer wants the piece: nothing was written, and nobody did wrong. */
+    data class Discarded(override val ticket: Ticket) : Completion
   }
 
   /** Non-null transfers ownership; saturation restores actor ownership without creating work. */
@@ -58,7 +61,11 @@ internal class TorrentV2CommitWorker private constructor(
         try {
           for (submission in input) {
             val result = try {
-              Completion.Committed(submission.ticket, submission.claim.commit(store))
+              when (submission.claim.commit(store)) {
+                CommitOutcome.VERIFIED -> Completion.Committed(submission.ticket, verified = true)
+                CommitOutcome.CORRUPT -> Completion.Committed(submission.ticket, verified = false)
+                CommitOutcome.NOT_WANTED -> Completion.Discarded(submission.ticket)
+              }
             } catch (error: CancellationException) {
               throw error
             } catch (error: Throwable) {
