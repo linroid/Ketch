@@ -40,10 +40,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.discover_example_blender
-import ketch.app.shared.generated.resources.discover_example_footage
 import ketch.app.shared.generated.resources.discover_example_quoted
-import ketch.app.shared.generated.resources.discover_example_ubuntu
 import ketch.app.shared.generated.resources.discover_hero_title
 import ketch.app.shared.generated.resources.discover_provider_openai_compatible
 import ketch.app.shared.generated.resources.discover_setup_body
@@ -92,7 +89,7 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
           .padding(horizontal = spacing.s3, vertical = spacing.s2),
       )
     } else {
-      DiscoverExamples(onClick = null)
+      DiscoverExamples(state.aiDiscover.examples, onClick = null)
     }
     if (!supported) return@DiscoverHero
     Spacer(Modifier.height(spacing.s8))
@@ -201,19 +198,19 @@ internal fun DiscoverHero(
 }
 
 /**
- * Searches to try. With [onClick] each one runs; without it they only show what a search can
- * look like.
+ * Searches to try, the [examples] a new session offers. With [onClick] each one runs; without it
+ * they only show what a search can look like.
  */
 @Composable
-internal fun DiscoverExamples(onClick: ((String) -> Unit)?) {
+internal fun DiscoverExamples(examples: List<UiText>, onClick: ((String) -> Unit)?) {
   val spacing = KetchTheme.spacing
   FlowRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2, Alignment.CenterHorizontally),
     verticalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier.fillMaxWidth(),
   ) {
-    for (resource in Examples) {
-      val example = stringResource(resource)
+    for (text in examples) {
+      val example = text.resolve()
       if (onClick != null) {
         KetchChip(
           label = example,
@@ -269,12 +266,6 @@ private val SetupProviders = listOf(
   LlmProvider.Anthropic,
   LlmProvider.Google,
   LlmProvider.Ollama,
-)
-
-private val Examples = listOf(
-  Res.string.discover_example_blender,
-  Res.string.discover_example_ubuntu,
-  Res.string.discover_example_footage,
 )
 
 private val HeroWidth: Dp = 640.dp

@@ -545,8 +545,10 @@ one ([below](#limiting-discovery-to-websites)). While the chat searches,
 the button turns into **Stop** (Esc), and the next message can be sent
 once the search ends.
 
-An empty chat shows what Discover does and example searches, which run
-when clicked. Each message becomes a turn in the thread:
+An empty chat shows what Discover does and three example searches, picked
+at random for each new chat, which run when clicked. Each message becomes
+a turn in the thread; your messages and the agent's summaries can be
+selected and copied:
 
 1. your message, with the websites it was limited to;
 2. the agent's steps, as it reports them, the running one with what the
