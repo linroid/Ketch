@@ -1775,6 +1775,7 @@ class AppState(
         is RemoteInstance -> entry.connectionState.map { it.toDeviceHealth() }
         else -> serverState.map { it.toDeviceHealth() }
       },
+      features = featuresFlow(entry),
     )
   }
 

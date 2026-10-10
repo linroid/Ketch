@@ -167,9 +167,10 @@ class RowContentTest {
 
     val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = null)
 
-    assertEquals(RowStatus.Downloading, content.status)
+    assertEquals(RowStatus.Starting, content.status)
     assertEquals("Starting", content.statusText.load())
     assertEquals(urlHost(request.url), content.detail.load())
+    assertEquals(RowAction.Pause, content.primary)
   }
 
   @Test
