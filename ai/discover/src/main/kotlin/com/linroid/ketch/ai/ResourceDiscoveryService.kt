@@ -547,7 +547,8 @@ class ResourceDiscoveryService internal constructor(
       |   Call emitStep("Understanding", <your analysis>).
       |
       |2. PLAN
-      |   Create 3-6 numbered search/fetch steps with budgets.
+      |   Create 3-6 numbered search/fetch steps with budgets, each on a
+      |   line of its own.
       |   Call emitStep("Plan", <your plan>).
       |
       |3. DISCOVER (iterative loop)
