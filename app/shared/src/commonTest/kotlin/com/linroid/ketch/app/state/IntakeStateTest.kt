@@ -465,10 +465,27 @@ class IntakeStateTest {
     val metadata = CompletableDeferred<ResolvedSource>()
     val api = IntakeTestApi(
       check = { _, _ -> metadata.await() },
-      features = setOf(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION),
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
     )
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
     val session = session(api, IntakeRequest(magnet))
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertTrue(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun addAnyway_uncheckedLinkOnSupportingDevice_awaitsFiles() = runTest {
+    val api = IntakeTestApi(
+      check = { _, _ -> throw KetchError.Http(404) },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val session = session(api, IntakeRequest("https://example.com/show/master.m3u8"))
+    runCurrent()
 
     session.addAllAnyway {}
     runCurrent()
@@ -495,7 +512,7 @@ class IntakeStateTest {
   fun submit_magnetWithItsFileList_doesNotAwaitFiles() = runTest {
     val api = IntakeTestApi(
       check = { url, _ -> torrent(url) },
-      features = setOf(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION),
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
     )
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
     val session = session(api, IntakeRequest(magnet))

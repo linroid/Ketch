@@ -19,7 +19,10 @@ class SelectionUpdate(
 /**
  * What [DownloadSource.planSelection] validates and sizes.
  *
- * @property fileIds files to choose, never empty; `null` chooses every file
+ * @property fileIds files to choose, never empty; `null` chooses every file. For a source whose
+ *   [ResolvedSource.selectionMode] is [com.linroid.ketch.api.FileSelectionMode.SINGLE], Ketch
+ *   passes exactly one ID, its [default][com.linroid.ketch.api.defaultSelection] in place of
+ *   `null`, and refuses several before planning
  * @property current the saved selection; empty for tasks that download every file
  * @property resumeState the task's saved [SourceResumeState], if any
  * @property resolved the task's [com.linroid.ketch.api.DownloadRequest.resolvedSource]: supplied
@@ -56,3 +59,6 @@ class SelectionPlan(
   val expands: Boolean,
   val segments: List<Segment>?,
 )
+
+/** Why a selection of several files is refused for a source offering a single choice. */
+internal const val SINGLE_CHOICE_MESSAGE: String = "Choose exactly one variant of this download"

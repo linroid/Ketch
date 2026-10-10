@@ -149,7 +149,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
   `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`, `KeepAwake`,
-  `SleepInhibitor`, `TorrentFilesModel`, `FileOrder`, `AiDiscoverController`, `DiscoverSession`,
+  `SleepInhibitor`, `FileSelectionModel`, `FileOrder`, `AiDiscoverController`, `DiscoverSession`,
   `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
   (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
@@ -241,16 +241,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `completed_at`, `4.sqm`; `null` for tasks completed before it was tracked). `seeding` is `true`
   while the source shares the finished content (a seeding torrent); it is not persisted
 - `DownloadState.Paused.reason` (`PauseReason`): `User`, `Preempted(byTaskId)`, `Shutdown`,
-  `AwaitingFileSelection` (a torrent that waits for `selectFiles`, wire
+  `AwaitingFileSelection` (a download that waits for `selectFiles`, wire
   `awaiting_file_selection`) or `WaitingForCondition` (defined, not produced yet); unknown wire
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
-  that a waiting torrent is derived from its record (`awaitFileSelection` with no selection)
+  that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
   `DOWNLOADING` records, so the next `start()` resumes them
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
-  plus the legacy `media.finite` when both are present, and the torrent source's
-  `torrent.fileSelection`, `torrent.awaitFileSelection` and `torrent.control`.
+  plus the legacy `media.finite` when both are present, `download.fileSelection` and
+  `download.awaitFileSelection` from sources that choose files (the torrent source), and the
+  torrent source's `torrent.control`.
   `DownloadSource.previousTypes` lets stored tasks with the old `media` type route to the
   matching protocol by URL
 - Retry with exponential backoff for transient errors
@@ -345,8 +346,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `ResolvedSource.files` lists selectable files within a source (e.g., torrent)
 - `FileSelectionMode.MULTIPLE` for subset selection (torrent)
 - `FileSelectionMode.SINGLE` for single-variant selection (reserved for HLS quality; no built-in
-  source uses it yet)
-- `DownloadRequest.selectedFileIds` specifies which files to download; empty downloads every file
+  source uses it yet): core supports it already. `selectFiles` takes exactly one ID (Ketch
+  refuses several before `planSelection`, and `download` refuses them against a `SINGLE`
+  `resolvedSource`), and the default, `ResolvedSource.defaultSelection()`, is the first of
+  `files` (every file for `MULTIPLE`). Tests: `SingleChoiceSelectionTest`
+- Sources that implement `planSelection` list `KetchFeatures.FILE_SELECTION`
+  (`download.fileSelection`) and, when their tasks can wait, `AWAIT_FILE_SELECTION`
+  (`download.awaitFileSelection`) in `DownloadSource.features`; clients gate on those, never on
+  the source type
+- `DownloadRequest.selectedFileIds` specifies which files to download; empty downloads the
+  source's default (every file, or the first variant)
 - `DownloadTask.selectFiles` changes the selection in every state but canceled (default throws
   `UnsupportedOperationException`; `RemoteDownloadTask` sends `PUT /api/tasks/{id}/files`). Ketch
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
@@ -358,10 +367,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   files reopens into the same folder, adopting its live seeding session, while one that only
   drops files changes its size, and its seeding session shares the smaller selection
   (`TorrentControlSource.changeSeedingSelection`). Re-selecting the current files does nothing
-- `DownloadRequest.awaitFileSelection`: a torrent added without a selection, as the apps' "Add
-  anyway" adds a magnet, parks as `Paused(AwaitingFileSelection)` once its files are known,
-  holding no queue slot, output path or segments; `selectFiles` starts it and `resume` downloads
-  every file. A `requestId` resubmission ignores the selection and the flag
+- `DownloadRequest.awaitFileSelection`: a download added without a selection, as the apps' "Add
+  anyway" adds a magnet, parks as `Paused(AwaitingFileSelection)` once it lists several files or
+  variants (either mode), holding no queue slot, output path or segments; `selectFiles` starts it
+  and `resume` downloads the default. A `requestId` resubmission ignores the selection and the
+  flag
 
 ### FTP/FTPS Support (`library:ftp`)
 - FTP and FTPS (FTP over TLS) as a pluggable `DownloadSource`
@@ -656,13 +666,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
   waits ("next in line", "2 ahead") and when a finished one finished (Finished column and sort,
-  Smart "Finished today" groups). A torrent waiting for its files says "Choose files to
-  download" (Choose files…, Download all files) and a seeding one "Seeding" (Stop seeding; Seed
+  Smart "Finished today" groups). A task waiting for its files says "Choose files to
+  download" (Choose files…, and Download all files unless its source offers a single choice) and a seeding one "Seeding" (Stop seeding; Seed
   is in the inspector only). Auto connections and queue positions only show for devices whose
   `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
-- Torrent files: the inspector's Files tab checks and unchecks files with an Apply bar
-  (`TorrentFilesModel`, at least one file stays checked) on devices listing
-  `torrent.fileSelection`, and starts a waiting torrent; the add sheet and the Files tab sort
+- Files: the inspector's Files tab lists the files or variants of any task whose resolved source
+  names some (torrents also page names from `KetchApi.torrents`) and, on devices listing
+  `download.fileSelection`, checks and unchecks them with an Apply bar (`FileSelectionModel`, at
+  least one file stays checked), or picks one with radio buttons (`KetchRadio`) for a
+  `FileSelectionMode.SINGLE` source, and starts a waiting task. "Add anyway" in the add sheet
+  sets `awaitFileSelection` for a link whose files are not known yet on devices listing
+  `download.awaitFileSelection`; the add sheet and the Files tab sort
   with one `FileOrder` (Name in natural order, Size, Kind by `FileKind`, Selected first, Torrent
   order, and Progress in the inspector), reversible and saved per surface in `[ui] sort`
   (`torrentFiles.intake`, `torrentFiles.inspector`). The server's `extension` order is the plain

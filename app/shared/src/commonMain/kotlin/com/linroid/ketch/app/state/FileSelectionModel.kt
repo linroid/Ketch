@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -16,30 +17,33 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 
 /**
- * The files of one torrent task as the inspector's Files tab lists and changes them.
+ * The files or variants of one task as the inspector's Files tab lists and changes them, for any
+ * source that offers a choice ([DownloadRequest.selectionMode]).
  *
- * Names come from the task's [DownloadRequest.resolvedSource]. A task without them, such as one
- * an older version saved, has them read from its device's [controller] with [load], at most
- * [MAX_PAGES] pages of [PAGE_SIZE]; files past those stay unnamed.
+ * Names come from the task's [DownloadRequest.resolvedSource]. A torrent without them, such as
+ * one an older version saved, has them read from its device's torrent [controller] with [load],
+ * at most [MAX_PAGES] pages of [PAGE_SIZE]; files past those stay unnamed. Other tasks pass no
+ * controller.
  *
- * Checking and unchecking files builds [pending] over the files the task downloads (see
- * [appliedSelection]); the last checked file cannot be unchecked ([keepOne]). [apply] saves the
- * choice with [DownloadTask.selectFiles], which also starts a task that waits for its files. A
- * failure goes back to the files the task downloads and is passed to [onFailure].
+ * Checking and unchecking files ([toggle]), or choosing one variant of a single choice
+ * ([choose]), builds [pending] over the files the task downloads (see [appliedSelection]); the
+ * last checked file cannot be unchecked ([keepOne]). [apply] saves the choice with
+ * [DownloadTask.selectFiles], which also starts a task that waits for its files. A failure goes
+ * back to the files the task downloads and is passed to [onFailure].
  *
  * @param launch runs [apply]'s call, in a scope that outlives the tab, such as
  *   [AppState.launchCommand].
  */
 @Stable
-internal class TorrentFilesModel(
+internal class FileSelectionModel(
   private val task: DownloadTask,
   private val controller: TorrentController?,
   private val launch: (suspend CoroutineScope.() -> Unit) -> Job,
   private val onFailure: (Throwable) -> Unit = {},
 ) {
-  private val log = KetchLogger("TorrentFiles")
+  private val log = KetchLogger("FileSelection")
 
-  /** The files [load] read from [controller], in torrent order; `null` until then. */
+  /** The files [load] read from [controller], in the torrent's order; `null` until then. */
   var listed: List<SourceFile>? by mutableStateOf(null)
     private set
 
@@ -55,7 +59,7 @@ internal class TorrentFilesModel(
   var keepOne: Boolean by mutableStateOf(false)
     private set
 
-  /** The files of [request]'s torrent: its resolved list, else the one [load] read. */
+  /** The files of [request]: its resolved list, else the one [load] read. */
   fun filesOf(request: DownloadRequest): List<SourceFile>? =
     request.resolvedSource?.files?.takeIf { it.isNotEmpty() } ?: listed
 
@@ -113,6 +117,12 @@ internal class TorrentFilesModel(
     pending = next.takeIf { it != applied }
   }
 
+  /** Chooses [fileId] as the one variant of a single choice, in place of [applied]. */
+  fun choose(fileId: String, applied: Set<String>) {
+    keepOne = false
+    pending = setOf(fileId).takeIf { it != applied }
+  }
+
   /** Goes back to the files the task downloads. */
   fun reset() {
     pending = null
@@ -155,14 +165,23 @@ internal class TorrentFilesModel(
 
 /**
  * The files of [all] that a task downloading [request] while in [state] downloads, and so shows
- * checked: its selection, or every file when it chose none or [waits][awaitsFileSelection] for a
- * choice, which starts from every file.
+ * checked: its selection, or its source's default when it chose none or
+ * [waits][awaitsFileSelection] for a choice, which starts from that default: every file, or the
+ * first variant of a single choice.
  */
 internal fun appliedSelection(
   request: DownloadRequest,
   state: DownloadState,
   all: List<SourceFile>,
 ): Set<String> = when {
-  state.awaitsFileSelection || request.selectedFileIds.isEmpty() -> all.mapTo(HashSet()) { it.id }
-  else -> request.selectedFileIds
+  !state.awaitsFileSelection && request.selectedFileIds.isNotEmpty() -> request.selectedFileIds
+  request.selectionMode == FileSelectionMode.SINGLE -> all.take(1).mapTo(HashSet()) { it.id }
+  else -> all.mapTo(HashSet()) { it.id }
 }
+
+/**
+ * How the files of this request are chosen: as its [DownloadRequest.resolvedSource] says, any of
+ * them when it does not say.
+ */
+internal val DownloadRequest.selectionMode: FileSelectionMode
+  get() = resolvedSource?.selectionMode ?: FileSelectionMode.MULTIPLE

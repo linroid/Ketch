@@ -70,11 +70,12 @@ import kotlinx.serialization.Serializable
  *   metadata/conditions are not compared; a repeated submission leaves the existing task's
  *   current settings unchanged.
  * @property awaitFileSelection when `true` and [selectedFileIds] is empty, a download with several
- *   files (a torrent) stops once its file list is known and waits, paused for
- *   [PauseReason.AwaitingFileSelection] and holding no download slot, until
- *   [DownloadTask.selectFiles] chooses files; [DownloadTask.resume] downloads every file. Ignored
- *   when files are selected or the content has one file. Servers that do not list
- *   [KetchFeatures.TORRENT_AWAIT_FILE_SELECTION] ignore it.
+ *   files or variants ([ResolvedSource.files], such as a torrent's files) stops once they are
+ *   known and waits, paused for [PauseReason.AwaitingFileSelection] and holding no download slot,
+ *   until [DownloadTask.selectFiles] chooses; [DownloadTask.resume] downloads the source's
+ *   [default][ResolvedSource.defaultSelection] (every file, or the first variant of a single
+ *   choice). Ignored when files are selected or the content has one file. Servers that do not
+ *   list [KetchFeatures.AWAIT_FILE_SELECTION] ignore it.
  */
 @Serializable
 data class DownloadRequest(

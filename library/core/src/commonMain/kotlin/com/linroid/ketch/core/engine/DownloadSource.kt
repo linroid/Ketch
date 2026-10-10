@@ -119,10 +119,18 @@ interface DownloadSource {
    * Validates [request] against this source's own metadata and sizes it, with no side effects
    * beyond checking which files exist. Sources that implement it must follow
    * [DownloadContext.selection] while a download runs and confirm each revision they apply with
-   * [DownloadContext.acknowledgeSelection]. The default refuses: the source has no files to
-   * choose.
+   * [DownloadContext.acknowledgeSelection]. A source that resolves with
+   * [com.linroid.ketch.api.FileSelectionMode.SINGLE] gets exactly one ID: Ketch refuses several
+   * before asking, and chooses the first of its [ResolvedSource.files] in place of every file. The
+   * default refuses: the source has no files to choose.
    *
-   * @throws IllegalArgumentException for unknown file IDs or an empty selection
+   * Sources that implement it list [com.linroid.ketch.api.KetchFeatures.FILE_SELECTION] in
+   * [features], and [com.linroid.ketch.api.KetchFeatures.AWAIT_FILE_SELECTION] when their tasks
+   * can wait for a choice ([com.linroid.ketch.api.DownloadRequest.awaitFileSelection]); with
+   * [resolveStored] such a task starts from what it saved instead of resolving again.
+   *
+   * @throws IllegalArgumentException for unknown file IDs, an empty selection, or several IDs
+   *   for a single choice
    * @throws IllegalStateException when the file list is not known yet, or a file the task does
    *   not own is where a newly chosen file would be saved
    */

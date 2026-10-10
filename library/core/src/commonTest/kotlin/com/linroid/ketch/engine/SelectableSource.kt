@@ -23,10 +23,12 @@ import kotlinx.coroutines.launch
 /**
  * A source with several files of [sizes] (IDs "0", "1", …) that writes its own files and follows
  * selections live, like a torrent. Each download or resume is a [Run] that lasts until the test
- * completes its [Run.finish].
+ * completes its [Run.finish]. With [FileSelectionMode.SINGLE] the files are variants, one of
+ * which downloads, "0" when none is chosen.
  */
 internal class SelectableSource(
   private val sizes: List<Long> = listOf(100, 200, 300),
+  private val mode: FileSelectionMode = FileSelectionMode.MULTIPLE,
 ) : DownloadSource {
   override val type = TYPE
   override val managesOwnFileIo = true
@@ -53,6 +55,12 @@ internal class SelectableSource(
 
   val ids: Set<String> = sizes.indices.mapTo(linkedSetOf()) { it.toString() }
 
+  /** The files a task with no selection downloads. */
+  private val defaults: Set<String> = if (mode == FileSelectionMode.SINGLE) setOf("0") else ids
+
+  /** The [SelectionRequest.fileIds] of every [planSelection] call, in order. */
+  val planned = mutableListOf<Set<String>?>()
+
   class Run(val context: DownloadContext, val resumed: Boolean, val initial: SelectionUpdate) {
     val finish = CompletableDeferred<Unit>()
     val applied = mutableListOf<SelectionUpdate>()
@@ -64,7 +72,7 @@ internal class SelectableSource(
       supportsResume = true, suggestedFileName = "pick", maxSegments = sizes.size,
       metadata = mapOf(ResolvedSource.METAINFO_KEY to "metainfo", MARKER to marker),
       files = sizes.indices.map { SourceFile(it.toString(), "file$it", fileSize(it)) },
-      selectionMode = FileSelectionMode.MULTIPLE,
+      selectionMode = mode,
     )
 
   override fun canHandle(url: String) = url.startsWith("pick:")
@@ -93,9 +101,11 @@ internal class SelectableSource(
   override suspend fun planSelection(request: SelectionRequest): SelectionPlan {
     val known = request.resumeState?.data?.startsWith(STORED) == true || request.resolved != null
     check(known) { "The file list is not known yet" }
+    planned += request.fileIds
     val chosen = request.fileIds ?: ids
     require(chosen.isNotEmpty() && chosen.all { it in ids }) { "Unknown file id" }
-    val effective = request.current.ifEmpty { ids }
+    if (mode == FileSelectionMode.SINGLE) check(chosen.size == 1) { "Several variants planned" }
+    val effective = request.current.ifEmpty { defaults }
     val old = request.segments.orEmpty().associateBy { it.index }
     return SelectionPlan(
       fileIds = chosen,
@@ -144,7 +154,7 @@ internal class SelectableSource(
   }
 
   private suspend fun publish(context: DownloadContext, fileIds: Set<String>) {
-    val chosen = fileIds.ifEmpty { ids }
+    val chosen = fileIds.ifEmpty { defaults }
     context.segments.value = layout(chosen) { 0 }
     context.onProgress(0, totalOf(chosen))
   }

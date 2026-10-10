@@ -28,7 +28,7 @@ enum class InspectorTab(private val resource: StringResource) {
   /** Each connection of an HTTP or FTP download; see [ConnectionsTab]. */
   Connections(Res.string.inspector_tab_connections),
 
-  /** Each file of a torrent; see [FilesTab]. */
+  /** Each file or variant of a task with several, such as a torrent; see [FilesTab]. */
   Files(Res.string.inspector_tab_files),
 
   /** Speed over the last five minutes and the session's events; see [ActivityTab]. */
@@ -40,10 +40,11 @@ enum class InspectorTab(private val resource: StringResource) {
 
 /**
  * The tabs the inspector offers for [row], in order, leaving out any with nothing to show:
- * Overview; Connections while an HTTP or FTP task has unfinished segments, or Files once a
- * torrent's files are known, or while it waits for them to be chosen on a device that lists
- * them ([KetchFeatures.TORRENT_CONTROL] among its [features]); and Activity once the task has a
- * speed [history] or a [timeline].
+ * Overview; for a torrent, Files once its files are known, or while it waits for them to be
+ * chosen on a device that lists them ([KetchFeatures.TORRENT_CONTROL] among its [features]);
+ * for other tasks, Connections while an HTTP or FTP task has unfinished segments, and Files when
+ * the source lists files or variants; and Activity once the task has a speed [history] or a
+ * [timeline].
  */
 fun inspectorTabs(
   row: TaskRow,
@@ -54,23 +55,24 @@ fun inspectorTabs(
   add(InspectorTab.Overview)
   if (row.isTorrent) {
     val listsFiles = row.state.awaitsFileSelection && KetchFeatures.TORRENT_CONTROL in features
-    if (torrentFileCount(row, filesSelectable(row, features)) > 0 || listsFiles) {
+    if (taskFileCount(row, filesSelectable(row, features)) > 0 || listsFiles) {
       add(InspectorTab.Files)
     }
-  } else if (connectionsCount(row) > 0) {
-    add(InspectorTab.Connections)
+  } else {
+    if (connectionsCount(row) > 0) add(InspectorTab.Connections)
+    if (taskFileCount(row, filesSelectable(row, features)) > 0) add(InspectorTab.Files)
   }
   if (history != null || timeline.isNotEmpty()) add(InspectorTab.Activity)
 }
 
 /**
  * The number after the tab's [InspectorTab.title] for [row] on a device that reports
- * [features], such as 8 in "Connections 8": the connections still downloading, or the torrent's
+ * [features], such as 8 in "Connections 8": the connections still downloading, or the task's
  * files; `null` for the other tabs and while there are none.
  */
 fun InspectorTab.count(row: TaskRow, features: Set<String> = emptySet()): Int? = when (this) {
   InspectorTab.Connections -> connectionsCount(row)
-  InspectorTab.Files -> torrentFileCount(row, filesSelectable(row, features)).takeIf { it > 0 }
+  InspectorTab.Files -> taskFileCount(row, filesSelectable(row, features)).takeIf { it > 0 }
   InspectorTab.Overview, InspectorTab.Activity -> null
 }
 

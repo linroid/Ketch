@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
@@ -21,6 +22,7 @@ import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.defaultSelection
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
@@ -38,6 +40,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RequestHeaders
+import com.linroid.ketch.core.engine.SINGLE_CHOICE_MESSAGE
 import com.linroid.ketch.core.engine.SeedingOutcome
 import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SelectionDelivery
@@ -210,11 +213,16 @@ class Ketch(
    * downloads has been reached.
    *
    * @throws IllegalArgumentException if a header in [DownloadRequest.headers] cannot be sent
-   *   (see [RequestHeaders.requireValid])
+   *   (see [RequestHeaders.requireValid]), or the request selects several variants of a
+   *   [DownloadRequest.resolvedSource] offering a single choice
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
     requireProxySupport(request.proxy)
+    require(
+      request.resolvedSource?.selectionMode != FileSelectionMode.SINGLE ||
+        request.selectedFileIds.size <= 1
+    ) { SINGLE_CHOICE_MESSAGE }
     if (request.requestId == null) return createDownload(request)
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
@@ -470,7 +478,7 @@ class Ketch(
         if (destination != null) {
           log.d { "Ignoring the destination of taskId=${handle.taskId}, which waits for files" }
         }
-        log.i { "Resuming taskId=${handle.taskId} with every file" }
+        log.i { "Resuming taskId=${handle.taskId} with its default files" }
         selectFiles(handle, fileIds = null)
         return
       }
@@ -657,7 +665,7 @@ class Ketch(
     val plan = source.planSelection(
       SelectionRequest(
         taskId = taskId,
-        fileIds = fileIds,
+        fileIds = choiceFor(source, record, fileIds),
         current = record.request.selectedFileIds,
         resumeState = record.sourceResumeState,
         resolved = record.request.resolvedSource,
@@ -813,6 +821,36 @@ class Ketch(
       seeding = seeding,
       recordedAtMs = Clock.System.now().toEpochMilliseconds(),
     )
+  }
+
+  /**
+   * The files to plan for [record]: [fileIds] as given, unless its source offers a single choice
+   * ([FileSelectionMode.SINGLE]), which takes exactly one ID and its
+   * [default][defaultSelection], the first variant, in place of every file (`null`). The mode
+   * comes from the request's [ResolvedSource], else the one its saved state rebuilds; unknown,
+   * the source decides.
+   *
+   * @throws IllegalArgumentException when several IDs are given for a single choice
+   */
+  private suspend fun choiceFor(
+    source: DownloadSource,
+    record: TaskRecord,
+    fileIds: Set<String>?,
+  ): Set<String>? {
+    val resolved = record.request.resolvedSource ?: record.sourceResumeState?.let { state ->
+      try {
+        source.resolveStored(state)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.d { "No saved file list for taskId=${record.taskId}: ${e.describeCauses()}" }
+        null
+      }
+    }
+    if (resolved?.selectionMode != FileSelectionMode.SINGLE) return fileIds
+    if (fileIds == null) return resolved.defaultSelection().ifEmpty { null }
+    require(fileIds.size == 1) { SINGLE_CHOICE_MESSAGE }
+    return fileIds
   }
 
   /** The source that plans [record]'s selection: its own, else its request's, else its URL's. */

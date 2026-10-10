@@ -2,6 +2,7 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.util.toCopy
@@ -237,10 +238,15 @@ fun taskActions(
       val primary = if (stalled) RowAction.Reconnect else RowAction.Pause
       waitingOrRunning(primary, listOf(primary, RowAction.Pause).distinct(), capabilities)
     }
-    // Resuming downloads every file, which the menu says as such.
+    // Resuming downloads every file, which the menu says as such; a single choice of variants
+    // offers only the choice, as resuming would download the first one.
     is DownloadState.Paused if state.awaitsFileSelection -> waitingOrRunning(
       RowAction.ChooseFiles,
-      listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles),
+      if (request.selectionMode == FileSelectionMode.SINGLE) {
+        listOf(RowAction.ChooseFiles)
+      } else {
+        listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles)
+      },
       capabilities
     )
     // Paused for an urgent download, it still waits in the queue: Resume would do nothing.

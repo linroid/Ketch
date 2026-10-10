@@ -26,7 +26,8 @@ import kotlinx.serialization.Serializable
  *   the UI should present a file selector before downloading.
  * @property selectionMode how the user selects from [files]:
  *   [FileSelectionMode.MULTIPLE] for subset selection (torrent),
- *   [FileSelectionMode.SINGLE] for single-variant selection (HLS).
+ *   [FileSelectionMode.SINGLE] for one variant (reserved for HLS quality). A source offering a
+ *   single choice lists its default variant first: see [defaultSelection].
  * @property contentType media type of the content as the source reports it, such as an HTTP
  *   `Content-Type` of `video/mp4`, or `null` when unknown. [DownloadCategory.mimeTypes] match it.
  */
@@ -65,4 +66,14 @@ fun ResolvedSource.withoutBulkMetadata(): ResolvedSource {
     key != ResolvedSource.METAINFO_KEY && value.length <= ResolvedSource.MAX_VIEW_METADATA_CHARS
   }
   return if (kept.size == metadata.size) this else copy(metadata = kept)
+}
+
+/**
+ * The files this source downloads when none are chosen, as [DownloadTask.resume] of a task
+ * waiting for a file selection picks them: every file for [FileSelectionMode.MULTIPLE], the
+ * first of [ResolvedSource.files] for [FileSelectionMode.SINGLE]. Empty without files.
+ */
+fun ResolvedSource.defaultSelection(): Set<String> = when (selectionMode) {
+  FileSelectionMode.MULTIPLE -> files.mapTo(LinkedHashSet()) { it.id }
+  FileSelectionMode.SINGLE -> files.firstOrNull()?.let { setOf(it.id) }.orEmpty()
 }
