@@ -775,6 +775,12 @@ maxConnectionsPerHost = 16
 # Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), for port
 # forwarding; 0 picks a free one at every launch. The apps always pick one.
 # listenPort = 6881
+# Share verified pieces with peers: "off" (default), "while-downloading", or
+# "seed" to keep sharing finished torrents while Ketch runs. Peers you upload
+# to see this device's IP address. The apps edit this under Settings >
+# BitTorrent.
+# upload = "off"
+# uploadLimit = "unlimited"  # "unlimited", "1m" (MB/s), "500k" (KB/s)
 
 # Pre-configured remote servers.
 # [[remotes]]
@@ -863,6 +869,8 @@ server, like the other download settings changed there, they last until it resta
 | `trackerList` | bool | `true` | Subscribe to the tracker lists at `trackerListUrls`, downloaded daily; their trackers are used after `trackers` |
 | `trackerListUrls` | string[] | ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's [`best.txt`](https://github.com/XIU2/TrackersListCollection) | `http` or `https` URLs of plain-text lists, one announce URL per line |
 | `listenPort` | int | `0` | Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), 0-65535; `0` picks a free one at every start. The apps and the other commands always pick one, so they never contend for it |
+| `upload` | string | `"off"` | What torrents upload to peers: `off`, `while-downloading` (verified pieces, until each torrent finishes) or `seed` (finished torrents too). `ketch server` and `ketch mcp --standalone` seed while they run; the download command exits when its downloads finish. Unknown values, and values that are not strings, load as `off` |
+| `uploadLimit` | string | `"unlimited"` | Upload cap shared by all torrents, in the [speed limit format](#speed-limit-format); a bare number is bytes per second, and a value that can't be read loads as unlimited |
 
 The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps
 also keep `[[remotes]]`, `[appearance]` and `server.autoStart` in this file; the CLI ignores them.

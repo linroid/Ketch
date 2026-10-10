@@ -14,6 +14,27 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import okio.ByteString
+
+/** How a v2 session met a peer. */
+internal sealed interface PeerV2Origin {
+  /** We dialed [endpoint], which is also where the peer listens. */
+  data class Outgoing(val endpoint: PeerEndpoint) : PeerV2Origin
+
+  /** The peer dialed us from [remote], an ephemeral source port that is never dialed back. */
+  data class Incoming(val remote: PeerEndpoint) : PeerV2Origin
+}
+
+/** Who a negotiated peer is; fixed for the life of its connection. */
+internal class PeerInfo(
+  val peerId: ByteString,
+  val mode: PeerIdentityHandshake.Mode,
+  val origin: PeerV2Origin,
+  /** Both sides set the BEP 10 bit. */
+  val extensions: Boolean,
+  /** The socket the handshake ran on; later transports and encryption describe themselves. */
+  val link: TorrentConnection,
+)
 
 /** The session owns membership; peer children forward ordered events into one bounded queue. */
 internal class PeerV2Pool private constructor(
@@ -27,6 +48,8 @@ internal class PeerV2Pool private constructor(
     internal val transport: PeerHashTransport,
     internal val admission: TorrentBufferBudget.Lease? = null,
     internal val slot: TorrentBufferBudget.Lease? = null,
+    /** Null only for peers attached without a negotiated identity (pipeline tests). */
+    val info: PeerInfo? = null,
   ) {
     internal val stop = CompletableDeferred<Unit>()
     internal val terminal = CompletableDeferred<Event.Closed>()
@@ -63,6 +86,7 @@ internal class PeerV2Pool private constructor(
     transport: PeerHashTransport,
     blocks: PeerBlockExchange,
     admission: TorrentBufferBudget.Lease? = null,
+    info: PeerInfo? = null,
   ): Peer? {
     check(!closed)
     require(members.keys.none { it.blocks === blocks || it.transport === transport }) {
@@ -71,7 +95,7 @@ internal class PeerV2Pool private constructor(
     if (members.size == maxPeers) return null
     // Charge the forwarded-event slot per attached peer, not for every possible peer up front.
     val slot = state.reserve(PEER_SLOT_BYTES) ?: return null
-    val peer = Peer(blocks, transport, admission, slot)
+    val peer = Peer(blocks, transport, admission, slot, info)
     val job = scope.launch(start = CoroutineStart.LAZY) {
       var cause = coroutineScope {
         val outcome = CompletableDeferred<Throwable?>()

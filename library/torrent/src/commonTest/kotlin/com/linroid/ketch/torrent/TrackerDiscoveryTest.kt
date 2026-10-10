@@ -22,7 +22,7 @@ class TrackerDiscoveryTest {
       requests += request
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata, ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(metadata, ByteArray(20), { 6881 }, tiers, nowMs = { now })
     val verified = booleanArrayOf(true, false)
     assertNotNull(discovery.poll(verified, 20, 0))
     assertEquals(TrackerEvent.STARTED, requests.last().event)
@@ -47,7 +47,7 @@ class TrackerDiscoveryTest {
     }
     var drops = 0
     var now = 0L
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { drops++ }, nowMs = { now })
     discovery.poll(booleanArrayOf(false, false), 0, 0)
     assertEquals(0, drops)
@@ -67,7 +67,8 @@ class TrackerDiscoveryTest {
       requests += request
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(document, layout, ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(document, layout, ByteArray(20), { 6881 }, tiers,
+      nowMs = { now })
     discovery.poll(booleanArrayOf(true, false), 1000, 0)
     assertEquals(document.info.hash, assertIs<TrackerTopic.V2>(requests.last().topic).hash)
     assertEquals(5L, requests.last().left)
@@ -92,7 +93,7 @@ class TrackerDiscoveryTest {
       TrackerResponse(emptyList(), 60)
     }
     val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
-      ByteArray(20), 6881, tiers)
+      ByteArray(20), { 6881 }, tiers)
     assertNull(discovery.poll(booleanArrayOf(true, true), 0, 0, stopped = true))
     discovery.poll(booleanArrayOf(true, true), 0, 0)
     assertEquals(TrackerEvent.STARTED, requests.single().event)
@@ -110,7 +111,7 @@ class TrackerDiscoveryTest {
       TrackerResponse(listOf(PeerEndpoint("127.0.0.1", 1)), 1)
     }
     val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
-      ByteArray(20), 6881, tiers, onPrivateTrackerChanged = { drops++ }, nowMs = { now })
+      ByteArray(20), { 6881 }, tiers, onPrivateTrackerChanged = { drops++ }, nowMs = { now })
     discovery.poll(booleanArrayOf(false, false), 0, 0)
     online = false
     now = 1000
@@ -128,10 +129,10 @@ class TrackerDiscoveryTest {
     }
     assertFailsWith<IllegalArgumentException> {
       TrackerDiscovery(document, TorrentContentLayout.from(v2Document("other").info),
-        ByteArray(20), 6881, tiers)
+        ByteArray(20), { 6881 }, tiers)
     }
     val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
-      ByteArray(20), 6881, tiers)
+      ByteArray(20), { 6881 }, tiers)
     assertFailsWith<IllegalArgumentException> { discovery.poll(booleanArrayOf(false), 0, 0) }
     assertEquals(0, calls)
   }
@@ -147,7 +148,7 @@ class TrackerDiscoveryTest {
       }
       val document = v2Document()
       val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
-        ByteArray(20), 6881, tiers, nowMs = { now })
+        ByteArray(20), { 6881 }, tiers, nowMs = { now })
       val bits = booleanArrayOf(false, false)
       discovery.poll(bits, 0, 0)
       now = maxOf(60L, minimum) * 1000 - 1
@@ -171,7 +172,7 @@ class TrackerDiscoveryTest {
       calls++
       TrackerResponse(emptyList(), 1, minimumIntervalSeconds = 1)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     discovery.poll(bits, 0, 0)
     now = 1000
@@ -188,7 +189,7 @@ class TrackerDiscoveryTest {
       calls++
       TrackerResponse(emptyList(), 600)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     discovery.poll(bits, 0, 0)
     now = 599_999
@@ -208,7 +209,7 @@ class TrackerDiscoveryTest {
       if (failing) error("Offline")
       TrackerResponse(emptyList(), 1)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     for (delay in listOf(15, 30, 60, 120, 240, 480, 900, 900)) {
       assertFailsWith<IllegalStateException> { discovery.poll(bits, 0, 0, manual = true) }
@@ -241,7 +242,7 @@ class TrackerDiscoveryTest {
       events += request.event
       TrackerResponse(emptyList(), 3600, minimumIntervalSeconds = 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { now })
     discovery.poll(booleanArrayOf(false, false), 0, 0)
     discovery.poll(booleanArrayOf(true, true), 7, 0)
     assertEquals(listOf(TrackerEvent.STARTED, TrackerEvent.COMPLETED), events)
@@ -262,7 +263,7 @@ class TrackerDiscoveryTest {
       if (calls++ == 0) throw CancellationException("Canceled announce")
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { 0 })
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { 0 })
     val bits = booleanArrayOf(false, false)
     assertFailsWith<CancellationException> { discovery.poll(bits, 0, 0) }
     discovery.poll(bits, 0, 0)
@@ -284,7 +285,7 @@ class TrackerDiscoveryTest {
     }
     val document = v2Document()
     val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
-      ByteArray(20), 6881, tiers, onPrivateTrackerChanged = {
+      ByteArray(20), { 6881 }, tiers, onPrivateTrackerChanged = {
         closing.complete(Unit)
         closed.await()
       }, nowMs = { now })
@@ -311,7 +312,7 @@ class TrackerDiscoveryTest {
       if (url == "b") replacementCalls++
       TrackerResponse(emptyList(), 1)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { error("Cleanup failed") }, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     discovery.poll(bits, 0, 0)
@@ -331,7 +332,7 @@ class TrackerDiscoveryTest {
       if ((url == "a" && !firstOnline) || url == "b") error("Offline")
       TrackerResponse(emptyList(), 1)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { cleanups++ }, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     discovery.poll(bits, 0, 0)
@@ -342,6 +343,63 @@ class TrackerDiscoveryTest {
     now = 2000
     assertEquals("c", discovery.poll(bits, 0, 0)?.source)
     assertEquals(1, cleanups)
+  }
+
+  @Test
+  fun hybridV1TopicAnnouncesTheV1HashWithoutPaddingInLeft() = runTest {
+    // Pieces of 32 KiB: a holds 40000 bytes and 25536 bytes of padding, then b holds 5.
+    val hybrid = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)
+    val v1 = TrackerTopic.V1(checkNotNull(hybrid.document.identity.v1))
+    val requests = mutableListOf<TrackerAnnounce>()
+    val discovery = TrackerDiscovery(hybrid.document, hybrid.layout, ByteArray(20), { 6881 },
+      TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+        requests += request
+        TrackerResponse(emptyList(), 60)
+      }, topic = v1)
+    assertEquals(v1, discovery.topic)
+    discovery.poll(booleanArrayOf(true, false, false), 0, 0)
+    assertEquals(v1, requests.single().topic)
+    // Left counts the files' bytes still missing, never the padding the v1 swarm hashes.
+    assertEquals(7_232L + 5, requests.single().left)
+    // A topic of another torrent is refused before anything is announced.
+    assertFailsWith<IllegalArgumentException> {
+      TrackerDiscovery(hybrid.document, hybrid.layout, ByteArray(20), { 6881 },
+        TrackerTiers(listOf(listOf("a"))) { _, _, _ -> error("Unused") },
+        topic = TrackerTopic.V1(InfoHash.fromBytes(ByteArray(20))))
+    }
+  }
+
+  @Test
+  fun pollReadsTheAdvertisedPortAtEachAnnounce() = runTest {
+    val port = TorrentAdvertisedPort()
+    port.setListen(6881)
+    var now = 0L
+    val requests = mutableListOf<TrackerAnnounce>()
+    // Tiers bind to the topic they first announce, so each discovery gets its own.
+    fun tiers() = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+      requests += request
+      TrackerResponse(emptyList(), 60)
+    }
+    val document = v2Document()
+    for (discovery in listOf(
+      TrackerDiscovery(metadata(), ByteArray(20), port::current, tiers(), nowMs = { now }),
+      TrackerDiscovery(document, TorrentContentLayout.from(document.info), ByteArray(20),
+        port::current, tiers(), nowMs = { now }),
+    )) {
+      requests.clear()
+      now = 0
+      port.setListen(6881)
+      val bits = booleanArrayOf(false, false)
+      discovery.poll(bits, 0, 0)
+      // The listener moved after the session started: later announces use the new port.
+      port.setListen(51413)
+      now = 60_000
+      discovery.poll(bits, 0, 0)
+      discovery.poll(bits, 0, 0, stopped = true)
+      assertEquals(listOf(6881, 51413, 51413), requests.map { it.port })
+      assertEquals(listOf(TrackerEvent.STARTED, TrackerEvent.NONE, TrackerEvent.STOPPED),
+        requests.map { it.event })
+    }
   }
 
   private fun v2Document(name: String = "test"): TorrentV2Document =

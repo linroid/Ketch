@@ -53,8 +53,11 @@ internal fun trackerControlStateWeight(trackers: Int = 256): Long {
 internal class TorrentAdmissionLedger(private val budget: TorrentBufferBudget) {
   private val entries = AtomicReference<List<TorrentBufferBudget.Lease>?>(emptyList())
 
-  fun admit(spec: TorrentTaskSpec, config: TorrentConfig): TorrentBufferBudget.Lease {
-    val lease = admitSession(spec, config, budget)
+  fun admit(spec: TorrentTaskSpec, config: TorrentConfig): TorrentBufferBudget.Lease =
+    adopt(admitSession(spec, config, budget))
+
+  /** Tracks a lease admitted elsewhere, such as a v2 owner's, so [close] returns it too. */
+  fun adopt(lease: TorrentBufferBudget.Lease): TorrentBufferBudget.Lease {
     while (true) {
       val current = entries.load()
       if (current == null) {

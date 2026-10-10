@@ -8,6 +8,8 @@ internal class TorrentContentLayout private constructor(
   val payloadBytes: Long,
   val files: List<File>,
   private val spans: List<Span>,
+  /** A pure v2 torrent, whose last file other clients pad to a whole piece as they do the rest. */
+  private val paddedTail: Boolean,
 ) {
   data class File(val id: String, val v2Index: Int, val offset: Long, val length: Long)
   /** A null file id denotes virtual zeros; those bytes are never an output file. */
@@ -65,6 +67,18 @@ internal class TorrentContentLayout private constructor(
   /** V2 never requests alignment gaps; a short file tail is a short protocol piece. */
   fun v2Piece(index: Long): Extent = pieceExtents(index).single { it.fileId != null }
 
+  /**
+   * How far requests for piece [index] may reach. A hybrid's pieces are its v1 pieces, padding
+   * included, and only the last may be short. A pure v2 torrent's pieces are all whole: it has no
+   * v1 geometry, and libtorrent pads its last file to a piece too, asking for a whole block of
+   * the last piece however few bytes it holds. Bytes past the files are zeros.
+   */
+  fun protocolPieceLength(index: Long): Long {
+    require(index >= 0 && index < pieceCount)
+    if (paddedTail) return pieceLength
+    return minOf(pieceLength, protocolBytes - index * pieceLength)
+  }
+
   companion object {
     fun from(info: TorrentV2Info, hybrid: TorrentHybridLayout? = null): TorrentContentLayout {
       require(hybrid == null || hybrid.identity.v2 == info.hash) { "Hybrid identity mismatch" }
@@ -89,8 +103,7 @@ internal class TorrentContentLayout private constructor(
       require(total >= cursor)
       if (total > cursor) spans += Span(cursor, total, null)
       return TorrentContentLayout(info.hash, info.pieceLength, total, info.totalBytes,
-        files.toList(),
-        spans.toList())
+        files.toList(), spans.toList(), paddedTail = hybrid == null)
     }
   }
 }

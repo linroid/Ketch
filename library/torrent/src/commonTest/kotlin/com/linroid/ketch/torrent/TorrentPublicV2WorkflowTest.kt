@@ -375,8 +375,11 @@ class TorrentPublicV2WorkflowTest {
           val connection = listener.accept()
           launch {
             try {
+              // Like hybrid clients, this peer takes the upgrade a hybrid offers on its v1 tag:
+              // it only serves v2 pieces, never v1 ones with their padding.
               PeerIdentityHandshake(document.identity, extensions = true).respond(connection,
-                torrentRandomBytes(20).toByteString(), TorrentBufferBudget(65_536))
+                torrentRandomBytes(20).toByteString(), TorrentBufferBudget(65_536),
+                allowUpgrade = true)
               val wire = PeerWire(connection, pieceCount = blocks.size + 1)
               wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
                 "m" to mapOf("ut_metadata" to PeerExtensions.METADATA.toLong()),

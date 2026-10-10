@@ -9,6 +9,11 @@ import kotlinx.coroutines.withTimeout
  *
  * The Fast extension (BEP 6) is not negotiated, so a CHOKE silently discards every outstanding
  * request (BEP 3). The actor collects those with [takeDropped] and returns them to the scheduler.
+ *
+ * On a hybrid's v1 route ([mode] V1) the peer only knows v1 pieces, which run on through the
+ * zero padding after a file's tail. A request that ends a file tail inside such a piece goes on
+ * the wire as the canonical v1 block instead; the padding that comes back must be zero and is
+ * stripped, so the scheduler and the store only ever see bytes of the v2 extent.
  */
 internal class PeerBlockExchange(
   private val layout: TorrentContentLayout,
@@ -17,10 +22,14 @@ internal class PeerBlockExchange(
   private val maxPending: Int = 32,
   private val timeoutMs: Long = 30_000,
   private val clock: () -> Long = monotonicClock(),
+  private val mode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
 ) {
   class Ticket internal constructor(
+    /** The scheduler's block, within the piece's v2 extent. */
     val request: PeerMessage.Request,
     internal val owner: Any? = null,
+    /** The block on the wire: [request], or on a v1 route its canonical block with padding. */
+    internal val wire: PeerMessage.Request = request,
   )
   sealed interface Response {
     class Block internal constructor(
@@ -48,6 +57,7 @@ internal class PeerBlockExchange(
   private var protocol: PeerProtocolState? = PeerProtocolState(
     layout.pieceCount.toInt(), maxPending)
   private val state: PeerProtocolState get() = checkNotNull(protocol)
+  // Keyed by the wire block, which is what the peer's pieces, rejects and our cancels name.
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
   private val dropped = mutableListOf<Response.Rejected>()
   private val identity = Any()
@@ -111,15 +121,16 @@ internal class PeerBlockExchange(
     PeerWire.encodedSize(request, layout.pieceCount.toInt())
     val length = layout.v2Piece(request.index.toLong()).length
     require(request.begin.toLong() + request.length <= length) { "Block crosses v2 file tail" }
-    if (state.choking || !state.hasPiece(request.index) || request in pending ||
+    val wire = wire(request, length)
+    if (state.choking || !state.hasPiece(request.index) || wire in pending ||
       pending.size == maxPending) return null
-    val lease = budget.reserve(request.length * 2 + 256) ?: return null
+    val lease = budget.reserve(wire.length * 2 + 256) ?: return null
     try {
-      val value = Pending(Ticket(request, identity), clock(), lease)
+      val value = Pending(Ticket(request, identity, wire), clock(), lease)
       val sent = write(value) {
-        transport.trySend(request) {
-          state.requested(request)
-          pending[request] = value
+        transport.trySend(wire) {
+          state.requested(wire)
+          pending[wire] = value
         }
       }
       if (!sent) {
@@ -134,18 +145,31 @@ internal class PeerBlockExchange(
     }
   }
 
+  /**
+   * The block to put on the wire for [request], whose piece has a v2 extent of [extent] bytes.
+   * A v1 peer only knows canonical blocks, which run on through a file tail's padding to the end
+   * of the v1 piece; blocks wholly inside padding are never planned, so none is requested.
+   */
+  private fun wire(request: PeerMessage.Request, extent: Long): PeerMessage.Request {
+    if (mode != PeerIdentityHandshake.Mode.V1) return request
+    val protocol = layout.protocolPieceLength(request.index.toLong())
+    if (request.begin.toLong() + request.length != extent || extent >= protocol) return request
+    val length = minOf(PeerWire.BLOCK_SIZE.toLong(), protocol - request.begin).toInt()
+    return PeerMessage.Request(request.index, request.begin, length)
+  }
+
   /** False means stale ownership or no frame credit; retry a live ticket when credit returns. */
   suspend fun cancel(ticket: Ticket): Boolean {
     checkLive()
-    val value = pending[ticket.request] ?: return false
+    val value = pending[ticket.wire] ?: return false
     if (value.ticket !== ticket) return false
     if (value.canceled) return true
     try {
       return write(value) {
-        val request = ticket.request
-        transport.trySend(PeerMessage.Cancel(request.index, request.begin, request.length)) {
+        val wire = ticket.wire
+        transport.trySend(PeerMessage.Cancel(wire.index, wire.begin, wire.length)) {
           value.canceled = true
-          state.cancel(ticket.request)
+          state.cancel(wire)
         }
       }
     } catch (error: Throwable) {
@@ -195,7 +219,15 @@ internal class PeerBlockExchange(
         return null
       }
       if (message is PeerMessage.Piece && accepted) {
-        return Response.Block(value.ticket, message.bytes, value.lease)
+        val ticket = value.ticket
+        val length = ticket.request.length
+        if (ticket.wire.length == length) return Response.Block(ticket, message.bytes, value.lease)
+        // The canonical v1 block ran on through padding, which must be zero to match v1 hashes.
+        if ((length until message.bytes.size).any { message.bytes[it] != 0.toByte() }) {
+          value.lease.close()
+          throw IllegalArgumentException("Nonzero hybrid padding")
+        }
+        return Response.Block(ticket, message.bytes.copyOf(length), value.lease)
       }
       value.lease.close()
       return if (message is PeerMessage.Reject) Response.Rejected(value.ticket) else

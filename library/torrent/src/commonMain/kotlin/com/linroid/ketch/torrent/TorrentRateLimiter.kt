@@ -17,6 +17,8 @@ internal class TorrentRateLimiter(
   private val mutex = Mutex()
   private var tokens = MAX_BLOCK.toDouble()
   private var updated = nowMs()
+  // When bulk work admitted by [canCharge] may run again; see [charge].
+  private var bulkReadyAt = Long.MIN_VALUE
 
   init { require(bytesPerSecond >= 0) }
 
@@ -51,6 +53,55 @@ internal class TorrentRateLimiter(
         delay
       }
     }
+  }
+
+  /**
+   * Whether upload work larger than a block, such as a piece read back from disk to prove its
+   * block hashes, may start now: every limited bucket holds at least a block and has repaid the
+   * pacing of its last [charge]. Charges nothing; the work pays with [charge] once it is done,
+   * so work that never happens costs nothing. Lock order and [task] as in [requestDelay].
+   */
+  suspend fun canCharge(task: TorrentRateLimiter): Boolean {
+    require(task !== this)
+    return mutex.withLock {
+      task.mutex.withLock {
+        val globalRate = rate.load()
+        val taskRate = task.rate.load()
+        refill(globalRate)
+        task.refill(taskRate)
+        bulkReady(globalRate) && task.bulkReady(taskRate)
+      }
+    }
+  }
+
+  /**
+   * Charges [bytes] of work [canCharge] admitted to each limited bucket. The bucket owes at most
+   * one refill window of it, so the block requests of every peer and session sharing the bucket
+   * keep flowing; the rest paces bulk work instead: the next [canCharge] waits until the bucket
+   * would have repaid twice [bytes], which keeps bulk work to at most half of the limit however
+   * often a peer asks for it. Lock order and [task] as in [requestDelay].
+   */
+  suspend fun charge(bytes: Long, task: TorrentRateLimiter) {
+    require(bytes >= 0 && task !== this)
+    mutex.withLock {
+      task.mutex.withLock {
+        val globalRate = rate.load()
+        val taskRate = task.rate.load()
+        refill(globalRate)
+        task.refill(taskRate)
+        chargeBulk(bytes, globalRate)
+        task.chargeBulk(bytes, taskRate)
+      }
+    }
+  }
+
+  private fun bulkReady(currentRate: Long): Boolean =
+    currentRate == 0L || tokens >= MAX_BLOCK && updated >= bulkReadyAt
+
+  private fun chargeBulk(bytes: Long, currentRate: Long) {
+    if (currentRate == 0L) return
+    tokens -= minOf(bytes.toDouble(), capacity(currentRate))
+    bulkReadyAt = updated + ceil(2.0 * bytes * 1000 / currentRate).toLong()
   }
 
   private fun refill(currentRate: Long) {

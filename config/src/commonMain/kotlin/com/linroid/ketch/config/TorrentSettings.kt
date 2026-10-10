@@ -1,6 +1,77 @@
 package com.linroid.ketch.config
 
+import com.linroid.ketch.api.SpeedLimit
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
+/**
+ * What this device shares with the peers of its torrents.
+ *
+ * Saved as [id]. An id this version does not know, or a value that is not a string at all, loads
+ * as [Off] rather than failing the whole config file.
+ *
+ * @property id value stored in `config.toml`.
+ */
+@Serializable(with = TorrentUploadModeSerializer::class)
+enum class TorrentUploadMode(val id: String) {
+  /** Never uploads file data; peers cannot fetch a magnet's metadata from this device either. */
+  Off(id = "off"),
+
+  /** Uploads verified pieces while torrents download, and stops when each one finishes. */
+  WhileDownloading(id = "while-downloading"),
+
+  /**
+   * Keeps uploading finished torrents while Ketch runs, until they are removed or this is
+   * changed. A seeding torrent gives its place among the active torrents
+   * (`TorrentConfig.maxActiveTorrents`) to one waiting to download, and one that finishes while
+   * another waits does not seed.
+   */
+  Seed(id = "seed"),
+}
+
+internal object TorrentUploadModeSerializer : KSerializer<TorrentUploadMode> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("com.linroid.ketch.config.TorrentUploadMode", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: TorrentUploadMode) {
+    encoder.encodeString(value.id)
+  }
+
+  override fun deserialize(decoder: Decoder): TorrentUploadMode {
+    // A value of another type (`upload = false`) is as unknown as a misspelled id.
+    val id = try { decoder.decodeString() } catch (_: SerializationException) { null }
+    return TorrentUploadMode.entries.firstOrNull { it.id == id } ?: TorrentUploadMode.Off
+  }
+}
+
+/**
+ * Reads a speed limit as [SpeedLimit] does (`"unlimited"`, `"1m"`, `"500k"` or bytes), also
+ * bytes written as a bare number, but loads a value it cannot read, of any type, as unlimited
+ * rather than failing the whole config file.
+ */
+internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("com.linroid.ketch.config.LenientSpeedLimit", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: SpeedLimit) {
+    encoder.encodeString(value.toString())
+  }
+
+  override fun deserialize(decoder: Decoder): SpeedLimit {
+    val text = try { decoder.decodeString() } catch (_: SerializationException) {
+      // Not a string: the bytes form without quotes (`uploadLimit = 1048576`), or nothing usable.
+      val bytes = try { decoder.decodeLong() } catch (_: SerializationException) { 0L }
+      return if (bytes > 0) SpeedLimit.of(bytes) else SpeedLimit.Unlimited
+    }
+    return SpeedLimit.parse(text) ?: SpeedLimit.Unlimited
+  }
+}
 
 /**
  * BitTorrent settings for the local engine.
@@ -21,6 +92,9 @@ import kotlinx.serialization.Serializable
  *   and runs DHT on, UDP; `0` lets the system pick a free one at every launch.
  *   The apps and the CLI's other commands always let the system pick, so they
  *   never contend for the server's port.
+ * @property upload what this device uploads to peers: nothing by default. Peers it uploads to
+ *   see its IP address.
+ * @property uploadLimit cap on the upload speed of all torrents together; unlimited by default.
  */
 @Serializable
 data class TorrentSettings(
@@ -29,6 +103,9 @@ data class TorrentSettings(
   val trackerListUrls: List<String> = DEFAULT_TRACKER_LISTS,
   val trackerListUrl: String? = null,
   val listenPort: Int = 0,
+  val upload: TorrentUploadMode = TorrentUploadMode.Off,
+  @Serializable(with = LenientSpeedLimitSerializer::class)
+  val uploadLimit: SpeedLimit = SpeedLimit.Unlimited,
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }

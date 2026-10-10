@@ -342,14 +342,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
+- Btih magnets of hybrid torrents resolve their v2 identity (`TorrentMetadata` with
+  `allowHybrid`, on the magnet path only) and run as v2 owners
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
 - Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; a task
   keeps looking (`DownloadSource.resolveForDownload`) until found or stopped, while previews
   give up after one `metadataTimeout`. The apps show it as Starting, "Finding peers"
-- Verified selected-file storage, ownership journal, restart rehash, live limits and explicit
-  seeding
+- Verified selected-file storage, ownership journal, restart rehash, live limits, and opt-in
+  upload and seeding (`[torrent] upload`)
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
@@ -358,7 +360,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   app) and resolve them through `KetchApi.resolveContent`, like dropped files
 - Native torrent engine dependencies exist only in interoperability tests
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
-  V2 incoming routing, upload/seeding, PEX and hybrid v1-only peers remain roadmap work.
+  V2/hybrid incoming routing through one engine route table keyed by 20-byte wire tags
+  (`TorrentRouteTable`, `launchIncoming`/`dispatchIncoming`), upload and seeding with 4-slot
+  rechoke and optimistic unchoke (`TorrentChoker`, v1 and v2), BEP 52 hash serving (piece and
+  block layers, `TorrentV2HashServer`), BEP 10 `ut_metadata`/`ut_pex`/`p` on v2 connections with
+  PEX flags from one `pexFlags()`, and hybrid participation in v1 swarms (v1 peers, v1-topic
+  trackers and DHT) are implemented. V2/hybrid owners live in the engine (`addV2Task`), so
+  `removeTorrent`, slot lending and the upload setters work for either hash. Seeding lasts until
+  removal, until `upload` leaves `seed`, until a download waiting for one of the
+  `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's, or until Ketch closes; a
+  torrent that finishes while a download waits does not seed, and seeding is not resumed after a
+  restart. The Fast extension (BEP 6) is not negotiated
 - See [support and migration](docs/torrent.md) and
   [verification](docs/development/torrent-verification.md)
 
@@ -489,7 +501,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and XIU2's best lists; `TorrentConfig.trackerListUrls`; a 0.3.0 `trackerListUrl` is still
   read), edited on the embedded instance's
   BitTorrent settings page and applied to torrents as they start or resume; a remote instance's
-  trackers are only editable on that device
+  trackers are only editable on that device. `upload` (`off`/`while-downloading`/`seed`,
+  `TorrentUploadMode`, mapped to `TorrentConfig.uploadPolicy` by an exhaustive `when` at each of
+  the four `TorrentConfig` sites) and `uploadLimit` (`TorrentConfig.uploadRateLimit`), both read
+  leniently (a value of any type that cannot be read loads as off or unlimited, and a bare
+  `uploadLimit` number is bytes per second), are applied live through
+  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
@@ -995,8 +1012,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
-5. `library:torrent` has no browser-local engine. V2/hybrid uses outgoing v2 TCP;
-   v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
+5. `library:torrent` has no browser-local engine. uTP and protocol encryption remain
+   unimplemented; seeding is not shown as a task state and is not resumed after a restart.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

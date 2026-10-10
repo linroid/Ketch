@@ -35,6 +35,7 @@ internal class PeerHashExchange(
   /** Reserve before enqueueing a request; null means pipeline saturation or exhausted credit. */
   fun request(selector: PeerHashSelector): Ticket? {
     check(!closed)
+    require(selector.length <= PeerHashSelector.MAX_HASHES) { "Hash request too long" }
     val length = requireNotNull(fileLength(selector.root)) { "Unknown hash request root" }
     require(peerHashProofHeight(selector, length) != null) { "Invalid hash request tree bounds" }
     if (selector in pending || pending.size == maxPending) return null

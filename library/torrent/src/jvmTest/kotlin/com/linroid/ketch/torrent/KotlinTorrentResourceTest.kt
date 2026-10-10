@@ -27,7 +27,7 @@ class KotlinTorrentResourceTest {
         val metadata = TorrentMetadata.fromBencode(data)
         val seedFile = root.resolve("seed").apply { writeBytes(bytes) }
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val counts = mutableListOf<Long>()
         try {
           seeder.start()

@@ -20,7 +20,7 @@
   <string name="settings_category_network">Netzwerk</string>
   <string name="settings_category_network_description">Netzwerke für Downloads</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">Zusätzliche Tracker für öffentliche Torrents</string>
+  <string name="settings_category_bittorrent_description">Upload und zusätzliche Tracker</string>
   <string name="settings_category_sharing">Freigabe</string>
   <string name="settings_category_sharing_description">Telefon oder Browser koppeln, um dieses Gerät zu steuern</string>
 
@@ -531,9 +531,20 @@
   <string name="settings_proxy_footer">Für HTTP-Downloads, sobald sie starten oder fortgesetzt werden. FTP und Torrents verbinden sich direkt.</string>
   <string name="settings_proxy_unsupported">%1$s kann keinen Proxy verwenden. Aktualisiere Ketch dort, um einen zu wählen.</string>
 
+  <string name="settings_torrent_upload">Upload</string>
+  <string name="settings_torrent_upload_mode">Mit Peers teilen</string>
+  <string name="settings_torrent_upload_off">Aus</string>
+  <string name="settings_torrent_upload_while_downloading">Beim Herunterladen</string>
+  <string name="settings_torrent_upload_seed">Weiter seeden</string>
+  <string name="settings_torrent_upload_off_hint">Peers können nichts von diesem Gerät herunterladen.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">Während deine Torrents laden, können Peers die Teile herunterladen, die du schon hast.</string>
+  <string name="settings_torrent_upload_seed_hint">Fertige Torrents laden weiter hoch, solange Ketch läuft, bis du sie entfernst oder dies ausschaltest. Torrents, die auf den Download warten, haben Vorrang.</string>
+  <string name="settings_torrent_upload_limit">Upload-Limit</string>
+  <string name="settings_torrent_upload_limit_hint">Gilt für alle Torrents zusammen.</string>
+  <string name="settings_torrent_upload_footer">Peers, an die du hochlädst, sehen die IP-Adresse dieses Geräts. Private Torrents teilen nur mit den Peers ihres Trackers.</string>
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>
-  <string name="settings_torrent_remote">Ändere die zusätzlichen Tracker direkt auf %1$s oder in seiner config.toml.</string>
+  <string name="settings_torrent_remote">Ändere die BitTorrent-Einstellungen direkt auf %1$s oder in seiner config.toml.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">%1$d Tracker entfernt.</item>
     <item quantity="other">%1$d Tracker entfernt.</item>
@@ -715,6 +726,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http-proxy, ausnahmen, firewall</string>
   <string name="settings_search_trackers">Tracker, die öffentlichen Torrents hinzugefügt werden</string>
   <string name="settings_search_trackers_keywords">Announce, UDP, Magnet, Tracker hinzufügen</string>
+  <string name="settings_search_upload">Teile mit Peers teilen und fertige Torrents seeden</string>
+  <string name="settings_search_upload_keywords">Upload, Seed, Seeding, teilen, Ratio, Peers</string>
   <string name="settings_search_pair">Dieses Gerät von einem Telefon oder Browser aus steuern</string>
   <string name="settings_search_pair_keywords">QR-Code, Handy, Smartphone, koppeln, Kopplung, Fernzugriff, Fernsteuerung, Web-App, verbinden</string>
   <string name="settings_search_reachable_keywords">LAN, Netzwerk, Fernzugriff</string>

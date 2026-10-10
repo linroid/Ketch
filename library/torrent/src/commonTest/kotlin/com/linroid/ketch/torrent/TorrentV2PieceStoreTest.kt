@@ -8,6 +8,9 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class TorrentV2PieceStoreTest {
@@ -113,6 +116,75 @@ class TorrentV2PieceStoreTest {
     } finally {
       store.cleanup()
     }
+  }
+
+  @Test
+  fun tryReadDistinguishesNoBudgetFromRevoked() = runTest {
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-v2-read-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(3)
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
+    try {
+      store.initialize()
+      assertSame(TorrentV2PieceStore.ReadOutcome.NotCommitted, store.tryRead(0))
+      assertTrue(store.commit(0, bytes))
+      val read = assertIs<TorrentV2PieceStore.ReadOutcome.Read>(store.tryRead(0))
+      assertContentEquals(bytes, read.buffer.bytes)
+      // The read holds its bytes' budget until it is closed; meanwhile nothing more fits.
+      assertSame(TorrentV2PieceStore.ReadOutcome.NoBudget, store.tryRead(0))
+      read.buffer.close()
+      // Running out of budget is not the piece's fault: it stays committed.
+      assertTrue(store.completed())
+      assertEquals(0, budget.allocated)
+      // A committed piece that changed on disk is revoked and must be fetched again.
+      torrentFileSystem.write(root / "a") { write(byteArrayOf(9, 9, 9)) }
+      assertIs<TorrentV2PieceStore.ReadOutcome.Revoked>(store.tryRead(0))
+      assertFalse(store.completed())
+      assertEquals(mapOf("0" to 0L, "1" to 0L), store.progress())
+      assertSame(TorrentV2PieceStore.ReadOutcome.NotCommitted, store.tryRead(0))
+      assertEquals(0, budget.allocated)
+    } finally {
+      store.cleanup()
+    }
+  }
+
+  @Test
+  fun countersSurviveCheckpointRoundTrip() = runTest {
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-v2-counters-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(1024)
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
+    var restored: TorrentV2PieceStore? = null
+    try {
+      store.initialize()
+      assertTrue(store.commit(0, bytes))
+      store.recordReceived(5)
+      store.recordUploaded(3)
+      store.recordUploaded(4)
+      assertEquals(5L, store.receivedBytes())
+      assertEquals(7L, store.uploadedBytes())
+      val checkpoint = TorrentV2Checkpoint.decode(store.checkpoint().encode())
+      assertEquals(7L, checkpoint?.uploadedBytes)
+      assertEquals(5L, checkpoint?.receivedBytes)
+      store.close()
+      // A new owner of the same files starts from the saved totals and keeps counting.
+      val next = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
+      restored = next
+      next.restore(checkNotNull(checkpoint))
+      assertEquals(5L, next.receivedBytes())
+      assertEquals(7L, next.uploadedBytes())
+      next.recordUploaded(10)
+      next.initialize()
+      assertEquals(17L, assertNotNull(TorrentV2Checkpoint.decode(next.checkpoint().encode()))
+        .uploadedBytes)
+      // Explicit totals only ever raise the counters.
+      assertEquals(20L, next.checkpoint(uploadedBytes = 20).uploadedBytes)
+      assertEquals(20L, next.uploadedBytes())
+      assertFailsWith<IllegalArgumentException> { next.checkpoint(uploadedBytes = 19) }
+    } finally {
+      (restored ?: store).cleanup()
+    }
+    assertEquals(0, budget.allocated)
   }
 
   @Test

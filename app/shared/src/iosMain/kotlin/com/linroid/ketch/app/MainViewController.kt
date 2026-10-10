@@ -29,6 +29,7 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.dash.DashDownloadSource
@@ -38,6 +39,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.IO
@@ -206,6 +208,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
       stateDirectory = "$supportDir/torrent-state",
       additionalTrackers = config.torrent.trackers,
       trackerListUrls = config.torrent.subscribedTrackerLists,
+      uploadPolicy = config.torrent.upload.toUploadPolicy(),
+      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
     ),
   )
   return InstanceManager(
@@ -228,6 +232,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
       applyTorrentSettings = {
         torrentSource.setAdditionalTrackers(it.trackers)
         torrentSource.setTrackerLists(it.subscribedTrackerLists)
+        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
+        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
       },
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
@@ -282,3 +288,10 @@ private fun DownloadConfig.inDownloadsFolder(folder: String): DownloadConfig {
 @Suppress("UNCHECKED_CAST")
 private fun userDirectory(directory: NSSearchPathDirectory): String =
   (NSSearchPathForDirectoriesInDomains(directory, NSUserDomainMask, true) as List<String>).first()
+
+/** The engine's upload policy for this `[torrent] upload` setting. */
+private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}

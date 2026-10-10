@@ -34,7 +34,17 @@ green report available for upload. Run the gate's negative cases with:
 python3 -m unittest discover -s tools/torrent -p 'test_*.py'
 ```
 
-The first manifest covers **v1 download** through libtorrent DHT/metadata and a Transmission magnet
-with an explicit peer. It does not certify v2, hybrid, uploads, or public trackerless discovery.
+The manifest covers **v1 download** through libtorrent DHT/metadata and a Transmission magnet
+with an explicit peer; **v2 and hybrid download and upload** with libtorrent, which fetches
+metadata, piece layers and payload from a seeding Ketch engine through `btmh`, dual-topic and
+`btih`-only magnets (the last over the v1 route, without hashes); and **hybrid v1-peer upload and
+download** with Transmission, which knows only v1 and its padding. It does not certify public
+trackerless discovery, a second independent v2 implementation, uTP or protocol encryption.
 Extend the manifest with each implemented capability and preserve independent expected payloads.
 Never add an unimplemented scenario as passing, or satisfy two capability rows with one no-op test.
+
+Transmission runs with `--no-utp`, so a build with uTP keeps the same TCP behavior, and
+libtorrent leechers with `pe_disabled` and uTP off, since Ketch speaks neither yet. libtorrent
+leechers use its POSIX disk back end: the memory-mapped one installs SIGSEGV and SIGBUS handlers
+for its writes that crash the test JVM. Any official Transmission 4.1.3 build works in place of the
+one `build_transmission.py` makes, as long as `--version` reports the pinned version.

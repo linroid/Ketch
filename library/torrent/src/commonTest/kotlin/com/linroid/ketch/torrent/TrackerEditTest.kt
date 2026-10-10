@@ -31,7 +31,7 @@ class TrackerEditTest {
       if (request.event == TrackerEvent.STARTED) assertNull(id)
       TrackerResponse(emptyList(), 3600, trackerId = byteArrayOf(7))
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { events += "close peers" })
     discovery.poll(bits, 0, 0)
     val previous = tiers.status()
@@ -53,7 +53,7 @@ class TrackerEditTest {
       if (request.event == TrackerEvent.STOPPED) input.clear()
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers)
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers)
     discovery.poll(bits, 0, 0)
     discovery.replaceTrackers(input, bits, 0, 0)
     discovery.poll(bits, 0, 0)
@@ -68,7 +68,7 @@ class TrackerEditTest {
       if (request.event == TrackerEvent.STOPPED) awaitCancellation()
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers)
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers)
     discovery.poll(bits, 0, 0)
     discovery.replaceTrackers(listOf(listOf(next)), bits, 0, 0, stopTimeoutMs = 5)
     discovery.poll(bits, 0, 0)
@@ -82,7 +82,7 @@ class TrackerEditTest {
       if (request.event == TrackerEvent.STOPPED) awaitCancellation()
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers)
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers)
     discovery.poll(bits, 0, 0)
     assertFailsWith<TimeoutCancellationException> {
       withTimeout(2) {
@@ -100,7 +100,7 @@ class TrackerEditTest {
       calls++
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers)
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers)
     discovery.poll(bits, 0, 0)
     for (invalid in listOf(listOf(listOf("file:///secret")), listOf(listOf("relative")),
       listOf(listOf("udp://user:password@host:80")), List(257) { listOf(next) },
@@ -118,7 +118,7 @@ class TrackerEditTest {
       calls += url
       TrackerResponse(emptyList(), 60)
     }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { error("Cleanup failed") })
     discovery.poll(bits, 0, 0)
     val error = assertFailsWith<IllegalStateException> {
@@ -133,7 +133,7 @@ class TrackerEditTest {
   @Test
   fun cancellationAtCleanupReturnDoesNotCommitReplacement() = runTest {
     val tiers = TrackerTiers(listOf(listOf(old))) { _, _, _ -> TrackerResponse(emptyList(), 60) }
-    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
       onPrivateTrackerChanged = { currentCoroutineContext().cancel() })
     discovery.poll(bits, 0, 0)
     val replacement = async { discovery.replaceTrackers(listOf(listOf(next)), bits, 0, 0) }

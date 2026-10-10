@@ -78,7 +78,11 @@ class KotlinRuntimePrivateTest {
               wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
               val extension = wire.read() as PeerMessage.Extended
               assertEquals(0, extension.id)
-              assertNull(Bencode.parse(extension.payload)["m"]?.get("ut_pex"))
+              val handshake = Bencode.parse(extension.payload)
+              assertNull(handshake["m"]?.get("ut_pex"))
+              // A private torrent never offers its info dictionary, even while uploading.
+              assertNull(handshake["m"]?.get("ut_metadata"))
+              assertNull(handshake["metadata_size"])
               if (index == 0) clock.store(60_000) else {
                 wire.send(PeerMessage.Bitfield(byteArrayOf(128.toByte())))
                 wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
@@ -90,7 +94,8 @@ class KotlinRuntimePrivateTest {
               // Failover/completion closes the corresponding peer.
             } finally { connection.close() }
           } }
-          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = true), network,
+          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = true,
+            uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING), network,
             TorrentHttp(http), nowMs = { clock.load() })
           try {
             engine.start()

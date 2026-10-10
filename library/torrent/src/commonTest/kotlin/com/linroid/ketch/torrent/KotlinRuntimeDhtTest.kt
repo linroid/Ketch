@@ -34,7 +34,7 @@ class KotlinRuntimeDhtTest {
           torrentFileSystem.createDirectories(root)
           torrentFileSystem.write(root / "seed") { write(bytes) }
           val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-            uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+            uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
           val network = createTorrentNetwork()
           fun node(socket: TorrentDatagramSocket) = DhtNode(socket, this,
             allowLocalAddresses = true).also { it.start() }
@@ -42,7 +42,7 @@ class KotlinRuntimeDhtTest {
           val announcer = node(network.bindUdp(PeerEndpoint("127.0.0.1", 0)))
           val config = TorrentConfig(dhtBootstrap = listOf("127.0.0.1:${router.local.port}"))
           val source = TorrentDownloadSource(config).also {
-            it.engineFactory = { KotlinTorrentEngine(config, allowLocalDiscovery = true,
+            it.engineFactory = { KotlinTorrentEngine(config, allowLocalPeers = true,
               discoveryIntervalMs = 100) }
           }
           try {

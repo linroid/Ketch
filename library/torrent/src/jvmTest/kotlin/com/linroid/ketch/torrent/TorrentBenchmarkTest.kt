@@ -55,7 +55,7 @@ class TorrentBenchmarkTest {
       for (size in sizes) {
         val root = Files.createTempDirectory("ketch-benchmark").toFile()
         val seeder = TorrentBenchmarkSeeder(root)
-        val tracker = TorrentBenchmarkTracker(seeder.peerPort, seeder.dataHost)
+        val tracker = TorrentBenchmarkTracker({ seeder.peerPort }, seeder.dataHost)
         try {
           require(root.usableSpace >= size * 2 + 2L * 1024 * 1024 * 1024) {
             "Benchmark needs space for one seed, one download, and 2 GiB headroom"
@@ -212,7 +212,7 @@ internal object TorrentBenchmarkProcess {
       val kotlin = if (native == null) KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
         connectionsPerTorrent = 1, maxBufferedBytes = 64 * 1024 * 1024,
         maxExchangeBytes = 256 * 1024 * 1024, maxSessionStateBytes = 64 * 1024 * 1024),
-        allowLocalDiscovery = true) else null
+        allowLocalPeers = true) else null
       try {
         kotlin?.start()
         val initializationMs = initialization.elapsedNow().inWholeMilliseconds

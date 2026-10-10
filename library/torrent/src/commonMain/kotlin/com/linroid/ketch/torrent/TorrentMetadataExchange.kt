@@ -4,6 +4,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import okio.Buffer
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
 /** BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification. */
@@ -27,7 +28,9 @@ internal class TorrentMetadataExchange(
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
   ): TorrentMetadata = fetchContent(TorrentIdentity(v1 = hash), endpoint, trackerTiers, privacy) {
       _, info, _ ->
-    val metadata = TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers))
+    // A btih magnet may name a hybrid; its v1 view tells resolution the v2 identity to fetch.
+    val metadata = TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers),
+      allowHybrid = true)
     if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       throw PrivateTorrentMagnetException()
     }
@@ -136,13 +139,27 @@ internal class TorrentMetadataExchange(
       PeerMessage.Extended(id, Bencode.encode(mapOf("msg_type" to type.toLong(),
         "piece" to piece.toLong())))
 
-    fun response(id: Int, piece: Int, metadata: TorrentMetadata): PeerMessage.Extended {
+    fun response(id: Int, piece: Int, metadata: TorrentMetadata): PeerMessage.Extended =
+      response(id, piece, metadata.infoBytes.size) { from, to ->
+        metadata.infoBytes.copyOfRange(from, to)
+      }
+
+    /** Block [piece] of the raw info dictionary [info], or a reject past its end. */
+    fun response(id: Int, piece: Int, info: ByteString): PeerMessage.Extended =
+      response(id, piece, info.size) { from, to -> info.substring(from, to).toByteArray() }
+
+    private inline fun response(
+      id: Int,
+      piece: Int,
+      size: Int,
+      slice: (from: Int, to: Int) -> ByteArray,
+    ): PeerMessage.Extended {
       val offset = piece.toLong() * BLOCK_SIZE
-      if (piece < 0 || offset >= metadata.infoBytes.size) return metadataMessage(id, 2, piece)
+      if (piece < 0 || offset >= size) return metadataMessage(id, 2, piece)
       val header = Bencode.encode(mapOf("msg_type" to 1L, "piece" to piece.toLong(),
-        "total_size" to metadata.infoBytes.size.toLong()))
-      return PeerMessage.Extended(id, header + metadata.infoBytes.copyOfRange(offset.toInt(),
-        minOf(offset + BLOCK_SIZE, metadata.infoBytes.size.toLong()).toInt()))
+        "total_size" to size.toLong()))
+      return PeerMessage.Extended(id, header + slice(offset.toInt(),
+        minOf(offset + BLOCK_SIZE, size.toLong()).toInt()))
     }
   }
 }

@@ -12,6 +12,7 @@ package com.linroid.ketch.torrent
  * @property trackers list of tracker announce URLs
  * @property comment optional comment from the torrent creator
  * @property createdBy optional tool that created the torrent
+ * @property isHybrid the info dictionary also describes a v2 torrent; this is only its v1 view
  */
 internal data class TorrentMetadata(
   val infoHash: InfoHash,
@@ -28,6 +29,7 @@ internal data class TorrentMetadata(
   val isPrivate: Boolean = false,
   val metainfoBytes: ByteArray = ByteArray(0),
   val isMultiFile: Boolean = files.size > 1,
+  val isHybrid: Boolean = false,
 ) {
   /**
    * A single file within a torrent.
@@ -43,29 +45,48 @@ internal data class TorrentMetadata(
   )
 
   companion object {
-    fun fromBencode(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): TorrentMetadata {
+    /**
+     * Parses v1 metainfo. With [allowHybrid], a hybrid's info dictionary parses as its v1 view
+     * (BEP 47 padding files included, marked [isHybrid]); only magnet resolution needs that, to
+     * learn the v2 identity it then downloads by. v1 sessions never run a hybrid view.
+     */
+    fun fromBencode(
+      data: ByteArray,
+      maxBytes: Int = 4 * 1024 * 1024,
+      allowHybrid: Boolean = false,
+    ): TorrentMetadata {
       val root = Bencode.parse(data, maxBytes)
       requireNotNull(root.dictionary) { "Torrent root must be a dictionary" }
       val info = requireNotNull(root["info"]) { "Missing info dictionary" }
       requireNotNull(info.dictionary) { "Info must be a dictionary" }
-      require(info["meta version"] == null) { "BitTorrent v2/hybrid is not supported" }
+      val version = info["meta version"]
+      val hybrid = version != null
+      require(!hybrid || allowHybrid && version?.integer == 2L) {
+        "BitTorrent v2/hybrid is not supported"
+      }
       val name = requireNotNull(info["name"]?.text()) { "Missing name" }
       validatePathComponent(name)
       val pieceLength = requireNotNull(info["piece length"]?.integer) { "Missing piece length" }
       require(pieceLength in 1..16L * 1024 * 1024) { "Unsupported piece length" }
       val fileNodes = info["files"]
       require(fileNodes == null || info["length"] == null) { "Conflicting file layouts" }
+      val padding = mutableSetOf<Int>()
       val files = if (fileNodes != null) {
         val list = requireNotNull(fileNodes.list) { "Invalid file list" }
         require(list.isNotEmpty() && list.size <= 10_000) { "Invalid file count" }
         list.mapIndexed { index, file ->
           require(file["attr"]?.text()?.contains('l') != true) { "Symlink files unsupported" }
+          val size = requireNotNull(file["length"]?.integer) { "Missing file length" }
+          require(size >= 0) { "Negative file length" }
+          // BEP 47 padding may share or omit its path; it is never written to disk.
+          if (hybrid && file["attr"]?.text()?.contains('p') == true) {
+            padding += index
+            return@mapIndexed TorrentFile(index, "$name/.pad/$size", size)
+          }
           val parts = requireNotNull(file["path"]?.list) { "Missing file path" }
           require(parts.isNotEmpty() && parts.size <= 64) { "Invalid path depth" }
           val names = parts.map { requireNotNull(it.text()) { "Invalid path component" } }
           names.forEach(::validatePathComponent)
-          val size = requireNotNull(file["length"]?.integer) { "Missing file length" }
-          require(size >= 0) { "Negative file length" }
           TorrentFile(index, (listOf(name) + names).joinToString("/"), size)
         }
       } else {
@@ -73,8 +94,9 @@ internal data class TorrentMetadata(
         require(size >= 0) { "Negative file length" }
         listOf(TorrentFile(0, name, size))
       }
-      val paths = files.map { canonicalTorrentName(it.path).lowercase() }.toSet()
-      require(paths.size == files.size) { "Colliding torrent paths" }
+      val stored = files.filter { it.index !in padding }
+      val paths = stored.map { canonicalTorrentName(it.path).lowercase() }.toSet()
+      require(paths.size == stored.size) { "Colliding torrent paths" }
       for (path in paths) {
         var parent = path.substringBeforeLast('/', "")
         while (parent.isNotEmpty()) {
@@ -120,6 +142,7 @@ internal data class TorrentMetadata(
         isPrivate = privateFlag == 1L,
         metainfoBytes = data.copyOf(),
         isMultiFile = fileNodes != null,
+        isHybrid = hybrid,
       )
     }
 

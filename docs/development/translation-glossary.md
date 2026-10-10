@@ -22,6 +22,9 @@ Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidab
 | link | 链接 | 連結 | リンク | 링크 | enlace | link | Link | lien | ссылка |
 | magnet link | 磁力链接 | 磁力連結 | マグネットリンク | 마그넷 링크 | enlace magnet | link magnet | Magnet-Link | lien magnet | magnet-ссылка |
 | torrent | 种子 | 種子 | トレント | 토렌트 | torrent | torrent | Torrent | torrent | торрент |
+| peer (BitTorrent) | 节点 | 對等端 | ピア | 피어 | par | peer | Peer | pair | пир |
+| upload (to peers) | 上传 | 上傳 | アップロード | 업로드 | subida | envio | Upload | envoi | отдача |
+| seed / seeding | 做种 | 做種 | シード | 시드 / 시딩 | sembrar / sembrado | semear / semeando | seeden | partage | раздача |
 | pause / resume | 暂停 / 继续 | 暫停 / 繼續 | 一時停止 / 再開 | 일시정지 / 재개 | pausar / reanudar | pausar / retomar | pausieren / fortsetzen | mettre en pause / reprendre | приостановить / возобновить |
 | retry / try again | 重试 / 再试一次 | 重試 / 再試一次 | 再試行 / もう一度試す | 재시도 / 다시 시도 | reintentar / volver a intentarlo | tentar novamente | erneut versuchen | réessayer | повторить / попробовать снова |
 | remove (from list) | 移除 | 移除 | 削除 | 제거 | quitar | remover | entfernen | retirer | удалить |

@@ -35,10 +35,31 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.time.TimeSource
+
+/** A full-metainfo v2 or hybrid task for [KotlinTorrentEngine.addV2Task]. */
+internal data class TorrentV2TaskSpec(
+  val taskId: String,
+  val document: TorrentV2Document,
+  val outputPath: String,
+  val selected: Set<String> = emptySet(),
+  val checkpoint: TorrentV2Checkpoint? = null,
+  /** A source-persisted checkpoint, decoded under the session-state budget. */
+  val checkpointEncoded: String? = null,
+  val trackerTiers: List<List<String>> = emptyList(),
+  val magnetUri: String? = null,
+  val privacy: TorrentDiscoveryPrivacy,
+  val throttle: suspend (Int) -> Unit = {},
+  val recoverCreations: Boolean = false,
+  /** Test hook replacing engine discovery: the endpoints it sends join as tracker peers. */
+  val discover: (suspend (SendChannel<PeerEndpoint>) -> Unit)? = null,
+  /** The swarm [discover]'s endpoints are in; a hybrid dials v1 ones in v1 mode. */
+  val discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
+)
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
 @OptIn(ExperimentalAtomicApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class,
@@ -47,9 +68,16 @@ internal class KotlinTorrentEngine(
   private val config: TorrentConfig,
   rawNetwork: TorrentNetwork = createTorrentNetwork(),
   private val http: TorrentHttp = TorrentHttp.default(),
-  private val allowLocalDiscovery: Boolean = false,
+  /** Test hook: lets discovery (DHT) and peer exchange use loopback and private addresses. */
+  private val allowLocalPeers: Boolean = false,
   private val discoveryIntervalMs: Long = 30_000,
   private val nowMs: () -> Long = monotonicClock(),
+  /**
+   * Test hook: the address peers reach us on, every interface by default. Tests that dial us on
+   * loopback listen there, as on macOS another socket bound to 127.0.0.1 on the same port takes
+   * loopback connections from a wildcard listener and resets them when it closes.
+   */
+  private val listenHost: String = WILDCARD_IPV4,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -67,24 +95,64 @@ internal class KotlinTorrentEngine(
   private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
   private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
+  /** Every exchange partition together; zero after [stop] unless something leaked. */
+  internal val allocatedExchangeBytes: Int get() = exchangeBudgets.allocated
+  /** What pieces read back for peers hold, every torrent's together; for tests. */
+  internal val allocatedUploadBytes: Int get() = exchangeBudgets.uploads.allocated
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
     exchangeBudgets.cache)
   private val tracker = TorrentTracker(http, network)
   private val peerId = torrentRandomBytes(20)
   private val mutex = Mutex()
   private val dhtMutex = Mutex()
-  private val sessions = mutableMapOf<String, KotlinTorrentSession>()
-  private val closing = mutableMapOf<String, Closing>()
-  private val v2Identities = mutableMapOf<String, TorrentIdentity>()
-  private val outputs = mutableMapOf<String, String>()
-  private val sessionLeases = mutableMapOf<String, TorrentBufferBudget.Lease>()
+
+  /** A registered owner: a v1 session, or a v2 or hybrid one. */
+  private sealed interface Owner {
+    val session: TorrentSession
+    suspend fun pause()
+    suspend fun close(deleteFiles: Boolean)
+
+    class V1(override val session: KotlinTorrentSession) : Owner {
+      override suspend fun pause() { session.pause() }
+      override suspend fun close(deleteFiles: Boolean) { session.close(deleteFiles) }
+    }
+
+    class V2(override val session: TorrentV2DownloadSession) : Owner {
+      override suspend fun pause() { session.pause() }
+      override suspend fun close(deleteFiles: Boolean) { session.close(deleteFiles) }
+    }
+  }
+
+  /**
+   * One owner with its route claim, admission lease and output. [key] is the v1 hash of a v1
+   * owner and the v2 hash of a v2 or hybrid one; [hexes] are every hash it answers to.
+   */
+  private class Entry(
+    val key: String,
+    val owner: Owner,
+    val claim: TorrentRouteTable.Claim,
+    val lease: TorrentBufferBudget.Lease,
+    val hexes: List<String>,
+    val output: String,
+  ) {
+    /** Removal began: the slot is free, but the hashes, tags and output stay claimed. */
+    var closing = false
+    var users = 0
+  }
+
+  // Guarded by [mutex].
+  private val entries = mutableMapOf<String, Entry>()
+  private val aliases = mutableMapOf<String, String>()
+  private val routes = TorrentRouteTable()
+  private val active: Int get() = entries.values.count { !it.closing }
   private val running = AtomicBoolean(false)
   private var closed = false
-  private var port = 0
-  val listenPort: Int get() = port
+  internal val advertisedPort = TorrentAdvertisedPort()
+  val listenPort: Int get() = advertisedPort.listenPort
   private var nodes: List<DhtNode>? = null
   private val downloadRate = TorrentRateLimiter()
-  private val uploadRate = TorrentRateLimiter()
+  private val uploadRate = TorrentRateLimiter(config.uploadRateLimit)
+  private val uploadPolicy = AtomicReference(config.effectiveUploadPolicy)
   private val additionalTrackers = AtomicReference(usableTrackers(config.additionalTrackers))
   override val isRunning: Boolean get() = running.load()
 
@@ -95,23 +163,27 @@ internal class KotlinTorrentEngine(
   override suspend fun start() = mutex.withLock {
     check(!closed && shutdown.load() == null) { "Torrent runtime is closed" }
     if (running.load()) return@withLock
-    val listener = network.listen(PeerEndpoint("0.0.0.0", config.listenPort))
-    port = listener.local.port
+    val listener = network.listen(PeerEndpoint(listenHost, config.listenPort))
+    advertisedPort.setListen(listener.local.port)
     running.store(true)
-    accept(listener)
+    acceptIncoming(listener)
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
-    val ipv6 = try { accept(network.listen(PeerEndpoint("::", port))); true } catch (_: Exception) {
+    val ipv6 = listenHost == WILDCARD_IPV4 && try {
+      acceptIncoming(network.listen(PeerEndpoint("::", listenPort)))
+      true
+    } catch (_: Exception) {
       currentCoroutineContext().ensureActive()
       false
     }
     log.i {
-      "Torrent engine listening on port $port" + (if (ipv6) " (IPv4 and IPv6)" else " (IPv4)") +
+      "Torrent engine listening on port $listenPort" +
+        (if (ipv6) " (IPv4 and IPv6)" else " (IPv4)") +
         ", dht=${config.dhtEnabled}, maxActiveTorrents=${config.maxActiveTorrents}, " +
         "maxConnections=${config.maxConnections}, extraTrackers=${additionalTrackers.load().size}"
     }
   }
 
-  private fun accept(listener: TorrentListener) = scope.launch {
+  private fun acceptIncoming(listener: TorrentListener) = scope.launch {
     try {
       var backoffMs = 0L
       while (isActive) {
@@ -127,33 +199,7 @@ internal class KotlinTorrentEngine(
           delay(backoffMs)
           continue
         }
-        launch(start = CoroutineStart.ATOMIC) {
-          var handedOff = false
-          try {
-            val bytes = withTimeout(10_000) { connection.readExactly(68) }
-            val hash = InfoHash.fromBytes(bytes.copyOfRange(28, 48))
-            PeerWire.decodeHandshake(bytes, hash)
-            // Replay the already bounded handshake through the ordinary peer worker.
-            val replay = object : TorrentConnection by connection {
-              var header: ByteArray? = bytes
-              override suspend fun readExactly(size: Int): ByteArray {
-                val first = header
-                if (first == null) return connection.readExactly(size)
-                require(size == first.size)
-                header = null
-                return first
-              }
-            }
-            handedOff = mutex.withLock { sessions[hash.hex]?.accept(replay) == true }
-          } catch (e: CancellationException) {
-            throw e
-          } catch (e: Exception) {
-            // Malformed, unknown, or expired handshakes are isolated to this connection.
-            log.v { "Rejected incoming peer ${connection.remote}: ${e.describeWithoutUrls()}" }
-          } finally {
-            if (!handedOff) connection.close()
-          }
-        }
+        launchIncoming(connection)
       }
     } catch (error: Exception) {
       // Closing a socket during shutdown can throw before its provider observes cancellation.
@@ -161,6 +207,46 @@ internal class KotlinTorrentEngine(
       throw error
     } finally { listener.close() }
   }
+
+  /**
+   * Starts [dispatchIncoming] in the engine scope, never the caller's: an accept loop that is
+   * cancelled (a listener replaced or a transport stopped) must not cancel handshakes already in
+   * flight. ATOMIC start still runs its `finally`, which closes the socket, while stopping.
+   */
+  internal fun launchIncoming(connection: TorrentConnection) {
+    scope.launch(start = CoroutineStart.ATOMIC) { dispatchIncoming(connection) }
+  }
+
+  /**
+   * Reads one BitTorrent handshake within 10 s and hands [connection], with the handshake still
+   * to read, to the owner of its wire tag. Transport-agnostic; closes unless handed off.
+   */
+  internal suspend fun dispatchIncoming(connection: TorrentConnection) {
+    var handedOff = false
+    try {
+      val header = withTimeout(10_000) { connection.readExactly(68) }
+      val tag = header.copyOfRange(28, 48)
+      PeerWire.decodeHandshake(header, InfoHash.fromBytes(tag))
+      handedOff = route(tag.toByteString(), PrefixedConnection(connection, header))
+      if (!handedOff) log.v { "Refused incoming peer ${connection.remote}: no accepting owner" }
+    } catch (_: TimeoutCancellationException) {
+      log.v { "Refused incoming peer ${connection.remote}: no handshake within 10s" }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      // Malformed handshakes and failed reads are isolated to this connection.
+      log.v { "Refused incoming peer ${connection.remote}: ${e.describeWithoutUrls()}" }
+    } finally {
+      if (!handedOff) connection.close()
+    }
+  }
+
+  /** Hands [connection] to the owner of [tag] under the engine mutex; true when it took it. */
+  internal suspend fun route(tag: ByteString, connection: TorrentConnection): Boolean =
+    mutex.withLock { routes.lookup(tag)?.sink?.accept(connection) == true }
+
+  /** Wire tags of the accepting owners, readable without the engine mutex. */
+  internal fun incomingTags(): Set<ByteString> = routes.tags
 
   override fun close() { requestShutdown() }
 
@@ -187,19 +273,30 @@ internal class KotlinTorrentEngine(
   }
 
   private suspend fun stopRuntime() {
-    val active = mutex.withLock {
+    val owners = mutex.withLock {
       if (closed) return
       closed = true
       running.store(false)
-      // Sessions still closing elsewhere are closed again here; close() is idempotent.
-      (sessions.values + closing.values.map { it.session }).also {
-        sessions.clear(); closing.clear(); outputs.clear(); sessionLeases.clear()
+      // Owners still closing elsewhere are closed again here; close() is idempotent.
+      entries.values.map { it.owner }.also {
+        entries.clear()
+        aliases.clear()
+        routes.clear()
       }
     }
-    log.i { "Stopping torrent engine with ${active.size} session(s)" }
+    log.i { "Stopping torrent engine with ${owners.size} session(s)" }
     withContext(NonCancellable) {
       try {
-        active.forEach { it.pause(); it.close() }
+        // v1, v2 and hybrid owners alike; a v2 close joins its discovery before admission returns.
+        for (owner in owners) {
+          try {
+            owner.pause()
+            owner.close(deleteFiles = false)
+          } catch (e: Exception) {
+            val hash = logHash(owner.session.infoHash)
+            log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
+          }
+        }
         nodes?.forEach { it.close() }
       } finally {
         scope.cancel()
@@ -269,9 +366,10 @@ internal class KotlinTorrentEngine(
     if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       throw PrivateTorrentMagnetException()
     }
-    // Cache the immutable info dictionary, retaining this caller's tracker list.
+    // Cache the immutable info dictionary, retaining this caller's tracker list. A hybrid's v1
+    // view only tells the caller the v2 identity to download it by.
     return TorrentMetadata.fromBencode(metainfoFromInfo(metadata.infoBytes,
-      magnet.trackers.map { listOf(it) }), config.maxMetadataBytes)
+      magnet.trackers.map { listOf(it) }), config.maxMetadataBytes, allowHybrid = true)
   }
 
   suspend fun fetchV2Metadata(
@@ -329,7 +427,7 @@ internal class KotlinTorrentEngine(
           var started = false
           try {
             val response = attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
-              port, 0, 1, event = TrackerEvent.STARTED)) } ?: continue
+              advertisedPort.current(), 0, 1, event = TrackerEvent.STARTED)) } ?: continue
             started = true
             interval = maxOf(interval, response.intervalSeconds)
             for (endpoint in response.peers.distinct()) {
@@ -339,8 +437,8 @@ internal class KotlinTorrentEngine(
           } finally {
             if (started) withContext(NonCancellable) {
               withTimeoutOrNull(2000) {
-                attempt { trackerSet.announce(TrackerAnnounce(topic, peerId, port, 0, 1,
-                  event = TrackerEvent.STOPPED)) }
+                attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
+                  advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED)) }
               }
             }
           }
@@ -375,7 +473,7 @@ internal class KotlinTorrentEngine(
         var contacted = false
         try {
           val result = attempt {
-            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, advertisedPort.current(), 0, 1,
               event = TrackerEvent.STARTED))
           } ?: continue
           contacted = true
@@ -396,8 +494,8 @@ internal class KotlinTorrentEngine(
           if (contacted) withContext(NonCancellable) {
             withTimeoutOrNull(2000) {
               attempt {
-                tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
-                  event = TrackerEvent.STOPPED))
+                tiers.announce(TrackerAnnounce(magnet.infoHash, peerId,
+                  advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED))
               }
             }
           }
@@ -423,7 +521,7 @@ internal class KotlinTorrentEngine(
       suspend fun announce(tiers: TrackerTiers) {
         while (currentCoroutineContext().isActive) {
           val result = attempt {
-            tiers.announce(TrackerAnnounce(topic, peerId, port, 0, 1,
+            tiers.announce(TrackerAnnounce(topic, peerId, advertisedPort.current(), 0, 1,
               event = TrackerEvent.STARTED))
           }
           result?.peers?.forEach { output.send(it) }
@@ -461,17 +559,20 @@ internal class KotlinTorrentEngine(
   }
 
   override suspend fun addTask(spec: TorrentTaskSpec): KotlinTorrentSession = mutex.withLock {
+    // A hybrid's v1 view lacks its v2 hashes and identity; hybrids run as v2 owners.
+    require(!spec.metadata.isHybrid) { "Hybrid torrents run as v2 owners" }
     check(isRunning && !closed)
-    check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
-      "Too many active torrents"
-    }
+    check(active < config.maxActiveTorrents) { "Too many active torrents" }
     val hash = spec.metadata.infoHash.hex
-    check(hash !in sessions && hash !in closing &&
-      v2Identities.values.none { it.v1 == spec.metadata.infoHash }) {
-      "Torrent already has an active owner"
+    check(hash !in aliases) { "Torrent already has an active owner" }
+    // Every lookup also holds the mutex, so the claim cannot route before the session exists.
+    var target: KotlinTorrentSession? = null
+    val claim = routes.register(hash, listOf(spec.metadata.infoHash.toBytes().toByteString())) {
+      target?.accept(it) == true
     }
-    val lease = admissions.admit(spec, config)
+    var lease: TorrentBufferBudget.Lease? = null
     try {
+      lease = admissions.admit(spec, config)
       val requested = torrentSystemFileSystem.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
       val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
@@ -482,36 +583,37 @@ internal class KotlinTorrentEngine(
       val trackerState = TorrentBufferBudget(
         maxOf(1, trackerControlStateWeight().toInt()))
       val session = KotlinTorrentSession(store, network, budget, scope,
-        connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
+        connections = config.connectionsPerTorrent, uploadBudget = exchangeBudgets.uploads,
+        uploadPolicy = { uploadPolicy.load() },
         checkpoint = checkpoint, peerId = peerId,
         discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
-        uploadThrottle = { uploadRate.acquire(it) },
+        engineUploadRate = uploadRate,
         trackerConfigurationBudget = exchangeBudgets.sessions,
         privacy = spec.privacy,
+        allowLocalPeers = allowLocalPeers,
+        listenPortFor = { advertisedPort.current() },
       )
-      sessionLeases[hash] = lease
-      sessions[hash] = session
-      outputs[hash] = output.toString()
+      target = session
+      entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())
+      aliases[hash] = hash
       log.i {
         "Added torrent ${logHash(hash)} for taskId=${spec.taskId}: " +
           "trackers=${spec.metadata.trackerTiers.sumOf { it.size }}, privacy=${spec.privacy}, " +
           "private=${spec.metadata.isPrivate}, resume=${checkpoint != null}, " +
-          "active=${sessions.size + v2Identities.size}/${config.maxActiveTorrents}"
+          "active=$active/${config.maxActiveTorrents}"
       }
       session
     } catch (failure: Throwable) {
-      sessions.remove(hash)
-      outputs.remove(hash)
-      sessionLeases.remove(hash)
-      admissions.release(lease)
+      routes.release(claim)
+      lease?.let(admissions::release)
       throw failure
     }
   }
 
   private fun requireAvailableOutput(output: Path) {
-    check(outputs.values.none { previous ->
-      val path = previous.toPath()
+    check(entries.values.none { entry ->
+      val path = entry.output.toPath()
       val left = path.segments.map { canonicalTorrentName(it).lowercase() }
       val right = output.segments.map { canonicalTorrentName(it).lowercase() }
       path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
@@ -520,11 +622,125 @@ internal class KotlinTorrentEngine(
   }
 
   /**
-   * Scoped full-metainfo download integration. The caller supplies policy-authorized endpoints;
-   * this path does not yet register incoming v2 routes, resolve magnets, or seed after completion.
-   * Retained metadata/storage indexes are admitted before storage construction or file I/O.
-   * Encoded checkpoints and retained recovery records share the session-state budget.
-   * Recovery validates ownership before exposing the session and rechecks payloads on resume.
+   * Registers a long-lived full-metainfo v2 or hybrid owner under every hash and wire tag of its
+   * identity, then restores its checkpoint. The owner downloads once resumed and stays until
+   * [removeTorrent] names either of its hashes, or the engine stops. Retained metadata and
+   * storage indexes are admitted before storage construction or file I/O; encoded checkpoints
+   * and retained recovery records share the session-state budget. Recovery validates ownership
+   * before the owner is returned, and resume rechecks the payload.
+   */
+  suspend fun addV2Task(spec: TorrentV2TaskSpec): TorrentV2DownloadSession {
+    var decoding: TorrentBufferBudget.Lease? = null
+    try {
+      require(spec.checkpoint == null || spec.checkpointEncoded == null)
+      val encoded = spec.checkpointEncoded
+      val recovery = if (encoded == null) spec.checkpoint else {
+        // Admit base64/raw/parser copies before decoding source-owned persisted state.
+        val bytes = encoded.length * 12L + 4096
+        require(bytes <= exchangeBudgets.sessions.capacity) { "Recovery state exceeds budget" }
+        decoding = checkNotNull(exchangeBudgets.sessions.reserve(bytes.toInt())) {
+          "Recovery decode budget exhausted"
+        }
+        requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(encoded))) {
+          "Invalid v2 checkpoint"
+        }
+      }
+      val entry = mutex.withLock { registerV2(spec, recovery) }
+      decoding?.close()
+      decoding = null
+      val owner = entry.owner as Owner.V2
+      try {
+        owner.session.restore(recovery)
+      } catch (failure: Throwable) {
+        withContext(NonCancellable) {
+          try { owner.close(deleteFiles = false) } finally {
+            mutex.withLock {
+              if (entries[entry.key] === entry) unregister(entry)
+              else admissions.release(entry.lease)
+            }
+          }
+        }
+        throw failure
+      }
+      return owner.session
+    } finally {
+      decoding?.close()
+    }
+  }
+
+  /** Under [mutex]: admits, claims and opens a v2 owner. No file I/O happens here. */
+  private fun registerV2(spec: TorrentV2TaskSpec, recovery: TorrentV2Checkpoint?): Entry {
+    check(isRunning && !closed) { "Torrent runtime is closed" }
+    check(active < config.maxActiveTorrents) { "Too many active torrents" }
+    val document = spec.document
+    require(spec.discoverMode == PeerIdentityHandshake.Mode.V2 || document.hybrid != null) {
+      "Only a hybrid has a v1 swarm"
+    }
+    val key = document.info.hash.hex
+    val hexes = listOfNotNull(key, document.identity.v1?.hex)
+    check(hexes.none { it in aliases }) { "Torrent already has an active owner" }
+    // Every lookup also holds the mutex, so the claim cannot route before the session exists.
+    var target: TorrentV2DownloadSession? = null
+    val claim = routes.register(key, TorrentRouteTable.tagsOf(document.identity)) {
+      target?.accept(it) == true
+    }
+    var lease: TorrentBufferBudget.Lease? = null
+    try {
+      lease = admissions.adopt(admitV2Session(document, spec.selected.size,
+        spec.outputPath.length, config, exchangeBudgets.sessions, recovery))
+      val selection = spec.selected.toSet()
+      val requested = torrentSystemFileSystem.canonicalize(".".toPath())
+        .resolve(spec.outputPath).normalized()
+      val parent = checkNotNull(requested.parent) { "Output root must have a parent" }
+      val output = torrentSystemFileSystem.canonicalize(parent) / requested.name
+      requireAvailableOutput(output)
+      val layout = TorrentContentLayout.from(document.info, document.hybrid)
+      val store = TorrentV2PieceStore(document, output, selection, spec.taskId, budget,
+        storageSlots, creationLogPath = if (spec.recoverCreations) {
+          v2CreationLog(output, spec.taskId)
+        } else null)
+      val custom = spec.discover
+      val discovery: suspend (TorrentV2DiscoverySink) -> Unit = if (custom != null) {
+        val topic = if (spec.discoverMode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1
+          else PeerTopic.V2
+        { sink -> sink.relay(topic = topic, discover = custom) }
+      } else {
+        { sink ->
+          discoverV2(document, layout, store, spec.trackerTiers, spec.magnetUri, spec.privacy,
+            sink)
+        }
+      }
+      val session = TorrentV2DownloadSession.open(scope, document, layout, selection, store,
+        TorrentV2Runtime(network, peerId.toByteString(), budget, exchangeBudgets.sessions,
+          downloadRate = downloadRate, uploadRate = uploadRate,
+          uploadPolicy = { uploadPolicy.load() },
+          listenPortFor = { advertisedPort.current() }, allowLocalPeers = allowLocalPeers,
+          uploadBuffers = exchangeBudgets.uploads),
+        TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
+          initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
+          privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,
+          discovery = discovery))
+      target = session
+      val entry = Entry(key, Owner.V2(session), claim, lease, hexes, output.toString())
+      entries[key] = entry
+      hexes.forEach { aliases[it] = key }
+      log.i {
+        "Added v2 torrent ${logHash(key)} for taskId=${spec.taskId}: " +
+          "hybrid=${document.hybrid != null}, trackers=${spec.trackerTiers.sumOf { it.size }}, " +
+          "privacy=${spec.privacy}, private=${document.info.privateTorrent}, " +
+          "resume=${recovery != null}, active=$active/${config.maxActiveTorrents}"
+      }
+      return entry
+    } catch (failure: Throwable) {
+      routes.release(claim)
+      lease?.let(admissions::release)
+      throw failure
+    }
+  }
+
+  /**
+   * Scoped wrapper over [addV2Task], for tests and callers that own one download: registers the
+   * owner, runs [body], then removes the owner, even when [body] fails or is cancelled.
    */
   suspend fun <T> withV2Download(
     taskId: String,
@@ -539,72 +755,17 @@ internal class KotlinTorrentEngine(
     privacy: TorrentDiscoveryPrivacy = config.discoveryPrivacy,
     throttle: suspend (Int) -> Unit = {},
     recoverCreations: Boolean = false,
+    discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
     body: suspend (TorrentV2DownloadSession) -> T,
   ): T {
+    val spec = TorrentV2TaskSpec(taskId, document, outputPath, selected, checkpoint,
+      checkpointEncoded, trackerTiers, magnetUri, privacy, throttle, recoverCreations, discover,
+      discoverMode)
+    // The engine scope runs the body, so callbacks inside it can request engine shutdown.
     val pending = scope.async {
-      val hash = document.info.hash.hex
-      var lease: TorrentBufferBudget.Lease? = null
-      var decoding: TorrentBufferBudget.Lease? = null
-      var registered = false
-      try {
-        require(checkpoint == null || checkpointEncoded == null)
-        val recovery = if (checkpointEncoded == null) checkpoint else {
-          // Admit base64/raw/parser copies before decoding source-owned persisted state.
-          val bytes = checkpointEncoded.length * 12L + 4096
-          require(bytes <= exchangeBudgets.sessions.capacity) { "Recovery state exceeds budget" }
-          decoding = checkNotNull(exchangeBudgets.sessions.reserve(bytes.toInt())) {
-            "Recovery decode budget exhausted"
-          }
-          requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(checkpointEncoded))) {
-            "Invalid v2 checkpoint"
-          }
-        }
-        val prepared = mutex.withLock {
-          check(isRunning && !closed) { "Torrent runtime is closed" }
-          check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
-            "Too many active torrents"
-          }
-          check(hash !in v2Identities &&
-            (document.identity.v1?.hex !in sessions) && (document.identity.v1?.hex !in closing) &&
-            v2Identities.values.none { identity ->
-              identity.v1 != null && identity.v1 == document.identity.v1
-            }) { "Torrent already has an active owner" }
-          lease = admitV2Session(document, selected.size, outputPath.length, config,
-            exchangeBudgets.sessions, recovery)
-          val selection = selected.toSet()
-          val requested = torrentSystemFileSystem.canonicalize(".".toPath())
-            .resolve(outputPath).normalized()
-          val parent = checkNotNull(requested.parent) { "Output root must have a parent" }
-          val output = torrentSystemFileSystem.canonicalize(parent) / requested.name
-          requireAvailableOutput(output)
-          val layout = TorrentContentLayout.from(document.info, document.hybrid)
-          val store = TorrentV2PieceStore(document, output, selection, taskId, budget, storageSlots,
-            creationLogPath = if (recoverCreations) v2CreationLog(output, taskId) else null)
-          v2Identities[hash] = document.identity
-          outputs[hash] = output.toString()
-          registered = true
-          Triple(layout, store, selection)
-        }
-        decoding?.close()
-        decoding = null
-        TorrentV2DownloadSession.run(document, prepared.first, prepared.third, prepared.second,
-          network, peerId.toByteString(), budget, exchangeBudgets.sessions,
-          maxPeers = 500, initialConnections = minOf(config.connectionsPerTorrent, 500),
-          globalRate = downloadRate, throttle = throttle, checkpoint = recovery,
-          discover = discover ?: {},
-          discoverWithReset = if (discover != null) null else { peers, reset ->
-            discoverV2(document, prepared.first, prepared.second, trackerTiers, magnetUri,
-              privacy, peers, reset)
-          }, body = body)
-      } finally {
-        withContext(NonCancellable) {
-          try {
-            if (registered) mutex.withLock { v2Identities.remove(hash); outputs.remove(hash) }
-          } finally {
-            lease?.close()
-            decoding?.close()
-          }
-        }
+      val session = addV2Task(spec)
+      try { body(session) } finally {
+        withContext(NonCancellable) { removeOwner(session) }
       }
     }
     try { return pending.await() } finally {
@@ -612,6 +773,14 @@ internal class KotlinTorrentEngine(
     }
   }
 
+  /**
+   * Feeds a v2 owner's transfer: its own trackers (whose hosts a restricted owner admits), and
+   * for public torrents extra trackers, explicit magnet peers and DHT. A hybrid is in two swarms,
+   * the v2 hash's and the v1 hash's: each has its own tracker tiers and DHT lookups, and its peers
+   * are dialed in its mode. A private hybrid's two topics share one tracker instead
+   * ([PrivateTrackerGroup]). Traffic counters come from the owner, so trackers see what it
+   * received and uploaded.
+   */
   private suspend fun discoverV2(
     document: TorrentV2Document,
     layout: TorrentContentLayout,
@@ -619,54 +788,94 @@ internal class KotlinTorrentEngine(
     tiers: List<List<String>>,
     magnetUri: String?,
     privacy: TorrentDiscoveryPrivacy,
-    peers: SendChannel<PeerEndpoint>,
-    reset: suspend () -> Unit,
+    sink: TorrentV2DiscoverySink,
   ): Unit = coroutineScope {
-    if (tiers.isNotEmpty()) launch {
-      val discovery = TrackerDiscovery(document, layout, peerId, port,
-        TrackerTiers(tiers, tracker::announce), reset)
+    val v1 = document.identity.v1?.takeIf { document.hybrid != null }
+    val topics = listOfNotNull(TrackerTopic.V2(document.info.hash), v1?.let(TrackerTopic::V1))
+    fun peerTopic(topic: TrackerTopic): PeerTopic =
+      if (topic is TrackerTopic.V1) PeerTopic.V1 else PeerTopic.V2
+    // Tier state follows each topic's own answers, so every topic gets fresh tiers.
+    fun discovery(topic: TrackerTopic, urls: List<List<String>>, onChanged: suspend () -> Unit) =
+      TrackerDiscovery(document, layout, peerId, advertisedPort::current,
+        TrackerTiers(urls, tracker::announce), onChanged, topic = topic)
+    suspend fun poll(discovery: TrackerDiscovery, stopped: Boolean = false): TrackerResponse? =
+      discovery.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes(),
+        stopped = stopped)
+    suspend fun publish(topic: TrackerTopic, peers: List<PeerEndpoint>) {
+      // Admit the hosts first: a restricted owner accepts only peers its trackers name.
+      sink.trackerPeers(topic, peers)
+      peers.forEach { sink.offer(it, peerTopic(topic), PeerOrigin.TRACKER) }
+    }
+    if (tiers.isNotEmpty() && document.info.privateTorrent && topics.size > 1) launch {
+      // BEP 27: both hashes of a private hybrid use one tracker at a time, and move together.
+      val group = PrivateTrackerGroup(topics, PrivateTrackerGroup.order(tiers),
+        { topic, url -> discovery(topic, listOf(listOf(url))) {} }, sink::reset)
       try {
         while (isActive) {
           attempt {
-            discovery.poll(store.verifiedPieces(), store.receivedBytes(), 0)?.peers
-              ?.distinct()?.forEach { peers.send(it) }
+            group.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
+              .forEach { (topic, response) -> publish(topic, response.peers.distinct()) }
           }
           delay(1000)
         }
       } finally {
         withContext(NonCancellable) {
           withTimeoutOrNull(2000) {
-            attempt { discovery.poll(store.verifiedPieces(), store.receivedBytes(), 0) }
-            attempt { discovery.poll(store.verifiedPieces(), store.receivedBytes(), 0,
-              stopped = true) }
+            attempt {
+              group.stop(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
+            }
+          }
+        }
+      }
+    } else if (tiers.isNotEmpty()) for (topic in topics) launch {
+      val discovery = discovery(topic, tiers, sink::reset)
+      try {
+        while (isActive) {
+          attempt { poll(discovery)?.let { publish(topic, it.peers.distinct()) } }
+          delay(1000)
+        }
+      } finally {
+        withContext(NonCancellable) {
+          withTimeoutOrNull(2000) {
+            attempt { poll(discovery) }
+            attempt { poll(discovery, stopped = true) }
           }
         }
       }
     }
     if (!document.info.privateTorrent && privacy == TorrentDiscoveryPrivacy.PUBLIC) {
       for (url in extraTrackers(tiers.flatten())) launch {
-        val discovery = TrackerDiscovery(document, layout, peerId, port,
-          TrackerTiers(listOf(listOf(url)), tracker::announce))
-        announceExtra({ stopped ->
-          discovery.poll(store.verifiedPieces(), store.receivedBytes(), 0, stopped = stopped)
-        }) { found -> found.forEach { peers.send(it) } }
+        // One coroutine per tracker polls the topics in turn, so a hybrid adds no sockets.
+        announceExtra(topics.map { discovery(it, listOf(listOf(url))) {} },
+          { extra, stopped -> poll(extra, stopped) }) { extra, found ->
+          found.forEach { sink.offer(it, peerTopic(extra.topic), PeerOrigin.TRACKER) }
+        }
       }
+      // A hybrid's magnet peers may only know the v1 swarm: dial them in v1 mode, offering v2.
+      val explicitTopic = if (v1 != null) PeerTopic.V1 else PeerTopic.V2
       magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { endpoint ->
-          attempt { resolveEndpoint(endpoint).forEach { peers.send(it) } }
+          attempt {
+            resolveEndpoint(endpoint).forEach {
+              sink.offer(it, explicitTopic, PeerOrigin.EXPLICIT)
+            }
+          }
         }
       } }
       if (config.dhtEnabled) launch {
         while (isActive) {
           attempt {
             dhtPeers(InfoHash.fromBytes(document.info.hash.wireBytes()), announce = true)
-              .forEach { peers.send(it) }
+              .forEach { sink.offer(it, PeerTopic.V2, PeerOrigin.DHT) }
+          }
+          if (v1 != null) attempt {
+            dhtPeers(v1, announce = true).forEach { sink.offer(it, PeerTopic.V1, PeerOrigin.DHT) }
           }
           delay(60_000)
         }
       }
     }
-    // Keep dialers available between tracker/DHT rounds and for tracker-only empty swarms.
+    // Keep the transfer open between tracker/DHT rounds and for tracker-only empty swarms.
     kotlinx.coroutines.awaitCancellation()
   }
 
@@ -680,7 +889,7 @@ internal class KotlinTorrentEngine(
     val configuration = session.trackerConfiguration()
     val trackerTiers = configuration.tiers
     if (trackerTiers.isNotEmpty()) launch {
-      val discovery = TrackerDiscovery(metadata, peerId, port,
+      val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
         TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
         nowMs = nowMs,
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
@@ -728,14 +937,14 @@ internal class KotlinTorrentEngine(
     }
     if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       for (url in extraTrackers(trackerTiers.flatten())) launch {
-        val discovery = TrackerDiscovery(metadata, peerId, port,
+        val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
           TrackerTiers(listOf(listOf(url)), tracker::announce), nowMs = nowMs,
           announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
         )
-        announceExtra({ stopped ->
-          discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
+        announceExtra(listOf(discovery), { topic, stopped ->
+          topic.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
             stopped = stopped)
-        }) { found -> found.forEach { output.send(it) } }
+        }) { _, found -> found.forEach { output.send(it) } }
       }
       spec.magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
@@ -755,7 +964,7 @@ internal class KotlinTorrentEngine(
     supervisorScope {
       dht().map { node -> async {
         attempt("DHT lookup for ${logHash(hash.hex)}") {
-          node.peers(hash, if (announce) port else null)
+          node.peers(hash, if (announce) advertisedPort.current() else null)
         } ?: emptyList()
       } }.awaitAll().flatten().distinct()
     }.also { peers -> log.d { "DHT lookup for ${logHash(hash.hex)} found ${peers.size} peer(s)" } }
@@ -791,7 +1000,7 @@ internal class KotlinTorrentEngine(
     for (host in listOf("0.0.0.0", "::")) {
       val family = if (':' in host) "IPv6" else "IPv4"
       val node = attempt("Binding the $family DHT socket") {
-        DhtNode(bindDhtSocket(host), scope, allowLocalAddresses = allowLocalDiscovery)
+        DhtNode(bindDhtSocket(host), scope, allowLocalAddresses = allowLocalPeers)
       } ?: continue
       node.start()
       result.add(node)
@@ -855,49 +1064,85 @@ internal class KotlinTorrentEngine(
     result
   }
 
-  /** False when [addTask] would reject a new torrent for lack of an active slot. */
+  /** False when [addTask] or [addV2Task] would reject a new torrent for lack of a slot. */
   internal suspend fun hasFreeSlot(): Boolean = mutex.withLock {
-    sessions.size + v2Identities.size < config.maxActiveTorrents
+    active < config.maxActiveTorrents
   }
 
   /**
-   * Closing joins peers, a final tracker announce and optionally a recursive delete, so it runs
-   * without the engine lock. The session stops receiving peers and frees its slot at once, but
-   * keeps its output path and admission lease until every concurrent close has finished and the
-   * last one succeeded.
+   * Removes the owner of [infoHash]: a v1 hash, a v2 hash, or a hybrid's v1 hash. Closing joins
+   * peers, a final tracker announce and optionally a recursive delete, so it runs without the
+   * engine lock. The owner stops receiving peers and frees its slot at once, but keeps its
+   * hashes, wire tags, output path and admission lease until every concurrent close has finished
+   * and the last one succeeded.
    */
   override suspend fun removeTorrent(infoHash: String, deleteFiles: Boolean) {
     val entry = mutex.withLock {
-      val current = closing[infoHash] ?: sessions.remove(infoHash)?.let { session ->
-        Closing(session).also { closing[infoHash] = it }
-      } ?: return
-      current.also { it.users++ }
+      val entry = aliases[infoHash]?.let { entries[it] } ?: return
+      beginRemoval(entry)
     }
-    var closed = false
     log.d { "Removing torrent ${logHash(infoHash)}, deleteFiles=$deleteFiles" }
+    finishRemoval(entry, deleteFiles)
+  }
+
+  /** Removes [session]'s entry, unless another owner replaced it meanwhile. */
+  private suspend fun removeOwner(session: TorrentSession) {
+    val entry = mutex.withLock {
+      val entry = entries[session.infoHash]?.takeIf { it.owner.session === session } ?: return
+      beginRemoval(entry)
+    }
+    finishRemoval(entry, deleteFiles = false)
+  }
+
+  /** Under [mutex]. */
+  private fun beginRemoval(entry: Entry): Entry {
+    if (!entry.closing) {
+      entry.closing = true
+      routes.stopAccepting(entry.claim)
+    }
+    entry.users++
+    return entry
+  }
+
+  private suspend fun finishRemoval(entry: Entry, deleteFiles: Boolean) {
+    var closed = false
     try {
-      withContext(NonCancellable) { entry.session.close(deleteFiles) }
+      withContext(NonCancellable) { entry.owner.close(deleteFiles) }
       closed = true
     } finally {
       withContext(NonCancellable) {
         mutex.withLock {
           // A failed close (such as a refused delete) stays charged and registered for a retry.
-          if (--entry.users == 0 && closed && closing[infoHash] === entry) {
-            closing.remove(infoHash)
-            outputs.remove(infoHash)
-            sessionLeases.remove(infoHash)?.let(admissions::release)
-          }
+          if (--entry.users == 0 && closed && entries[entry.key] === entry) unregister(entry)
         }
       }
     }
   }
 
-  private class Closing(val session: KotlinTorrentSession) {
-    var users = 0
+  /** Under [mutex]: frees every hash, tag, the output and the admission of a closed owner. */
+  private fun unregister(entry: Entry) {
+    routes.release(entry.claim)
+    entries.remove(entry.key)
+    entry.hexes.forEach { if (aliases[it] == entry.key) aliases.remove(it) }
+    admissions.release(entry.lease)
   }
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
+
+  /**
+   * Replaces the upload policy of running and later torrents. Every owner chokes or unchokes its
+   * peers within a tick and stops seeding unless [policy] seeds: v1 sessions read the policy on
+   * each pass, and v2 and hybrid owners are told.
+   */
+  override suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
+    uploadPolicy.store(policy)
+    val owners = mutex.withLock {
+      entries.values.mapNotNull { (it.owner as? Owner.V2)?.session }
+    }
+    owners.forEach { it.uploadPolicyChanged() }
+    log.d { "Engine upload policy: $policy" }
+  }
   fun setConnections(value: Int) = network.set(value)
 
   /** Replaces the extra public trackers; sessions and lookups started afterwards use them. */
@@ -934,24 +1179,35 @@ internal class KotlinTorrentEngine(
   }
 
   /**
-   * Announces one extra tracker until cancelled, then sends a best-effort stop. Each extra runs on
-   * its own because tier traversal stops at the first tracker that answers, and would otherwise
-   * wait behind every unreachable tracker of the torrent's own list.
+   * Announces one extra tracker for each of [discoveries] (one per topic) until cancelled, then
+   * sends a best-effort stop to each within one shared bound. Each extra runs on its own because
+   * tier traversal stops at the first tracker that answers, and would otherwise wait behind every
+   * unreachable tracker of the torrent's own list. Topics are polled in sequence, so a torrent
+   * with two topics does not double the concurrent requests to a tracker.
    */
   private suspend fun announceExtra(
-    poll: suspend (stopped: Boolean) -> TrackerResponse?,
-    publish: suspend (List<PeerEndpoint>) -> Unit,
+    discoveries: List<TrackerDiscovery>,
+    poll: suspend (TrackerDiscovery, stopped: Boolean) -> TrackerResponse?,
+    publish: suspend (TrackerDiscovery, List<PeerEndpoint>) -> Unit,
   ) {
     try {
       while (currentCoroutineContext().isActive) {
-        attempt { poll(false) }?.let { publish(it.peers.distinct()) }
+        for (discovery in discoveries) {
+          attempt { poll(discovery, false) }?.let { publish(discovery, it.peers.distinct()) }
+        }
         delay(1000)
       }
     } finally {
-      withContext(NonCancellable) { withTimeoutOrNull(2000) { attempt { poll(true) } } }
+      withContext(NonCancellable) {
+        withTimeoutOrNull(2000) {
+          for (discovery in discoveries) attempt { poll(discovery, true) }
+        }
+      }
     }
   }
 }
+
+private const val WILDCARD_IPV4 = "0.0.0.0"
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128

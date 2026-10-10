@@ -15,6 +15,7 @@ import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -222,6 +223,40 @@ class KotlinTorrentEngineTest {
   }
 
   @Test
+  fun addTaskRejectsHybridMetadata() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        // A btih magnet can resolve to a hybrid, whose v1 view has no v2 hashes or identity.
+        val hybrid = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)
+        val metadata = TorrentMetadata.fromBencode(hybrid.metainfo, allowHybrid = true)
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-hybrid-v1-view-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        FileSystem.SYSTEM.createDirectories(root)
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        try {
+          engine.start()
+          assertFailsWith<IllegalArgumentException> {
+            engine.addTask(TorrentTaskSpec("hybrid", metadata, (root / "out").toString(),
+              emptySet()))
+          }
+          // Nothing was claimed: the same torrent still runs as a v2 owner.
+          assertTrue(engine.hasFreeSlot())
+          assertEquals(0, engine.admittedSessionBytes)
+          engine.addV2Task(TorrentV2TaskSpec("hybrid", hybrid.document, (root / "out").toString(),
+            privacy = TorrentDiscoveryPrivacy.PUBLIC))
+          engine.removeTorrent(metadata.infoHash.hex, deleteFiles = false)
+          assertEquals(0, engine.admittedSessionBytes)
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+        assertEquals(0, engine.admittedSessionBytes)
+        assertEquals(0, engine.allocatedExchangeBytes)
+      }
+    }
+  }
+
+  @Test
   fun completedTorrent_acceptsNewIncomingPeerAndSeedsVerifiedBytes() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
@@ -234,7 +269,7 @@ class KotlinTorrentEngineTest {
         FileSystem.SYSTEM.createDirectories(root)
         FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val remote = createTorrentNetwork()
         try {
           engine.start()

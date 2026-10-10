@@ -197,4 +197,20 @@ class SpeedLimitTest {
     assertEquals(null, SpeedLimit.parse("-1k"))
     assertEquals(null, SpeedLimit.parse(""))
   }
+
+  @Test
+  fun parse_rateTooLargeForBytes_returnsNull() {
+    // These would overflow a Long of bytes per second.
+    assertEquals(null, SpeedLimit.parse("9000000000000m"))
+    assertEquals(null, SpeedLimit.parse("9223372036854775807k"))
+    val largestMegabytes = Long.MAX_VALUE / (1024 * 1024)
+    assertEquals(SpeedLimit.mbps(largestMegabytes), SpeedLimit.parse("${largestMegabytes}m"))
+    assertEquals(null, SpeedLimit.parse("${largestMegabytes + 1}m"))
+  }
+
+  @Test
+  fun kbpsAndMbps_overflowingRate_throws() {
+    assertFailsWith<IllegalArgumentException> { SpeedLimit.mbps(9_000_000_000_000) }
+    assertFailsWith<IllegalArgumentException> { SpeedLimit.kbps(Long.MAX_VALUE) }
+  }
 }

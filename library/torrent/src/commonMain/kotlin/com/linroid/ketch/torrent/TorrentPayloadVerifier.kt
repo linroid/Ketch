@@ -61,16 +61,17 @@ internal class TorrentPayloadVerifier(private val document: TorrentV2Document) {
       finished = true
       var hash = merkle.digest()
       var blocks = 1L
+      var level = 0
       val actualBlocks = (payloadLength - 1) / TorrentMerkleRoot.BLOCK_BYTES + 1
-      var zero = ByteArray(32)
       while (blocks < actualBlocks) {
-        zero = Sha256().update(zero).update(zero).digest()
+        level++
         blocks *= 2
       }
+      // A short last piece is padded with zero subtrees up to a whole piece's height.
       val targetBlocks = (treeLength - 1) / TorrentMerkleRoot.BLOCK_BYTES + 1
       while (blocks < targetBlocks) {
-        hash = Sha256().update(hash).update(zero).digest()
-        zero = Sha256().update(zero).update(zero).digest()
+        hash = Sha256().update(hash).update(merkleZeroHash(level)).digest()
+        level++
         blocks *= 2
       }
       if (!hash.contentEquals(expectedV2)) return false

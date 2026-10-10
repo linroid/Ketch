@@ -35,14 +35,22 @@ internal class KotlinTorrentSession(
   private val budget: TorrentBufferBudget,
   parent: CoroutineScope,
   connections: Int = 20,
-  private val uploadPolicy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED,
+  /** The part of [budget] pieces read back for peers may hold, every session's together. */
+  private val uploadBudget: TorrentBufferBudget = budget,
+  /** Read live: peers follow a change within a tick, and a seed finishes once it leaves SEED. */
+  private val uploadPolicy: () -> TorrentUploadPolicy = { TorrentUploadPolicy.DISABLED },
   private val checkpoint: TorrentCheckpoint? = null,
   private val peerId: ByteArray = torrentRandomBytes(20),
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
-  private val uploadThrottle: suspend (Int) -> Unit = {},
+  /** The engine's upload bucket, shared by every torrent and applied before this one's. */
+  private val engineUploadRate: TorrentRateLimiter = TorrentRateLimiter(),
   private val trackerConfigurationBudget: TorrentBufferBudget? = null,
   private val privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+  /** Test hook: lets peer exchange carry loopback and private addresses. */
+  private val allowLocalPeers: Boolean = false,
+  /** Our listen port as a peer at that address reaches it (BEP 10 `p`); 0 leaves it out. */
+  private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -237,7 +245,7 @@ internal class KotlinTorrentSession(
           "Checked files for $label: ${verified.count { it }}/${verified.size} pieces verified, " +
             "${_downloadedBytes.value}/${store.totalSelectedBytes} bytes"
         }
-        if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+        if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
           store.finish()
           store.persistCheckpoint(received.load(), uploaded.load())
           _state.value = TorrentSessionState.FINISHED
@@ -252,7 +260,7 @@ internal class KotlinTorrentSession(
         _state.value = TorrentSessionState.DOWNLOADING
         log.i {
           "Downloading $label with up to ${connectionLimit.load()} peer(s), " +
-            "upload=$uploadPolicy, privacy=$privacy"
+            "upload=${uploadPolicy()}, privacy=$privacy"
         }
         coroutineScope {
           val peers = Channel<PeerEndpoint>(256)
@@ -261,8 +269,10 @@ internal class KotlinTorrentSession(
           }
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
-              connections = { connectionLimit.load() }, uploadPolicy = uploadPolicy,
-              trackerOnly = trackerRestricted,
+              connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
+              uploadPolicy = uploadPolicy,
+              allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
+              listenPortFor = listenPortFor,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()
@@ -277,15 +287,12 @@ internal class KotlinTorrentSession(
                 rate.acquire(bytes)
                 downloadThrottle(bytes)
               },
-              uploadPayload = { bytes ->
-                uploadRate.acquire(bytes)
-                uploadThrottle(bytes)
-                uploaded.fetchAndAdd(bytes.toLong())
-              },
+              uploadRate = engineUploadRate, sessionUploadRate = uploadRate,
+              onUploaded = { bytes -> uploaded.fetchAndAdd(bytes.toLong()) },
               onProgress = { _downloadedBytes.value = it },
               onCompleted = {
                 store.persistCheckpoint(received.load(), uploaded.load())
-                _state.value = if (uploadPolicy == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+                _state.value = if (uploadPolicy() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
                   TorrentSessionState.SEEDING
                 } else TorrentSessionState.FINISHED
                 log.i {
@@ -295,6 +302,12 @@ internal class KotlinTorrentSession(
               },
               logLabel = label,
             ).run(peers, incoming, resets)
+            // A swarm returns while seeding only once the policy stops seeding.
+            if (_state.value == TorrentSessionState.SEEDING) {
+              store.persistCheckpoint(received.load(), uploaded.load())
+              _state.value = TorrentSessionState.FINISHED
+              log.i { "Torrent $label stopped seeding: upload policy changed" }
+            }
           } finally {
             withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
           }
@@ -401,7 +414,7 @@ internal class KotlinTorrentSession(
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = rate.set(bytesPerSecond)
 
-  fun setUploadRateLimit(value: Long) = uploadRate.set(value)
+  override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
 
   fun setConnections(value: Int) {
     require(value in 1..512)

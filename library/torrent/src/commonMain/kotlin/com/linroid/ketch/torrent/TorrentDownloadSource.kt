@@ -15,11 +15,13 @@ import com.linroid.ketch.core.engine.SourceResumeState
 import io.ktor.http.Url
 import io.ktor.http.decodeURLPart
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.io.encoding.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -32,6 +34,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -57,8 +61,15 @@ class TorrentDownloadSource(
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
   private val listedTrackers = AtomicReference(emptyList<String>())
-  internal var engineFactory: () -> TorrentEngine = {
-    KotlinTorrentEngine(config.copy(additionalTrackers = extraTrackers()), http = http)
+  private val uploadPolicy = AtomicReference(config.effectiveUploadPolicy)
+  private val uploadRateLimit = AtomicLong(config.uploadRateLimit)
+
+  /** The upload policy of running and later torrents: the configured one or the last set. */
+  internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
+
+  /** Creates the engine from [engineConfig], under [engineMutex]. */
+  internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
+    KotlinTorrentEngine(it, http = http)
   }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val trackerListSubscription = TrackerLists(
@@ -81,6 +92,8 @@ class TorrentDownloadSource(
   private val metadataFetches = Semaphore(MAX_PENDING_METADATA)
   private val stateMutex = Mutex()
   private val states = linkedMapOf<String, TorrentResumeState>()
+  // Guarded by stateMutex: what stops each seeding session's lent slot coming back.
+  private val seedWatchers = mutableMapOf<String, Job>()
   private val log = KetchLogger("TorrentSource")
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
@@ -107,7 +120,7 @@ class TorrentDownloadSource(
   private suspend fun startEngine(): TorrentEngine = engineMutex.withLock {
     check(!closed.load()) { "Torrent source is closed" }
     engine.load()?.let { return@withLock it }
-    val created = engineFactory()
+    val created = engineFactory(engineConfig())
     try {
       try {
         created.start()
@@ -131,16 +144,44 @@ class TorrentDownloadSource(
     }
   }
 
-  /** Change the shared upload rate immediately; zero means unlimited. */
-  suspend fun setUploadRateLimit(bytesPerSecond: Long) {
-    require(bytesPerSecond >= 0)
-    getEngine().setUploadRateLimit(bytesPerSecond)
+  /** The configuration of the next engine: the config with what the setters changed since. */
+  private fun engineConfig(): TorrentConfig = config.copy(additionalTrackers = extraTrackers(),
+    uploadPolicy = uploadPolicy.load(), uploadRateLimit = uploadRateLimit.load())
+
+  /**
+   * Replaces [TorrentConfig.uploadPolicy] at once: running torrents choke or unchoke their peers
+   * within a rechoke, seeding ones finish unless [policy] is
+   * [TorrentUploadPolicy.SEED_AFTER_COMPLETION], and torrents started later use it. Never starts
+   * the engine.
+   */
+  suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
+    engineMutex.withLock {
+      uploadPolicy.store(policy)
+      engine.load()?.setUploadPolicy(policy)
+    }
+    log.i { "Upload policy: $policy" }
   }
 
-  /** Change upload rate for an active task, including a completed task that is seeding. */
+  /**
+   * Replaces the upload cap shared by every torrent ([TorrentConfig.uploadRateLimit]) at once;
+   * zero means unlimited. Torrents started later keep it. Never starts the engine.
+   */
+  suspend fun setUploadRateLimit(bytesPerSecond: Long) {
+    require(bytesPerSecond >= 0)
+    engineMutex.withLock {
+      uploadRateLimit.store(bytesPerSecond)
+      engine.load()?.setUploadRateLimit(bytesPerSecond)
+    }
+    log.i { "Upload limit: $bytesPerSecond B/s" }
+  }
+
+  /**
+   * Change upload rate for an active task, v1, v2 or hybrid, including a completed task that is
+   * seeding; zero means unlimited. It applies in addition to [setUploadRateLimit].
+   */
   suspend fun setTaskUploadRateLimit(taskId: String, bytesPerSecond: Long) {
     require(bytesPerSecond >= 0)
-    checkNotNull(tasks.session(taskId) as? KotlinTorrentSession) { "Torrent task is not active" }
+    checkNotNull(tasks.session(taskId)) { "Torrent task is not active" }
       .setUploadRateLimit(bytesPerSecond)
   }
 
@@ -313,7 +354,7 @@ class TorrentDownloadSource(
     }
     val fetched = getEngine().fetchMetadata(url, privacy)
       ?: throw KetchError.Network(MetadataNotFoundException())
-    if (!isHybridInfo(fetched.infoBytes)) return resolved(url, fetched, privacy)
+    if (!fetched.isHybrid) return resolved(url, fetched, privacy)
     // A btih-only magnet found a hybrid torrent. Its v2 identity keys the task, so fetch the
     // piece layers under that topic instead of mixing v1 and v2 hashes.
     val v2Hash = V2InfoHash.fromBytes(sha256Digest(fetched.infoBytes))
@@ -438,7 +479,7 @@ class TorrentDownloadSource(
         "files=${selected.size}/${metadata.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
-    withActiveSlot(context, total) {
+    withActiveSlot(context, total, hash) {
       tasks.reserve(context.taskId, hash)
       var session: TorrentSession? = null
       var keepSeeding = false
@@ -494,13 +535,7 @@ class TorrentDownloadSource(
             if (!keepSeeding) session?.pause()
             updateResumeState(context)
             // Seeding is optional: a download waiting for this slot takes precedence.
-            if (keepSeeding) {
-              lent = slots.lend(context.taskId)
-              log.i {
-                if (lent) "Torrent taskId=${context.taskId} keeps seeding"
-                else "Torrent taskId=${context.taskId} stops seeding for a waiting download"
-              }
-            }
+            if (keepSeeding) lent = lendSlot(context.taskId, checkNotNull(session))
           } finally {
             if (!lent) {
               engine.load()?.removeTorrent(hash)
@@ -511,6 +546,43 @@ class TorrentDownloadSource(
       }
       lent
     }
+  }
+
+  /**
+   * Lends the task's slot to its seeding [session], watched until it stops; false when a
+   * download waits for the slot, and the caller stops the session.
+   */
+  private suspend fun lendSlot(taskId: String, session: TorrentSession): Boolean {
+    val lent = slots.lend(taskId)
+    log.i {
+      if (lent) "Torrent taskId=$taskId keeps seeding"
+      else "Torrent taskId=$taskId stops seeding for a waiting download"
+    }
+    if (lent) watchSeeder(taskId, session)
+    return lent
+  }
+
+  /**
+   * Takes the slot back once a lent seeder stops by itself, such as when the upload policy stops
+   * seeding or its storage fails, and stops it. [release], eviction and [close] cancel it.
+   */
+  private suspend fun watchSeeder(taskId: String, session: TorrentSession) {
+    val watcher = scope.launch(start = CoroutineStart.LAZY) {
+      val self = coroutineContext.job
+      session.state.first {
+        it == TorrentSessionState.STOPPED || it == TorrentSessionState.FINISHED
+      }
+      // Once it reclaimed the slot, it stops the seeder and returns the slot, whatever happens.
+      withContext(NonCancellable) {
+        stateMutex.withLock { if (seedWatchers[taskId] === self) seedWatchers.remove(taskId) }
+        if (slots.reclaim(taskId)) {
+          log.i { "Torrent taskId=$taskId stopped seeding; its slot is free" }
+          try { stopSession(taskId) } finally { slots.release() }
+        }
+      }
+    }
+    stateMutex.withLock { seedWatchers.put(taskId, watcher)?.cancel() }
+    watcher.start()
   }
 
   private suspend fun executeV2(
@@ -544,85 +616,126 @@ class TorrentDownloadSource(
         "files=${selected.size}/${resolved.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
-    withActiveSlot(context, total) {
+    withActiveSlot(context, total, hash) {
       tasks.reserve(context.taskId, hash)
+      var engine: KotlinTorrentEngine? = null
+      var session: TorrentV2DownloadSession? = null
+      var keepSeeding = false
+      var lent = false
       try {
         rememberState(context.taskId, state)
-        (getEngine() as KotlinTorrentEngine).withV2Download(context.taskId, document, output,
-          selected, checkpointEncoded = previous?.resumeData?.takeIf { it.isNotEmpty() },
+        val owner = getEngine() as KotlinTorrentEngine
+        engine = owner
+        session = owner.addV2Task(TorrentV2TaskSpec(context.taskId, document, output, selected,
+          checkpointEncoded = previous?.resumeData?.takeIf { it.isNotEmpty() },
           trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
           magnetUri = context.url.takeIf { it.startsWith("magnet:", true) },
           privacy = privacy, throttle = context.throttle, recoverCreations = true,
-        ) { session ->
-          coroutineScope {
-            tasks.attach(context.taskId, session)
-            val connections = launch {
-              context.maxConnections.collect { value ->
-                session.setConnections(
-                  torrentPeerLimit(value, config.connectionsPerTorrent, MAX_V2_PEERS))
-              }
-            }
-            val clock = monotonicClock()
-            var lastTime = clock()
-            var lastReceived = session.receivedBytes()
-            try {
-              session.resume()
-              var lastState: TorrentSessionState? = null
-              while (true) {
-                val status = session.state.value
-                if (status != lastState) {
-                  log.d { "Torrent taskId=${context.taskId} session state: $status" }
-                  lastState = status
-                }
-                val progress = session.fileProgress()
-                var offset = 0L
-                context.segments.value = files.map { file ->
-                  Segment(file.id.toInt(), offset, offset + file.size - 1,
-                    progress[file.id] ?: 0).also { offset += file.size }
-                }
-                val now = clock()
-                val received = session.receivedBytes()
-                context.reportedSpeed.value = if (now > lastTime) {
-                  (received - lastReceived) * 1000 / (now - lastTime)
-                } else 0
-                lastReceived = received
-                lastTime = now
-                context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total)
-                when (status) {
-                  TorrentSessionState.FINISHED -> break
-                  TorrentSessionState.STOPPED -> throw (session.failure.value
-                    ?: IllegalStateException("Torrent session stopped"))
-                  else -> delay(200)
-                }
-              }
-            } finally {
-              withContext(NonCancellable) {
-                connections.cancel()
-                session.pause()
+        ))
+        tasks.attach(context.taskId, session)
+        keepSeeding = transferV2(context, session, files, total)
+      } catch (e: Throwable) {
+        keepSeeding = false
+        throw e
+      } finally {
+        val owned = session
+        withContext(NonCancellable) {
+          try {
+            if (owned != null) {
+              try {
+                if (!keepSeeding) owned.pause()
                 updateResumeState(context)
+                if (keepSeeding) lent = lendSlot(context.taskId, owned)
+              } finally {
+                // Removal closes the store before the task is released: cleanup cannot race it.
+                if (!lent) engine?.removeTorrent(hash)
               }
             }
+          } finally {
+            if (!lent) tasks.release(context.taskId)
           }
         }
-      } finally {
-        withContext(NonCancellable) { tasks.release(context.taskId) }
       }
-      false
+      lent
     }
+  }
+
+  /**
+   * Reports a v2 owner's progress until it finishes, and returns whether it keeps seeding; a
+   * stopped owner fails the task.
+   */
+  private suspend fun transferV2(
+    context: DownloadContext,
+    session: TorrentV2DownloadSession,
+    files: List<SourceFile>,
+    total: Long,
+  ): Boolean = coroutineScope {
+    val connections = launch {
+      context.maxConnections.collect { value ->
+        session.setConnections(torrentPeerLimit(value, config.connectionsPerTorrent, MAX_V2_PEERS))
+      }
+    }
+    val clock = monotonicClock()
+    var lastTime = clock()
+    var lastReceived = session.receivedBytes()
+    var seeding = false
+    try {
+      session.resume()
+      var lastState: TorrentSessionState? = null
+      while (true) {
+        val status = session.state.value
+        if (status != lastState) {
+          log.d { "Torrent taskId=${context.taskId} session state: $status" }
+          lastState = status
+        }
+        val progress = session.fileProgress()
+        var offset = 0L
+        context.segments.value = files.map { file ->
+          Segment(file.id.toInt(), offset, offset + file.size - 1,
+            progress[file.id] ?: 0).also { offset += file.size }
+        }
+        val now = clock()
+        val received = session.receivedBytes()
+        context.reportedSpeed.value = if (now > lastTime) {
+          (received - lastReceived) * 1000 / (now - lastTime)
+        } else 0
+        lastReceived = received
+        lastTime = now
+        context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total)
+        when (status) {
+          // The task completes either way; a seeding owner outlives it.
+          TorrentSessionState.FINISHED -> break
+          TorrentSessionState.SEEDING -> { seeding = true; break }
+          TorrentSessionState.STOPPED -> throw (session.failure.value
+            ?: IllegalStateException("Torrent session stopped"))
+          else -> delay(200)
+        }
+      }
+    } finally {
+      connections.cancel()
+    }
+    seeding
   }
 
   /**
    * Runs [block] holding one of the engine's [TorrentConfig.maxActiveTorrents] slots. When every
    * slot is taken the task waits, cancellably, by priority and then arrival instead of failing;
-   * the oldest seeder yields its slot first. [block] returns true when it lent the slot to a
-   * seeding session, which gives it back on eviction or [release].
+   * the oldest seeder yields its slot first. A seeder of the same torrent [hash], such as a
+   * finished task's, gives way to the new task and hands it its slot, since one swarm has one
+   * owner. [block] returns true when it lent the slot to a seeding session, which gives it back
+   * on eviction or [release].
    */
   private suspend fun withActiveSlot(
     context: DownloadContext,
     total: Long,
+    hash: String,
     block: suspend () -> Boolean,
   ) {
-    val evicted = slots.acquire(context.request.priority) {
+    // Only a lent seeder can be reclaimed; an active download of the same torrent still refuses
+    // this task when it reserves the hash.
+    val sameTorrent = tasks.ownerOf(hash)
+      ?.takeIf { it != context.taskId && slots.reclaim(it) }
+    val evicted = sameTorrent ?: slots.acquire(context.request.priority) {
       log.i {
         "Torrent taskId=${context.taskId} waits for one of ${config.maxActiveTorrents} " +
           "active torrent slots"
@@ -661,6 +774,7 @@ class TorrentDownloadSource(
 
   /** Stops a session whose download already returned, such as one still seeding. */
   private suspend fun stopSession(taskId: String) {
+    stateMutex.withLock { seedWatchers.remove(taskId) }?.cancel()
     val session = tasks.session(taskId) ?: return
     try {
       engine.load()?.removeTorrent(session.infoHash)
@@ -818,6 +932,3 @@ internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)
 
 /** Platform-specific base64 decoding. */
 internal fun decodeBase64(data: String): ByteArray = Base64.Default.decode(data)
-
-private fun isHybridInfo(infoBytes: ByteArray): Boolean = infoBytes.isNotEmpty() &&
-  Bencode.parse(infoBytes, infoBytes.size)["meta version"]?.integer == 2L

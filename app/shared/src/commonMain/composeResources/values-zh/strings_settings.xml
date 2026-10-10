@@ -20,7 +20,7 @@
   <string name="settings_category_network">网络</string>
   <string name="settings_category_network_description">下载使用的网络</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">用于公开种子的额外 Tracker</string>
+  <string name="settings_category_bittorrent_description">上传和额外的 Tracker</string>
   <string name="settings_category_sharing">共享</string>
   <string name="settings_category_sharing_description">配对手机或浏览器来控制这台设备</string>
 
@@ -519,9 +519,20 @@
   <string name="settings_proxy_footer">适用于开始或继续时的 HTTP 下载。FTP 和种子始终直接连接。</string>
   <string name="settings_proxy_unsupported">%1$s 无法使用代理。请先在该设备上更新 Ketch。</string>
 
+  <string name="settings_torrent_upload">上传</string>
+  <string name="settings_torrent_upload_mode">与节点共享</string>
+  <string name="settings_torrent_upload_off">关闭</string>
+  <string name="settings_torrent_upload_while_downloading">下载时</string>
+  <string name="settings_torrent_upload_seed">持续做种</string>
+  <string name="settings_torrent_upload_off_hint">节点无法从此设备下载任何内容。</string>
+  <string name="settings_torrent_upload_while_downloading_hint">种子下载期间，节点可以下载已有的分块。</string>
+  <string name="settings_torrent_upload_seed_hint">Ketch 运行期间，已完成的种子会持续上传，直到将其移除或关闭此选项。等待下载的种子优先。</string>
+  <string name="settings_torrent_upload_limit">上传限速</string>
+  <string name="settings_torrent_upload_limit_hint">所有种子共用。</string>
+  <string name="settings_torrent_upload_footer">接收上传的节点可以看到此设备的 IP 地址。私有种子只与其 Tracker 提供的节点共享。</string>
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>
-  <string name="settings_torrent_remote">请在 %1$s 上打开 Ketch，或编辑该设备的 config.toml，修改额外的 Tracker。</string>
+  <string name="settings_torrent_remote">请在 %1$s 上打开 Ketch，或编辑该设备的 config.toml，修改 BitTorrent 设置。</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">已移除 %1$d 个 Tracker。</item>
   </plurals>
@@ -696,6 +707,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 代理, 代理, 例外, 防火墙</string>
   <string name="settings_search_trackers">添加到公开种子的 Tracker</string>
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, tracker, 添加 tracker</string>
+  <string name="settings_search_upload">与节点共享分块，并为已完成的种子做种</string>
+  <string name="settings_search_upload_keywords">上传, 做种, seed, 分享, 共享, 分享率, 节点</string>
   <string name="settings_search_pair">从手机或浏览器控制这台设备</string>
   <string name="settings_search_pair_keywords">二维码, 手机, 配对, 远程, 网页版, 连接</string>
   <string name="settings_search_reachable_keywords">局域网, 网络, 远程访问</string>

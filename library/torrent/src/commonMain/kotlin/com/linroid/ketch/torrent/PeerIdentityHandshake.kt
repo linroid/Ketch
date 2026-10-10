@@ -4,6 +4,15 @@ import kotlinx.coroutines.withTimeout
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import okio.IOException
+
+/** The peer answered our handshake for another swarm than the one we asked for. */
+internal class PeerSwarmChangedException :
+  IllegalArgumentException("Peer handshake changed the requested swarm")
+
+/** The peer hung up instead of answering our handshake, as peers that lack the swarm do. */
+internal class PeerHandshakeUnansweredException(cause: Throwable) :
+  IOException("Peer closed before answering the handshake", cause)
 
 /** Full identities remain attached to a route; 20-byte wire tags never become content keys. */
 internal class PeerIdentityHandshake(
@@ -42,11 +51,16 @@ internal class PeerIdentityHandshake(
     val offer = allowUpgrade && mode == Mode.V1 && v1 != null && v2 != null
     require(!offer || v1 != v2) { "Ambiguous hybrid upgrade tag" }
     connection.write(encode(mode, peerId, offer))
-    val remote = decode(connection.readExactly(68))
+    val reply = try {
+      connection.readExactly(68)
+    } catch (error: IOException) {
+      throw PeerHandshakeUnansweredException(error)
+    }
+    val remote = decode(reply)
     val negotiated = when {
       remote.tag == tag(mode) -> mode
       offer && remote.tag == v2 -> Mode.V2
-      else -> throw IllegalArgumentException("Peer handshake changed the requested swarm")
+      else -> throw PeerSwarmChangedException()
     }
     result(remote, negotiated, peerId, expectedPeerId)
   }

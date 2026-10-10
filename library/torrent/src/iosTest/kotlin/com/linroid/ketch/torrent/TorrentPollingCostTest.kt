@@ -43,7 +43,7 @@ class TorrentPollingCostTest {
         FileSystem.SYSTEM.createDirectories(root)
         FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
         val seed = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val client = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
         try {
           seed.start()

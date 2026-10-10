@@ -41,6 +41,12 @@ internal interface TorrentSession {
   fun setDownloadRateLimit(bytesPerSecond: Long)
 
   /**
+   * Sets this torrent's upload rate limit (bytes/sec, 0=unlimited), applied after the engine's
+   * shared one. Sessions that never upload ignore it.
+   */
+  fun setUploadRateLimit(bytesPerSecond: Long) {}
+
+  /**
    * Saves resume data for later session recovery.
    *
    * @return raw resume data bytes, or null if unavailable

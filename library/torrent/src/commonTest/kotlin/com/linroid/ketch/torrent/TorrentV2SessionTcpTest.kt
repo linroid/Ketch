@@ -67,7 +67,7 @@ class TorrentV2SessionTcpTest {
   }
 
   @Test
-  fun rejectsAnArrivingConnectionForAnotherTorrent() = runTest {
+  fun closesAnArrivingConnectionForAnotherTorrent() = runTest {
     exercise(hybrid = false, wrongSession = true)
   }
 
@@ -141,8 +141,9 @@ class TorrentV2SessionTcpTest {
             }
           }
           if (wrongSession) {
-            val failure = assertFailsWith<IllegalArgumentException> { download() }
-            assertEquals("Wrong incoming torrent", failure.message)
+            // The connection is closed and the session carries on, until no peer is left.
+            val failure = assertFailsWith<IllegalStateException> { download() }
+            assertEquals("All torrent peers disconnected before completion", failure.message)
             assertFalse(store.completed())
             assertEquals(0L, store.progress().getValue("0"))
           } else if (invalidV1) {

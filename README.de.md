@@ -118,9 +118,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **HTTP und HTTPS**, mit Cookies und Referrer der Seite, wenn die Browsererweiterung den Download
   übergibt.
 - **FTP und FTPS**, mit parallelen Verbindungen und Fortsetzen.
-- **BitTorrent und Magnet-Links** — v1-, v2- und Hybrid-Torrents mit Dateiauswahl und einer
-  vollständig
-  in Kotlin geschriebenen Engine ([Details](docs/torrent.md)).
+- **BitTorrent und Magnet-Links** — v1-, v2- und Hybrid-Torrents mit Dateiauswahl und
+  optionalem Seeden, in einer vollständig in Kotlin geschriebenen Engine
+  ([Details](docs/torrent.md)).
 - **HLS (`.m3u8`) und DASH (`.mpd`)** — Speichere zeitlich begrenzte, unverschlüsselte Streams als
   eine Mediendatei. Bei HLS-Master-Playlists wird die Variante mit der höchsten Bandbreite verwendet
   ([Unterstützung und Grenzen](docs/media.md)).

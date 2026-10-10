@@ -45,6 +45,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.pauseActiveTasks
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
@@ -56,6 +57,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -168,6 +170,8 @@ class KetchService : Service() {
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,
         additionalTrackers = config.torrent.trackers,
         trackerListUrls = config.torrent.subscribedTrackerLists,
+        uploadPolicy = config.torrent.upload.toUploadPolicy(),
+        uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
       ),
     )
     instanceManager = InstanceManager(
@@ -230,6 +234,8 @@ class KetchService : Service() {
         applyTorrentSettings = {
           torrentSource.setAdditionalTrackers(it.trackers)
           torrentSource.setTrackerLists(it.subscribedTrackerLists)
+          torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
+          torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
         },
         trackerList = torrentSource.trackerLists.map { lists ->
           lists.map {
@@ -587,4 +593,11 @@ class KetchService : Service() {
     val PEAK_SAVE_DELAY = 10.seconds
     val RECOVERY_HOLD = 30.seconds
   }
+}
+
+/** The engine's upload policy for this `[torrent] upload` setting. */
+private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
 }

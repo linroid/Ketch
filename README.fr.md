@@ -117,8 +117,8 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **HTTP et HTTPS**, avec les cookies et le référent de la page lorsque l'extension de navigateur
   transmet le téléchargement.
 - **FTP et FTPS**, avec connexions parallèles et reprise.
-- **BitTorrent et liens magnet** — Torrents v1, v2 et hybrides, avec sélection des fichiers, dans
-  un moteur entièrement écrit en Kotlin ([détails](docs/torrent.md)).
+- **BitTorrent et liens magnet** — Torrents v1, v2 et hybrides, avec sélection des fichiers et
+  partage facultatif, dans un moteur entièrement écrit en Kotlin ([détails](docs/torrent.md)).
 - **HLS (`.m3u8`) et DASH (`.mpd`)** — Enregistrez les flux de durée finie non chiffrés dans un
   seul fichier multimédia. Les listes maîtresses HLS utilisent la variante au débit le plus élevé
   ([prise en charge et limites](docs/media.md)).

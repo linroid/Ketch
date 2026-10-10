@@ -20,7 +20,7 @@
   <string name="settings_category_network">ネットワーク</string>
   <string name="settings_category_network_description">ダウンロードに使うネットワーク</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">公開トレント用の追加トラッカー</string>
+  <string name="settings_category_bittorrent_description">アップロードと追加トラッカー</string>
   <string name="settings_category_sharing">共有</string>
   <string name="settings_category_sharing_description">スマートフォンやブラウザとペアリングして、このデバイスを操作</string>
 
@@ -519,9 +519,20 @@
   <string name="settings_proxy_footer">HTTPダウンロードの開始時と再開時に適用されます。FTPとトレントは直接接続します。</string>
   <string name="settings_proxy_unsupported">%1$sではプロキシを使えません。プロキシを選ぶには、そのデバイスのKetchをアップデートしてください。</string>
 
+  <string name="settings_torrent_upload">アップロード</string>
+  <string name="settings_torrent_upload_mode">ピアと共有</string>
+  <string name="settings_torrent_upload_off">オフ</string>
+  <string name="settings_torrent_upload_while_downloading">ダウンロード中</string>
+  <string name="settings_torrent_upload_seed">シードを続ける</string>
+  <string name="settings_torrent_upload_off_hint">ピアはこのデバイスから何もダウンロードできません。</string>
+  <string name="settings_torrent_upload_while_downloading_hint">トレントのダウンロード中は、取得済みのピースをピアがダウンロードできます。</string>
+  <string name="settings_torrent_upload_seed_hint">Ketchの実行中、完了したトレントは削除するかこの設定をオフにするまでアップロードを続けます。ダウンロード待ちのトレントが優先されます。</string>
+  <string name="settings_torrent_upload_limit">アップロード速度制限</string>
+  <string name="settings_torrent_upload_limit_hint">すべてのトレントで共有します。</string>
+  <string name="settings_torrent_upload_footer">アップロード先のピアには、このデバイスのIPアドレスが見えます。非公開トレントは、そのトラッカーのピアとだけ共有します。</string>
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>
-  <string name="settings_torrent_remote">追加トラッカーは、%1$s本体またはそのconfig.tomlで変更してください。</string>
+  <string name="settings_torrent_remote">BitTorrentの設定は、%1$s本体またはそのconfig.tomlで変更してください。</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">%1$d件のトラッカーを削除しました。</item>
   </plurals>
@@ -696,6 +707,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, httpプロキシ, プロキシ, 除外, ファイアウォール</string>
   <string name="settings_search_trackers">公開トレントに追加するトラッカー</string>
   <string name="settings_search_trackers_keywords">アナウンス, udp, マグネット, トラッカーを追加</string>
+  <string name="settings_search_upload">ピアとピースを共有し、完了したトレントをシードする</string>
+  <string name="settings_search_upload_keywords">アップロード, シード, シーディング, 共有, 比率, ピア, seed</string>
   <string name="settings_search_pair">スマートフォンやブラウザからこのデバイスを操作</string>
   <string name="settings_search_pair_keywords">QRコード, スマートフォン, ペアリング, リモート, Webアプリ, 接続</string>
   <string name="settings_search_reachable_keywords">LAN, ネットワーク, リモートアクセス</string>

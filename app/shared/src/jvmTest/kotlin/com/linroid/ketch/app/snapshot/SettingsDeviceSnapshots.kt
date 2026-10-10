@@ -32,6 +32,7 @@ import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
@@ -107,8 +108,8 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
-  fun bitTorrent_trackers_listsThem() {
-    pageSnapshots("settings-bittorrent", SettingsCategory.BitTorrent, sizes = listOf(Pane))
+  fun bitTorrent_seedingWithTrackers_showsUploadAndTrackers() {
+    pageSnapshots("settings-bittorrent", SettingsCategory.BitTorrent)
   }
 
   @Test
@@ -413,6 +414,8 @@ private class DeviceEnvironment(
             "udp://open.demonii.com:1337/announce",
             "https://tracker.example.org:443/announce",
           ),
+          upload = TorrentUploadMode.Seed,
+          uploadLimit = SpeedLimit.mbps(1),
         ),
         server = if (setup.sharing) {
           ServerConfig(apiToken = setup.token, mdnsEnabled = true)

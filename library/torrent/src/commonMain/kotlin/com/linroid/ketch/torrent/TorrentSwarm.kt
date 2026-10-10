@@ -18,35 +18,76 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
 
-/** Bounded peer workers around verified storage. Each worker owns its wire and request state. */
+/**
+ * Bounded peer workers around verified storage. Each worker owns its wire and request state.
+ * One [TorrentChoker] picks the peers to upload to; workers apply its decisions to their wires.
+ * Upload limits never hold a worker: requests wait in its queue until the buckets admit them,
+ * while it keeps reading, downloading and following the choker.
+ */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TorrentSwarm(
   private val store: TorrentPieceStore,
   private val network: TorrentNetwork,
   private val budget: TorrentBufferBudget,
   private val peerId: ByteArray = torrentRandomBytes(20),
   private val connections: () -> Int = { 20 },
-  private val uploadPolicy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED,
+  /**
+   * The part of [budget] pieces read back for peers may hold, every session's together, so
+   * uploads never take the frames and pieces downloads need.
+   */
+  private val uploadBudget: TorrentBufferBudget = budget,
+  /** Read live: peers are choked or unchoked within a tick, and a seed stops leaving SEED. */
+  private val uploadPolicy: () -> TorrentUploadPolicy = { TorrentUploadPolicy.DISABLED },
   private val downloadPayload: suspend (Int) -> Unit = {},
-  private val uploadPayload: suspend (Int) -> Unit = {},
+  /** Engine-wide upload bucket, applied before [sessionUploadRate]. */
+  private val uploadRate: TorrentRateLimiter = TorrentRateLimiter(),
+  /** This torrent's own upload bucket. */
+  private val sessionUploadRate: TorrentRateLimiter = TorrentRateLimiter(),
+  /** Payload the limits admitted for a peer, counted just before it is written. */
+  private val onUploaded: (Int) -> Unit = {},
   private val onProgress: suspend (Long) -> Unit = {},
   private val onCompleted: suspend () -> Unit = {},
-  private val allowLocalDiscovery: Boolean = false,
+  /** Test hook: lets peer exchange carry loopback and private addresses. */
+  private val allowLocalPeers: Boolean = false,
   trackerOnly: Boolean = false,
+  /** Our listen port as a peer at that address reaches it (BEP 10 `p`); 0 leaves it out. */
+  private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
+  private val nowMs: () -> Long = monotonicClock(),
   private val logLabel: String = logHash(store.metadata.infoHash.hex),
 ) {
+  /** What peer exchange may tell others about a connection: where it listens, and its flags. */
+  private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
+
+  /** How a worker ended. An incoming one's [endpoint] is its source port, never dialed. */
+  private class PeerResult(
+    val endpoint: PeerEndpoint,
+    val failure: Throwable?,
+    val incoming: Boolean,
+    val listen: PeerEndpoint?,
+  )
+
   private val log = KetchLogger("TorrentSwarm")
   private val trackerRestricted = store.metadata.isPrivate || trackerOnly
-  private val uploadSlots = Semaphore(4)
+  private val chokerMutex = Mutex()
+  // Guarded by chokerMutex; keyed by worker ID.
+  private val choker = TorrentChoker<Int>(nowMs)
   private val connectedMutex = Mutex()
-  private val connected = mutableMapOf<Int, PeerEndpoint>()
+  // Guarded by connectedMutex. Each worker publishes only its own contact.
+  private val connected = mutableMapOf<Int, PexContact>()
+  private val uploaded = AtomicLong(0)
+
+  private fun uploadAllowed(policy: TorrentUploadPolicy, complete: Boolean): Boolean =
+    policy == TorrentUploadPolicy.SEED_AFTER_COMPLETION ||
+      (policy == TorrentUploadPolicy.WHILE_DOWNLOADING && !complete)
 
   /** A closed peer stream fails once every candidate has exhausted its bounded retries. */
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,
@@ -57,7 +98,7 @@ internal class TorrentSwarm(
     resets: ReceiveChannel<CompletableDeferred<Unit>>? = null,
   ) = supervisorScope {
     store.initialize()
-    if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+    if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
       store.finish()
       onProgress(store.progress().sum())
       onCompleted()
@@ -80,12 +121,14 @@ internal class TorrentSwarm(
     val attempts = linkedMapOf<PeerEndpoint, Int>()
     val attemptedAt = mutableMapOf<PeerEndpoint, Long>()
     val pending = ArrayDeque<PeerEndpoint>()
-    val results = Channel<Pair<PeerEndpoint, Throwable?>>(512)
+    val results = Channel<PeerResult>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
     val pexEvents = Channel<Pair<PeerEndpoint, PexUpdate>>(64)
     val pexDirectory = TorrentPeerDirectory(trackerRestricted)
+    // Flags peers advertised for endpoints; handed to a worker when it dials one.
+    val peerFlags = PeerFlagBook()
     val retryAt = mutableMapOf<PeerEndpoint, Long>()
-    val now = monotonicClock()
+    val now = nowMs
     var discoveryClosed = false
     var complete = false
     var nextId = 0
@@ -95,6 +138,7 @@ internal class TorrentSwarm(
     var corruptPieces = 0
     var lastSummary = now()
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
+      peerFlags.record(update.flags)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
       for (endpoint in pexDirectory.candidates()) {
@@ -107,10 +151,15 @@ internal class TorrentSwarm(
       log.d {
         val verified = store.verifiedPieces().count { it }
         val handshaken = connectedMutex.withLock { connected.size }
+        val uploads = chokerMutex.withLock {
+          "uploadSlots=${choker.unchokedCount}/$UPLOAD_SLOTS " +
+            "interestedPeers=${choker.interestedCount}"
+        }
         "Swarm $logLabel: pieces $verified/${store.pieceCount}, peers connected=$handshaken " +
           "active=${active.size}/${connections()}, queued=${pending.size}, " +
           "known=${attempts.size}, discovered=$discovered, failed=$connectFailures, " +
-          "corrupt=$corruptPieces, discovery=${if (discoveryClosed) "closed" else "open"}"
+          "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
+          "discovery=${if (discoveryClosed) "closed" else "open"}"
       }
       discovered = 0
       connectFailures = 0
@@ -122,12 +171,20 @@ internal class TorrentSwarm(
       connection: TorrentConnection? = null,
     ) {
       val id = nextId++
-      attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
-      attemptedAt[endpoint] = now()
+      val incoming = connection != null
+      // An incoming peer's source port is not a candidate, so it never counts as an attempt.
+      if (!incoming) {
+        attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
+        attemptedAt[endpoint] = now()
+      }
+      val flags = if (incoming) 0 else peerFlags[endpoint]
       active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
+        var listen: PeerEndpoint? = if (incoming) null else endpoint
         try {
-          peer(id, endpoint, scheduler, progressEvents, pexEvents, connection)
+          peer(id, endpoint, flags, scheduler, progressEvents, pexEvents, connection) {
+            listen = it
+          }
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
@@ -136,10 +193,11 @@ internal class TorrentSwarm(
           withContext(NonCancellable) {
             scheduler.remove(id)
             connectedMutex.withLock { connected.remove(id) }
+            chokerMutex.withLock { choker.remove(id) }
           }
           connection?.close()
           overhead.close()
-          results.trySend(endpoint to failure)
+          results.trySend(PeerResult(endpoint, failure, incoming, listen))
         }
       }
     }
@@ -156,11 +214,14 @@ internal class TorrentSwarm(
           onCompleted()
           complete = true
         }
+        val policy = uploadPolicy()
+        // Workers apply what changed on their next pass; this loop ticks at least every 100 ms.
+        chokerMutex.withLock { choker.update(uploadAllowed(policy, complete), seeding = complete) }
         if (now() - lastSummary >= SWARM_SUMMARY_INTERVAL_MS) {
           lastSummary = now()
           logSummary()
         }
-        if (complete && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
+        if (complete && policy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
         val expired = attemptedAt.filter { (endpoint, time) ->
           now() - time >= 300_000 && endpoint !in active && endpoint !in pending
         }.keys
@@ -217,7 +278,9 @@ internal class TorrentSwarm(
               discovered++
             }
           }
-          results.onReceive { (endpoint, failure) ->
+          results.onReceive { result ->
+            val endpoint = result.endpoint
+            val failure = result.failure
             active.remove(endpoint)
             if (failure is TorrentStorageException) throw failure
             if (failure != null) {
@@ -225,8 +288,16 @@ internal class TorrentSwarm(
               if (failure is CorruptPieceException) corruptPieces++
               log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
             }
-            if (failure !is IllegalArgumentException && (attempts[endpoint] ?: 0) < 3 &&
-              !complete) {
+            if (result.incoming) {
+              // Never redial a source port: a public torrent dials where the peer listens.
+              val listen = result.listen
+              if (listen != null && !trackerRestricted && listen !in active &&
+                listen !in attempts && listen !in pending &&
+                attempts.size + pending.size < 4096) {
+                pending.addLast(listen)
+              }
+            } else if (failure !is IllegalArgumentException &&
+              (attempts[endpoint] ?: 0) < 3 && !complete) {
               retryAt[endpoint] = now() + 1000L * (attempts[endpoint] ?: 1)
               pending.addLast(endpoint)
             }
@@ -245,17 +316,22 @@ internal class TorrentSwarm(
     }
   }
 
+  /** Runs one peer; [onListen] learns where it listens once known, also when it fails. */
   private suspend fun peer(
     id: Int,
     endpoint: PeerEndpoint,
+    receivedFlags: Int,
     scheduler: TorrentPieceScheduler,
     progressEvents: SendChannel<Unit>,
     pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
-    accepted: TorrentConnection? = null,
+    accepted: TorrentConnection?,
+    onListen: (PeerEndpoint?) -> Unit,
   ) {
     val connection = accepted ?: network.connect(endpoint)
     try {
-      PeerWorker(id, endpoint, connection, scheduler, progressEvents, pexEvents).run()
+      val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, scheduler,
+        progressEvents, pexEvents)
+      try { worker.run() } finally { onListen(worker.listen) }
     } finally {
       connection.close()
     }
@@ -270,17 +346,33 @@ internal class TorrentSwarm(
     private val id: Int,
     private val endpoint: PeerEndpoint,
     private val connection: TorrentConnection,
+    /** The peer dialed us; [endpoint] is then its source port. */
+    private val incoming: Boolean,
+    /** Flags other peers advertised for [endpoint] (BEP 11), for later transports. */
+    val receivedFlags: Int,
     private val scheduler: TorrentPieceScheduler,
     private val progressEvents: SendChannel<Unit>,
     private val pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
   ) {
-    private val uploadCache = TorrentUploadCache(store, budget)
+    /** Where the peer accepts connections: the dialed endpoint, or `p` of an incoming peer. */
+    var listen: PeerEndpoint? = if (incoming) null else endpoint
+      private set
+    private val uploadCache = TorrentUploadCache(store, uploadBudget)
+    /** Requests of the peer we unchoked, oldest first; at most what we advertise (`reqq`). */
+    private val uploads = ArrayDeque<PeerMessage.Request>()
+    /** When the upload buckets admit the next block, if they held the last one back. */
+    private var uploadRetryAt = 0L
     private val wire = PeerWire(connection, store.metadata)
     private val exchange = PeerExchange()
+    /** Hosts the peer introduced by peer exchange, bounded over this connection. */
+    private val introductions = PexIntroductions()
     private val extensions = PeerExtensions()
     private val state = PeerProtocolState(store.pieceCount, maxPending = 16)
     private var extensionsNegotiated = false
+    /** We unchoked the peer: the choker gave it a slot and we told it so. */
     private var uploadSlot = false
+    /** The peer's interest as the choker last heard it. */
+    private var reportedInterest = false
     private var metadataServed = 0
     private var metadataWindow = TimeSource.Monotonic.markNow()
     private var advertised = BooleanArray(0)
@@ -318,7 +410,7 @@ internal class TorrentSwarm(
           while (isActive) {
             val message = select<PeerMessage?> {
               messages.onReceive { it }
-              onTimeout(100) { null }
+              onTimeout(idleMs()) { null }
             }
             if (message != null) {
               receive(message)
@@ -342,22 +434,33 @@ internal class TorrentSwarm(
         }
       } finally {
         uploadCache.close()
-        if (uploadSlot) uploadSlots.release()
       }
     }
 
     private suspend fun open() {
       val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
-      connectedMutex.withLock { connected[id] = connection.remote }
+      chokerMutex.withLock { choker.add(id) }
+      publishContact()
       extensionsNegotiated = handshake.extensions
       metadataWindow = TimeSource.Monotonic.markNow()
       if (extensionsNegotiated) {
-        wire.send(PeerExtensions.handshake(store.metadata, pex = !trackerRestricted))
+        wire.send(PeerExtensions.handshake(
+          utMetadata = servesMetadata(store.metadata.isPrivate, uploadPolicy()),
+          metadataSize = store.metadata.infoBytes.size, pex = !trackerRestricted,
+          listenPort = listenPortFor(connection.remote), requestQueue = REQUEST_QUEUE,
+        ))
       }
       advertised = store.verifiedPieces()
       wire.send(PeerMessage.Bitfield(pieceBitfield(advertised)))
       wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+    }
+
+    /** Publishes this connection's contact; others read nothing else of this worker. */
+    private suspend fun publishContact() {
+      val contact = PexContact(listen, pexFlags(reachedOutgoing = !incoming, connection,
+        extensions))
+      connectedMutex.withLock { connected[id] = contact }
     }
 
     private suspend fun receive(message: PeerMessage) {
@@ -374,23 +477,26 @@ internal class TorrentSwarm(
         // peer cannot force a full snapshot and rarity scan per announcement.
         is PeerMessage.Bitfield -> scheduler.availability(id, state.availabilitySnapshot())
         is PeerMessage.Have -> scheduler.announce(id, message.index)
-        is PeerMessage.Control -> {
-          if (message.signal == PeerMessage.Signal.CHOKE) {
+        is PeerMessage.Control -> when (message.signal) {
+          PeerMessage.Signal.CHOKE -> {
             scheduler.release(id)
             claim = null
           }
-          if (message.signal == PeerMessage.Signal.NOT_INTERESTED && uploadSlot) {
-            uploadSlots.release()
-            uploadSlot = false
-            uploadCache.close()
-            wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
-          }
+          // A peer that wants nothing more has no requests left (BEP 3).
+          PeerMessage.Signal.NOT_INTERESTED -> uploads.clear()
+          else -> Unit
         }
-        is PeerMessage.Piece -> if (accepted) receiveBlock(message)
+        is PeerMessage.Piece -> if (accepted) {
+          receiveBlock(message)
+          chokerMutex.withLock { choker.received(id, message.bytes.size.toLong()) }
+        }
         is PeerMessage.Request -> if (uploadSlot && state.interested &&
-          scheduler.isVerified(message.index)) {
-          upload(message)
+          scheduler.isVerified(message.index) && message !in uploads &&
+          uploads.size < REQUEST_QUEUE) {
+          uploads.addLast(message)
         }
+        is PeerMessage.Cancel ->
+          uploads.remove(PeerMessage.Request(message.index, message.begin, message.length))
         is PeerMessage.Extended -> receiveExtension(message)
         else -> Unit
       }
@@ -419,23 +525,50 @@ internal class TorrentSwarm(
       }
     }
 
-    private suspend fun upload(request: PeerMessage.Request) {
-      val bytes = storage { uploadCache.read(request.index) }
-      if (bytes != null) {
-        uploadPayload(request.length)
+    /**
+     * Sends queued blocks while the upload buckets admit them. A held block waits for a later
+     * pass, so a low limit never keeps this worker from reading the peer or keeping its
+     * deadlines.
+     */
+    private suspend fun serveUploads() {
+      while (uploadSlot && uploads.isNotEmpty() && uploadRetryAt <= nowMs()) {
+        val request = uploads.first()
+        val bytes = storage { uploadCache.read(request.index) }
+        if (bytes == null) {
+          // No buffer for the piece: the choker hands the slot on, and the peer is choked next.
+          uploads.clear()
+          chokerMutex.withLock { choker.refused(id) }
+          return
+        }
+        val delay = uploadRate.requestDelay(request.length, sessionUploadRate)
+        if (delay > 0) {
+          uploadRetryAt = nowMs() + delay
+          return
+        }
+        uploads.removeFirst()
+        onUploaded(request.length)
         wire.send(PeerMessage.Piece(request.index, request.begin,
           bytes.copyOfRange(request.begin, request.begin + request.length)))
-      } else {
-        wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
-        uploadSlots.release()
-        uploadSlot = false
+        uploaded.fetchAndAdd(request.length.toLong())
+        chokerMutex.withLock { choker.uploaded(id, request.length.toLong()) }
       }
+    }
+
+    /** How long the worker waits for a message: a held upload wakes it when it is due. */
+    private fun idleMs(): Long {
+      if (!uploadSlot || uploads.isEmpty()) return IDLE_MS
+      return (uploadRetryAt - nowMs()).coerceIn(1, IDLE_MS)
     }
 
     private suspend fun receiveExtension(message: PeerMessage.Extended) {
       require(extensionsNegotiated) { "Unnegotiated peer extension" }
-      if (message.id == 0) extensions.receive(message.payload, 4 * 1024 * 1024)
-      else if (message.id == PeerExtensions.METADATA) {
+      if (message.id == 0) {
+        extensions.receive(message.payload, 4 * 1024 * 1024)
+        // An incoming peer becomes a contact once it says where it listens.
+        val port = extensions.listenPort
+        if (incoming && port != null) listen = PeerEndpoint(connection.remote.host, port)
+        publishContact()
+      } else if (message.id == PeerExtensions.METADATA) {
         val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
         if (header["msg_type"]?.integer == 0L) {
           val index = requireNotNull(header["piece"]?.integer)
@@ -447,7 +580,9 @@ internal class TorrentSwarm(
               metadataWindow = TimeSource.Monotonic.markNow()
             }
             val limit = (store.metadata.infoBytes.size / 16_384 + 1) * 3
-            val response = if (metadataServed < limit) {
+            // Served only while the policy still allows it, whatever the handshake offered.
+            val response = if (servesMetadata(store.metadata.isPrivate, uploadPolicy()) &&
+              metadataServed < limit) {
               metadataServed++
               TorrentMetadataExchange.response(remoteId, index.toInt(), store.metadata)
             } else TorrentMetadataExchange.metadataMessage(remoteId, 2, index.toInt())
@@ -459,27 +594,52 @@ internal class TorrentSwarm(
           "Tracker-restricted peer exchange is forbidden"
         }
         val update = exchange.receive(message.payload)
+        // One endpoint per host, and a bounded number over the connection. The directory frees
+        // what a peer drops, but those may already wait to be dialed: dropping makes no room.
         val added = update.added.filter { peer ->
-          allowLocalDiscovery ||
-            numericAddress(peer.host)?.let(::publicTorrentAddress) == true
+          (allowLocalPeers || numericAddress(peer.host)?.let(::publicTorrentAddress) == true) &&
+            introductions.admit(peer)
         }
-        pexEvents.send(connection.remote to update.copy(added = added))
+        val kept = added.toSet()
+        pexEvents.send(connection.remote to update.copy(added = added,
+          flags = update.flags.filterKeys { it in kept }))
       }
     }
 
     /** Runs after every message and idle tick: upload slot, PEX, HAVEs, deadlines, requests. */
     private suspend fun maintain() {
       uploadCache.expire()
-      if (state.interested && !uploadSlot && uploadPolicy != TorrentUploadPolicy.DISABLED &&
-        uploadSlots.tryAcquire()) {
-        uploadSlot = true
-        wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+      val unchoked = chokerMutex.withLock {
+        if (reportedInterest != state.interested) {
+          reportedInterest = state.interested
+          choker.interested(id, reportedInterest)
+        }
+        choker.isUnchoked(id)
       }
+      if (unchoked != uploadSlot) {
+        uploadSlot = unchoked
+        if (!unchoked) {
+          // Choking a peer discards what it asked for (BEP 3).
+          uploads.clear()
+          uploadCache.close()
+        }
+        wire.send(PeerMessage.Control(
+          if (unchoked) PeerMessage.Signal.UNCHOKE else PeerMessage.Signal.CHOKE))
+      }
+      serveUploads()
       if (!trackerRestricted && extensions.id("ut_pex") != 0 && exchange.due()) {
-        val contacts = connectedMutex.withLock { connected.values.toSet() }
-          .filter { it != connection.remote && (allowLocalDiscovery ||
-            numericAddress(it.host)?.let(::publicTorrentAddress) == true) }.toSet()
-        exchange.message(extensions.id("ut_pex"), contacts)?.let { wire.send(it) }
+        // Only listen endpoints, never another peer's source port.
+        val contacts = connectedMutex.withLock {
+          connected.filterKeys { it != id }.values.mapNotNull { contact ->
+            contact.listen?.takeIf { it != listen }?.let { it to contact.flags }
+          }
+        }.filter { (peer, _) ->
+          allowLocalPeers || numericAddress(peer.host)?.let(::publicTorrentAddress) == true
+        }.toMap()
+        exchange.message(extensions.id("ut_pex"), contacts)?.let {
+          wire.send(it.message)
+          exchange.commit(it)
+        }
       }
       scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
         version = nextVersion
@@ -540,6 +700,12 @@ internal class TorrentSwarm(
 
 /** One maximal frame plus its decode copy; piece buffers are charged separately per claim. */
 private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
+
+/** Requests a v1 peer may queue with us (BEP 10 `reqq`). */
+private const val REQUEST_QUEUE = 16
+
+/** The longest a peer worker waits for a message before its next pass. */
+private const val IDLE_MS = 100L
 
 internal class TorrentStorageException(cause: IOException) :
   Exception("Torrent storage failed", cause)

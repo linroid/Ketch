@@ -46,17 +46,23 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
 
     /**
      * Creates a speed limit of [kilobytesPerSecond] KB/s.
-     * @throws IllegalArgumentException if [kilobytesPerSecond] is not positive
+     * @throws IllegalArgumentException if [kilobytesPerSecond] is not positive, or so large that
+     *   its bytes per second overflow a [Long]
      */
-    fun kbps(kilobytesPerSecond: Long): SpeedLimit =
-      of(kilobytesPerSecond * 1024)
+    fun kbps(kilobytesPerSecond: Long): SpeedLimit {
+      require(kilobytesPerSecond <= Long.MAX_VALUE / KB) { "kilobytesPerSecond is too large" }
+      return of(kilobytesPerSecond * KB)
+    }
 
     /**
      * Creates a speed limit of [megabytesPerSecond] MB/s.
-     * @throws IllegalArgumentException if [megabytesPerSecond] is not positive
+     * @throws IllegalArgumentException if [megabytesPerSecond] is not positive, or so large that
+     *   its bytes per second overflow a [Long]
      */
-    fun mbps(megabytesPerSecond: Long): SpeedLimit =
-      of(megabytesPerSecond * 1024 * 1024)
+    fun mbps(megabytesPerSecond: Long): SpeedLimit {
+      require(megabytesPerSecond <= Long.MAX_VALUE / MB) { "megabytesPerSecond is too large" }
+      return of(megabytesPerSecond * MB)
+    }
 
     /**
      * Parses a speed limit string with optional suffix.
@@ -67,7 +73,8 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
      * - `"500k"` — 500 KB/s
      * - `"1048576"` — raw bytes per second
      *
-     * @return the parsed [SpeedLimit], or `null` if the value is invalid.
+     * @return the parsed [SpeedLimit], or `null` if the value is invalid, including a rate
+     *   too large for a [Long] of bytes per second.
      */
     fun parse(value: String): SpeedLimit? {
       val trimmed = value.trim().lowercase()
@@ -75,12 +82,12 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
       return when {
         trimmed.endsWith("m") -> {
           val num = trimmed.dropLast(1).toLongOrNull() ?: return null
-          if (num <= 0) return null
+          if (num <= 0 || num > Long.MAX_VALUE / MB) return null
           mbps(num)
         }
         trimmed.endsWith("k") -> {
           val num = trimmed.dropLast(1).toLongOrNull() ?: return null
-          if (num <= 0) return null
+          if (num <= 0 || num > Long.MAX_VALUE / KB) return null
           kbps(num)
         }
         else -> {
@@ -101,14 +108,15 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
     internal fun format(limit: SpeedLimit): String {
       if (limit.isUnlimited) return "unlimited"
       val bytes = limit.bytesPerSecond
-      val mb = 1024L * 1024L
-      val kb = 1024L
       return when {
-        bytes % mb == 0L -> "${bytes / mb}m"
-        bytes % kb == 0L -> "${bytes / kb}k"
+        bytes % MB == 0L -> "${bytes / MB}m"
+        bytes % KB == 0L -> "${bytes / KB}k"
         else -> "$bytes"
       }
     }
+
+    private const val KB = 1024L
+    private const val MB = 1024L * 1024L
   }
 
   override fun toString(): String {

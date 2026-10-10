@@ -10,6 +10,41 @@
       "id": "v1.transmission.explicit-peer-magnet-download",
       "class": "com.linroid.ketch.torrent.TransmissionInteropTest",
       "method": "publicSource_resolvesTrackerlessMagnetAndDownloadsFromTransmission"
+    },
+    {
+      "id": "v2.libtorrent.btmh-magnet-download",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentSeederTest",
+      "method": "pureV2MagnetDownloadsFromLibtorrent"
+    },
+    {
+      "id": "hybrid.libtorrent.dual-magnet-download",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentSeederTest",
+      "method": "hybridMagnetDownloadsFromLibtorrent"
+    },
+    {
+      "id": "v2.libtorrent.btmh-magnet-upload",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentLeecherTest",
+      "method": "libtorrentDownloadsPureV2FromKetchSeeder"
+    },
+    {
+      "id": "hybrid.libtorrent.dual-magnet-upload",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentLeecherTest",
+      "method": "libtorrentDownloadsHybridFromKetchSeeder"
+    },
+    {
+      "id": "hybrid.libtorrent.v1-topic-upload",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentLeecherTest",
+      "method": "libtorrentJoinsHybridThroughTheV1Topic"
+    },
+    {
+      "id": "hybrid.transmission.v1-peer-upload",
+      "class": "com.linroid.ketch.torrent.HybridTransmissionInteropTest",
+      "method": "transmissionDownloadsHybridFromKetchSeeder"
+    },
+    {
+      "id": "hybrid.transmission.v1-peer-download",
+      "class": "com.linroid.ketch.torrent.HybridTransmissionInteropTest",
+      "method": "hybridTaskDownloadsFromTransmissionV1Seeder"
     }
   ]
 }

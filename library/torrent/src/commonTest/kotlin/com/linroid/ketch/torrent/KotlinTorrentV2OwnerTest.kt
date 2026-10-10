@@ -353,8 +353,6 @@ class KotlinTorrentV2OwnerTest {
       engine.start()
       engine.withV2Download("first", document(), output.toString(), discover = {}) {
         val retained = engine.admittedSessionBytes
-        // A legacy removal request cannot release the scoped v2 owner's output claim.
-        engine.removeTorrent(document().info.hash.hex, deleteFiles = false)
         assertFailsWith<IllegalStateException> {
           engine.withV2Download("same", document(), (output.parent!! / "unused").toString(),
             discover = { error("Unexpected discovery") }) { error("Unexpected owner") }

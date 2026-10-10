@@ -1,6 +1,8 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -10,7 +12,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
-import java.net.ServerSocket
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.URI
@@ -25,8 +26,10 @@ internal class TorrentBenchmarkSeeder(
   private val root: File,
   val dataHost: String = benchmarkAddress(),
 ) {
-  private val rpcPort = ServerSocket(0).use { it.localPort }
-  val peerPort: Int = ServerSocket(0).use { it.localPort }
+  private var rpcPort = freePort()
+  /** Where it takes peers; [start] moves it when the port was taken before Transmission bound it. */
+  @Volatile var peerPort: Int = freePort()
+    private set
   private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
   private var token: String? = null
   private var process: Process? = null
@@ -46,17 +49,38 @@ internal class TorrentBenchmarkSeeder(
     val text = version.inputStream.bufferedReader().readText()
     check(version.exitValue() == 0 &&
       text.startsWith("transmission-daemon ${ConformanceClients.version("transmission")} "))
-    process = ProcessBuilder(binary, "--foreground", "--config-dir",
-      root.resolve("config").absolutePath, "--download-dir", seed.absolutePath,
-      "--port", rpcPort.toString(), "--peerport", peerPort.toString(),
-      "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", dataHost,
-      "--bind-address-ipv6", "::1",
-      "--no-auth", "--no-dht", "--no-lpd", "--no-portmap", "--no-utp",
-      "--encryption-tolerated", "--no-global-seedratio")
-      .redirectErrorStream(true).redirectOutput(log).start()
-    while (true) {
-      check(checkNotNull(process).isAlive) { log.readText() }
-      try { rpc("session-get"); break } catch (_: java.io.IOException) { delay(50) }
+    for (attempt in 1..TRANSMISSION_START_ATTEMPTS) {
+      if (attempt > 1) {
+        close()
+        rpcPort = freePort()
+        peerPort = freePort()
+        token = null
+      }
+      process = ProcessBuilder(binary, "--foreground", "--config-dir",
+        root.resolve("config").absolutePath, "--download-dir", seed.absolutePath,
+        "--port", rpcPort.toString(), "--peerport", peerPort.toString(),
+        "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", dataHost,
+        "--bind-address-ipv6", "::1",
+        "--no-auth", "--no-dht", "--no-lpd", "--no-portmap", "--no-utp",
+        "--encryption-tolerated", "--no-global-seedratio")
+        .redirectErrorStream(true).redirectOutput(log).start()
+      val ready = try {
+        withTimeout(30_000) {
+          while (true) {
+            check(checkNotNull(process).isAlive) { log.readText() }
+            try { rpc("session-get"); break } catch (_: java.io.IOException) { delay(50) }
+          }
+        }
+        true
+      } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        // Another server on the RPC port answers, but not as Transmission does.
+        if (attempt == TRANSMISSION_START_ATTEMPTS) throw error
+        false
+      }
+      // The ports were free when chosen, but another process may have bound one since.
+      if (ready && !transmissionBindFailed(log)) break
+      check(attempt < TRANSMISSION_START_ATTEMPTS) { log.readText() }
     }
     if (metainfo != null) {
       addTorrent(metainfo, seed)

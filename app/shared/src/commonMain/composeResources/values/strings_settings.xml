@@ -26,7 +26,7 @@
   <string name="settings_category_network">Network</string>
   <string name="settings_category_network_description">Networks downloads use</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">Extra trackers for public torrents</string>
+  <string name="settings_category_bittorrent_description">Uploading and extra trackers</string>
   <string name="settings_category_sharing">Sharing</string>
   <string name="settings_category_sharing_description">Pair a phone or browser to control this device</string>
 
@@ -706,10 +706,24 @@
   <string name="settings_proxy_unsupported">%1$s can't use a proxy. Update Ketch there to choose one.</string>
 
   <!-- BitTorrent. -->
+  <!-- The group on top of the BitTorrent page: what this device uploads to peers. -->
+  <string name="settings_torrent_upload">Uploading</string>
+  <string name="settings_torrent_upload_mode">Share with peers</string>
+  <!-- The choices of Share with peers, each with the hint under it once chosen. -->
+  <string name="settings_torrent_upload_off">Off</string>
+  <string name="settings_torrent_upload_while_downloading">While downloading</string>
+  <string name="settings_torrent_upload_seed">Keep seeding</string>
+  <string name="settings_torrent_upload_off_hint">Peers can't download anything from this device.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">Peers can download the pieces you have while your torrents download.</string>
+  <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading while Ketch is running, until you remove them or turn this off. Torrents waiting to download go first.</string>
+  <string name="settings_torrent_upload_limit">Upload limit</string>
+  <!-- Under Upload limit: one cap for all torrents together, not one per torrent. -->
+  <string name="settings_torrent_upload_limit_hint">Shared by all torrents.</string>
+  <string name="settings_torrent_upload_footer">Peers you upload to see this device's IP address. Private torrents only share with their tracker's peers.</string>
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->
-  <string name="settings_torrent_remote">Change the extra trackers on %1$s itself, or in its config.toml.</string>
+  <string name="settings_torrent_remote">Change the BitTorrent settings on %1$s itself, or in its config.toml.</string>
   <!-- After Remove all, with Undo. -->
   <plurals name="settings_torrent_removed">
     <item quantity="one">Removed %1$d tracker.</item>
@@ -937,6 +951,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http proxy, bypass, firewall</string>
   <string name="settings_search_trackers">Trackers added to public torrents</string>
   <string name="settings_search_trackers_keywords">announce, udp, magnet, add trackers</string>
+  <string name="settings_search_upload">Share pieces with peers and seed finished torrents</string>
+  <string name="settings_search_upload_keywords">upload, seed, seeding, share, ratio, peers</string>
   <string name="settings_search_pair">Control this device from a phone or browser</string>
   <string name="settings_search_pair_keywords">qr code, phone, pairing, remote, web app, connect</string>
   <string name="settings_search_reachable_keywords">lan, network, remote access</string>

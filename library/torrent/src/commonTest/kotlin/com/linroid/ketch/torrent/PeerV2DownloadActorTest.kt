@@ -30,6 +30,7 @@ class PeerV2DownloadActorTest {
     var readers = 0
     var blockWrites: CompletableDeferred<Unit>? = null
     var respond = false
+    var pieces = 0
     val writing = CompletableDeferred<Unit>()
     override suspend fun readExactly(size: Int): ByteArray {
       readers++
@@ -48,6 +49,7 @@ class PeerV2DownloadActorTest {
       if (respond && request is PeerMessage.Request) {
         add(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))
       }
+      if (request is PeerMessage.Piece) pieces++
     }
     fun add(message: PeerMessage) {
       check(input.trySend(PeerWire.encode(message, pieceCount = 1)).isSuccess)
@@ -182,6 +184,71 @@ class PeerV2DownloadActorTest {
         assertEquals(0, f.connection.readers)
       }
     } finally { f.finish() }
+    assertEquals(0, f.buffers.allocated)
+  }
+
+  @Test
+  fun queuedUploadAndProofLeasesAreReleasedOnShutdown() = runTest {
+    val f = Fixture { testScheduler.currentTime }
+    val payloads = TorrentBufferBudget(100_000)
+    f.connection.blockWrites = CompletableDeferred()
+    try {
+      PeerV2DownloadActor.run(f.transport, f.blocks, f.state) { actor ->
+        f.ready(actor)
+        // The first upload is being written when the peer goes; the others wait in the queue.
+        repeat(3) { index ->
+          actor.commands.send(PeerV2DownloadActor.Command.Upload(
+            PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)),
+            assertNotNull(payloads.reserve(1_000 + index))))
+        }
+        val selector = PeerHashSelector(ByteArray(32).toByteString(), 0, 0, 2, 0)
+        actor.commands.send(PeerV2DownloadActor.Command.ServeHashes(
+          PeerHashMessage.Hashes(selector, ByteArray(64).toByteString()),
+          assertNotNull(payloads.reserve(5_000))))
+        f.connection.writing.await()
+        assertEquals(8_003, payloads.allocated)
+      }
+    } finally { f.finish() }
+    assertEquals(0, payloads.allocated)
+    assertEquals(0, f.buffers.allocated)
+  }
+
+  @Test
+  fun refusedUploadFramePublishesServedFalse() = runTest {
+    val f = Fixture { testScheduler.currentTime }
+    val payloads = TorrentBufferBudget(100_000)
+    try {
+      PeerV2DownloadActor.run(f.transport, f.blocks, f.state) { actor ->
+        f.ready(actor)
+        // The frame budget cannot hold a 16 KiB block's encoding, so nothing is written.
+        val hold = assertNotNull(f.buffers.reserve(
+          f.buffers.capacity - f.buffers.allocated - 1_000))
+        try {
+          val lease = assertNotNull(payloads.reserve(16_640))
+          actor.commands.send(PeerV2DownloadActor.Command.Upload(
+            PeerMessage.Piece(0, 0, ByteArray(16_384)), lease))
+          val served = assertIs<PeerV2DownloadActor.Event.Served>(actor.events.receive())
+          assertEquals(PeerMessage.Request(0, 0, 16_384), served.request)
+          assertFalse(served.sent)
+          // The dropped block's copy is released; the connection carries on.
+          assertEquals(0, payloads.allocated)
+          assertFalse(f.connection.closed)
+        } finally { hold.close() }
+        actor.commands.send(PeerV2DownloadActor.Command.Upload(
+          PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)), assertNotNull(payloads.reserve(300))))
+        val served = assertIs<PeerV2DownloadActor.Event.Served>(actor.events.receive())
+        assertTrue(served.sent)
+        assertEquals(1, f.connection.pieces)
+        // A CHOKE is confirmed; a Have that went out is not reported.
+        actor.commands.send(PeerV2DownloadActor.Command.Send(PeerMessage.Have(0)))
+        actor.commands.send(PeerV2DownloadActor.Command.Send(
+          PeerMessage.Control(PeerMessage.Signal.CHOKE)))
+        val sent = assertIs<PeerV2DownloadActor.Event.Sent>(actor.events.receive())
+        assertEquals(PeerMessage.Control(PeerMessage.Signal.CHOKE), sent.message)
+        assertTrue(sent.sent)
+      }
+    } finally { f.finish() }
+    assertEquals(0, payloads.allocated)
     assertEquals(0, f.buffers.allocated)
   }
 

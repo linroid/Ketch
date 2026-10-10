@@ -16,11 +16,46 @@ internal class PeerV2DownloadActor private constructor(
   val events: ReceiveChannel<Event>,
 ) {
   sealed interface Command {
+    /**
+     * Releases what the command holds. The actor calls it once the command was dispatched, and
+     * the queue for commands it never dispatched; the sender, for one the queue refused.
+     */
+    fun close() = Unit
+
     data class Request(val plan: TorrentV2PieceScheduler.RequestPlan) : Command
     data class Interest(val interested: Boolean) : Command
     data class Cancel(val ticket: PeerBlockExchange.Ticket) : Command
     data class RequestHashes(val selector: PeerHashSelector) : Command
     data class RejectHashes(val selector: PeerHashSelector) : Command
+
+    /**
+     * A message the session sends of its own accord: CHOKE or UNCHOKE, Have, Bitfield or an
+     * extension message. Interest, requests and payload have commands of their own.
+     */
+    data class Send(val message: PeerMessage) : Command {
+      init {
+        require(message is PeerMessage.Have || message is PeerMessage.Bitfield ||
+          message is PeerMessage.Extended || message is PeerMessage.Control &&
+          (message.signal == PeerMessage.Signal.CHOKE ||
+            message.signal == PeerMessage.Signal.UNCHOKE)) { "Not a session message" }
+      }
+    }
+
+    /** One block we upload; [lease] covers its copied bytes until written or dropped. */
+    class Upload(
+      val piece: PeerMessage.Piece,
+      private val lease: TorrentBufferBudget.Lease,
+    ) : Command {
+      override fun close() = lease.close()
+    }
+
+    /** Hashes we serve; [lease] covers the proof until written or dropped. */
+    class ServeHashes(
+      val message: PeerHashMessage.Hashes,
+      private val lease: TorrentBufferBudget.Lease,
+    ) : Command {
+      override fun close() = lease.close()
+    }
   }
 
   sealed interface Event {
@@ -50,6 +85,18 @@ internal class PeerV2DownloadActor private constructor(
       val ticket: PeerHashExchange.Ticket?,
     ) : Event
     data class HashTimeout(val tickets: List<PeerHashExchange.Ticket>) : Event
+
+    /**
+     * A [Command.Send] of CHOKE or UNCHOKE went out, or one of any message was dropped unsent
+     * for want of frame credit.
+     */
+    data class Sent(val message: PeerMessage, val sent: Boolean) : Event
+
+    /** An uploaded block went out, or without frame credit was dropped unsent. */
+    data class Served(val request: PeerMessage.Request, val sent: Boolean) : Event
+
+    /** Served hashes went out, or without frame credit were dropped unsent. */
+    data class HashServed(val selector: PeerHashSelector, val sent: Boolean) : Event
   }
 
   companion object {
@@ -73,7 +120,8 @@ internal class PeerV2DownloadActor private constructor(
       val lease = checkNotNull(state.reserve(capacity * 1024 + 4096)) {
         "Peer actor queue budget exhausted"
       }
-      val commands = Channel<Command>(capacity)
+      // Queued uploads and proofs hold transfer credit; the queue gives back what it drops.
+      val commands = Channel<Command>(capacity, onUndeliveredElement = { it.close() })
       val events = Channel<Event>(capacity, onUndeliveredElement = { it.close() })
       val actor = launch {
         try {
@@ -99,22 +147,41 @@ internal class PeerV2DownloadActor private constructor(
             }
             while (true) {
               when (val next = inbox.next(commands)) {
-                is PeerV2Inbox.Event.Command -> withTimeout(deadline()) {
-                  when (val command = next.value) {
-                    is Command.Request -> {
-                      require(command.plan.peer === blocks) { "Wrong request peer actor" }
-                      val ticket = blocks.request(command.plan.request)
-                      publish(Event.Requested(command.plan, ticket))
+                is PeerV2Inbox.Event.Command -> try {
+                  withTimeout(deadline()) {
+                    when (val command = next.value) {
+                      is Command.Request -> {
+                        require(command.plan.peer === blocks) { "Wrong request peer actor" }
+                        val ticket = blocks.request(command.plan.request)
+                        publish(Event.Requested(command.plan, ticket))
+                      }
+                      is Command.Interest -> publish(Event.Interest(command.interested,
+                        blocks.setInterested(command.interested)))
+                      is Command.Cancel -> publish(Event.Canceled(command.ticket,
+                        blocks.cancel(command.ticket)))
+                      is Command.RequestHashes -> publish(Event.HashRequested(command.selector,
+                        transport.request(command.selector)))
+                      is Command.RejectHashes -> transport.respond(
+                        PeerHashMessage.Reject(command.selector))
+                      is Command.Send -> {
+                        val sent = transport.trySend(command.message)
+                        // Only a CHOKE or UNCHOKE needs confirming; anything else, only a loss.
+                        if (!sent || command.message is PeerMessage.Control) {
+                          publish(Event.Sent(command.message, sent))
+                        }
+                      }
+                      is Command.Upload -> {
+                        val piece = command.piece
+                        val sent = transport.trySend(piece)
+                        publish(Event.Served(PeerMessage.Request(piece.index, piece.begin,
+                          piece.bytes.size), sent))
+                      }
+                      is Command.ServeHashes -> publish(Event.HashServed(
+                        command.message.selector, transport.tryRespond(command.message)))
                     }
-                    is Command.Interest -> publish(Event.Interest(command.interested,
-                      blocks.setInterested(command.interested)))
-                    is Command.Cancel -> publish(Event.Canceled(command.ticket,
-                      blocks.cancel(command.ticket)))
-                    is Command.RequestHashes -> publish(Event.HashRequested(command.selector,
-                      transport.request(command.selector)))
-                    is Command.RejectHashes -> transport.respond(
-                      PeerHashMessage.Reject(command.selector))
                   }
+                } finally {
+                  next.value.close()
                 }
                 is PeerV2Inbox.Event.HashTimeout -> publish(Event.HashTimeout(next.tickets))
                 is PeerV2Inbox.Event.Frame -> {
