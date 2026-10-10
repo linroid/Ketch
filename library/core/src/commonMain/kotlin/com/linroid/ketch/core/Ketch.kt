@@ -730,7 +730,14 @@ class Ketch(
         handle.mutableState.value = DownloadState.Queued
         queue.enqueue(handle, preferResume = true)
       }
-      else -> showStopped(handle, plan, handle.record.value.segments)
+      else -> {
+        if (state is DownloadState.Completed && plan.changed) {
+          // A seeding session keeps running on the smaller selection rather than reopening.
+          controlSources.firstOrNull { it.first.type == source.type }?.second
+            ?.changeSeedingSelection(taskId, plan.fileIds)
+        }
+        showStopped(handle, plan, handle.record.value.segments)
+      }
     }
     log.i {
       "Selected files for taskId=$taskId: files=${plan.fileIds.size}, " +

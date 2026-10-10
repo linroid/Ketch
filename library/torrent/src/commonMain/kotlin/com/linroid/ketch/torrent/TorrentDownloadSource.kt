@@ -615,6 +615,20 @@ class TorrentDownloadSource(
     }
   }
 
+  /** Applies a completed task's smaller selection to its seeding session, if it seeds. */
+  override suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
+    if (taskId !in seedingTaskIds.value) return false
+    val session = tasks.session(taskId) ?: return false
+    val live = session.changeSelection(fileIds)
+    stateMutex.withLock {
+      states[taskId]?.let {
+        states[taskId] = it.copy(selectedFileIds = fileIds, totalBytes = session.totalBytes)
+      }
+    }
+    log.i { "Torrent taskId=$taskId seeding selection applied: files=${fileIds.size}, live=$live" }
+    return live
+  }
+
   /** Tasks holding a session reservation; for leak checks. */
   internal suspend fun reservedTasks(): Int = tasks.size()
 

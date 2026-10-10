@@ -188,6 +188,27 @@ class RemoteTorrentControllerTest {
   }
 
   @Test
+  fun capabilities_responseAfterReconnect_isConnectionChanged() = runTest {
+    var reconnect = true
+    val fixture = fixture { request, generation ->
+      if (reconnect) {
+        reconnect = false
+        generation.update { it + 1 }
+      }
+      capabilities(request) ?: error("Unexpected request ${request.url}")
+    }
+    try {
+      failure(TorrentCommandError.CONNECTION_CHANGED) { fixture.controller.capabilities() }
+      // Nothing from the old connection was cached: the next call asks again and succeeds.
+      fixture.paths.clear()
+      assertEquals(full.names, fixture.controller.capabilities().names)
+      assertEquals(listOf("/api/torrents/capabilities"), fixture.paths)
+    } finally {
+      fixture.client.close()
+    }
+  }
+
+  @Test
   fun select_responseAfterReconnect_isConnectionChanged() = runTest {
     val result = TorrentCommandResult("t1", TorrentRevision("epoch", 5), 1)
     val fixture = fixture { request, generation ->

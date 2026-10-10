@@ -75,7 +75,11 @@ internal class RemoteTorrentController(
       log.d { "The server has no torrent controls (HTTP ${response.status.value})" }
       TorrentCapabilities()
     }
-    mutex.withLock { if (generation.value == current) cached = current to capabilities }
+    // Capabilities of a previous connection would gate commands on the new one.
+    mutex.withLock {
+      if (generation.value != current) throw connectionChanged()
+      cached = current to capabilities
+    }
     return capabilities
   }
 

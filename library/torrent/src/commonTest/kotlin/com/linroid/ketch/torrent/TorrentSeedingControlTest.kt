@@ -227,6 +227,25 @@ class TorrentSeedingControlTest {
   }
 
   @Test
+  fun selectFiles_seedingShrink_appliesToTheSeedingSession() = harness {
+    val source = source()
+    val ketch = ketch(source)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    task.selectFiles(setOf("1"))
+    val session = assertNotNull(source.sessionOf(task.taskId))
+    assertEquals(setOf("1"), session.selectedFileIds)
+    assertEquals(torrent.sizes[1].toLong(), session.totalBytes)
+    val completed = assertIs<DownloadState.Completed>(task.state.value)
+    assertTrue(completed.seeding)
+    assertEquals(setOf(task.taskId), source.seedingTaskIds.value)
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
+  }
+
+  @Test
   fun stopSeeding_stopsTheSessionAndPublishesNotSeeding() = harness {
     val source = source()
     val store = MemoryTaskStore()
