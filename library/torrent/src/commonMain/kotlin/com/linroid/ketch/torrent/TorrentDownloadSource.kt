@@ -7,6 +7,7 @@ import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.torrent.TorrentActivity
 import com.linroid.ketch.api.torrent.TorrentCapability
@@ -65,6 +66,10 @@ import okio.Path.Companion.toPath
  *
  * A task's files can change at any time ([com.linroid.ketch.api.DownloadTask.selectFiles]): a
  * running torrent follows the change without reconnecting to its peers.
+ *
+ * Under [TorrentUploadPolicy.SEED_AFTER_COMPLETION] a completed task keeps seeding on a slot no
+ * download needs, and [com.linroid.ketch.core.Ketch.start] seeds again the tasks that seeded
+ * when it last stopped, each only once a recheck finds its files complete.
  *
  * @param restoreSeeding whether [com.linroid.ketch.core.Ketch.start] shares again the completed
  *   tasks that were sharing; false for processes that share a task store with the apps, such as
@@ -129,12 +134,23 @@ class TorrentDownloadSource(
       add(TorrentCapability.V1.wireName)
       add(TorrentCapability.V2.wireName)
       add(TorrentCapability.HYBRID.wireName)
+      // Sharing follows the live upload setting.
+      if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+        add(TorrentCapability.SEEDING.wireName)
+      }
     }
 
   override val seedingTaskIds: StateFlow<Set<String>> = seeding.asStateFlow()
 
-  // Sharing completed tasks again at start is not offered yet.
-  override val restoresSeeding: Boolean get() = false
+  /** Only while the live upload setting seeds, so switching it on needs no restart. */
+  override val restoresSeeding: Boolean
+    get() = restoreSeeding &&
+      uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION
+
+  // The only writers of [seeding].
+  private fun markSeeding(taskId: String) = seeding.update { it + taskId }
+
+  private fun unmarkSeeding(taskId: String) = seeding.update { it - taskId }
 
   /** Test hook: runs once a transfer stopped following selections, before its run returns. */
   internal var onTransferEnd: suspend (taskId: String) -> Unit = {}
@@ -180,6 +196,7 @@ class TorrentDownloadSource(
     if (closed.compareAndSet(false, true)) {
       slots.close()
       scope.cancel()
+      seeding.value = emptySet()
       engine.exchange(null)?.close()
       if (httpDelegate.isInitialized()) http.close()
     }
@@ -413,13 +430,190 @@ class TorrentDownloadSource(
     return LiveTorrent(activity, counters.received, counters.uploaded, counters.uploadSpeed)
   }
 
-  // Sharing completed tasks on request is not offered yet.
-  override suspend fun seedingAvailability(taskId: String): SeedingOutcome =
-    SeedingOutcome.UNSUPPORTED
+  override suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {
+    uploadPolicy.load() != TorrentUploadPolicy.SEED_AFTER_COMPLETION -> SeedingOutcome.POLICY_OFF
+    tasks.isReserved(taskId) -> SeedingOutcome.ALREADY_ACTIVE
+    !slots.hasFree() -> SeedingOutcome.NO_SLOT
+    else -> null
+  }
 
-  override suspend fun startSeeding(task: SeedingTask): SeedingOutcome = SeedingOutcome.UNSUPPORTED
+  /**
+   * Seeds a completed task on a free slot, never one a download waits for: a seed-only session
+   * checks the files first and contacts no tracker or peer unless they are complete. The slot is
+   * lent from the start, so a download that needs it stops the seeder even while it checks.
+   */
+  override suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
+    val taskId = task.taskId
+    seedingAvailability(taskId)?.let { return it }
+    val plan = try {
+      seedPlan(task)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Torrent taskId=$taskId cannot seed: ${e.describeCauses()}" }
+      return SeedingOutcome.FAILED
+    }
+    if (!slots.tryAcquire()) return SeedingOutcome.NO_SLOT
+    var reserved = false
+    var lent = false
+    var outcome = SeedingOutcome.FAILED
+    try {
+      try {
+        tasks.reserve(taskId, plan.hash)
+        reserved = true
+      } catch (e: IllegalStateException) {
+        // Its own run started meanwhile, or another task owns the same torrent.
+        outcome = if (tasks.isReserved(taskId)) SeedingOutcome.ALREADY_ACTIVE else {
+          log.i { "Torrent taskId=$taskId cannot seed: another task shares its torrent" }
+          SeedingOutcome.FAILED
+        }
+        return outcome
+      }
+      val session = plan.open()
+      try {
+        tasks.attach(taskId, session)
+      } catch (e: Throwable) {
+        withContext(NonCancellable) { engine.load()?.removeTorrent(plan.hash) }
+        throw e
+      }
+      lent = slots.lend(taskId)
+      if (!lent) {
+        outcome = SeedingOutcome.NO_SLOT
+        return outcome
+      }
+      log.i { "Torrent taskId=$taskId checks its files to seed (${logHash(plan.hash)})" }
+      session.resume()
+      val reached = session.state.first {
+        it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED ||
+          it == TorrentSessionState.FINISHED
+      }
+      if (!slots.isLent(taskId)) {
+        // A download took the slot and stops the session, or the task's own run took it over.
+        outcome = if (reached != TorrentSessionState.STOPPED && tasks.session(taskId) === session) {
+          SeedingOutcome.ALREADY_ACTIVE
+        } else SeedingOutcome.NO_SLOT
+        log.i { "Torrent taskId=$taskId gave its slot up before seeding: $outcome" }
+        return outcome
+      }
+      outcome = when (reached) {
+        TorrentSessionState.SEEDING -> SeedingOutcome.SEEDING
+        TorrentSessionState.STOPPED -> if (failureOf(session) is IncompleteSeedException) {
+          SeedingOutcome.CHANGED_ON_DISK
+        } else SeedingOutcome.FAILED
+        // The upload setting stopped seeding while it checked.
+        else -> SeedingOutcome.FAILED
+      }
+      if (outcome == SeedingOutcome.SEEDING) {
+        markSeeding(taskId)
+        watchSeeder(taskId, session)
+        log.i { "Torrent taskId=$taskId seeds again" }
+      } else {
+        log.i { "Torrent taskId=$taskId does not seed: $outcome" }
+      }
+      return outcome
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Torrent taskId=$taskId could not seed: ${e.describeCauses()}" }
+      outcome = SeedingOutcome.FAILED
+      return outcome
+    } finally {
+      if (outcome != SeedingOutcome.SEEDING) withContext(NonCancellable) {
+        if (lent) {
+          stopSeeder(taskId)
+        } else {
+          try {
+            if (reserved) stopSession(taskId)
+          } finally {
+            if (reserved) tasks.release(taskId)
+            slots.release()
+          }
+        }
+      }
+    }
+  }
 
-  override suspend fun stopSeeding(taskId: String) = release(taskId, null)
+  /** A completed task's seed-only session: its identity and how to open it. */
+  private class SeedPlan(val hash: String, val open: suspend () -> TorrentSession)
+
+  private suspend fun seedPlan(task: SeedingTask): SeedPlan {
+    val state = decodeResumeState(task.resumeState.data)
+    val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
+      TorrentCheckpoint.decode(decodeBase64(state.resumeData))
+    val bytes = state.metainfo.takeIf { it.isNotEmpty() }?.let(::decodeBase64)
+      ?: checkpoint?.metadata?.metainfoBytes
+      ?: error("The task saved no metainfo")
+    val privacy = state.privacy ?: config.discoveryPrivacy
+    val output = state.savePath.ifEmpty { task.outputPath }
+    require(output.isNotEmpty() && "://" !in output) { "Torrent output requires a filesystem path" }
+    val table = withContext(Dispatchers.Default) {
+      fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
+    }
+    val selected = selectionOf(table, task.selectedFileIds, state)
+    val magnet = task.url.takeIf { it.startsWith("magnet:", true) }
+    val resumeData = state.resumeData.takeIf { it.isNotEmpty() }
+    if (table.v2) {
+      require(state.version == 3) { "Invalid v2 resume state" }
+      val document = TorrentV2Document.parse(bytes, maxDocumentBytes = config.maxMetadataBytes,
+        maxFiles = config.maxFilesPerTorrent)
+      val hash = document.info.hash.hex
+      require(hash == state.infoHash) { "Saved torrent changed" }
+      return SeedPlan(hash) {
+        (getEngine() as KotlinTorrentEngine).addV2Task(TorrentV2TaskSpec(task.taskId, document,
+          output, selected, checkpointEncoded = resumeData,
+          trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
+          magnetUri = magnet, privacy = privacy, recoverCreations = true,
+          legacySelections = listOfNotNull(state.selectedFileIds.takeIf { it.isNotEmpty() }),
+          seedOnly = true))
+      }
+    }
+    require(state.version != 3) { "Cannot downgrade a v2 task" }
+    val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
+    val hash = metadata.infoHash.hex
+    require(hash == state.infoHash) { "Saved torrent changed" }
+    return SeedPlan(hash) {
+      getEngine().addTask(TorrentTaskSpec(task.taskId, metadata, output,
+        selected.mapTo(LinkedHashSet()) { it.toInt() }, magnet, resumeData?.let(::decodeBase64),
+        privacy = privacy, seedOnly = true))
+    }
+  }
+
+  private fun failureOf(session: TorrentSession): Throwable? = when (session) {
+    is KotlinTorrentSession -> session.failure.value
+    is TorrentV2DownloadSession -> session.failure.value
+    else -> null
+  }
+
+  /** Stops a seeder whose slot is still lent to it and frees the slot; nothing otherwise. */
+  private suspend fun stopSeeder(taskId: String) {
+    if (!slots.reclaim(taskId)) return
+    try { stopSession(taskId) } finally { withContext(NonCancellable) { slots.release() } }
+  }
+
+  /** Stops the task's seeding session after it saved its state, and frees its slot. */
+  override suspend fun stopSeeding(taskId: String) {
+    if (!slots.reclaim(taskId)) {
+      log.d { "Torrent taskId=$taskId is not seeding" }
+      return
+    }
+    try {
+      stateMutex.withLock {
+        unmarkSeeding(taskId)
+        seedWatchers.remove(taskId)
+      }?.cancel()
+      try {
+        tasks.session(taskId)?.pause()
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Torrent taskId=$taskId could not save its state: ${e.describeCauses()}" }
+      }
+      stopSession(taskId)
+      log.i { "Torrent taskId=$taskId stopped seeding" }
+    } finally {
+      withContext(NonCancellable) { slots.release() }
+    }
+  }
 
   /** Tasks holding a session reservation; for leak checks. */
   internal suspend fun reservedTasks(): Int = tasks.size()
@@ -784,7 +978,10 @@ class TorrentDownloadSource(
       if (tasks.isReserved(taskId)) awaitRelease(taskId)
       return null
     }
-    stateMutex.withLock { seedWatchers.remove(taskId) }?.cancel()
+    stateMutex.withLock {
+      unmarkSeeding(taskId)
+      seedWatchers.remove(taskId)
+    }?.cancel()
     val owned = slots.reclaim(taskId)
     if (owned && existing.infoHash == hash && existing.state.value in ADOPTABLE) {
       log.i { "Torrent taskId=$taskId takes over its running session" }
@@ -814,17 +1011,25 @@ class TorrentDownloadSource(
       if (lent) "Torrent taskId=$taskId keeps seeding"
       else "Torrent taskId=$taskId stops seeding for a waiting download"
     }
-    if (lent) watchSeeder(taskId, session)
+    if (lent) {
+      // Marked before the watcher starts, which unmarks it once it stops seeding.
+      markSeeding(taskId)
+      watchSeeder(taskId, session)
+    }
     return lent
   }
 
   /**
-   * Takes the slot back once a lent seeder stops by itself, such as when the upload policy stops
-   * seeding or its storage fails, and stops it. [release], eviction and [close] cancel it.
+   * The only seed watcher: reports that a lent seeder stopped seeding once it leaves
+   * [TorrentSessionState.SEEDING], and takes the slot back once it stops by itself, such as when
+   * the upload policy stops seeding or its storage fails, and stops it. [release], eviction,
+   * adoption and [close] cancel it.
    */
   private suspend fun watchSeeder(taskId: String, session: TorrentSession) {
     val watcher = scope.launch(start = CoroutineStart.LAZY) {
       val self = coroutineContext.job
+      session.state.first { it != TorrentSessionState.SEEDING }
+      stateMutex.withLock { if (seedWatchers[taskId] === self) unmarkSeeding(taskId) }
       session.state.first {
         it == TorrentSessionState.STOPPED || it == TorrentSessionState.FINISHED
       }
@@ -1032,7 +1237,10 @@ class TorrentDownloadSource(
 
   /** Stops a session whose download already returned, such as one still seeding. */
   private suspend fun stopSession(taskId: String) {
-    stateMutex.withLock { seedWatchers.remove(taskId) }?.cancel()
+    stateMutex.withLock {
+      unmarkSeeding(taskId)
+      seedWatchers.remove(taskId)
+    }?.cancel()
     val session = tasks.session(taskId) ?: return
     try {
       engine.load()?.removeTorrent(session.infoHash)

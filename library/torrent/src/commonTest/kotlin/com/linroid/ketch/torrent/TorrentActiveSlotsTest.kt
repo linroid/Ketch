@@ -100,6 +100,38 @@ class TorrentActiveSlotsTest {
   }
 
   @Test
+  fun tryAcquire_noFreeSlot_returnsFalseWithoutWaiting() = runTest {
+    val slots = TorrentActiveSlots(2)
+    assertTrue(slots.tryAcquire())
+    assertEquals(1, slots.inUse())
+    slots.acquire()
+    assertTrue(slots.lend("seeder"))
+    // Every slot is used: it neither waits nor takes the seeder's slot.
+    assertFalse(slots.hasFree())
+    assertFalse(slots.tryAcquire())
+    assertTrue(slots.isLent("seeder"))
+    assertEquals(2, slots.inUse())
+
+    // A download waiting for a slot comes first: a freed slot goes to it.
+    assertTrue(slots.reclaim("seeder"))
+    val waiter = async { slots.acquire() }
+    runCurrent()
+    assertFalse(waiter.isCompleted)
+    assertFalse(slots.tryAcquire())
+    slots.release()
+    runCurrent()
+    assertTrue(waiter.isCompleted)
+    assertFalse(slots.tryAcquire())
+
+    slots.release()
+    assertTrue(slots.hasFree())
+    assertTrue(slots.tryAcquire())
+    slots.release()
+    slots.release()
+    assertEquals(0, slots.inUse())
+  }
+
+  @Test
   fun close_failsWaitingAndLaterAcquisitions() = runTest {
     val slots = TorrentActiveSlots(1)
     slots.acquire()
