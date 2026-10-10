@@ -81,6 +81,16 @@ class ReleasesBetweenTest {
   }
 
   @Test
+  fun releasesFrom_readsMorePagesThanReleasesBetween() = runTest {
+    val feed = PagedFeed((40 downTo 1).map { "0.$it.0" }, pageSize = 3)
+
+    val releases = feed.releasesFrom(version("0.1.0"), version("0.40.0"))
+
+    assertEquals((1..15).toList(), feed.pages)
+    assertEquals(40, releases.size)
+  }
+
+  @Test
   fun releasesFrom_firstNotOlder_readsOnlyTheVersion() = runTest {
     val feed = PagedFeed(listOf("0.3.2", "0.3.1"))
 

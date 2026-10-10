@@ -162,8 +162,8 @@ internal const val FIRST_LISTED_RELEASE = "0.1.0"
 
 /**
  * Every release from [FIRST_LISTED_RELEASE] up to [version], newest first, as [updates] reads
- * them: a line per release with its date and how many changes it brings, which opens to those
- * changes under New, Fixed and Improved. The newest starts open.
+ * them: a line per release with its date and how many changes its notes list, which opens to
+ * those changes under New, Fixed and Improved. The newest starts open.
  */
 @Composable
 fun ReleaseHistoryDialog(updates: AppUpdates, version: String, onDismiss: () -> Unit) {
@@ -172,7 +172,8 @@ fun ReleaseHistoryDialog(updates: AppUpdates, version: String, onDismiss: () -> 
   LaunchedEffect(updates, version, attempt) {
     load = NotesLoad.Loading
     load = try {
-      NotesLoad.Loaded(updates.releaseHistory(version, FIRST_LISTED_RELEASE).withoutRepeats())
+      // Each release keeps its notes as published, repeats included, so none drops out.
+      NotesLoad.Loaded(updates.releaseHistory(version, FIRST_LISTED_RELEASE))
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {

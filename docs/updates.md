@@ -119,8 +119,10 @@ the next step, Update or Restart.
   shows only under the newest (`withoutRepeats`).
 - Settings → About → Updates → Release history (`ReleaseHistoryDialog`) lists every release from
   0.1.0 (`FIRST_LISTED_RELEASE`) up to the release found or the running version
-  (`AppUpdates.releaseHistory`, `releasesFrom`, which lists the first release too). Each release
-  is a line with its date and number of changes that opens to its notes; the newest starts open.
+  (`AppUpdates.releaseHistory`, `releasesFrom`, which lists the first release too and reads up
+  to twenty pages). Each release is a line with its date and number of changes that opens to its
+  notes, as published: unlike the update dialog, it keeps the changes a newer release repeats, so
+  no release drops out. The newest starts open.
 - Reading them is one request without a range and one per page with one, so the dialog can fail
   on GitHub's hourly limit; it then offers Try again and the release page.
 
