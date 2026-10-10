@@ -25,6 +25,7 @@ import com.linroid.ketch.app.ui.inspector.tabs.sameByteUnit
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
+import com.linroid.ketch.app.util.startingReason
 import com.linroid.ketch.app.util.urlHost
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_at_time
@@ -60,6 +61,7 @@ import ketch.app.shared.generated.resources.inspector_with_cookies_referrer
 import ketch.app.shared.generated.resources.inspector_with_cookies_referrer_alone
 import ketch.app.shared.generated.resources.inspector_with_referrer
 import ketch.app.shared.generated.resources.inspector_with_referrer_alone
+import ketch.app.shared.generated.resources.queue_starting
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.StringResource
@@ -101,9 +103,9 @@ internal data class InspectorReason(
  * The reason line of [row], or `null` when nothing needs explaining. A stall comes first; then
  * the limit that caps a running download: the Slow lane when [slowLane] is on and [globalCap]
  * is the lower one, the download's own limit, or the device's [globalCap]. Waiting tasks say why
- * they wait, tasks the engine paused say why and when they go on, and paused ones whether
- * resuming keeps their progress; a completed download whose
- * file is gone ([fileMissing]) says so. The action bar already offers Resume, Start now and
+ * they wait, starting ones that they start or find peers, tasks the engine paused say why and
+ * when they go on, and paused ones whether resuming keeps their progress; a completed download
+ * whose file is gone ([fileMissing]) says so. The action bar already offers Resume, Start now and
  * Download again, so these reasons carry no chip of their own.
  */
 internal fun inspectorReason(
@@ -119,6 +121,9 @@ internal fun inspectorReason(
         InspectorReason(content.detail, ReasonAction.Reconnect, warning = true)
       else -> limitReason(row.request.speedLimit, slowLane, globalCap)
     }
+    // The subline already names the site that a starting row's detail may be.
+    is DownloadState.Queued if row.isStarting ->
+      InspectorReason(startingReason(row.request) ?: Res.string.queue_starting.text())
     is DownloadState.Queued, is DownloadState.Scheduled -> InspectorReason(content.detail)
     // The row explains a pause the engine made, and when the task goes on by itself.
     is DownloadState.Paused -> if (row.state.reason != PauseReason.User) {

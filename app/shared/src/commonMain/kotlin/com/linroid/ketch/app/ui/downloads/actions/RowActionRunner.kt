@@ -343,6 +343,7 @@ internal class RowActionRunner(
     state = row.state,
     device = row.device,
     stalled = row.isStalled,
+    starting = row.isStarting,
     fileMissing = isFileMissing(row),
   )
 

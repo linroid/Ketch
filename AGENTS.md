@@ -126,7 +126,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
   `UnreadableConfig`, `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`,
-  `AiSettings`, `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`,
+  `AiSettings`, `LlmSettings`, `LlmProvider`, `LlmApi`, `LlmProviderGroup`, `SearchSettings`,
+  `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
   `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
   `NotificationSettings`, `IntegrationSettings`, `PowerSettings`
@@ -156,7 +157,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `TextTool`
 
 ### `ai:discover` (JVM/Android only)
-- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
+- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`, `LlmModelLister`,
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverTurn`, `DiscoverResult`,
   `RankedCandidate`, `DiscoveryException`, `PageAccessApprover`, `PageAccessRequest`,
   `PageAccessKind`
@@ -326,10 +327,27 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
 - LLM agent-driven discovery using Koog framework (v1.2.0)
-- Providers: OpenAI, Anthropic, Google Gemini, Ollama, any
-  OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
+- Providers are `LlmProvider` presets, data: id, `LlmApi` (OpenAI Responses, chat completions,
+  Anthropic, Gemini, Ollama), endpoints per region, model suggestions, key variables and key
+  page. OpenAI, Anthropic, Gemini, Ollama, LM Studio, hosted chat-completions services
+  (OpenRouter, DeepSeek, xAI, Mistral, Groq, Together, Fireworks), ones in China (Zhipu,
+  Moonshot, Alibaba Model Studio, Volcengine Ark, SiliconFlow, MiniMax) and any
+  OpenAI-compatible endpoint; `LlmClientFactory` maps them to Koog clients by `LlmApi`. An
+  unknown id loads as `OpenAiCompatible`. See [AI discovery](docs/ai-discovery.md#providers)
+- Several providers are saved at once (`AiSettings.providers`, `[[ai.providers]]`, each an
+  `LlmSettings` with a unique id, name, key, endpoint, its default `model` and the `models` the
+  user added); `active` names the one in use. `ConfigStore.decode` loads an old `[ai.llm]` as
+  one active entry (`AiSettings.migrated`). With none saved, `entries`/`llm` give a default
+  OpenAI one with a blank id
+- `LlmModelLister` lists a provider's models (`/models`, Anthropic's and Gemini's model lists,
+  Ollama's tags) for the settings page (`AiSettingsController.loadModels`); errors never quote
+  the provider's reply
 - Configured under Settings → Discover and persisted under `[ai]` in
-  `config.toml`; blank credentials fall back to environment variables
+  `config.toml`; blank credentials of every saved provider fall back to its provider's
+  environment variables (`LlmProvider.envKeys`)
+- Switching the provider or model (`AiSettingsController.use`) applies to the next turn; running
+  turns finish on the engine they started with, and each `DiscoverTurn` records its
+  `TurnModel` (provider name and model id), saved in the history
 - `AiSettings.enabled` defaults to on. The Discover destination, and every way into it (add
   sheet, palette, phone search, Find another source, launchpad), shows wherever discovery is
   supported while it is switched on (`AiSettingsController.offered`); until it is set up it shows
@@ -418,8 +436,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
   desktop, notifications, integration and power sections
-- `AiSettings`: AI discovery provider, token, model, endpoint, search keys and page access
-  (`access`, `[ai.access]`)
+- `AiSettings`: AI discovery's saved LLM providers (`[[ai.providers]]`, `active`), search keys
+  and page access (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
   Settings (app-only; CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`) and
@@ -671,9 +689,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers, Firefox and a limited Safari target; plain JavaScript modules with no
-  dependencies. `src/` loads unpacked in Chromium; `node build.mjs` writes `build/chrome`,
-  `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
-  workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number).
+  dependencies. `src/` loads unpacked in Chromium, its `key` pinning the development id;
+  `node build.mjs` writes `build/chrome` (no `key`: the Chrome Web Store package, item
+  `flnjeochbgpaipiofdjmoijaeooemhka`), `build/firefox` (event page instead of service worker,
+  gecko id) and zips. It is released apart from the apps, by running `extension-release.yml` by hand: the
+  version is the latest app tag plus the run number (`0.3.1.7`, shown as `0.3.1`), tagged
+  `extension-v0.3.1.7`, and the GitHub release is never marked latest (the updaters read the
+  latest release).
   `build/safari` reaches configured servers only, with mandatory review and no download capture,
   native app launching or notifications. `npm run safari` generates an unsigned macOS Xcode host
   project; signing and Safari enablement are separate local/distribution steps

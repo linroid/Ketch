@@ -210,9 +210,7 @@
   <string name="settings_ai_provider_ollama">Ollama · 本地运行，无需密钥</string>
   <string name="settings_ai_provider_compatible">自定义（OpenAI 兼容）</string>
   <string name="settings_ai_provider_compatible_name">OpenAI 兼容</string>
-  <string name="settings_ai_hint_openai">在 platform.openai.com 获取密钥。</string>
-  <string name="settings_ai_hint_anthropic">在 console.anthropic.com 获取密钥。</string>
-  <string name="settings_ai_hint_gemini">在 aistudio.google.com/apikey 获取密钥。</string>
+  <string name="settings_ai_hint_key">在 %1$s 获取密钥。</string>
   <string name="settings_ai_hint_ollama">请先下载模型：ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter、DeepSeek、LM Studio、vLLM 等类似服务器。</string>
   <string name="settings_ai_api_key_env">正在使用环境变量中的密钥。在此填写的密钥会覆盖它。</string>
@@ -233,6 +231,7 @@
   <string name="settings_ai_test_unsupported">此平台不支持 AI 搜索。</string>
   <string name="settings_ai_test_connection_failed">连接失败。</string>
   <string name="settings_ai_engine_failed">无法启动搜索引擎。</string>
+  <string name="settings_ai_models_failed">无法获取模型列表。</string>
   <string name="settings_ai_search_footer">没有搜索服务时，“搜索”只会读取你提供的网页。</string>
   <string name="settings_ai_search_provider">搜索服务</string>
   <string name="settings_ai_search_none">无</string>

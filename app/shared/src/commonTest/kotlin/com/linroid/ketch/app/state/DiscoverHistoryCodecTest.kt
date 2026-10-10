@@ -47,6 +47,7 @@ class DiscoverHistoryCodecTest {
           AccessNote("mirror.example", allowed = false),
         ),
         filtered = 2,
+        model = TurnModel(provider = "Work", model = "claude-opus-5-5"),
       ),
       DiscoverTurn(
         id = "t2",

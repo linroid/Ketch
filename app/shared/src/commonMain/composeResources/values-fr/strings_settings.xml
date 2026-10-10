@@ -214,9 +214,7 @@
   <string name="settings_ai_provider_ollama">Ollama · en local, sans clé</string>
   <string name="settings_ai_provider_compatible">Personnalisé (compatible OpenAI)</string>
   <string name="settings_ai_provider_compatible_name">Compatible OpenAI</string>
-  <string name="settings_ai_hint_openai">Obtenez une clé sur platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Obtenez une clé sur console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Obtenez une clé sur aistudio.google.com/apikey.</string>
+  <string name="settings_ai_hint_key">Obtenez une clé sur %1$s.</string>
   <string name="settings_ai_hint_ollama">Téléchargez d'abord un modèle : ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM et serveurs similaires.</string>
   <string name="settings_ai_api_key_env">Utilise la clé de l'environnement. Une clé saisie ici la remplace.</string>
@@ -237,6 +235,7 @@
   <string name="settings_ai_test_unsupported">La découverte par IA n'est pas disponible sur cette plateforme.</string>
   <string name="settings_ai_test_connection_failed">Échec de la connexion.</string>
   <string name="settings_ai_engine_failed">Impossible de démarrer le moteur de découverte.</string>
+  <string name="settings_ai_models_failed">Impossible de récupérer la liste des modèles.</string>
   <string name="settings_ai_search_footer">Sans fournisseur de recherche, Découvrir ne lit que les pages que vous lui donnez.</string>
   <string name="settings_ai_search_provider">Fournisseur de recherche</string>
   <string name="settings_ai_search_none">Aucun</string>

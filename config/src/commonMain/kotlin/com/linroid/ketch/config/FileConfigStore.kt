@@ -55,9 +55,7 @@ class FileConfigStore(
       source.close()
     }
     return try {
-      ConfigStore.toml.decodeFromString(
-        KetchConfig.serializer(), content,
-      ).expandHome(userHomeDirectory)
+      ConfigStore.decode(content).expandHome(userHomeDirectory)
     } catch (e: Exception) {
       val report = onUnreadable ?: throw e
       val movedTo = moveAside(file, e)

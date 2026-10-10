@@ -360,6 +360,7 @@ private fun reasonIcon(row: TaskRow, reason: InspectorReason): KetchIcon = when 
   reason.warning -> KetchIcon.Warning
   reason.action == ReasonAction.FullSpeed -> KetchIcon.SlowLane
   reason.action != null -> KetchIcon.Speed
+  row.isStarting -> KetchIcon.Active
   row.state is DownloadState.Queued -> KetchIcon.Queued
   row.state is DownloadState.Scheduled -> KetchIcon.Scheduled
   row.state is DownloadState.Paused -> KetchIcon.Pause
@@ -444,7 +445,8 @@ private fun barActions(row: TaskRow, runner: RowActionRunner, missing: Boolean):
     // Paused for an urgent download, it waits in the queue and resumes on its own.
     is DownloadState.Paused ->
       listOf(if (row.state.waitsInQueue) RowAction.StartNow else RowAction.Resume)
-    is DownloadState.Queued -> listOf(RowAction.StartNow)
+    // Out of the queue, a starting task already runs.
+    is DownloadState.Queued -> listOf(if (row.isStarting) RowAction.Pause else RowAction.StartNow)
     is DownloadState.Scheduled -> {
       listOfNotNull(RowAction.StartNow.takeIf { row.device.capabilities.canReschedule })
     }

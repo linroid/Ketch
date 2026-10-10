@@ -23,6 +23,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.isStarting
 import com.linroid.ketch.app.state.taskActions
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_today_at
@@ -76,6 +77,12 @@ enum class RowStatus {
 
   /** Downloading, but no data arrived for more than 5 seconds. */
   Stalled,
+
+  /**
+   * Holds a slot but gets ready before any data arrives, such as a magnet link looking for its
+   * metadata; see [com.linroid.ketch.app.state.isStarting].
+   */
+  Starting,
   Paused,
   Queued,
   Scheduled,
@@ -165,6 +172,7 @@ fun rowContent(
 ): RowContent {
   val stalled = state is DownloadState.Downloading && stalledFor != null &&
     stalledFor > STALL_THRESHOLD
+  val starting = state.isStarting(queuePosition, context.features)
   val missing = fileMissing && !context.device.capabilities.isRemote
   val retryCount = context.config?.retryCount ?: 0
   val primary = taskActions(
@@ -173,6 +181,7 @@ fun rowContent(
     device = context.device,
     retryCount = retryCount,
     stalled = stalled,
+    starting = starting,
     fileMissing = missing,
   ).primary
   val added = formatAdded(createdAt, context.now, context.timeZone)
@@ -223,17 +232,10 @@ fun rowContent(
         progress = fraction(progress),
       )
     }
-    // A queued task out of the queue holds a slot and is resolving, such as a magnet link
-    // looking for its metadata; devices without queue positions cannot tell.
-    is DownloadState.Queued if KetchFeatures.QUEUE_POSITION in context.features &&
-      queuePosition == null -> RowContent(
-      status = RowStatus.Downloading,
+    is DownloadState.Queued if starting -> RowContent(
+      status = RowStatus.Starting,
       statusText = Res.string.row_status_starting.text(),
-      detail = if (request.url.startsWith("magnet:", ignoreCase = true)) {
-        Res.string.row_finding_peers.text()
-      } else {
-        host?.let(::verbatim) ?: Res.string.queue_starting.text()
-      },
+      detail = startingReason(request) ?: host?.let(::verbatim) ?: Res.string.queue_starting.text(),
       size = knownSize(request),
       added = added,
     )
@@ -287,6 +289,14 @@ fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): UiText {
     else -> shortDateText(added.date, today)
   }
 }
+
+/**
+ * What a [RowStatus.Starting] task waits for: "Finding peers" for a magnet link, which looks for
+ * its metadata; `null` for other links.
+ */
+internal fun startingReason(request: DownloadRequest): UiText? =
+  Res.string.row_finding_peers.text()
+    .takeIf { request.url.startsWith("magnet:", ignoreCase = true) }
 
 /** A downloading task counts as stalled once it has received no data for longer than this. */
 internal val STALL_THRESHOLD: Duration = 5.seconds

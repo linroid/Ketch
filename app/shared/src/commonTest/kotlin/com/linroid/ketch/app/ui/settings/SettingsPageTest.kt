@@ -105,7 +105,7 @@ class SettingsPageTest {
   @Test
   fun discoverSummary_keyOnlyInTheEnvironment_countsAsSetUp() = runTest {
     val saved = AiSettings(enabled = true, llm = LlmSettings(provider = LlmProvider.OpenAi))
-    val effective = saved.copy(llm = saved.llm.copy(apiKey = "sk-env"))
+    val effective = saved.withEntry(saved.llm.copy(apiKey = "sk-env"))
 
     assertEquals("Not set up", discoverSummary(saved, saved).load())
     assertEquals("OpenAI", discoverSummary(saved, effective).load())
