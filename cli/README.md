@@ -189,7 +189,8 @@ id=$(ketch add https://example.com/file.zip)
 ketch watch "$id"
 ```
 
-Without a destination, it goes to Ketch's download folder. A destination works as for
+Without a destination, it goes to Ketch's download folder, or to the
+[category folder](#downloadcategories) there that matches it. A destination works as for
 [`ketch <url>`](#download-a-file): an existing directory, or a path ending in a separator, keeps
 the file name from the source, and a relative path is taken from the current directory when Ketch
 runs on this machine. Another device's paths are passed as they are; that server may keep
@@ -670,6 +671,16 @@ maxConnectionsPerHost = 16
 # password = "secret"
 # bypass = ["*.lan", "10.0.0.0/8"]
 
+# Category folders: a download that does not choose a folder is saved in the
+# folder of the first category it matches, inside defaultDirectory.
+# [[download.categories]]
+# folder = "Video"
+# extensions = ["mp4", "mkv", "webm"]
+# mimeTypes = ["video/*"]
+# [[download.categories]]
+# folder = "Software/GitHub"
+# hosts = ["github.com"]
+
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.
@@ -739,6 +750,25 @@ be negative.
 
 Requests to this machine (`localhost`, `127.0.0.0/8`, `::1`) never use a proxy. `ketch server` and
 `ketch mcp` apply the setting to every HTTP(S) download; see [proxies](../docs/proxy.md).
+
+#### `[[download.categories]]`
+
+Category folders sort the downloads that do not choose a folder (the server's clients send no
+destination, or only a file name, as the browser extension does) into folders inside
+`defaultDirectory`. Each `[[download.categories]]` table is one category; a download goes to
+the first one it matches, and stays in `defaultDirectory` when it matches none.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `folder` | string | *(required)* | Folder inside `defaultDirectory`, such as `"Video"`; `/` nests folders. Absolute paths and `..` fail to load |
+| `extensions` | string[] | `[]` | File name extensions, such as `"mp4"` or `"tar.gz"` |
+| `mimeTypes` | string[] | `[]` | Media types the server reports, such as `"application/pdf"`, or `"video/*"` for a whole kind |
+| `hosts` | string[] | `[]` | Sites, such as `"github.com"`, which also covers its subdomains |
+
+A download matches when its extension or media type is listed (either is enough; with neither
+list set, any type matches) and, when `hosts` is set, it comes from one of them. A category
+without any rule matches nothing. The apps also edit them under Settings → Downloads; on a
+server, like the other download settings changed there, they last until it restarts.
 
 #### `[torrent]`
 

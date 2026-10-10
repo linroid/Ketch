@@ -9,6 +9,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.categoryFor
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isFile
 import com.linroid.ketch.api.isName
@@ -24,6 +25,7 @@ import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.OutputPathReservations
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.file.isInsideDirectory
+import com.linroid.ketch.core.file.resolveChildFolder
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.task.TaskHandle
@@ -208,6 +210,7 @@ internal class DownloadExecution(
           ?: defaultDownloadDirectory()
       },
       serverFileName = fileName,
+      contentType = resolvedUrl.contentType,
     )
     log.i {
       "Resolved taskId=$taskId: source=${source.type}, totalBytes=$total, " +
@@ -603,7 +606,10 @@ internal class DownloadExecution(
    * Picks the output path and reserves it until the execution stops. A file [destination] is
    * used as it is. Otherwise the name, a [destination] name or else [serverFileName] made safe
    * with [sanitizeFileName], is joined to the folder, must stay inside it, and gets a ` (n)`
-   * suffix when the file exists or another download reserved the path.
+   * suffix when the file exists or another download reserved the path. The folder is a
+   * [destination] folder; without one, it is the folder of the first of
+   * [DownloadConfig.categories] that the name, [contentType] and the URL host match, or else
+   * the default one.
    *
    * @throws KetchError.Disk if the name would leave the folder
    */
@@ -611,19 +617,20 @@ internal class DownloadExecution(
     destination: Destination?,
     defaultDir: () -> String,
     serverFileName: String,
+    contentType: String?,
   ): String {
     if (destination != null && destination.isFile()) {
       return destination.value.also(::reserve)
-    }
-    val directory = when {
-      destination != null && destination.isDirectory() ->
-        destination.value.trimEnd('/', '\\')
-      else -> defaultDir()
     }
     val fileName = when {
       destination != null && destination.isName() ->
         destination.value
       else -> sanitizeFileName(serverFileName) ?: DefaultFileNameResolver.FALLBACK
+    }
+    val directory = when {
+      destination != null && destination.isDirectory() ->
+        destination.value.trimEnd('/', '\\')
+      else -> categoryDirectory(defaultDir(), fileName, contentType)
     }
     val outputPath = resolveChildPath(directory, fileName)
     // A content:// document was just created under a name its provider made unique.
@@ -634,6 +641,30 @@ internal class DownloadExecution(
       )
     }
     return OutputPathReservations.reserveUnique(outputPath).also { reservedPath = it }
+  }
+
+  /**
+   * The folder under [defaultDir] of the first of [DownloadConfig.categories] that a download
+   * named [fileName], of [contentType], from the request's host matches, or [defaultDir] when it
+   * matches none. Each folder name goes through [sanitizeFileName]; folders are created as the
+   * file is, except in a content:// tree, where [resolveChildFolder] finds or creates them.
+   */
+  private fun categoryDirectory(
+    defaultDir: String,
+    fileName: String,
+    contentType: String?,
+  ): String {
+    val host = DownloadQueue.extractHost(request.url)
+    val category = config.categoryFor(fileName, contentType, host) ?: return defaultDir
+    val names = category.folder.split('/', '\\').mapNotNull(::sanitizeFileName)
+    if (names.isEmpty()) return defaultDir
+    log.d { "Category folder \"${category.folder}\" for taskId=$taskId" }
+    return try {
+      names.fold(defaultDir, ::resolveChildFolder)
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      throw KetchError.Disk(e)
+    }
   }
 
   /** Reserves [path], used as it is, unless it is a content:// document. */

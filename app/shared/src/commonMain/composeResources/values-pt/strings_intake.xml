@@ -209,6 +209,7 @@
   <string name="intake_save_to">Salvar em</string>
   <string name="intake_folder_downloads">Downloads</string>
   <string name="intake_default_folder">Pasta padrão</string>
+  <string name="intake_category_folder">Vai para %1$s</string>
   <string name="intake_recent">Recentes</string>
   <string name="intake_pinned">Fixadas</string>
   <string name="intake_unpin">Desafixar %1$s</string>

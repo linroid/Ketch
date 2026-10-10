@@ -79,6 +79,7 @@ internal class HttpDownloadSource(
           put(META_RATE_LIMIT_RESET, it.toString())
         }
       },
+      contentType = serverInfo.contentType,
     )
   }
 

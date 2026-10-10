@@ -209,6 +209,7 @@
   <string name="intake_save_to">Speichern in</string>
   <string name="intake_folder_downloads">Downloads</string>
   <string name="intake_default_folder">Standardordner</string>
+  <string name="intake_category_folder">Einsortiert in %1$s</string>
   <string name="intake_recent">Zuletzt verwendet</string>
   <string name="intake_pinned">Angeheftet</string>
   <string name="intake_unpin">%1$s loslösen</string>

@@ -444,6 +444,7 @@ class KtorHttpEngine private constructor(
       contentDisposition = response.headers[HttpHeaders.ContentDisposition],
       rateLimitRemaining = findRateLimitRemaining(response.headers),
       rateLimitReset = findRateLimitReset(response.headers),
+      contentType = response.headers[HttpHeaders.ContentType],
     )
 
     private fun redirectOf(response: HttpResponse): Hop.Redirect? {

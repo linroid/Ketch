@@ -15,6 +15,7 @@ package com.linroid.ketch.core.engine
  *   (`RateLimit-Remaining` header), or `null` if absent
  * @property rateLimitReset seconds until the rate limit window resets
  *   (`RateLimit-Reset` header), or `null` if absent
+ * @property contentType the `Content-Type` header, which category folders match by media type
  */
 data class ServerInfo(
   val contentLength: Long?,
@@ -24,6 +25,7 @@ data class ServerInfo(
   val contentDisposition: String? = null,
   val rateLimitRemaining: Long? = null,
   val rateLimitReset: Long? = null,
+  val contentType: String? = null,
 ) {
   /** `true` when the server supports byte-range requests and reports a content length. */
   val supportsResume: Boolean

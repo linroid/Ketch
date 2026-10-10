@@ -145,6 +145,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   copy.
 - **Keyboard first** on the desktop: `⌘K` (`Ctrl+K` on Windows and Linux) opens the command
   palette, and the shortcut sheet lists every key.
+- **Category folders** — Videos, music, documents and archives go to folders of their own inside
+  the download folder, by file type or website: start from the suggested ones under
+  **Settings → Downloads**, or set your own rules.
 - **Finished means openable** — Open a file, show it in its folder or drag it out, straight from
   the list.
 - **At home on each platform** — The menu bar or tray, notifications, Dock and taskbar progress
@@ -221,8 +224,6 @@ the [CLI documentation](cli/README.md) lists every command.
   choose timeouts and how often to retry, unlimited included
 - **Unfinished files look unfinished** — Downloads are written under a temporary name and get
   their real name once complete
-- **Category folders** — Save videos, music, documents and archives to folders of their own, by
-  rules you set
 - **Torrent files, chosen any time** — Pick the files of a magnet link once its details arrive,
   and change the selection while it downloads
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down

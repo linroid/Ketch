@@ -157,6 +157,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   sugiera descargar los enlaces que copias.
 - **Accesible con el teclado** en escritorio: `⌘K` (`Ctrl+K` en Windows y Linux) abre la paleta de
   comandos, y la lista de atajos muestra todas las combinaciones.
+- **Carpetas por categoría** — Los vídeos, la música, los documentos y los archivos comprimidos
+  van a sus propias carpetas dentro de la carpeta de descargas, según el tipo de archivo o el
+  sitio web: empieza con las sugeridas en **Ajustes → Descargas** o define tus reglas.
 - **Listo para abrir al terminar** — Abre el archivo, muéstralo en su carpeta o arrástralo fuera,
   directamente desde la lista.
 - **Integrado en cada plataforma** — Barra de menús o bandeja, notificaciones y progreso en el Dock
@@ -242,8 +245,6 @@ la [documentación de la CLI](cli/README.md) enumera todos los comandos.
   y elegir tiempos de espera y número de reintentos, incluidos reintentos ilimitados
 - **Archivos incompletos reconocibles** — Usar un nombre temporal durante la descarga y asignar el
   definitivo al terminar
-- **Carpetas por categoría** — Guardar vídeos, música, documentos y archivos comprimidos en sus
-  propias carpetas según tus reglas
 - **Elegir archivos de un torrent en cualquier momento** — Seleccionarlos cuando lleguen los
   detalles de un enlace magnet y cambiar la selección durante la descarga
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando

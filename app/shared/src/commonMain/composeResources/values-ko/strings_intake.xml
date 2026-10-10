@@ -189,6 +189,7 @@
   <string name="intake_save_to">저장 위치</string>
   <string name="intake_folder_downloads">다운로드</string>
   <string name="intake_default_folder">기본 폴더</string>
+  <string name="intake_category_folder">%1$s에 정리됨</string>
   <string name="intake_recent">최근</string>
   <string name="intake_pinned">고정됨</string>
   <string name="intake_unpin">%1$s 고정 해제</string>

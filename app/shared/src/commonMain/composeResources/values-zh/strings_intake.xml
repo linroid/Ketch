@@ -189,6 +189,7 @@
   <string name="intake_save_to">保存到</string>
   <string name="intake_folder_downloads">下载</string>
   <string name="intake_default_folder">默认文件夹</string>
+  <string name="intake_category_folder">归入 %1$s</string>
   <string name="intake_recent">最近</string>
   <string name="intake_pinned">已固定</string>
   <string name="intake_unpin">取消固定 %1$s</string>

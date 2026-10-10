@@ -64,7 +64,8 @@ class KetchToolSet(
         stringParameter(
           "destination",
           "Where to save the file. Can be a directory path (ending with /), a filename, " +
-            "or a full file path. Omit to use the default directory.",
+            "or a full file path. Omit it, or give only a filename, to use the default " +
+            "directory, or the category folder in it that the file's type or site picks.",
           required = false,
         ),
         integerParameter(

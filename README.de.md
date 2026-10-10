@@ -161,6 +161,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   oder lass Ketch Downloads für kopierte Links vorschlagen.
 - **Mit der Tastatur bedienen** — Auf dem Desktop öffnet `⌘K` (`Ctrl+K` unter Windows und Linux)
   die Befehlspalette. Die Tastenkürzelübersicht zeigt alle Kombinationen.
+- **Kategorieordner** — Videos, Musik, Dokumente und Archive landen nach Dateityp oder Website
+  in eigenen Ordnern im Downloadordner: Starte mit den Vorschlägen unter
+  **Einstellungen → Downloads** oder lege eigene Regeln fest.
 - **Nach dem Download direkt öffnen** — Öffne eine Datei, zeige sie im Ordner oder ziehe sie
   heraus, direkt aus der Liste.
 - **Auf jeder Plattform zu Hause** — Menüleiste oder Infobereich, Benachrichtigungen und Fortschritt
@@ -247,8 +250,6 @@ Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
   ankommen; Zeitlimits und Wiederholungszahlen wählen, auch unbegrenzt
 - **Unfertige Dateien erkennbar machen** — Unter einem temporären Namen speichern und erst nach
   Abschluss den endgültigen Namen vergeben
-- **Kategorieordner** — Videos, Musik, Dokumente und Archive nach eigenen Regeln in getrennten
-  Ordnern speichern
 - **Torrent-Dateien jederzeit wählen** — Nach Eingang der Magnet-Metadaten Dateien auswählen und
   die Auswahl während des Downloads ändern
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder

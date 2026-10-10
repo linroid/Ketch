@@ -277,6 +277,8 @@
   <!-- The default folder's name before the device says it. -->
   <string name="intake_folder_downloads">Downloads</string>
   <string name="intake_default_folder">Default folder</string>
+  <!-- Under the default folder in the Save to menu, when a category folder of the device takes this download. %1$s is that folder, such as "Video". -->
+  <string name="intake_category_folder">Sorted into %1$s</string>
   <string name="intake_recent">Recent</string>
   <string name="intake_pinned">Pinned</string>
   <!-- %1$s is a folder name. -->

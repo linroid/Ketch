@@ -46,6 +46,10 @@ import kotlinx.serialization.Serializable
  * @property proxy How HTTP(S) downloads reach their servers, by default following the system's
  *   proxy settings. [DownloadRequest.proxy] replaces it for one download. Resolving a URL with
  *   [KetchApi.resolve] uses it too.
+ * @property categories folders under [defaultDirectory] that downloads not choosing a folder
+ *   are sorted into, by file extension, media type or site; the first category a download
+ *   matches wins, and one that matches none stays in [defaultDirectory]. Empty by default, so
+ *   every such download is saved in [defaultDirectory]. See [DownloadCategory].
  */
 @Serializable
 data class DownloadConfig(
@@ -60,6 +64,7 @@ data class DownloadConfig(
   val maxConnectionsPerDownload: Int = 4,
   val maxConnectionsPerHost: Int = 16,
   val proxy: ProxyConfig = ProxyConfig.System,
+  val categories: List<DownloadCategory> = emptyList(),
 ) {
   init {
     require(retryCount >= 0) { "retryCount must be non-negative" }

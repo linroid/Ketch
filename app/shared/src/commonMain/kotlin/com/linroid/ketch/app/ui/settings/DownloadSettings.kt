@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -37,6 +38,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberFilePicker
@@ -128,7 +130,14 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
     return
   }
   val onChange = { updated: DownloadConfig -> controller.updateDownload(updated) }
+  val presence by state.instanceManager.presence.collectAsState()
+  // A remote device that has not reported yet is assumed to sort, as it just sent its settings.
+  val sortsIntoFolders = remember(presence, device) {
+    device !is RemoteInstance || presence.firstOrNull { it.deviceId == device.deviceId }
+      ?.status?.let { KetchFeatures.CATEGORY_FOLDERS in it.features } ?: true
+  }
   FolderGroup(device, config, onChange)
+  CategoryGroup(device, { controller.download ?: config }, sortsIntoFolders, onChange)
   FolderShortcuts(state, device, config)
   QueueGroup(config, onChange)
 }
