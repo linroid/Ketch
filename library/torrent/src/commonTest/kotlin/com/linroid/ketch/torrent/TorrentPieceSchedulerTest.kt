@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -66,4 +67,57 @@ class TorrentPieceSchedulerTest {
     second.close()
     assertEquals(0, budget.allocated)
   }
+
+  @Test
+  fun retarget_unwantedPieces_areNoLongerClaimed() = runTest {
+    val budget = TorrentBufferBudget(12)
+    val scheduler = TorrentPieceScheduler(BooleanArray(2) { true }, BooleanArray(2), { 4 }, budget)
+    scheduler.availability(1, booleanArrayOf(true, true))
+    val before = scheduler.wantVersion
+    scheduler.retarget { view(wanted = booleanArrayOf(false, true)) }
+    assertTrue(scheduler.wantVersion > before)
+    assertFalse(scheduler.isWanted(0))
+    assertEquals(1, scheduler.claim(1)?.index)
+    scheduler.release(1)
+    scheduler.retarget { view(wanted = booleanArrayOf(false, false)) }
+    assertNull(scheduler.claim(1))
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun retarget_newVerifiedBits_bumpHaveVersion() = runTest {
+    val budget = TorrentBufferBudget(12)
+    val scheduler = TorrentPieceScheduler(BooleanArray(2) { true }, BooleanArray(2), { 4 }, budget)
+    val (version, _) = assertNotNull(scheduler.snapshot(-1))
+    scheduler.retarget { view(verified = booleanArrayOf(true, false)) }
+    val (next, pieces) = assertNotNull(scheduler.snapshot(version))
+    assertTrue(pieces[0])
+    // Nothing new to announce: the version stays, while the wanted version still moves.
+    val wantVersion = scheduler.wantVersion
+    scheduler.retarget { view(verified = booleanArrayOf(true, false)) }
+    assertNull(scheduler.snapshot(next))
+    assertTrue(scheduler.wantVersion > wantVersion)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun revoke_clearsVerified() = runTest {
+    val budget = TorrentBufferBudget(12)
+    val scheduler = TorrentPieceScheduler(BooleanArray(1) { true }, BooleanArray(1), { 4 }, budget)
+    scheduler.availability(1, booleanArrayOf(true))
+    scheduler.verified(0)
+    assertNull(scheduler.claim(1))
+    scheduler.revoke(0)
+    assertFalse(scheduler.isVerified(0))
+    // A wanted piece the store lost downloads again.
+    assertEquals(0, scheduler.claim(1)?.index)
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  private fun view(
+    wanted: BooleanArray = booleanArrayOf(true, true),
+    verified: BooleanArray = BooleanArray(wanted.size),
+  ) = SelectionView(1, wanted, verified, IntArray(0))
 }

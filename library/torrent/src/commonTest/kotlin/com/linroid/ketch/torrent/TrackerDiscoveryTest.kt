@@ -402,6 +402,54 @@ class TrackerDiscoveryTest {
     }
   }
 
+  @Test
+  fun poll_selectionBecomesComplete_announcesCompletedOnce() = runTest {
+    var now = 0L
+    var selectsAll = false
+    val requests = mutableListOf<TrackerAnnounce>()
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+      requests += request
+      TrackerResponse(emptyList(), 60)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
+      nowMs = { now }, announceCompletion = { selectsAll })
+    discovery.poll(booleanArrayOf(true, false), 4, 0)
+    assertEquals(TrackerEvent.STARTED, requests.last().event)
+    now = 60_000
+    // Every piece of a partial selection: still not complete for the tracker.
+    discovery.poll(booleanArrayOf(true, true), 7, 0)
+    assertEquals(TrackerEvent.NONE, requests.last().event)
+    // The selection grew to the whole torrent, which it holds: completed goes out at once.
+    selectsAll = true
+    discovery.poll(booleanArrayOf(true, true), 7, 0)
+    assertEquals(TrackerEvent.COMPLETED, requests.last().event)
+    now = 120_000
+    discovery.poll(booleanArrayOf(true, true), 7, 0)
+    assertEquals(TrackerEvent.NONE, requests.last().event)
+    assertEquals(1, requests.count { it.event == TrackerEvent.COMPLETED })
+  }
+
+  @Test
+  fun poll_partialSelectionHoldingEveryPiece_sendsNoCompleted() = runTest {
+    var now = 0L
+    val requests = mutableListOf<TrackerAnnounce>()
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+      requests += request
+      TrackerResponse(emptyList(), 60)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers,
+      nowMs = { now }, announceCompletion = { false })
+    discovery.poll(booleanArrayOf(false, false), 0, 0)
+    for (round in 1..3) {
+      now = round * 60_000L
+      discovery.poll(booleanArrayOf(true, true), 7, 0)
+      assertEquals(0L, requests.last().left)
+    }
+    discovery.poll(booleanArrayOf(true, true), 7, 0, stopped = true)
+    assertEquals(listOf(TrackerEvent.STARTED, TrackerEvent.NONE, TrackerEvent.NONE,
+      TrackerEvent.NONE, TrackerEvent.STOPPED), requests.map { it.event })
+  }
+
   private fun v2Document(name: String = "test"): TorrentV2Document =
     TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
       "name" to name, "private" to 1L, "meta version" to 2L, "piece length" to 16_384L,

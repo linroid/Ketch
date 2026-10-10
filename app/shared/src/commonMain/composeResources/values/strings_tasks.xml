@@ -33,6 +33,10 @@
   <string name="row_saved_on">Saved on %1$s</string>
   <string name="row_missing_file">File moved or deleted</string>
   <string name="row_completed">Completed</string>
+  <!-- A torrent's detail while it waits for the user to choose which of its files to download. -->
+  <string name="row_choose_files">Choose files to download</string>
+  <!-- A finished torrent's detail while it shares its files with other peers. -->
+  <string name="row_seeding">Seeding</string>
   <!-- How long a finished download took. %1$s is a duration, such as "4m 2s". -->
   <string name="row_took">took %1$s</string>
   <plurals name="row_files">
@@ -81,6 +85,14 @@
   <string name="sort_origin">Origin</string>
   <string name="sort_priority">Priority</string>
   <string name="sort_device">Device</string>
+  <!-- The orders of a torrent's file list, in its Sort menu, beside sort_name, sort_size and
+       sort_progress. Kind groups videos, audio, subtitles and so on. -->
+  <string name="sort_kind">Kind</string>
+  <string name="sort_selected_first">Selected first</string>
+  <!-- The order the torrent itself lists its files in. -->
+  <string name="sort_torrent_order">Torrent order</string>
+  <!-- A check in a Sort menu that turns the order around. -->
+  <string name="sort_reverse">Reverse order</string>
   <!-- How the Downloads list groups rows, in the Group menu. -->
   <string name="group_smart">Smart</string>
   <string name="group_status">Status</string>
@@ -166,6 +178,11 @@
   <string name="action_row_copy_details">Copy details</string>
   <string name="action_row_stop_and_discard">Cancel download…</string>
   <string name="action_row_remove">Remove…</string>
+  <!-- Opens the torrent's file list to choose which files to download. -->
+  <string name="action_row_choose_files">Choose files…</string>
+  <string name="action_row_download_all_files">Download all files</string>
+  <string name="action_row_stop_seeding">Stop seeding</string>
+  <string name="action_row_seed">Seed</string>
   <!-- Menu labels of actions on several selected downloads. %1$d is how many. -->
   <plurals name="batch_pause">
     <item quantity="one">Pause %1$d download</item>

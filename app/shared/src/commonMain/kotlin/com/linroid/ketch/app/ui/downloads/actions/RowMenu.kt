@@ -623,6 +623,10 @@ internal val RowAction.icon: KetchIcon
     RowAction.CopyPath, RowAction.CopyError, RowAction.CopyDetails -> KetchIcon.Copy
     RowAction.RetryWithOptions, RowAction.EnterCredentials -> KetchIcon.Settings
     RowAction.FindAnotherSource -> KetchIcon.Discover
+    RowAction.ChooseFiles -> KetchIcon.CheckCircle
+    RowAction.DownloadAllFiles -> KetchIcon.Play
+    RowAction.StopSeeding -> KetchIcon.Stop
+    RowAction.Seed -> KetchIcon.Send
     RowAction.StopAndDiscard -> KetchIcon.Stop
     RowAction.Remove -> KetchIcon.Trash
   }

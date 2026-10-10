@@ -24,6 +24,8 @@
   <string name="row_saved_on">Enregistré sur %1$s</string>
   <string name="row_missing_file">Fichier déplacé ou supprimé</string>
   <string name="row_completed">Terminé</string>
+  <string name="row_choose_files">Choisissez les fichiers à télécharger</string>
+  <string name="row_seeding">En partage</string>
   <string name="row_took">en %1$s</string>
   <plurals name="row_files">
     <item quantity="one">%1$d fichier</item>
@@ -61,6 +63,10 @@
   <string name="sort_origin">Origine</string>
   <string name="sort_priority">Priorité</string>
   <string name="sort_device">Appareil</string>
+  <string name="sort_kind">Type</string>
+  <string name="sort_selected_first">Sélectionnés d'abord</string>
+  <string name="sort_torrent_order">Ordre du torrent</string>
+  <string name="sort_reverse">Ordre inversé</string>
   <string name="group_smart">Intelligent</string>
   <string name="group_status">État</string>
   <string name="group_day">Jour</string>
@@ -134,6 +140,10 @@
   <string name="action_row_copy_details">Copier les détails</string>
   <string name="action_row_stop_and_discard">Annuler le téléchargement…</string>
   <string name="action_row_remove">Retirer…</string>
+  <string name="action_row_choose_files">Choisir les fichiers…</string>
+  <string name="action_row_download_all_files">Télécharger tous les fichiers</string>
+  <string name="action_row_stop_seeding">Arrêter le partage</string>
+  <string name="action_row_seed">Partager</string>
   <plurals name="batch_pause">
     <item quantity="one">Mettre en pause %1$d téléchargement</item>
     <item quantity="other">Mettre en pause %1$d téléchargements</item>

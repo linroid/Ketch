@@ -750,6 +750,15 @@ class IntakeSession internal constructor(
   /** What the sheet does with the clipboard; see [AppSettingsController.clipboardMode]. */
   val clipboardMode: ClipboardMode get() = state.appSettings.clipboardMode
 
+  /** How the torrent picker orders a torrent's files, as last chosen there. */
+  internal var torrentSort: FileSort
+    get() = state.appSettings.fileSort(FileSortSurface.Intake)
+    set(value) = state.appSettings.saveFileSort(FileSortSurface.Intake, value)
+
+  /** What [target] reports it supports, as its status says, else as the app last heard. */
+  private fun targetFeatures(): Set<String> =
+    targetStatus?.features ?: target?.let { state.featuresOf(it.deviceId) }.orEmpty()
+
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
 
@@ -1387,6 +1396,9 @@ class IntakeSession internal constructor(
     } else {
       selection
     }
+    // A magnet added before its file list arrived waits for a choice on devices that can.
+    val awaitsFiles = entry.isMagnet && entry.addAnyway && resolved?.files.isNullOrEmpty() &&
+      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION in targetFeatures()
     val name = entry.fileName.trim().ifEmpty { null }
       ?: (entry.source as? IntakeSource.Link)?.fileName
     val urls = when (val source = entry.source) {
@@ -1412,6 +1424,7 @@ class IntakeSession internal constructor(
           schedule = schedule,
           selectedFileIds = selectedIds,
           resolvedSource = resolved.takeIf { index == 0 },
+          awaitFileSelection = awaitsFiles,
         )
       } catch (e: IllegalArgumentException) {
         log.w { "Couldn't build a request for ${redactUrl(url)}: ${e.describeCauses()}" }

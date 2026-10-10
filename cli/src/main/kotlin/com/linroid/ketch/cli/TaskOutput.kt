@@ -78,6 +78,7 @@ private fun pauseReasonName(reason: PauseReason): String = when (reason) {
   is PauseReason.Preempted -> "preempted"
   PauseReason.WaitingForCondition -> "waiting_for_condition"
   PauseReason.Shutdown -> "shutdown"
+  PauseReason.AwaitingFileSelection -> "awaiting_file_selection"
 }
 
 /**
@@ -124,6 +125,7 @@ internal fun stateLabel(task: DownloadTask): String = when (val state = task.sta
   is DownloadState.Paused -> when (state.reason) {
     is PauseReason.Preempted, PauseReason.WaitingForCondition -> "waiting"
     PauseReason.User, PauseReason.Shutdown -> "paused"
+    PauseReason.AwaitingFileSelection -> "choose files"
   }
   else -> stateName(state)
 }

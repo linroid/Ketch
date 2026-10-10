@@ -1,5 +1,7 @@
 package com.linroid.ketch.api.torrent
 
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,5 +71,65 @@ class TorrentContractsTest {
     assertFailsWith<IllegalArgumentException> { snapshot.copy(counters = null) }
     assertFailsWith<IllegalArgumentException> { counters.copy(wantedBytes = 101) }
     assertFailsWith<IllegalArgumentException> { counters.copy(selectedVerifiedBytes = -1) }
+  }
+
+  @Test
+  fun counters_untrackedFields_areNull() {
+    val counters = Json.decodeFromString<TorrentCounters>(
+      """{"totalPayloadBytes":100,"wantedBytes":40,"selectedVerifiedBytes":10}"""
+    )
+    assertEquals(null, counters.receivedPayloadBytes)
+    assertEquals(null, counters.uploadedPayloadBytes)
+    assertEquals(null, counters.discardedPayloadBytes)
+    assertEquals(null, counters.protocolBytes)
+    assertEquals(null, counters.downloadBytesPerSecond)
+    assertEquals(null, counters.uploadBytesPerSecond)
+    assertEquals(null, counters.seedSeconds)
+    assertFailsWith<IllegalArgumentException> { counters.copy(uploadedPayloadBytes = -1) }
+  }
+
+  @Test
+  fun filePage_oversizedPage_isRejected() {
+    val revision = TorrentRevision("a", 1)
+    val entry = TorrentFileEntry("0", "a.mkv", 10, selected = true)
+    TorrentFilePage("task", revision, 0, 1000, List(1000) { entry })
+    assertFailsWith<IllegalArgumentException> {
+      TorrentFilePage("task", revision, 0, 1001, List(1001) { entry })
+    }
+    assertFailsWith<IllegalArgumentException> {
+      TorrentFilePage("task", revision, 0, 1, listOf(entry), nextCursor = "")
+    }
+    assertFailsWith<IllegalArgumentException> { TorrentFileEntry("", "a", 1, false) }
+    assertFailsWith<IllegalArgumentException> { TorrentFileEntry("0", "a", -1, false) }
+  }
+
+  @Test
+  fun commandError_fromWire_roundTrips() {
+    TorrentCommandError.entries.forEach {
+      assertEquals(it, TorrentCommandError.fromWire(it.wireName))
+    }
+    assertEquals(TorrentCommandError.CONFLICT, TorrentCommandError.fromWire("revision_conflict"))
+    assertEquals(null, TorrentCommandError.fromWire("future_error"))
+    assertEquals(null, TorrentCommandError.fromWire(null))
+    TorrentFileOrder.entries.forEach {
+      assertEquals(it, TorrentFileOrder.fromWire(it.wireName))
+    }
+    assertEquals(null, TorrentFileOrder.fromWire("kind"))
+  }
+
+  @Test
+  fun controller_defaultCommands_failAsUnsupported() = runTest {
+    val controller = object : TorrentController {
+      override suspend fun capabilities() = TorrentCapabilities()
+      override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+      override fun observe(taskId: String) = flowOf<TorrentSnapshot?>(null)
+    }
+    val context = TorrentCommandContext("key", TorrentRevision("a", 0))
+    val errors = listOf(
+      assertFailsWith<TorrentCommandException> { controller.files("task") },
+      assertFailsWith<TorrentCommandException> { controller.select("task", setOf("0"), context) },
+      assertFailsWith<TorrentCommandException> { controller.setSeeding("task", true, context) }
+    )
+    assertTrue(errors.all { it.error == TorrentCommandError.UNSUPPORTED })
   }
 }

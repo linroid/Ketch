@@ -17,6 +17,7 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** libtorrent is used only as an independent local reference seeder for this test. */
@@ -90,6 +91,55 @@ class IndependentSeederTest {
           root.deleteRecursively()
         }
       }
+    }
+  }
+
+  @Test
+  fun liveSelectionExpand_keepsTheIndependentSeederConnection() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(60_000) {
+        NativeLibraryLoader.ensureLoaded()
+        assertEquals(ConformanceClients.version("libtorrent4j"),
+          LibTorrent.libtorrent4jVersion())
+        println("CONFORMANCE_CLIENT libtorrent ${LibTorrent.version()} " +
+          "libtorrent4j ${LibTorrent.libtorrent4jVersion()}")
+        val root = Files.createTempDirectory("ketch-interop-selection").toFile()
+        val seed = root.resolve("seed").apply { mkdirs() }
+        // Three files whose boundaries fall inside pieces; libtorrent seeds them from seed/pack.
+        val torrent = MultiFileTorrent()
+        torrent.writeTo(seed.absolutePath.toPath() / "pack")
+        val manager = SessionManager()
+        try {
+          manager.start(SessionParams(seederSettings()))
+          val info = TorrentInfo(torrent.metainfo)
+          manager.download(info, seed)
+          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
+            manager.swig().listen_port() == 0) {
+            delay(20)
+          }
+          val magnet = MagnetUri(torrent.metadata.infoHash,
+            explicitPeers = listOf("127.0.0.1:${manager.swig().listen_port()}")).toUri()
+          val output = root.resolve("out")
+          val expansion = downloadExpandingLive(magnet, torrent.metainfo, output.absolutePath,
+            first = setOf("0"), expanded = setOf("0", "1"))
+          assertContentEquals(torrent.payloads[0], output.resolve("f0").readBytes())
+          assertContentEquals(torrent.payloads[1], output.resolve("f1").readBytes())
+          assertFalse(output.resolve("f2").exists())
+          // The expansion reached the running swarm: no peer was dialed again.
+          assertEquals(1, expansion.connects)
+        } finally {
+          manager.stop()
+          root.deleteRecursively()
+        }
+      }
+    }
+  }
+
+  private fun seederSettings() = SettingsPack().also { settings ->
+    settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
+    for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
+      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp)) {
+      settings.setBoolean(flag.swigValue(), false)
     }
   }
 }

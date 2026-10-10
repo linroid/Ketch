@@ -13,6 +13,15 @@ val DownloadState.waitsInQueue: Boolean
   get() = this is DownloadState.Queued ||
     (this is DownloadState.Paused && reason is PauseReason.Preempted)
 
+/**
+ * Whether a task in this state waits for its files to be chosen: a torrent added with
+ * [com.linroid.ketch.api.DownloadRequest.awaitFileSelection] whose file list arrived. It holds
+ * no slot and stays paused ([isPausedUntilResumed]) until files are chosen or it is resumed,
+ * which downloads every file.
+ */
+val DownloadState.awaitsFileSelection: Boolean
+  get() = this is DownloadState.Paused && reason == PauseReason.AwaitingFileSelection
+
 /** Whether a task in this state is paused and stays so until someone resumes it. */
 val DownloadState.isPausedUntilResumed: Boolean
   get() = this is DownloadState.Paused && reason !is PauseReason.Preempted

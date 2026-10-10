@@ -293,6 +293,8 @@
 
   <!-- What the devices report, in the Activity history. %1$s is a file name. -->
   <string name="feedback_added">Added %1$s</string>
+  <!-- A torrent waits until the user chooses its files. %1$s is its name. -->
+  <string name="feedback_choose_files">Choose which files of “%1$s” to download</string>
   <plurals name="feedback_recovered">
     <item quantity="one">Resuming %1$d download from your last session</item>
     <item quantity="other">Resuming %1$d downloads from your last session</item>

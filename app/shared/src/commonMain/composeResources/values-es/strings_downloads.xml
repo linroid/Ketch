@@ -239,6 +239,8 @@
   <string name="downloads_failed_priority">Error al establecer la prioridad de %1$s en %2$s</string>
   <string name="downloads_failed_connections">Error al establecer las conexiones de %1$s en %2$s</string>
   <string name="downloads_failed_reschedule">Error al reprogramar %1$s en %2$s</string>
+  <string name="downloads_failed_files">Error al cambiar los archivos de %1$s en %2$s</string>
+  <string name="downloads_failed_seeding">Error al cambiar el sembrado de %1$s en %2$s</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">Se pausó %1$d descarga</item>

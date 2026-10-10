@@ -19,8 +19,12 @@ import kotlin.coroutines.cancellation.CancellationException
  * @property status the HTTP status code, such as 403
  * @property errorCode the server's error code, `null` when the response carried none. Among
  *   them: `path_rejected` (403) for a destination, or files to delete, outside the folders the
- *   server allows; `payload_too_large` (413); `unsupported_media_type` (415); and
- *   `too_many_attempts` (429) once this address sent too many wrong access tokens
+ *   server allows; `payload_too_large` (413); `unsupported_media_type` (415);
+ *   `too_many_attempts` (429) once this address sent too many wrong access tokens;
+ *   `selection_unavailable` (409) when a task's files cannot change now, such as while its file
+ *   list is not known yet. Torrent controller failures carry the wire names of
+ *   [com.linroid.ketch.api.torrent.TorrentCommandError] and surface as
+ *   [com.linroid.ketch.api.torrent.TorrentCommandException] instead
  * @property retryAfterSeconds how long the server asks to wait before trying again, from its
  *   `Retry-After` header, when it sent one
  */
@@ -39,8 +43,11 @@ private val errorJson = Json { ignoreUnknownKeys = true }
  * The failure this unsuccessful response reports, with the error code and message of its
  * [ErrorResponse] body when it has one. Reads the body.
  */
-internal suspend fun HttpResponse.toRemoteApiException(): RemoteApiException {
-  val body = errorResponse()
+internal suspend fun HttpResponse.toRemoteApiException(): RemoteApiException =
+  toRemoteApiException(errorResponse())
+
+/** The failure this unsuccessful response reports with its already read [body]. */
+internal fun HttpResponse.toRemoteApiException(body: ErrorResponse?): RemoteApiException {
   return RemoteApiException(
     status = status.value,
     errorCode = body?.error,
@@ -49,7 +56,8 @@ internal suspend fun HttpResponse.toRemoteApiException(): RemoteApiException {
   )
 }
 
-private suspend fun HttpResponse.errorResponse(): ErrorResponse? {
+/** The [ErrorResponse] body of this unsuccessful response, or `null` without one. Reads it. */
+internal suspend fun HttpResponse.errorResponse(): ErrorResponse? {
   val text = try {
     bodyAsText()
   } catch (e: CancellationException) {

@@ -193,6 +193,7 @@
   <string name="feedback_send_sign_in">로그인 정보가 %1$s에 전송됩니다.</string>
 
   <string name="feedback_added">%1$s 추가됨</string>
+  <string name="feedback_choose_files">“%1$s”에서 다운로드할 파일을 선택하세요</string>
   <plurals name="feedback_recovered">
     <item quantity="other">지난 세션의 다운로드 %1$d개를 재개하는 중</item>
   </plurals>

@@ -526,7 +526,7 @@
   <string name="settings_torrent_upload_seed">持续做种</string>
   <string name="settings_torrent_upload_off_hint">节点无法从此设备下载任何内容。</string>
   <string name="settings_torrent_upload_while_downloading_hint">种子下载期间，节点可以下载已有的分块。</string>
-  <string name="settings_torrent_upload_seed_hint">Ketch 运行期间，已完成的种子会持续上传，直到将其移除或关闭此选项。等待下载的种子优先。</string>
+  <string name="settings_torrent_upload_seed_hint">已完成的种子会持续上传，直到手动停止或关闭此选项，Ketch 重启后依然如此。</string>
   <string name="settings_torrent_upload_limit">上传限速</string>
   <string name="settings_torrent_upload_limit_hint">所有种子共用。</string>
   <string name="settings_torrent_upload_footer">接收上传的节点可以看到此设备的 IP 地址。私有种子只与其 Tracker 提供的节点共享。</string>

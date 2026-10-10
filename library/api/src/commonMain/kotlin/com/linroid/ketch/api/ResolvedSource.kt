@@ -42,4 +42,27 @@ data class ResolvedSource(
   val files: List<SourceFile> = emptyList(),
   val selectionMode: FileSelectionMode = FileSelectionMode.MULTIPLE,
   val contentType: String? = null,
-)
+) {
+  companion object {
+    /**
+     * [metadata] key holding a source's whole content description, such as a torrent's base64
+     * metainfo. [withoutBulkMetadata] always leaves it out, whatever its size.
+     */
+    const val METAINFO_KEY: String = "metainfo"
+
+    /** [metadata] values longer than this are left out of task views and events. */
+    const val MAX_VIEW_METADATA_CHARS: Int = 4096
+  }
+}
+
+/**
+ * This source without [ResolvedSource.METAINFO_KEY] and without metadata values longer than
+ * [ResolvedSource.MAX_VIEW_METADATA_CHARS], as tasks keep and show it; [ResolvedSource.files]
+ * are kept. Results of [KetchApi.resolve] keep everything.
+ */
+fun ResolvedSource.withoutBulkMetadata(): ResolvedSource {
+  val kept = metadata.filter { (key, value) ->
+    key != ResolvedSource.METAINFO_KEY && value.length <= ResolvedSource.MAX_VIEW_METADATA_CHARS
+  }
+  return if (kept.size == metadata.size) this else copy(metadata = kept)
+}

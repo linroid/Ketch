@@ -51,6 +51,19 @@ class TorrentSessionAdmissionTest {
   }
 
   @Test
+  fun sessionStateWeight_chargesEveryFile() {
+    val single = fixture("a")
+    val metadata = single.copy(files = List(5) {
+      TorrentMetadata.TorrentFile(it, "a/$it", if (it == 0) 1 else 0)
+    })
+    val one = TorrentTaskSpec("task", metadata, "/tmp/admission/a", setOf(0))
+    val all = one.copy(selected = metadata.files.indices.toSet())
+    // The selection may grow while the session runs, so it never lowers the charge.
+    assertEquals(sessionStateWeight(all), sessionStateWeight(one))
+    assertEquals(sessionStateWeight(all), sessionStateWeight(one.copy(selected = emptySet())))
+  }
+
+  @Test
   fun engineRejectsBeforeCreatingStorageAndReturnsCreditOnFailedConstruction() = runTest {
     withContext(Dispatchers.Default) {
       val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /

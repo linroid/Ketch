@@ -1,14 +1,15 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** Reserves swarm ownership before starting I/O and routes snapshots by task identity. */
 internal class TorrentSessionRegistry {
-  private data class Entry(
-    val infoHash: String,
-    var session: TorrentSession? = null,
-  )
+  private class Entry(val infoHash: String) {
+    var session: TorrentSession? = null
+    val released = CompletableDeferred<Unit>()
+  }
 
   private val mutex = Mutex()
   private val entries = mutableMapOf<String, Entry>()
@@ -39,8 +40,17 @@ internal class TorrentSessionRegistry {
 
   suspend fun isReserved(taskId: String): Boolean = mutex.withLock { taskId in entries }
 
+  /** How many tasks hold a reservation; for leak checks. */
+  suspend fun size(): Int = mutex.withLock { entries.size }
+
   suspend fun release(taskId: String) = mutex.withLock {
-    entries.remove(taskId)
+    entries.remove(taskId)?.released?.complete(Unit)
     Unit
+  }
+
+  /** Suspends until [taskId]'s current reservation, if any, is released. */
+  suspend fun awaitRelease(taskId: String) {
+    val entry = mutex.withLock { entries[taskId] } ?: return
+    entry.released.await()
   }
 }

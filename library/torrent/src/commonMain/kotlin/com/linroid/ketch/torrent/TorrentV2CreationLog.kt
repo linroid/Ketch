@@ -5,20 +5,31 @@ import okio.FileSystem
 import okio.Path
 import okio.use
 
-/** Single-writer, checksummed creation records in a caller-private directory outside payloads. */
+/**
+ * Single-writer, checksummed creation records in a caller-private directory outside payloads. Its
+ * first frame binds it to one task's content and output; [open] accepts any of several bindings,
+ * and [rewrite] replaces the log as a whole, binding included.
+ */
 internal class TorrentV2CreationLog(
   private val path: Path,
-  private val binding: ByteArray,
   private val fileSystem: FileSystem,
 ) {
+  /** What [open] read: the records, and which of the accepted bindings the log has. */
+  class Opened(val records: List<TorrentV2Checkpoint.Owned>, val matched: Int)
+
   private val records = mutableListOf<TorrentV2Checkpoint.Owned>()
   private val indices = mutableMapOf<List<String>, Int>()
   private var position = 0L
   private var identity: String? = null
+  private var binding = ByteArray(0)
 
-  fun open(): List<TorrentV2Checkpoint.Owned> {
+  /**
+   * Reads the log, which must be bound to one of [bindings]; a missing log is created bound to
+   * `bindings[initial]`.
+   */
+  fun open(bindings: List<ByteArray>, initial: Int = 0): Opened {
     check(position == 0L)
-    require(binding.size == 32)
+    require(bindings.isNotEmpty() && bindings.all { it.size == 32 } && initial in bindings.indices)
     val parent = checkNotNull(path.parent)
     val metadata = fileSystem.metadata(parent)
     require(metadata.isDirectory && metadata.symlinkTarget == null)
@@ -28,7 +39,7 @@ internal class TorrentV2CreationLog(
       try {
         fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
           created = requireNotNull(torrentFileIdentity(temp))
-          val bytes = frame(binding)
+          val bytes = frame(bindings[initial])
           handle.write(0, bytes, 0, bytes.size)
           handle.flush()
         }
@@ -45,6 +56,7 @@ internal class TorrentV2CreationLog(
     require(size in 68..MAX_BYTES)
     identity = requireNotNull(torrentFileIdentity(path))
     var first = true
+    var matched = -1
     fileSystem.read(path) {
       while (size - position >= 4) {
         val length = readInt()
@@ -54,7 +66,9 @@ internal class TorrentV2CreationLog(
         val checksum = readByteArray(32)
         require(sha256Digest(bytes).contentEquals(checksum)) { "Corrupt creation log frame" }
         if (first) {
-          require(bytes.contentEquals(binding)) { "Creation log binding mismatch" }
+          matched = bindings.indexOfFirst { it.contentEquals(bytes) }
+          require(matched >= 0) { "Creation log binding mismatch" }
+          binding = bytes
           first = false
         } else {
           val row = requireNotNull(Bencode.parse(bytes, 16_384).list)
@@ -82,24 +96,27 @@ internal class TorrentV2CreationLog(
       it.resize(position)
       it.flush()
     }
-    return records.toList()
+    return Opened(records.toList(), matched)
   }
 
-  /** A failed append retains its offset so a retry overwrites the incomplete tail. */
+  fun records(): List<TorrentV2Checkpoint.Owned> = records.toList()
+
+  /**
+   * A failed append retains its offset so a retry overwrites the incomplete tail. A path whose
+   * claim changed, created again after it was deleted, replaces its stale claim and the claims
+   * below it, which [rewrite] drops first.
+   */
   fun append(record: TorrentV2Checkpoint.Owned) {
     check(position > 0)
     val existing = indices[record.components]
     if (existing != null) {
-      require(records[existing] == record) { "Creation ownership changed" }
-      return
+      if (records[existing] == record) return
+      val stale = record.components
+      rewrite(binding, records.filterNot {
+        it.components.size >= stale.size && it.components.subList(0, stale.size) == stale
+      })
     }
-    validate(record)
-    val parent = if (record.components.isEmpty()) 0 else
-      indices.getValue(record.components.dropLast(1)) + 1
-    val bytes = frame(Bencode.encode(listOf(
-      if (record.directory) parent.toLong() else -parent.toLong(),
-      record.components.lastOrNull() ?: "", record.identity
-    ), maxBytes = 16_384))
+    val bytes = encode(record)
     require(bytes.size <= MAX_BYTES - position) { "Creation log exceeds byte limit" }
     validateIdentity()
     fileSystem.openReadWrite(path, mustExist = true).use { handle ->
@@ -109,6 +126,17 @@ internal class TorrentV2CreationLog(
     }
     position += bytes.size
     accept(record)
+  }
+
+  /** [record]'s frame, its parent referenced by its place among the records before it. */
+  private fun encode(record: TorrentV2Checkpoint.Owned): ByteArray {
+    validate(record)
+    val parent = if (record.components.isEmpty()) 0 else
+      indices.getValue(record.components.dropLast(1)) + 1
+    return frame(Bencode.encode(listOf(
+      if (record.directory) parent.toLong() else -parent.toLong(),
+      record.components.lastOrNull() ?: "", record.identity
+    ), maxBytes = 16_384))
   }
 
   private fun accept(record: TorrentV2Checkpoint.Owned) {
@@ -126,6 +154,46 @@ internal class TorrentV2CreationLog(
       val parent = requireNotNull(indices[record.components.dropLast(1)])
       require(records[parent].directory)
     }
+  }
+
+  /**
+   * Replaces the log with one bound to [binding] that holds [records], parents before children:
+   * written beside it, then moved over it, so a crash leaves the old log or the new one whole.
+   */
+  fun rewrite(binding: ByteArray, records: List<TorrentV2Checkpoint.Owned>) {
+    check(position > 0)
+    require(binding.size == 32)
+    validateIdentity()
+    // Validated and encoded against a scratch index before anything is written.
+    val staged = TorrentV2CreationLog(path, fileSystem)
+    val output = Buffer().write(frame(binding))
+    for (record in records) {
+      output.write(staged.encode(record))
+      staged.accept(record)
+    }
+    val bytes = output.readByteArray()
+    require(bytes.size <= MAX_BYTES) { "Creation log exceeds byte limit" }
+    val parent = checkNotNull(path.parent)
+    val temp = parent / (".creation-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
+    var created: String? = null
+    try {
+      fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
+        created = requireNotNull(torrentFileIdentity(temp))
+        handle.write(0, bytes, 0, bytes.size)
+        handle.flush()
+      }
+      fileSystem.atomicMove(temp, path)
+    } finally {
+      if (created != null && fileSystem.exists(temp) && torrentFileIdentity(temp) == created) {
+        fileSystem.delete(temp, mustExist = false)
+      }
+    }
+    this.records.clear()
+    indices.clear()
+    staged.records.forEach(::accept)
+    this.binding = binding
+    position = bytes.size.toLong()
+    identity = requireNotNull(torrentFileIdentity(path))
   }
 
   fun delete() {

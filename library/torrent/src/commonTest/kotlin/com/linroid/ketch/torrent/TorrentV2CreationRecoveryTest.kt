@@ -30,9 +30,17 @@ class TorrentV2CreationRecoveryTest {
     torrentFileSystem.createDirectory(it)
   }
 
-  private fun store(root: Path, task: String = "task", provider: FileSystem = torrentFileSystem) =
-    TorrentV2PieceStore(document, root / "payload", emptySet(), task, TorrentBufferBudget(65_536),
-      Semaphore(1), provider, root / "creation")
+  private fun store(
+    root: Path,
+    task: String = "task",
+    provider: FileSystem = torrentFileSystem,
+    selected: Set<String> = emptySet(),
+    legacy: List<Set<String>> = emptyList(),
+  ) = TorrentV2PieceStore(document, root / "payload", selected, task, TorrentBufferBudget(65_536),
+    Semaphore(1), provider, root / "creation", legacy)
+
+  private fun temporaryFiles(root: Path): List<Path> =
+    torrentFileSystem.list(root).filter { it.name.startsWith(".creation-") }
 
   @Test
   fun recoversCreatedFilesBeforeAnyCheckpointAndRechecksPayload() = runTest {
@@ -47,7 +55,7 @@ class TorrentV2CreationRecoveryTest {
       assertContentEquals(booleanArrayOf(false, false), recovered.verifiedPieces())
       assertContentEquals(booleanArrayOf(true, false), recovered.recheck())
       assertFalse(recovered.completed())
-      assertTrue(recovered.commit(1, byteArrayOf(2)))
+      assertEquals(CommitOutcome.VERIFIED, recovered.commit(1, byteArrayOf(2)))
       assertTrue(recovered.completed())
       recovered.cleanup()
       assertFalse(torrentFileSystem.exists(root / "payload"))
@@ -173,6 +181,141 @@ class TorrentV2CreationRecoveryTest {
       assertEquals("foreign", torrentFileSystem.read(path) { readUtf8() })
     } finally {
       torrentFileSystem.deleteRecursively(root)
+    }
+  }
+
+  @Test
+  fun open_legacyBindingOfCheckpointSelection_isAccepted() = runTest {
+    val root = root()
+    try {
+      // An older build bound the log to the selection the task had then: only a.
+      val original = store(root, selected = setOf("0"))
+      original.initialize()
+      assertEquals(CommitOutcome.VERIFIED, original.commit(0, byteArrayOf(1)))
+      val checkpoint = original.checkpoint()
+      original.close()
+      // Neither the new binding nor the current selection's: the checkpoint's selection opens it.
+      val restored = store(root, selected = setOf("0", "1"))
+      restored.restore(checkpoint)
+      restored.initialize()
+      assertContentEquals(booleanArrayOf(true, false), restored.recheck())
+      restored.close()
+      // So does the selection a task's resume state mirrors, without any checkpoint.
+      val mirrored = store(root, selected = setOf("1"), legacy = listOf(setOf("0")))
+      mirrored.initialize()
+      mirrored.cleanup()
+      assertFalse(torrentFileSystem.exists(root / "payload"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root)
+    }
+  }
+
+  @Test
+  fun open_unchangedSelection_keepsTheLegacyBinding() = runTest {
+    val root = root()
+    try {
+      val original = store(root, selected = setOf("0"))
+      original.initialize()
+      original.close()
+      val written = torrentFileSystem.read(root / "creation") { readByteArray() }
+      // Reopened with the same selection, the log stays readable by builds that bind to it.
+      val reopened = store(root, selected = setOf("0"))
+      reopened.initialize()
+      reopened.close()
+      assertContentEquals(written, torrentFileSystem.read(root / "creation") { readByteArray() })
+      // A store that never had that selection cannot open it.
+      val other = store(root, selected = setOf("1"))
+      assertFailsWith<IllegalArgumentException> { other.initialize() }
+      other.close()
+    } finally {
+      torrentFileSystem.deleteRecursively(root)
+    }
+  }
+
+  @Test
+  fun changeSelection_rebindsTheLogWithoutSelection() = runTest {
+    val root = root()
+    try {
+      val original = store(root, selected = setOf("0"))
+      original.initialize()
+      val legacy = torrentFileSystem.read(root / "creation") { readByteArray() }
+      original.changeSelection(setOf("0", "1"))
+      original.changeSelection(setOf("1"))
+      original.close()
+      val bound = torrentFileSystem.read(root / "creation") { readByteArray() }
+      assertFalse(legacy.contentEquals(bound))
+      assertTrue(temporaryFiles(root).isEmpty())
+      // Bound without a selection, any selection opens it, including one never used.
+      for (selection in listOf(setOf("0"), setOf("1"), setOf("0", "1"))) {
+        val reopened = store(root, selected = selection)
+        reopened.initialize()
+        reopened.close()
+      }
+      assertContentEquals(bound, torrentFileSystem.read(root / "creation") { readByteArray() })
+      val last = store(root)
+      last.initialize()
+      last.cleanup()
+      assertFalse(torrentFileSystem.exists(root / "payload"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root)
+    }
+  }
+
+  @Test
+  fun recreateDeletedPath_rewritesTheStaleRecord() = runTest {
+    val root = root()
+    try {
+      val original = store(root)
+      original.initialize()
+      original.changeSelection(setOf("0"))
+      // b is deselected, and the user deletes it; selected again, it is created anew.
+      torrentFileSystem.delete(root / "payload" / "b")
+      original.changeSelection(setOf("0", "1"))
+      assertEquals(CommitOutcome.VERIFIED, original.commit(1, byteArrayOf(2)))
+      original.close()
+      val recovered = store(root)
+      recovered.initialize()
+      assertContentEquals(booleanArrayOf(false, true), recovered.recheck())
+      recovered.cleanup()
+      assertFalse(torrentFileSystem.exists(root / "payload"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root)
+    }
+  }
+
+  @Test
+  fun rewrite_interrupted_leavesOldOrNewLogIntact() = runTest {
+    for (afterMove in listOf(false, true)) {
+      val root = root()
+      try {
+        var fail = true
+        val provider = object : ForwardingFileSystem(torrentFileSystem) {
+          override fun atomicMove(source: Path, target: Path) {
+            if (fail && target.name == "creation" && !afterMove) {
+              fail = false
+              throw IOException("Injected failure before the log is replaced")
+            }
+            super.atomicMove(source, target)
+            if (fail && target.name == "creation") {
+              fail = false
+              throw IOException("Injected failure after the log is replaced")
+            }
+          }
+        }
+        val original = store(root, selected = setOf("0"), provider = provider)
+        original.initialize()
+        assertFailsWith<IOException> { original.changeSelection(setOf("0", "1")) }
+        assertEquals(setOf("0"), original.selectedIds())
+        original.close()
+        assertTrue(temporaryFiles(root).isEmpty())
+        // Either the old log, bound to a, or the new one, bound to nothing, opens whole.
+        val reopened = store(root, selected = if (afterMove) setOf("1") else setOf("0"))
+        reopened.initialize()
+        reopened.cleanup()
+        assertFalse(torrentFileSystem.exists(root / "payload"))
+      } finally {
+        torrentFileSystem.deleteRecursively(root)
+      }
     }
   }
 }

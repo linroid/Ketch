@@ -130,8 +130,13 @@ as `Authorization: Bearer <token>`.
 | `GET /api/tasks/{id}` | One task |
 | `POST /api/tasks/{id}/pause`, `/resume`, `/cancel` | Control a task |
 | `PUT /api/tasks/{id}/speed-limit`, `/priority`, `/connections` | Change a task while it runs; `connections` 0 means Auto |
+| `PUT /api/tasks/{id}/files` | Choose the files of a torrent task, at any time; the body is `{"fileIds": [...]}` |
 | `DELETE /api/tasks/{id}?deleteFiles=true` | Remove a task, and its files if asked |
 | `GET /api/events`, `/api/events/{id}` | Server-sent events: `task_added`, `task_removed`, `state_changed`, `progress` |
+| `GET /api/torrents/capabilities` | What the server's torrent controller can do, on servers listing `torrent.control` |
+| `GET /api/torrents/{id}`, `/api/torrents/{id}/events` | A torrent task's snapshot, and server-sent `snapshot` events of it |
+| `GET /api/torrents/{id}/files?limit=&cursor=&sort=&desc=true` | A page of its files, up to 1000, sorted `torrent`, `name`, `size`, `extension` or `selected` |
+| `PUT /api/torrents/{id}/selection`, `/seeding` | Choose its files, or start or stop seeding it, guarded by a revision and an idempotency key |
 | `POST /api/pairing`, `GET`, `DELETE /api/pairing/{id}` | Ask the server's owner for the access code, poll for the answer, withdraw; no code needed |
 | `GET /api/health` | `200 {"status":"ready"}` once the server has restored its saved tasks, `503 {"status":"starting"}` before, while the other endpoints but pairing answer `503` with a `starting` error; no code needed, for health checks |
 

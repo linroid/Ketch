@@ -34,7 +34,8 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
     pieces * 128 + metadata.files.sumOf { 512 + it.path.length * 4L } +
     TorrentPieceStore.CHECK_CHUNK_BYTES + (spec.resumeData?.size ?: 0) * 8L +
     spec.outputPath.length * 4L + (spec.magnetUri?.length ?: 0) * 4L +
-    spec.selected.size * 64L + 128 * 1024 + trackerControlStateWeight()
+    // Every file, not only the selected ones: the selection may grow while the session runs.
+    metadata.files.size * 64L + 128 * 1024 + trackerControlStateWeight()
 }
 
 /**
@@ -114,7 +115,8 @@ internal fun admitV2Session(
   val bytes = recoveryBytes + document.info.rawInfo.size * 4L +
     document.pieceLayers.values.sumOf { it.size * 2L + 128 } +
     document.info.files.sumOf { file -> 2048L + file.path.sumOf { it.size * 8L + 128 } } +
-    pieces * 128 + selectedCount * 128L + outputLength * 4L + 256 * 1024
+    // Every file, not only the selected ones: the selection may grow while the owner runs.
+    pieces * 128 + document.info.files.size * 128L + outputLength * 4L + 256 * 1024
   check(bytes <= budget.capacity) { "Torrent session state exceeds admission capacity" }
   return checkNotNull(budget.reserve(bytes.toInt())) { "Torrent session state budget exhausted" }
 }

@@ -20,27 +20,30 @@ enum class TorrentActivity {
  * separate.
  * [selectedVerifiedBytes] can decrease after selection changes or a failed recheck. Completion is
  * scoped to the snapshot's selection generation. Ratio is undefined when downloaded payload is
- * zero.
+ * zero. A counter the backend does not track is `null`, never an invented zero.
  */
 @Serializable
 data class TorrentCounters(
   val totalPayloadBytes: Long,
   val wantedBytes: Long,
   val selectedVerifiedBytes: Long,
-  val receivedPayloadBytes: Long,
-  val uploadedPayloadBytes: Long,
-  val discardedPayloadBytes: Long,
-  val protocolBytes: Long,
-  val downloadBytesPerSecond: Long,
-  val uploadBytesPerSecond: Long,
-  val seedSeconds: Long,
+  val receivedPayloadBytes: Long? = null,
+  val uploadedPayloadBytes: Long? = null,
+  val discardedPayloadBytes: Long? = null,
+  val protocolBytes: Long? = null,
+  val downloadBytesPerSecond: Long? = null,
+  val uploadBytesPerSecond: Long? = null,
+  val seedSeconds: Long? = null,
 ) {
   init {
     require(totalPayloadBytes >= 0 && wantedBytes in 0..totalPayloadBytes)
     require(selectedVerifiedBytes in 0..wantedBytes)
-    require(receivedPayloadBytes >= 0 && uploadedPayloadBytes >= 0)
-    require(discardedPayloadBytes >= 0 && protocolBytes >= 0)
-    require(downloadBytesPerSecond >= 0 && uploadBytesPerSecond >= 0 && seedSeconds >= 0)
+    require(
+      listOf(
+        receivedPayloadBytes, uploadedPayloadBytes, discardedPayloadBytes, protocolBytes,
+        downloadBytesPerSecond, uploadBytesPerSecond, seedSeconds
+      ).all { it == null || it >= 0 }
+    )
   }
 }
 

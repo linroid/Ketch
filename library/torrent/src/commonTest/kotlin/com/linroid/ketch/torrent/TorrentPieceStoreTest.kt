@@ -118,13 +118,13 @@ class TorrentPieceStoreTest {
     val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2, 3), "test")
     try {
       store.initialize()
-      assertFalse(store.commit(0, "bad!".encodeToByteArray()))
+      assertEquals(CommitOutcome.CORRUPT, store.commit(0, "bad!".encodeToByteArray()))
       assertContentEquals(longArrayOf(0, 0, 0, 0), store.progress())
-      assertTrue(store.commit(0, bytes.copyOfRange(0, 4)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, bytes.copyOfRange(0, 4)))
       assertContentEquals(longArrayOf(3, 0, 0, 0), store.progress())
       assertFalse(store.completed())
-      assertTrue(store.commit(1, bytes.copyOfRange(4, 8)))
-      assertTrue(store.commit(2, bytes.copyOfRange(8, 10)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(1, bytes.copyOfRange(4, 8)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(2, bytes.copyOfRange(8, 10)))
       assertTrue(store.completed())
       assertContentEquals(longArrayOf(3, 0, 3, 0), store.progress())
       assertFalse(torrentFileSystem.exists(root / "pack/skip"))
@@ -133,7 +133,9 @@ class TorrentPieceStoreTest {
       assertEquals("789", torrentFileSystem.read(root / "pack/b") { readUtf8() })
       assertContentEquals(bytes.copyOfRange(4, 8), store.read(1))
       torrentFileSystem.write(root / "pack/b") { writeUtf8("bad") }
-      assertContentEquals(booleanArrayOf(true, false, false), store.recheck())
+      // Piece 1 heals its byte of b from its sidecar; piece 2 has no other copy.
+      assertContentEquals(booleanArrayOf(true, true, false), store.recheck())
+      assertEquals("7ad", torrentFileSystem.read(root / "pack/b") { readUtf8() })
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

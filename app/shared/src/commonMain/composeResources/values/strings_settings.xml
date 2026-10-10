@@ -715,7 +715,7 @@
   <string name="settings_torrent_upload_seed">Keep seeding</string>
   <string name="settings_torrent_upload_off_hint">Peers can't download anything from this device.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Peers can download the pieces you have while your torrents download.</string>
-  <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading while Ketch is running, until you remove them or turn this off. Torrents waiting to download go first.</string>
+  <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading until you stop them or turn this off, also after Ketch restarts.</string>
   <string name="settings_torrent_upload_limit">Upload limit</string>
   <!-- Under Upload limit: one cap for all torrents together, not one per torrent. -->
   <string name="settings_torrent_upload_limit_hint">Shared by all torrents.</string>

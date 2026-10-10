@@ -11,15 +11,16 @@ CREATE TABLE IF NOT EXISTS task_records (
   updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   error_json TEXT,
   download_time_ms INTEGER,
-  completed_at INTEGER
+  completed_at INTEGER,
+  control_json TEXT
 );
 
 insertOrIgnore:
 INSERT OR IGNORE INTO task_records(
   task_id, request_json, output_path, state,
   total_bytes, source_type, source_resume_state_json,
-  segments_json, error_json, download_time_ms, completed_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  segments_json, error_json, download_time_ms, completed_at, control_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE task_records SET
@@ -33,6 +34,7 @@ UPDATE task_records SET
   error_json = ?,
   download_time_ms = ?,
   completed_at = ?,
+  control_json = ?,
   updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
 WHERE task_id = ?;
 

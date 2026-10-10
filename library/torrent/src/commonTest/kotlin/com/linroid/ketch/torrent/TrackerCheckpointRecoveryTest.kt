@@ -57,7 +57,7 @@ class TrackerCheckpointRecoveryTest {
           try {
             val initial = store(root)
             initial.initialize()
-            assertTrue(initial.commit(0, bytes))
+            assertEquals(CommitOutcome.VERIFIED, initial.commit(0, bytes))
             val stale = if (sameRevision) initial.replaceTrackerConfiguration(next, 10, 11)
               else initial.persistCheckpoint(10, 11)
             if (sameRevision) initial.persistCheckpoint(20, 21)

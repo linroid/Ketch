@@ -24,6 +24,8 @@
   <string name="row_saved_on">Сохранено на устройстве «%1$s»</string>
   <string name="row_missing_file">Файл перемещён или удалён</string>
   <string name="row_completed">Завершена</string>
+  <string name="row_choose_files">Выберите файлы для скачивания</string>
+  <string name="row_seeding">Раздаётся</string>
   <string name="row_took">за %1$s</string>
   <plurals name="row_files">
     <item quantity="one">%1$d файл</item>
@@ -65,6 +67,10 @@
   <string name="sort_origin">Откуда</string>
   <string name="sort_priority">Приоритет</string>
   <string name="sort_device">Устройство</string>
+  <string name="sort_kind">Тип</string>
+  <string name="sort_selected_first">Сначала выбранные</string>
+  <string name="sort_torrent_order">Порядок в торренте</string>
+  <string name="sort_reverse">Обратный порядок</string>
   <string name="group_smart">Умная</string>
   <string name="group_status">Статус</string>
   <string name="group_day">День</string>
@@ -140,6 +146,10 @@
   <string name="action_row_copy_details">Копировать подробности</string>
   <string name="action_row_stop_and_discard">Отменить загрузку…</string>
   <string name="action_row_remove">Удалить…</string>
+  <string name="action_row_choose_files">Выбрать файлы…</string>
+  <string name="action_row_download_all_files">Скачать все файлы</string>
+  <string name="action_row_stop_seeding">Остановить раздачу</string>
+  <string name="action_row_seed">Раздавать</string>
   <plurals name="batch_pause">
     <item quantity="one">Приостановить %1$d загрузку</item>
     <item quantity="few">Приостановить %1$d загрузки</item>

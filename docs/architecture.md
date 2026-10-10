@@ -243,10 +243,17 @@ The server module (`library:server`) exposes any `KetchApi` (usually a `Ketch`) 
 resources in `library:endpoints` (`Api`) and shared with the client:
 
 - **REST API** under `/api`: create, list, get, pause, resume, cancel and remove tasks; set a
-  task's speed limit, priority and connections; `status`, `config`, `network-interfaces`,
-  `resolve` and `resolve/content` (resolve uploaded file bytes, such as a `.torrent` file)
+  task's speed limit, priority, connections and files (`PUT /api/tasks/{id}/files`); `status`,
+  `config`, `network-interfaces`, `resolve` and `resolve/content` (resolve uploaded file bytes,
+  such as a `.torrent` file)
+- **Torrents**: on servers listing `torrent.control`, `/api/torrents` serves the
+  `TorrentController` of `KetchApi.torrents`: capabilities, a task's snapshot, sorted pages of
+  its files, the `selection` and `seeding` commands, guarded by a revision and an idempotency key,
+  and an `events` stream of snapshots. `RemoteKetch.torrents` calls them and fails closed against
+  servers without them
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
-  `task_removed`, `state_changed` and `progress` events
+  `task_removed`, `state_changed` and `progress` events. A `progress` event leaves out a request
+  that did not change, and task views and events never carry a torrent's metainfo
 - **Auth**: Bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
   `config.toml`) required on every API route except pairing and health, compared in constant
   time; ten wrong tokens from an address within a minute get `429` until the minute ends.

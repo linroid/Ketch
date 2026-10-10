@@ -18,6 +18,15 @@ sealed interface ActivityEvent {
     val request: DownloadRequest,
   ) : ActivityEvent
 
+  /**
+   * A torrent's file list arrived and it waits, paused, for the user to choose which files to
+   * download.
+   */
+  data class FilesNeeded(
+    val taskKey: TaskKey,
+    val request: DownloadRequest,
+  ) : ActivityEvent
+
   /** A task finished; [state] holds its output path, size and download time. */
   data class Completed(
     val taskKey: TaskKey,

@@ -526,7 +526,7 @@
   <string name="settings_torrent_upload_seed">계속 시딩</string>
   <string name="settings_torrent_upload_off_hint">피어가 이 기기에서 아무것도 다운로드할 수 없습니다.</string>
   <string name="settings_torrent_upload_while_downloading_hint">토렌트를 다운로드하는 동안 피어가 이미 받은 조각을 다운로드할 수 있습니다.</string>
-  <string name="settings_torrent_upload_seed_hint">Ketch가 실행 중인 동안 완료된 토렌트는 제거하거나 이 설정을 끌 때까지 계속 업로드합니다. 다운로드를 기다리는 토렌트가 우선합니다.</string>
+  <string name="settings_torrent_upload_seed_hint">완료된 토렌트는 중지하거나 이 설정을 끌 때까지 계속 업로드하며, Ketch를 다시 시작한 후에도 마찬가지입니다.</string>
   <string name="settings_torrent_upload_limit">업로드 속도 제한</string>
   <string name="settings_torrent_upload_limit_hint">모든 토렌트가 함께 사용합니다.</string>
   <string name="settings_torrent_upload_footer">업로드받는 피어는 이 기기의 IP 주소를 볼 수 있습니다. 비공개 토렌트는 해당 트래커의 피어와만 공유합니다.</string>

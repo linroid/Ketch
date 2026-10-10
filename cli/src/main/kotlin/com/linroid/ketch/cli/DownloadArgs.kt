@@ -4,9 +4,13 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.api.torrent.TorrentFileOrder
+import com.linroid.ketch.api.torrent.sortedByFileOrder
 import com.linroid.ketch.core.engine.RequestHeaders
 import java.io.File
 
@@ -27,6 +31,14 @@ internal sealed interface DownloadArgs {
     val headers: Map<String, String> = emptyMap(),
     /** `--proxy` or `--no-proxy`, in place of the configured proxy; `null` for that one. */
     val proxy: ProxyConfig? = null,
+    /** `--files`: the IDs of the files of a torrent to download; empty for every file. */
+    val fileIds: Set<String> = emptySet(),
+    /** `--list-files`: list the files of the URL instead of downloading it. */
+    val listFiles: Boolean = false,
+    /** `--sort` of `--list-files`. */
+    val fileOrder: TorrentFileOrder = TorrentFileOrder.TORRENT,
+    /** `--reverse` of `--list-files`. */
+    val reverse: Boolean = false,
   ) : DownloadArgs
 }
 
@@ -136,7 +148,22 @@ internal class ProxyOptions {
 }
 
 private val valueOptions =
-  setOf("--speed-limit", "--priority", "--max-concurrent") + HEADER_OPTIONS + PROXY_OPTIONS
+  setOf("--speed-limit", "--priority", "--max-concurrent", "--files", "--sort") +
+    HEADER_OPTIONS + PROXY_OPTIONS
+
+/** The orders `--sort` names: `type` sorts by file extension. */
+private val FILE_ORDERS = mapOf(
+  "name" to TorrentFileOrder.NAME,
+  "size" to TorrentFileOrder.SIZE,
+  "type" to TorrentFileOrder.EXTENSION,
+)
+
+/** The file IDs of a `--files` [value], or `null` when it is not comma-separated IDs. */
+private fun parseFileIds(value: String): Set<String>? {
+  val ids = value.split(',').map { it.trim() }
+  if (ids.any { it.isEmpty() || it.length > DownloadTask.MAX_FILE_ID_LENGTH }) return null
+  return ids.toCollection(LinkedHashSet())
+}
 
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
@@ -147,6 +174,10 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
   val headers = HeaderOptions()
   val proxy = ProxyOptions()
+  var fileIds = emptySet<String>()
+  var listFiles = false
+  var fileOrder: TorrentFileOrder? = null
+  var reverse = false
 
   var i = 0
   while (i < args.size) {
@@ -154,6 +185,8 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     when {
       arg == "--help" || arg == "-h" -> return DownloadArgs.Help
       arg == NO_PROXY_OPTION -> proxy.noProxy()
+      arg == "--list-files" -> listFiles = true
+      arg == "--reverse" -> reverse = true
       arg in valueOptions -> {
         val value = args.getOrNull(i + 1)
           ?: return DownloadArgs.Invalid("$arg requires a value")
@@ -171,6 +204,12 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
               return DownloadArgs.Invalid("--max-concurrent must be > 0")
             }
           }
+          "--files" -> fileIds = parseFileIds(value)
+            ?: return DownloadArgs.Invalid(
+              "--files expects comma-separated file IDs, such as 0,2,5"
+            )
+          "--sort" -> fileOrder = FILE_ORDERS[value.trim().lowercase()]
+            ?: return DownloadArgs.Invalid("invalid sort '$value' (valid values: name, size, type)")
           in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
           else -> headers.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
         }
@@ -185,6 +224,12 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   }
 
   if (url == null) return DownloadArgs.Invalid("missing <url>")
+  if (listFiles && fileIds.isNotEmpty()) {
+    return DownloadArgs.Invalid("--list-files and --files cannot be used together")
+  }
+  if (!listFiles && (fileOrder != null || reverse)) {
+    return DownloadArgs.Invalid("--sort and --reverse require --list-files")
+  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
@@ -197,6 +242,10 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     proxy = proxy.build().getOrElse {
       return DownloadArgs.Invalid(it.message ?: "invalid proxy")
     },
+    fileIds = fileIds,
+    listFiles = listFiles,
+    fileOrder = fileOrder ?: TorrentFileOrder.TORRENT,
+    reverse = reverse,
   )
 }
 
@@ -210,7 +259,40 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     headers = headers,
     properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
     proxy = proxy,
+    selectedFileIds = fileIds,
   )
+
+/**
+ * The rows `--list-files` prints for [source]: a header, then one `ID  SIZE  PATH` row per file,
+ * sorted by [order] and reversed when [reverse]. Empty when the source has no files to choose.
+ */
+internal fun fileListRows(
+  source: ResolvedSource,
+  order: TorrentFileOrder = TorrentFileOrder.TORRENT,
+  reverse: Boolean = false,
+): List<String> {
+  if (source.files.isEmpty()) return emptyList()
+  val files = source.files.sortedByFileOrder(
+    order = order,
+    descending = reverse,
+    path = { it.metadata["path"] ?: it.name },
+    size = { it.size },
+    selected = { true },
+  )
+  val rows = files.map { file ->
+    Triple(
+      file.id,
+      if (file.size >= 0) formatBytes(file.size) else "-",
+      // Paths come from the torrent: printed as one line of plain text.
+      (file.metadata["path"] ?: file.name).printable(),
+    )
+  }
+  val idWidth = maxOf("ID".length, rows.maxOf { it.first.length })
+  val sizeWidth = maxOf("SIZE".length, rows.maxOf { it.second.length })
+  return listOf(Triple("ID", "SIZE", "PATH")).plus(rows).map { (id, size, path) ->
+    "${id.padEnd(idWidth)}  ${size.padStart(sizeWidth)}  $path"
+  }
+}
 
 /**
  * Resolves the destination argument against the current directory, like other command-line

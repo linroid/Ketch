@@ -50,11 +50,14 @@ import kotlinx.serialization.Serializable
  * @property selectedFileIds IDs of files selected from
  *   [ResolvedSource.files]. Empty means download all/default.
  *   Sources read this via the download context to determine
- *   which files to download.
+ *   which files to download. [DownloadTask.selectFiles] changes it while the task exists, after
+ *   which it always lists the chosen files.
  * @property resolvedSource pre-resolved metadata from
  *   [KetchApi.resolve]. When present, the download engine skips
- *   its own probe and uses this information directly. Not persisted
- *   across restarts.
+ *   its own probe and uses this information directly. It is saved with the task: Ketch keeps its
+ *   file list and, once the download starts, drops the bulky metadata
+ *   ([ResolvedSource.withoutBulkMetadata]). Task views and events never carry
+ *   [ResolvedSource.METAINFO_KEY].
  * @property proxy how this download reaches its servers, in place of
  *   [DownloadConfig.proxy]; `null` (the default) follows the global setting
  *   as it is when the download starts or resumes. Saved with the task, its
@@ -62,9 +65,16 @@ import kotlinx.serialization.Serializable
  * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
  *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
  *   is retained, including after restart. Reusing an ID with different source, destination,
- *   headers, properties, file selection or proxy is rejected. Mutable task controls (connections,
- *   speed limit, priority and schedule) and transient metadata/conditions are not compared;
- *   a repeated submission leaves the existing task's current settings unchanged.
+ *   headers, properties or proxy is rejected. Mutable task controls (connections,
+ *   speed limit, priority, schedule, the file selection and [awaitFileSelection]) and transient
+ *   metadata/conditions are not compared; a repeated submission leaves the existing task's
+ *   current settings unchanged.
+ * @property awaitFileSelection when `true` and [selectedFileIds] is empty, a download with several
+ *   files (a torrent) stops once its file list is known and waits, paused for
+ *   [PauseReason.AwaitingFileSelection] and holding no download slot, until
+ *   [DownloadTask.selectFiles] chooses files; [DownloadTask.resume] downloads every file. Ignored
+ *   when files are selected or the content has one file. Servers that do not list
+ *   [KetchFeatures.TORRENT_AWAIT_FILE_SELECTION] ignore it.
  */
 @Serializable
 data class DownloadRequest(
@@ -81,6 +91,7 @@ data class DownloadRequest(
   val resolvedSource: ResolvedSource? = null,
   val requestId: String? = null,
   val proxy: ProxyConfig? = null,
+  val awaitFileSelection: Boolean = false,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

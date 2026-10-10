@@ -48,7 +48,9 @@ internal class TorrentPeerDownloader(
           message.bytes.copyInto(assembled, offset)
           offset += message.bytes.size
           if (offset == assembled.size) {
-            require(store.commit(piece, assembled)) { "Peer sent a corrupt piece" }
+            require(store.commit(piece, assembled) == CommitOutcome.VERIFIED) {
+              "Peer sent a corrupt piece"
+            }
             verified[piece] = true
             if (!store.completed()) wire.send(PeerMessage.Have(piece))
             onProgress(store.progress().sum())

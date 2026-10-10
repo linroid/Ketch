@@ -38,7 +38,8 @@ Ketch only connects to the places you point it at:
   any BitTorrent client, the trackers and peers can see your IP address and which torrent you
   are downloading. Uploading is off by default. If you turn it on (Settings → BitTorrent, or
   `[torrent] upload`), peers also download the pieces you have from you; with *Keep seeding*,
-  Ketch keeps sharing finished torrents at most until you remove them, turn it off or quit.
+  Ketch keeps sharing finished torrents while it runs, until you stop sharing them, remove them
+  or turn it off, and shares them again after it restarts.
 - **Your other devices.** When you pair devices, the device that controls another sends it your
   commands and receives its list of downloads, directly over your network. On a local network
   this traffic is not encrypted unless you set up HTTPS. Ketch looks for your devices on the local

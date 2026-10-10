@@ -538,7 +538,7 @@
   <string name="settings_torrent_upload_seed">Weiter seeden</string>
   <string name="settings_torrent_upload_off_hint">Peers können nichts von diesem Gerät herunterladen.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Während deine Torrents laden, können Peers die Teile herunterladen, die du schon hast.</string>
-  <string name="settings_torrent_upload_seed_hint">Fertige Torrents laden weiter hoch, solange Ketch läuft, bis du sie entfernst oder dies ausschaltest. Torrents, die auf den Download warten, haben Vorrang.</string>
+  <string name="settings_torrent_upload_seed_hint">Fertige Torrents laden weiter hoch, bis du sie stoppst oder dies ausschaltest, auch nach einem Neustart von Ketch.</string>
   <string name="settings_torrent_upload_limit">Upload-Limit</string>
   <string name="settings_torrent_upload_limit_hint">Gilt für alle Torrents zusammen.</string>
   <string name="settings_torrent_upload_footer">Peers, an die du hochlädst, sehen die IP-Adresse dieses Geräts. Private Torrents teilen nur mit den Peers ihres Trackers.</string>

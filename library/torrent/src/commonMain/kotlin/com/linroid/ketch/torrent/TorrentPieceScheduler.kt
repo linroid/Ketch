@@ -2,16 +2,25 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 
-/** Serialized rarity and ownership state. No disk or network operation runs under its lock. */
+/**
+ * Serialized rarity and ownership state. No disk or network operation runs under its lock, except
+ * the store's brief selection snapshot in [retarget].
+ */
 internal class TorrentPieceScheduler(
-  private val wanted: BooleanArray,
+  wanted: BooleanArray,
   verified: BooleanArray,
   private val pieceSize: (Int) -> Int,
   private val budget: TorrentBufferBudget,
 ) {
   private val mutex = Mutex()
-  private val verified = verified.copyOf()
+  private var wanted = wanted.copyOf()
+  private var verified = verified.copyOf()
+
+  /** Raised by every [retarget]; workers drop claims the selection no longer wants. */
+  @Volatile var wantVersion: Long = 0
+    private set
   private val availability = mutableMapOf<Int, BooleanArray>()
   private var version = 0L
   private val rarity = IntArray(wanted.size)
@@ -67,6 +76,27 @@ internal class TorrentPieceScheduler(
   }
 
   suspend fun isVerified(index: Int): Boolean = mutex.withLock { verified[index] }
+
+  suspend fun isWanted(index: Int): Boolean = mutex.withLock { wanted[index] }
+
+  /**
+   * Takes the store's selection from [read], which runs under this lock: a commit that finishes
+   * meanwhile publishes its piece here only afterwards, so it is never lost. Newly verified
+   * pieces are announced; claims of pieces no longer wanted are dropped by their workers.
+   */
+  suspend fun retarget(read: suspend () -> SelectionView): SelectionView = mutex.withLock {
+    val view = read()
+    require(view.wanted.size == wanted.size && view.verified.size == verified.size)
+    val gained = view.verified.indices.any { view.verified[it] && !verified[it] }
+    wanted = view.wanted.copyOf()
+    verified = view.verified.copyOf()
+    if (gained) version++
+    wantVersion++
+    view
+  }
+
+  /** Forgets a piece the store could no longer read; it downloads again if still wanted. */
+  suspend fun revoke(index: Int) = mutex.withLock { verified[index] = false }
 
   suspend fun verified(index: Int) = mutex.withLock {
     if (!verified[index]) {

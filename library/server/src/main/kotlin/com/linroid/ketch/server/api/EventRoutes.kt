@@ -1,10 +1,13 @@
 package com.linroid.ketch.server.api
 
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.TaskEvent
+import com.linroid.ketch.server.TaskMapper
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.ServerSSESession
 import io.ktor.server.sse.sse
@@ -13,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -88,31 +92,55 @@ private suspend fun ServerSSESession.trackTaskState(
   taskEvents(task).collect { sendEvent(it) }
 }
 
-internal fun taskEvents(task: DownloadTask): Flow<TaskEvent> =
+/**
+ * The events of [task] on one stream. Requests are shown without bulky metadata
+ * ([TaskMapper.viewOf]); a [TaskEvent.Progress] leaves out a request this stream already sent,
+ * while the first event and every [TaskEvent.StateChanged] carry it.
+ */
+internal fun taskEvents(task: DownloadTask): Flow<TaskEvent> = flow {
+  var sent: DownloadRequest? = null
+  var view: DownloadRequest? = null
   combine(
     task.state,
     task.requestState,
     task.segments,
     task.queuePosition,
   ) { state, request, segments, position ->
-    when (state) {
+    TaskUpdate(state, request, segments, position)
+  }.collect { update ->
+    val request = update.request
+    val changed = request !== sent
+    if (changed) {
+      sent = request
+      view = TaskMapper.viewOf(request)
+    }
+    val event = when (val state = update.state) {
       // A downloading task never waits in the queue, so Progress carries no position.
       is DownloadState.Downloading -> TaskEvent.Progress(
         taskId = task.taskId,
         state = state,
-        request = request,
-        segments = segments,
+        request = if (changed) view else null,
+        segments = update.segments,
       )
 
       else -> TaskEvent.StateChanged(
         taskId = task.taskId,
         state = state,
-        request = request,
-        segments = segments,
-        queuePosition = position,
+        request = view,
+        segments = update.segments,
+        queuePosition = update.queuePosition,
       )
     }
+    emit(event)
   }
+}
+
+private class TaskUpdate(
+  val state: DownloadState,
+  val request: DownloadRequest,
+  val segments: List<Segment>,
+  val queuePosition: Int?,
+)
 
 private suspend fun ServerSSESession.sendEvent(event: TaskEvent) {
   log.d { "SSE event: ${event.eventType.value} taskId=${event.taskId}" }

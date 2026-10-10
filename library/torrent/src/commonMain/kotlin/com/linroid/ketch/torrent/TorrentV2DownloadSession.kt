@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -73,6 +74,11 @@ internal class TorrentV2SessionOptions(
   val throttle: suspend (Int) -> Unit = {},
   /** Runs for the length of each transfer, feeding it peers through the sink. */
   val discovery: suspend (TorrentV2DiscoverySink) -> Unit = { awaitCancellation() },
+  /**
+   * Only seed: when the file check finds the selection incomplete, stop with
+   * [IncompleteSeedException] before any discovery instead of downloading.
+   */
+  val seedOnly: Boolean = false,
 )
 
 /** Discovery's only view of a session, valid for one transfer. */
@@ -123,7 +129,6 @@ internal class TorrentV2DownloadSession private constructor(
   private val scope: CoroutineScope,
   private val document: TorrentV2Document,
   private val layout: TorrentContentLayout,
-  private val selected: Set<String>,
   private val store: TorrentV2PieceStore,
   private val runtime: TorrentV2Runtime,
   options: TorrentV2SessionOptions,
@@ -139,19 +144,110 @@ internal class TorrentV2DownloadSession private constructor(
   private val discover = options.discovery
   private val privacy = options.privacy
   private val waitForPeers = options.waitForPeers
+  private val seedOnly = options.seedOnly
+  private val fileIds: Set<String> = TorrentOutputMapping.from(document).files.mapTo(HashSet()) {
+    it.id
+  }
   private val restricted = document.info.privateTorrent ||
     privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY
   override val infoHash: String get() = document.info.hash.hex
   override val downloadedBytes: StateFlow<Long> get() = mutableProgress
-  override val totalBytes: Long = TorrentOutputMapping.from(document).files
-    .filter { selected.isEmpty() || it.id in selected }
-    .sumOf { document.info.files[it.v2Index].length }
+  /** Follows [changeSelection]. */
+  override val totalBytes: Long get() = store.totalSelectedBytes
   override val downloadSpeed: Long get() = 0
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
-  override fun setFilePriorities(priorities: Map<Int, Int>) {
-    error("File selection is fixed for this session")
+  override val selectedFileIds: Set<String> get() = store.selectedIds()
+
+  /** One selection change at a time, handed to whichever transfer runs; see [changeSelection]. */
+  private val selections = Channel<CompletableDeferred<Unit>>(1)
+
+  /**
+   * Applies [fileIds] to the store, then to a running transfer, which follows it without dropping
+   * a peer. A file check restarts with it, as no peer is connected yet; a paused, finished or
+   * stopped session only saves it. No lock is held while the transfer takes the change.
+   */
+  override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    require(fileIds.isNotEmpty()) { "Select at least one file" }
+    require(fileIds.all { it in this.fileIds }) { "Unknown file id" }
+    check(scope.coroutineContext[Job]?.isActive == true) { "Torrent session is closed" }
+    // Applied in the session's scope, so a canceled caller never leaves a check stopped.
+    val pending = scope.async {
+      lifecycle.withLock {
+        check(!closed) { "Torrent session is closed" }
+        val running = job?.takeIf { it.isActive }
+        when {
+          running != null && mutableState.value == TorrentSessionState.CHECKING_FILES -> {
+            stop()
+            try {
+              store.changeSelection(fileIds)
+            } finally {
+              if (currentCoroutineContext()[Job]?.isActive == true) resumeLocked()
+            }
+            Applied.Restarted
+          }
+          running != null -> {
+            store.changeSelection(fileIds)
+            updateProgress()
+            Applied.Running(running)
+          }
+          else -> {
+            store.changeSelection(fileIds)
+            updateProgress()
+            Applied.Saved
+          }
+        }
+      }
+    }
+    val applied = try { pending.await() } finally {
+      withContext(NonCancellable) { pending.cancelAndJoin() }
+    }
+    log.i {
+      "Torrent $label selection: files=${fileIds.size}/${this.fileIds.size}, " +
+        "wanted=${store.totalSelectedBytes}"
+    }
+    val transfer = when (applied) {
+      Applied.Restarted -> return true
+      Applied.Saved -> return false
+      is Applied.Running -> applied.job
+    }
+    val done = CompletableDeferred<Unit>()
+    val sent = select {
+      selections.onSend(done) { true }
+      transfer.onJoin { false }
+    }
+    if (!sent) return false
+    return select {
+      done.onAwait { true }
+      transfer.onJoin { false }
+    }
+  }
+
+  private sealed interface Applied {
+    data object Restarted : Applied
+    data object Saved : Applied
+    class Running(val job: Job) : Applied
+  }
+
+  override suspend fun payloadCounters(): TorrentPayloadCounters =
+    TorrentPayloadCounters(store.receivedBytes(), store.uploadedBytes(), uploadSpeed())
+
+  private class UploadSample(val atMs: Long, val bytes: Long, val speed: Long)
+  private val clock = monotonicClock()
+  private val uploadSample = AtomicReference(UploadSample(clock(), 0, 0))
+
+  /** Bytes per second uploaded, over the time since the previous sample, at least a second. */
+  fun uploadSpeed(): Long {
+    while (true) {
+      val last = uploadSample.load()
+      val now = clock()
+      val elapsed = now - last.atMs
+      if (elapsed < 1000) return last.speed
+      val bytes = store.uploadedBytes()
+      val next = UploadSample(now, bytes, (bytes - last.bytes).coerceAtLeast(0) * 1000 / elapsed)
+      if (uploadSample.compareAndSet(last, next)) return next.speed
+    }
   }
 
   override suspend fun saveResumeData(): ByteArray? = store.resumeData()
@@ -213,17 +309,23 @@ internal class TorrentV2DownloadSession private constructor(
     controls.load()?.trySend(TorrentV2SessionLoop.Control.PolicyChanged)
   }
 
-  override suspend fun resume() = lifecycle.withLock {
+  override suspend fun resume() = lifecycle.withLock { resumeLocked() }
+
+  /** Under [lifecycle]. */
+  private suspend fun resumeLocked() {
     check(!closed) { "Torrent session is closed" }
     currentCoroutineContext().ensureActive()
     if (job?.isActive == true && (mutableState.value == TorrentSessionState.CHECKING_FILES ||
         mutableState.value == TorrentSessionState.DOWNLOADING ||
-        mutableState.value == TorrentSessionState.SEEDING)) return@withLock
+        mutableState.value == TorrentSessionState.SEEDING)) return
     job?.join()
     checkNotNull(scope.coroutineContext[Job]).ensureActive()
     mutableProgress.value = 0
     mutableFailure.value = null
     mutableState.value = TorrentSessionState.CHECKING_FILES
+    // A change sent to an earlier transfer was saved in the store, which this run reads.
+    while (selections.tryReceive().isSuccess) { }
+    uploadSample.store(UploadSample(clock(), store.uploadedBytes(), 0))
     job = scope.launch {
       try {
         log.i { "Checking files for $label" }
@@ -232,6 +334,13 @@ internal class TorrentV2DownloadSession private constructor(
         store.recheck()
         updateProgress()
         log.i { "Checked files for $label: ${mutableProgress.value}/$totalBytes bytes verified" }
+        if (seedOnly && !store.completed()) {
+          // No discovery or peer: seeding only serves a completed selection.
+          log.i { "Completed torrent $label changed on disk; not seeding" }
+          mutableFailure.value = IncompleteSeedException()
+          mutableState.value = TorrentSessionState.STOPPED
+          return@launch
+        }
         if (!store.completed()) {
           admission.withLock { accepting = true }
           mutableState.value = TorrentSessionState.DOWNLOADING
@@ -359,6 +468,13 @@ internal class TorrentV2DownloadSession private constructor(
     log.i { "Seeding $label: upload=${TorrentUploadPolicy.SEED_AFTER_COMPLETION}" }
   }
 
+  /** A selection change left the complete transfer with pieces to download. */
+  private suspend fun incomplete() {
+    updateProgress()
+    mutableState.value = TorrentSessionState.DOWNLOADING
+    log.i { "Torrent $label is downloading again for its selection" }
+  }
+
   /** The transfer verified every selected piece: true keeps it running as a seed. */
   private suspend fun completed(): Boolean {
     updateProgress()
@@ -433,6 +549,10 @@ internal class TorrentV2DownloadSession private constructor(
     val limits = launch {
       connectionLimit.collect { loopControls.send(TorrentV2SessionLoop.Control.SetLimit(it)) }
     }
+    // Selection changes reach the running loop too; one the loop never takes is not confirmed.
+    val selecting = launch {
+      for (done in selections) loopControls.send(TorrentV2SessionLoop.Control.Select(done))
+    }
     try {
       PeerV2Pool.run(memory, maxPeers = maxPeers) { pool ->
         PeerV2Dialer.run(dial, memory, parallelism = DIAL_WORKERS,
@@ -462,7 +582,8 @@ internal class TorrentV2DownloadSession private constructor(
               chargeRead = { bytes -> runtime.uploadRate.charge(bytes, uploadRate) })
             // What peers ask of us, pieces and proofs alike, stays within the upload partition.
             TorrentV2ServeWorker.run(store, hashServer, runtime.uploadBuffers) { serve ->
-              TorrentV2SessionLoop.download(layout, selected, store, pool, worker, buffers, memory,
+              TorrentV2SessionLoop.download(layout, store.selectedIds(), store, pool, worker,
+                buffers, memory,
                 maxPeers = maxPeers, maxActive = activePieces(layout, buffers),
                 connections = dialer.connections, onProgress = ::updateProgress,
                 requestDelay = { bytes, admit ->
@@ -474,7 +595,7 @@ internal class TorrentV2DownloadSession private constructor(
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
-                  onRoom = room::store))
+                  onRoom = room::store, onIncomplete = ::incomplete))
             }
           }
         }
@@ -486,6 +607,7 @@ internal class TorrentV2DownloadSession private constructor(
           charging?.cancelAndJoin()
           discovery.cancelAndJoin()
           limits.cancelAndJoin()
+          selecting.cancelAndJoin()
         } finally {
           // A reset sent after the loop returned has no peers left to wait for.
           loopControls.close()
@@ -573,7 +695,7 @@ internal class TorrentV2DownloadSession private constructor(
       }
       val owner = SupervisorJob(parent.coroutineContext[Job])
       return TorrentV2DownloadSession(CoroutineScope(parent.coroutineContext + owner), document,
-        layout, selected.toSet(), store, runtime, options, lease)
+        layout, store, runtime, options, lease)
     }
 
     /**

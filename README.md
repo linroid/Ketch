@@ -108,6 +108,10 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **FTP and FTPS**, with parallel connections and resume.
 - **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files and
   optional seeding, in an engine written in pure Kotlin ([details](docs/torrent.md)).
+- **Torrent files, chosen any time** — Choose a torrent's files before or while it downloads and
+  change them without starting over; a magnet link added before its details arrive waits for
+  your choice. Stop or restart seeding a finished torrent; the ones you keep sharing seed again
+  after Ketch restarts.
 - **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
   HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
@@ -235,8 +239,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   choose timeouts and how often to retry, unlimited included
 - **Unfinished files look unfinished** — Downloads are written under a temporary name and get
   their real name once complete
-- **Torrent files, chosen any time** — Pick the files of a magnet link once its details arrive,
-  and change the selection while it downloads
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
   once the queue is empty
 - **Automation hooks** — Run a command or call a webhook when a download finishes or fails

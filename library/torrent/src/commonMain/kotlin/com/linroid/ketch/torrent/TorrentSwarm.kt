@@ -56,6 +56,8 @@ internal class TorrentSwarm(
   private val onUploaded: (Int) -> Unit = {},
   private val onProgress: suspend (Long) -> Unit = {},
   private val onCompleted: suspend () -> Unit = {},
+  /** A selection change made a completed swarm incomplete; it downloads again, then completes. */
+  private val onIncomplete: suspend () -> Unit = {},
   /** Test hook: lets peer exchange carry loopback and private addresses. */
   private val allowLocalPeers: Boolean = false,
   trackerOnly: Boolean = false,
@@ -89,25 +91,29 @@ internal class TorrentSwarm(
     policy == TorrentUploadPolicy.SEED_AFTER_COMPLETION ||
       (policy == TorrentUploadPolicy.WHILE_DOWNLOADING && !complete)
 
-  /** A closed peer stream fails once every candidate has exhausted its bounded retries. */
+  /**
+   * A closed peer stream fails once every candidate has exhausted its bounded retries. Each of
+   * [selections] tells the swarm the store's selection changed; it completes the deferred once
+   * the scheduler follows it, keeping every peer connected.
+   */
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,
     kotlinx.coroutines.DelicateCoroutinesApi::class)
   suspend fun run(
     peers: ReceiveChannel<PeerEndpoint>,
     incoming: ReceiveChannel<TorrentConnection>? = null,
     resets: ReceiveChannel<CompletableDeferred<Unit>>? = null,
+    selections: ReceiveChannel<CompletableDeferred<Unit>>? = null,
   ) = supervisorScope {
     store.initialize()
-    if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
-      store.finish()
+    if (uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION && store.finishIfComplete()) {
       onProgress(store.progress().sum())
       onCompleted()
       return@supervisorScope
     }
     val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
       store.verifiedPieces(), store::pieceSize, budget)
-    val largestPiece = (0 until store.pieceCount).filter { store.needed(it) }
-      .maxOfOrNull { store.pieceSize(it) } ?: 0
+    // Any piece may become wanted, and the first is the longest.
+    val largestPiece = if (store.pieceCount == 0) 0 else store.pieceSize(0)
     val peerOverhead = PEER_WIRE_BYTES + store.pieceCount * 4
     require(budget.capacity >= largestPiece + peerOverhead) {
       "Torrent buffer limit cannot hold a piece and peer protocol state"
@@ -131,6 +137,26 @@ internal class TorrentSwarm(
     val now = nowMs
     var discoveryClosed = false
     var complete = false
+    // Hashes of stored pieces a selection made wanted; each wakes the loop when done.
+    val rechecked = Channel<Unit>(Channel.CONFLATED)
+    val verifiers = mutableListOf<Job>()
+    suspend fun applySelection() {
+      val view = scheduler.retarget { store.selectionView() }
+      verifiers.removeAll { it.isCompleted }
+      if (view.recheck.isEmpty()) return
+      verifiers += launch {
+        try {
+          val found = store.verifyExisting(view.recheck)
+          log.d { "Swarm $logLabel: $found of ${view.recheck.size} reselected piece(s) stored" }
+          if (found > 0) rechecked.trySend(Unit)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          // Unchecked pieces download as usual.
+          log.d { "Swarm $logLabel: checking reselected pieces failed: ${e.describeWithoutUrls()}" }
+        }
+      }
+    }
     var nextId = 0
     // Counters since the last periodic summary, which explains a stalled swarm.
     var discovered = 0
@@ -208,8 +234,13 @@ internal class TorrentSwarm(
           val event = pexEvents.tryReceive().getOrNull() ?: return@repeat
           acceptPex(event.first, event.second)
         }
-        if (store.completed() && !complete) {
-          store.finish()
+        if (complete && !store.completed()) {
+          // A selection, or a piece revoked from a file outside it, needs pieces again.
+          complete = false
+          onIncomplete()
+        }
+        // A selection change between the check and finishing keeps the swarm downloading.
+        if (!complete && store.completed() && store.finishIfComplete()) {
           onProgress(store.progress().sum())
           onCompleted()
           complete = true
@@ -269,6 +300,19 @@ internal class TorrentSwarm(
             retryAt.clear()
             done.complete(Unit)
           }
+          selections?.onReceive { done ->
+            applySelection()
+            if (complete && !store.completed()) {
+              complete = false
+              onIncomplete()
+            }
+            progressEvents.trySend(Unit)
+            done.complete(Unit)
+          }
+          rechecked.onReceive {
+            applySelection()
+            progressEvents.trySend(Unit)
+          }
           if (!discoveryClosed) peers.onReceiveCatching { result ->
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
@@ -308,8 +352,11 @@ internal class TorrentSwarm(
         }
       }
     } finally {
+      verifiers.forEach { it.cancel() }
       active.values.forEach { it.cancel() }
       active.values.forEach { it.join() }
+      verifiers.forEach { it.join() }
+      rechecked.close()
       results.close()
       progressEvents.close()
       pexEvents.close()
@@ -381,7 +428,11 @@ internal class TorrentSwarm(
     private var received = BooleanArray(0)
     private var requested = BooleanArray(0)
     private var receivedBytes = 0
-    private var lastUsefulPayload = TimeSource.Monotonic.markNow()
+    /** When the peer last sent a wanted block, on [nowMs]; a selection change restarts it. */
+    private var lastUsefulPayload = nowMs()
+    private var seenWantVersion = scheduler.wantVersion
+    /** The store was complete at the last pass: a seed judges no peer by its downloads. */
+    private var sawComplete = false
     private var lastBlock = TimeSource.Monotonic.markNow()
     private var lastWrite = TimeSource.Monotonic.markNow()
 
@@ -403,7 +454,7 @@ internal class TorrentSwarm(
             messages.close(e)
           }
         }
-        lastUsefulPayload = TimeSource.Monotonic.markNow()
+        lastUsefulPayload = nowMs()
         lastBlock = TimeSource.Monotonic.markNow()
         lastWrite = TimeSource.Monotonic.markNow()
         try {
@@ -466,10 +517,10 @@ internal class TorrentSwarm(
     private suspend fun receive(message: PeerMessage) {
       if (message is PeerMessage.Piece) {
         val throttling = TimeSource.Monotonic.markNow()
+        val throttledAt = nowMs()
         downloadPayload(message.bytes.size)
-        val paused = throttling.elapsedNow()
-        lastBlock += paused
-        lastUsefulPayload += paused
+        lastBlock += throttling.elapsedNow()
+        lastUsefulPayload += nowMs() - throttledAt
       }
       val accepted = state.received(message)
       when (message) {
@@ -511,17 +562,22 @@ internal class TorrentSwarm(
       received[block] = true
       receivedBytes += message.bytes.size
       lastBlock = TimeSource.Monotonic.markNow()
-      lastUsefulPayload = TimeSource.Monotonic.markNow()
+      lastUsefulPayload = nowMs()
       if (receivedBytes == current.bytes.size) {
-        val valid = storage { store.commit(current.index, current.bytes) }
-        if (!valid) {
-          log.w { "Piece ${current.index} of $logLabel from $endpoint failed its hash check" }
-          throw CorruptPieceException()
+        when (storage { store.commit(current.index, current.bytes) }) {
+          CommitOutcome.VERIFIED -> {
+            scheduler.verified(current.index)
+            progressEvents.trySend(Unit)
+          }
+          // The selection dropped the piece while it arrived: the peer did nothing wrong.
+          CommitOutcome.NOT_WANTED -> Unit
+          CommitOutcome.CORRUPT -> {
+            log.w { "Piece ${current.index} of $logLabel from $endpoint failed its hash check" }
+            throw CorruptPieceException()
+          }
         }
-        scheduler.verified(current.index)
         scheduler.release(id)
         claim = null
-        progressEvents.trySend(Unit)
       }
     }
 
@@ -533,7 +589,17 @@ internal class TorrentSwarm(
     private suspend fun serveUploads() {
       while (uploadSlot && uploads.isNotEmpty() && uploadRetryAt <= nowMs()) {
         val request = uploads.first()
-        val bytes = storage { uploadCache.read(request.index) }
+        val bytes = try {
+          storage { uploadCache.read(request.index) }
+        } catch (revoked: PieceRevokedException) {
+          // A piece outside the selection could not be read back: refuse it and keep the peer.
+          log.d { "Swarm $logLabel: revoked piece ${revoked.index}" }
+          scheduler.revoke(revoked.index)
+          uploads.clear()
+          uploadCache.close()
+          chokerMutex.withLock { choker.refused(id) }
+          return
+        }
         if (bytes == null) {
           // No buffer for the piece: the choker hands the slot on, and the peer is choked next.
           uploads.clear()
@@ -650,8 +716,16 @@ internal class TorrentSwarm(
           }
         }
       }
+      val wantVersion = scheduler.wantVersion
+      val retargeted = wantVersion != seenWantVersion
+      if (retargeted) {
+        seenWantVersion = wantVersion
+        // The selection changed: a seed that downloads again judges its peers from now on.
+        lastUsefulPayload = nowMs()
+      }
       val current = claim
-      if (current != null && scheduler.isVerified(current.index)) {
+      if (current != null && (scheduler.isVerified(current.index) ||
+          retargeted && !scheduler.isWanted(current.index))) {
         for (request in state.requests) {
           state.cancel(request)
           wire.send(PeerMessage.Cancel(request.index, request.begin, request.length))
@@ -659,7 +733,11 @@ internal class TorrentSwarm(
         scheduler.release(id)
         claim = null
       }
-      if (!store.completed() && lastUsefulPayload.elapsedNow().inWholeSeconds >= 90) {
+      val completed = store.completed()
+      // The selection grew while seeding: a peer has 90 s from now, not from its last block.
+      if (sawComplete && !completed) lastUsefulPayload = nowMs()
+      sawComplete = completed
+      if (!completed && nowMs() - lastUsefulPayload >= 90_000) {
         throw IOException("Peer made no useful download progress")
       }
       if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {

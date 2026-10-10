@@ -91,7 +91,10 @@ server refuses HEAD) and returns its size, resume support,
 suggested file name and, for multi-file sources such as torrents, the selectable `files`.
 `resolveContent(bytes, fileName)` does the same for file content the caller already holds, such
 as a picked `.torrent` file. Pass the result as `DownloadRequest.resolvedSource` (with its `url`
-as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files`.
+as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files` (empty
+downloads every file). With `awaitFileSelection = true` and no `selectedFileIds`, a torrent waits
+once its file list is known, as `Paused(AwaitingFileSelection)` holding no download slot, until
+`selectFiles` chooses its files; `resume()` downloads every file instead.
 
 `KetchApi.download(...)` returns a `DownloadTask` for controlling an
 individual download. Tasks expose reactive state and per-task actions:
@@ -112,6 +115,7 @@ interface DownloadTask {
   suspend fun setSpeedLimit(limit: SpeedLimit)
   suspend fun setPriority(priority: DownloadPriority)
   suspend fun setConnections(connections: Int)  // 0 = Auto, the configured default
+  suspend fun selectFiles(fileIds: Set<String>)  // torrents: change the files at any time
   suspend fun reschedule(
     schedule: DownloadSchedule,
     conditions: List<DownloadCondition> = emptyList(),
@@ -133,19 +137,40 @@ interface DownloadTask {
 }
 ```
 
+`selectFiles(ids)` changes which files of a torrent the task downloads, in every state but
+canceled: a running torrent follows the change without reconnecting, newly chosen files are
+downloaded and unchosen ones stop downloading but stay on disk, and a completed task that gains
+files downloads them and completes again. It throws `IllegalArgumentException` for an empty set
+or an ID the torrent does not have, `IllegalStateException` while the file list is not known or
+after `cancel()`, and `UnsupportedOperationException` for tasks without files or backends that
+cannot change them (see [torrents](torrent.md#choosing-files)).
+
 `DownloadState.Paused.reason` is a `PauseReason`: `User` for `pause()` (and tasks restored
 paused), `Preempted(byTaskId)` for a task that gave its slot to an URGENT one and still waits in
 the queue, `Shutdown` for a task that was downloading when its `Ketch` closed (its partial file
-is kept and it resumes on the next `start()`), and `WaitingForCondition`. A reason the client
-does not know decodes as `User`. `DownloadState.Completed.completedAt` is when the task
-finished, in whole milliseconds; it is `null` for tasks that finished before Ketch recorded it.
+is kept and it resumes on the next `start()`), `AwaitingFileSelection` for a torrent that waits
+for `selectFiles`, and `WaitingForCondition`. A reason the client does not know decodes as
+`User`. `DownloadState.Completed.completedAt` is when the task last finished, in whole
+milliseconds; it is `null` for tasks that finished before Ketch recorded it.
+`DownloadState.Completed.seeding` is `true` while a finished torrent shares its files with other
+peers.
 `queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`)
 in the order the queue starts them, priority first, then age.
 
 `KetchStatus.features` lists the optional behaviors an instance supports, from
-`KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`) and `QUEUE_POSITION`. Older servers
-send none, so their tasks report no position and `setConnections(0)` on them throws
+`KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`), `QUEUE_POSITION`, `REQUEST_ID`,
+`PROXY`, `CATEGORY_FOLDERS`, the media sources' `FINITE_HLS` and `FINITE_DASH`, and the torrent
+source's `TORRENT_FILE_SELECTION` (`selectFiles`), `TORRENT_AWAIT_FILE_SELECTION`
+(`awaitFileSelection`) and `TORRENT_CONTROL` (`KetchApi.torrents`). Older servers send fewer, so
+their tasks report no position and `setConnections(0)` on them throws
 `UnsupportedOperationException`.
+
+`KetchApi.torrents` is a `TorrentController`, or `null` without a torrent source: capabilities, a
+task's snapshot and `observe` stream, its files a page at a time (`files`, sorted by
+`TorrentFileOrder` and optionally descending), and the `select` and `setSeeding` commands, each
+guarded by a `TorrentCommandContext` (an idempotency key and the expected revision). Failures throw
+`TorrentCommandException` with a `TorrentCommandError`. See the
+[control contract](design/torrent-control-contract.md#version-1-runtime).
 
 ### `library:core`
 

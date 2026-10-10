@@ -24,6 +24,8 @@
   <string name="row_saved_on">%1$s에 저장됨</string>
   <string name="row_missing_file">파일이 이동되었거나 삭제됨</string>
   <string name="row_completed">완료</string>
+  <string name="row_choose_files">다운로드할 파일 선택</string>
+  <string name="row_seeding">시딩 중</string>
   <string name="row_took">%1$s 소요</string>
   <plurals name="row_files">
     <item quantity="other">파일 %1$d개</item>
@@ -59,6 +61,10 @@
   <string name="sort_origin">출처</string>
   <string name="sort_priority">우선순위</string>
   <string name="sort_device">기기</string>
+  <string name="sort_kind">종류</string>
+  <string name="sort_selected_first">선택한 항목 먼저</string>
+  <string name="sort_torrent_order">토렌트 순서</string>
+  <string name="sort_reverse">역순</string>
   <string name="group_smart">스마트</string>
   <string name="group_status">상태</string>
   <string name="group_day">날짜</string>
@@ -131,6 +137,10 @@
   <string name="action_row_copy_details">세부 정보 복사</string>
   <string name="action_row_stop_and_discard">다운로드 취소…</string>
   <string name="action_row_remove">제거…</string>
+  <string name="action_row_choose_files">파일 선택…</string>
+  <string name="action_row_download_all_files">모든 파일 다운로드</string>
+  <string name="action_row_stop_seeding">시딩 중지</string>
+  <string name="action_row_seed">시드</string>
   <plurals name="batch_pause">
     <item quantity="other">다운로드 %1$d개 일시정지</item>
   </plurals>

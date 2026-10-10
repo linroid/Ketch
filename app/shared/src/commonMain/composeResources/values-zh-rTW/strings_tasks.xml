@@ -24,6 +24,8 @@
   <string name="row_saved_on">已儲存在 %1$s</string>
   <string name="row_missing_file">檔案已移動或刪除</string>
   <string name="row_completed">已完成</string>
+  <string name="row_choose_files">選擇要下載的檔案</string>
+  <string name="row_seeding">做種中</string>
   <string name="row_took">耗時 %1$s</string>
   <plurals name="row_files">
     <item quantity="other">%1$d 個檔案</item>
@@ -59,6 +61,10 @@
   <string name="sort_origin">新增方式</string>
   <string name="sort_priority">優先順序</string>
   <string name="sort_device">裝置</string>
+  <string name="sort_kind">類型</string>
+  <string name="sort_selected_first">已選優先</string>
+  <string name="sort_torrent_order">種子順序</string>
+  <string name="sort_reverse">反向排序</string>
   <string name="group_smart">智慧</string>
   <string name="group_status">狀態</string>
   <string name="group_day">日期</string>
@@ -131,6 +137,10 @@
   <string name="action_row_copy_details">複製詳細資料</string>
   <string name="action_row_stop_and_discard">取消下載…</string>
   <string name="action_row_remove">移除…</string>
+  <string name="action_row_choose_files">選擇檔案…</string>
+  <string name="action_row_download_all_files">下載全部檔案</string>
+  <string name="action_row_stop_seeding">停止做種</string>
+  <string name="action_row_seed">做種</string>
   <plurals name="batch_pause">
     <item quantity="other">暫停 %1$d 個下載項目</item>
   </plurals>

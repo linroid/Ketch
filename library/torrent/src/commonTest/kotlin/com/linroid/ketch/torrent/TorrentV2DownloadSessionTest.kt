@@ -16,6 +16,9 @@ import kotlinx.coroutines.withTimeout
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -24,6 +27,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalAtomicApi::class)
 class TorrentV2DownloadSessionTest {
   private val bytes = byteArrayOf(1, 2, 3, 4)
   private val document = TorrentV2Document.parse(Bencode.encode(mapOf(
@@ -234,6 +238,102 @@ class TorrentV2DownloadSessionTest {
         }
       }
       assertFalse(torrentFileSystem.exists(output))
+    }
+  }
+
+  // Two files of one piece each: a ("0") is piece 0, b ("1") is piece 1.
+  private val pair = TorrentV2Fixture.build(listOf("a" to 4, "b" to 6), pieceLength = 16_384)
+
+  @Test
+  fun changeSelection_downloading_keepsThePeerSocket() = runTest {
+    fixture {
+      val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val accepted = AtomicInt(0)
+      val firstRequest = CompletableDeferred<Unit>()
+      val release = CompletableDeferred<Unit>()
+      // A seed with both pieces that holds a back until the test releases it.
+      val server = scope.launch {
+        while (true) {
+          val connection = listener.accept()
+          accepted.incrementAndFetch()
+          launch {
+            try {
+              PeerIdentityHandshake(pair.document.identity).respond(connection,
+                ByteArray(20) { 2 }.toByteString(), buffers)
+              val wire = PeerWire(connection, pieceCount = 2)
+              wire.send(PeerMessage.Bitfield(byteArrayOf(192.toByte())))
+              wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+              while (true) {
+                val request = wire.read() as? PeerMessage.Request ?: continue
+                if (request.index == 0) {
+                  firstRequest.complete(Unit)
+                  release.await()
+                }
+                wire.send(PeerMessage.Piece(request.index, request.begin,
+                  pair.v2Piece(request.index)))
+              }
+            } catch (_: IOException) {
+              // The session closed the connection.
+            } finally { connection.close() }
+          }
+        }
+      }
+      val store = TorrentV2PieceStore(pair.document, output, setOf("0"), "owner", buffers,
+        Semaphore(4))
+      try {
+        TorrentV2DownloadSession.run(pair.document, pair.layout, setOf("0"), store, network,
+          peerId, buffers, state, maxPeers = 1,
+          discover = { it.send(listener.local); awaitCancellation() }) { session ->
+          session.resume()
+          firstRequest.await()
+          assertEquals(4L, session.totalBytes)
+          // Taken by the running transfer, over the same connection.
+          assertTrue(session.changeSelection(setOf("0", "1")))
+          assertEquals(setOf("0", "1"), session.selectedFileIds)
+          assertEquals(10L, session.totalBytes)
+          release.complete(Unit)
+          assertEquals(TorrentSessionState.FINISHED, session.state.first {
+            it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
+          }, session.failure.value?.stackTraceToString())
+          assertEquals(10L, session.verifiedBytes.value)
+          // Finished, a change is only saved: the next resume downloads it.
+          assertFalse(session.changeSelection(setOf("1")))
+          assertEquals(6L, session.totalBytes)
+        }
+        assertEquals(1, accepted.load())
+        assertContentEquals(pair.payloads[1], torrentFileSystem.read(output / "b") {
+          readByteArray()
+        })
+      } finally {
+        server.cancelAndJoin()
+        listener.close()
+        store.cleanup()
+      }
+    }
+  }
+
+  @Test
+  fun resume_seedOnlyChangedPayload_stopsWithoutDiscovery() = runTest {
+    fixture {
+      var discoveries = 0
+      val session = TorrentV2DownloadSession.open(scope, document, layout, emptySet(), store,
+        TorrentV2Runtime(network, peerId, buffers, state,
+          uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION }),
+        TorrentV2SessionOptions(maxPeers = 1, seedOnly = true, discovery = {
+          discoveries++
+          awaitCancellation()
+        }))
+      try {
+        // The files of a completed torrent are gone: seeding would download them instead.
+        session.resume()
+        assertEquals(TorrentSessionState.STOPPED, session.state.first {
+          it == TorrentSessionState.STOPPED || it == TorrentSessionState.SEEDING
+        })
+        assertIs<IncompleteSeedException>(session.failure.value)
+        assertEquals(0, discoveries)
+      } finally {
+        withContext(NonCancellable) { session.close() }
+      }
     }
   }
 }

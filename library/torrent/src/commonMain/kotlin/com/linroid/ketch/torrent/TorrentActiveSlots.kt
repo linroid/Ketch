@@ -87,6 +87,22 @@ internal class TorrentActiveSlots(private val capacity: Int) {
   }
 
   /**
+   * Takes a free slot without waiting and without evicting a seeder: false when every slot is
+   * used or a download is waiting for one. Optional work, such as seeding a completed task
+   * again, starts only on a slot nobody needs.
+   */
+  suspend fun tryAcquire(): Boolean = mutex.withLock {
+    if (closed.load() || waiters.isNotEmpty() || used >= capacity) return@withLock false
+    used++
+    true
+  }
+
+  /** Whether [tryAcquire] would take a slot now. */
+  suspend fun hasFree(): Boolean = mutex.withLock {
+    !closed.load() && waiters.isEmpty() && used < capacity
+  }
+
+  /**
    * Lends the caller's slot to its seeding session. False when a download is waiting: the caller
    * keeps the slot and must stop the session, then [release] the slot.
    */
@@ -101,6 +117,12 @@ internal class TorrentActiveSlots(private val capacity: Int) {
    * after stopping the seeder; false when a download already took it.
    */
   suspend fun reclaim(taskId: String): Boolean = mutex.withLock { seeders.remove(taskId) }
+
+  /** Whether [taskId]'s seeder still holds the slot lent to it. */
+  suspend fun isLent(taskId: String): Boolean = mutex.withLock { taskId in seeders }
+
+  /** Slots owned or lent to seeders; for leak checks. */
+  suspend fun inUse(): Int = mutex.withLock { used }
 
   /** Returns an owned slot, handing it straight to the first waiter. */
   suspend fun release() = mutex.withLock { releaseLocked() }

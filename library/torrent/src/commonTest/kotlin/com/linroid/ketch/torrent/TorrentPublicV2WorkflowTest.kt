@@ -183,6 +183,134 @@ class TorrentPublicV2WorkflowTest {
     } }
   }
 
+  @Test fun v2SelectionChange_survivesKetchRestart() = runTest {
+    fixture(false) { peer ->
+      val root = temporaryDirectory()
+      val recordPath = root / "tasks.json"
+      fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val firstSource = source()
+      val first = Ketch(peer.http, taskStore = Records(recordPath),
+        additionalSources = listOf(firstSource))
+      var second: Ketch? = null
+      try {
+        first.start()
+        val task = first.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        // Taken by the running owner, then saved with the task.
+        task.selectFiles(setOf("0", "1"))
+        task.pause()
+        first.close()
+        firstSource.assertNoLeaks()
+        peer.remaining.complete(Unit)
+        val secondSource = source()
+        val replacement = Ketch(peer.http, taskStore = Records(recordPath),
+          additionalSources = listOf(secondSource))
+        second = replacement
+        replacement.start()
+        val restored = replacement.tasks.value.single()
+        assertEquals(setOf("0", "1"), restored.request.selectedFileIds)
+        restored.resume()
+        restored.await().getOrThrow()
+        assertEquals(peer.payload.size + 1L,
+          (restored.state.value as DownloadState.Completed).totalBytes)
+        assertContentEquals(peer.payload, torrentFileSystem.read(root / "out" / "a") {
+          readByteArray()
+        })
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        secondSource.assertNoLeaks()
+      } finally {
+        first.close()
+        second?.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
+  @Test fun hybridSelectionChange_completesAndRemovesOwnedFiles() = runTest {
+    fixture(true) { peer ->
+      val root = temporaryDirectory()
+      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val ketch = Ketch(peer.http, additionalSources = listOf(source))
+      try {
+        ketch.start()
+        val task = ketch.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        // Hybrid IDs skip the padding file between a and b.
+        task.selectFiles(setOf("0", "2"))
+        peer.remaining.complete(Unit)
+        task.await().getOrThrow()
+        assertContentEquals(peer.payload, torrentFileSystem.read(root / "out" / "a") {
+          readByteArray()
+        })
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        torrentFileSystem.write(root / "out" / "foreign") { writeUtf8("keep") }
+        task.remove(deleteFiles = true)
+        assertFalse(torrentFileSystem.exists(root / "out" / "a"))
+        assertFalse(torrentFileSystem.exists(root / "out" / "b"))
+        assertEquals("keep", torrentFileSystem.read(root / "out" / "foreign") { readUtf8() })
+        assertFalse(torrentFileSystem.exists(v2CreationLog(root / "out", task.taskId)))
+        source.assertNoLeaks()
+      } finally {
+        ketch.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
+  @Test fun v2LegacyCreationLog_isRebound() = runTest {
+    fixture(false) { peer ->
+      val root = temporaryDirectory()
+      val recordPath = root / "tasks.json"
+      fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val firstSource = source()
+      val first = Ketch(peer.http, taskStore = Records(recordPath),
+        additionalSources = listOf(firstSource))
+      var second: Ketch? = null
+      try {
+        first.start()
+        val task = first.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        task.pause()
+        first.close()
+        firstSource.assertNoLeaks()
+        // An unchanged task's creation log is bound to its selection, as older builds bind it.
+        val log = v2CreationLog(root / "out", task.taskId)
+        val legacy = torrentFileSystem.read(log) { readByteArray() }
+        val secondSource = source()
+        val replacement = Ketch(peer.http, taskStore = Records(recordPath),
+          additionalSources = listOf(secondSource))
+        second = replacement
+        replacement.start()
+        val restored = replacement.tasks.value.single()
+        // Changed while paused: the next run opens the log through the selection it last ran.
+        restored.selectFiles(setOf("0", "1"))
+        peer.remaining.complete(Unit)
+        restored.resume()
+        restored.await().getOrThrow()
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        assertFalse(legacy.contentEquals(torrentFileSystem.read(log) { readByteArray() }))
+        restored.remove(deleteFiles = true)
+        assertFalse(torrentFileSystem.exists(root / "out" / "a"))
+        assertFalse(torrentFileSystem.exists(root / "out" / "b"))
+        assertFalse(torrentFileSystem.exists(log))
+        secondSource.assertNoLeaks()
+      } finally {
+        first.close()
+        second?.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
   private suspend fun magnet(
     hybrid: Boolean,
     selectLast: Boolean = false,

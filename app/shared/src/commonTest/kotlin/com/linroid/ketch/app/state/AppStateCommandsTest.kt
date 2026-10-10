@@ -11,6 +11,7 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.backgroundChild
+import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
@@ -38,7 +39,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -486,6 +489,36 @@ class AppStateCommandsTest {
     assertEquals(MessageLevel.Error, error.level)
     assertEquals("Couldn't remove ubuntu.iso on This Mac", error.title.load())
     assertEquals("file in use", error.detail?.load())
+  }
+
+  @Test
+  fun quickAdd_magnet_doesNotAwaitFiles() = commandsTest { api, controller ->
+    controller.state.quickAdd(listOf(MAGNET))
+    runCurrent()
+
+    assertFalse(api.requests.single().awaitFileSelection)
+  }
+
+  @Test
+  fun report_filesNeeded_offersToChooseThem() = commandsTest { api, controller ->
+    val waiting = DownloadState.Paused(RecordingTask.PROGRESS, PauseReason.AwaitingFileSelection)
+    val task = api.add(waiting, DownloadRequest(MAGNET))
+    val key = controller.state.keyOf(task)
+
+    controller.state.report(ActivityEvent.FilesNeeded(key, task.request))
+    val message = controller.messages.active.value.last()
+    controller.click("Choose files…")
+
+    assertEquals(MessageLevel.Info, message.level)
+    assertEquals("Choose which files of “Show” to download", message.title.load())
+    assertEquals(key, controller.state.inspectedTask)
+    assertEquals(key, controller.state.filesRequest)
+    controller.state.filesRequestHandled()
+    assertNull(controller.state.filesRequest)
+  }
+
+  private companion object {
+    const val MAGNET = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
   }
 }
 

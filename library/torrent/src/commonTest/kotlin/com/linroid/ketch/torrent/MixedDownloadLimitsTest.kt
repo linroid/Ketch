@@ -9,6 +9,10 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.task.TaskControl
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -16,13 +20,16 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.time.Instant
 
 class MixedDownloadLimitsTest {
   @Test
@@ -162,6 +169,78 @@ class MixedDownloadLimitsTest {
           seeder.stop()
           torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
+      }
+    }
+  }
+
+  @Test
+  fun restoredSeeder_servesAKotlinLeecher() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(TEST_TIMEOUT_MS) {
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-restored-seed-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        val torrent = MultiFileTorrent(listOf(60_000, 45_000))
+        val seeded = root / "seeded"
+        torrent.writeTo(seeded)
+        // A completed task that seeded when its Ketch last stopped.
+        val ids = setOf("0", "1")
+        val total = torrent.sizes.sum().toLong()
+        val state = TorrentResumeState(torrent.metadata.infoHash.hex, total, "", ids,
+          seeded.toString(), encodeBase64(torrent.metainfo), version = 2,
+          privacy = TorrentDiscoveryPrivacy.PUBLIC)
+        val now = Instant.fromEpochMilliseconds(1_000)
+        val store = MemoryTaskStore()
+        store.save(TaskRecord(taskId = "restored",
+          request = DownloadRequest("http://fixture/pack.torrent",
+            destination = Destination(seeded.toString()), selectedFileIds = ids),
+          outputPath = seeded.toString(), state = TaskState.COMPLETED, totalBytes = total,
+          sourceType = TorrentDownloadSource.TYPE,
+          sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
+            Json.encodeToString(state)),
+          createdAt = now, updatedAt = now, completedAt = now,
+          control = TaskControl(seeding = true)))
+        var seedEngine: KotlinTorrentEngine? = null
+        val seedSource = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), UnusedHttp).also {
+          it.engineFactory = { config ->
+            KotlinTorrentEngine(config, listenHost = "127.0.0.1").also { seedEngine = it }
+          }
+        }
+        val seedKetch = Ketch(UnusedHttp, taskStore = store, additionalSources = listOf(seedSource))
+        val leechSource = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), UnusedHttp)
+        val leechKetch = Ketch(UnusedHttp, additionalSources = listOf(leechSource))
+        try {
+          seedKetch.start()
+          val restored = seedKetch.tasks.value.single()
+          awaitStage("the restored task to seed", restored) {
+            restored.state.first { it is DownloadState.Completed && it.seeding }
+          }
+          leechKetch.start()
+          val magnet = MagnetUri(torrent.metadata.infoHash,
+            explicitPeers = listOf("127.0.0.1:${checkNotNull(seedEngine).listenPort}")).toUri()
+          val leech = leechKetch.download(DownloadRequest(magnet,
+            destination = Destination((root / "leeched").toString()),
+            resolvedSource = leechSource.resolveMetainfo(torrent.metainfo)))
+          awaitStage("the leecher to download from the restored seeder", leech) {
+            leech.await().getOrThrow()
+          }
+          assertIs<DownloadState.Completed>(leech.state.value)
+          torrent.payloads.forEachIndexed { index, payload ->
+            assertContentEquals(payload,
+              torrentFileSystem.read(root / "leeched" / "f$index") { readByteArray() })
+          }
+          seedSource.stopSeeding("restored")
+          assertEquals(0, seedSource.slotsInUse())
+          assertEquals(0, seedSource.reservedTasks())
+          assertEquals(0, leechSource.slotsInUse())
+          assertEquals(0, leechSource.reservedTasks())
+        } finally {
+          leechKetch.close()
+          seedKetch.close()
+          seedEngine?.stop()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+        seedEngine?.assertNoLeaks()
       }
     }
   }

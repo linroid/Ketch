@@ -15,6 +15,11 @@ interface KetchApi {
   /**
    * Optional typed torrent controls exposed by this backend. Null preserves compatibility with
    * backends that support legacy torrent downloads but have not implemented the control protocol.
+   * The in-process engine returns one when a registered download source offers torrent controls
+   * (the torrent source does); a remote backend always returns one that fails closed against
+   * servers without them. Before relying on its commands, check that [KetchStatus.features]
+   * lists [KetchFeatures.TORRENT_CONTROL]; a controller of a backend without it fails its
+   * commands with [com.linroid.ketch.api.torrent.TorrentCommandError.UNSUPPORTED].
    */
   val torrents: TorrentController? get() = null
 

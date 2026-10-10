@@ -59,6 +59,16 @@ internal data class TorrentV2TaskSpec(
   val discover: (suspend (SendChannel<PeerEndpoint>) -> Unit)? = null,
   /** The swarm [discover]'s endpoints are in; a hybrid dials v1 ones in v1 mode. */
   val discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
+  /**
+   * Selections an older build may have bound the creation log to, such as the one the task's
+   * resume state mirrors; see [TorrentV2PieceStore].
+   */
+  val legacySelections: List<Set<String>> = emptyList(),
+  /**
+   * Only seed: a recheck that finds the selection incomplete stops the owner with
+   * [IncompleteSeedException] instead of downloading, before any discovery.
+   */
+  val seedOnly: Boolean = false,
 )
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
@@ -593,6 +603,7 @@ internal class KotlinTorrentEngine(
         privacy = spec.privacy,
         allowLocalPeers = allowLocalPeers,
         listenPortFor = { advertisedPort.current() },
+        seedOnly = spec.seedOnly,
       )
       target = session
       entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())
@@ -698,7 +709,7 @@ internal class KotlinTorrentEngine(
       val store = TorrentV2PieceStore(document, output, selection, spec.taskId, budget,
         storageSlots, creationLogPath = if (spec.recoverCreations) {
           v2CreationLog(output, spec.taskId)
-        } else null)
+        } else null, legacySelections = spec.legacySelections)
       val custom = spec.discover
       val discovery: suspend (TorrentV2DiscoverySink) -> Unit = if (custom != null) {
         val topic = if (spec.discoverMode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1
@@ -719,7 +730,7 @@ internal class KotlinTorrentEngine(
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,
-          discovery = discovery))
+          discovery = discovery, seedOnly = spec.seedOnly))
       target = session
       val entry = Entry(key, Owner.V2(session), claim, lease, hexes, output.toString())
       entries[key] = entry
@@ -797,7 +808,8 @@ internal class KotlinTorrentEngine(
     // Tier state follows each topic's own answers, so every topic gets fresh tiers.
     fun discovery(topic: TrackerTopic, urls: List<List<String>>, onChanged: suspend () -> Unit) =
       TrackerDiscovery(document, layout, peerId, advertisedPort::current,
-        TrackerTiers(urls, tracker::announce), onChanged, topic = topic)
+        TrackerTiers(urls, tracker::announce), onChanged,
+        announceCompletion = store::selectsAll, topic = topic)
     suspend fun poll(discovery: TrackerDiscovery, stopped: Boolean = false): TrackerResponse? =
       discovery.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes(),
         stopped = stopped)
@@ -892,7 +904,7 @@ internal class KotlinTorrentEngine(
       val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
         TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
         nowMs = nowMs,
-        announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+        announceCompletion = session::selectsAllFiles,
       )
       discovery.observeStatus(session::updateTrackerStatus)
       try {
@@ -939,7 +951,7 @@ internal class KotlinTorrentEngine(
       for (url in extraTrackers(trackerTiers.flatten())) launch {
         val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
           TrackerTiers(listOf(listOf(url)), tracker::announce), nowMs = nowMs,
-          announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+          announceCompletion = session::selectsAllFiles,
         )
         announceExtra(listOf(discovery), { topic, stopped ->
           topic.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,

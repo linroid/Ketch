@@ -225,6 +225,8 @@
   <string name="downloads_failed_priority">%2$sで%1$sの優先度を設定できませんでした</string>
   <string name="downloads_failed_connections">%2$sで%1$sの接続数を設定できませんでした</string>
   <string name="downloads_failed_reschedule">%2$sで%1$sの予約を変更できませんでした</string>
+  <string name="downloads_failed_files">%2$sで%1$sのファイルを変更できませんでした</string>
+  <string name="downloads_failed_seeding">%2$sで%1$sのシードを変更できませんでした</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">%1$d件のダウンロードを一時停止しました</item>

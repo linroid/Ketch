@@ -239,6 +239,8 @@
   <string name="downloads_failed_priority">Não foi possível definir a prioridade de %1$s (%2$s)</string>
   <string name="downloads_failed_connections">Não foi possível definir as conexões de %1$s (%2$s)</string>
   <string name="downloads_failed_reschedule">Não foi possível reagendar %1$s (%2$s)</string>
+  <string name="downloads_failed_files">Não foi possível alterar os arquivos de %1$s (%2$s)</string>
+  <string name="downloads_failed_seeding">Não foi possível alterar o semeio de %1$s (%2$s)</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">%1$d download pausado</item>

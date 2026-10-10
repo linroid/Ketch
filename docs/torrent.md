@@ -28,11 +28,12 @@ ketch.close()
 
 For v1, a single-file destination names the file; a multi-file destination names the root folder.
 For v2/hybrid, the destination always names a root folder, including single-file torrents. Files
-inside it use the sanitized paths shown by resolution. An empty selection downloads every file.
-IDs retain their original metainfo indices. Progress counts verified selected bytes. In v1, a
-piece spanning selected and skipped files needs all its bytes for verification; skipped boundary
-bytes live in a hidden task sidecar, not in skipped output files. Network speed includes received
-payload, including those boundary bytes/retries.
+inside it use the sanitized paths shown by resolution. An empty selection downloads every file;
+see [choosing files](#choosing-files) to change it later. IDs retain their original metainfo
+indices. Progress counts verified selected bytes. In v1, a piece spanning selected and skipped
+files needs all its bytes for verification; skipped boundary bytes live in a hidden task sidecar,
+not in skipped output files. Network speed includes received payload, including those boundary
+bytes/retries.
 
 For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
 `torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
@@ -45,6 +46,45 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller. To
 reduce tracker URLs to `scheme://host:port` and magnets to their topic and name. At debug level,
 each running swarm logs a summary every 30 seconds; see
 [troubleshooting](logging.md#troubleshooting) for reading it when a magnet or torrent stalls.
+
+## Choosing files
+
+`DownloadTask.selectFiles(ids)` changes which files a torrent task downloads at any time but
+after it is canceled, for v1, v2 and hybrid torrents alike (`KetchFeatures.TORRENT_FILE_SELECTION`,
+`torrent.fileSelection`). IDs are those of `ResolvedSource.files`, 1 to 100,000 of them. Ketch
+checks them against the metainfo it saved for the task, never against sizes a client sent, saves
+the selection and its size as the task's total, and then applies it:
+
+- A running torrent follows it on its open connections, without reconnecting to its peers or
+  starting its tracker announces over. Newly chosen files are created and downloaded. Files no
+  longer chosen stop downloading and stay on disk as they are, with their verified pieces; pieces
+  of them that still arrive are discarded without blaming the peer.
+- Paused, queued, scheduled and failed tasks use it when they start.
+- A completed task that gains files downloads them into the same folder (Queued, Downloading,
+  then Completed again), taking over its seeding session if it has one. One that only drops files
+  changes its size, and a seeding session shares the smaller selection from then on.
+- In v1, the verified bytes of boundary pieces kept in the task's sidecar are copied into a file
+  chosen later and rechecked, and a recheck heals a piece from its sidecar. A v2 or hybrid task
+  refuses a newly chosen file whose path holds a file it did not create.
+- Choosing the current files again does nothing. An empty selection is refused; to download
+  nothing yet, wait for a choice instead.
+
+A torrent added with `DownloadRequest.awaitFileSelection = true` and no selection
+(`torrent.awaitFileSelection`), typically a magnet whose files are not known yet, waits for one:
+once its metadata arrives it stops as `DownloadState.Paused(PauseReason.AwaitingFileSelection)`,
+holding no queue slot, output folder or segments, and keeps waiting across restarts. A torrent of
+one file does not wait. `selectFiles` starts it with the chosen files, without
+looking up the metadata again; `resume()` downloads every file. The apps add a magnet this way
+when it is added before its file list arrives ("Add anyway"). A `requestId` resubmission ignores
+the selection and this flag.
+
+`RemoteKetch` changes the files through `PUT /api/tasks/{id}/files`. `KetchApi.torrents` lists a
+task's files a page at a time (`TorrentController.files`), sorted by `TorrentFileOrder`: torrent
+order, case-insensitive natural name order ("Episode 2" before "Episode 10"), size, extension then
+name, or selected files first, each reversible. The apps sort the same way, except that their Kind
+order groups files by type (video, audio, subtitles, ...), where the server sorts by the plain
+extension. The MCP tools `listDownloadFiles` and `selectDownloadFiles` and the CLI's `--list-files`
+and `--files` build on these.
 
 ## Opening `.torrent` files in the apps
 
@@ -126,7 +166,8 @@ including a development run, hands its files to the running app instead of openi
 - Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
   working tracker until failover, and disconnects its old peers before switching. Public-mode
   magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
-  metainfo. Partial selections do not send a completed announce.
+  metainfo. Trackers hear `completed` only once every file is selected and complete, so a partial
+  selection never announces it.
 - Upload is opt-in, with the same `TorrentConfig.uploadPolicy` for v1, v2 and hybrid torrents.
   It defaults to `DISABLED`, the previous `enableUpload = false` behavior; `enableUpload = true`
   maps to `SEED_AFTER_COMPLETION` when no policy is supplied.
@@ -134,8 +175,9 @@ including a development run, hands its files to the running app instead of openi
     the info dictionary from this device) and rejects every BEP 52 hash request.
   - `WHILE_DOWNLOADING` uploads verified pieces while the task downloads and stops at completion.
   - `SEED_AFTER_COMPLETION` keeps uploading after completion, also for a v2 task that starts
-    complete, until the task is removed, the policy leaves seeding, a waiting download takes its
-    engine slot, or the source is closed.
+    complete, until seeding is stopped, the task is removed, the policy leaves seeding, a waiting
+    download takes its engine slot, or the source is closed, and seeds again after a restart
+    (see [implementation boundary and limits](#implementation-boundary-and-limits)).
 
   The apps and the CLI map `[torrent] upload` (`off`, `while-downloading` or `seed`) to these
   policies and `[torrent] uploadLimit` to `uploadRateLimit`, the upload cap all torrents share;
@@ -143,8 +185,9 @@ including a development run, hands its files to the running app instead of openi
   `TorrentDownloadSource.setUploadPolicy` and `setUploadRateLimit` never start the engine: peers
   are choked within a rechoke (about 10 seconds), seeding sessions finish once the policy leaves
   seeding, and torrents started later use the new values. `ketch server` and
-  `ketch mcp --standalone` seed while they run; a `ketch <url>` download exits once its downloads
-  finish.
+  `ketch mcp --standalone` seed while they run, and `ketch server` also seeds again after a
+  restart; `ketch mcp --standalone` builds its source with `restoreSeeding = false`, and MCP
+  offers no seeding tool. A `ketch <url>` download exits once its downloads finish.
 - Each torrent has four upload slots: three regular ones, reassigned every 10 seconds to the
   peers that sent the most while it downloads, or took the most while it seeds, and one
   optimistic slot that rotates every 30 seconds. Peers are served verified pieces only, through
@@ -199,8 +242,11 @@ undone by a later private flag.
 
 New source resume records retain the chosen privacy independently of later default changes, including
 when metadata must be fetched again. Legacy records without a privacy choice use the configured
-default and record it on their next save. Source-level selection applies to the local backend;
-remote privacy commands and capability negotiation remain on the v2 roadmap.
+default and record it on their next save. Privacy is chosen at the source, for the local backend;
+remote privacy commands remain on the v2 roadmap. Capability negotiation, inspection, file pages
+and the selection and seeding commands are available through `KetchApi.torrents`, locally and,
+for servers listing `torrent.control`, over `/api/torrents`; see the
+[control contract](design/torrent-control-contract.md#version-1-runtime).
 
 ## Storage and restart
 
@@ -220,6 +266,13 @@ leave an unclaimed file, which recovery preserves rather than guessing ownership
 Existing native resume blobs are never interpreted as Kotlin checkpoints. Metainfo, when available,
 is used to recheck existing payload. Legacy records with neither metainfo nor a usable magnet
 need their original `.torrent` input again; cleanup preserves data it cannot prove belongs to the task.
+
+Choosing files changes no storage format, so an older Ketch still opens these tasks, with these
+limits: a magnet waiting for its files shows as paused and downloads every file when resumed; a
+paused task whose selection changed fails to resume (v1 with a source error, v2 and hybrid with a
+creation-log binding mismatch) and keeps its files; and the seeding intent, kept in the task
+database's `control_json` column, is ignored. Tasks whose selection never changed resume as
+before.
 
 ## Implementation boundary and limits
 
@@ -260,12 +313,20 @@ of it at once, and such reads take at most half of a limit, so a peer asking for
 starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
 so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
 answering their handshake, v2 and hybrid like v1. The Fast extension (BEP 6) is not negotiated.
-Seeding ends when the task is removed, when the upload policy leaves seeding, when a download
-waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's, when the same
-torrent is added as another task, which takes the seeder's slot, or when Ketch quits; a torrent that
-finishes while a download waits for a slot does not seed at all. Seeding shows as Completed and is
-not resumed after a restart. On Android a seeding-only app is not kept in the foreground, so Android
-may stop it, and its seeding, in the background; on iOS seeding stops while the app is suspended.
+Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
+when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
+when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;
+a torrent that finishes while a download waits for a slot does not seed at all. Seeding shows as
+Completed with `DownloadState.Completed.seeding` set, and as the `SEEDING` activity of
+`KetchApi.torrents`.
+`TorrentController.setSeeding` (REST `PUT /api/torrents/{id}/seeding`, the apps' inspector) stops
+it, or starts a completed task seeding again after a recheck, on a free engine slot only, while
+the upload policy seeds. Ketch remembers which tasks seed: `Ketch.start()` seeds them again, oldest
+completion first, under `SEED_AFTER_COMPLETION` and only into free engine slots, each once a
+recheck finds its files complete. A seeder that a download or shutdown stopped keeps that intent;
+stopping it, or files that changed on disk, clear it. Seeding runs only while the process runs: on
+Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
+in the background; on iOS seeding stops while the app is suspended.
 
 This version does not implement uTP, protocol encryption, web seeds, NAT mapping, local service
 discovery, torrent creation, or ratio management. No automatic incoming-port mapping is
