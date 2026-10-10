@@ -211,9 +211,7 @@
   <string name="settings_ai_provider_ollama">Ollama · läuft lokal, kein Schlüssel nötig</string>
   <string name="settings_ai_provider_compatible">Eigener (OpenAI-kompatibel)</string>
   <string name="settings_ai_provider_compatible_name">OpenAI-kompatibel</string>
-  <string name="settings_ai_hint_openai">Einen Schlüssel erhältst du auf platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Einen Schlüssel erhältst du auf console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Einen Schlüssel erhältst du auf aistudio.google.com/apikey.</string>
+  <string name="settings_ai_hint_key">Einen Schlüssel erhältst du auf %1$s.</string>
   <string name="settings_ai_hint_ollama">Lade zuerst ein Modell: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM und ähnliche Server.</string>
   <string name="settings_ai_api_key_env">Der Schlüssel aus der Umgebung wird verwendet. Ein Schlüssel hier hat Vorrang.</string>
@@ -234,6 +232,7 @@
   <string name="settings_ai_test_unsupported">KI-Suche ist auf dieser Plattform nicht verfügbar.</string>
   <string name="settings_ai_test_connection_failed">Verbindung fehlgeschlagen.</string>
   <string name="settings_ai_engine_failed">Die Such-Engine konnte nicht gestartet werden.</string>
+  <string name="settings_ai_models_failed">Die Modelle konnten nicht abgerufen werden.</string>
   <string name="settings_ai_search_footer">Ohne Suchanbieter liest Entdecken nur die Seiten, die du angibst.</string>
   <string name="settings_ai_search_provider">Suchanbieter</string>
   <string name="settings_ai_search_none">Keiner</string>

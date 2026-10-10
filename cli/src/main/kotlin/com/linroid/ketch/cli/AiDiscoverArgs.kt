@@ -15,6 +15,9 @@ internal sealed interface AiDiscoverArgs {
    * @param allowAll `--yes`: open every website without asking
    * @param noFilter `--no-filter`: show the results the content filter would hide, whatever
    *   `[ai] contentFilter` says
+   * @param provider `--provider`: the saved provider to search with, by its id or name, or a
+   *   provider such as `deepseek`; `null` for the one the settings use
+   * @param model `--model`: the model to call; `null` for the provider's own
    */
   data class Discover(
     val query: String,
@@ -22,6 +25,8 @@ internal sealed interface AiDiscoverArgs {
     val maxResults: Int = DEFAULT_MAX_RESULTS,
     val allowAll: Boolean = false,
     val noFilter: Boolean = false,
+    val provider: String? = null,
+    val model: String? = null,
   ) : AiDiscoverArgs
 }
 
@@ -35,6 +40,8 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
   var maxResults = DEFAULT_MAX_RESULTS
   var allowAll = false
   var noFilter = false
+  var provider: String? = null
+  var model: String? = null
 
   var i = 0
   while (i < args.size) {
@@ -43,16 +50,25 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
       arg == "--help" || arg == "-h" -> return AiDiscoverArgs.Help
       arg == "--yes" || arg == "-y" -> allowAll = true
       arg == "--no-filter" -> noFilter = true
-      arg == "--sites" || arg == "--max-results" -> {
+      arg in VALUE_OPTIONS -> {
         val value = args.getOrNull(++i)
           ?: return AiDiscoverArgs.Invalid("$arg requires a value")
-        if (arg == "--sites") {
-          sites = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-          if (sites.isEmpty()) return AiDiscoverArgs.Invalid("--sites requires a domain")
-        } else {
-          maxResults = value.toIntOrNull()
-            ?: return AiDiscoverArgs.Invalid("invalid number '$value'")
-          if (maxResults <= 0) return AiDiscoverArgs.Invalid("--max-results must be > 0")
+        when (arg) {
+          "--sites" -> {
+            sites = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (sites.isEmpty()) return AiDiscoverArgs.Invalid("--sites requires a domain")
+          }
+          "--max-results" -> {
+            maxResults = value.toIntOrNull()
+              ?: return AiDiscoverArgs.Invalid("invalid number '$value'")
+            if (maxResults <= 0) return AiDiscoverArgs.Invalid("--max-results must be > 0")
+          }
+          "--provider" -> provider = value.trim().ifEmpty {
+            return AiDiscoverArgs.Invalid("--provider requires a name")
+          }
+          "--model" -> model = value.trim().ifEmpty {
+            return AiDiscoverArgs.Invalid("--model requires a model id")
+          }
         }
       }
       arg.length > 1 && arg.startsWith("-") ->
@@ -70,5 +86,10 @@ internal fun parseAiDiscoverArgs(args: List<String>): AiDiscoverArgs {
     maxResults = maxResults,
     allowAll = allowAll,
     noFilter = noFilter,
+    provider = provider,
+    model = model,
   )
 }
+
+/** Options that take the argument after them as their value. */
+private val VALUE_OPTIONS = setOf("--sites", "--max-results", "--provider", "--model")

@@ -30,6 +30,7 @@ import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
@@ -64,11 +65,9 @@ import ketch.app.shared.generated.resources.settings_ai_endpoint_optional
 import ketch.app.shared.generated.resources.settings_ai_engine_id
 import ketch.app.shared.generated.resources.settings_ai_engine_id_hint
 import ketch.app.shared.generated.resources.settings_ai_engine_id_placeholder
-import ketch.app.shared.generated.resources.settings_ai_hint_anthropic
 import ketch.app.shared.generated.resources.settings_ai_hint_compatible
-import ketch.app.shared.generated.resources.settings_ai_hint_gemini
+import ketch.app.shared.generated.resources.settings_ai_hint_key
 import ketch.app.shared.generated.resources.settings_ai_hint_ollama
-import ketch.app.shared.generated.resources.settings_ai_hint_openai
 import ketch.app.shared.generated.resources.settings_ai_model
 import ketch.app.shared.generated.resources.settings_ai_model_any
 import ketch.app.shared.generated.resources.settings_ai_model_group
@@ -120,6 +119,7 @@ fun AiDiscoverySettings(state: AppState) {
   val editable = supported && settings.enabled
   val connectionTest = ai.connectionTest
   val onChange = { changed: AiSettings -> ai.save(changed) }
+  val onLlmChange = { changed: LlmSettings -> ai.saveProvider(changed) }
   val focusManager = LocalFocusManager.current
   // What the engine will actually run with: a blank token may still be
   // supplied by the environment, which the form is judged by.
@@ -154,7 +154,7 @@ fun AiDiscoverySettings(state: AppState) {
   SettingsGroup(title = stringResource(Res.string.settings_ai_model_group)) {
     SettingsRow(
       title = stringResource(Res.string.settings_ai_provider),
-      description = providerHint(llm.provider).resolve(),
+      description = providerHint(llm.provider)?.resolve(),
       enabled = editable,
     ) {
       FlowRow(
@@ -167,16 +167,9 @@ fun AiDiscoverySettings(state: AppState) {
             label = provider.buttonLabel.resolve(),
             selected = provider == llm.provider,
             enabled = editable,
-            // Model and endpoint are provider-specific, so switching falls back to the new
-            // provider's defaults. The token is kept: clearing a secret on a stray tap is
-            // worse than a token the connection test will reject.
-            onClick = {
-              if (provider != llm.provider) {
-                onChange(
-                  settings.copy(llm = llm.copy(provider = provider, model = "", baseUrl = "")),
-                )
-              }
-            },
+            // Each provider keeps its own key, model and endpoint, so switching back to one
+            // finds them as they were.
+            onClick = { if (provider != llm.provider) ai.chooseProvider(provider) },
           )
         }
       }
@@ -193,7 +186,7 @@ fun AiDiscoverySettings(state: AppState) {
       ) {
         SettingsTextInput(
           value = llm.apiKey,
-          onCommit = { onChange(settings.copy(llm = llm.copy(apiKey = it))) },
+          onCommit = { onLlmChange(llm.copy(apiKey = it)) },
           placeholder = tokenPlaceholder(llm.provider),
           secret = true,
           mono = true,
@@ -212,13 +205,13 @@ fun AiDiscoverySettings(state: AppState) {
     ) {
       SettingsTextInput(
         value = llm.model,
-        onCommit = { onChange(settings.copy(llm = llm.copy(model = it))) },
+        onCommit = { onLlmChange(llm.withModel(it)) },
         placeholder = llm.provider.defaultModel
           .ifBlank { stringResource(Res.string.settings_ai_model_placeholder) },
         mono = true,
         enabled = editable,
       )
-      val suggestions = modelSuggestions(llm.provider)
+      val suggestions = llm.modelChoices
       if (suggestions.isNotEmpty()) {
         FlowRow(
           modifier = Modifier.fillMaxWidth(),
@@ -228,7 +221,7 @@ fun AiDiscoverySettings(state: AppState) {
           suggestions.forEach { suggestion ->
             KetchButton(
               text = suggestion,
-              onClick = { onChange(settings.copy(llm = llm.copy(model = suggestion))) },
+              onClick = { onLlmChange(llm.withModel(suggestion)) },
               variant = if (suggestion == llm.effectiveModel) {
                 KetchButtonVariant.Secondary
               } else {
@@ -257,7 +250,7 @@ fun AiDiscoverySettings(state: AppState) {
     ) {
       SettingsTextInput(
         value = llm.baseUrl,
-        onCommit = { onChange(settings.copy(llm = llm.copy(baseUrl = it))) },
+        onCommit = { onLlmChange(llm.copy(baseUrl = it)) },
         placeholder = llm.provider.defaultBaseUrl.ifBlank { "https://openrouter.ai/api/v1" },
         mono = true,
         enabled = editable,
@@ -291,7 +284,7 @@ fun AiDiscoverySettings(state: AppState) {
             focusManager.clearFocus()
             testStarted = TimeSource.Monotonic.markNow()
             testTook = null
-            state.launchCommand { ai.testConnection(ai.settings) }
+            state.launchCommand { ai.testConnection() }
           },
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,
@@ -569,27 +562,28 @@ internal val SearchProvider.displayName: UiText
 /** How a provider reads on its button. */
 private val LlmProvider.buttonLabel: UiText
   get() = when (this) {
-    LlmProvider.OpenAi -> verbatim("OpenAI")
-    LlmProvider.Anthropic -> verbatim("Anthropic")
     LlmProvider.Google -> verbatim("Gemini")
     LlmProvider.Ollama -> Res.string.settings_ai_provider_ollama.text()
     LlmProvider.OpenAiCompatible -> Res.string.settings_ai_provider_compatible.text()
+    else -> verbatim(label)
   }
 
 private fun tokenPlaceholder(provider: LlmProvider): String =
   when (provider) {
-    LlmProvider.OpenAi, LlmProvider.OpenAiCompatible -> "sk-…"
+    LlmProvider.OpenAi, LlmProvider.OpenAiCompatible, LlmProvider.DeepSeek -> "sk-…"
     LlmProvider.Anthropic -> "sk-ant-…"
     LlmProvider.Google -> "AIza…"
-    LlmProvider.Ollama -> ""
+    else -> ""
   }
 
-private fun providerHint(provider: LlmProvider): UiText = when (provider) {
-  LlmProvider.OpenAi -> Res.string.settings_ai_hint_openai.text()
-  LlmProvider.Anthropic -> Res.string.settings_ai_hint_anthropic.text()
-  LlmProvider.Google -> Res.string.settings_ai_hint_gemini.text()
-  LlmProvider.Ollama -> Res.string.settings_ai_hint_ollama.text(LlmProvider.Ollama.defaultModel)
-  LlmProvider.OpenAiCompatible -> Res.string.settings_ai_hint_compatible.text()
+/** Under Provider: where to get its key, or what else it needs. */
+private fun providerHint(provider: LlmProvider): UiText? = when {
+  provider == LlmProvider.Ollama ->
+    Res.string.settings_ai_hint_ollama.text(LlmProvider.Ollama.defaultModel)
+  provider == LlmProvider.OpenAiCompatible -> Res.string.settings_ai_hint_compatible.text()
+  provider.keyUrl.isNotBlank() ->
+    Res.string.settings_ai_hint_key.text(verbatim(provider.keyUrl.substringAfter("://")))
+  else -> null
 }
 
 private fun searchProviderHint(provider: SearchProvider) = when (provider) {
@@ -597,19 +591,3 @@ private fun searchProviderHint(provider: SearchProvider) = when (provider) {
   SearchProvider.Brave -> Res.string.settings_ai_search_hint_brave
   SearchProvider.Google -> Res.string.settings_ai_search_hint_google
 }
-
-/**
- * Current models per provider, most capable first; the field stays free
- * text so a model released after this list still works.
- */
-private fun modelSuggestions(provider: LlmProvider): List<String> =
-  when (provider) {
-    LlmProvider.OpenAi ->
-      listOf("gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
-    LlmProvider.Anthropic ->
-      listOf("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5")
-    LlmProvider.Google ->
-      listOf("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite")
-    LlmProvider.Ollama -> listOf("qwen3", "llama3.1:8b", "gemma4")
-    LlmProvider.OpenAiCompatible -> emptyList()
-  }

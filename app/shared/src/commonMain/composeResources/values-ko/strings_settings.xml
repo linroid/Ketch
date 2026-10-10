@@ -207,9 +207,7 @@
   <string name="settings_ai_provider_ollama">Ollama · 로컬에서 실행, 키 불필요</string>
   <string name="settings_ai_provider_compatible">사용자 지정(OpenAI 호환)</string>
   <string name="settings_ai_provider_compatible_name">OpenAI 호환</string>
-  <string name="settings_ai_hint_openai">platform.openai.com에서 키를 발급받으세요.</string>
-  <string name="settings_ai_hint_anthropic">console.anthropic.com에서 키를 발급받으세요.</string>
-  <string name="settings_ai_hint_gemini">aistudio.google.com/apikey에서 키를 발급받으세요.</string>
+  <string name="settings_ai_hint_key">%1$s에서 키를 발급받으세요.</string>
   <string name="settings_ai_hint_ollama">먼저 모델을 받으세요: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM 및 유사한 서버.</string>
   <string name="settings_ai_api_key_env">환경 변수의 키를 사용 중입니다. 여기에 입력한 키가 우선합니다.</string>
@@ -230,6 +228,7 @@
   <string name="settings_ai_test_unsupported">이 플랫폼에서는 AI 찾기를 사용할 수 없습니다.</string>
   <string name="settings_ai_test_connection_failed">연결에 실패했습니다.</string>
   <string name="settings_ai_engine_failed">찾기 엔진을 시작할 수 없습니다.</string>
+  <string name="settings_ai_models_failed">모델 목록을 가져올 수 없습니다.</string>
   <string name="settings_ai_search_footer">검색 제공업체가 없으면 찾기는 사용자가 제공한 페이지만 읽습니다.</string>
   <string name="settings_ai_search_provider">검색 제공업체</string>
   <string name="settings_ai_search_none">없음</string>
