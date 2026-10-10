@@ -836,14 +836,17 @@ class TorrentDownloadSource(
     val selected = if (state.resumeData.isEmpty() && state.savePath.isEmpty()) {
       context.request.selectedFileIds.ifEmpty { state.selectedFileIds }
     } else state.selectedFileIds
+    val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }?.let {
+      requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(it)))
+    }
+    // The creation log may be bound to any selection the task ran with.
     val store = TorrentV2PieceStore(document, absolute, selected, context.taskId,
       TorrentBufferBudget(config.maxBufferedBytes),
       Semaphore(config.maxOpenPayloadFiles),
-      creationLogPath = v2CreationLog(absolute, context.taskId))
+      creationLogPath = v2CreationLog(absolute, context.taskId),
+      legacySelections = listOfNotNull(checkpoint?.selected, state.selectedFileIds))
     try {
-      state.resumeData.takeIf { it.isNotEmpty() }?.let {
-        store.restore(requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(it))))
-      }
+      checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }

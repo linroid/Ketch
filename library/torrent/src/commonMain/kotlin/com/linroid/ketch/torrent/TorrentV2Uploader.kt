@@ -41,6 +41,8 @@ internal class TorrentV2Uploader private constructor(
   private val cache = TorrentV2UploadCache(cacheBytes, nowMs)
   private val haveLog = IntArray(layout.pieceCount.toInt())
   private var haveCount = 0
+  // Pieces already in the log: a piece revoked and verified again is not told twice.
+  private val announced = BooleanArray(layout.pieceCount.toInt())
   private val loading = mutableSetOf<Int>()
   // Pieces peers wait to have read, in the order they first asked: reads start in that order.
   private val waiting = LinkedHashSet<Int>()
@@ -62,8 +64,20 @@ internal class TorrentV2Uploader private constructor(
 
   /** A verified piece joins the log every peer is told from. */
   fun committed(index: Int) {
+    if (announced[index]) return
     check(haveCount < haveLog.size) { "Have log overflow" }
+    announced[index] = true
     haveLog[haveCount++] = index
+  }
+
+  /**
+   * Piece [index], outside the selection, could not be read back and is no longer ours: what
+   * peers asked of it is dropped. Peers that heard we have it are refused it from now on.
+   */
+  fun revoked(index: Int, peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>) {
+    loading.remove(index)
+    waiting.remove(index)
+    for (view in peers.values) view.uploads.removeAll { it.index == index }
   }
 
   /** Payload [peer] sent us, which earns it a regular slot while we download. */
@@ -343,7 +357,7 @@ internal class TorrentV2Uploader private constructor(
       nowMs: () -> Long,
     ): TorrentV2Uploader? {
       require(layout.pieceCount in 0..1_000_000)
-      val lease = state.reserve(layout.pieceCount.toInt() * 4 + 1024) ?: return null
+      val lease = state.reserve(layout.pieceCount.toInt() * 5 + 1024) ?: return null
       try {
         return TorrentV2Uploader(layout, swarm, store, buffers, nowMs, lease)
       } catch (error: Throwable) {

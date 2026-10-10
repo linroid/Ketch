@@ -45,7 +45,7 @@ class TorrentV2RecheckCancellationTest {
     val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, slots, provider)
     try {
       store.initialize()
-      assertTrue(store.commit(0, payload))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, payload))
       blockReads = true
       val scan = async { store.recheck() }
       try {

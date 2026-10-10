@@ -59,6 +59,11 @@ internal data class TorrentV2TaskSpec(
   val discover: (suspend (SendChannel<PeerEndpoint>) -> Unit)? = null,
   /** The swarm [discover]'s endpoints are in; a hybrid dials v1 ones in v1 mode. */
   val discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
+  /**
+   * Only seed: a recheck that finds the selection incomplete stops the owner with
+   * [IncompleteSeedException] instead of downloading, before any discovery.
+   */
+  val seedOnly: Boolean = false,
 )
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
@@ -720,7 +725,7 @@ internal class KotlinTorrentEngine(
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,
-          discovery = discovery))
+          discovery = discovery, seedOnly = spec.seedOnly))
       target = session
       val entry = Entry(key, Owner.V2(session), claim, lease, hexes, output.toString())
       entries[key] = entry
@@ -798,7 +803,8 @@ internal class KotlinTorrentEngine(
     // Tier state follows each topic's own answers, so every topic gets fresh tiers.
     fun discovery(topic: TrackerTopic, urls: List<List<String>>, onChanged: suspend () -> Unit) =
       TrackerDiscovery(document, layout, peerId, advertisedPort::current,
-        TrackerTiers(urls, tracker::announce), onChanged, topic = topic)
+        TrackerTiers(urls, tracker::announce), onChanged,
+        announceCompletion = store::selectsAll, topic = topic)
     suspend fun poll(discovery: TrackerDiscovery, stopped: Boolean = false): TrackerResponse? =
       discovery.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes(),
         stopped = stopped)

@@ -53,7 +53,7 @@ internal class TorrentV2PieceAssembly private constructor(
    * Consumes a complete assembly on success, hash rejection, cancellation or storage failure.
    * Only the store may publish verified progress, after validating and flushing this sealed buffer.
    */
-  suspend fun commit(store: TorrentV2PieceStore): Boolean {
+  suspend fun commit(store: TorrentV2PieceStore): CommitOutcome {
     check(complete) { "Assembly is unavailable or incomplete" }
     return commitFrom(Owner.ACTOR, store)
   }
@@ -61,7 +61,8 @@ internal class TorrentV2PieceAssembly private constructor(
   /** Queue ownership prevents mutation or early release through the original assembly handle. */
   class Claim internal constructor(private val assembly: TorrentV2PieceAssembly) {
     val index: Int get() = assembly.index
-    suspend fun commit(store: TorrentV2PieceStore): Boolean = assembly.commitFrom(this, store)
+    suspend fun commit(store: TorrentV2PieceStore): CommitOutcome =
+      assembly.commitFrom(this, store)
     fun close() {
       if (assembly.owner.compareAndSet(this, Owner.CLOSED)) assembly.release()
     }
@@ -77,7 +78,7 @@ internal class TorrentV2PieceAssembly private constructor(
     return claim
   }
 
-  private suspend fun commitFrom(expected: Any, store: TorrentV2PieceStore): Boolean {
+  private suspend fun commitFrom(expected: Any, store: TorrentV2PieceStore): CommitOutcome {
     check(owner.compareAndSet(expected, Owner.COMMITTING)) { "Stale assembly owner" }
     try {
       return store.commitOwned(index, bytes)

@@ -135,7 +135,8 @@ class TorrentV2PieceAssemblyTest {
             if (corrupt && slot == 0) value[0] = (value[0].toInt() xor 1).toByte()
             assembly.accept(block(request, value, budget))
           }
-          assertEquals(!corrupt, assembly.commit(store))
+          assertEquals(if (corrupt) CommitOutcome.CORRUPT else CommitOutcome.VERIFIED,
+            assembly.commit(store))
           assertEquals(!corrupt, store.completed())
           assertEquals(if (corrupt) 0L else bytes.size.toLong(),
             torrentFileSystem.metadata(path / "a").size)
@@ -161,7 +162,7 @@ class TorrentV2PieceAssemblyTest {
         assembly.accept(block(request, bytes.copyOfRange(request.begin,
           request.begin + request.length), incoming))
       }
-      assertTrue(assembly.commit(store))
+      assertEquals(CommitOutcome.VERIFIED, assembly.commit(store))
       assertFalse(assembly.complete)
       assertTrue(store.completed())
       assertEquals(bytes.size.toLong(), torrentFileSystem.metadata(path / "a").size)
@@ -231,7 +232,7 @@ class TorrentV2PieceAssemblyTest {
       for (slot in assembly.missingBlocks()) {
         assembly.accept(block(assembly.request(slot), data, budget))
       }
-      assertTrue(assembly.commit(store))
+      assertEquals(CommitOutcome.VERIFIED, assembly.commit(store))
       assertTrue(store.completed())
       assertEquals(length.toLong(), torrentFileSystem.metadata(path / "a").size)
       assertEquals(0, budget.allocated)
@@ -294,7 +295,7 @@ class TorrentV2PieceAssemblyTest {
           }
           assertTrue(assembly.complete)
           assertFalse(store.completed())
-          assertTrue(assembly.commit(store))
+          assertEquals(CommitOutcome.VERIFIED, assembly.commit(store))
           assertTrue(store.completed())
           assertContentEquals(bytes, torrentFileSystem.read(path / "a") { readByteArray() })
           server.await()

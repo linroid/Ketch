@@ -63,7 +63,7 @@ class TorrentV2StorageCancellationTest {
         assertEquals(0, budget.allocated)
         assertEquals(1, slots.availablePermits)
         assertContentEquals(original, torrentFileSystem.read(root / "payload") { readByteArray() })
-        assertTrue(store.commit(0, original))
+        assertEquals(CommitOutcome.VERIFIED, store.commit(0, original))
         assertTrue(store.completed())
       } finally {
         unblock.countDown()

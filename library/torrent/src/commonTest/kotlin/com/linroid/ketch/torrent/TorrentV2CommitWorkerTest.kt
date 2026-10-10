@@ -149,4 +149,33 @@ class TorrentV2CommitWorkerTest {
       assertIs<CancellationException>(result.exceptionOrNull())
     } finally { store.cleanup() }
   }
+
+  @Test
+  fun notWantedCommit_completesAsDiscarded() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("a" to 5, "b" to 7), pieceLength = 16_384)
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-worker-discard-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(65_536)
+    // Only a is selected; b's piece arrives from a peer that still had it asked for.
+    val store = TorrentV2PieceStore(fixture.document, path, setOf("0"), "test", budget,
+      Semaphore(1))
+    try {
+      store.initialize()
+      val assembly = assertNotNull(TorrentV2PieceAssembly.create(fixture.layout, 1, budget))
+      assembly.accept(PeerBlockExchange.Response.Block(
+        PeerBlockExchange.Ticket(assembly.request(0)), fixture.v2Piece(1),
+        assertNotNull(budget.reserve(512))))
+      TorrentV2CommitWorker.run(store, dispatcher = StandardTestDispatcher(testScheduler)) {
+        assertNotNull(it.trySubmit(assembly))
+        val completion = it.completions.receive()
+        assertIs<TorrentV2CommitWorker.Completion.Discarded>(completion)
+        assertEquals(1, completion.ticket.index)
+      }
+      assertFalse(torrentFileSystem.exists(path / "b"))
+      assertFalse(store.verifiedPieces()[1])
+      assertEquals(0, budget.allocated)
+    } finally {
+      store.cleanup()
+    }
+  }
 }
