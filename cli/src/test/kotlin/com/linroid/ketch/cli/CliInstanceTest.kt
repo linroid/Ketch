@@ -64,4 +64,33 @@ class CliInstanceTest {
     File(dir, CliInstance.INFO_FILE).writeText("{\"command\":\"ketch server\"}")
     assertNull(CliInstance.read(dir))
   }
+
+  @Test
+  fun `holding the lock, only a running app keeps this process from the downloads`() {
+    assertNull(otherEngine(locked = true, holder = { null }, appRunning = { false }))
+    // An app from before the lock runs them without holding it.
+    assertEquals(
+      OtherEngine.App,
+      otherEngine(locked = true, holder = { null }, appRunning = { true }),
+    )
+  }
+
+  @Test
+  fun `without the lock, the command that describes itself runs the downloads, else the app`() {
+    val server = CliInstance.Info("ketch server", pid = 7)
+
+    // An app running beside it shows that command's downloads.
+    assertEquals(
+      OtherEngine.Command(server),
+      otherEngine(locked = false, holder = { server }, appRunning = { true }),
+    )
+    assertEquals(
+      OtherEngine.App,
+      otherEngine(locked = false, holder = { null }, appRunning = { true }),
+    )
+    assertEquals(
+      OtherEngine.Command(null),
+      otherEngine(locked = false, holder = { null }, appRunning = { false }),
+    )
+  }
 }

@@ -76,6 +76,11 @@
     <item quantity="other">링크 %1$d개 복사됨</item>
   </plurals>
   <string name="message_window_error">문제가 발생했습니다</string>
+  <string name="message_downloads_run_by">%1$s(프로세스 %2$d)에서 이 컴퓨터의 다운로드를 실행 중입니다</string>
+  <string name="message_downloads_run_elsewhere">다른 Ketch 프로세스에서 이 컴퓨터의 다운로드를 실행 중입니다</string>
+  <string name="message_downloads_run_hint">중지한 뒤 Ketch를 종료하고 다시 열면 여기에서 실행됩니다</string>
+  <string name="message_command_stopped">%1$s 중지됨</string>
+  <string name="message_command_stopped_hint">Ketch를 종료하고 다시 열면 이 컴퓨터의 다운로드를 여기에서 실행합니다</string>
   <string name="open_torrent_title">토렌트 파일 열기</string>
 
   <string name="close_keep_running_title">백그라운드에서 계속 다운로드할까요?</string>

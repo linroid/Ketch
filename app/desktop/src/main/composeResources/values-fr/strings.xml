@@ -83,6 +83,11 @@
     <item quantity="other">%1$d liens copiés</item>
   </plurals>
   <string name="message_window_error">Une erreur s'est produite</string>
+  <string name="message_downloads_run_by">%1$s (processus %2$d) exécute les téléchargements de cet ordinateur</string>
+  <string name="message_downloads_run_elsewhere">Un autre processus Ketch exécute les téléchargements de cet ordinateur</string>
+  <string name="message_downloads_run_hint">Arrêtez-le, puis quittez et rouvrez Ketch pour les exécuter ici</string>
+  <string name="message_command_stopped">%1$s s'est arrêté</string>
+  <string name="message_command_stopped_hint">Quittez et rouvrez Ketch pour exécuter ici les téléchargements de cet ordinateur</string>
   <string name="open_torrent_title">Ouvrir un fichier torrent</string>
 
   <string name="close_keep_running_title">Continuer à télécharger en arrière-plan ?</string>

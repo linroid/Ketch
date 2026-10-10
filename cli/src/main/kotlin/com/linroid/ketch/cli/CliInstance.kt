@@ -23,7 +23,9 @@ import java.nio.file.attribute.PosixFilePermissions
  * no other `ketch` process opens it too, and describes itself in [INFO_FILE], readable by its
  * owner only as it holds the access token, so other `ketch` commands can attach to it.
  *
- * The desktop app is found through its own endpoint instead (see [DesktopApp]).
+ * The desktop app holds the lock too while its engine runs the downloads, but writes no info
+ * file; it is found through its own endpoint instead (see [DesktopApp]), and reads the info file
+ * to show the downloads through the process's API while that runs them.
  */
 internal class CliInstance private constructor(
   private val infoFile: File,
@@ -120,6 +122,38 @@ internal class CliInstance private constructor(
         token = json["token"]?.jsonPrimitive?.contentOrNull,
       )
     }
+  }
+}
+
+/** What runs the downloads of a config directory besides this process ([otherEngine]). */
+internal sealed interface OtherEngine {
+  /** The desktop app. */
+  data object App : OtherEngine
+
+  /** A `ketch` process, as its info file describes it, or `null` when it does not. */
+  data class Command(val info: CliInstance.Info?) : OtherEngine
+}
+
+/**
+ * What runs the downloads of a config directory besides this process, or `null` when nothing
+ * does and this process, which [locked] says holds the lock, may run them.
+ *
+ * A lock this process does not hold belongs to the `ketch` process the info file describes while
+ * it runs ([holder]), else to the app, which holds it without an info file, when [appRunning].
+ * A running app counts even when this process holds the lock: an app from before the lock runs
+ * the downloads without it, and this process cannot tell it from one showing the downloads of a
+ * `ketch` process that stopped, which runs them once it opens again.
+ */
+internal fun otherEngine(
+  locked: Boolean,
+  holder: () -> CliInstance.Info?,
+  appRunning: () -> Boolean,
+): OtherEngine? {
+  if (!locked) holder()?.let { return OtherEngine.Command(it) }
+  return when {
+    appRunning() -> OtherEngine.App
+    locked -> null
+    else -> OtherEngine.Command(null)
   }
 }
 

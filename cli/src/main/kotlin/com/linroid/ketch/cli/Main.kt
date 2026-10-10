@@ -540,16 +540,6 @@ private const val STANDALONE_MCP_COMMAND = "ketch mcp --standalone"
  */
 private fun claimDownloads(command: String): CliInstance {
   val configDir = File(defaultConfigDir())
-  if (DesktopApp.isRunning(configDir)) {
-    System.err.println(
-      """
-      |Error: the Ketch app is running, and it runs the downloads in ${defaultDbPath()}.
-      |Quit it before running `$command`. To reach the app's downloads, use `ketch add`,
-      |`ketch list` and `ketch mcp`, or turn on Settings > Sharing in the app for other devices.
-      """.trimMargin()
-    )
-    exitProcess(1)
-  }
   val instance = try {
     CliInstance.acquire(configDir)
   } catch (e: IOException) {
@@ -557,20 +547,39 @@ private fun claimDownloads(command: String): CliInstance {
     System.err.println("Error: couldn't lock $lockFile: ${e.message}")
     exitProcess(1)
   }
-  if (instance == null) {
-    val holder = CliInstance.read(configDir)
-    val who = holder?.let { "`${it.command}` (process ${it.pid})" } ?: "another `ketch` process"
-    System.err.println(
+  val other = otherEngine(
+    locked = instance != null,
+    holder = { CliInstance.read(configDir)?.takeIf { isProcessAlive(it.pid) } },
+    appRunning = { DesktopApp.isRunning(configDir) },
+  )
+  if (other == null) return checkNotNull(instance)
+  // It removes the info file, which can only be one a process that stopped left behind.
+  instance?.close()
+  when (other) {
+    OtherEngine.App -> System.err.println(
       """
-      |Error: $who already runs the downloads in ${defaultDbPath()}.
-      |Stop it before running `$command`, or use `ketch add`, `ketch list` and `ketch mcp`,
-      |which work through it.
+      |Error: the Ketch app is running, and it runs the downloads in ${defaultDbPath()}.
+      |Quit it before running `$command`. To reach the app's downloads, use `ketch add`,
+      |`ketch list` and `ketch mcp`, or turn on Settings > Sharing in the app for other devices.
       """.trimMargin()
     )
-    exitProcess(1)
+    is OtherEngine.Command -> {
+      val who = other.info?.let { "`${it.command}` (process ${it.pid})" }
+        ?: "another `ketch` process"
+      System.err.println(
+        """
+        |Error: $who already runs the downloads in ${defaultDbPath()}.
+        |Stop it before running `$command`, or use `ketch add`, `ketch list` and `ketch mcp`,
+        |which work through it.
+        """.trimMargin()
+      )
+    }
   }
-  return instance
+  exitProcess(1)
 }
+
+private fun isProcessAlive(pid: Long): Boolean =
+  ProcessHandle.of(pid).map { it.isAlive }.orElse(false)
 
 /**
  * The address this machine reaches a server listening on [host] and [port] at: the loopback

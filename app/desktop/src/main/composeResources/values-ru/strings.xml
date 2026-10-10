@@ -97,6 +97,11 @@
     <item quantity="other">Скопировано %1$d ссылки</item>
   </plurals>
   <string name="message_window_error">Что-то пошло не так</string>
+  <string name="message_downloads_run_by">%1$s (процесс %2$d) выполняет загрузки этого компьютера</string>
+  <string name="message_downloads_run_elsewhere">Другой процесс Ketch выполняет загрузки этого компьютера</string>
+  <string name="message_downloads_run_hint">Остановите его, затем завершите и снова откройте Ketch, чтобы выполнять их здесь</string>
+  <string name="message_command_stopped">%1$s завершил работу</string>
+  <string name="message_command_stopped_hint">Завершите и снова откройте Ketch, чтобы выполнять загрузки этого компьютера здесь</string>
   <string name="open_torrent_title">Открыть торрент-файл</string>
 
   <string name="close_keep_running_title">Продолжить загрузку в фоне?</string>

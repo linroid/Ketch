@@ -76,6 +76,11 @@
     <item quantity="other">已复制 %1$d 个链接</item>
   </plurals>
   <string name="message_window_error">出现问题</string>
+  <string name="message_downloads_run_by">%1$s（进程 %2$d）正在运行这台电脑的下载任务</string>
+  <string name="message_downloads_run_elsewhere">另一个 Ketch 进程正在运行这台电脑的下载任务</string>
+  <string name="message_downloads_run_hint">停止它，再退出并重新打开 Ketch，即可在这里运行</string>
+  <string name="message_command_stopped">%1$s 已停止</string>
+  <string name="message_command_stopped_hint">退出并重新打开 Ketch，即可在这里运行这台电脑的下载任务</string>
   <string name="open_torrent_title">打开种子文件</string>
 
   <string name="close_keep_running_title">在后台继续下载？</string>

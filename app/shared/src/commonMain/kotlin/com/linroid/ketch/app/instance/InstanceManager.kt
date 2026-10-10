@@ -68,6 +68,11 @@ import kotlin.time.Clock
  * @param context dispatcher of the coroutines that connect devices and follow them; a [Job] in
  *   it becomes the parent of those coroutines, and cancelling it stops them like [close].
  * @param clock current time of [presence].
+ * @param standIn a remote device that runs this device's downloads in its place, for a manager
+ *   without an embedded device, such as the `ketch server` the desktop app finds running them
+ *   when it starts. Like an embedded device, it is listed first and shown at launch unless
+ *   another device was shown last, and it is never saved with the remote devices; one of those
+ *   at the same address stands in instead and stays saved.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InstanceManager(
@@ -77,6 +82,7 @@ class InstanceManager(
   private val keepAlive: KeepAlivePolicy = KeepAlivePolicy(),
   context: CoroutineContext = Dispatchers.Default,
   private val clock: Clock = Clock.System,
+  standIn: RemoteConfig? = null,
 ) {
   private val log = KetchLogger("InstanceManager")
   private val scope = CoroutineScope(context + SupervisorJob(context[Job]))
@@ -147,6 +153,9 @@ class InstanceManager(
   private val learning = mutableMapOf<String, Job>()
   private val connected = MutableStateFlow<Set<String>>(emptySet())
 
+  // The stand-in device, which persistRemotes leaves out, until it is removed.
+  private var unsavedId: String? = null
+
   /**
    * What each configured device is doing, in the order of [instances]. Built on first use; it
    * reads each online device's status every 30 seconds.
@@ -167,7 +176,13 @@ class InstanceManager(
   init {
     val saved = configStore?.load()
     for (remote in initialRemotes) add(remote)
+    val standInEntry = standIn?.let(::addStandIn)
     restoreActive(saved?.ui?.lastDeviceId)
+    if (_activeInstance.value == null && standInEntry != null) {
+      _activeInstance.value = standInEntry
+      _activeApi.value = standInEntry.instance
+      _deviceScope.value = DeviceScope.Single(standInEntry.deviceId)
+    }
     embeddedInstance?.instance?.let { ketch ->
       scope.launch { ketch.start() }
     }
@@ -353,6 +368,8 @@ class InstanceManager(
     connectionLock.withLock {
       val removed = entryOf(deviceId) ?: return
       _instances.update { list -> list.filterNot { it.deviceId == deviceId } }
+      // A device added at its address later is the user's own, and saved.
+      if (deviceId == unsavedId) unsavedId = null
       forget(deviceId)
       removed.instance.close()
       reconcile()
@@ -380,6 +397,18 @@ class InstanceManager(
     if (existing is RemoteInstance) return existing
     val entry = factory.createRemote(config.copy(name = deviceNameOrNull(config.name)))
     _instances.update { it + entry }
+    return entry
+  }
+
+  // Lists the stand-in first, where the embedded device would be, unless a saved device has its
+  // address already.
+  private fun addStandIn(config: RemoteConfig): RemoteInstance {
+    require(embeddedInstance == null)
+    val existing = entryOf("${config.host}:${config.port}")
+    if (existing is RemoteInstance) return existing
+    val entry = factory.createRemote(config.copy(name = deviceNameOrNull(config.name)))
+    unsavedId = entry.deviceId
+    _instances.update { listOf(entry) + it }
     return entry
   }
 
@@ -502,8 +531,10 @@ class InstanceManager(
 
   private fun persistRemotes() {
     val store = configStore ?: return
+    val unsaved = unsavedId
     val remotes = _instances.value
       .filterIsInstance<RemoteInstance>()
+      .filter { it.deviceId != unsaved }
       .map { it.remoteConfig }
     val current = store.load()
     store.save(current.copy(remotes = remotes))
