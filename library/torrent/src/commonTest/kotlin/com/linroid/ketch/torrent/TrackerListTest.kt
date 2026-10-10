@@ -258,6 +258,14 @@ class TrackerListTest {
   }
 
   @Test
+  fun lists_keepTheShippedTrackersWhileSubscribing() = realTime {
+    body = null
+    val lists = lists()
+    lists.subscribe(listOf(BUNDLED_LIST, LIST))
+    assertEquals(listOf(listOf(BUNDLED)), lock.withLock { published.distinct() })
+  }
+
+  @Test
   fun bestTrackers_areAllUsable() {
     val text = TorrentConfig.BEST_TRACKERS.joinToString("\n")
     assertEquals(TorrentConfig.BEST_TRACKERS, parseTrackerList(text))
@@ -288,7 +296,7 @@ class TrackerListTest {
     stateDirectory = directory,
     scope = scope,
     onTrackers = { synchronizedAdd(published, it) },
-    bundled = { emptyList() },
+    bundled = { if (it == BUNDLED_LIST) listOf(BUNDLED) else emptyList() },
     clock = clock,
   )
 

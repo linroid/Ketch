@@ -25,6 +25,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import okio.Path
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -213,6 +215,7 @@ internal class TrackerListSubscription(
  * Several tracker lists, each a [TrackerListSubscription] with its own copy in [stateDirectory],
  * whose trackers [onTrackers] gets combined in list order, without repeats.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TrackerLists(
   private val http: () -> TorrentHttp,
   private val stateDirectory: Path?,
@@ -224,6 +227,9 @@ internal class TrackerLists(
   private val log = KetchLogger("TrackerList")
   private val mutex = Mutex()
   private val subscribed = MutableStateFlow(emptyList<Pair<String, TrackerListSubscription>>())
+  // The lists [publish] combines. It is set before new lists subscribe, because each publishes
+  // as it subscribes, and [subscribed] still holds the previous lists then (none at first).
+  private val publishing = AtomicReference(emptyList<TrackerListSubscription>())
 
   /** Each subscribed list, in order. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -248,6 +254,7 @@ internal class TrackerLists(
     val kept = current.toMap()
     current.filter { it.first !in urls }.forEach { it.second.subscribe(null) }
     val next = urls.map { url -> url to (kept[url] ?: newList(url)) }
+    publishing.store(next.map { it.second })
     // Subscribed before they are published, so [state] never shows a list without its URL.
     next.forEach { (url, list) -> list.subscribe(url) }
     subscribed.value = next
@@ -268,7 +275,7 @@ internal class TrackerLists(
   }
 
   private suspend fun publish() {
-    onTrackers(subscribed.value.flatMap { it.second.state.value.trackers }.distinct())
+    onTrackers(publishing.load().flatMap { it.state.value.trackers }.distinct())
   }
 }
 
