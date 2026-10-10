@@ -290,7 +290,7 @@
   <string name="settings_ai_access_add_invalid">Digite o nome de um site, como ubuntu.com.</string>
   <string name="settings_ai_access_footer">Pesquisas limitadas a sites que você indica nunca perguntam.</string>
 
-  <string name="settings_about_name_line">Ketch (queche) é um veleiro de dois mastros.</string>
+  <string name="settings_about_name_line">Ketch (queche) é um veleiro de dois mastros. O Ketch divide cada download em faixas, como as suas velas.</string>
   <string name="settings_about_discover_elsewhere">O Descobrir funciona nos apps para computador e Android.</string>
   <string name="settings_about_version">Versão</string>
   <string name="settings_about_build">Build</string>

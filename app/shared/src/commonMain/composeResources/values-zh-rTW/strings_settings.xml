@@ -285,7 +285,7 @@
   <string name="settings_ai_access_add_invalid">請輸入網域名稱，例如 ubuntu.com。</string>
   <string name="settings_ai_access_footer">限定在你指定網站的搜尋不會詢問。</string>
 
-  <string name="settings_about_name_line">Ketch 是一種雙桅帆船。</string>
+  <string name="settings_about_name_line">Ketch 是一種雙桅帆船的名稱。如同多面船帆協力航行，Ketch 透過多路連線同時下載。</string>
   <string name="settings_about_discover_elsewhere">「搜尋」可在桌面版和 Android 應用程式中使用。</string>
   <string name="settings_about_version">版本</string>
   <string name="settings_about_build">組建</string>

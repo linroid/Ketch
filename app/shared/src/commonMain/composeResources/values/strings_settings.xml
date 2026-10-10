@@ -380,7 +380,7 @@
 
   <!-- About. -->
   <!-- Under the app's name: what the name means. -->
-  <string name="settings_about_name_line">A ketch is a two-masted sailboat.</string>
+  <string name="settings_about_name_line">A ketch is a two-masted sailboat. Ketch splits every download into lanes, like its sails.</string>
   <!-- On the web and iOS, which have no Discover page. -->
   <string name="settings_about_discover_elsewhere">Discover runs in the desktop and Android apps.</string>
   <string name="settings_about_version">Version</string>

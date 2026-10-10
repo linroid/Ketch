@@ -285,7 +285,7 @@
   <string name="settings_ai_access_add_invalid">ubuntu.comのように、Webサイトのドメイン名を入力してください。</string>
   <string name="settings_ai_access_footer">検索対象として指定したWebサイトは確認しません。</string>
 
-  <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。</string>
+  <string name="settings_about_name_line">ケッチ（ketch）は2本マストの帆船です。Ketchはその帆のように、すべてのダウンロードをレーンに分けます。</string>
   <string name="settings_about_discover_elsewhere">ディスカバーは、デスクトップ版とAndroid版のアプリで利用できます。</string>
   <string name="settings_about_version">バージョン</string>
   <string name="settings_about_build">ビルド</string>
