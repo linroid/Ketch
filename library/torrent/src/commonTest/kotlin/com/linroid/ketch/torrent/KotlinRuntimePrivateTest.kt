@@ -1,15 +1,25 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.task.TaskControl
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.IOException
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -18,8 +28,11 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 @OptIn(ExperimentalAtomicApi::class)
 class KotlinRuntimePrivateTest {
@@ -200,6 +213,90 @@ class KotlinRuntimePrivateTest {
             torrentFileSystem.deleteRecursively(root, mustExist = false)
           }
           assertEquals(0, engine.allocatedExchangeBytes)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun restoreSeeding_policyOff_bindsNothing() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val metainfo = Bencode.encode(mapOf("announce" to "http://a/announce",
+          "info" to mapOf("name" to "private", "private" to 1L, "length" to 4L,
+            "piece length" to 4L, "pieces" to sha1Digest(bytes))))
+        val metadata = TorrentMetadata.fromBencode(metainfo)
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-private-restore-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        torrentFileSystem.createDirectories(root)
+        torrentFileSystem.write(root / "private") { write(bytes) }
+        val sockets = AtomicInt(0)
+        val requests = AtomicInt(0)
+        val transport = createTorrentNetwork()
+        val network = object : TorrentNetwork by transport {
+          override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
+            sockets.fetchAndAdd(1)
+            return transport.bindUdp(local)
+          }
+          override suspend fun listen(local: PeerEndpoint): TorrentListener {
+            sockets.fetchAndAdd(1)
+            return transport.listen(local)
+          }
+          override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+            sockets.fetchAndAdd(1)
+            return transport.connect(remote)
+          }
+        }
+        val http = object : HttpEngine {
+          override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+            error("unused")
+          override suspend fun download(url: String, range: LongRange?,
+            headers: Map<String, String>, onData: suspend (ByteArray) -> Unit) {
+            requests.fetchAndAdd(1)
+            error("No tracker is contacted")
+          }
+          override fun close() = Unit
+        }
+        val now = Instant.fromEpochMilliseconds(1_000)
+        val state = TorrentResumeState(metadata.infoHash.hex, 4, "", setOf("0"),
+          (root / "private").toString(), encodeBase64(metainfo), version = 2,
+          privacy = TorrentDiscoveryPrivacy.PUBLIC)
+        val store = MemoryTaskStore()
+        store.save(TaskRecord(taskId = "private-seed",
+          request = DownloadRequest("http://a/private.torrent",
+            destination = Destination((root / "private").toString())),
+          outputPath = (root / "private").toString(), state = TaskState.COMPLETED,
+          totalBytes = 4, sourceType = TorrentDownloadSource.TYPE,
+          sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
+            Json.encodeToString(state)),
+          createdAt = now, updatedAt = now, completedAt = now,
+          control = TaskControl(seeding = true)))
+        var created = 0
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = true,
+          uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING), http).also {
+          it.engineFactory = { config ->
+            created++
+            KotlinTorrentEngine(config, network, TorrentHttp(http))
+          }
+        }
+        val ketch = Ketch(http, taskStore = store, additionalSources = listOf(source))
+        try {
+          ketch.start()
+          delay(500)
+          val task = ketch.tasks.value.single()
+          assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
+          // The seeding intent is kept, but nothing starts while uploads stop at completion.
+          assertEquals(true, store.load("private-seed")?.control?.seeding)
+          assertEquals(0, created)
+          assertEquals(0, sockets.load())
+          assertEquals(0, requests.load())
+          assertEquals(0, source.slotsInUse())
+          assertEquals(0, source.reservedTasks())
+        } finally {
+          ketch.close()
+          network.close()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
       }
     }
