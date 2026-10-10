@@ -27,13 +27,24 @@ internal class DestinationGuard(
    * [request] with its destination [confined][DestinationPathPolicy.confine]: inside the
    * folders, relative to the download directory, and never naming an existing file.
    *
+   * A request sent again with the [DownloadRequest.requestId] of a task keeps the destination
+   * that task got, when it names the same place: the task's download may have created the file
+   * since, which would give a new submission another name and make the two differ.
+   *
    * @throws PathRejectedException if the destination lies outside the folders
    */
   suspend fun newDownload(request: DownloadRequest): DownloadRequest {
     val destination = request.destination
     if (!enabled || destination == null) return request
     val directory = ketch.status().system.downloadDirectory
-    val confined = policy(directory).confine(destination, directory)
+    val policy = policy(directory)
+    val previous = request.requestId?.let { id ->
+      ketch.tasks.value.find { it.request.requestId == id }?.request?.destination
+    }
+    if (previous != null && policy.confinesTo(destination, directory, previous)) {
+      return request.copy(destination = previous)
+    }
+    val confined = policy.confine(destination, directory)
     return if (confined == destination) request else request.copy(destination = confined)
   }
 

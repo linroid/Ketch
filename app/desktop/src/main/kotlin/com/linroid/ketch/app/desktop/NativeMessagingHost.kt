@@ -25,7 +25,7 @@ import kotlin.time.TimeSource
  * The native messaging host the browser extension talks to, so it can reach this app without
  * the API server users turn on in Settings. The browser starts this app's launcher with [FLAG]
  * (see [NativeHostRegistration]); the host reads one request, gets the address and token of
- * [BrowserExtensionServer] from the running app, starting the app first if asked to, replies and
+ * [LocalApiServer] from the running app, starting the app first if asked to, replies and
  * exits. The app it starts stays hidden in the menu bar or notification area
  * ([AppCommand.launchDetached]), so a captured download never pops up a window.
  *
@@ -87,7 +87,7 @@ internal class NativeMessagingHost(
     /** Launch argument that runs the app as the native messaging host. */
     const val FLAG = "--native-messaging-host"
 
-    /** [SingleInstance] request for [BrowserExtensionServer]'s address and token. */
+    /** [SingleInstance] request for [LocalApiServer]'s address and token. */
     const val CONNECT_REQUEST = "browser-extension/connect"
 
     /** Name of the host, as the extension and the host manifests know it. */

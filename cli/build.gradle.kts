@@ -31,6 +31,9 @@ graalvmNative {
       )
       buildArgs.addAll(
         "--no-fallback",
+        // Runs the shutdown hooks on SIGINT and SIGTERM, as the JVM does: `ketch server` then
+        // pauses its downloads and stops announcing itself.
+        "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         "--initialize-at-build-time=ch.qos.logback",
@@ -132,14 +135,18 @@ tasks.named("nativeCompile") {
 
 // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the CLI does not
 // use (reflective tool sets and schemas, loading server modules by name). The stdlib looks it up
-// by name, so native-image would compile much of it in.
-configurations.runtimeClasspath {
-  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
-}
+// by name, so native-image would compile much of it in, without the metadata it reads: Ktor's
+// StatusPages then failed every error response with "Built-in class kotlin.Any is not found"
+// while printing its handler. The native image resolves a classpath of its own.
+configurations.matching { it.name == "runtimeClasspath" || it.name == "nativeImageClasspath" }
+  .configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+  }
 
 dependencies {
   implementation(projects.config)
   implementation(projects.library.server)
+  implementation(projects.library.remote)
   implementation(projects.library.mcp)
   implementation(projects.ai.discover)
   implementation(projects.library.core)

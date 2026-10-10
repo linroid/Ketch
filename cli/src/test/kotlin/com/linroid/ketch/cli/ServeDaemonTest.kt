@@ -10,6 +10,7 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.server.KetchServer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -46,6 +47,36 @@ class ServeDaemonTest {
       ketch.close()
     }
     assertFalse(daemon.isAlive)
+  }
+
+  // Clients that find the server through what onReady publishes must see every task.
+  @Test
+  fun `serveDaemon is ready once it listens and has restored the tasks`() {
+    val ketch = Ketch(UnreachableHttpEngine(), taskStore = SavedTaskStore(pausedRecord("saved")))
+    val server = KetchServer(ketch, host = "127.0.0.1", port = 0, mdnsEnabled = false)
+    val ready = CompletableDeferred<Pair<Int, Int>>()
+    val daemon = thread {
+      serveDaemon(server, ketch) {
+        ready.complete(runBlocking { server.port() } to ketch.tasks.value.size)
+      }
+    }
+    try {
+      val (port, tasks) = runBlocking { withTimeout(5.seconds) { ready.await() } }
+      assertTrue(port > 0)
+      assertEquals(1, tasks)
+    } finally {
+      server.stop()
+      daemon.join(5_000)
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun `loopbackUrl reaches a server on every interface through loopback`() {
+    assertEquals("http://127.0.0.1:8642", loopbackUrl("0.0.0.0", 8642))
+    assertEquals("http://127.0.0.1:8642", loopbackUrl("::", 8642))
+    assertEquals("http://[::1]:9000", loopbackUrl("::1", 9000))
+    assertEquals("http://192.168.1.20:8642", loopbackUrl("192.168.1.20", 8642))
   }
 
   @Test
