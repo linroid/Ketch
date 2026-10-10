@@ -125,7 +125,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
-  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`
+  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`
 
 ### `library:endpoints`
 - `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API)
@@ -308,6 +308,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   its data channel is not encrypted yet). HLS/DASH: one per task, following the host of the part
   being fetched. HEAD, probes, manifests and `resolve` are never reported. Hosts and peer
   addresses are never logged (`ConnectionSpec`'s `toString` leaves the host out)
+- Torrent: one per connected peer once its handshake succeeds, v1 (`TorrentSwarm`'s workers) and
+  v2/hybrid (the session loop, from `Ready` to `Closed`, on `TorrentV2PeerView`), either
+  direction, through `PeerTraffic`: protocol `BitTorrent`, `PeerDetails.wire` `v1` (also a
+  hybrid's v1-swarm peers) or `v2`, choke and interest state as it changes, the peer's IP and port
+  (an incoming peer's source port until BEP 10 `p` names its listen port), and payload on the
+  wire both ways (a v1 route's padding included). `TorrentTaskSpec`/`TorrentV2TaskSpec`
+  `.connections` carry the task's reporter for the session's life, so a seeding session (lent
+  after its download returned, started by `startSeeding`, restored or adopted) keeps reporting.
+  Magnet metadata peers, trackers and DHT are not reported
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)

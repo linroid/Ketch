@@ -30,6 +30,8 @@ internal class TorrentV2PeerView(
   val info: PeerInfo?,
   private val lease: TorrentBufferBudget.Lease? = null,
   nowMs: () -> Long = monotonicClock(),
+  /** This peer among the task's live connections; closed with the view. */
+  val traffic: PeerTraffic? = null,
 ) {
   // Download
   var choked = true
@@ -110,8 +112,15 @@ internal class TorrentV2PeerView(
   /** Block [piece] of the info dictionary, or a reject when [serve] is false. */
   class MetadataAnswer(val piece: Int, val serve: Boolean)
 
+  /** Reports the choke and interest state, which only changes as the loop handles events. */
+  fun reportState() {
+    traffic?.state(peerChoking = choked, uploadSlot = !amChoking,
+      peerInterested = remoteInterested)
+  }
+
   fun close() {
     try {
+      traffic?.close()
       while (hashAnswers.isNotEmpty()) hashAnswers.removeFirst().close()
     } finally { lease?.close() }
   }
