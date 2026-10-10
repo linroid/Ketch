@@ -47,7 +47,10 @@ does not complete a broader phase.
 - [x] **Tracker slice:** internal lifecycle, edits/revisions, scrape and tracker-only privacy (#237).
   Step 11 retains its complete private-network evidence gate and remaining integration work.
 - [x] **Public integration milestone:** v2/hybrid download and restart through Ketch/source (#240).
-  Steps 27–28 still require the complete torrent controller and equivalent product controls.
+  Steps 27–28 are partly delivered by `torrent-v2-selection`: a runtime `TorrentController` in
+  `Ketch` and `RemoteKetch` (inspection, file pages, live selection and seeding commands with
+  revisions and a retry ledger, REST and SSE), with selection in the SDK, daemon, MCP, CLI and
+  apps and seeding control in the SDK, daemon and apps. The other command families remain.
 
 Checks describe the merged baseline and recorded tests, not uncommitted fixes or production
 release qualification. All other original phase checkboxes remain open.
@@ -77,9 +80,13 @@ gate is still open. No production qualification or release is claimed.
 2. Complete runtime readiness and network policy. iOS still uses 5 ms polling; production
    profiles, aggregate memory/RSS and responsiveness acceptance remain open.
 3. Deliver uTP, MSE/PE, PCP/NAT-PMP/UPnP, hole punching, proxy routing, local discovery and web seeds.
-4. Deliver live selection/verified streaming, durable seed goals/queue, storage management,
-   mobile destinations/lifecycle, creation/export and equivalent SDK/daemon/CLI/app/remote controls.
-   `TorrentController` currently supplies inspection contracts; runtime adapters and mutations remain.
+4. Live selection for v1, v2 and hybrid (without reconnecting, waiting magnets, completed tasks
+   that reopen), the local and remote controller adapters, and seeding start, stop and restore
+   after a restart were delivered with `torrent-v2-selection`; see
+   [its evidence](../development/torrent-verification.md#live-file-selection-torrent-v2-selection).
+   Verified streaming, file priorities, seed goals and a seed queue, storage management, mobile
+   destinations/lifecycle (including background seeding), creation/export and the remaining
+   controller command families remain.
 5. Complete shaped-network, adversarial/performance, physical-device, migration/package and
    72-hour soak evidence. Preserve all original release requirements and exclusions.
 
