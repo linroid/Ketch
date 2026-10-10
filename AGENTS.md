@@ -32,6 +32,8 @@ so public API breaking changes are allowed.
 ```
 library/
   api/        # Public API interfaces and models -- published SDK module
+  torrent-api/  # Torrent control contract (TorrentController and its models; same targets as
+                # api) -- published SDK module
   core/       # In-process download engine (Android, iOS, JVM, JS/Node, WasmWasi) -- published
   ktor/       # Ktor-based HttpEngine implementation (Android, iOS, JVM) -- published SDK module
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
@@ -67,25 +69,35 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
-  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`
+  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `ControlKey` (`KetchApi.control(key)` looks up optional typed controllers that other modules
+  define; `null` by default), and `FileOrder`, `NaturalOrder`, `fileExtension()` and
+  `sortedByFileOrder()`, the file orders the apps, the CLI, MCP and the torrent controller share
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
   `redactUrl()`, `describeCauses()`
-- `com.linroid.ketch.api.torrent` -- `TorrentController` (optional `KetchApi.torrents`:
-  `Ketch` builds one over a `TorrentControlSource`, `RemoteKetch` one over REST and SSE that fails
-  closed against older servers), `TorrentCapabilities` (`TorrentCapability`: `inspect`,
-  `file-selection`, `v1`, `v2`, `hybrid`, and `seeding` while uploads seed), `TorrentSnapshot`,
-  `TorrentCounters`, `TorrentActivity`, `TorrentRevision`, `TorrentCommandContext`,
-  `TorrentCommandResult`, `TorrentCommandError`/`TorrentCommandException`, `TorrentPageRequest`,
-  `TorrentFilePage`, `TorrentFileEntry`, `TorrentFileOrder`, and `NaturalOrder`,
-  `fileExtension()` and `sortedByFileOrder()`, the file orders the apps share
+- `library:api` and `library:core` name no protocol: torrent types live in `library:torrent-api`
+  and `library:torrent`, which plug in through `ControlKey` and `DownloadSource.attach`
+
+### `library:torrent-api` (torrent control contract)
+- `com.linroid.ketch.torrent.api` -- `TorrentController` (its companion `Key` is the
+  `ControlKey`: `ketch.control(TorrentController)`; `Ketch` returns one when the torrent source is
+  registered, `RemoteKetch` one over REST and SSE that fails closed against older servers),
+  `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
+  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, and `seeding` while uploads seed),
+  `TorrentSnapshot`, `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
+  `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
+  `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
+  `TorrentFileOrder` (wire names, each naming a `FileOrder`)
 
 ### `library:core` (implementation)
 - `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `KetchDispatchers`
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
   `SourceResolver`, `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
-  `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `TorrentControlSource` (with
-  `LiveTorrent`, `SeedingTask`, `SeedingOutcome`),
+  `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
+  (what `DownloadSource.attach` adds: controllers for `KetchApi.control`, `start`,
+  `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
+  `selectFiles`/`setSharing`, `showSharing` and `saveSharingIntent`),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
@@ -97,8 +109,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `PathRejectedException`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`, `TaskControl` (selection
-  generation, seeding intent and the command retry ledger; SQLite `control_json`, `5.sqm`)
-- `com.linroid.ketch.core.torrent` -- `KetchTorrentController`, `TorrentRevisions` (internal)
+  generation, sharing intent and the command retry ledger; SQLite `control_json`, `5.sqm`),
+  `ControlCommand`, `ControlOutcome`, `ControlRevision`, `ControlLedgerException`
 
 ### `library:ktor`, `library:kermit`, `library:sqlite`
 - `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM),
@@ -123,14 +135,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
   `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`
+- `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
+  `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
+  `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
 
 ### `library:endpoints`
 - `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API)
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
-  `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `TorrentSelectionRequest`,
-  `TorrentSeedingRequest`, `PairingRequest`, `PairingTicket`, `PairingStatus`, `PairingState`,
-  `HealthResponse`, `HealthStatus`
+  `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `PairingRequest`,
+  `PairingTicket`, `PairingStatus`, `PairingState`, `HealthResponse`, `HealthStatus`
+- `com.linroid.ketch.endpoints.torrent` -- `Torrents` (the `/api/torrents` resources),
+  `TorrentSelectionRequest`, `TorrentSeedingRequest`
 
 ### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -238,7 +254,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
   and `completedAt`, stamped in whole milliseconds each time the task completes (a selection
   that adds files clears it until then) and saved as `TaskRecord.completedAt` (SQLite
-  `completed_at`, `4.sqm`; `null` for tasks completed before it was tracked). `seeding` is `true`
+  `completed_at`, `4.sqm`; `null` for tasks completed before it was tracked). `sharing` is `true`
   while the source shares the finished content (a seeding torrent); it is not persisted
 - `DownloadState.Paused.reason` (`PauseReason`): `User`, `Preempted(byTaskId)`, `Shutdown`,
   `AwaitingFileSelection` (a download that waits for `selectFiles`, wire
@@ -251,7 +267,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
   `download.awaitFileSelection` from sources that choose files (the torrent source), and the
-  torrent source's `torrent.control`.
+  torrent source's `torrent.control` (`TorrentFeatures.CONTROL`, outside `KetchFeatures.ALL`).
   `DownloadSource.previousTypes` lets stored tasks with the old `media` type route to the
   matching protocol by URL
 - Retry with exponential backoff for transient errors
@@ -366,7 +382,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   paused, queued, scheduled and failed tasks use it when they start; a completed task that gains
   files reopens into the same folder, adopting its live seeding session, while one that only
   drops files changes its size, and its seeding session shares the smaller selection
-  (`TorrentControlSource.changeSeedingSelection`). Re-selecting the current files does nothing
+  (`SourceExtension.selectionChanged`). Re-selecting the current files does nothing
 - `DownloadRequest.awaitFileSelection`: a download added without a selection, as the apps' "Add
   anyway" adds a magnet, parks as `Paused(AwaitingFileSelection)` once it lists several files or
   variants (either mode), holding no queue slot, output path or segments; `selectFiles` starts it
@@ -411,10 +427,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more. Trackers hear
   `completed` only once every file is selected and complete; admission charges every file
-- Seeding control: `Completed.seeding` and the controller's `SEEDING` activity show it, and
+- Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it, and
   `TorrentController.setSeeding` (REST `PUT /api/torrents/{id}/seeding`, the inspector's Seed and
-  Stop seeding) starts or stops it. Ketch saves the intent in `TaskControl.seeding` once a task
-  seeds, and `Ketch.start()` seeds those tasks again, oldest completion first, under `upload =
+  Stop seeding) starts or stops it. `TorrentControls` (the source's `SourceExtension`) saves the
+  intent in `TaskControl.sharing` once a task seeds, and after `Ketch.start()` seeds those tasks
+  again, oldest completion first, under `upload =
   seed` and into free engine slots only, each after a recheck; a task whose files changed on disk
   loses the intent, one a download or shutdown stopped keeps it. `TorrentDownloadSource(...,
   restoreSeeding = false)`, as `ketch mcp --standalone` builds it, never restores
@@ -675,9 +692,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Smart "Finished today" groups). A task waiting for its files says "Choose files to
   download" (Choose files…, and Download all files unless its source offers a single choice) and a seeding one "Seeding" (Stop seeding; Seed
   is in the inspector only). Auto connections and queue positions only show for devices whose
-  `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
+  `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all,
+  `EmbeddedFeatures`)
 - Files: the inspector's Files tab lists the files or variants of any task whose resolved source
-  names some (torrents also page names from `KetchApi.torrents`) and, on devices listing
+  names some (torrents also page names from `control(TorrentController)`) and, on devices listing
   `download.fileSelection`, checks and unchecks them with an Apply bar (`FileSelectionModel`, at
   least one file stays checked), or picks one with radio buttons (`KetchRadio`) for a
   `FileSelectionMode.SINGLE` source, and starts a waiting task. "Add anyway" in the add sheet
@@ -761,10 +779,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   position moved), `progress` carries none and leaves out a request that did not change. Task
   views and events never carry a torrent's metainfo (`ResolvedSource.withoutBulkMetadata()`)
 - Torrents: `PUT /api/tasks/{id}/files` (`FileSelectionRequest`) chooses a task's files; with
-  `torrent.control`, `/api/torrents` serves `capabilities`, a task's snapshot, sorted file pages
-  (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`), `selection` and
-  `seeding` commands guarded by a revision and an idempotency key, and an SSE `events` stream of
-  snapshots. Command failures answer with the `TorrentCommandError` wire name
+  `torrent.control` (the instance's `control(TorrentController)`; without one the routes are not
+  installed and answer `404`), `/api/torrents` serves `capabilities`, a task's snapshot, sorted
+  file pages (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`),
+  `selection` and `seeding` commands guarded by a revision and an idempotency key, and an SSE
+  `events` stream of snapshots. Command failures answer with the `TorrentCommandError` wire name
 - Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
   `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
   without a token. Tokens are compared in constant time (SHA-256 digests,
@@ -916,10 +935,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 14 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl` (without the metainfo), `listDownloadFiles` (`cursor`, `limit` up to 1000, `sort`
-  and `descending`, from `KetchApi.torrents`, else the request's resolved files),
+  and `descending`, from `control(TorrentController)`, else the request's resolved files),
   `selectDownloadFiles` (comma-separated IDs), `getStatus`, `setSpeedLimit`, `setPriority`,
   `updateConfig`; `startDownload` takes `fileIds`, and task JSON has `selectedFiles`,
-  `totalFiles` and a completed task's `seeding`. There is no seeding tool. Downloads it starts
+  `totalFiles` and a completed task's `sharing`. There is no seeding tool. Downloads it starts
   carry `DownloadRequest.properties["ketch.origin"] = "agent"`
 - Agent tools are `TextTool`s (`library:mcp` and `ai:discover` each have a copy): a name, a
   description and string or integer parameters (also boolean ones in `library:mcp`), required
@@ -1034,7 +1053,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### Pluggable Components
 - `HttpEngine` interface for custom HTTP clients (default: Ktor)
 - `TaskStore` interface for persistence (InMemoryTaskStore, SqliteTaskStore)
-- `DownloadSource` interface for protocol-level extensibility
+- `DownloadSource` interface for protocol-level extensibility; `DownloadSource.attach` returns a
+  `SourceExtension` for protocol controllers (`KetchApi.control(ControlKey)`) and task lifecycle
+  hooks, so `library:api` and `library:core` stay protocol-neutral
 - `Logger` interface for logging backends
 
 ### Expect/Actual for Platform Code
@@ -1082,8 +1103,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TrackerList", "TorrentController", "RemoteKetch", "RemoteTask",
-  "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore",
+  "TorrentTracker", "TrackerList", "TorrentController", "TorrentControls", "RemoteKetch",
+  "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore",
   "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "EventRoutes",
   "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")

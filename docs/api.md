@@ -22,6 +22,7 @@ ketch-ftp = { module = "com.linroid.ketch:ftp", version.ref = "ketch" }
 ketch-hls = { module = "com.linroid.ketch:hls", version.ref = "ketch" }
 ketch-dash = { module = "com.linroid.ketch:dash", version.ref = "ketch" }
 ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
+ketch-torrent-api = { module = "com.linroid.ketch:torrent-api", version.ref = "ketch" }
 ```
 
 ```kotlin
@@ -46,8 +47,10 @@ kotlin {
 ```
 
 `core`, `hls` and `dash` target Android, iOS, JVM, JavaScript (Node.js) and WasmWasi; `ktor`,
-`sqlite`, `ftp` and `torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to control a daemon
-instead of running the engine in-process.
+`sqlite`, `ftp` and `torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to
+control a daemon instead of running the engine in-process. `torrent-api`, the torrent controller
+contract that `torrent` and `remote` expose, has the targets of `api`, so any client can inspect
+and command torrents (`ketch.control(TorrentController)`).
 
 The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
 It does not support WASI because Kermit 2.1.0 does not publish a WASI variant. Projects with
@@ -157,8 +160,8 @@ is kept and it resumes on the next `start()`), `AwaitingFileSelection` for a dow
 for `selectFiles`, and `WaitingForCondition`. A reason the client does not know decodes as
 `User`. `DownloadState.Completed.completedAt` is when the task last finished, in whole
 milliseconds; it is `null` for tasks that finished before Ketch recorded it.
-`DownloadState.Completed.seeding` is `true` while a finished torrent shares its files with other
-peers.
+`DownloadState.Completed.sharing` is `true` while its source shares the finished content with
+others, as a seeding torrent does.
 `queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`)
 in the order the queue starts them, priority first, then age.
 
@@ -167,16 +170,27 @@ in the order the queue starts them, priority first, then age.
 `PROXY`, `CATEGORY_FOLDERS`, the media sources' `FINITE_HLS` and `FINITE_DASH`, `FILE_SELECTION`
 (`download.fileSelection`, `selectFiles`) and `AWAIT_FILE_SELECTION`
 (`download.awaitFileSelection`, `awaitFileSelection`), listed by the sources that choose files
-(the torrent source today), and the torrent source's `TORRENT_CONTROL` (`KetchApi.torrents`).
+(the torrent source today). Modules beside `library:api` name their own: the torrent source lists
+`TorrentFeatures.CONTROL` (`torrent.control`, in `library:torrent-api`).
 Older servers send fewer, so
 their tasks report no position and `setConnections(0)` on them throws
 `UnsupportedOperationException`.
 
-`KetchApi.torrents` is a `TorrentController`, or `null` without a torrent source: capabilities, a
-task's snapshot and `observe` stream, its files a page at a time (`files`, sorted by
-`TorrentFileOrder` and optionally descending), and the `select` and `setSeeding` commands, each
-guarded by a `TorrentCommandContext` (an idempotency key and the expected revision). Failures throw
-`TorrentCommandException` with a `TorrentCommandError`. See the
+`KetchApi.control(key)` returns an optional typed controller a backend offers beyond the download
+API, or `null`; `library:api` defines only the `ControlKey` lookup, and the module that defines a
+controller defines its key. `library:api` also holds the file orders every client shares:
+`FileOrder`, `NaturalOrder`, `fileExtension()` and `sortedByFileOrder()`.
+
+### `library:torrent-api`
+
+The torrent control contract, with the targets of `library:api`, so browser and remote clients
+use it without linking the torrent engine. `ketch.control(TorrentController)` is a
+`TorrentController`, or `null` without a torrent source: capabilities, a task's snapshot and
+`observe` stream, its files a page at a time (`files`, sorted by `TorrentFileOrder`, which names a
+`FileOrder`, and optionally descending), and the `select` and `setSeeding` commands, each guarded
+by a `TorrentCommandContext` (an idempotency key and the expected revision). Failures throw
+`TorrentCommandException` with a `TorrentCommandError`. `RemoteKetch` returns one that fails closed
+against servers without `TorrentFeatures.CONTROL`. See the
 [control contract](design/torrent-control-contract.md#version-1-runtime).
 
 ### `library:core`

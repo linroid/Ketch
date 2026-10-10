@@ -1,14 +1,19 @@
 # Torrent control protocol, version 1
 
 This contract implements the API boundary decision in [roadmap #162][roadmap]. The types live in
-`library:api`, so WebAssembly and remote clients can use them without linking a torrent engine.
+`library:torrent-api` (`com.linroid.ketch.torrent.api`), which has the targets of `library:api`, so
+WebAssembly and remote clients can use them without linking a torrent engine. `library:api` and
+`library:core` name no torrent type: `KetchApi.control(key)` looks controllers up by a
+`ControlKey`, here `TorrentController.Key`, and a `DownloadSource` contributes one through
+`DownloadSource.attach`, which returns a `SourceExtension`.
 This PR defines inspection, capability negotiation, ordering, and command preconditions. Runtime
 wiring and the typed mutation methods ship with their capabilities, with SDK/HTTP/SSE parity checked
 in roadmap step 27. A contract declaration is not an implemented runtime capability.
 
 ## Availability and negotiation
 
-`KetchApi.torrents` is nullable and defaults to null for existing backend implementations. Null means
+`ketch.control(TorrentController)` is nullable and defaults to null for existing backend
+implementations. Null means
 no typed control protocol, not no torrent downloader. Local and remote adapters expose a controller
 only when they implement inspection. They advertise only executable features. The backend's
 platform determines capabilities: a browser connected to a daemon can have capabilities unavailable
@@ -92,10 +97,12 @@ untrusted paths. Unsupported requests fail before any side effect or network acc
 
 ## Version 1 runtime
 
-`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.torrents` adapts the first
-registered source that is a `TorrentControlSource` (`KetchTorrentController`);
-`RemoteKetch.torrents` calls a server's `/api/torrents` routes and their `events` stream
-(`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
+`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.control(TorrentController)`
+returns the controller of the first registered source whose `SourceExtension` offers one: the
+torrent source's `TorrentControls` (in `library:torrent`), which builds `KetchTorrentController`
+over the task records and ledgered commands of core's `SourceHost`;
+`RemoteKetch.control(TorrentController)` calls a server's `/api/torrents` routes and their
+`events` stream (`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
 serve them. What the runtime does, where it narrows the contract above:
 
 - **Capabilities.** `inspect`, `file-selection`, `v1`, `v2` and `hybrid`, plus `seeding` only while
@@ -128,7 +135,7 @@ serve them. What the runtime does, where it narrows the contract above:
 - **Counters.** Received and uploaded payload and upload speed come from a live session; without
   one, as for a completed task that does not seed, they are `null`.
 - **File pages.** `files` sorts by `TorrentFileOrder` (torrent, natural name, size, extension,
-  selected first), optionally descending. Cursors bind the task, the epoch, the selection generation
+  selected first; each names a `FileOrder` of `library:api`), optionally descending. Cursors bind the task, the epoch, the selection generation
   and the order; one used after any of them changed fails with `STALE_CURSOR`.
 
 ## Migration gates

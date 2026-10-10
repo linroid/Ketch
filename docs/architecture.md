@@ -6,8 +6,9 @@ core abstractions, the download pipeline, and how the apps work with several dev
 ## Module Dependency Graph
 
 ```
-library:api          (public interfaces and models, no dependencies)
+library:api          (public interfaces and models, no dependencies, no protocol types)
   ^
+  +--- library:torrent-api (torrent control contract: TorrentController and its models)
   +--- library:core       (download engine, implements KetchApi)
   |      ^
   |      +--- library:ktor      (Ktor-based HttpEngine)
@@ -15,11 +16,11 @@ library:api          (public interfaces and models, no dependencies)
   |      +--- library:ftp       (FTP/FTPS DownloadSource)
   |      +--- library:hls       (finite HLS DownloadSource)
   |      +--- library:dash      (finite DASH DownloadSource)
-  |      +--- library:torrent   (BitTorrent DownloadSource, also uses ktor)
+  |      +--- library:torrent   (BitTorrent DownloadSource and its controller; ktor, torrent-api)
   |      +--- library:server    (Ktor REST API + SSE daemon, also uses endpoints)
   |
-  +--- library:endpoints  (REST resource definitions shared by server and remote)
-  +--- library:remote     (HTTP+SSE client, implements KetchApi, uses endpoints)
+  +--- library:endpoints  (REST resource definitions shared by server and remote; torrent-api)
+  +--- library:remote     (HTTP+SSE client, implements KetchApi, uses endpoints and torrent-api)
   +--- library:kermit     (Kermit logging adapter)
   +--- library:mcp        (MCP server exposing a KetchApi as AI agent tools)
   +--- config             (TOML configuration)
@@ -42,6 +43,7 @@ Ketch is split into published SDK modules that you add as dependencies:
 | Module | Description | Platforms |
 |---|---|---|
 | `library:api` | Public API interfaces and models (`KetchApi`, `DownloadTask`, `DownloadState`, etc.) | All |
+| `library:torrent-api` | Torrent control contract (`TorrentController`, its snapshots, file pages and commands), for clients of any backend | All |
 | `library:core` | In-process download engine -- embed downloads directly in your app | Android, iOS, Desktop, JS (Node.js), WasmWasi |
 | `library:ktor` | Ktor-based `HttpEngine` implementation (the default engine for `core`) | Android, iOS, Desktop |
 | `library:sqlite` | SQLite-backed `TaskStore` for persistent resume | Android, iOS, Desktop |
@@ -246,11 +248,12 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   task's speed limit, priority, connections and files (`PUT /api/tasks/{id}/files`); `status`,
   `config`, `network-interfaces`, `resolve` and `resolve/content` (resolve uploaded file bytes,
   such as a `.torrent` file)
-- **Torrents**: on servers listing `torrent.control`, `/api/torrents` serves the
-  `TorrentController` of `KetchApi.torrents`: capabilities, a task's snapshot, sorted pages of
-  its files, the `selection` and `seeding` commands, guarded by a revision and an idempotency key,
-  and an `events` stream of snapshots. `RemoteKetch.torrents` calls them and fails closed against
-  servers without them
+- **Torrents**: on servers listing `torrent.control`, `/api/torrents` (resources in
+  `endpoints.torrent`) serves the instance's `control(TorrentController)`: capabilities, a task's
+  snapshot, sorted pages of its files, the `selection` and `seeding` commands, guarded by a
+  revision and an idempotency key, and an `events` stream of snapshots. A server whose instance
+  has no torrent controller installs none of these routes. `RemoteKetch.control(TorrentController)`
+  calls them and fails closed against servers without them
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events. A `progress` event leaves out a request
   that did not change, and task views and events never carry a torrent's metainfo

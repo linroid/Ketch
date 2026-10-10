@@ -79,12 +79,12 @@ looking up the metadata again; `resume()` downloads every file. The apps add a m
 when it is added before its file list arrives ("Add anyway"). A `requestId` resubmission ignores
 the selection and this flag.
 
-`RemoteKetch` changes the files through `PUT /api/tasks/{id}/files`. `KetchApi.torrents` lists a
-task's files a page at a time (`TorrentController.files`), sorted by `TorrentFileOrder`: torrent
-order, case-insensitive natural name order ("Episode 2" before "Episode 10"), size, extension then
-name, or selected files first, each reversible. The apps sort the same way, except that their Kind
-order groups files by type (video, audio, subtitles, ...), where the server sorts by the plain
-extension. The MCP tools `listDownloadFiles` and `selectDownloadFiles` and the CLI's `--list-files`
+`RemoteKetch` changes the files through `PUT /api/tasks/{id}/files`.
+`ketch.control(TorrentController)` (from `library:torrent-api`) lists a task's files a page at a
+time (`TorrentController.files`), sorted by `TorrentFileOrder`: torrent order, case-insensitive
+natural name order ("Episode 2" before "Episode 10"), size, extension then name, or selected
+files first, each reversible. The apps sort the same way, except that their Kind order groups
+files by type (video, audio, subtitles, ...), where the server sorts by the plain extension. The MCP tools `listDownloadFiles` and `selectDownloadFiles` and the CLI's `--list-files`
 and `--files` build on these.
 
 ## Opening `.torrent` files in the apps
@@ -245,7 +245,8 @@ New source resume records retain the chosen privacy independently of later defau
 when metadata must be fetched again. Legacy records without a privacy choice use the configured
 default and record it on their next save. Privacy is chosen at the source, for the local backend;
 remote privacy commands remain on the v2 roadmap. Capability negotiation, inspection, file pages
-and the selection and seeding commands are available through `KetchApi.torrents`, locally and,
+and the selection and seeding commands are available through `ketch.control(TorrentController)`,
+locally and,
 for servers listing `torrent.control`, over `/api/torrents`; see the
 [control contract](design/torrent-control-contract.md#version-1-runtime).
 
@@ -318,8 +319,8 @@ Seeding ends when it is stopped, when the task is removed, when the upload polic
 when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
 when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;
 a torrent that finishes while a download waits for a slot does not seed at all. Seeding shows as
-Completed with `DownloadState.Completed.seeding` set, and as the `SEEDING` activity of
-`KetchApi.torrents`.
+Completed with `DownloadState.Completed.sharing` set, and as the `SEEDING` activity of the
+`TorrentController`.
 `TorrentController.setSeeding` (REST `PUT /api/torrents/{id}/seeding`, the apps' inspector) stops
 it, or starts a completed task seeding again after a recheck, on a free engine slot only, while
 the upload policy seeds. Ketch remembers which tasks seed: `Ketch.start()` seeds them again, oldest

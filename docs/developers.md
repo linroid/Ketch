@@ -31,6 +31,7 @@ published on Maven Central under `com.linroid.ketch`. You can use it to:
 | `hls` | Finite HLS downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `dash` | Finite DASH downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `torrent` | BitTorrent and magnet downloads ([details](torrent.md)) | Android, iOS, JVM |
+| `torrent-api` | `TorrentController`: torrent snapshots, file pages and commands, through `ketch.control(TorrentController)` on any backend | All |
 | `remote` | `RemoteKetch`, a `KetchApi` that controls a Ketch server | Android, iOS, JVM, WasmJs |
 | `endpoints` | REST resource and wire model definitions shared by the server and `remote` | Android, iOS, JVM, WasmJs |
 | `kermit` | `KermitLogger`, an optional [Kermit](https://github.com/touchlab/Kermit) logging backend | Android, iOS, JVM, JS, WasmJs |
