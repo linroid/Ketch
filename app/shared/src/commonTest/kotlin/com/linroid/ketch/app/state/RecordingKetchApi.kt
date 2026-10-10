@@ -96,6 +96,16 @@ internal class RecordingTask(
     requestState.update { it.copy(schedule = schedule) }
   }
 
+  override suspend fun selectFiles(fileIds: Set<String>) {
+    record("select ${fileIds.sorted().joinToString(",")}")
+    requestState.update { it.copy(selectedFileIds = fileIds) }
+    // Choosing files starts a task that waits for them.
+    if (state.value.awaitsFileSelection) {
+      state.value = DownloadState.Queued
+      api.promoteNext()
+    }
+  }
+
   override suspend fun remove(deleteFiles: Boolean) {
     record("remove deleteFiles=$deleteFiles")
     api.removeTask(this)

@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.awaitsFileSelection
 import com.linroid.ketch.app.state.waitsInQueue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -93,12 +94,16 @@ class ActivityMonitor(
     source.tasks.flatMapLatest(::phases).map { Signal.Tasks(source.deviceId, it) }
   )
 
-  // Progress updates do not matter here, so each task only emits when its kind of state changes.
+  // Progress updates do not matter here, so each task only emits when its kind of state changes,
+  // a pause that waits for files counting as its own kind. A finished torrent that starts or
+  // stops seeding stays Completed, so it is never reported again.
   private fun phases(tasks: List<DownloadTask>): Flow<List<TaskSnapshot>> {
     if (tasks.isEmpty()) return flowOf(emptyList())
     val flows = tasks.map { task ->
       task.state
-        .distinctUntilChanged { old, new -> old::class == new::class }
+        .distinctUntilChanged { old, new ->
+          old::class == new::class && old.awaitsFileSelection == new.awaitsFileSelection
+        }
         .map { TaskSnapshot(task, it) }
     }
     return combine(flows) { it.toList() }
@@ -143,6 +148,8 @@ class ActivityMonitor(
             completions += ActivityEvent.Completed(key, task.request, state)
           state is DownloadState.Failed && previous !is DownloadState.Failed ->
             events += ActivityEvent.Failed(key, task.request, state)
+          state.awaitsFileSelection && !previous.awaitsFileSelection ->
+            events += ActivityEvent.FilesNeeded(key, task.request)
         }
         isBaseline || task.createdAt < startedAt -> {
           preexisting = true
@@ -230,16 +237,18 @@ class ActivityMonitor(
   }
 
   // Requests can hold credentials and cookies, so only ids are logged.
-  private fun describe(event: ActivityEvent): String = when (event) {
-    is ActivityEvent.Added -> "added taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.Completed ->
-      "completed taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.CompletedBatch -> "${event.completions.size} completed"
-    is ActivityEvent.Failed -> "failed taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.Recovered -> "${event.count} recovered on ${event.deviceId}"
-    is ActivityEvent.QueueDrained -> "queue drained after ${event.files} on ${event.deviceId}"
-    is ActivityEvent.DeviceOffline -> "${event.deviceId} offline"
-    is ActivityEvent.DeviceOnline -> "${event.deviceId} online"
+  private fun describe(event: ActivityEvent): String {
+    ActivityRouting.taskKeyOf(event)?.let { key ->
+      return "${event::class.simpleName} taskId=${key.taskId} on ${key.deviceId}"
+    }
+    return when (event) {
+      is ActivityEvent.CompletedBatch -> "${event.completions.size} completed"
+      is ActivityEvent.Recovered -> "${event.count} recovered on ${event.deviceId}"
+      is ActivityEvent.QueueDrained -> "queue drained after ${event.files} on ${event.deviceId}"
+      is ActivityEvent.DeviceOffline -> "${event.deviceId} offline"
+      is ActivityEvent.DeviceOnline -> "${event.deviceId} online"
+      else -> event::class.simpleName.orEmpty()
+    }
   }
 
   private class DeviceTracker {

@@ -24,6 +24,8 @@
   <string name="row_saved_on">Salvo em %1$s</string>
   <string name="row_missing_file">Arquivo movido ou apagado</string>
   <string name="row_completed">Concluído</string>
+  <string name="row_choose_files">Escolha os arquivos para baixar</string>
+  <string name="row_seeding">Semeando</string>
   <string name="row_took">levou %1$s</string>
   <plurals name="row_files">
     <item quantity="one">%1$d arquivo</item>
@@ -61,6 +63,10 @@
   <string name="sort_origin">Origem</string>
   <string name="sort_priority">Prioridade</string>
   <string name="sort_device">Dispositivo</string>
+  <string name="sort_kind">Tipo</string>
+  <string name="sort_selected_first">Selecionados primeiro</string>
+  <string name="sort_torrent_order">Ordem do torrent</string>
+  <string name="sort_reverse">Inverter ordem</string>
   <string name="group_smart">Inteligente</string>
   <string name="group_status">Status</string>
   <string name="group_day">Dia</string>
@@ -134,6 +140,10 @@
   <string name="action_row_copy_details">Copiar detalhes</string>
   <string name="action_row_stop_and_discard">Cancelar download…</string>
   <string name="action_row_remove">Remover…</string>
+  <string name="action_row_choose_files">Escolher arquivos…</string>
+  <string name="action_row_download_all_files">Baixar todos os arquivos</string>
+  <string name="action_row_stop_seeding">Parar de semear</string>
+  <string name="action_row_seed">Semear</string>
   <plurals name="batch_pause">
     <item quantity="one">Pausar %1$d download</item>
     <item quantity="other">Pausar %1$d downloads</item>

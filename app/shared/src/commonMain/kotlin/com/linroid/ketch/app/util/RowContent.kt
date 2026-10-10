@@ -43,6 +43,7 @@ import ketch.app.shared.generated.resources.row_paused
 import ketch.app.shared.generated.resources.row_paused_preempted
 import ketch.app.shared.generated.resources.row_paused_shutdown
 import ketch.app.shared.generated.resources.row_saved_on
+import ketch.app.shared.generated.resources.row_seeding
 import ketch.app.shared.generated.resources.row_stalled_for
 import ketch.app.shared.generated.resources.row_starts_after
 import ketch.app.shared.generated.resources.row_starts_in
@@ -334,11 +335,14 @@ private fun completedContent(
 ): RowContent {
   val device = context.device
   val size = state.totalBytes?.let(::sizeText)
+  // A torrent that shares its files says so first: "Seeding · 4.2 MB/s avg · example.com".
+  val seeding = Res.string.row_seeding.text().takeIf { state.seeding }
   val detail = when {
-    device.capabilities.isRemote -> Res.string.row_saved_on.text(device.name)
     missing -> Res.string.row_missing_file.text()
+    device.capabilities.isRemote ->
+      listOfNotNull(seeding, Res.string.row_saved_on.text(device.name)).joinText()
     else -> {
-      val parts = transferSummary(state).filter { it != size } +
+      val parts = listOfNotNull(seeding) + transferSummary(state).filter { it != size } +
         listOfNotNull(host?.let(::verbatim))
       if (parts.isEmpty()) Res.string.row_completed.text() else parts.joinText()
     }

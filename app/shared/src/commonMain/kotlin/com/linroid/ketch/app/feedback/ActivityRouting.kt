@@ -54,8 +54,8 @@ object ActivityRouting {
   /**
    * Where to report [event] under [settings]. Toasts only show while the app is [inFront];
    * notifications are posted while it is in the background, and also in front when
-   * [NotificationSettings.onlyInBackground] is off. Events about adding, recovering and
-   * connecting are only ever toasts.
+   * [NotificationSettings.onlyInBackground] is off. Events about adding, recovering, files to
+   * choose and connecting are only ever toasts.
    */
   fun deliveryOf(
     event: ActivityEvent,
@@ -118,6 +118,7 @@ object ActivityRouting {
         ).joinText().load(),
       )
       is ActivityEvent.Added,
+      is ActivityEvent.FilesNeeded,
       is ActivityEvent.Recovered,
       is ActivityEvent.DeviceOffline,
       is ActivityEvent.DeviceOnline -> null
@@ -137,6 +138,7 @@ object ActivityRouting {
   /** Id of the device [event] happened on. */
   fun deviceIdOf(event: ActivityEvent): String? = when (event) {
     is ActivityEvent.Added -> event.taskKey.deviceId
+    is ActivityEvent.FilesNeeded -> event.taskKey.deviceId
     is ActivityEvent.Completed -> event.taskKey.deviceId
     is ActivityEvent.CompletedBatch -> event.completions.firstOrNull()?.taskKey?.deviceId
     is ActivityEvent.Failed -> event.taskKey.deviceId
@@ -149,6 +151,7 @@ object ActivityRouting {
   /** Task [event] is about, or `null` when it is about a device or several tasks. */
   fun taskKeyOf(event: ActivityEvent): TaskKey? = when (event) {
     is ActivityEvent.Added -> event.taskKey
+    is ActivityEvent.FilesNeeded -> event.taskKey
     is ActivityEvent.Completed -> event.taskKey
     is ActivityEvent.Failed -> event.taskKey
     else -> null
@@ -182,7 +185,8 @@ object ActivityRouting {
         if (settings.queueDrained) settings.finished else NotificationMode.Off
       is ActivityEvent.DeviceOffline, is ActivityEvent.DeviceOnline ->
         if (settings.deviceOffline) NotificationMode.InApp else NotificationMode.Off
-      is ActivityEvent.Added, is ActivityEvent.Recovered -> NotificationMode.InApp
+      is ActivityEvent.Added, is ActivityEvent.FilesNeeded, is ActivityEvent.Recovered ->
+        NotificationMode.InApp
     }
 
   private fun sourceOf(entry: InstanceEntry): ActivitySource = ActivitySource(

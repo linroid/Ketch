@@ -21,6 +21,7 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.torrent.TorrentController
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
@@ -63,6 +64,7 @@ import com.linroid.ketch.remote.ConnectionState
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
+import ketch.app.shared.generated.resources.action_row_choose_files
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
@@ -80,6 +82,7 @@ import ketch.app.shared.generated.resources.discover_undo_discard
 import ketch.app.shared.generated.resources.feedback_add_failed
 import ketch.app.shared.generated.resources.feedback_add_failed_count
 import ketch.app.shared.generated.resources.feedback_added
+import ketch.app.shared.generated.resources.feedback_choose_files
 import ketch.app.shared.generated.resources.feedback_cleared
 import ketch.app.shared.generated.resources.feedback_cleared_missing
 import ketch.app.shared.generated.resources.feedback_device_offline
@@ -388,6 +391,13 @@ class AppState(
 
   /** Task shown in the inspector, or `null`. */
   var inspectedTask by mutableStateOf<TaskKey?>(null)
+    private set
+
+  /**
+   * A task whose files the inspector should show on its Files tab, as [chooseFiles] asks; the
+   * inspector clears it with [filesRequestHandled] once it switched.
+   */
+  var filesRequest by mutableStateOf<TaskKey?>(null)
     private set
 
   /** Selected rows of the task list. */
@@ -858,6 +868,32 @@ class AppState(
   /** Shows [key] in the inspector, or clears it with `null`. */
   fun inspect(key: TaskKey?) {
     inspectedTask = key
+  }
+
+  /**
+   * Shows the files of [key]'s torrent in the inspector, on the Downloads page, to choose which
+   * to download; switches to its device when it is not shown.
+   */
+  fun chooseFiles(key: TaskKey) {
+    val entry = instances.value.firstOrNull { it.deviceId == key.deviceId }
+    if (entry != null && entry !in shownInstances.value) switchInstance(entry)
+    showDownloads()
+    inspectedTask = key
+    filesRequest = key
+  }
+
+  /** Clears [filesRequest] once the inspector shows the Files tab. */
+  fun filesRequestHandled() {
+    filesRequest = null
+  }
+
+  /**
+   * The torrent controller of the device [deviceId] when its features list
+   * [KetchFeatures.TORRENT_CONTROL]; `null` otherwise.
+   */
+  fun torrentControllerOf(deviceId: String): TorrentController? {
+    if (KetchFeatures.TORRENT_CONTROL !in featuresOf(deviceId)) return null
+    return instances.value.firstOrNull { it.deviceId == deviceId }?.instance?.torrents
   }
 
   /**
@@ -1637,6 +1673,18 @@ class AppState(
         monitorAdds[event.taskKey] = message.id
         while (monitorAdds.size > RECENT_ADDS_LIMIT) monitorAdds.remove(monitorAdds.keys.first())
       }
+      is ActivityEvent.FilesNeeded -> messages.post(
+        level = MessageLevel.Info,
+        title = onDevice(
+          event.taskKey.deviceId,
+          Res.string.feedback_choose_files.text(displayName(event.request)),
+        ),
+        taskKey = event.taskKey,
+        deviceId = event.taskKey.deviceId,
+        actions = listOf(
+          MessageAction(Res.string.action_row_choose_files.text()) { chooseFiles(event.taskKey) },
+        ),
+      )
       is ActivityEvent.Completed -> messages.post(
         level = MessageLevel.Success,
         title = onDevice(event.taskKey.deviceId, Res.string.notify_download_complete.text()),

@@ -6,6 +6,7 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.util.toCopy
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_row_choose_files
 import ketch.app.shared.generated.resources.action_row_connections
 import ketch.app.shared.generated.resources.action_row_copy_details
 import ketch.app.shared.generated.resources.action_row_copy_error
@@ -13,6 +14,7 @@ import ketch.app.shared.generated.resources.action_row_copy_link
 import ketch.app.shared.generated.resources.action_row_copy_path
 import ketch.app.shared.generated.resources.action_row_details
 import ketch.app.shared.generated.resources.action_row_download_again
+import ketch.app.shared.generated.resources.action_row_download_all_files
 import ketch.app.shared.generated.resources.action_row_edit_link
 import ketch.app.shared.generated.resources.action_row_enter_credentials
 import ketch.app.shared.generated.resources.action_row_find_another_source
@@ -26,12 +28,14 @@ import ketch.app.shared.generated.resources.action_row_resume
 import ketch.app.shared.generated.resources.action_row_retry
 import ketch.app.shared.generated.resources.action_row_retry_with_connections
 import ketch.app.shared.generated.resources.action_row_retry_with_options
+import ketch.app.shared.generated.resources.action_row_seed
 import ketch.app.shared.generated.resources.action_row_send_to
 import ketch.app.shared.generated.resources.action_row_show_in_folder
 import ketch.app.shared.generated.resources.action_row_speed_limit
 import ketch.app.shared.generated.resources.action_row_start_later
 import ketch.app.shared.generated.resources.action_row_start_now
 import ketch.app.shared.generated.resources.action_row_stop_and_discard
+import ketch.app.shared.generated.resources.action_row_stop_seeding
 
 /**
  * Something the user can do with a task. Row buttons, hover actions, the context menu, the
@@ -123,6 +127,18 @@ sealed class RowAction(val label: UiText, val destructive: Boolean = false) {
 
   /** Copies technical details for a bug report. */
   data object CopyDetails : RowAction(Res.string.action_row_copy_details.text())
+
+  /** Opens the torrent's files in the inspector, to choose which to download. */
+  data object ChooseFiles : RowAction(Res.string.action_row_choose_files.text())
+
+  /** Starts a torrent that waits for its files to be chosen with every file. */
+  data object DownloadAllFiles : RowAction(Res.string.action_row_download_all_files.text())
+
+  /** Stops sharing a finished torrent's files with other peers. */
+  data object StopSeeding : RowAction(Res.string.action_row_stop_seeding.text())
+
+  /** Shares a finished torrent's files with other peers again. */
+  data object Seed : RowAction(Res.string.action_row_seed.text())
 
   /** Cancels the task after confirmation; its progress cannot be resumed. */
   data object StopAndDiscard :
@@ -221,6 +237,12 @@ fun taskActions(
       val primary = if (stalled) RowAction.Reconnect else RowAction.Pause
       waitingOrRunning(primary, listOf(primary, RowAction.Pause).distinct(), capabilities)
     }
+    // Resuming downloads every file, which the menu says as such.
+    is DownloadState.Paused if state.awaitsFileSelection -> waitingOrRunning(
+      RowAction.ChooseFiles,
+      listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles),
+      capabilities
+    )
     // Paused for an urgent download, it still waits in the queue: Resume would do nothing.
     is DownloadState.Paused -> if (state.waitsInQueue) {
       waitingOrRunning(
@@ -245,7 +267,7 @@ fun taskActions(
       val startNow = RowAction.StartNow.takeIf { capabilities.canReschedule }
       waitingOrRunning(startNow, listOfNotNull(startNow), capabilities)
     }
-    is DownloadState.Completed -> completed(capabilities, fileMissing)
+    is DownloadState.Completed -> completed(capabilities, fileMissing, state.seeding)
     is DownloadState.Failed -> failed(request, state, device, retryCount)
     is DownloadState.Canceled -> restartable()
   }
@@ -270,13 +292,18 @@ private fun waitingOrRunning(
   return TaskActions(primary, listOfNotNull(primary), menu)
 }
 
-private fun completed(capabilities: RowCapabilities, fileMissing: Boolean): TaskActions {
+private fun completed(
+  capabilities: RowCapabilities,
+  fileMissing: Boolean,
+  seeding: Boolean,
+): TaskActions {
   val local = !capabilities.isRemote
   if (local && fileMissing) return restartable()
   val canOpen = capabilities.canOpenFiles
   val menu = listOfNotNull(
     RowAction.Open.takeIf { canOpen },
     RowAction.ShowInFolder.takeIf { canOpen },
+    RowAction.StopSeeding.takeIf { seeding },
     RowAction.CopyLink,
     RowAction.CopyPath,
     RowAction.SendTo,

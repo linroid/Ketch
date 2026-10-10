@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.inspector.tabs
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -12,14 +13,20 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures.START
 import com.linroid.ketch.app.state.ListFixtures.downloading
 import com.linroid.ketch.app.state.ListFixtures.row
+import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSort
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.TimelineKind
+import com.linroid.ketch.app.state.TorrentFilesModel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FilesTabTest {
   @Test
@@ -87,14 +94,86 @@ class FilesTabTest {
   @Test
   fun sortedFor_eachOrder_ordersTheFiles() {
     val files = listOf(
-      file("0", path = "b.mkv", size = 10, downloaded = 10, start = 0),
-      file("1", path = "C.mkv", size = 30, downloaded = 0, start = 10),
-      file("2", path = "a.mkv", size = 20, downloaded = 5, start = 40)
+      file("0", path = "b.mkv", size = 10, downloaded = 10, start = 0, number = 1),
+      file("1", path = "C.mkv", size = 30, downloaded = 0, start = 10, number = 2),
+      file("2", path = "a.mkv", size = 20, downloaded = 5, start = 40, number = 3)
     )
 
-    assertEquals(listOf("1", "2", "0"), files.sortedFor(FileSort.IncompleteFirst).map { it.id })
-    assertEquals(listOf("2", "0", "1"), files.sortedFor(FileSort.Name).map { it.id })
-    assertEquals(listOf("1", "2", "0"), files.sortedFor(FileSort.Size).map { it.id })
+    assertEquals(listOf("2", "1", "0"), files.sortedFor(FileSort(FileOrder.Progress)).map { it.id })
+    assertEquals(listOf("2", "0", "1"), files.sortedFor(FileSort(FileOrder.Name)).map { it.id })
+    assertEquals(listOf("1", "2", "0"), files.sortedFor(FileSort(FileOrder.Size)).map { it.id })
+    assertEquals(listOf("0", "1", "2"), files.sortedFor(FileSort(FileOrder.Torrent)).map { it.id })
+    assertEquals(
+      listOf("1", "0", "2"),
+      files.sortedFor(FileSort(FileOrder.Name).reverse()).map { it.id }
+    )
+  }
+
+  @Test
+  fun torrentFiles_selectable_listsUnselectedFiles() = runTest {
+    val row = torrent(
+      files = listOf(
+        SourceFile("0", "Show/S01E01.mkv", 100),
+        SourceFile("1", "Show/S01E02.mkv", 200),
+        SourceFile("2", "Show/sample.mkv", 50),
+      ),
+      segments = listOf(seg(1, 100, 299, 50)),
+      selected = setOf("1"),
+    )
+
+    val files = torrentFiles(row, selectable = true)
+
+    assertEquals(listOf("0", "1", "2"), files.map { it.id })
+    assertEquals(listOf(false, true, false), files.map { it.selected })
+    assertEquals(listOf(0L, 50L, 0L), files.map { it.downloaded })
+    assertEquals(listOf(0L, 100L, 300L), files.map { it.start })
+    assertEquals(listOf("S01E01.mkv", "S01E02.mkv", "sample.mkv"), files.map { it.label }.load())
+    assertEquals(listOf("1"), torrentFiles(row).map { it.id })
+    assertEquals(3, torrentFileCount(row, selectable = true))
+    assertEquals(1, torrentFileCount(row))
+  }
+
+  @Test
+  fun torrentFiles_namesFromTheDevice_neverFallBackToNumbers() = runTest {
+    val row = torrent(files = emptyList(), segments = listOf(seg(0, 0, 99, 10)))
+    val listed = listOf(SourceFile("0", "Show/S01E01.mkv", 100), SourceFile("1", "b.mkv", 5))
+
+    val files = torrentFiles(row, listed, selectable = true)
+
+    assertEquals(listOf("S01E01.mkv", "b.mkv"), files.map { it.label }.load())
+    assertEquals(listOf(true, true), files.map { it.selected })
+  }
+
+  @Test
+  fun toggle_lastSelectedFile_staysChecked() = runTest {
+    val row = torrent(
+      files = listOf(SourceFile("0", "a.mkv", 100), SourceFile("1", "b.mkv", 100)),
+      selected = setOf("1"),
+    )
+    val model = TorrentFilesModel(row.task, null, launch = { backgroundScope.launch(block = it) })
+    val applied = setOf("1")
+
+    model.toggle(listOf("1"), applied)
+
+    assertTrue(model.keepOne)
+    assertEquals(applied, model.checked(applied))
+    assertNull(model.pending)
+    model.toggle(listOf("0"), applied)
+    assertFalse(model.keepOne)
+    assertEquals(setOf("0", "1"), model.checked(applied))
+  }
+
+  @Test
+  fun torrentFileCount_awaiting_countsEveryFile() {
+    val awaiting = DownloadState.Paused(DownloadProgress(0, 300), PauseReason.AwaitingFileSelection)
+    val row = torrent(
+      files = listOf(SourceFile("0", "a.mkv", 100), SourceFile("1", "b.nfo", 2)),
+      state = awaiting,
+    )
+
+    assertEquals(2, torrentFileCount(row, selectable = true))
+    assertEquals(2, torrentFileCount(row))
+    assertEquals(listOf(true, true), torrentFiles(row, selectable = true).map { it.selected })
   }
 
   @Test
@@ -214,7 +293,15 @@ class FilesTabTest {
     size: Long = 100,
     downloaded: Long = 0,
     start: Long = 0,
-  ) = TorrentFile(id = id, path = path, start = start, size = size, downloaded = downloaded)
+    number: Int = 0,
+  ) = TorrentFile(
+    id = id,
+    path = path,
+    start = start,
+    size = size,
+    downloaded = downloaded,
+    number = number,
+  )
 
   private fun seg(index: Int, start: Long, end: Long, downloaded: Long) =
     Segment(index = index, start = start, end = end, downloadedBytes = downloaded)

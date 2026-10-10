@@ -137,6 +137,15 @@ class AppSettingsController(
     update { it.copy(ui = transform(it.ui)) }
   }
 
+  /** The order of torrent files [surface] shows, as last chosen there. */
+  internal fun fileSort(surface: FileSortSurface): FileSort =
+    FileSort.decode(ui.sort[surface.key], surface)
+
+  /** Remembers [sort] as the order of torrent files [surface] shows. */
+  internal fun saveFileSort(surface: FileSortSurface, sort: FileSort) {
+    saveUi { it.copy(sort = it.sort + (surface.key to sort.encode())) }
+  }
+
   /** Persists a change to the desktop app's window and startup behavior. */
   fun saveDesktop(transform: (DesktopSettings) -> DesktopSettings) {
     update { it.copy(desktop = transform(it.desktop)) }

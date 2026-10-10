@@ -292,6 +292,7 @@
   <string name="feedback_send_sign_in">Данные для входа будут отправлены на %1$s.</string>
 
   <string name="feedback_added">Добавлено: %1$s</string>
+  <string name="feedback_choose_files">Выберите, какие файлы «%1$s» скачать</string>
   <plurals name="feedback_recovered">
     <item quantity="one">Возобновляется %1$d загрузка из прошлого сеанса</item>
     <item quantity="few">Возобновляются %1$d загрузки из прошлого сеанса</item>

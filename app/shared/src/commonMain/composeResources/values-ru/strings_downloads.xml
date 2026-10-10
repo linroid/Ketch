@@ -267,6 +267,8 @@
   <string name="downloads_failed_priority">Не удалось изменить приоритет на устройстве «%2$s»: %1$s</string>
   <string name="downloads_failed_connections">Не удалось изменить число подключений на устройстве «%2$s»: %1$s</string>
   <string name="downloads_failed_reschedule">Не удалось перенести %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_files">Не удалось изменить файлы %1$s на устройстве «%2$s»</string>
+  <string name="downloads_failed_seeding">Не удалось изменить раздачу %1$s на устройстве «%2$s»</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">Приостановлена %1$d загрузка</item>

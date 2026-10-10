@@ -2,6 +2,8 @@ package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.ui.state.ToggleableState
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSort
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -91,7 +93,7 @@ class TorrentFilesTest {
 
   @Test
   fun sortBySize_files_putTheLargestFirst() {
-    val sorted = TorrentTree(files, TorrentSort.Size)
+    val sorted = TorrentTree(files, FileSort(FileOrder.Size))
 
     assertEquals(
       listOf("Season 1", "cover.jpg"),
@@ -101,6 +103,76 @@ class TorrentFilesTest {
     assertEquals(
       listOf("Season 1/Extras", "Season 1/S01E02.mkv", "Season 1/S01E01.mkv"),
       season.children.take(3).map { it.path },
+    )
+  }
+
+  @Test
+  fun sortByKind_foldersFirstByNameThenFilesGroupedByKind() {
+    val tree = TorrentTree(
+      listOf(
+        SourceFile("0", "b-folder/x.mkv", 10),
+        SourceFile("1", "a-folder/y.mkv", 10),
+        SourceFile("2", "notes.txt", 10),
+        SourceFile("3", "song.flac", 10),
+        SourceFile("4", "movie.mkv", 10),
+        SourceFile("5", "movie.srt", 10),
+      ),
+      FileSort(FileOrder.Kind),
+    )
+
+    assertEquals(
+      listOf("a-folder", "b-folder", "movie.mkv", "song.flac", "movie.srt", "notes.txt"),
+      tree.roots.map { it.path }
+    )
+  }
+
+  @Test
+  fun sortByTorrentOrder_foldersByTheirFirstFile() {
+    val sorted = TorrentTree(files, FileSort(FileOrder.Torrent))
+    val season = sorted.roots.first() as TorrentNode.Folder
+
+    assertEquals(listOf("Season 1", "cover.jpg"), sorted.roots.map { it.path })
+    assertEquals(
+      listOf(
+        "Season 1/Extras",
+        "Season 1/S01E02.mkv",
+        "Season 1/S01E01.mkv",
+        "Season 1/S01E01.en.srt",
+      ),
+      season.children.map { it.path }
+    )
+  }
+
+  @Test
+  fun sortBySelected_chosenFirstWithFoldersStillFirst() {
+    val sorted = TorrentTree(files, FileSort(FileOrder.Selected), selection = setOf("2", "4"))
+    val season = sorted.roots.first() as TorrentNode.Folder
+
+    assertEquals(listOf("Season 1", "cover.jpg"), sorted.roots.map { it.path })
+    assertEquals(
+      listOf(
+        "Season 1/Extras",
+        "Season 1/S01E01.en.srt",
+        "Season 1/S01E01.mkv",
+        "Season 1/S01E02.mkv",
+      ),
+      season.children.map { it.path }
+    )
+  }
+
+  @Test
+  fun sortByName_reversed_turnsFoldersAndFilesAround() {
+    val sorted = TorrentTree(files, FileSort(FileOrder.Name).reverse())
+    val season = sorted.roots.first() as TorrentNode.Folder
+
+    assertEquals(
+      listOf(
+        "Season 1/Extras",
+        "Season 1/S01E02.mkv",
+        "Season 1/S01E01.mkv",
+        "Season 1/S01E01.en.srt",
+      ),
+      season.children.map { it.path }
     )
   }
 }

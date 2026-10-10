@@ -526,7 +526,7 @@
   <string name="settings_torrent_upload_seed">シードを続ける</string>
   <string name="settings_torrent_upload_off_hint">ピアはこのデバイスから何もダウンロードできません。</string>
   <string name="settings_torrent_upload_while_downloading_hint">トレントのダウンロード中は、取得済みのピースをピアがダウンロードできます。</string>
-  <string name="settings_torrent_upload_seed_hint">Ketchの実行中、完了したトレントは削除するかこの設定をオフにするまでアップロードを続けます。ダウンロード待ちのトレントが優先されます。</string>
+  <string name="settings_torrent_upload_seed_hint">完了したトレントは、Ketchの再起動後も、停止するかこの設定をオフにするまでアップロードを続けます。</string>
   <string name="settings_torrent_upload_limit">アップロード速度制限</string>
   <string name="settings_torrent_upload_limit_hint">すべてのトレントで共有します。</string>
   <string name="settings_torrent_upload_footer">アップロード先のピアには、このデバイスのIPアドレスが見えます。非公開トレントは、そのトラッカーのピアとだけ共有します。</string>

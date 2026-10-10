@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -18,6 +21,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -37,7 +41,13 @@ import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
-import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
+import com.linroid.ketch.app.ui.inspector.tabs.FilesTabContent
+import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSort
+import com.linroid.ketch.app.state.FileSortSurface
+import com.linroid.ketch.app.state.TorrentFilesModel
+import com.linroid.ketch.app.state.appliedSelection
+import kotlinx.coroutines.Job
 import com.linroid.ketch.app.util.SegmentRate
 import kotlinx.datetime.TimeZone
 import kotlin.math.PI
@@ -67,7 +77,7 @@ class InspectorTabsSnapshots {
           TabCard("Connections 6", DockedWidth) {
             ConnectionsTabContent(ubuntu(), RATES, onConnectionsChange = {})
           }
-          TabCard("Files 14", DockedWidth) { FilesTab(season()) }
+          TabCard("Files 14", DockedWidth) { FilesTabContent(season()) }
           TabCard("Activity", DockedWidth) { Activity(ubuntu()) }
         }
       }
@@ -149,7 +159,7 @@ class InspectorTabsSnapshots {
           TabCard("Connections 6", WidestDock) {
             ConnectionsTabContent(ubuntu(), RATES, onConnectionsChange = {})
           }
-          TabCard("Files 300", WidestDock) { FilesTab(pack()) }
+          TabCard("Files 300", WidestDock) { FilesTabContent(pack()) }
         }
       }
     }
@@ -162,10 +172,45 @@ class InspectorTabsSnapshots {
         PhoneSheet { ConnectionsTabContent(ubuntu(), RATES, onConnectionsChange = {}) }
       }
       snapshot("inspector-tabs-phone-files", SnapshotSize.Phone, theme) {
-        PhoneSheet { FilesTab(pack()) }
+        PhoneSheet { FilesTabContent(pack()) }
       }
       snapshot("inspector-tabs-phone-activity", SnapshotSize.Phone, theme) {
         PhoneSheet { Activity(ubuntu(), globalLimit = SpeedLimit.mbps(12)) }
+      }
+    }
+  }
+
+  @Test
+  fun files_selectable_rendersChecksAndTheChoiceBar() {
+    val size = SnapshotSize(1104.dp, 640.dp, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("files-selectable", size, theme) {
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+          modifier = Modifier.padding(KetchTheme.spacing.s4),
+        ) {
+          // Two subtitles and the extras left out; two episodes unchecked since.
+          val chosen = (0..11).map { it.toString() }.toSet()
+          TabCard("Files 14 · changed", DockedWidth) {
+            SelectableFiles(season(selected = chosen), toggles = listOf("10", "11"))
+          }
+          TabCard("Waiting for files", DockedWidth) { SelectableFiles(waitingSeason()) }
+          TabCard("By kind", DockedWidth) {
+            SelectableFiles(season(selected = chosen), sort = FileSort(FileOrder.Kind))
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun files_sortMenu_listsTheOrdersAndReverse() {
+    val size = SnapshotSize(380.dp, 560.dp, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("files-sort-menu", size, theme, interact = { clickOnText("Progress") }) {
+        Column(Modifier.padding(KetchTheme.spacing.s4)) {
+          TabCard("Files 14", DockedWidth) { SelectableFiles(season()) }
+        }
       }
     }
   }
@@ -335,13 +380,50 @@ private fun rates(segments: List<Segment>): List<SegmentRate> =
     }
   }
 
-/** A season of a show: 14 files in a folder, some done. */
-private fun season(): TaskRow {
+/**
+ * The Files tab of [row] with checkboxes, as on a device that changes a torrent's files, after
+ * clicking [toggles], in [sort].
+ */
+@Composable
+private fun SelectableFiles(
+  row: TaskRow,
+  toggles: List<String> = emptyList(),
+  sort: FileSort = FileSortSurface.Inspector.default,
+) {
+  val model = remember(row) {
+    TorrentFilesModel(row.task, controller = null, launch = { Job() }).apply {
+      val files = row.request.resolvedSource?.files.orEmpty()
+      val applied = appliedSelection(row.request, row.state, files)
+      toggles.forEach { toggle(listOf(it), applied) }
+    }
+  }
+  var shown by remember { mutableStateOf(sort) }
+  FilesTabContent(row, model = model, sort = shown, onSort = { shown = it })
+}
+
+/** A season of a show: 14 files in a folder, some done; [selected] downloads, or all of them. */
+private fun season(selected: Set<String> = emptySet()): TaskRow {
+  val (names, sizes) = seasonFiles()
+  val done = listOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.42, 0.18, 0.0, 0.0, 1.0, 1.0)
+  return torrent("season", "The.Show.S01", names, sizes, done, selected)
+}
+
+/** [season] once its file list arrived, waiting for its files to be chosen. */
+private fun waitingSeason(): TaskRow {
+  val (names, sizes) = seasonFiles()
+  val row = torrent("waiting", "The.Show.S01", names, sizes, List(names.size) { 0.0 })
+  val waiting = DownloadState.Paused(
+    DownloadProgress(0, sizes.sum()),
+    PauseReason.AwaitingFileSelection,
+  )
+  return row.copy(state = waiting, segments = emptyList())
+}
+
+private fun seasonFiles(): Pair<List<String>, List<Long>> {
   val episodes = (1..12).map { "The.Show.S01E${it.toString().padStart(2, '0')}.1080p.mkv" }
   val names = (episodes + listOf("Subs/English.srt", "README.nfo")).map { "The.Show.S01/$it" }
   val sizes = List(12) { 1_180_000_000L + it * 7_340_032L } + listOf(84_000L, 3_000L)
-  val done = listOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.42, 0.18, 0.0, 0.0, 1.0, 1.0)
-  return torrent("season", "The.Show.S01", names, sizes, done)
+  return names to sizes
 }
 
 /** A pack of 300 files. */
@@ -358,6 +440,7 @@ private fun torrent(
   names: List<String>,
   sizes: List<Long>,
   done: List<Double>,
+  selected: Set<String> = emptySet(),
 ): TaskRow {
   val url = "magnet:?xt=urn:btih:4c7f3e2b9d1a8f6e5c0b7a3d2e1f9c8b7a6d5e4f&dn=$name"
   val files = names.mapIndexed { index, path -> SourceFile(index.toString(), path, sizes[index]) }
@@ -366,14 +449,14 @@ private fun torrent(
     val start = offset
     offset += file.size
     Segment(index, start, start + file.size - 1, (file.size * done[index]).toLong())
-  }
-  val total = sizes.sum()
-  val source = ResolvedSource(url, "torrent", total, true, name, 1, files = files)
+  }.filter { selected.isEmpty() || it.index.toString() in selected }
+  val total = segments.sumOf { it.totalBytes }
+  val source = ResolvedSource(url, "torrent", sizes.sum(), true, name, 1, files = files)
   val progress = DownloadProgress(segments.sumOf { it.downloadedBytes }, total, 9_400_000)
   return ListFixtures.row(
     id = id,
     state = DownloadState.Downloading(progress),
-    request = DownloadRequest(url = url, resolvedSource = source),
+    request = DownloadRequest(url = url, selectedFileIds = selected, resolvedSource = source),
     now = SampleData.NOW,
   ).copy(segments = segments)
 }
