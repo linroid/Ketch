@@ -45,6 +45,9 @@ graalvmNative {
         // build-time WhenMappings class initializes it, along with its companion.
         "--initialize-at-build-time=okhttp3.Protocol,okhttp3.Protocol\$Companion",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
+        // Ktor 3.6 starts the nonce generator's executor in this class's initializer, and an
+        // executor cannot be kept in the image heap.
+        "--initialize-at-run-time=io.ktor.util.NonceKt",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
       )
