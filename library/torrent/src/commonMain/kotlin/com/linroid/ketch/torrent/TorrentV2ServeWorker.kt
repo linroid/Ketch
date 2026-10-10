@@ -101,6 +101,8 @@ internal class TorrentV2ServeWorker private constructor(
       suspend fun read(index: Int) =
         if (uploads == null) store.tryRead(index) else store.tryRead(index, uploads)
       val worker = launch(dispatcher) {
+        // As the commit worker does: a cancelled worker closes its results with the cancellation.
+        var stopped: Throwable? = null
         try {
           for (job in input) {
             when (job) {
@@ -123,8 +125,11 @@ internal class TorrentV2ServeWorker private constructor(
               }
             }
           }
+        } catch (error: Throwable) {
+          stopped = error
+          throw error
         } finally {
-          output.close()
+          output.close(stopped)
         }
       }
       try {

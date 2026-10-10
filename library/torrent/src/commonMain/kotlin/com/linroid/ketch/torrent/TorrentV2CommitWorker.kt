@@ -52,6 +52,9 @@ internal class TorrentV2CommitWorker private constructor(
       val input = Channel<Submission>(capacity, onUndeliveredElement = { it.claim.close() })
       val output = Channel<Completion>(capacity)
       val worker = launch(dispatcher) {
+        // Closing with the cause the worker stopped with lets the loop tell a stop it must
+        // report from a cancellation it may see before its own job is marked cancelled.
+        var stopped: Throwable? = null
         try {
           for (submission in input) {
             val result = try {
@@ -65,8 +68,11 @@ internal class TorrentV2CommitWorker private constructor(
             }
             output.send(result)
           }
+        } catch (error: Throwable) {
+          stopped = error
+          throw error
         } finally {
-          output.close()
+          output.close(stopped)
         }
       }
       try {

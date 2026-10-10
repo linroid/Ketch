@@ -1,6 +1,12 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.ChannelResult
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -114,6 +120,33 @@ class TorrentV2CommitWorkerTest {
         assertIs<TorrentV2CommitWorker.Completion.Failed>(worker.completions.receive())
         assertEquals(0, budget.allocated)
       }
+    } finally { store.cleanup() }
+  }
+
+  @Test
+  fun cancelledWorkerClosesCompletionsWithItsCancellation() = runTest {
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-worker-cancel-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(4096)
+    val store = TorrentV2PieceStore(document, path, emptySet(), "test", budget, Semaphore(1))
+    store.initialize()
+    try {
+      var seen: ChannelResult<TorrentV2CommitWorker.Completion>? = null
+      val job = launch {
+        TorrentV2CommitWorker.run(store, dispatcher = StandardTestDispatcher(testScheduler)) {
+          // A loop may see the worker's channel close before its own cancellation lands: the
+          // close must then carry that cancellation, not read as a worker that stopped.
+          seen = withContext(NonCancellable) { it.completions.receiveCatching() }
+          awaitCancellation()
+        }
+      }
+      runCurrent()
+      job.cancel()
+      runCurrent()
+      job.join()
+      val result = assertNotNull(seen)
+      assertTrue(result.isClosed)
+      assertIs<CancellationException>(result.exceptionOrNull())
     } finally { store.cleanup() }
   }
 }
