@@ -117,12 +117,13 @@ the next step, Update or Restart.
   with nothing else says it only has maintenance. The scope shows after the summary.
 - A pull request listed by several releases, as when a release repeats its release candidates,
   shows only under the newest (`withoutRepeats`).
-- Settings → About → Updates → Release history (`ReleaseHistoryDialog`) lists every release from
-  0.1.0 (`FIRST_LISTED_RELEASE`) up to the release found or the running version
-  (`AppUpdates.releaseHistory`, `releasesFrom`, which lists the first release too and reads up
-  to twenty pages). Each release is a line with its date and number of changes that opens to its
-  notes, as published: unlike the update dialog, it keeps the changes a newer release repeats, so
-  no release drops out. The newest starts open.
+- Settings → About → Updates → Release history (`ReleaseHistoryDialog`) lists every published
+  release from 0.1.0 (`FIRST_LISTED_RELEASE`) on (`AppUpdates.releaseHistory`, `releasesFrom`).
+  It only pages through `/releases`, up to twenty pages, until one reaches an older release, and
+  never asks for a release by version, so development builds, whose version GitHub has no
+  release of, list them too. Each release is a line with its date and number of changes that
+  opens to its notes, as published: unlike the update dialog, it keeps the changes a newer
+  release repeats, so no release drops out. The newest starts open.
 - Reading them is one request without a range and one per page with one, so the dialog can fail
   on GitHub's hourly limit; it then offers Try again and the release page.
 

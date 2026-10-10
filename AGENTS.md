@@ -626,8 +626,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`releasesBetween`), whose generated pull request lines `releaseChanges` groups into New, Fixed
   and Improved, leaving out developer-only types and `deps`. Each launch records its version as
   `[ui] lastVersion`; a newer one toasts "Updated to Ketch …". About's Release history
-  (`ReleaseHistoryDialog`, `AppUpdates.releaseHistory`, `releasesFrom`) lists every release since
-  0.1.0, each opening to its changes. See
+  (`ReleaseHistoryDialog`, `AppUpdates.releaseHistory`, `releasesFrom`, which only pages through
+  the release list) lists every published release since 0.1.0, each opening to its changes. See
   [updates](docs/updates.md#release-notes)
 - Self-update (Android): `direct` and `play` distribution flavors; only `direct` supplies
   `AndroidUpdater` through `LocalAppUpdates` in Settings → About. It reuses `GitHubReleases`

@@ -232,14 +232,13 @@ private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController
         trailing = { Chevron() },
       )
     }
-    if (request != null) {
-      SettingsRow(
-        title = stringResource(Res.string.settings_about_history),
-        description = stringResource(Res.string.settings_about_history_hint, FIRST_LISTED_RELEASE),
-        modifier = Modifier.clickable(role = Role.Button) { historyShown = true },
-        trailing = { Chevron() },
-      )
-    }
+    // Lists the published releases, whatever this build's version.
+    SettingsRow(
+      title = stringResource(Res.string.settings_about_history),
+      description = stringResource(Res.string.settings_about_history_hint, FIRST_LISTED_RELEASE),
+      modifier = Modifier.clickable(role = Role.Button) { historyShown = true },
+      trailing = { Chevron() },
+    )
     SettingsSwitchRow(
       title = stringResource(Res.string.settings_about_update_auto),
       description = stringResource(Res.string.settings_about_update_auto_hint),
@@ -253,10 +252,8 @@ private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController
   notes?.let { request ->
     ReleaseNotesDialog(updates, request, onDismiss = { notes = null })
   }
-  // Up to the newer release once one is found, so its changes are listed too.
-  val newest = state.releaseVersion() ?: updates.currentVersion
-  if (historyShown && newest != null) {
-    ReleaseHistoryDialog(updates, newest, onDismiss = { historyShown = false })
+  if (historyShown) {
+    ReleaseHistoryDialog(updates, onDismiss = { historyShown = false })
   }
 }
 

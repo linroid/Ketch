@@ -175,8 +175,8 @@ internal class DesktopUpdater(
     feed.releasesBetween(since?.let(ReleaseVersion::parse), releaseVersion(version))
       .map { it.toNotes() }
 
-  override suspend fun releaseHistory(version: String, first: String): List<ReleaseNotes> =
-    feed.releasesFrom(releaseVersion(first), releaseVersion(version)).map { it.toNotes() }
+  override suspend fun releaseHistory(first: String): List<ReleaseNotes> =
+    feed.releasesFrom(releaseVersion(first)).map { it.toNotes() }
 
   override fun setCheckAutomatically(enabled: Boolean) {
     automatic?.cancel()
