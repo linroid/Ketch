@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +40,23 @@ class InstanceArgsTest {
 
     assertEquals(null, command.requestId)
     assertEquals(null, command.destination)
+  }
+
+  @Test
+  fun `add takes a proxy for the download`() {
+    val command = run(
+      "add", "--proxy", "socks5://me:secret@127.0.0.1:1080", "--proxy-bypass", "*.lan",
+      "https://example.com/a.iso",
+    )
+    assertEquals(
+      ProxyConfig.manual("socks5://me:secret@127.0.0.1:1080", bypass = listOf("*.lan")),
+      assertIs<InstanceCommand.Add>(command).proxy,
+    )
+    val direct = run("add", "--no-proxy", "https://example.com/a.iso")
+    assertEquals(ProxyConfig.Direct, assertIs<InstanceCommand.Add>(direct).proxy)
+    assertIs<InstanceArgs.Invalid>(
+      parseInstanceArgs("add", listOf("--proxy", "http://p:8080", "--no-proxy", "https://x.test")),
+    )
   }
 
   @Test

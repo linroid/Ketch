@@ -3,6 +3,7 @@ package com.linroid.ketch.core.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
@@ -37,7 +38,7 @@ import kotlinx.coroutines.withContext
  * Starts, resumes and stops download executions.
  *
  * @param config provides the current global configuration; each start or
- *   resume takes a snapshot of it
+ *   resume takes a snapshot of it, with the task's own [DownloadRequest.proxy] if it has one
  * @param clock stamps when downloads complete
  */
 internal class DownloadCoordinator(
@@ -333,7 +334,7 @@ internal class DownloadCoordinator(
       handle = handle,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
-      config = config(),
+      config = config().forRequest(handle.request),
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
       clock = clock,
@@ -398,7 +399,7 @@ internal class DownloadCoordinator(
       throttle = { _ -> },
       headers = handle.request.headers,
       outputPath = outputPath,
-      config = config(),
+      config = config().forRequest(handle.request),
     )
     try {
       source.cleanup(ctx, record.sourceResumeState)
@@ -422,3 +423,7 @@ internal class DownloadCoordinator(
     val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
   }
 }
+
+/** This configuration as [request] downloads with it: with its own proxy, if it has one. */
+internal fun DownloadConfig.forRequest(request: DownloadRequest): DownloadConfig =
+  request.proxy?.let { copy(proxy = it) } ?: this

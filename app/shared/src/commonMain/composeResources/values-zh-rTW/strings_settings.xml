@@ -421,6 +421,25 @@
   <string name="settings_network_none_found">找不到網路。請連上 Wi-Fi 或乙太網路，然後重新整理。</string>
   <string name="settings_network_http_only">僅適用於 HTTP。FTP 和種子使用系統預設網路。</string>
   <string name="settings_network_gone">%1$s · 未連線</string>
+  <string name="settings_proxy">代理伺服器</string>
+  <string name="settings_proxy_mode">連線方式</string>
+  <string name="settings_proxy_system">系統代理伺服器</string>
+  <string name="settings_proxy_direct">不使用代理伺服器</string>
+  <string name="settings_proxy_manual">手動代理伺服器</string>
+  <string name="settings_proxy_system_hint">依照 %1$s 的代理伺服器設定。</string>
+  <string name="settings_proxy_address">位址</string>
+  <string name="settings_proxy_address_hint">HTTP 或 SOCKS5 代理伺服器。</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <string name="settings_proxy_address_invalid">請使用 http://host:port 或 socks5://host:port</string>
+  <string name="settings_proxy_username">使用者名稱</string>
+  <string name="settings_proxy_password">密碼</string>
+  <string name="settings_proxy_optional">選填</string>
+  <string name="settings_proxy_bypass">直接連線至</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">主機、IP 位址或位址範圍，以逗號分隔。包含子網域。</string>
+  <string name="settings_proxy_bypass_invalid">%1$s 不是有效的主機、位址或範圍</string>
+  <string name="settings_proxy_footer">適用於開始或繼續時的 HTTP 下載。FTP 和種子一律直接連線。</string>
+  <string name="settings_proxy_unsupported">%1$s 無法使用代理伺服器。請先在該裝置上更新 Ketch。</string>
 
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>
@@ -593,6 +612,8 @@
   <string name="settings_search_connections_keywords">分段, 執行緒, 並行, 分割, 多執行緒</string>
   <string name="settings_search_networks">下載使用的網路</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, 乙太網路, 網路介面, vpn, 多重網路, 網卡</string>
+  <string name="settings_search_proxy">下載如何連線至伺服器</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 代理, 代理伺服器, 例外, 防火牆</string>
   <string name="settings_search_trackers">新增到公開種子的 Tracker</string>
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, 新增 tracker, 追蹤器</string>
   <string name="settings_search_pair">從手機或瀏覽器控制此裝置</string>

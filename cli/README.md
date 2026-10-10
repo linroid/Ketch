@@ -98,11 +98,19 @@ instead, use [`ketch add`](#add-a-download).
 | `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
 | `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
 | `--referer <url>` | Send this `Referer` |
+| `--proxy <url>` | Download HTTP(S) through this proxy: `http://[user:pass@]host:port` or `socks5://[user:pass@]host:port` |
+| `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated (`*.lan,10.0.0.0/8`) |
+| `--no-proxy` | Connect directly, whatever the configured or system proxy |
 | `--help`, `-h` | Show help message |
 
 Headers go with every request of the download. A redirect to another scheme, host or port keeps
 only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and the origin of `Referer`;
 cookies, `Authorization` and other headers stay with the site they were given for.
+
+Without `--proxy` or `--no-proxy`, HTTP(S) downloads use `[download.proxy]` of the
+[config file](#downloadproxy), which by default follows the `https_proxy`, `http_proxy`,
+`all_proxy` and `no_proxy` environment variables. FTP and torrents always connect directly. See
+[proxies](../docs/proxy.md).
 
 **Examples:**
 
@@ -122,6 +130,9 @@ ketch --speed-limit 1m --priority high https://example.com/file.zip
 # A file behind a sign-in, with the cookie and referring page the site expects
 ketch -H 'Cookie: session=abc123' --referer https://example.com/downloads \
   https://example.com/files/report.pdf
+
+# Through a SOCKS5 proxy, reaching the local network directly
+ketch --proxy socks5://127.0.0.1:1080 --proxy-bypass '*.lan' https://example.com/file.zip
 
 # FTP with credentials, and a magnet link into a directory, with debug logs
 ketch ftp://user:secret@ftp.example.com/pub/file.iso
@@ -192,6 +203,9 @@ downloads to [its folders](#save-folders).
 | `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
 | `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
 | `--referer <url>` | Send this `Referer` |
+| `--proxy <url>` | Download through this HTTP or SOCKS5 proxy instead of the instance's [proxy setting](#downloadproxy) |
+| `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated |
+| `--no-proxy` | Connect directly, whatever the instance's proxy |
 | `--idempotency-key <key>` | Running the command again with the same key adds the download once |
 | `--json` | Print the task as JSON (see [Task JSON](#task-json)) instead of its ID |
 
@@ -642,6 +656,20 @@ maxConnectionsPerHost = 16
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# How HTTP(S) downloads reach servers; FTP and BitTorrent always connect
+# directly. "system" (the default) follows the https_proxy, http_proxy,
+# all_proxy and no_proxy environment variables, then the system's settings;
+# "direct" uses no proxy; "manual" uses url, an http:// or socks5:// proxy.
+# Hosts in bypass (names, which match their subdomains too, IP addresses or
+# CIDR ranges) and this machine are always reached directly. The apps edit
+# this under Settings > Network.
+# [download.proxy]
+# mode = "manual"
+# url = "socks5://127.0.0.1:1080"
+# username = "me"
+# password = "secret"
+# bypass = ["*.lan", "10.0.0.0/8"]
+
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.
@@ -698,6 +726,19 @@ maxConnectionsPerHost = 16
 A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
 `saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
 be negative.
+
+#### `[download.proxy]`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `mode` | string | `"system"` | `"system"`: the proxy environment variables, then the JVM's and system's settings; `"direct"`: no proxy; `"manual"`: `url` |
+| `url` | string | *(none)* | `http://host:port` or `socks5://host:port`, without credentials; required for `"manual"` |
+| `username` | string | *(none)* | Proxy user name (HTTP Basic or SOCKS5 authentication) |
+| `password` | string | *(none)* | Password for `username`, stored in plain text |
+| `bypass` | string[] | `[]` | Hosts `"manual"` reaches directly: domains (subdomains included), IP addresses, CIDR ranges, `<local>` or `*` |
+
+Requests to this machine (`localhost`, `127.0.0.0/8`, `::1`) never use a proxy. `ketch server` and
+`ketch mcp` apply the setting to every HTTP(S) download; see [proxies](../docs/proxy.md).
 
 #### `[torrent]`
 

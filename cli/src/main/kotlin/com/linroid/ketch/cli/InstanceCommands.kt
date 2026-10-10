@@ -90,6 +90,9 @@ private suspend fun add(
   if (command.requestId != null && !supportsRequestIds) {
     throw CliFailure("${endpoint.label} doesn't support --idempotency-key; update it.")
   }
+  if (command.proxy != null && KetchFeatures.PROXY !in attachment.status.features) {
+    throw CliFailure("${endpoint.label} doesn't support --proxy or --no-proxy; update it.")
+  }
   val request = try {
     DownloadRequest(
       url = command.url,
@@ -101,6 +104,7 @@ private suspend fun add(
       priority = command.priority,
       // Lets a submission whose reply was lost be sent again without adding it twice.
       requestId = command.requestId ?: Uuid.random().toString().takeIf { supportsRequestIds },
+      proxy = command.proxy,
     )
   } catch (e: IllegalArgumentException) {
     throw CliFailure(e.message ?: "Invalid download")

@@ -47,6 +47,7 @@ import ketch.app.shared.generated.resources.settings_logs_open
 import ketch.app.shared.generated.resources.settings_logs_share
 import ketch.app.shared.generated.resources.settings_network_networks
 import ketch.app.shared.generated.resources.settings_network_spread
+import ketch.app.shared.generated.resources.settings_proxy
 import ketch.app.shared.generated.resources.settings_notifications_all_finished
 import ketch.app.shared.generated.resources.settings_notifications_background
 import ketch.app.shared.generated.resources.settings_notifications_browser
@@ -102,6 +103,8 @@ import ketch.app.shared.generated.resources.settings_search_magnet_keywords
 import ketch.app.shared.generated.resources.settings_search_model_keywords
 import ketch.app.shared.generated.resources.settings_search_networks
 import ketch.app.shared.generated.resources.settings_search_networks_keywords
+import ketch.app.shared.generated.resources.settings_search_proxy
+import ketch.app.shared.generated.resources.settings_search_proxy_keywords
 import ketch.app.shared.generated.resources.settings_search_offline_keywords
 import ketch.app.shared.generated.resources.settings_search_open_at_login_keywords
 import ketch.app.shared.generated.resources.settings_search_pair
@@ -472,6 +475,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     description = Res.string.settings_search_networks.text(),
     keywords = Res.string.settings_search_networks_keywords,
     anchors = listOf(Res.string.settings_network_networks, Res.string.settings_network_spread),
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Network,
+    title = Res.string.settings_proxy,
+    description = Res.string.settings_search_proxy.text(),
+    keywords = Res.string.settings_search_proxy_keywords,
   ),
   // BitTorrent
   SettingsIndexEntry(

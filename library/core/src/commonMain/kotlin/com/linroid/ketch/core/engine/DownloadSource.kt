@@ -65,7 +65,8 @@ interface DownloadSource {
   /**
    * Resolves source metadata with the engine's current global [config].
    * Ketch calls this overload for a preview, such as `KetchApi.resolve`,
-   * and [resolveForDownload] for a task. Override it when the resolved
+   * and [resolveForDownload] for a task, whose [config] carries the task's
+   * own [DownloadConfig.proxy] when it has one. Override it when the resolved
    * metadata depends on global defaults, for example when
    * [ResolvedSource.maxSegments] reports
    * [DownloadConfig.maxConnectionsPerDownload]. The default ignores

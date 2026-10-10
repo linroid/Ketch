@@ -21,7 +21,12 @@ interface KetchApi {
   /** Reactive task list updated on any state change. */
   val tasks: StateFlow<List<DownloadTask>>
 
-  /** Create a new download and return the task handle. */
+  /**
+   * Create a new download and return the task handle.
+   *
+   * @throws UnsupportedOperationException if [DownloadRequest.proxy] sets a proxy and this
+   *   backend does not list [KetchFeatures.PROXY]
+   */
   suspend fun download(request: DownloadRequest): DownloadTask
 
   /**
@@ -92,11 +97,13 @@ interface KetchApi {
    * values they started with until paused and resumed):
    * [DownloadConfig.defaultDirectory], [DownloadConfig.maxConnectionsPerDownload],
    * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
-   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs] and
-   * [DownloadConfig.bufferSize].
+   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs],
+   * [DownloadConfig.bufferSize] and [DownloadConfig.proxy].
    *
    * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
    *   changed to a folder that does not exist on this instance
+   * @throws UnsupportedOperationException if [DownloadConfig.proxy] sets a proxy and this
+   *   backend does not list [KetchFeatures.PROXY]
    */
   suspend fun updateConfig(config: DownloadConfig)
 

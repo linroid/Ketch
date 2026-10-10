@@ -1,7 +1,9 @@
 package com.linroid.ketch.hls
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
@@ -27,10 +29,16 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource {
     Regex("https?://[^?#]+\\.m3u8(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(url)
 
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    helper.resolve(url, plan(url, properties))
+    helper.resolve(url, plan(url, properties, ProxyConfig.System))
+
+  override suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = helper.resolve(url, plan(url, properties, config.proxy))
 
   override suspend fun download(context: DownloadContext) {
-    helper.download(context, plan(context.url, context.headers))
+    helper.download(context, plan(context.url, context.headers, context.config.proxy))
   }
 
   override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
@@ -40,13 +48,17 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource {
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
     helper.buildResumeState()
 
-  private suspend fun plan(original: String, headers: Map<String, String>): MediaPlan {
+  private suspend fun plan(
+    original: String,
+    headers: Map<String, String>,
+    proxy: ProxyConfig,
+  ): MediaPlan {
     var url = mediaUrl("hls", original, original)
     var requestHeaders = headers
     val visited = mutableSetOf<String>()
     repeat(4) {
       mediaRequire(visited.add(url), "HLS playlist cycle")
-      val manifest = helper.fetchManifest(url, requestHeaders)
+      val manifest = helper.fetchManifest(url, requestHeaders, proxy)
       val playlist = parseHls(manifest.text, manifest.url)
       playlist.plan?.let { return it }
       val next = playlist.variants.maxBy { it.bandwidth }.url

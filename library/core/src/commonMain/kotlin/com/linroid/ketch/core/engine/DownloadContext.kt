@@ -37,11 +37,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   canceling the download batch scope. Read by sources to
  *   distinguish resegment-cancel from external cancel.
  * @property config snapshot of the global [DownloadConfig] taken when
- *   this download started or resumed. Sources read their defaults from
- *   it instead of their own constructor settings:
+ *   this download started or resumed, with [DownloadRequest.proxy] in
+ *   place of [DownloadConfig.proxy] when the request names one. Sources
+ *   read their defaults from it instead of their own constructor settings:
  *   [DownloadConfig.maxConnectionsPerDownload] via [effectiveConnections],
- *   [DownloadConfig.progressIntervalMs] for progress throttling and
- *   [DownloadConfig.bufferSize] for socket reads. Retries
+ *   [DownloadConfig.progressIntervalMs] for progress throttling,
+ *   [DownloadConfig.bufferSize] for socket reads and [DownloadConfig.proxy]
+ *   for HTTP requests ([HttpEngine.withProxy]). Retries
  *   ([DownloadConfig.retryCount], [DownloadConfig.retryDelayMs]) are
  *   applied by the engine, which calls [DownloadSource.download] again
  *   after a retryable [com.linroid.ketch.api.KetchError]; sources should

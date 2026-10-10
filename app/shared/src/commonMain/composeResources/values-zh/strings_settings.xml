@@ -421,6 +421,25 @@
   <string name="settings_network_none_found">未找到网络。请连接 Wi-Fi 或以太网，然后刷新。</string>
   <string name="settings_network_http_only">仅限 HTTP。FTP 和种子使用系统默认网络。</string>
   <string name="settings_network_gone">%1$s · 未连接</string>
+  <string name="settings_proxy">代理</string>
+  <string name="settings_proxy_mode">连接方式</string>
+  <string name="settings_proxy_system">系统代理</string>
+  <string name="settings_proxy_direct">不使用代理</string>
+  <string name="settings_proxy_manual">手动代理</string>
+  <string name="settings_proxy_system_hint">跟随 %1$s 的代理设置。</string>
+  <string name="settings_proxy_address">地址</string>
+  <string name="settings_proxy_address_hint">HTTP 或 SOCKS5 代理。</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <string name="settings_proxy_address_invalid">请使用 http://host:port 或 socks5://host:port</string>
+  <string name="settings_proxy_username">用户名</string>
+  <string name="settings_proxy_password">密码</string>
+  <string name="settings_proxy_optional">可选</string>
+  <string name="settings_proxy_bypass">直接连接</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">主机、IP 地址或地址段，用逗号分隔。包含子域名。</string>
+  <string name="settings_proxy_bypass_invalid">%1$s 不是有效的主机、地址或地址段</string>
+  <string name="settings_proxy_footer">适用于开始或继续时的 HTTP 下载。FTP 和种子始终直接连接。</string>
+  <string name="settings_proxy_unsupported">%1$s 无法使用代理。请先在该设备上更新 Ketch。</string>
 
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>
@@ -593,6 +612,8 @@
   <string name="settings_search_connections_keywords">分段, 线程, 多线程, 并行</string>
   <string name="settings_search_networks">下载使用的网络</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, 无线, 以太网, 网卡, 接口, vpn, 多网络</string>
+  <string name="settings_search_proxy">下载如何连接服务器</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 代理, 代理, 例外, 防火墙</string>
   <string name="settings_search_trackers">添加到公开种子的 Tracker</string>
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, tracker, 添加 tracker</string>
   <string name="settings_search_pair">从手机或浏览器控制这台设备</string>
