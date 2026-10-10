@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.state
 
 import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.LlmSettings
 
 /**
  * A download AI discovery found.
@@ -212,4 +213,14 @@ fun interface AiDiscoveryProviderFactory {
    * page judge an unsaved form the same way [create] will.
    */
   fun withPlatformCredentials(settings: AiSettings): AiSettings = settings
+
+  /**
+   * The ids of the models [llm]'s provider offers, as it lists them, with the credentials this
+   * platform can supply filled in.
+   *
+   * @throws AiDiscoverFailure when the provider cannot be reached or refuses the request.
+   * @throws UnsupportedOperationException where the platform cannot list them.
+   */
+  suspend fun listModels(llm: LlmSettings): List<String> =
+    throw UnsupportedOperationException("This platform cannot list models")
 }

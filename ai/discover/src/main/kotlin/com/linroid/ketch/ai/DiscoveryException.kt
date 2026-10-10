@@ -43,15 +43,8 @@ internal fun describeLlmFailure(error: Throwable, withProviderReason: Boolean = 
   val http = chain.firstNotNullOfOrNull { it as? KoogHttpClientException }
   val status = http?.statusCode
   if (status != null) {
-    val summary = when {
-      status == 401 || status == 403 -> "The AI provider rejected the API token"
-      status == 404 -> "The AI provider doesn't know this model or endpoint"
-      status == 429 -> "The AI provider is limiting requests"
-      status >= 500 -> "The AI provider had a server error"
-      else -> "The AI provider refused the request"
-    }
     val reason = http.errorBody?.takeIf { withProviderReason }?.let(::providerReason)
-    return "$summary (HTTP $status)" + reason?.let { ": $it" }.orEmpty()
+    return describeProviderStatus(status) + reason?.let { ": $it" }.orEmpty()
   }
   val io = chain.firstNotNullOfOrNull { it as? IOException }
   if (io != null) {
@@ -60,6 +53,18 @@ internal fun describeLlmFailure(error: Throwable, withProviderReason: Boolean = 
   val detail = chain.asReversed().firstNotNullOfOrNull { it.firstLine() }
     ?: error::class.simpleName
   return "The AI request failed: $detail"
+}
+
+/** What an LLM provider's HTTP [status] means, such as "The AI provider is limiting requests". */
+internal fun describeProviderStatus(status: Int): String {
+  val summary = when {
+    status == 401 || status == 403 -> "The AI provider rejected the API token"
+    status == 404 -> "The AI provider doesn't know this model or endpoint"
+    status == 429 -> "The AI provider is limiting requests"
+    status >= 500 -> "The AI provider had a server error"
+    else -> "The AI provider refused the request"
+  }
+  return "$summary (HTTP $status)"
 }
 
 /**

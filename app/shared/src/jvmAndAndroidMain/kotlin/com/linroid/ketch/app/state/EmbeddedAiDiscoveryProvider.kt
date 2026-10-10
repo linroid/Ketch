@@ -6,11 +6,13 @@ import com.linroid.ketch.ai.DiscoverDevice
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoverResult
 import com.linroid.ketch.ai.DiscoveryException
+import com.linroid.ketch.ai.LlmModelLister
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.PageAccessKind
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.ai.DiscoverTurn as EngineTurn
 
 /**
@@ -168,6 +170,7 @@ internal class RunStepListener(
 class EmbeddedAiDiscoveryProviderFactory(
   private val getenv: (String) -> String? = System::getenv,
 ) : AiDiscoveryProviderFactory {
+  private val lister = LlmModelLister()
 
   override fun create(settings: AiSettings): AiDiscoveryProvider? {
     if (!settings.enabled) return null
@@ -185,4 +188,13 @@ class EmbeddedAiDiscoveryProviderFactory(
 
   override fun withPlatformCredentials(settings: AiSettings): AiSettings =
     resolveAiSettingsFromEnv(settings, getenv, autoConfigure = false)
+
+  override suspend fun listModels(llm: LlmSettings): List<String> {
+    val resolved = withPlatformCredentials(AiSettings(llm = llm)).llm
+    return try {
+      lister.list(resolved)
+    } catch (e: DiscoveryException) {
+      throw AiDiscoverFailure(e.message, e.brief, e)
+    }
+  }
 }

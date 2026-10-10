@@ -273,10 +273,8 @@
   <string name="settings_ai_provider_compatible">Custom (OpenAI-compatible)</string>
   <!-- A provider with an endpoint that speaks OpenAI's API, as summaries name it. -->
   <string name="settings_ai_provider_compatible_name">OpenAI-compatible</string>
-  <!-- Under Provider: where to get a key for it. -->
-  <string name="settings_ai_hint_openai">Get a key at platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Get a key at console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Get a key at aistudio.google.com/apikey.</string>
+  <!-- Under Provider: where to get a key for it. %1$s is the page, such as platform.openai.com/api-keys. -->
+  <string name="settings_ai_hint_key">Get a key at %1$s.</string>
   <!-- %1$s is a model's name, such as qwen3; "ollama pull" is a command, keep it as it is. -->
   <string name="settings_ai_hint_ollama">Pull a model first: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM and similar servers.</string>
@@ -305,6 +303,8 @@
   <string name="settings_ai_test_unsupported">AI discovery isn't available on this platform.</string>
   <string name="settings_ai_test_connection_failed">Connection failed.</string>
   <string name="settings_ai_engine_failed">Could not start the discovery engine.</string>
+  <!-- Why the provider's models could not be listed, when it gave no reason. -->
+  <string name="settings_ai_models_failed">Couldn't list the models.</string>
   <string name="settings_ai_search_footer">Without a search provider, Discover only reads the pages you give it.</string>
   <string name="settings_ai_search_provider">Search provider</string>
   <!-- The search provider that is no provider: Discover searches nothing. -->

@@ -37,14 +37,14 @@ data class AiConfig(
 /**
  * Fills blank credentials in [base] from environment variables.
  *
- * The API key for the configured provider is read from that provider's
- * conventional variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
- * `GEMINI_API_KEY`/`GOOGLE_API_KEY`). When [autoConfigure] is on and
- * [base] is still at its defaults, any of those variables also selects
- * the provider and switches discovery on, which keeps the "export a key
- * and go" flow working for the CLI (discovery is on by default, and a
- * config that switched it off is not untouched). The apps turn it off, so the
- * environment never picks a provider their settings page does not show.
+ * Every saved provider, and the default one while none is saved, with a blank API key gets it
+ * from its provider's conventional variable ([LlmProvider.envKeys], such as `OPENAI_API_KEY`,
+ * `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY` or `DEEPSEEK_API_KEY`). When
+ * [autoConfigure] is on and [base] is still at its defaults, each provider whose variable is set
+ * is added, the first in [LlmProvider] order active, which keeps the "export a key and go" flow
+ * working for the CLI (discovery is on by default, and a config that switched it off is not
+ * untouched). The apps turn it off, so the environment never adds a provider their settings page
+ * does not show.
  *
  * Search works the same way: the selected provider's blank key (and,
  * for Google, engine id) are filled from `BRAVE_SEARCH_API_KEY`, or
@@ -63,40 +63,45 @@ fun resolveAiSettingsFromEnv(
   autoConfigure: Boolean = true,
 ): AiSettings {
   val untouched = autoConfigure && base.engineSettings == AiSettings()
-  val llm = resolveLlmFromEnv(base.llm, untouched, getenv)
+  val llm = if (untouched) providersFromEnv(base, getenv) else keysFromEnv(base, getenv)
   val search = resolveSearchFromEnv(base.search, untouched, getenv)
-  return base.copy(llm = llm, search = search)
+  return llm.copy(search = search)
 }
 
-private fun resolveLlmFromEnv(
-  llm: LlmSettings,
-  untouched: Boolean,
-  getenv: (String) -> String?,
-): LlmSettings {
-  if (llm.apiKey.isNotBlank()) return llm
-  val configured = envKeyFor(llm.provider, getenv)
-  if (configured != null) return llm.copy(apiKey = configured)
-  // Untouched settings: let any provider key pick the provider.
-  if (!untouched) return llm
-  for (provider in ENV_PROVIDER_ORDER) {
-    val key = envKeyFor(provider, getenv) ?: continue
-    return llm.copy(provider = provider, apiKey = key)
+/** [settings] with the blank key of each provider, the default one included, from [getenv]. */
+private fun keysFromEnv(settings: AiSettings, getenv: (String) -> String?): AiSettings {
+  if (settings.providers.isEmpty()) {
+    // The default provider, while none is saved, keeps its blank id so it stays the one used.
+    val default = LlmSettings()
+    val key = envKeyFor(default.provider, getenv) ?: return settings
+    return settings.copy(providers = listOf(default.copy(apiKey = key)), active = default.id)
   }
-  return llm
+  return settings.copy(
+    providers = settings.providers.map { entry ->
+      if (entry.apiKey.isNotBlank()) return@map entry
+      envKeyFor(entry.provider, getenv)?.let { entry.copy(apiKey = it) } ?: entry
+    },
+  )
 }
 
+/** Untouched [settings] with a provider for each key in the environment, the first active. */
+private fun providersFromEnv(settings: AiSettings, getenv: (String) -> String?): AiSettings {
+  var resolved = settings
+  for (provider in LlmProvider.entries) {
+    if (provider.requiresBaseUrl) continue
+    val key = envKeyFor(provider, getenv) ?: continue
+    resolved = resolved.withEntry(resolved.newEntry(provider).copy(apiKey = key))
+  }
+  return resolved
+}
+
+/** The API key for [provider] in the environment, from the first of its variables that is set. */
 private fun envKeyFor(
   provider: LlmProvider,
   getenv: (String) -> String?,
-): String? = when (provider) {
-  LlmProvider.OpenAi,
-  LlmProvider.OpenAiCompatible,
-  -> getenv("OPENAI_API_KEY")
-  LlmProvider.Anthropic -> getenv("ANTHROPIC_API_KEY")
-  LlmProvider.Google ->
-    getenv("GEMINI_API_KEY") ?: getenv("GOOGLE_API_KEY")
-  LlmProvider.Ollama -> null
-}?.takeIf { it.isNotBlank() }
+): String? = provider.envKeys.firstNotNullOfOrNull { name ->
+  getenv(name)?.takeIf { it.isNotBlank() }
+}
 
 private fun resolveSearchFromEnv(
   search: SearchSettings,
@@ -138,12 +143,6 @@ private fun resolveSearchFromEnv(
 private const val BRAVE_KEY = "BRAVE_SEARCH_API_KEY"
 private const val GOOGLE_KEY = "GOOGLE_SEARCH_API_KEY"
 private const val GOOGLE_CX = "GOOGLE_SEARCH_CX"
-
-private val ENV_PROVIDER_ORDER = listOf(
-  LlmProvider.OpenAi,
-  LlmProvider.Anthropic,
-  LlmProvider.Google,
-)
 
 /**
  * Fetcher security settings.

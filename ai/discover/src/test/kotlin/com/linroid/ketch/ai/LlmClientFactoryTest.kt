@@ -122,7 +122,7 @@ class LlmClientFactoryTest {
       LlmSettings(provider = LlmProvider.Anthropic, apiKey = "key"),
     )
     assertNotNull(resolved)
-    assertEquals("claude-opus-5", resolved.model.id)
+    assertEquals("claude-opus-5-5", resolved.model.id)
   }
 
   @Test
