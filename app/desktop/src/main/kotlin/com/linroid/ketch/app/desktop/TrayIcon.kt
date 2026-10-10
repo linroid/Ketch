@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -97,11 +98,10 @@ internal fun rememberTrayIcon(look: TrayIconLook, speed: Long?): TrayImage {
   val style = TrayIconStyle.current
   val sail = rememberVectorPainter(KetchIcon.Sail.imageVector)
   val label = if (style.label) rememberSpeedLabel(speed) else null
-  // The label only widens while downloads run, so the menu bar items beside it hold still.
-  val widest = remember { WidestLabel() }
-  val labelWidth = widest.fit(label?.size?.width)
   val painter = remember(sail, look, label, style) { TrayIconPainter(sail, look, style, label) }
-  val width = if (label == null) style.extent else style.extent + LABEL_GAP + labelWidth
+  val icon = style.extent * (1 - style.leading)
+  // The item fits the label; its figures share one width, so it only changes with their count.
+  val width = if (label == null) icon else icon + LABEL_GAP + label.size.width
   return TrayImage(painter, Size(width, style.extent))
 }
 
@@ -114,16 +114,6 @@ private fun rememberSpeedLabel(speed: Long?): TextLayoutResult? {
   val text = speed?.let { speedText(it).resolve() } ?: return null
   return remember(measurer, text) {
     measurer.measure(text, LABEL_STYLE, softWrap = false, maxLines = 1)
-  }
-}
-
-private class WidestLabel {
-  private var widest = 0
-
-  /** The width to give a label [width] points wide, or no label: the widest since the last. */
-  fun fit(width: Int?): Int {
-    widest = if (width == null) 0 else maxOf(widest, width)
-    return widest
   }
 }
 
@@ -199,6 +189,8 @@ private fun TrayIcon.displayMessage(notification: Notification) {
  * @property pausedGlyph [glyph] while everything is paused, which grays the sail out instead of
  *   fading it; `null` fades it.
  * @property label whether the speed follows the icon.
+ * @property leading share of the icon's width left of the sail that the image leaves out: the
+ *   macOS menu bar item already pads it on both sides.
  */
 internal class TrayIconStyle(
   val extent: Float,
@@ -206,10 +198,17 @@ internal class TrayIconStyle(
   val failure: Color,
   val pausedGlyph: List<Color>? = null,
   val label: Boolean = false,
+  val leading: Float = 0f,
 ) {
   companion object {
     /** A template image, of which macOS only keeps the alpha to tint it for the menu bar. */
-    val Template = TrayIconStyle(MAC_EXTENT, listOf(Color.Black), Color.Black, label = true)
+    val Template = TrayIconStyle(
+      extent = MAC_EXTENT,
+      glyph = listOf(Color.Black),
+      failure = Color.Black,
+      label = true,
+      leading = SAIL_LEFT,
+    )
 
     /** The sail in the app icon's colors, which show on light and dark taskbars alike. */
     val AppColors = TrayIconStyle(
@@ -250,6 +249,10 @@ internal class TrayIconPainter(
     val alpha = if (look.dimmed && !grayed) DIMMED_ALPHA else 1f
     val colors = if (grayed) checkNotNull(style.pausedGlyph) else style.glyph
     val extent = size.height
+    translate(left = -extent * style.leading) { drawIcon(extent, colors, alpha) }
+  }
+
+  private fun DrawScope.drawIcon(extent: Float, colors: List<Color>, alpha: Float) {
     val single = colors.singleOrNull()
     if (single != null) {
       drawSail(extent, alpha, ColorFilter.tint(single))
@@ -320,9 +323,10 @@ private const val GRADIENT_INSET = 0.15f
 // Redder than the sail's orange.
 private val FAILURE_RED = Color(0xFFE5202E)
 
-// Where the sails of KetchIcon.Sail start and end, in its 20-unit grid.
+// Where the sails of KetchIcon.Sail start and end, in its 20-unit grid, and where its hull starts.
 private const val SAIL_HEAD = 2.25f / 20
 private const val SAIL_FOOT = 14.32f / 20
+private const val SAIL_LEFT = 2f / 20
 private const val SAIL_TRACK_ALPHA = 0.3f
 
 private const val PROGRESS_STEPS = 32
