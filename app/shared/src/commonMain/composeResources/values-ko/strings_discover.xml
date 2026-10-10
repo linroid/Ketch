@@ -47,6 +47,8 @@
   <string name="discover_send">보내기</string>
   <string name="discover_stop">중지</string>
   <string name="discover_sites_limit">특정 웹사이트로 제한</string>
+  <string name="discover_model_menu_title">모델</string>
+  <string name="discover_model_manage">제공자 관리</string>
   <plurals name="discover_sites_count">
     <item quantity="other">웹사이트 %1$d개</item>
   </plurals>

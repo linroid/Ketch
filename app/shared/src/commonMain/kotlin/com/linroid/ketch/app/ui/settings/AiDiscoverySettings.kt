@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,10 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
 import com.linroid.ketch.app.components.KetchButton
-import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.i18n.UiText
@@ -30,7 +27,6 @@ import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
-import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
@@ -52,31 +48,15 @@ import ketch.app.shared.generated.resources.settings_ai_access_trusted
 import ketch.app.shared.generated.resources.settings_ai_access_trusted_hint
 import ketch.app.shared.generated.resources.settings_ai_access_trusted_none
 import ketch.app.shared.generated.resources.settings_ai_api_key
-import ketch.app.shared.generated.resources.settings_ai_api_key_env
-import ketch.app.shared.generated.resources.settings_ai_api_key_plain
 import ketch.app.shared.generated.resources.settings_ai_connected
 import ketch.app.shared.generated.resources.settings_ai_connected_in
 import ketch.app.shared.generated.resources.settings_ai_content_filter
 import ketch.app.shared.generated.resources.settings_ai_content_filter_hint
 import ketch.app.shared.generated.resources.settings_ai_discovery
-import ketch.app.shared.generated.resources.settings_ai_endpoint
-import ketch.app.shared.generated.resources.settings_ai_endpoint_compatible_hint
-import ketch.app.shared.generated.resources.settings_ai_endpoint_optional
 import ketch.app.shared.generated.resources.settings_ai_engine_id
 import ketch.app.shared.generated.resources.settings_ai_engine_id_hint
 import ketch.app.shared.generated.resources.settings_ai_engine_id_placeholder
-import ketch.app.shared.generated.resources.settings_ai_hint_compatible
-import ketch.app.shared.generated.resources.settings_ai_hint_key
-import ketch.app.shared.generated.resources.settings_ai_hint_ollama
-import ketch.app.shared.generated.resources.settings_ai_model
-import ketch.app.shared.generated.resources.settings_ai_model_any
-import ketch.app.shared.generated.resources.settings_ai_model_group
-import ketch.app.shared.generated.resources.settings_ai_model_placeholder
-import ketch.app.shared.generated.resources.settings_ai_model_required
-import ketch.app.shared.generated.resources.settings_ai_provider
-import ketch.app.shared.generated.resources.settings_ai_provider_compatible
 import ketch.app.shared.generated.resources.settings_ai_provider_compatible_name
-import ketch.app.shared.generated.resources.settings_ai_provider_ollama
 import ketch.app.shared.generated.resources.settings_ai_search_api_key
 import ketch.app.shared.generated.resources.settings_ai_search_footer
 import ketch.app.shared.generated.resources.settings_ai_search_hint_brave
@@ -88,26 +68,22 @@ import ketch.app.shared.generated.resources.settings_ai_status_needs_search
 import ketch.app.shared.generated.resources.settings_ai_status_off
 import ketch.app.shared.generated.resources.settings_ai_status_ready
 import ketch.app.shared.generated.resources.settings_ai_status_unsupported
-import ketch.app.shared.generated.resources.settings_ai_test
-import ketch.app.shared.generated.resources.settings_ai_test_button
 import ketch.app.shared.generated.resources.settings_ai_test_failed
 import ketch.app.shared.generated.resources.settings_ai_test_idle
-import ketch.app.shared.generated.resources.settings_ai_test_running
 import ketch.app.shared.generated.resources.settings_ai_test_waiting
 import ketch.app.shared.generated.resources.settings_ai_the_model
 import ketch.app.shared.generated.resources.settings_ai_web_search
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
-import kotlin.time.TimeMark
-import kotlin.time.TimeSource
 
 /**
- * The content filter, page access, provider, credentials and web search for AI discovery, from
- * [state]'s AI settings. Every change is saved as it is made. Changes to the model or search
+ * The content filter, page access, saved LLM providers and web search for AI discovery, from
+ * [state]'s AI settings. Every change is saved as it is made, but providers, which are added and
+ * edited in a dialog of their own ([ProvidersGroup]). Changes to the provider in use or search
  * rebuild the discovery engine; page access and content filter changes keep it, so running
  * searches carry on, asking by the new rules, and the next search filters by the new setting.
- * Test calls the provider with the saved settings. While discovery is switched off, everything
+ * While discovery is switched off, everything
  * but its switch is disabled, keeping what was entered for when it is switched back on.
  */
 @Composable
@@ -117,17 +93,11 @@ fun AiDiscoverySettings(state: AppState) {
   val supported = ai.supported
   // Everything under the switch follows it.
   val editable = supported && settings.enabled
-  val connectionTest = ai.connectionTest
   val onChange = { changed: AiSettings -> ai.save(changed) }
-  val onLlmChange = { changed: LlmSettings -> ai.saveProvider(changed) }
-  val focusManager = LocalFocusManager.current
   // What the engine will actually run with: a blank token may still be
   // supplied by the environment, which the form is judged by.
   val effective = ai.withPlatformCredentials(settings)
-  val llm = settings.llm
   val search = settings.search
-  val tokenFromEnvironment = llm.apiKey.isBlank() && effective.llm.apiKey.isNotBlank()
-  val testing = connectionTest is AiConnectionTest.Running
 
   SettingsGroup {
     val (status, statusColor) = discoveryStatus(settings, effective, supported)
@@ -151,148 +121,7 @@ fun AiDiscoverySettings(state: AppState) {
 
   PageAccessGroup(access = settings.access, enabled = editable, onChange = ai::saveAccess)
 
-  SettingsGroup(title = stringResource(Res.string.settings_ai_model_group)) {
-    SettingsRow(
-      title = stringResource(Res.string.settings_ai_provider),
-      description = providerHint(llm.provider)?.resolve(),
-      enabled = editable,
-    ) {
-      FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-        verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-      ) {
-        LlmProvider.entries.forEach { provider ->
-          KetchChip(
-            label = provider.buttonLabel.resolve(),
-            selected = provider == llm.provider,
-            enabled = editable,
-            // Each provider keeps its own key, model and endpoint, so switching back to one
-            // finds them as they were.
-            onClick = { if (provider != llm.provider) ai.chooseProvider(provider) },
-          )
-        }
-      }
-    }
-    if (llm.provider.requiresApiKey) {
-      SettingsRow(
-        title = stringResource(Res.string.settings_ai_api_key),
-        description = if (tokenFromEnvironment) {
-          stringResource(Res.string.settings_ai_api_key_env)
-        } else {
-          stringResource(Res.string.settings_ai_api_key_plain)
-        },
-        enabled = editable,
-      ) {
-        SettingsTextInput(
-          value = llm.apiKey,
-          onCommit = { onLlmChange(llm.copy(apiKey = it)) },
-          placeholder = tokenPlaceholder(llm.provider),
-          secret = true,
-          mono = true,
-          enabled = editable,
-        )
-      }
-    }
-    SettingsRow(
-      title = stringResource(Res.string.settings_ai_model),
-      description = if (llm.provider.defaultModel.isBlank()) {
-        stringResource(Res.string.settings_ai_model_required)
-      } else {
-        stringResource(Res.string.settings_ai_model_any)
-      },
-      enabled = editable,
-    ) {
-      SettingsTextInput(
-        value = llm.model,
-        onCommit = { onLlmChange(llm.withModel(it)) },
-        placeholder = llm.provider.defaultModel
-          .ifBlank { stringResource(Res.string.settings_ai_model_placeholder) },
-        mono = true,
-        enabled = editable,
-      )
-      val suggestions = llm.modelChoices
-      if (suggestions.isNotEmpty()) {
-        FlowRow(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-          verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-        ) {
-          suggestions.forEach { suggestion ->
-            KetchButton(
-              text = suggestion,
-              onClick = { onLlmChange(llm.withModel(suggestion)) },
-              variant = if (suggestion == llm.effectiveModel) {
-                KetchButtonVariant.Secondary
-              } else {
-                KetchButtonVariant.Ghost
-              },
-              size = KetchButtonSize.Small,
-              enabled = editable,
-            )
-          }
-        }
-      }
-    }
-    SettingsRow(
-      title = if (llm.provider.requiresBaseUrl) {
-        stringResource(Res.string.settings_ai_endpoint)
-      } else {
-        stringResource(Res.string.settings_ai_endpoint_optional)
-      },
-      // The field shows the default endpoint while it is empty.
-      description = if (llm.provider.requiresBaseUrl) {
-        stringResource(Res.string.settings_ai_endpoint_compatible_hint)
-      } else {
-        null
-      },
-      enabled = editable,
-    ) {
-      SettingsTextInput(
-        value = llm.baseUrl,
-        onCommit = { onLlmChange(llm.copy(baseUrl = it)) },
-        placeholder = llm.provider.defaultBaseUrl.ifBlank { "https://openrouter.ai/api/v1" },
-        mono = true,
-        enabled = editable,
-      )
-    }
-    // How long the last test took, measured from the click.
-    var testStarted by remember { mutableStateOf<TimeMark?>(null) }
-    var testTook by remember { mutableStateOf<Duration?>(null) }
-    LaunchedEffect(connectionTest) {
-      if (connectionTest is AiConnectionTest.Success) {
-        testTook = testStarted?.elapsedNow()
-        testStarted = null
-      }
-    }
-    val model = effective.llm.effectiveModel
-    val (testMessage, testColor) = testStatus(connectionTest, model, testTook)
-    SettingsRow(
-      title = stringResource(Res.string.settings_ai_test),
-      description = testMessage.resolve(),
-      descriptionColor = testColor,
-      enabled = editable,
-      trailing = {
-        KetchButton(
-          text = if (testing) {
-            stringResource(Res.string.settings_ai_test_running)
-          } else {
-            stringResource(Res.string.settings_ai_test_button)
-          },
-          onClick = {
-            // Leaving the field saves what was just typed.
-            focusManager.clearFocus()
-            testStarted = TimeSource.Monotonic.markNow()
-            testTook = null
-            state.launchCommand { ai.testConnection() }
-          },
-          variant = KetchButtonVariant.Secondary,
-          size = KetchButtonSize.Small,
-          enabled = editable && effective.llm.isComplete && !testing,
-        )
-      },
-    )
-  }
+  ProvidersGroup(state, enabled = editable)
 
   SettingsGroup(
     title = stringResource(Res.string.settings_ai_web_search),
@@ -520,7 +349,7 @@ private fun discoveryStatus(
  * @param took how long a successful test took, or `null` when it was not timed.
  */
 @Composable
-private fun testStatus(
+internal fun testStatus(
   test: AiConnectionTest,
   model: String,
   took: Duration?,
@@ -558,33 +387,6 @@ internal val SearchProvider.displayName: UiText
     SearchProvider.None -> Res.string.settings_ai_search_none.text()
     else -> verbatim(label)
   }
-
-/** How a provider reads on its button. */
-private val LlmProvider.buttonLabel: UiText
-  get() = when (this) {
-    LlmProvider.Google -> verbatim("Gemini")
-    LlmProvider.Ollama -> Res.string.settings_ai_provider_ollama.text()
-    LlmProvider.OpenAiCompatible -> Res.string.settings_ai_provider_compatible.text()
-    else -> verbatim(label)
-  }
-
-private fun tokenPlaceholder(provider: LlmProvider): String =
-  when (provider) {
-    LlmProvider.OpenAi, LlmProvider.OpenAiCompatible, LlmProvider.DeepSeek -> "sk-…"
-    LlmProvider.Anthropic -> "sk-ant-…"
-    LlmProvider.Google -> "AIza…"
-    else -> ""
-  }
-
-/** Under Provider: where to get its key, or what else it needs. */
-private fun providerHint(provider: LlmProvider): UiText? = when {
-  provider == LlmProvider.Ollama ->
-    Res.string.settings_ai_hint_ollama.text(LlmProvider.Ollama.defaultModel)
-  provider == LlmProvider.OpenAiCompatible -> Res.string.settings_ai_hint_compatible.text()
-  provider.keyUrl.isNotBlank() ->
-    Res.string.settings_ai_hint_key.text(verbatim(provider.keyUrl.substringAfter("://")))
-  else -> null
-}
 
 private fun searchProviderHint(provider: SearchProvider) = when (provider) {
   SearchProvider.None -> null

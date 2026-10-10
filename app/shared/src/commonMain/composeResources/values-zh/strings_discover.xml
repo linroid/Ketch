@@ -47,6 +47,8 @@
   <string name="discover_send">发送</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">限定网站</string>
+  <string name="discover_model_menu_title">模型</string>
+  <string name="discover_model_manage">管理服务商</string>
   <plurals name="discover_sites_count">
     <item quantity="other">%1$d 个网站</item>
   </plurals>

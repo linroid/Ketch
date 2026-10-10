@@ -382,6 +382,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Configured under Settings → Discover and persisted under `[ai]` in
   `config.toml`; blank credentials of every saved provider fall back to its provider's
   environment variables (`LlmProvider.envKeys`)
+- Settings → Discover lists the saved providers (`ProvidersGroup` in
+  `ui/settings/AiProviderSettings.kt`): the one in use is checked, Use switches, and Add provider
+  or Edit opens a dialog (provider, name, key, endpoint, model candidates, which it can load from
+  the provider, and Test) that saves only on Add or Save (`AiSettingsController.addProvider`,
+  `saveProvider`; `testConnection` and `loadModels` also take an unsaved `LlmSettings`). The
+  Discover composer's model chip (`DiscoverModelChip`) switches provider and model
 - Switching the provider or model (`AiSettingsController.use`) applies to the next turn; running
   turns finish on the engine they started with, and each `DiscoverTurn` records its
   `TurnModel` (provider name and model id), saved in the history

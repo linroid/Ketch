@@ -158,6 +158,16 @@ class AiSettingsController(
     return entry.id
   }
 
+  /**
+   * Saves [entry], a provider made with [AiSettings.newEntry], at the end of the list. It becomes
+   * the one discovery uses when the one in use lacks what it needs, as before any is set up.
+   */
+  fun addProvider(entry: LlmSettings) {
+    val added = settings.withEntry(entry)
+    val replaces = !isComplete(settings.llm.id) || settings.providers.isEmpty()
+    save(if (replaces) added.withActive(entry.id) else added)
+  }
+
   /** Saves [entry] in place of the provider with its id, or as the default one's first save. */
   fun saveProvider(entry: LlmSettings) {
     save(settings.withEntry(entry))
@@ -212,12 +222,22 @@ class AiSettingsController(
    * released afterwards.
    */
   suspend fun testConnection(id: String = settings.llm.id) {
+    testConnection(settings.entry(id) ?: settings.llm.copy(id = id))
+  }
+
+  /**
+   * Calls [entry], saved or not, with its model, as [testConnection] does for a saved provider:
+   * the settings page tests a provider as it is being added or edited, before saving it.
+   */
+  suspend fun testConnection(entry: LlmSettings) {
+    val id = entry.id
     testedId = id
-    val inUse = id == settings.llm.id && settings.enabled && provider != null
+    val inUse = entry == settings.llm && settings.enabled && provider != null
     val temporary = if (inUse) {
       null
     } else {
-      val created = runCatching { factory?.create(settings.copy(enabled = true).withActive(id)) }
+      val draft = settings.withEntry(entry).copy(enabled = true).withActive(id)
+      val created = runCatching { factory?.create(draft) }
       created.exceptionOrNull()?.let { e ->
         if (e is CancellationException) throw e
         connectionTest = AiConnectionTest.Failure(
@@ -261,7 +281,15 @@ class AiSettingsController(
    * list them, or that lacks the key it needs, reports why.
    */
   suspend fun loadModels(id: String) {
-    val entry = settings.entry(id) ?: return
+    loadModels(settings.entry(id) ?: return)
+  }
+
+  /**
+   * Asks [entry], saved or not, for its models, for [modelLists] under its id, so the settings
+   * page can offer them while the provider is being added or edited.
+   */
+  suspend fun loadModels(entry: LlmSettings) {
+    val id = entry.id
     val lister = factory ?: return
     modelLists = modelLists + (id to AiModelList.Loading)
     val result = try {

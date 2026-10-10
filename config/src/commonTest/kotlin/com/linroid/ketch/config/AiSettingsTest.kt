@@ -412,4 +412,24 @@ class AiSettingsTest {
     val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), KetchConfig(ai = off))
     assertEquals(off, ConfigStore.decode(encoded).ai)
   }
+
+  @Test
+  fun `a candidate model is offered without changing the model called`() {
+    val llm = LlmSettings(provider = LlmProvider.Anthropic)
+
+    val added = llm.withCandidate(" claude-next ").withCandidate(LlmProvider.Anthropic.defaultModel)
+
+    assertEquals(listOf("claude-next"), added.models)
+    assertEquals(LlmProvider.Anthropic.defaultModel, added.effectiveModel)
+  }
+
+  @Test
+  fun `the first candidate of a provider without a default model is called`() {
+    val llm = LlmSettings(provider = LlmProvider.LmStudio)
+
+    val added = llm.withCandidate("qwen3").withCandidate("gemma4")
+
+    assertEquals("qwen3", added.effectiveModel)
+    assertEquals(listOf("qwen3", "gemma4"), added.models)
+  }
 }

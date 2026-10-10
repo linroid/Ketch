@@ -47,6 +47,8 @@
   <string name="discover_send">Отправить</string>
   <string name="discover_stop">Остановить</string>
   <string name="discover_sites_limit">Ограничить сайтами</string>
+  <string name="discover_model_menu_title">Модель</string>
+  <string name="discover_model_manage">Управлять провайдерами</string>
   <plurals name="discover_sites_count">
     <item quantity="one">%1$d сайт</item>
     <item quantity="few">%1$d сайта</item>

@@ -47,6 +47,8 @@
   <string name="discover_send">送信</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">Webサイトを限定</string>
+  <string name="discover_model_menu_title">モデル</string>
+  <string name="discover_model_manage">プロバイダを管理</string>
   <plurals name="discover_sites_count">
     <item quantity="other">%1$d件のWebサイト</item>
   </plurals>
