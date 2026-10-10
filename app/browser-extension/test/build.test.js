@@ -33,23 +33,17 @@ describe('build', () => {
   const outputs = build({ outDir });
 
   test('builds for Chromium, Firefox and Safari', () => {
-    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'chrome-store', 'firefox', 'safari']);
+    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox', 'safari']);
   });
 
-  test('store zip omits the development key while the local zip keeps it', () => {
+  test('Chromium zip omits the development key of src', () => {
     const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
     assert.ok(source.key);
-    const manifests = {};
-    for (const browser of ['chrome', 'chrome-store']) {
-      const { dir, zip } = outputs.find((it) => it.browser === browser);
-      const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
-      assert.deepEqual(packaged, JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
-      manifests[browser] = packaged;
-    }
-    assert.equal(manifests.chrome.key, source.key);
-    assert.ok(!Object.hasOwn(manifests['chrome-store'], 'key'));
-    const { key: _key, ...local } = manifests.chrome;
-    assert.deepEqual(manifests['chrome-store'], local);
+    const { dir, zip } = outputs.find((it) => it.browser === 'chrome');
+    const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
+    assert.deepEqual(packaged, JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
+    const { key: _key, ...expected } = source;
+    assert.deepEqual(packaged, expected);
   });
 
   test('every build and zip has the messages of every language', () => {
@@ -72,18 +66,16 @@ describe('build', () => {
   });
 });
 
-test('store and local packages use the same release version', () => {
+test('Chromium release package carries the release version and no key', () => {
   const outDir = mkdtempSync(join(tmpdir(), 'ketch-store-build-'));
   try {
     const outputs = build({ outDir, release: '1.2.3-rc1', buildNumber: '57' });
-    for (const browser of ['chrome', 'chrome-store']) {
-      const { zip } = outputs.find((it) => it.browser === browser);
-      assert.equal(zip, join(outDir, `ketch-extension-1.2.3-rc1-${browser}.zip`));
-      const manifest = JSON.parse(zipEntry(zip, 'manifest.json'));
-      assert.equal(manifest.version, '1.2.3.57');
-      assert.equal(manifest.version_name, '1.2.3-rc1');
-      assert.equal(Object.hasOwn(manifest, 'key'), browser === 'chrome');
-    }
+    const { zip } = outputs.find((it) => it.browser === 'chrome');
+    assert.equal(zip, join(outDir, 'ketch-extension-1.2.3-rc1-chrome.zip'));
+    const manifest = JSON.parse(zipEntry(zip, 'manifest.json'));
+    assert.equal(manifest.version, '1.2.3.57');
+    assert.equal(manifest.version_name, '1.2.3-rc1');
+    assert.ok(!Object.hasOwn(manifest, 'key'));
   } finally {
     rmSync(outDir, { recursive: true, force: true });
   }

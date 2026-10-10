@@ -215,6 +215,7 @@ data class TaskActions(
  *
  * @param retryCount how many times the engine retries a failure, to explain failed tasks.
  * @param stalled whether a downloading task has received no data for a while.
+ * @param starting whether a queued task already holds a slot; see [isStarting].
  * @param fileMissing whether a completed task's file is gone; only checked on local devices.
  */
 fun taskActions(
@@ -223,6 +224,7 @@ fun taskActions(
   device: DeviceInfo,
   retryCount: Int = 0,
   stalled: Boolean = false,
+  starting: Boolean = false,
   fileMissing: Boolean = false,
 ): TaskActions {
   val capabilities = device.capabilities
@@ -241,11 +243,16 @@ fun taskActions(
     } else {
       waitingOrRunning(RowAction.Resume, listOf(RowAction.Resume), capabilities)
     }
-    is DownloadState.Queued -> waitingOrRunning(
-      RowAction.StartNow,
-      listOf(RowAction.Pause, RowAction.StartNow),
-      capabilities
-    )
+    // Out of the queue, it already started: Start now would do nothing.
+    is DownloadState.Queued -> if (starting) {
+      waitingOrRunning(RowAction.Pause, listOf(RowAction.Pause), capabilities)
+    } else {
+      waitingOrRunning(
+        RowAction.StartNow,
+        listOf(RowAction.Pause, RowAction.StartNow),
+        capabilities
+      )
+    }
     is DownloadState.Scheduled -> {
       val startNow = RowAction.StartNow.takeIf { capabilities.canReschedule }
       waitingOrRunning(startNow, listOfNotNull(startNow), capabilities)

@@ -945,7 +945,7 @@ class AiDiscoverControllerTest {
     controller.say("blender")
     runCurrent()
 
-    settings.save(settings.settings.copy(llm = LlmSettings(model = NEXT_MODEL)))
+    settings.save(settings.settings.withEntry(settings.settings.llm.copy(model = NEXT_MODEL)))
     applySnapshotChanges()
     runCurrent()
     assertSame(next, settings.provider)
@@ -955,6 +955,11 @@ class AiDiscoverControllerTest {
 
     assertEquals(TurnStatus.Done, controller.turn.status)
     assertTrue(next.requests.isEmpty())
+    // The turn records what it searched with, and the next one the new model.
+    assertEquals(TurnModel("OpenAI", LlmProvider.OpenAi.defaultModel), controller.turn.model)
+    controller.say("only the macOS build")
+    runCurrent()
+    assertEquals(TurnModel("OpenAI", NEXT_MODEL), controller.turn.model)
   }
 
   @Test

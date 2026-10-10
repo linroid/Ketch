@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
@@ -80,6 +81,26 @@ class InspectorModelTest {
 
     assertEquals(queued.content.detail, reason?.text)
     assertNull(reason?.action)
+  }
+
+  @Test
+  fun inspectorReason_startingMagnet_saysFindingPeers() = runTest {
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:45b3e332a3b991b3ff000513c4a135054775d73d")
+    val starting = row("m", DownloadState.Queued, request = magnet, features = KetchFeatures.ALL)
+
+    val reason = inspectorReason(starting, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals("Finding peers", reason?.text?.load())
+    assertNull(reason?.action)
+  }
+
+  @Test
+  fun inspectorReason_startingLink_saysStartingRatherThanTheSite() = runTest {
+    val starting = row("s", DownloadState.Queued, features = KetchFeatures.ALL)
+
+    val reason = inspectorReason(starting, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals("Starting", reason?.text?.load())
   }
 
   @Test

@@ -26,3 +26,10 @@ internal enum class SuccessFeedbackSupport {
 
 /** What this platform's host plays when a download finishes or Discover finds downloads. */
 internal expect val successFeedbackSupport: SuccessFeedbackSupport
+
+/**
+ * Whether this platform's host keeps the system awake while downloads run (`[power] keepAwake`):
+ * the desktop and Android apps. iOS suspends apps in the background, and the web app has no
+ * downloads of its own.
+ */
+internal expect val keepAwakeSupported: Boolean

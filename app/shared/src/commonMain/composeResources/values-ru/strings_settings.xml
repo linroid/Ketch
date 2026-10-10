@@ -136,6 +136,9 @@
   <string name="settings_general_badge_active">Активные загрузки</string>
   <string name="settings_general_badge_failures">Только ошибки</string>
   <string name="settings_general_badge_off">Ничего</string>
+  <string name="settings_general_power">Питание</string>
+  <string name="settings_general_keep_awake">Не засыпать во время загрузок</string>
+  <string name="settings_general_keep_awake_hint">%1$s не будет сам переходить в режим сна, пока идут загрузки. Экран при этом может выключаться.</string>
 
   <string name="settings_notifications_downloads">Загрузки</string>
   <string name="settings_notifications_footer">«Уведомлять» использует системные уведомления. «Только в приложении» — сообщения внутри Ketch.</string>
@@ -219,9 +222,7 @@
   <string name="settings_ai_provider_ollama">Ollama · работает локально, без ключа</string>
   <string name="settings_ai_provider_compatible">Другой (совместимый с OpenAI)</string>
   <string name="settings_ai_provider_compatible_name">Совместимый с OpenAI</string>
-  <string name="settings_ai_hint_openai">Получите ключ на platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Получите ключ на console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Получите ключ на aistudio.google.com/apikey.</string>
+  <string name="settings_ai_hint_key">Получите ключ на %1$s.</string>
   <string name="settings_ai_hint_ollama">Сначала загрузите модель: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM и подобные серверы.</string>
   <string name="settings_ai_api_key_env">Используется ключ из переменной окружения. Ключ, указанный здесь, заменяет его.</string>
@@ -242,6 +243,7 @@
   <string name="settings_ai_test_unsupported">ИИ-поиск недоступен на этой платформе.</string>
   <string name="settings_ai_test_connection_failed">Не удалось подключиться.</string>
   <string name="settings_ai_engine_failed">Не удалось запустить механизм поиска.</string>
+  <string name="settings_ai_models_failed">Не удалось получить список моделей.</string>
   <string name="settings_ai_search_footer">Без поискового провайдера Поиск читает только те страницы, которые вы ему дадите.</string>
   <string name="settings_ai_search_provider">Поисковый провайдер</string>
   <string name="settings_ai_search_none">Нет</string>
@@ -594,6 +596,7 @@
   <string name="settings_search_start_hidden_keywords">автозапуск, фон, свернуть, строка меню, трей</string>
   <string name="settings_search_badge">Что показывает значок в Dock или на панели задач</string>
   <string name="settings_search_badge_keywords">счётчик, наклейка, dock, панель задач</string>
+  <string name="settings_search_keep_awake_keywords">сон, спящий режим, питание, батарея, не засыпать, wake lock</string>
   <string name="settings_search_shortcuts">Все сочетания клавиш</string>
   <string name="settings_search_shortcuts_keywords">клавиши, горячие клавиши, быстрые клавиши</string>
   <string name="settings_search_finished_keywords">завершено, готово, оповещение</string>

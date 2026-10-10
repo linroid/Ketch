@@ -530,7 +530,9 @@ class AiDiscoverController(
       return
     }
     val request = requestFor(session, turn)
-    editTurn(run) { it.copy(status = TurnStatus.Running) }
+    // What it searches with: a provider or model chosen later applies to the next turn.
+    val model = aiSettings.activeModel
+    editTurn(run) { it.copy(status = TurnStatus.Running, model = model) }
     run.job = scope.launch {
       // The agent reports steps from its own threads; they reach the turn in order, here.
       val reported = Channel<DiscoveryStep>(Channel.UNLIMITED)

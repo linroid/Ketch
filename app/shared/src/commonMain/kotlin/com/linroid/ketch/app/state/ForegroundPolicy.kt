@@ -34,6 +34,14 @@ data class ForegroundStatus(
   /** Whether the service must run in the foreground. */
   val isRequired: Boolean
     get() = downloading > 0 || queued > 0 || serverPort != null || discovering > 0
+
+  /**
+   * Whether the system should stay awake, as [KeepAwake] keeps it: while downloads run or wait in
+   * the queue. The local server and Discover never do, as the server may run all day and a search
+   * can wait hours for the user's OK.
+   */
+  val keepsAwake: Boolean
+    get() = downloading > 0 || queued > 0
 }
 
 /**

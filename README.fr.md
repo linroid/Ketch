@@ -25,7 +25,7 @@
 
 <p align="center">
 
-[![Dernière version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Dernière version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Application web](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
@@ -138,6 +138,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   un autre appareil sans changer de vue.
 - **Sans interface graphique sur NAS ou serveur** — `ketch server` exécute le même moteur avec
   une API REST et l'application web intégrées. Les applications le trouvent sur votre réseau.
+- **Depuis le terminal** — `ketch add`, `list`, `pause`, `resume` et `watch` pilotent les
+  téléchargements de l'application Ketch ou d'un serveur depuis un terminal ou un script ; `watch`
+  produit des lignes JSON ([CLI](cli/README.md#work-on-a-running-ketch)).
 
 ### Maîtrisez votre bande passante
 
@@ -163,6 +166,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Intégré à chaque plateforme** — Barre de menus ou zone de notification, notifications et
   progression dans le Dock et la barre des tâches sur ordinateur ; téléchargements en arrière-plan
   sur Android et iOS 26.
+- **Éveillé pendant les téléchargements** — Les apps pour ordinateur et Android empêchent la mise
+  en veille automatique du système pendant les téléchargements ; l'écran peut tout de même
+  s'éteindre (**Réglages → Général**).
 - **Votre style, votre langue** — Thèmes clair et sombre avec quatre couleurs d'accent, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch et Français
   ([traductions](docs/development/localization.md)).
@@ -177,8 +183,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   l'avez déjà accordée. Utilisez votre propre service de modèles : OpenAI, Anthropic, Gemini,
   Ollama ou tout service compatible avec OpenAI. Disponible dans les applications de bureau et
   Android, ainsi qu'avec `ketch ai-discover` ([configuration](docs/ai-discovery.md)).
-- **Serveur MCP** — `ketch mcp` permet aux assistants IA de lancer, suivre et gérer vos
-  téléchargements via le [Model Context Protocol](cli/README.md#mcp-server).
+- **Serveur MCP** — `ketch mcp` permet aux assistants IA de lancer, suivre et gérer les
+  téléchargements de l'application Ketch ou d'un serveur via le
+  [Model Context Protocol](cli/README.md#mcp-server).
 
 <a id="getting-started"></a>
 
@@ -246,13 +253,10 @@ La [documentation CLI](cli/README.md) présente toutes les commandes.
   dossiers selon vos règles
 - **Choix des fichiers torrent à tout moment** — Choisir les fichiers d'un lien magnet une fois
   ses détails reçus et modifier la sélection pendant le téléchargement
-- **Maintien en éveil** — Empêcher la mise en veille pendant les téléchargements, puis permettre
-  la mise en veille ou l'arrêt à la fin
+- **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
+  au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un
   téléchargement
-- **Ligne de commande pour les appareils actifs** — `ketch` et les agents IA ajoutent, listent,
-  mettent en pause et suivent les téléchargements de l'application ou d'un serveur sans démarrer
-  un second moteur
 - **Image Docker** — Une image officielle pour NAS et serveurs domestiques x64 et ARM, avec
   contrôle d'état et port torrent fixe
 - **Transferts entre appareils** — Envoyer vers et Déplacer vers transmettent les données déjà

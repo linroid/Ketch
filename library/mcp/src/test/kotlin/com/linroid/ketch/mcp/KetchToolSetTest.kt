@@ -10,11 +10,13 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -76,6 +78,63 @@ class KetchToolSetTest {
   }
 
   @Test
+  fun startDownload_requestId_isSentWithTheRequest() = runTest {
+    val ketch = RecordingKetchApi()
+
+    KetchToolSet(ketch).startDownload(
+      url = "https://example.com/a.iso",
+      requestId = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a",
+    )
+
+    assertEquals("6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a", ketch.requests.single().requestId)
+  }
+
+  @Test
+  fun startDownload_requestIdNotAUuid_isRejected() = runTest {
+    val ketch = RecordingKetchApi()
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso", requestId = "job-42")
+    }
+    assertTrue(ketch.requests.isEmpty())
+  }
+
+  // An instance without request IDs drops the field, so a retried call would add the download
+  // again.
+  @Test
+  fun startDownload_requestIdOnAnInstanceWithoutRequestIds_isRejected() = runTest {
+    val ketch = RecordingKetchApi(features = emptySet())
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(
+        url = "https://example.com/a.iso",
+        requestId = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a",
+      )
+    }
+    assertTrue(ketch.requests.isEmpty())
+
+    KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso")
+    assertEquals(1, ketch.requests.size)
+  }
+
+  // `ketch mcp` hands its tools the instance it is attached to, which changes when the instance
+  // restarts, so every call asks for it again.
+  @Test
+  fun tools_connectProvider_askedOnEveryCall() = runTest {
+    val first = RecordingKetchApi()
+    val second = RecordingKetchApi()
+    var current: KetchApi = first
+    val tools = KetchToolSet({ current })
+
+    tools.startDownload(url = "https://example.com/a.iso")
+    current = second
+    tools.startDownload(url = "https://example.com/b.iso")
+
+    assertEquals(listOf("https://example.com/a.iso"), first.requests.map { it.url })
+    assertEquals(listOf("https://example.com/b.iso"), second.requests.map { it.url })
+  }
+
+  @Test
   fun resolveUrl_anyUrl_sendsNoOriginToResolve() = runTest {
     val ketch = RecordingKetchApi()
 
@@ -85,7 +144,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_queuedTask_includesQueuePosition() {
+  fun getDownload_queuedTask_includesQueuePosition() = runTest {
     val task = QueuedTask(request(), queuePosition = 2)
 
     val json = getDownload(task)
@@ -95,7 +154,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_preemptedTask_includesPauseReasonAndPreemptedBy() {
+  fun getDownload_preemptedTask_includesPauseReasonAndPreemptedBy() = runTest {
     val state = DownloadState.Paused(
       DownloadProgress(10, 100),
       PauseReason.Preempted("task-urgent"),
@@ -111,7 +170,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_completedTask_includesCompletedAt() {
+  fun getDownload_completedTask_includesCompletedAt() = runTest {
     val completedAt = Instant.parse("2026-10-03T08:00:03.123Z")
     val state = DownloadState.Completed("/d/a.iso", 100, completedAt = completedAt)
     val task = QueuedTask(request(), state)
@@ -124,13 +183,14 @@ class KetchToolSetTest {
 
   private fun request() = DownloadRequest(url = "https://example.com/a.iso")
 
-  private fun getDownload(task: DownloadTask): JsonObject {
+  private suspend fun getDownload(task: DownloadTask): JsonObject {
     val result = KetchToolSet(RecordingKetchApi(listOf(task))).getDownload(task.taskId)
     return Json.parseToJsonElement(result).jsonObject
   }
 
   private class RecordingKetchApi(
     tasks: List<DownloadTask> = emptyList(),
+    private val features: Set<String> = setOf(KetchFeatures.REQUEST_ID),
   ) : KetchApi {
     val requests = mutableListOf<DownloadRequest>()
     val resolveProperties = mutableListOf<Map<String, String>>()
@@ -160,7 +220,28 @@ class KetchToolSetTest {
 
     override suspend fun start() {}
 
-    override suspend fun status(): KetchStatus = throw UnsupportedOperationException()
+    override suspend fun status(): KetchStatus = KetchStatus(
+      name = "Ketch",
+      version = "1.0.0",
+      revision = "abc1234",
+      uptime = 0,
+      config = DownloadConfig(),
+      system = SystemInfo(
+        os = "TestOS",
+        arch = "test",
+        separator = "/",
+        javaVersion = "21",
+        availableProcessors = 1,
+        maxMemory = 0,
+        totalMemory = 0,
+        freeMemory = 0,
+        downloadDirectory = "/downloads",
+        totalSpace = 0,
+        freeSpace = 0,
+        usableSpace = 0,
+      ),
+      features = features,
+    )
 
     override suspend fun updateConfig(config: DownloadConfig) {}
 

@@ -31,6 +31,7 @@ import ketch.app.shared.generated.resources.settings_general_badge
 import ketch.app.shared.generated.resources.settings_general_close
 import ketch.app.shared.generated.resources.settings_general_density
 import ketch.app.shared.generated.resources.settings_general_device_name
+import ketch.app.shared.generated.resources.settings_general_keep_awake
 import ketch.app.shared.generated.resources.settings_general_language
 import ketch.app.shared.generated.resources.settings_general_open_at_login
 import ketch.app.shared.generated.resources.settings_general_reduce_motion
@@ -75,6 +76,7 @@ import ketch.app.shared.generated.resources.settings_search_checklist_keywords
 import ketch.app.shared.generated.resources.settings_search_clipboard_keywords
 import ketch.app.shared.generated.resources.settings_search_close
 import ketch.app.shared.generated.resources.settings_search_close_keywords
+import ketch.app.shared.generated.resources.settings_search_keep_awake_keywords
 import ketch.app.shared.generated.resources.settings_search_code_keywords
 import ketch.app.shared.generated.resources.settings_search_connections_keywords
 import ketch.app.shared.generated.resources.settings_search_density
@@ -227,6 +229,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     description = Res.string.settings_search_badge.text(),
     keywords = Res.string.settings_search_badge_keywords,
     needs = SettingsFeature.Desktop,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.General,
+    title = Res.string.settings_general_keep_awake,
+    keywords = Res.string.settings_search_keep_awake_keywords,
+    needs = SettingsFeature.KeepAwake,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.General,

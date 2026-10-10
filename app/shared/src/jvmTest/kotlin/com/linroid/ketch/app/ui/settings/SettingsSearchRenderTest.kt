@@ -68,7 +68,12 @@ class SettingsSearchRenderTest {
     const val FRAMES = 30
 
     /** What the desktop app offers; the web's and phones' entries are not on its pages. */
-    val Shown = setOf(null, SettingsFeature.Desktop, SettingsFeature.SetupChecklist)
+    val Shown = setOf(
+      null,
+      SettingsFeature.Desktop,
+      SettingsFeature.SetupChecklist,
+      SettingsFeature.KeepAwake
+    )
 
     /**
      * Settings that only show sometimes: the add sheet's folders once there are any, and the

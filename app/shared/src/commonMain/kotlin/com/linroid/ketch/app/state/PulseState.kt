@@ -164,13 +164,16 @@ data class PulseCounts(
   )
 
   companion object {
-    /** Counts tasks in [states]. */
-    fun of(states: Collection<DownloadState>): PulseCounts = PulseCounts(
-      downloading = states.count(StatusFilter.Downloading::matches),
-      waiting = states.count(StatusFilter.Waiting::matches),
-      paused = states.count(StatusFilter.Paused::matches),
-      done = states.count(StatusFilter.Done::matches),
-      failed = states.count(StatusFilter.Failed::matches),
+    /**
+     * Counts tasks in [states], [starting] of which are queued but hold a slot ([isStarting]),
+     * so they count as downloading.
+     */
+    fun of(states: Collection<DownloadState>, starting: Int = 0): PulseCounts = PulseCounts(
+      downloading = states.count { StatusFilter.Downloading.matches(it) } + starting,
+      waiting = states.count { StatusFilter.Waiting.matches(it) } - starting,
+      paused = states.count { StatusFilter.Paused.matches(it) },
+      done = states.count { StatusFilter.Done.matches(it) },
+      failed = states.count { StatusFilter.Failed.matches(it) },
     )
   }
 }
@@ -404,6 +407,8 @@ data class PulseState(
  * @property config its current download config, for the speed limit; `null` while it loads.
  * @property status reads its status, for the free space.
  * @property health how well the app is connected to it.
+ * @property features what it reports in [KetchStatus.features], which tells its starting tasks
+ *   from waiting ones; empty while unknown.
  */
 class PulseSource(
   val deviceId: String,
@@ -412,6 +417,7 @@ class PulseSource(
   val config: Flow<DownloadConfig?>,
   val status: suspend () -> KetchStatus,
   val health: Flow<DeviceHealth> = flowOf(DeviceHealth.Local()),
+  val features: Flow<Set<String>> = flowOf(emptySet()),
 )
 
 /**
@@ -480,10 +486,9 @@ class PulseModel(
   }
 
   private fun liveFlow(source: PulseSource): Flow<DeviceLive> = combine(
-    source.tasks
-      .flatMapLatest(::taskStates)
+    combine(source.tasks.flatMapLatest(::taskStates), source.features, ::Pair)
       .throttleLatest(UPDATE_INTERVAL)
-      .map(::summarize),
+      .map { (samples, features) -> summarize(samples, features) },
     source.health,
     source.config.map { it?.speedLimit ?: SpeedLimit.Unlimited }.distinctUntilChanged()
   ) { totals, health, cap ->
@@ -492,12 +497,15 @@ class PulseModel(
 
   private fun taskStates(tasks: List<DownloadTask>): Flow<List<TaskSample>> {
     if (tasks.isEmpty()) return flowOf(emptyList())
-    return combine(tasks.map { task -> task.state.map { TaskSample(task.request, it) } }) {
-      it.toList()
+    val samples = tasks.map { task ->
+      combine(task.state, task.queuePosition) { state, position ->
+        TaskSample(task.request, state, position)
+      }
     }
+    return combine(samples) { it.toList() }
   }
 
-  private fun summarize(samples: List<TaskSample>): TaskTotals {
+  private fun summarize(samples: List<TaskSample>, features: Set<String>): TaskTotals {
     var failures = 0
     var speed = 0L
     var downloaded = 0L
@@ -524,7 +532,10 @@ class PulseModel(
       }
     }
     return TaskTotals(
-      counts = PulseCounts.of(samples.map { it.state }),
+      counts = PulseCounts.of(
+        states = samples.map { it.state },
+        starting = samples.count { it.state.isStarting(it.queuePosition, features) },
+      ),
       failures = failures,
       speed = speed,
       downloadedBytes = downloaded,
@@ -588,6 +599,7 @@ class PulseModel(
   private data class TaskSample(
     val request: DownloadRequest,
     val state: DownloadState,
+    val queuePosition: Int?,
   )
 
   private data class TaskTotals(

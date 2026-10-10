@@ -201,4 +201,7 @@
 
   <!-- Title of the Settings window. -->
   <string name="settings_window_title">Settings</string>
+
+  <!-- Why Ketch keeps the system from sleeping, as the system lists it among what prevents sleep. -->
+  <string name="keep_awake_reason">Downloads are running</string>
 </resources>

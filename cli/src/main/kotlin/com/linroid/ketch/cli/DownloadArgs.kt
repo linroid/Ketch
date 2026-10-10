@@ -30,19 +30,113 @@ internal sealed interface DownloadArgs {
   ) : DownloadArgs
 }
 
-private val valueOptions = setOf(
-  "--speed-limit", "--priority", "--max-concurrent", "-H", "--header", "--user-agent", "--referer",
-  "--proxy", "--proxy-bypass",
-)
-
 /**
  * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
  * it; apps group and filter downloads by it.
  */
-private const val ORIGIN_PROPERTY = "ketch.origin"
+internal const val ORIGIN_PROPERTY = "ketch.origin"
 
 /** Value of [ORIGIN_PROPERTY] on downloads started from the command line. */
-private const val CLI_ORIGIN = "cli"
+internal const val CLI_ORIGIN = "cli"
+
+/** Options that set a request header: `-H 'Name: value'`, `--user-agent` and `--referer`. */
+internal val HEADER_OPTIONS = setOf("-H", "--header", "--user-agent", "--referer")
+
+/** The request headers [HEADER_OPTIONS] give, in the order given. */
+internal class HeaderOptions {
+  private val headers = LinkedHashMap<String, String>()
+
+  /**
+   * Applies [option], one of [HEADER_OPTIONS], with its [value], returning why it cannot be used
+   * or `null`. Header names ignore case, so a later option replaces an earlier one however it is
+   * spelled.
+   */
+  fun apply(option: String, value: String): String? {
+    when (option) {
+      "-H", "--header" -> {
+        val separator = value.indexOf(':')
+        if (separator <= 0) return "$option expects 'Name: value'"
+        set(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
+      }
+      "--user-agent" -> set("User-Agent", value)
+      "--referer" -> set("Referer", value)
+      else -> return "unknown option '$option'"
+    }
+    return null
+  }
+
+  /** The headers, or why one of them cannot be sent. */
+  fun build(): Result<Map<String, String>> = try {
+    RequestHeaders.requireValid(headers)
+    Result.success(headers.toMap())
+  } catch (e: IllegalArgumentException) {
+    Result.failure(e)
+  }
+
+  private fun set(name: String, value: String) {
+    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
+    headers[name] = value
+  }
+}
+
+/** Options that choose a download's proxy with a value: `--proxy` and `--proxy-bypass`. */
+internal val PROXY_OPTIONS = setOf("--proxy", "--proxy-bypass")
+
+/** The flag that downloads without a proxy. */
+internal const val NO_PROXY_OPTION = "--no-proxy"
+
+/**
+ * The proxy [PROXY_OPTIONS] and [NO_PROXY_OPTION] give a download, in place of the configured
+ * one.
+ */
+internal class ProxyOptions {
+  private var url: String? = null
+  private var bypass: List<String>? = null
+  private var direct = false
+
+  /** Notes [NO_PROXY_OPTION]. */
+  fun noProxy() {
+    direct = true
+  }
+
+  /** Applies [option], one of [PROXY_OPTIONS], with its [value], returning why it cannot be used. */
+  fun apply(option: String, value: String): String? {
+    when (option) {
+      "--proxy" -> url = value
+      "--proxy-bypass" -> {
+        val entries = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        entries.firstOrNull { !ProxyConfig.isValidBypass(it) }?.let {
+          return "invalid host '$it' in --proxy-bypass"
+        }
+        bypass = entries
+      }
+      else -> return "unknown option '$option'"
+    }
+    return null
+  }
+
+  /** The proxy, `null` to keep the configured one, or why the options cannot be used together. */
+  fun build(): Result<ProxyConfig?> {
+    val proxyUrl = url
+    val problem = when {
+      direct && proxyUrl != null -> "--proxy and --no-proxy cannot be used together"
+      bypass != null && proxyUrl == null -> "--proxy-bypass requires --proxy"
+      else -> null
+    }
+    if (problem != null) return Result.failure(IllegalArgumentException(problem))
+    if (direct) return Result.success(ProxyConfig.Direct)
+    if (proxyUrl == null) return Result.success(null)
+    return try {
+      Result.success(ProxyConfig.manual(proxyUrl, bypass.orEmpty()))
+    } catch (_: IllegalArgumentException) {
+      val message = "invalid proxy '$proxyUrl' (expected http://host:port or socks5://host:port)"
+      Result.failure(IllegalArgumentException(message))
+    }
+  }
+}
+
+private val valueOptions =
+  setOf("--speed-limit", "--priority", "--max-concurrent") + HEADER_OPTIONS + PROXY_OPTIONS
 
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
@@ -51,22 +145,15 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var speedLimit = SpeedLimit.Unlimited
   var priority = DownloadPriority.NORMAL
   var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
-  val headers = LinkedHashMap<String, String>()
-  var proxyUrl: String? = null
-  var bypass: List<String>? = null
-  var direct = false
-  // Header names ignore case, so a later option replaces an earlier one however it is spelled.
-  fun setHeader(name: String, value: String) {
-    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
-    headers[name] = value
-  }
+  val headers = HeaderOptions()
+  val proxy = ProxyOptions()
 
   var i = 0
   while (i < args.size) {
     val arg = args[i]
     when {
       arg == "--help" || arg == "-h" -> return DownloadArgs.Help
-      arg == "--no-proxy" -> direct = true
+      arg == NO_PROXY_OPTION -> proxy.noProxy()
       arg in valueOptions -> {
         val value = args.getOrNull(i + 1)
           ?: return DownloadArgs.Invalid("$arg requires a value")
@@ -84,20 +171,8 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
               return DownloadArgs.Invalid("--max-concurrent must be > 0")
             }
           }
-          "-H", "--header" -> {
-            val separator = value.indexOf(':')
-            if (separator <= 0) return DownloadArgs.Invalid("$arg expects 'Name: value'")
-            setHeader(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
-          }
-          "--user-agent" -> setHeader("User-Agent", value)
-          "--referer" -> setHeader("Referer", value)
-          "--proxy" -> proxyUrl = value
-          "--proxy-bypass" -> {
-            bypass = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            bypass.firstOrNull { !ProxyConfig.isValidBypass(it) }?.let {
-              return DownloadArgs.Invalid("invalid host '$it' in --proxy-bypass")
-            }
-          }
+          in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
+          else -> headers.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
         }
         i++
       }
@@ -110,36 +185,18 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   }
 
   if (url == null) return DownloadArgs.Invalid("missing <url>")
-  try {
-    RequestHeaders.requireValid(headers)
-  } catch (e: IllegalArgumentException) {
-    return DownloadArgs.Invalid(e.message ?: "invalid header")
-  }
-  if (direct && proxyUrl != null) {
-    return DownloadArgs.Invalid("--proxy and --no-proxy cannot be used together")
-  }
-  if (bypass != null && proxyUrl == null) {
-    return DownloadArgs.Invalid("--proxy-bypass requires --proxy")
-  }
-  val proxy = when {
-    direct -> ProxyConfig.Direct
-    proxyUrl != null -> try {
-      ProxyConfig.manual(proxyUrl, bypass.orEmpty())
-    } catch (_: IllegalArgumentException) {
-      return DownloadArgs.Invalid(
-        "invalid proxy '$proxyUrl' (expected http://host:port or socks5://host:port)",
-      )
-    }
-    else -> null
-  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
     speedLimit = speedLimit,
     priority = priority,
     maxConcurrent = maxConcurrent,
-    headers = headers,
-    proxy = proxy,
+    headers = headers.build().getOrElse {
+      return DownloadArgs.Invalid(it.message ?: "invalid header")
+    },
+    proxy = proxy.build().getOrElse {
+      return DownloadArgs.Invalid(it.message ?: "invalid proxy")
+    },
   )
 }
 

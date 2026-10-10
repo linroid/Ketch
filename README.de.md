@@ -25,7 +25,7 @@
 
 <p align="center">
 
-[![Neueste Version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Neueste Version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web-App](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
@@ -139,6 +139,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   auf ein anderes Gerät, ohne die Ansicht zu wechseln.
 - **Ohne Oberfläche auf NAS oder Server** — `ketch server` startet dieselbe Engine mit REST-API
   und integrierter Web-App. Die Apps finden den Server in deinem Netzwerk.
+- **Aus dem Terminal** — `ketch add`, `list`, `pause`, `resume` und `watch` steuern die Downloads
+  der Ketch-App oder eines Servers aus dem Terminal oder einem Skript; `watch` gibt JSON-Zeilen aus
+  ([CLI](cli/README.md#work-on-a-running-ketch)).
 
 ### Deine Bandbreite im Griff
 
@@ -162,6 +165,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   heraus, direkt aus der Liste.
 - **Auf jeder Plattform zu Hause** — Menüleiste oder Infobereich, Benachrichtigungen und Fortschritt
   im Dock und in der Taskleiste auf dem Desktop; Hintergrunddownloads unter Android und iOS 26.
+- **Wach während Downloads** — Die Desktop- und Android-Apps halten das System vom selbstständigen
+  Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
+  (**Einstellungen → Allgemein**).
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit vier Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
   ([Übersetzungen](docs/development/localization.md)).
@@ -177,8 +183,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   Modelldienst: OpenAI, Anthropic, Gemini, Ollama oder einen OpenAI-kompatiblen Dienst. Verfügbar in
   den Desktop- und Android-Apps sowie mit `ketch ai-discover`
   ([Einrichtung](docs/ai-discovery.md)).
-- **MCP-Server** — Mit `ketch mcp` können KI-Assistenten deine Downloads über das
-  [Model Context Protocol](cli/README.md#mcp-server) starten, verfolgen und verwalten.
+- **MCP-Server** — Mit `ketch mcp` können KI-Assistenten die Downloads der Ketch-App oder eines
+  Servers über das [Model Context Protocol](cli/README.md#mcp-server) starten, verfolgen und
+  verwalten.
 
 <a id="getting-started"></a>
 
@@ -244,11 +251,9 @@ Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
   Ordnern speichern
 - **Torrent-Dateien jederzeit wählen** — Nach Eingang der Magnet-Metadaten Dateien auswählen und
   die Auswahl während des Downloads ändern
-- **Wach halten** — Den Computer während Downloads am Einschlafen hindern und danach optional
-  in den Ruhezustand versetzen oder herunterfahren
+- **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
+  herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen
-- **Kommandozeile für laufende Geräte** — `ketch` und KI-Agenten ergänzen, listen, pausieren und
-  verfolgen Downloads der Ketch-App oder eines Servers, ohne eine zweite Engine zu starten
 - **Docker-Image** — Ein offizielles Image für NAS und Heimserver auf x64 und ARM, mit
   Zustandsprüfung und festem Torrent-Port
 - **Übertragung zwischen Geräten** — Senden an und Verschieben nach übertragen bereits geladene

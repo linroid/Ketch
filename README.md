@@ -25,7 +25,7 @@
 
 <p align="center">
 
-[![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web app](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
@@ -123,6 +123,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   sidebar, or send or move a download to another device, without switching.
 - **Headless on a NAS or server** — `ketch server` runs the same engine with a REST API and the
   web app built in, and the apps find it on your network.
+- **From a terminal** — `ketch add`, `list`, `pause`, `resume` and `watch` control the downloads
+  of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
+  ([CLI](cli/README.md#work-on-a-running-ketch)).
 
 ### In control of your bandwidth
 
@@ -146,6 +149,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   the list.
 - **At home on each platform** — The menu bar or tray, notifications, Dock and taskbar progress
   on the desktop; downloads that keep running in the background on Android and on iOS 26.
+- **Awake while it downloads** — The desktop and Android apps keep the system from going to sleep
+  on its own while downloads run; the screen can still turn off (**Settings → General**).
 - **Your look, your language** — Light and dark themes with four accent colors, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch and Français
   ([translating](docs/development/localization.md)).
@@ -159,8 +164,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   a website, unless you let it. Bring your own model: OpenAI, Anthropic, Gemini, Ollama or any
   OpenAI-compatible service. In the desktop and Android apps, and with
   `ketch ai-discover` ([setup](docs/ai-discovery.md)).
-- **MCP server** — `ketch mcp` lets AI assistants start, watch and manage your downloads through
-  the [Model Context Protocol](cli/README.md#mcp-server).
+- **MCP server** — `ketch mcp` lets AI assistants start, watch and manage the downloads of the
+  Ketch app or a server through the [Model Context Protocol](cli/README.md#mcp-server).
 
 ## Getting started
 
@@ -220,11 +225,9 @@ the [CLI documentation](cli/README.md) lists every command.
   rules you set
 - **Torrent files, chosen any time** — Pick the files of a magnet link once its details arrive,
   and change the selection while it downloads
-- **Keep awake** — Keep the computer from sleeping while downloads run, and optionally sleep or
-  shut down when they finish
+- **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
+  once the queue is empty
 - **Automation hooks** — Run a command or call a webhook when a download finishes or fails
-- **Command line for running devices** — `ketch` and AI agents add, list, pause and watch the
-  downloads of the Ketch app or a server, instead of starting a second engine
 - **Docker image** — An official image for NAS and home servers on x64 and ARM, with a health
   check and a fixed torrent port
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
