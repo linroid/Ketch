@@ -98,8 +98,14 @@ fun main(args: Array<String>) {
         System.err.println("Error: ${parsed.message}")
         println()
         printUsage()
+        exitProcess(InstanceExit.USAGE)
       }
-      is DownloadArgs.Download -> runDownload(parsed)
+      is DownloadArgs.Download -> if (parsed.listFiles) {
+        val status = runListFiles(parsed)
+        if (status != 0) exitProcess(status)
+      } else {
+        runDownload(parsed)
+      }
     }
   }
 }
@@ -122,6 +128,7 @@ private fun runDownload(args: DownloadArgs.Download) {
     println("Priority: ${args.priority}")
   }
   println("Max concurrent: ${args.maxConcurrent}")
+  if (args.fileIds.isNotEmpty()) println("Files: ${args.fileIds.joinToString(",")}")
   // Names only: values such as cookies are credentials.
   if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
   val fileConfig = readDefaultConfig()
@@ -198,6 +205,41 @@ private fun runDownload(args: DownloadArgs.Download) {
       }
     )
 
+    ketch.close()
+  }
+}
+
+/**
+ * Lists the files of [args]' URL, such as a torrent's, without downloading it: one `ID  SIZE
+ * PATH` row each, in the order `--sort` and `--reverse` ask for. Returns 0, or 1 when the URL
+ * cannot be resolved or has no files to choose.
+ */
+private fun runListFiles(args: DownloadArgs.Download): Int {
+  val fileConfig = readDefaultConfig()
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  val ketch = Ketch(
+    httpEngine = httpEngine,
+    config = DownloadConfig(proxy = args.proxy ?: fileConfig.download.proxy),
+    logger = Logger.console(ketchLogLevel),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
+  )
+  return try {
+    val source = runBlocking { ketch.resolve(args.url, args.headers) }
+    val rows = fileListRows(source, args.fileOrder, args.reverse)
+    if (rows.isEmpty()) {
+      System.err.println("This download has no files to choose.")
+      1
+    } else {
+      rows.forEach(::println)
+      0
+    }
+  } catch (e: Exception) {
+    System.err.println("Couldn't list the files: ${e.message}")
+    1
+  } finally {
     ketch.close()
   }
 }
@@ -1054,7 +1096,9 @@ private fun runStandaloneMcp(
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
-      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      // It serves an agent while the client runs, so it does not share finished torrents again
+      // when it starts; MCP offers no seeding tool to stop them.
+      FtpDownloadSource(), torrentSource(fileConfig.torrent, restoreSeeding = false),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
     ),
   )
@@ -1189,10 +1233,15 @@ private fun printMcpUsage() {
  * Torrent source that persists DHT state, adds the configured extra trackers and tracker list,
  * and uploads as `[torrent] upload` and `uploadLimit` say. Only `ketch server` passes a
  * [listenPort], [TorrentSettings.listenPort]: the other commands may run beside it, so they let
- * the system pick a free port.
+ * the system pick a free port. [restoreSeeding] shares finished torrents again when the engine
+ * starts, as `[torrent] upload = "seed"` asks; `ketch mcp --standalone` turns it off.
  */
-private fun torrentSource(settings: TorrentSettings, listenPort: Int = 0) = TorrentDownloadSource(
-  TorrentConfig(
+private fun torrentSource(
+  settings: TorrentSettings,
+  listenPort: Int = 0,
+  restoreSeeding: Boolean = true,
+) = TorrentDownloadSource(
+  config = TorrentConfig(
     listenPort = listenPort,
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
@@ -1200,6 +1249,7 @@ private fun torrentSource(settings: TorrentSettings, listenPort: Int = 0) = Torr
     uploadPolicy = torrentUploadPolicy(settings.upload),
     uploadRateLimit = settings.uploadLimit.bytesPerSecond,
   ),
+  restoreSeeding = restoreSeeding,
 )
 
 /** The engine's upload policy for the `[torrent] upload` setting [mode]. */
@@ -1282,6 +1332,14 @@ private fun printUsage() {
   println("                           Default: [download.proxy] in the config")
   println("                           file, else https_proxy, http_proxy,")
   println("                           all_proxy and no_proxy")
+  println("  --files <ids>            Download only these files of a torrent,")
+  println("                           comma-separated IDs from --list-files")
+  println("  --list-files             List the files of a torrent or magnet")
+  println("                           with their IDs instead of downloading")
+  println("  --sort <order>           Order of --list-files: name, size or")
+  println("                           type (by extension); default: the")
+  println("                           torrent's own order")
+  println("  --reverse                Reverse the order of --list-files")
   println()
   println("Running Ketch (the app, or `ketch server`):")
   println("  add <url> [destination]  Add a download; prints its task ID")

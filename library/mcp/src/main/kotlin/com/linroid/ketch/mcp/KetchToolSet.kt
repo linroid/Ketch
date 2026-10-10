@@ -1,6 +1,7 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.Tool
+import ai.koog.agents.core.tools.ToolException
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -8,7 +9,15 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.torrent.TorrentCommandError
+import com.linroid.ketch.api.torrent.TorrentCommandException
+import com.linroid.ketch.api.torrent.TorrentFileOrder
+import com.linroid.ketch.api.torrent.TorrentFilePage
+import com.linroid.ketch.api.torrent.TorrentPageRequest
+import com.linroid.ketch.api.torrent.sortedByFileOrder
+import com.linroid.ketch.api.withoutBulkMetadata
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -97,6 +106,12 @@ class KetchToolSet(
             "adding another. Omit to add a download every time.",
           required = false,
         ),
+        stringParameter(
+          "fileIds",
+          "For a torrent or magnet: the IDs of the files to download, comma-separated, as " +
+            "resolveUrl lists them in 'files'. Omit to download every file.",
+          required = false,
+        ),
       ),
     ) {
       startDownload(
@@ -107,6 +122,7 @@ class KetchToolSet(
         speedLimit = string("speedLimit", "unlimited"),
         headers = string("headers", ""),
         requestId = string("requestId", ""),
+        fileIds = string("fileIds", ""),
       )
     },
     TextTool(
@@ -136,6 +152,61 @@ class KetchToolSet(
         "resume support, suggested filename, and source type.",
       parameters = listOf(stringParameter("url", "The URL to resolve")),
     ) { resolveUrl(string("url")) },
+    TextTool(
+      name = "listDownloadFiles",
+      description = "List the files of a torrent download, a page at a time, with each " +
+        "file's ID, path, size and whether it is selected for download. Returns JSON with " +
+        "'files' and, when more remain, 'nextCursor' for the next call.",
+      parameters = listOf(
+        stringParameter("taskId", "The unique task ID"),
+        stringParameter(
+          "cursor",
+          "The nextCursor of the previous page, with the same sort and descending. Omit for " +
+            "the first page.",
+          required = false,
+        ),
+        integerParameter(
+          "limit",
+          "Files per page, 1 to $MAX_FILES_PER_PAGE. Default $DEFAULT_FILES_PER_PAGE.",
+          required = false,
+        ),
+        stringParameter(
+          "sort",
+          "Order of the files: torrent (the torrent's own order, default), name (natural " +
+            "order of the path, so 2 comes before 10), size (smallest first), extension " +
+            "(by file extension, then name) or selected (selected files first, then name).",
+          required = false,
+        ),
+        booleanParameter(
+          "descending",
+          "Reverse the order, e.g. largest files first with sort=size. Default false.",
+          required = false,
+        ),
+      ),
+    ) {
+      listDownloadFiles(
+        taskId = string("taskId"),
+        cursor = string("cursor", ""),
+        limit = int("limit", DEFAULT_FILES_PER_PAGE),
+        sort = string("sort", TorrentFileOrder.TORRENT.wireName),
+        descending = boolean("descending", false),
+      )
+    },
+    TextTool(
+      name = "selectDownloadFiles",
+      description = "Choose which files of a torrent download are downloaded, at any time: " +
+        "newly chosen files download, unchosen ones stop downloading and stay on disk. A " +
+        "torrent waiting for its files starts with the chosen ones; to download every file " +
+        "of a waiting torrent, call resumeDownload instead. Returns the task snapshot.",
+      parameters = listOf(
+        stringParameter("taskId", "The unique task ID"),
+        stringParameter(
+          "fileIds",
+          "The IDs of the files to download, comma-separated, from listDownloadFiles. At " +
+            "least one.",
+        ),
+      ),
+    ) { selectDownloadFiles(string("taskId"), string("fileIds")) },
     TextTool(
       name = "getStatus",
       description = "Get server status including version, uptime, configuration, " +
@@ -217,7 +288,9 @@ class KetchToolSet(
     speedLimit: String = "unlimited",
     headers: String = "",
     requestId: String = "",
+    fileIds: String = "",
   ): String {
+    val selected = if (fileIds.isBlank()) emptySet() else parseFileIds(fileIds)
     val request = DownloadRequest(
       url = url,
       destination = destination.ifEmpty { null }?.let { Destination(it) },
@@ -227,6 +300,7 @@ class KetchToolSet(
       headers = parseHeaders(headers),
       properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
       requestId = requestId.ifEmpty { null },
+      selectedFileIds = selected,
     )
     val ketch = connect()
     // An instance without request IDs would drop it and add the download again on a retry.
@@ -274,10 +348,62 @@ class KetchToolSet(
   suspend fun resolveUrl(
     url: String,
   ): String {
-    val resolved = connect().resolve(url)
+    // The files are listed; a torrent's whole metainfo is of no use to an agent.
+    val resolved = connect().resolve(url).withoutBulkMetadata()
     return json.encodeToString(
       json.encodeToJsonElement(resolved),
     )
+  }
+
+  /**
+   * A page of the files of torrent task [taskId], sorted by [sort] (a [TorrentFileOrder] wire
+   * name) and reversed when [descending], from the instance's
+   * [com.linroid.ketch.api.torrent.TorrentController]. An instance without one, or one that
+   * cannot list them, pages the task's [DownloadRequest.resolvedSource] files instead.
+   */
+  suspend fun listDownloadFiles(
+    taskId: String,
+    cursor: String = "",
+    limit: Int = DEFAULT_FILES_PER_PAGE,
+    sort: String = TorrentFileOrder.TORRENT.wireName,
+    descending: Boolean = false,
+  ): String {
+    if (limit !in 1..MAX_FILES_PER_PAGE) {
+      throw ToolException.ValidationFailure("limit must be between 1 and $MAX_FILES_PER_PAGE")
+    }
+    val order = TorrentFileOrder.fromWire(sort.trim().lowercase())
+      ?: throw ToolException.ValidationFailure(
+        "Unknown sort '$sort'. Use " +
+          TorrentFileOrder.entries.joinToString { it.wireName } + ".",
+      )
+    val ketch = connect()
+    val task = ketch.tasks.value.find { it.taskId == taskId } ?: return notFound(taskId)
+    if (!cursor.startsWith(LOCAL_CURSOR_PREFIX)) {
+      val page = try {
+        ketch.torrents?.files(
+          taskId = taskId,
+          page = TorrentPageRequest(limit, cursor.ifEmpty { null }),
+          order = order,
+          descending = descending,
+        )
+      } catch (e: TorrentCommandException) {
+        if (e.error != TorrentCommandError.UNSUPPORTED) throw e
+        null
+      }
+      if (page != null) return json.encodeToString(pageToJson(page))
+    }
+    return localFiles(task, cursor, limit, order, descending)
+  }
+
+  /** Has task [taskId] download the files of [fileIds], comma-separated IDs. */
+  suspend fun selectDownloadFiles(
+    taskId: String,
+    fileIds: String,
+  ): String {
+    val ids = parseFileIds(fileIds)
+    val task = findTask(taskId) ?: return notFound(taskId)
+    task.selectFiles(ids)
+    return json.encodeToString(taskToJson(task))
   }
 
   suspend fun getStatus(): String {
@@ -338,6 +464,89 @@ class KetchToolSet(
   private suspend fun findTask(taskId: String) =
     connect().tasks.value.find { it.taskId == taskId }
 
+  /**
+   * A page of [task]'s [DownloadRequest.resolvedSource] files, for instances that cannot list
+   * them. Its cursors start with [LOCAL_CURSOR_PREFIX] and hold the order and the offset.
+   */
+  private fun localFiles(
+    task: com.linroid.ketch.api.DownloadTask,
+    cursor: String,
+    limit: Int,
+    order: TorrentFileOrder,
+    descending: Boolean,
+  ): String {
+    val request = task.request
+    val files = request.resolvedSource?.files.orEmpty()
+    if (files.isEmpty()) {
+      return buildJsonObject {
+        put("error", "no_files")
+        put("message", "This download has no files to choose, or they are not known yet")
+      }.toString()
+    }
+    val prefix = "$LOCAL_CURSOR_PREFIX${order.wireName}:${if (descending) 1 else 0}:"
+    val offset = if (cursor.isEmpty()) {
+      0
+    } else {
+      cursor.takeIf { it.startsWith(prefix) }
+        ?.removePrefix(prefix)?.toIntOrNull()?.takeIf { it in 0..files.size }
+        ?: throw ToolException.ValidationFailure(
+          "Invalid cursor. Use the nextCursor of the previous page with the same sort and " +
+            "descending, or omit it to start again.",
+        )
+    }
+    val waiting = (task.state.value as? DownloadState.Paused)?.reason ==
+      PauseReason.AwaitingFileSelection
+    val chosen = request.selectedFileIds
+    fun isSelected(file: SourceFile) = !waiting && (chosen.isEmpty() || file.id in chosen)
+    val sorted = files.sortedByFileOrder(
+      order = order,
+      descending = descending,
+      path = { it.path() },
+      size = { it.size },
+      selected = ::isSelected,
+    )
+    val end = minOf(offset + limit, sorted.size)
+    return json.encodeToString(
+      buildJsonObject {
+        put("taskId", task.taskId)
+        put("totalFiles", files.size)
+        put(
+          "files",
+          buildJsonArray {
+            sorted.subList(offset, end).forEach { file ->
+              add(fileJson(file.id, file.path(), file.size.coerceAtLeast(0), isSelected(file)))
+            }
+          },
+        )
+        if (end < sorted.size) put("nextCursor", "$prefix$end")
+      },
+    )
+  }
+
+  private fun pageToJson(page: TorrentFilePage): JsonObject = buildJsonObject {
+    put("taskId", page.taskId)
+    put("totalFiles", page.totalFiles)
+    put("selectionGeneration", page.selectionGeneration)
+    put(
+      "files",
+      buildJsonArray {
+        page.files.forEach { add(fileJson(it.id, it.path, it.size, it.selected)) }
+      },
+    )
+    page.nextCursor?.let { put("nextCursor", it) }
+  }
+
+  private fun fileJson(id: String, path: String, size: Long, selected: Boolean) =
+    buildJsonObject {
+      put("id", id)
+      put("path", path)
+      put("size", size)
+      put("selected", selected)
+    }
+
+  /** The file's path inside its torrent, as torrent sources record it. */
+  private fun SourceFile.path(): String = metadata["path"] ?: name
+
   private fun notFound(taskId: String): String =
     buildJsonObject {
       put("error", "not_found")
@@ -373,6 +582,7 @@ class KetchToolSet(
           state.totalBytes?.let { put("totalBytes", it) }
           state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
           state.completedAt?.let { put("completedAt", it.toString()) }
+          put("seeding", state.seeding)
         }
         is DownloadState.Failed -> {
           put("error", state.error.message ?: "Unknown error")
@@ -380,6 +590,16 @@ class KetchToolSet(
         else -> {}
       }
       task.queuePosition.value?.let { put("queuePosition", it) }
+      val files = task.request.resolvedSource?.files.orEmpty()
+      val selectedFiles = when {
+        (state as? DownloadState.Paused)?.reason == PauseReason.AwaitingFileSelection -> 0
+        task.request.selectedFileIds.isNotEmpty() -> task.request.selectedFileIds.size
+        else -> files.size
+      }
+      if (files.isNotEmpty() || selectedFiles > 0) {
+        put("selectedFiles", selectedFiles)
+        if (files.isNotEmpty()) put("totalFiles", files.size)
+      }
       if (task.request.priority != DownloadPriority.NORMAL) {
         put("priority", task.request.priority.name)
       }
@@ -410,6 +630,19 @@ class KetchToolSet(
     PauseReason.AwaitingFileSelection -> "awaiting_file_selection"
   }
 
+  /** Comma-separated file IDs, trimmed and without repeats; at least one. */
+  private fun parseFileIds(value: String): Set<String> {
+    val ids = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toCollection(
+      LinkedHashSet(),
+    )
+    if (ids.isEmpty()) {
+      throw ToolException.ValidationFailure(
+        "fileIds must name at least one file ID, comma-separated",
+      )
+    }
+    return ids
+  }
+
   private fun parsePriority(value: String): DownloadPriority =
     DownloadPriority.entries.find {
       it.name.equals(value, ignoreCase = true)
@@ -438,6 +671,15 @@ class KetchToolSet(
         )
     }
 }
+
+/** The files [KetchToolSet.listDownloadFiles] lists when the agent names no limit. */
+private const val DEFAULT_FILES_PER_PAGE = 100
+
+/** The most files one [KetchToolSet.listDownloadFiles] page holds. */
+private const val MAX_FILES_PER_PAGE = 1000
+
+/** Starts the cursors of pages [KetchToolSet.listDownloadFiles] builds from a task's request. */
+private const val LOCAL_CURSOR_PREFIX = "request:"
 
 private val defaultJson = Json {
   encodeDefaults = true

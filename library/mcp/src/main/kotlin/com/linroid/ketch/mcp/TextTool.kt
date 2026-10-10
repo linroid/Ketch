@@ -13,7 +13,8 @@ import ai.koog.serialization.JSONSerializer
 import ai.koog.serialization.TypeToken
 
 /**
- * A tool that takes named string and integer arguments and answers with text, described by hand.
+ * A tool that takes named string, integer and boolean arguments and answers with text, described
+ * by hand.
  *
  * Koog's `ToolSet` describes and calls `@Tool` methods through Kotlin reflection, which needs
  * kotlin-reflect: megabytes in the desktop app and the native CLI. A [TextTool] needs none.
@@ -54,6 +55,9 @@ internal class TextTool(
 
     fun int(name: String, default: Int): Int = primitive(name)?.toInt(name) ?: default
 
+    fun boolean(name: String, default: Boolean): Boolean =
+      primitive(name)?.toBoolean(name) ?: default
+
     private fun primitive(name: String): JSONPrimitive? = when (val value = values.entries[name]) {
       null, JSONNull -> null
       is JSONPrimitive -> value
@@ -63,6 +67,12 @@ internal class TextTool(
     private fun JSONPrimitive.toInt(name: String): Int = content.toIntOrNull()
       ?: content.toDoubleOrNull()?.takeIf { it % 1.0 == 0.0 }?.toInt()
       ?: throw ToolException.ValidationFailure("Argument '$name' must be an integer")
+
+    private fun JSONPrimitive.toBoolean(name: String): Boolean = when (content.lowercase()) {
+      "true" -> true
+      "false" -> false
+      else -> throw ToolException.ValidationFailure("Argument '$name' must be true or false")
+    }
 
     private fun missing(name: String): Nothing =
       throw ToolException.ValidationFailure("Missing argument '$name'")
@@ -88,3 +98,9 @@ internal fun stringParameter(name: String, description: String, required: Boolea
 
 internal fun integerParameter(name: String, description: String, required: Boolean = true) =
   TextTool.Parameter(ToolParameterDescriptor(name, description, ToolParameterType.Integer), required)
+
+internal fun booleanParameter(name: String, description: String, required: Boolean = true) =
+  TextTool.Parameter(
+    ToolParameterDescriptor(name, description, ToolParameterType.Boolean),
+    required,
+  )

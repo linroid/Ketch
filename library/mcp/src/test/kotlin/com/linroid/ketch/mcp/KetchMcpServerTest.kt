@@ -242,6 +242,8 @@ class KetchMcpServerTest {
           "cancelDownload" to listOf("taskId"),
           "removeDownload" to listOf("taskId"),
           "resolveUrl" to listOf("url"),
+          "listDownloadFiles" to listOf("taskId"),
+          "selectDownloadFiles" to listOf("taskId", "fileIds"),
           "getStatus" to emptyList(),
           "setSpeedLimit" to listOf("taskId", "speedLimit"),
           "setPriority" to listOf("taskId", "priority"),
@@ -255,9 +257,17 @@ class KetchMcpServerTest {
       assertEquals(
         setOf(
           "url", "destination", "connections", "priority", "speedLimit", "headers", "requestId",
+          "fileIds",
         ),
         schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
       )
+      assertEquals(
+        setOf("taskId", "cursor", "limit", "sort", "descending"),
+        schemas.getValue("listDownloadFiles").getValue("properties").jsonObject.keys,
+      )
+      val descending = schemas.getValue("listDownloadFiles").getValue("properties").jsonObject
+        .getValue("descending").jsonObject
+      assertEquals("boolean", descending.getValue("type").jsonPrimitive.content)
     }
 
   @Test

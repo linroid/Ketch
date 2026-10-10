@@ -56,6 +56,22 @@ class TextToolTest {
   }
 
   @Test
+  fun call_booleanWrittenAsValueOrText_isAccepted() = runTest {
+    val tool = TextTool(
+      name = "flag",
+      description = "Echoes a flag",
+      parameters = listOf(booleanParameter("on", "The flag", required = false)),
+    ) { boolean("on", false).toString() }
+    suspend fun call(arguments: JsonObject) =
+      tool.execute(tool.decodeArgs(arguments.toKoogJSONObject(), serializer))
+
+    assertEquals("true", call(buildJsonObject { put("on", true) }))
+    assertEquals("true", call(buildJsonObject { put("on", "TRUE") }))
+    assertEquals("false", call(buildJsonObject {}))
+    assertFailsWith<ToolException.ValidationFailure> { call(buildJsonObject { put("on", "yes") }) }
+  }
+
+  @Test
   fun encodeResultToString_jsonText_isNotEncodedAgain() {
     assertEquals("""{"ok":true}""", repeat.encodeResultToString("""{"ok":true}""", serializer))
   }
