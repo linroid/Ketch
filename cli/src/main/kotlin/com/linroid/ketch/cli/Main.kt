@@ -16,6 +16,7 @@ import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
+import com.linroid.ketch.config.CONFIG_DIR_ENV
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
@@ -57,7 +58,7 @@ fun main(args: Array<String>) {
   val remaining = applyGlobalFlags(args.toMutableList())
 
   // The MCP server owns stdout, and ai-discover keeps it for its results, so each prints the
-  // banner to stderr itself
+  // banner to stderr itself; health prints none
   when (remaining.firstOrNull()) {
     "mcp" -> {
       runMcp(remaining.drop(1))
@@ -68,13 +69,18 @@ fun main(args: Array<String>) {
       if (status != AiDiscoverExit.OK) exitProcess(status)
       return
     }
+    // Health checks run it every few seconds: one line, no banner.
+    "health" -> exitProcess(runHealth(remaining.drop(1)))
   }
 
   printBanner()
 
   when (remaining.firstOrNull()) {
     null -> printUsage()
-    "server" -> runServer(remaining.drop(1).toTypedArray())
+    "server" -> {
+      val status = runServer(remaining.drop(1).toTypedArray())
+      if (status != 0) exitProcess(status)
+    }
     "update" -> {
       // The engine that downloads the release only logs warnings unless -v or --debug asks for
       // more, so the progress line stays readable.
@@ -212,7 +218,12 @@ private fun applyGlobalFlags(args: MutableList<String>): List<String> {
   return remaining
 }
 
-private fun runServer(args: Array<String>) {
+/**
+ * Runs `ketch server` with [args], the arguments after `server`, until the server stops, and
+ * returns its exit status: 0, 1 when it cannot start, or 2 for unusable arguments or
+ * environment variables.
+ */
+private fun runServer(args: Array<String>): Int {
   // Track which CLI flags are explicitly set
   var cliHost: String? = null
   var cliPort: Int? = null
@@ -223,6 +234,7 @@ private fun runServer(args: Array<String>) {
   var cliAllowedDirectories: List<String>? = null
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
+  var cliTorrentPort: Int? = null
   var configPath: String? = null
 
   var i = 0
@@ -230,7 +242,7 @@ private fun runServer(args: Array<String>) {
     when (args[i]) {
       "--help", "-h" -> {
         printServerUsage()
-        return
+        return 0
       }
       "--generate-config" -> {
         val path = defaultConfigPath()
@@ -239,17 +251,17 @@ private fun runServer(args: Array<String>) {
           System.err.println(
             "Delete it first if you want to regenerate."
           )
-          return
+          return 1
         }
         generateConfig(path)
         println("Generated default config at: $path")
-        return
+        return 0
       }
       "--config" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --config requires a value")
           printServerUsage()
-          return
+          return 2
         }
         configPath = args[++i]
       }
@@ -257,7 +269,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --host requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliHost = args[++i]
       }
@@ -265,12 +277,12 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --port requires a value")
           printServerUsage()
-          return
+          return 2
         }
         val value = args[++i].toIntOrNull()
         if (value == null || value !in 1..65535) {
           System.err.println("Error: invalid port '${args[i]}'")
-          return
+          return 2
         }
         cliPort = value
       }
@@ -278,7 +290,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --token requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliToken = args[++i]
       }
@@ -287,7 +299,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --cors requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliCorsOrigins = args[++i].split(",").map { it.trim() }
       }
@@ -295,7 +307,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --allowed-hosts requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliAllowedHosts = args[++i].split(",").map { it.trim() }
       }
@@ -303,7 +315,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --allowed-dirs requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliAllowedDirectories = args[++i].split(",").map { it.trim() }.filter { it.isNotEmpty() }
       }
@@ -311,7 +323,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --dir requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliDownloadDir = args[++i]
       }
@@ -319,25 +331,38 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --speed-limit requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliSpeedLimit = SpeedLimit.parse(args[++i]) ?: run {
           System.err.println("Error: invalid speed limit '${args[i]}'")
           printServerUsage()
-          return
+          return 2
         }
+      }
+      "--torrent-port" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --torrent-port requires a value")
+          printServerUsage()
+          return 2
+        }
+        val value = args[++i].toIntOrNull()
+        if (value == null || value !in 0..65535) {
+          System.err.println("Error: invalid torrent port '${args[i]}'")
+          return 2
+        }
+        cliTorrentPort = value
       }
       else -> {
         System.err.println("Error: unknown option '${args[i]}'")
         printServerUsage()
-        return
+        return 2
       }
     }
     i++
   }
   if (noToken && cliToken != null) {
     System.err.println("Error: --token and --no-token cannot be used together")
-    return
+    return 2
   }
 
   // Load config: explicit --config path, or default path if exists,
@@ -347,7 +372,7 @@ private fun runServer(args: Array<String>) {
       FileConfigStore(configPath).load()
     } catch (e: Exception) {
       System.err.println("Error loading config: ${e.message}")
-      return
+      return 1
     }
   } else {
     val defaultPath = defaultConfigPath()
@@ -359,33 +384,43 @@ private fun runServer(args: Array<String>) {
         System.err.println(
           "Error loading config from $defaultPath: ${e.message}"
         )
-        return
+        return 1
       }
     } else {
       KetchConfig()
     }
   }
 
-  // CLI flags override config file values
+  // Environment variables override config file values, and CLI flags both
+  val environment = System.getenv()
+  val envConfig = try {
+    applyServerEnvironment(fileConfig, environment)
+  } catch (e: IllegalArgumentException) {
+    System.err.println("Error: ${e.message}")
+    return 2
+  }
   val defaultDownloadDir = System.getProperty("user.home") +
     File.separator + "Downloads"
-  val mergedConfig = fileConfig.copy(
-    server = fileConfig.server.copy(
-      host = cliHost ?: fileConfig.server.host,
-      port = cliPort ?: fileConfig.server.port,
+  val mergedConfig = envConfig.copy(
+    server = envConfig.server.copy(
+      host = cliHost ?: envConfig.server.host,
+      port = cliPort ?: envConfig.server.port,
       corsAllowedHosts = cliCorsOrigins
-        ?: fileConfig.server.corsAllowedHosts,
+        ?: envConfig.server.corsAllowedHosts,
       allowedHosts = cliAllowedHosts
-        ?: fileConfig.server.allowedHosts,
+        ?: envConfig.server.allowedHosts,
       allowedDirectories = cliAllowedDirectories
-        ?: fileConfig.server.allowedDirectories,
+        ?: envConfig.server.allowedDirectories,
     ),
-    download = fileConfig.download.copy(
+    download = envConfig.download.copy(
       defaultDirectory = cliDownloadDir
-        ?: fileConfig.download.defaultDirectory
+        ?: envConfig.download.defaultDirectory
         ?: defaultDownloadDir,
       speedLimit = cliSpeedLimit
-        ?: fileConfig.download.speedLimit,
+        ?: envConfig.download.speedLimit,
+    ),
+    torrent = envConfig.torrent.copy(
+      listenPort = cliTorrentPort ?: envConfig.torrent.listenPort,
     ),
   )
 
@@ -402,7 +437,7 @@ private fun runServer(args: Array<String>) {
     )
   } catch (e: IOException) {
     System.err.println("Error: could not keep the access token: ${e.message}")
-    return
+    return 1
   }
   val serverConfig = mergedConfig.server.copy(
     apiToken = token.value,
@@ -426,7 +461,8 @@ private fun runServer(args: Array<String>) {
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
-      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      FtpDownloadSource(),
+      torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
     ),
   )
@@ -440,6 +476,8 @@ private fun runServer(args: Array<String>) {
     allowedHosts = serverConfig.allowedHosts,
     allowedDirectories = serverConfig.allowedDirectories,
     mdnsEnabled = serverConfig.mdnsEnabled,
+    // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
+    ready = false,
   )
 
   Runtime.getRuntime().addShutdownHook(Thread {
@@ -456,6 +494,11 @@ private fun runServer(args: Array<String>) {
   if (configPath != null) {
     println("  Config:        $configPath")
   }
+  serverEnvironmentNames(environment).takeIf { it.isNotEmpty() }?.let { names ->
+    println("  Environment:   " + names.joinToString(", "))
+  }
+  val torrentPort = mergedConfig.torrent.listenPort
+  println("  Torrent port:  " + if (torrentPort == 0) "any free one" else "$torrentPort (TCP, UDP)")
   when (token) {
     is ServerToken.Given -> println("  Auth:          token from ${token.source}")
     is ServerToken.Saved -> println("  Auth:          token from ${token.file}")
@@ -499,16 +542,24 @@ private fun runServer(args: Array<String>) {
   }
 
   serveDaemon(server, ketch)
+  return 0
 }
 
 /**
  * Serves [ketch] through [server] until the server stops. It listens before restoring the
  * tasks saved by earlier runs, so a daemon that cannot start, e.g. because another one uses
- * the port, never resumes downloads into the same files.
+ * the port, never resumes downloads into the same files; health checks report it ready once
+ * they are restored. A failure to restore them stops the server.
  */
 internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
   server.start(wait = false)
-  runBlocking { ketch.start() }
+  try {
+    runBlocking { ketch.start() }
+  } catch (e: Throwable) {
+    server.stop()
+    throw e
+  }
+  server.markReady()
   server.awaitStop()
 }
 
@@ -815,6 +866,61 @@ private fun runMcp(args: List<String>) {
   exitProcess(0)
 }
 
+/**
+ * Runs `ketch health` with [args], the arguments after `health`: asks the `ketch server` this
+ * machine runs, found through the same config file and environment variables, whether it is
+ * ready, and returns one of [HealthExit].
+ */
+private fun runHealth(args: List<String>): Int {
+  val check = when (val parsed = parseHealthArgs(args)) {
+    HealthArgs.Help -> {
+      printHealthUsage()
+      return HealthExit.READY
+    }
+    is HealthArgs.Invalid -> {
+      System.err.println("Error: ${parsed.message}")
+      System.err.println("Run `ketch health --help` for usage.")
+      return HealthExit.USAGE
+    }
+    is HealthArgs.Check -> parsed
+  }
+  val fileConfig = check.configPath?.let { path ->
+    try {
+      FileConfigStore(path).load()
+    } catch (e: Exception) {
+      System.err.println("Ignoring $path, which can't be read: ${e.message}")
+      KetchConfig()
+    }
+  } ?: readDefaultConfig()
+  val server = try {
+    applyServerEnvironment(fileConfig, System.getenv()).server
+  } catch (e: IllegalArgumentException) {
+    System.err.println("Error: ${e.message}")
+    return HealthExit.USAGE
+  }
+  val host = check.host ?: healthCheckHost(server.host)
+  return checkHealth(healthUrl(host, check.port ?: server.port))
+}
+
+private fun printHealthUsage() {
+  println("Usage: ketch health [options]")
+  println()
+  println("Check whether the `ketch server` on this machine is ready, as")
+  println("container health checks do. It reads the config file and the")
+  println("KETCH_* environment variables the server reads to find it.")
+  println()
+  println("Options:")
+  println("  --host <address>  Address to ask (default: 127.0.0.1 for a")
+  println("                    server on every interface, else its address)")
+  println("  --port <number>   Port to ask (default: the server's)")
+  println("  --config <path>   Config file the server was started with")
+  println("  --help, -h        Show this help message")
+  println()
+  println("Exit status: 0 once the server serves its saved downloads; 1")
+  println("while it restores them or when it cannot be reached; 2 for")
+  println("invalid arguments or environment variables.")
+}
+
 private fun printMcpError(message: String) {
   System.err.println("Error: $message")
   System.err.println("Run `ketch mcp --help` for usage.")
@@ -846,9 +952,12 @@ private fun printMcpUsage() {
 
 /**
  * Torrent source that persists DHT state and adds the configured extra trackers and tracker list.
+ * Only `ketch server` passes a [listenPort], [TorrentSettings.listenPort]: the other commands
+ * may run beside it, so they let the system pick a free port.
  */
-private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
+private fun torrentSource(settings: TorrentSettings, listenPort: Int = 0) = TorrentDownloadSource(
   TorrentConfig(
+    listenPort = listenPort,
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
     trackerListUrls = settings.subscribedTrackerLists,
@@ -898,6 +1007,7 @@ private fun printUsage() {
   println("       ketch mcp [options]")
   println("       ketch ai-discover <query> [options]")
   println("       ketch update [options]")
+  println("       ketch health [options]")
   println()
   println("Global Options:")
   println("  -v, --verbose            Enable verbose logging (DEBUG)")
@@ -954,6 +1064,10 @@ private fun printUsage() {
   println("                           release; run `ketch update --help`")
   println("                           for options")
   println()
+  println("Health:")
+  println("  health [options]         Exit 0 once the local server is ready;")
+  println("                           run `ketch health --help` for options")
+  println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")
   println("  ketch -v https://example.com/file.zip")
@@ -993,12 +1107,37 @@ private fun printServerUsage() {
   println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
   println("                         (e.g., 10m, 500k)")
+  println("  --torrent-port <number>")
+  println("                         Port for BitTorrent peers (TCP) and")
+  println("                         DHT (UDP), to forward on a router;")
+  println("                         0 picks a free one (default)")
   println("  --help, -h             Show this help message")
   println()
   println("Config file:")
   println("  Default location: ${defaultConfigPath()}")
-  println("  CLI flags override config file values.")
+  println("  Environment variables override config file values, and")
+  println("  CLI flags override both.")
   println("  Use --generate-config to create a default file.")
+  println()
+  println("Environment variables:")
+  println("  $CONFIG_DIR_ENV         Folder for config.toml, the")
+  println("                           database and the token")
+  println("  $TOKEN_ENV          --token")
+  println("  ${ServerEnv.HOST}, ${ServerEnv.PORT}   --host, --port")
+  println("  ${ServerEnv.DOWNLOAD_DIR}       --dir")
+  println("  ${ServerEnv.ALLOWED_DIRS}       --allowed-dirs")
+  println("  ${ServerEnv.ALLOWED_HOSTS}      --allowed-hosts")
+  println("  ${ServerEnv.CORS}               --cors")
+  println("  ${ServerEnv.SPEED_LIMIT}        --speed-limit")
+  println("  ${ServerEnv.TORRENT_PORT}       --torrent-port")
+  println("  ${ServerEnv.NAME}               name")
+  println("  ${ServerEnv.MDNS}               mdnsEnabled (true or false)")
+  println("  ${ServerEnv.MAX_CONCURRENT_DOWNLOADS}")
+  println("                           maxConcurrentDownloads")
+  println("  ${ServerEnv.MAX_CONNECTIONS_PER_DOWNLOAD}")
+  println("                           maxConnectionsPerDownload")
+  println("  ${ServerEnv.MAX_CONNECTIONS_PER_HOST}")
+  println("                           maxConnectionsPerHost")
   println()
   println("Examples:")
   println("  ketch server")

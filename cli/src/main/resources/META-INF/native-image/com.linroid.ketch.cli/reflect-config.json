@@ -10,6 +10,25 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "com.linroid.ketch.endpoints.model.HealthResponse",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthResponse$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthStatus",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthStatus$Companion",
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.linroid.ketch.endpoints.model.TaskSnapshot",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

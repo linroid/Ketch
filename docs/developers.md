@@ -133,6 +133,7 @@ as `Authorization: Bearer <token>`.
 | `DELETE /api/tasks/{id}?deleteFiles=true` | Remove a task, and its files if asked |
 | `GET /api/events`, `/api/events/{id}` | Server-sent events: `task_added`, `task_removed`, `state_changed`, `progress` |
 | `POST /api/pairing`, `GET`, `DELETE /api/pairing/{id}` | Ask the server's owner for the access code, poll for the answer, withdraw; no code needed |
+| `GET /api/health` | `200 {"status":"ready"}` once the server has restored its saved tasks, `503 {"status":"starting"}` before; no code needed, for health checks |
 
 ```bash
 curl -X POST http://localhost:8642/api/tasks \

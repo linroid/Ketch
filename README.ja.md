@@ -84,6 +84,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/) から別のデバイスで動作する Ketch を操作 |
 | ブラウザ拡張機能 | Chrome、Edge、Brave、Firefox など：[最新リリース][release]の `.zip`（[インストール方法](app/browser-extension/README.md#installing)） |
 | コマンドラインとサーバー | macOS、Linux、Windows：[インストールスクリプト](#run-ketch-on-a-server)または[最新リリース][release] |
+| Docker | x64 と ARM64 の NAS・ホームサーバー：`ghcr.io/linroid/ketch`（[ガイド](docs/docker.md)、TrueNAS と fnOS の手順付き） |
 
 デスクトップアプリはランタイムを同梱し、コマンドラインツールは単体のネイティブバイナリなので、
 どちらも Java のインストールは不要です。どちらもこのリポジトリのリリースから更新できます。
@@ -127,8 +128,9 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   キー操作で切り替えたり、「すべてのデバイス」で全ダウンロードをひとつの表に表示したりできます。
 - **ダウンロード先のデバイスを選択** — デバイスを切り替えずに、任意のデバイスへリンクを追加したり、
   サイドバーのデバイスにドロップしたり、ダウンロードを別のデバイスへ送信・移動したりできます。
-- **NAS やサーバーでヘッドレス実行** — `ketch server` は REST API と Web アプリを内蔵した
-  同じエンジンを実行します。アプリからネットワーク上のサーバーを見つけられます。
+- **NAS やサーバーでヘッドレス実行** — `ketch server`（[Docker イメージ](docs/docker.md)もあり）は
+  REST API と Web アプリを内蔵した同じエンジンを実行します。アプリからネットワーク上のサーバーを
+  見つけられます。
 
 ### 帯域幅をコントロール
 
@@ -206,6 +208,15 @@ ketch https://example.com/file.zip
 アクセスコード、ポートなどは[設定ファイル](cli/README.md#configuration-file)で指定します。
 すべてのコマンドは [CLI ドキュメント](cli/README.md)を参照してください。
 
+NAS など Docker が動く環境では、代わりにイメージを起動します。設定と TrueNAS・fnOS での手順は
+[Docker ガイド](docs/docker.md)を参照してください。
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## ロードマップ
 
 - **v1.0.0 までの配布準備** — Windows 版の署名、macOS 版の署名と公証、ブラウザストアでの
@@ -228,8 +239,6 @@ ketch https://example.com/file.zip
 - **自動化フック** — 完了時や失敗時にコマンド実行や webhook 呼び出し
 - **実行中のデバイスをコマンドラインで操作** — `ketch` や AI エージェントから、別のエンジンを起動せずに
   Ketch アプリやサーバーのダウンロードを追加・一覧表示・一時停止・確認
-- **Docker イメージ** — x64 と ARM の NAS・ホームサーバー向け公式イメージ。
-  ヘルスチェックと固定トレントポートに対応
 - **デバイス間転送** — 送信・移動時にダウンロード済みデータも渡し、別のデバイスで最初からやり直さずに再開
   （[計画](docs/plans/task-transfer.md)）
 - **補助デバイス** — 他のデバイスがそれぞれの回線で同じファイルの一部をダウンロード。

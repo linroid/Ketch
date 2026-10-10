@@ -43,6 +43,9 @@ graalvmNative {
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
+        // SIGTERM and SIGINT run the shutdown hooks, which pause downloads and save them. Without
+        // handlers, PID 1 of a container, as in the Docker image, ignores `docker stop`'s SIGTERM.
+        "--install-exit-handlers",
       )
       // Optimizing for size needs GraalVM for JDK 23 or later. Older ones build with -Ob, which
       // optimizes less than the default -O2 and so makes a smaller binary.

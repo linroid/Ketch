@@ -86,6 +86,7 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), um Ketch auf einem anderen Gerät zu steuern |
 | Browsererweiterung | Chrome, Edge, Brave, Firefox und weitere: `.zip` der [neuesten Version][release] ([Installation](app/browser-extension/README.md#installing)) |
 | Kommandozeile und Server | macOS, Linux und Windows: [Installationsskript](#run-ketch-on-a-server) oder [neueste Version][release] |
+| Docker | NAS und Heimserver mit x64 und ARM64: `ghcr.io/linroid/ketch` ([Anleitung](docs/docker.md), mit TrueNAS und fnOS) |
 
 Die Desktop-Apps bringen ihre Laufzeitumgebung mit; die Kommandozeile ist eine einzelne native
 Binärdatei. Beide benötigen kein Java und aktualisieren sich über die hier veröffentlichten
@@ -134,8 +135,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Downloads zum passenden Gerät schicken** — Füge einen Link für ein beliebiges Gerät hinzu,
   ziehe ihn auf ein Gerät in der Seitenleiste oder sende beziehungsweise verschiebe einen Download
   auf ein anderes Gerät, ohne die Ansicht zu wechseln.
-- **Ohne Oberfläche auf NAS oder Server** — `ketch server` startet dieselbe Engine mit REST-API
-  und integrierter Web-App. Die Apps finden den Server in deinem Netzwerk.
+- **Ohne Oberfläche auf NAS oder Server** — `ketch server`, auch als
+  [Docker-Image](docs/docker.md), startet dieselbe Engine mit REST-API und integrierter Web-App.
+  Die Apps finden den Server in deinem Netzwerk.
 
 ### Deine Bandbreite im Griff
 
@@ -218,6 +220,16 @@ Zugangscode, Port und weitere Optionen legst du in einer
 [Konfigurationsdatei](cli/README.md#configuration-file) fest.
 Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
 
+Auf einem NAS, oder überall, wo Docker läuft, startest du stattdessen das Image. Die
+[Docker-Anleitung](docs/docker.md) beschreibt seine Einstellungen und die Schritte für TrueNAS und
+fnOS:
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## Roadmap
 
 - **Verteilung vor v1.0.0** — Signierte Windows-Versionen, signierte und notarisierte
@@ -247,8 +259,6 @@ Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen
 - **Kommandozeile für laufende Geräte** — `ketch` und KI-Agenten ergänzen, listen, pausieren und
   verfolgen Downloads der Ketch-App oder eines Servers, ohne eine zweite Engine zu starten
-- **Docker-Image** — Ein offizielles Image für NAS und Heimserver auf x64 und ARM, mit
-  Zustandsprüfung und festem Torrent-Port
 - **Übertragung zwischen Geräten** — Senden an und Verschieben nach übertragen bereits geladene
   Daten, damit das andere Gerät fortsetzen kann, statt von vorn zu beginnen
   ([Plan](docs/plans/task-transfer.md))

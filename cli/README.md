@@ -33,6 +33,8 @@ You can also download an archive from
 
 Once installed, `ketch update` keeps the binary current; see [Update](#update).
 
+To run the server on a NAS or with Docker, use the [Docker image](../docs/docker.md).
+
 ## Build & Run
 
 ```bash
@@ -151,7 +153,12 @@ ketch server [options]
 | `--allowed-dirs <paths>` | Comma-separated folders, besides the download directory, that clients may save to and delete files from (see [Save folders](#save-folders)) |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
+| `--torrent-port <number>` | Port BitTorrent peers connect to (TCP), which DHT also uses (UDP), 0-65535; `0`, the default, picks a free one at every start. Set one to forward it on a router |
 | `--help`, `-h` | Show help message |
+
+The server exits with status 1 when it cannot start, such as when the config file cannot be read
+or the database cannot be opened, and 2 for invalid options or
+[environment variables](#environment-variables).
 
 **Examples:**
 
@@ -182,7 +189,48 @@ ketch server --generate-config
 
 # Without a token, also accept requests addressed to a DNS alias
 ketch server --allowed-hosts nas.example.com
+
+# A fixed BitTorrent port, to forward on the router
+ketch server --torrent-port 51413
+
+# Configured through the environment, as in a container
+KETCH_PORT=9000 KETCH_DOWNLOAD_DIR=/srv/downloads ketch server
 ```
+
+#### Environment variables
+
+`ketch server` also reads these variables, which take precedence over the config file; its
+options take precedence over both. Blank values count as unset. The
+[Docker image](../docs/docker.md) is configured this way. When any is set, the server lists their
+names where it starts.
+
+| Variable | Option or config key |
+|---|---|
+| `KETCH_CONFIG_DIR` | The [config directory](#config-file-locations), holding `config.toml`, the database, `api-token` and `torrent-state` |
+| `KETCH_API_TOKEN` | `--token`, `apiToken` (see [Access token](#access-token)) |
+| `KETCH_NAME` | `name` |
+| `KETCH_HOST` | `--host`, `host` |
+| `KETCH_PORT` | `--port`, `port` |
+| `KETCH_CORS` | `--cors`, `corsAllowedHosts`; comma-separated |
+| `KETCH_ALLOWED_HOSTS` | `--allowed-hosts`, `allowedHosts`; comma-separated |
+| `KETCH_ALLOWED_DIRS` | `--allowed-dirs`, `allowedDirectories`; comma-separated |
+| `KETCH_MDNS` | `mdnsEnabled`; `true` or `false` (also `yes`/`no`, `on`/`off`, `1`/`0`) |
+| `KETCH_DOWNLOAD_DIR` | `--dir`, `defaultDirectory` |
+| `KETCH_SPEED_LIMIT` | `--speed-limit`, `speedLimit` |
+| `KETCH_MAX_CONCURRENT_DOWNLOADS` | `maxConcurrentDownloads` |
+| `KETCH_MAX_CONNECTIONS_PER_DOWNLOAD` | `maxConnectionsPerDownload` |
+| `KETCH_MAX_CONNECTIONS_PER_HOST` | `maxConnectionsPerHost` |
+| `KETCH_TORRENT_PORT` | `--torrent-port`, `[torrent] listenPort` |
+
+A value that cannot be used, such as `KETCH_PORT=http`, stops the server with an error naming the
+variable.
+
+#### Health
+
+`GET /api/health` answers without the token: `200 {"status":"ready"}` once the server has
+restored the tasks saved by earlier runs, and `503 {"status":"starting"}` while it does. The
+server listens before restoring them, so a second server that cannot get the port never resumes
+the same downloads. [`ketch health`](#health-check) asks it.
 
 #### Access token
 
@@ -381,6 +429,28 @@ ketch ai-discover "ffmpeg release" --sites ffmpeg.org
 ketch ai-discover --yes "blender 4.2 macOS" > results.txt
 ```
 
+### Health check
+
+Check whether the `ketch server` of this machine is ready, as container health checks and service
+managers do. It finds the server through the same config file and
+[environment variables](#environment-variables) as the server, and asks its
+[health endpoint](#health): a server on every interface is asked on `127.0.0.1`.
+
+```bash
+ketch health [options]
+```
+
+| Option | Description |
+|---|---|
+| `--host <address>` | Address to ask instead |
+| `--port <number>` | Port to ask instead |
+| `--config <path>` | The config file the server was started with |
+| `--help`, `-h` | Show help message |
+
+It prints one line, `ready` or why not, and exits with status 0 once the server is ready, 1 while
+it restores its tasks or when it cannot be reached, and 2 for invalid options or environment
+variables.
+
 ### Update
 
 Replace the `ketch` binary with the latest release from GitHub. The archive is checked against the
@@ -415,8 +485,9 @@ ketch update --version 0.0.1-rc15
 ## Configuration File
 
 The `server` and `mcp` commands support TOML configuration files. CLI flags always take precedence
-over config file values. The download command reads only `[torrent]`, and `ai-discover` only
-`[ai]`, from the default path.
+over config file values, and `ketch server` reads
+[environment variables](#environment-variables) in between. The download command reads only
+`[torrent]`, and `ai-discover` only `[ai]`, from the default path.
 
 ### Config file locations
 
@@ -425,6 +496,9 @@ over config file values. The download command reads only `[torrent]`, and `ai-di
 | macOS | `~/Library/Application Support/ketch/config.toml` |
 | Linux | `$XDG_CONFIG_HOME/ketch/config.toml` (default: `~/.config/ketch/config.toml`) |
 | Windows | `%APPDATA%\ketch\config.toml` |
+
+`KETCH_CONFIG_DIR`, when set, replaces the directory for the CLI and the desktop app, `api-token`,
+the [database](#database) and `torrent-state` included; the Docker image sets it to `/config`.
 
 If no `--config` flag is provided, the CLI automatically loads from the default path when the file
 exists. The desktop app uses the same directory, so the CLI shares its settings and task database.
@@ -489,6 +563,9 @@ maxConnectionsPerHost = 16
 # used after the trackers above: ngosang's and XIU2's best lists by default.
 # trackerList = true
 # trackerListUrls = ["https://lists.example.org/trackers.txt"]
+# Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), for port
+# forwarding; 0 picks a free one at every launch. The apps always pick one.
+# listenPort = 6881
 
 # Pre-configured remote servers.
 # [[remotes]]
@@ -544,6 +621,7 @@ be negative.
 | `trackers` | string[] | `[]` | Extra `http`, `https` or `udp` trackers that public torrents also announce to |
 | `trackerList` | bool | `true` | Subscribe to the tracker lists at `trackerListUrls`, downloaded daily; their trackers are used after `trackers` |
 | `trackerListUrls` | string[] | ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's [`best.txt`](https://github.com/XIU2/TrackersListCollection) | `http` or `https` URLs of plain-text lists, one announce URL per line |
+| `listenPort` | int | `0` | Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), 0-65535; `0` picks a free one at every start. The apps and the other commands always pick one, so they never contend for it |
 
 The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps
 also keep `[[remotes]]`, `[appearance]` and `server.autoStart` in this file; the CLI ignores them.

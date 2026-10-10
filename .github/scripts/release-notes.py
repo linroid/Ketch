@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-def download_notes(artifacts, server_url, repository, tag):
+def download_notes(artifacts, server_url, repository, tag, docker_image):
   version = tag.removeprefix("v")
   release_url = f"{server_url}/{repository}/releases/download/{quote(tag, safe='')}"
   source_url = f"{server_url}/{repository}/tree/{quote(tag, safe='')}"
@@ -65,6 +65,7 @@ def download_notes(artifacts, server_url, repository, tag):
      download("Extension source ZIP", "extension-{version}-safari.zip")),
   ])
   web = download("Download the web bundle", "web-{version}.zip")
+  docker = f"`docker pull {docker_image}:{version}`"
   references = "\n".join(links)
   return f"""## Get Ketch
 
@@ -97,6 +98,9 @@ No Java installation needed.
 
 {commands}
 
+**Docker** (x64 and ARM64), for a NAS or home server: {docker}.
+[Run it with Docker, on TrueNAS or fnOS]({source_url}/docs/docker.md).
+
 **Hosting the web interface separately?** {web} (ZIP).
 Connect it to a running Ketch server to manage your downloads.
 
@@ -121,5 +125,8 @@ if __name__ == "__main__":
   parser.add_argument("--server-url", default="https://github.com")
   parser.add_argument("--repository", required=True)
   parser.add_argument("--tag", required=True)
+  parser.add_argument("--docker-image", required=True)
   args = parser.parse_args()
-  print(download_notes(args.artifacts, args.server_url, args.repository, args.tag))
+  print(download_notes(
+    args.artifacts, args.server_url, args.repository, args.tag, args.docker_image,
+  ))

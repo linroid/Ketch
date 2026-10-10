@@ -2,6 +2,7 @@ package com.linroid.ketch.config
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class TorrentSettingsTest {
 
@@ -33,6 +34,12 @@ class TorrentSettingsTest {
       val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
       assertEquals(settings, decoded.torrent, encoded)
     }
+  }
+
+  @Test
+  fun `listen port outside 0 to 65535 is rejected`() {
+    assertFailsWith<IllegalArgumentException> { TorrentSettings(listenPort = -1) }
+    assertFailsWith<IllegalArgumentException> { TorrentSettings(listenPort = 65536) }
   }
 
   @Test

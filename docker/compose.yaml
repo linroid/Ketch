@@ -1,0 +1,22 @@
+# Ketch server with Docker Compose. Change the folders on the left of each volume if you like,
+# then run `docker compose up -d` here and open http://<this machine>:8642. See docs/docker.md.
+services:
+  ketch:
+    image: ghcr.io/linroid/ketch:latest
+    container_name: ketch
+    restart: unless-stopped
+    environment:
+      # The user and group that own the downloads; `id` shows yours.
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      # The access code apps and the web UI ask for. Left empty, the first start creates one,
+      # prints it in the logs and keeps it in config/api-token.
+      KETCH_API_TOKEN: ""
+    volumes:
+      - ./config:/config
+      - ./downloads:/downloads
+    ports:
+      - "8642:8642" # web UI and REST API
+      - "16881:16881" # BitTorrent peers
+      - "16881:16881/udp" # BitTorrent DHT

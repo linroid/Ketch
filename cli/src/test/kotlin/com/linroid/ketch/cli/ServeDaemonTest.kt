@@ -10,6 +10,7 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.server.KetchServer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -25,6 +26,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.time.TimeSource
 
 class ServeDaemonTest {
 
@@ -46,6 +48,32 @@ class ServeDaemonTest {
       ketch.close()
     }
     assertFalse(daemon.isAlive)
+  }
+
+  @Test
+  fun `serveDaemon reports ready once the saved tasks are restored`() {
+    val restore = CompletableDeferred<Unit>()
+    val store = GatedTaskStore(restore, SavedTaskStore(pausedRecord("saved")))
+    val ketch = Ketch(UnreachableHttpEngine(), taskStore = store)
+    val server =
+      KetchServer(ketch, host = "127.0.0.1", port = 0, mdnsEnabled = false, ready = false)
+    val daemon = thread { serveDaemon(server, ketch) }
+    try {
+      val url = healthUrl("127.0.0.1", runBlocking { withTimeout(5.seconds) { server.port() } })
+      assertEquals(HealthExit.NOT_READY, checkHealth(url))
+
+      restore.complete(Unit)
+      val deadline = TimeSource.Monotonic.markNow() + 5.seconds
+      while (checkHealth(url) != HealthExit.READY) {
+        assertTrue(deadline.hasNotPassedNow(), "the server never reported ready")
+        Thread.sleep(50)
+      }
+      assertEquals(listOf("saved"), ketch.tasks.value.map { it.taskId })
+    } finally {
+      server.stop()
+      daemon.join(5_000)
+      ketch.close()
+    }
   }
 
   @Test
@@ -96,6 +124,17 @@ private class SavedTaskStore(vararg records: TaskRecord) : TaskStore {
 
   override suspend fun remove(taskId: String) {
     records.remove(taskId)
+  }
+}
+
+/** A [TaskStore] whose saved records only load once [gate] completes. */
+private class GatedTaskStore(
+  private val gate: CompletableDeferred<Unit>,
+  private val delegate: TaskStore,
+) : TaskStore by delegate {
+  override suspend fun loadAll(): List<TaskRecord> {
+    gate.await()
+    return delegate.loadAll()
   }
 }
 

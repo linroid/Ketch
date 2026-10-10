@@ -114,6 +114,13 @@ including a development run, hands its files to the running app instead of openi
   the lists are changed. `TorrentConfig.trackerListUrls` itself is empty for SDK users.
   `setTrackerLists` and `refreshTrackerLists` change or update them at runtime, `trackerLists`
   reports each; the apps show them under Settings → BitTorrent → Tracker lists.
+- `listenPort` is the port incoming peers connect to over TCP. DHT binds the same port over UDP
+  when it can (a dual-stack system refuses the IPv6 socket on it, which then takes any port), so
+  one forwarded port, TCP and UDP, reaches both; trackers and DHT announce it. `0`, the default,
+  lets the system pick each port at every start. `ketch server` takes it from `[torrent]
+  listenPort`, `KETCH_TORRENT_PORT` or `--torrent-port`, and the [Docker image](docker.md) sets
+  16881; the apps and the CLI's other commands always let the system pick. A port in use fails
+  the torrents that start with `KetchError.Network`, retried like other transient failures.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not

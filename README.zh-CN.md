@@ -83,6 +83,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 | 网页版 | [linroid.com/Ketch](https://linroid.com/Ketch/)，用于控制其他设备上运行的 Ketch |
 | 浏览器扩展 | Chrome、Edge、Brave、Firefox 等：[最新版本][release]中的 `.zip`（[安装方法](app/browser-extension/README.md#installing)） |
 | 命令行和服务器 | macOS、Linux 和 Windows：[安装脚本](#run-ketch-on-a-server)或[最新版本][release] |
+| Docker | x64 和 ARM64 的 NAS 与家庭服务器：`ghcr.io/linroid/ketch`（[指南](docs/docker.zh-CN.md)，含飞牛 fnOS 和 TrueNAS） |
 
 桌面应用自带运行时，命令行工具则是单个原生可执行文件，两者均无需安装 Java。
 它们都能从本仓库发布的版本更新：桌面应用通过「设置 → 关于」，命令行通过 `ketch update`
@@ -123,8 +124,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   或打开「所有设备」，在同一张表格中查看全部下载任务。
 - **将下载任务交给合适的设备** — 向任意设备添加链接、将链接拖到侧边栏的设备上，
   或将下载任务发送或移动到另一台设备，无需切换当前设备。
-- **在 NAS 或服务器上无界面运行** — `ketch server` 运行同一个引擎，内置 REST API 和网页应用，
-  其他 Ketch 应用可在局域网中发现它。
+- **在 NAS 或服务器上无界面运行** — `ketch server`（也提供 [Docker 镜像](docs/docker.zh-CN.md)）
+  运行同一个引擎，内置 REST API 和网页应用，其他 Ketch 应用可在局域网中发现它。
 
 ### 掌控带宽
 
@@ -197,6 +198,15 @@ ketch https://example.com/file.zip
 在[配置文件](cli/README.md#configuration-file)中设置访问码、端口及其他选项；
 [命令行文档](cli/README.md)列出了所有命令。
 
+在 NAS 或其他能运行 Docker 的地方，可以改为启动镜像。[Docker 指南](docs/docker.zh-CN.md)介绍了
+各项设置，以及飞牛 fnOS 和 TrueNAS 上的步骤：
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## 路线图
 
 - **v1.0.0 前的分发准备** — Windows 版本签名、macOS 版本签名与公证、浏览器扩展商店上架，
@@ -218,7 +228,6 @@ ketch https://example.com/file.zip
 - **自动化钩子** — 下载完成或失败时执行命令或调用 webhook
 - **控制运行中设备的命令行** — `ketch` 和 AI 智能体可添加、列出、暂停和查看 Ketch 应用
   或服务器中的下载任务，无需启动第二个引擎
-- **Docker 镜像** — 为 x64 和 ARM 的 NAS 与家庭服务器提供官方镜像，支持健康检查和固定种子端口
 - **设备间传输** — 「发送到」和「移动到」携带已下载的数据，让另一台设备继续下载，
   无需从头开始（[计划](docs/plans/task-transfer.md)）
 - **辅助设备** — 让其他设备使用各自的网络连接下载同一文件的部分内容，运行中可随时加入或退出
