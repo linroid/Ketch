@@ -251,6 +251,11 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   its files, the `selection` and `seeding` commands, guarded by a revision and an idempotency key,
   and an `events` stream of snapshots. `RemoteKetch.torrents` calls them and fails closed against
   servers without them
+- **Live connections**: `GET /api/connections` and the SSE stream `/api/connections/events`
+  (`snapshot` events, an `error` event before it closes; `?limit=1..1024`) serve
+  `KetchApi.activeConnections`, at most 16 streams at once. Hosts and peer addresses go only
+  there, never on `/api/events`. `RemoteKetch.activeConnections` fails closed for servers without
+  `net.activeConnections`
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events. A `progress` event leaves out a request
   that did not change, and task views and events never carry a torrent's metainfo

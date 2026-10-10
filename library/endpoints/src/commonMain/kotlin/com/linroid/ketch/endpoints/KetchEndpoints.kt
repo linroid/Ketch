@@ -1,5 +1,6 @@
 package com.linroid.ketch.endpoints
 
+import com.linroid.ketch.api.ActiveConnections as ConnectionsSnapshot
 import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 
@@ -39,6 +40,10 @@ import kotlinx.serialization.Serializable
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
  * - `PUT /api/torrents/{id}/seeding`  — start or stop seeding it, guarded by a revision
  * - `GET /api/torrents/{id}/events`   — SSE stream of its snapshots
+ *
+ * ### Live connections
+ * - `GET /api/connections`        — a snapshot of the live connections (`?limit=1..1024`)
+ * - `GET /api/connections/events` — SSE stream of their snapshots (`?limit=1..1024`)
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -173,6 +178,27 @@ class Api {
       @Resource("events")
       data class Events(val parent: ById)
     }
+  }
+
+  /**
+   * The live connections of every task, which servers listing `net.activeConnections` serve: a
+   * `com.linroid.ketch.api.ActiveConnections` snapshot holding at most [limit] of them, in
+   * 1..1024; another limit is `400` `invalid_limit`.
+   */
+  @Serializable
+  @Resource("connections")
+  data class ActiveConnections(
+    val parent: Api = Api(),
+    val limit: Int = ConnectionsSnapshot.DEFAULT_LIMIT,
+  ) {
+
+    /**
+     * SSE stream of the snapshots, named in [ConnectionEvents], with the parent's `limit`. A
+     * server streams to a few clients at once and answers `429` `too_many_streams` beyond them.
+     */
+    @Serializable
+    @Resource("events")
+    data class Events(val parent: ActiveConnections = ActiveConnections())
   }
 
   @Serializable

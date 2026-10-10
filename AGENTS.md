@@ -128,7 +128,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`
 
 ### `library:endpoints`
-- `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API)
+- `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API),
+  `ConnectionEvents` (live connection stream event names and error codes)
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
   `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `TorrentSelectionRequest`,
@@ -778,6 +779,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`), `selection` and
   `seeding` commands guarded by a revision and an idempotency key, and an SSE `events` stream of
   snapshots. Command failures answer with the `TorrentCommandError` wire name
+- Live connections (`ConnectionRoutes`): `GET /api/connections?limit=1..1024` answers the first
+  `ActiveConnections` snapshot and `/api/connections/events` streams `snapshot` events (id: a
+  per-stream count), repeating the last one every 15 s while nothing changes; `error`
+  (`ErrorResponse`) ends it. Another limit is 400 `invalid_limit`, an engine without them 501
+  `unsupported` (or that `error` event), and past 16 open streams (`ConnectionStreams`) 429
+  `too_many_streams`. Behind the token and startup gate like every route; hosts and peer
+  addresses never go on `/api/events`. Event names and codes: `ConnectionEvents` in endpoints.
+  `RemoteKetch.activeConnections` asks `features()` first and fails with
+  `UnsupportedOperationException` without opening the stream for servers lacking
+  `net.activeConnections` (and for a 404/405 without a body, 501 or `unsupported`); it reads the
+  stream as text in a `channelFlow` (Darwin runs `execute` elsewhere), drops repeats, and ends
+  with the failure when the stream drops or closes, never reconnecting
 - Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
   `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
   without a token. Tokens are compared in constant time (SHA-256 digests,
@@ -1097,8 +1110,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
   "TorrentTracker", "TrackerList", "TorrentController", "Connections", "RemoteKetch", "RemoteTask",
   "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore",
-  "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "EventRoutes",
-  "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
+  "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "ConnectionRoutes",
+  "EventRoutes", "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
