@@ -2,7 +2,6 @@ package com.linroid.ketch.app.desktop
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,7 +32,6 @@ import ketch.app.desktop.generated.resources.app_title_status
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.hypot
 
 /**
  * System property that keeps the system's title bar on macOS, in case the full-window layout
@@ -163,18 +161,25 @@ internal fun Modifier.onDoubleClick(action: () -> Unit): Modifier = pointerInput
 
 /**
  * Runs [action] when the primary button is pressed and released without the pointer moving on
- * the screen, so a press that drags the window is no click. The pointer keeps its place in a
- * window it drags, so the screen position tells the two apart.
+ * the screen in between, so a press that drags the window, even back to where it started, is no
+ * click. The pointer keeps its place in a window it drags, so the screen position tells the two
+ * apart; the window follows every movement, so any movement is a drag.
  */
 internal fun Modifier.onStillClick(action: () -> Unit): Modifier = pointerInput(action) {
   awaitEachGesture {
-    awaitFirstDown()
+    val down = awaitFirstDown()
     if (!currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
     val start = currentEvent.awtEventOrNull?.locationOnScreen ?: return@awaitEachGesture
-    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
-    val end = currentEvent.awtEventOrNull?.locationOnScreen ?: return@awaitEachGesture
-    val moved = hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble())
-    if (!up.isConsumed && moved <= viewConfiguration.touchSlop) action()
+    var moved = false
+    while (true) {
+      val event = awaitPointerEvent()
+      val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+      if (event.awtEventOrNull?.locationOnScreen.let { it == null || it != start }) moved = true
+      if (!change.pressed) {
+        if (!moved && !change.isConsumed) action()
+        return@awaitEachGesture
+      }
+    }
   }
 }
 
