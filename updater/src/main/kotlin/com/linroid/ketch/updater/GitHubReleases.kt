@@ -45,40 +45,36 @@ suspend fun ReleaseFeed.releasesBetween(
   version: ReleaseVersion,
 ): List<Release> {
   if (since == null || since >= version) return listOf(release(version))
-  return releasesUpTo(version, MAX_RELEASE_PAGES) { it > since }
+  val found = listed(MAX_RELEASE_PAGES) { it > since }.filter { it.version <= version }
+  // The pages may miss it, as when it is newer than they reach.
+  val all = if (found.none { it.version == version }) found + release(version) else found
+  return all.sortedByDescending { it.version }
 }
 
 /**
- * The releases from [first] up to [version], newest first, for the history of Ketch's releases:
- * like [releasesBetween], but [first] is listed too and up to [MAX_HISTORY_PAGES] pages are read.
- * Only [version] when [first] is not older.
+ * Every release from [first] on, newest first, for the history of Ketch's releases: those the
+ * pages of [ReleaseFeed.releases] list, read until one reaches a release older than [first] or
+ * for [MAX_HISTORY_PAGES] pages. Only lists, never asks for a release by its version, so it works
+ * whatever version the app runs, a development build's included.
  */
-suspend fun ReleaseFeed.releasesFrom(
-  first: ReleaseVersion,
-  version: ReleaseVersion,
-): List<Release> {
-  if (first >= version) return listOf(release(version))
-  return releasesUpTo(version, MAX_HISTORY_PAGES) { it >= first }
-}
+suspend fun ReleaseFeed.releasesFrom(first: ReleaseVersion): List<Release> =
+  listed(MAX_HISTORY_PAGES) { it >= first }.sortedByDescending { it.version }
 
 /**
- * The releases up to [version] that [wanted] keeps, newest first: those the pages of
- * [ReleaseFeed.releases] list, read until one lists a release [wanted] does not keep or for
- * [maxPages] pages, and [version], asked for on its own when they do not list it.
+ * The releases [wanted] keeps that the pages of [ReleaseFeed.releases] list, read until one lists
+ * a release [wanted] does not keep or for [maxPages] pages, each version once.
  */
-private suspend fun ReleaseFeed.releasesUpTo(
-  version: ReleaseVersion,
+private suspend fun ReleaseFeed.listed(
   maxPages: Int,
   wanted: (ReleaseVersion) -> Boolean,
 ): List<Release> {
   val found = mutableListOf<Release>()
   for (page in 1..maxPages) {
     val releases = releases(page)
-    found += releases.filter { wanted(it.version) && it.version <= version }
+    found += releases.filter { wanted(it.version) }
     if (releases.isEmpty() || releases.any { !wanted(it.version) }) break
   }
-  if (found.none { it.version == version }) found += release(version)
-  return found.distinctBy { it.version }.sortedByDescending { it.version }
+  return found.distinctBy { it.version }
 }
 
 /** The most pages of [ReleaseFeed.releases] that [releasesBetween] reads. */

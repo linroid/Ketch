@@ -101,12 +101,12 @@ interface AppUpdates {
   suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes>
 
   /**
-   * The notes of the releases from [first] up to [version], newest first, [first] included, for
-   * the history of Ketch's releases; only [version]'s when [first] is not an older release.
+   * The notes of every published release from [first] on, newest first, for the history of
+   * Ketch's releases, whatever version the app runs.
    *
    * @throws Exception when they cannot be read, with a message that says why.
    */
-  suspend fun releaseHistory(version: String, first: String): List<ReleaseNotes>
+  suspend fun releaseHistory(first: String): List<ReleaseNotes>
 }
 
 /** [AppUpdates] of the running app, `null` where the app does not update itself. */

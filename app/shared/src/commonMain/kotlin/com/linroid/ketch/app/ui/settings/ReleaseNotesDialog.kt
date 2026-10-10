@@ -161,23 +161,23 @@ fun ReleaseNotesDialog(updates: AppUpdates, request: ReleaseNotesRequest, onDism
 internal const val FIRST_LISTED_RELEASE = "0.1.0"
 
 /**
- * Every release from [FIRST_LISTED_RELEASE] up to [version], newest first, as [updates] reads
+ * Every published release from [FIRST_LISTED_RELEASE] on, newest first, as [updates] reads
  * them: a line per release with its date and how many changes its notes list, which opens to
  * those changes under New, Fixed and Improved. The newest starts open.
  */
 @Composable
-fun ReleaseHistoryDialog(updates: AppUpdates, version: String, onDismiss: () -> Unit) {
+fun ReleaseHistoryDialog(updates: AppUpdates, onDismiss: () -> Unit) {
   var attempt by remember { mutableIntStateOf(0) }
-  var load by remember(version) { mutableStateOf<NotesLoad>(NotesLoad.Loading) }
-  LaunchedEffect(updates, version, attempt) {
+  var load by remember { mutableStateOf<NotesLoad>(NotesLoad.Loading) }
+  LaunchedEffect(updates, attempt) {
     load = NotesLoad.Loading
     load = try {
       // Each release keeps its notes as published, repeats included, so none drops out.
-      NotesLoad.Loaded(updates.releaseHistory(version, FIRST_LISTED_RELEASE))
+      NotesLoad.Loaded(updates.releaseHistory(FIRST_LISTED_RELEASE))
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      log.w { "Couldn't read the releases up to Ketch $version: ${e.describeCauses()}" }
+      log.w { "Couldn't read the releases since $FIRST_LISTED_RELEASE: ${e.describeCauses()}" }
       NotesLoad.Failed(e.message ?: e.describeCauses())
     }
   }

@@ -101,7 +101,7 @@ class UpdateSnapshots {
       val updates = FixedUpdates(AppUpdateState.UpToDate, SampleNotes + quietRelease("0.3.0"))
       snapshot("release-history", size, theme) {
         CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
-          ReleaseHistoryDialog(updates, version = "0.3.2", onDismiss = {})
+          ReleaseHistoryDialog(updates, onDismiss = {})
         }
       }
     }
@@ -138,7 +138,7 @@ class UpdateSnapshots {
       return notes
     }
 
-    override suspend fun releaseHistory(version: String, first: String): List<ReleaseNotes> {
+    override suspend fun releaseHistory(first: String): List<ReleaseNotes> {
       failure?.let { throw it }
       return notes
     }
