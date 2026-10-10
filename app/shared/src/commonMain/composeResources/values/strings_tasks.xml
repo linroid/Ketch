@@ -59,6 +59,7 @@
   <!-- A paused task's detail when the engine paused it for an urgent download. -->
   <string name="row_paused_preempted">Paused for an urgent download · resumes automatically</string>
   <!-- A paused task's detail when its device's Ketch closed while it downloaded. -->
+  <string name="row_choose_files">Choose files to start</string>
   <string name="row_paused_shutdown">Paused when Ketch closed · resumes when it starts</string>
 
   <!-- Bytes so far of the total. %1$s and %2$s are sizes, such as "1.0 KB". -->

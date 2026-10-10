@@ -139,6 +139,43 @@ internal class DownloadCoordinator(
     job?.join()
   }
 
+  /**
+   * Joins the task's stopping execution, if any, without touching a running one.
+   */
+  suspend fun awaitStopping(taskId: String) {
+    mutex.withLock { stoppingDownloads[taskId] }?.join()
+  }
+
+  /** Whether the task has a running execution. */
+  suspend fun isActive(taskId: String): Boolean = mutex.withLock {
+    activeDownloads.containsKey(taskId)
+  }
+
+  /**
+   * Whether the task's running execution is finishing: its source returned and it is completing,
+   * so it takes no more selections.
+   */
+  suspend fun isFinishing(taskId: String): Boolean = mutex.withLock {
+    activeDownloads[taskId]?.execution?.isFinishing == true
+  }
+
+  /**
+   * Hands a saved selection to the task's running execution. The caller holds the task's
+   * [TaskHandle.controlLock] and saved the selection first.
+   */
+  suspend fun deliverSelection(
+    taskId: String,
+    fileIds: Set<String>,
+    totalBytes: Long,
+  ): SelectionDelivery = mutex.withLock {
+    val entry = activeDownloads[taskId] ?: return@withLock SelectionDelivery.NOT_RUNNING
+    if (entry.execution.deliverSelection(fileIds, totalBytes)) {
+      SelectionDelivery.DELIVERED
+    } else {
+      SelectionDelivery.FINISHING
+    }
+  }
+
   suspend fun resume(
     handle: TaskHandle,
     destination: Destination? = null,
@@ -422,6 +459,18 @@ internal class DownloadCoordinator(
   private companion object {
     val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
   }
+}
+
+/** What [DownloadCoordinator.deliverSelection] did with a selection. */
+internal enum class SelectionDelivery {
+  /** The running execution took it. */
+  DELIVERED,
+
+  /** The task has no running execution; the next one reads the saved selection. */
+  NOT_RUNNING,
+
+  /** The running execution is finishing and takes no more selections. */
+  FINISHING
 }
 
 /** This configuration as [request] downloads with it: with its own proxy, if it has one. */

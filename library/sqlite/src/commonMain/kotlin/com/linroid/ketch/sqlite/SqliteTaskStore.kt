@@ -7,6 +7,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -32,6 +33,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val errorSerializer = KetchError.serializer()
   private val segmentListSerializer = ListSerializer(Segment.serializer())
   private val resumeStateSerializer = SourceResumeState.serializer()
+  private val controlSerializer = TaskControl.serializer()
 
   /**
    * Saves a [TaskRecord] to the SQLite database. If a record with the same
@@ -51,6 +53,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
     val resumeStateJson = record.sourceResumeState?.let {
       json.encodeToString(resumeStateSerializer, it)
     }
+    val controlJson = record.control?.let { json.encodeToString(controlSerializer, it) }
     queries.transaction {
       queries.insertOrIgnore(
         task_id = record.taskId,
@@ -64,6 +67,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
+        control_json = controlJson,
       )
       queries.update(
         task_id = record.taskId,
@@ -77,6 +81,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
+        control_json = controlJson,
       )
     }
   }
@@ -155,6 +160,14 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       createdAt = Instant.fromEpochMilliseconds(created_at),
       updatedAt = Instant.fromEpochMilliseconds(updated_at),
       completedAt = completed_at?.let(Instant::fromEpochMilliseconds),
+      control = control_json?.let {
+        try {
+          json.decodeFromString(controlSerializer, it)
+        } catch (e: Exception) {
+          log.w { "Unreadable control state for taskId=$task_id: ${e.describeCauses()}" }
+          null
+        }
+      },
     )
   }
 }

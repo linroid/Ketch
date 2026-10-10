@@ -42,6 +42,13 @@ sealed class PauseReason {
    * instance starts again.
    */
   data object Shutdown : PauseReason()
+
+  /**
+   * Waiting for [DownloadTask.selectFiles], as [DownloadRequest.awaitFileSelection] asked once
+   * the file list was known. Holds no download slot and has no queue position;
+   * [DownloadTask.resume] downloads every file. Older clients decode it as [User].
+   */
+  data object AwaitingFileSelection : PauseReason()
 }
 
 // The wire shape of every reason. Not polymorphic on purpose: a sealed polymorphic hierarchy
@@ -60,6 +67,7 @@ internal object PauseReasonSerializer : KSerializer<PauseReason> {
       is PauseReason.Preempted -> PauseReasonWire(PREEMPTED, value.byTaskId)
       PauseReason.WaitingForCondition -> PauseReasonWire(WAITING_FOR_CONDITION)
       PauseReason.Shutdown -> PauseReasonWire(SHUTDOWN)
+      PauseReason.AwaitingFileSelection -> PauseReasonWire(AWAITING_FILE_SELECTION)
     }
     encoder.encodeSerializableValue(PauseReasonWire.serializer(), wire)
   }
@@ -78,6 +86,7 @@ internal object PauseReasonSerializer : KSerializer<PauseReason> {
       PREEMPTED -> byTaskId?.let(PauseReason::Preempted) ?: PauseReason.User
       WAITING_FOR_CONDITION -> PauseReason.WaitingForCondition
       SHUTDOWN -> PauseReason.Shutdown
+      AWAITING_FILE_SELECTION -> PauseReason.AwaitingFileSelection
       else -> PauseReason.User
     }
   }
@@ -89,4 +98,5 @@ internal object PauseReasonSerializer : KSerializer<PauseReason> {
   private const val PREEMPTED = "preempted"
   private const val WAITING_FOR_CONDITION = "waiting_for_condition"
   private const val SHUTDOWN = "shutdown"
+  private const val AWAITING_FILE_SELECTION = "awaiting_file_selection"
 }

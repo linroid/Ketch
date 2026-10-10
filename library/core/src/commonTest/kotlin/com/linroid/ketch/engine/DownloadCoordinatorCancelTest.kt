@@ -17,6 +17,7 @@ import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +104,7 @@ class DownloadCoordinatorCancelTest {
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(record) {}
     }
   }

@@ -25,9 +25,18 @@ object KetchFeatures {
   /** [DownloadConfig.categories] sort downloads into folders. */
   const val CATEGORY_FOLDERS: String = "download.categories"
 
+  /** [DownloadTask.selectFiles] works for torrent tasks in every state but canceled. */
+  const val TORRENT_FILE_SELECTION: String = "torrent.fileSelection"
+
+  /** [DownloadRequest.awaitFileSelection] is honored. */
+  const val TORRENT_AWAIT_FILE_SELECTION: String = "torrent.awaitFileSelection"
+
+  /** [KetchApi.torrents] executes commands: REST `/api/torrents` and its event stream. */
+  const val TORRENT_CONTROL: String = "torrent.control"
+
   /** Every feature this version of Ketch supports, including optional sources. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
-    CATEGORY_FOLDERS
+    CATEGORY_FOLDERS, TORRENT_FILE_SELECTION, TORRENT_AWAIT_FILE_SELECTION, TORRENT_CONTROL
   )
 }
