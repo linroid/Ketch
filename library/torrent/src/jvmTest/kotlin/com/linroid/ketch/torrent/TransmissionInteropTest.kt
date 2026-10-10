@@ -4,11 +4,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import okio.Path.Companion.toPath
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** An isolated Transmission process is a test fixture, never a production downloader dependency. */
@@ -58,6 +60,39 @@ class TransmissionInteropTest {
           }
         } finally {
           source.close()
+          daemon.close()
+          root.deleteRecursively()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun publicSource_expandsSelectionWhileDownloadingFromTransmission() = runTest {
+    withContext(Dispatchers.IO) {
+      withTimeout(90_000) {
+        val binary = TransmissionDaemon.binary()
+        val root = Files.createTempDirectory("ketch-transmission-selection").toFile()
+        val seed = root.resolve("seed").apply { mkdirs() }
+        // Three files whose boundaries fall inside pieces; Transmission seeds them from seed/pack.
+        val torrent = MultiFileTorrent()
+        torrent.writeTo(seed.absolutePath.toPath() / "pack")
+        val daemon = TransmissionDaemon.start(binary, root, seed)
+        try {
+          daemon.awaitReady()
+          daemon.add(torrent.metainfo, seed)
+          daemon.awaitComplete()
+          val magnet = MagnetUri(torrent.metadata.infoHash,
+            explicitPeers = listOf("127.0.0.1:${daemon.peerPort}")).toUri()
+          val output = root.resolve("out")
+          val expansion = downloadExpandingLive(magnet, torrent.metainfo, output.absolutePath,
+            first = setOf("0"), expanded = setOf("0", "2"))
+          assertContentEquals(torrent.payloads[0], output.resolve("f0").readBytes())
+          assertContentEquals(torrent.payloads[2], output.resolve("f2").readBytes())
+          assertFalse(output.resolve("f1").exists())
+          // The expansion reached the running swarm: no peer was dialed again.
+          assertEquals(1, expansion.connects)
+        } finally {
           daemon.close()
           root.deleteRecursively()
         }

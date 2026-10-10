@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -43,5 +44,26 @@ class TorrentSessionRegistryTest {
       registry.attach("a", FakeTorrentSession("second"))
     }
     assertNull(registry.session("a"))
+  }
+
+  @Test
+  fun awaitRelease_completesOnRelease() = runTest {
+    val registry = TorrentSessionRegistry()
+    // Nothing reserved: nothing to wait for.
+    registry.awaitRelease("a")
+    registry.reserve("a", "hash")
+    val waiting = async { registry.awaitRelease("a") }
+    testScheduler.runCurrent()
+    assertFalse(waiting.isCompleted)
+    registry.release("a")
+    waiting.await()
+    assertEquals(0, registry.size())
+    // A new reservation is a new wait.
+    registry.reserve("a", "hash")
+    val again = async { registry.awaitRelease("a") }
+    testScheduler.runCurrent()
+    assertFalse(again.isCompleted)
+    registry.release("a")
+    again.await()
   }
 }
