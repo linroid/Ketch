@@ -73,6 +73,7 @@ import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.pulse.PulseBar
 import com.linroid.ketch.app.ui.pulse.PulseSheet
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
+import com.linroid.ketch.app.ui.settings.ReleaseNotesHost
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import com.linroid.ketch.app.ui.shell.AddFab
 import com.linroid.ketch.app.ui.shell.BOTTOM_BAR_MIN_DESTINATIONS
@@ -295,6 +296,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   }
   ConnectHost(appState)
   PairingApprovalHost(appState)
+  ReleaseNotesHost(appState)
 }
 
 /** Keeps the Downloads tab and search across an Android activity recreation. */

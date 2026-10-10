@@ -23,6 +23,7 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -232,19 +233,52 @@ class DesktopUpdaterTest {
   fun start_afterInstallingThisVersion_reportsItAndClearsTheFiles() = runTest {
     File(workDir, "pending-install").writeText("0.0.2")
     File(workDir, "Ketch.app").mkdirs()
-    updater(current = "0.0.2").start(checkAutomatically = false)
+    updater(current = "0.0.2").start(checkAutomatically = false, lastVersion = null)
     runCurrent()
 
-    val installed = assertIs<UpdateEvent.Installed>(events.single())
-    assertEquals("0.0.2", installed.version)
-    assertEquals("https://github.com/linroid/Ketch/releases/tag/v0.0.2", installed.notesUrl)
+    assertEquals(listOf<UpdateEvent>(UpdateEvent.Installed("0.0.2", since = null)), events)
     assertFalse(workDir.exists())
+  }
+
+  @Test
+  fun start_afterInstallingThisVersion_namesTheVersionThatRanLast() = runTest {
+    File(workDir, "pending-install").writeText("0.0.2")
+    updater(current = "0.0.2").start(checkAutomatically = false, lastVersion = "0.0.1")
+    runCurrent()
+
+    assertEquals(listOf<UpdateEvent>(UpdateEvent.Installed("0.0.2", since = "0.0.1")), events)
+  }
+
+  @Test
+  fun start_updatedAnotherWay_reportsTheUpdate() = runTest {
+    updater(current = "0.0.3").start(checkAutomatically = false, lastVersion = "0.0.1")
+    runCurrent()
+
+    assertEquals(listOf<UpdateEvent>(UpdateEvent.Installed("0.0.3", since = "0.0.1")), events)
+  }
+
+  @Test
+  fun start_sameOlderOrUnknownVersionRanLast_reportsNothing() = runTest {
+    for (lastVersion in listOf(null, "0.0.2", "0.0.3", "dev")) {
+      updater(current = "0.0.2").start(checkAutomatically = false, lastVersion = lastVersion)
+      runCurrent()
+    }
+
+    assertTrue(events.isEmpty())
+  }
+
+  @Test
+  fun start_notARelease_reportsNoUpdate() = runTest {
+    updater(current = "dev").start(checkAutomatically = false, lastVersion = "0.0.1")
+    runCurrent()
+
+    assertTrue(events.isEmpty())
   }
 
   @Test
   fun start_afterAnInstallThatDidNotTake_reportsTheFailure() = runTest {
     File(workDir, "pending-install").writeText("0.0.2")
-    updater(current = "0.0.1").start(checkAutomatically = false)
+    updater(current = "0.0.1").start(checkAutomatically = false, lastVersion = "0.0.1")
     runCurrent()
 
     assertEquals(listOf<UpdateEvent>(UpdateEvent.InstallFailed("0.0.2")), events)
@@ -252,10 +286,25 @@ class DesktopUpdaterTest {
 
   @Test
   fun start_withoutAnInstall_reportsNothing() = runTest {
-    updater().start(checkAutomatically = false)
+    updater().start(checkAutomatically = false, lastVersion = "0.0.1")
     runCurrent()
 
     assertTrue(events.isEmpty())
+  }
+
+  @Test
+  fun releaseNotes_readsTheChangesOfEveryReleaseSince() = runTest {
+    feed.listed = listOf(release("0.0.3"), release("0.0.2"), release("0.0.1"))
+
+    val notes = updater().releaseNotes("0.0.3", since = "0.0.1")
+
+    assertEquals(listOf("0.0.3", "0.0.2"), notes.map { it.version })
+    assertEquals(listOf("Pause with a click in 0.0.3"), notes.first().changes.map { it.summary })
+  }
+
+  @Test
+  fun releaseNotes_notARelease_fails() = runTest {
+    assertFailsWith<UpdateException> { updater().releaseNotes("dev", since = null) }
   }
 
   private fun TestScope.available(): DesktopUpdater = updater().also {
@@ -296,6 +345,7 @@ class DesktopUpdaterTest {
     version = ReleaseVersion.parse(version)!!,
     pageUrl = "https://github.com/linroid/Ketch/releases/tag/v$version",
     assets = listOf(asset("ketch-desktop-$version-macos-arm64.dmg")),
+    notes = "* feat: pause with a click in $version by @linroid in https://x.test/pull/1",
   )
 
   private fun asset(name: String) = ReleaseAsset(
@@ -307,6 +357,7 @@ class DesktopUpdaterTest {
 
   private class FakeFeed(var latest: Release) : ReleaseFeed {
     var failure: Exception? = null
+    var listed: List<Release> = emptyList()
     var calls = 0
       private set
 
@@ -316,7 +367,10 @@ class DesktopUpdaterTest {
       return latest
     }
 
-    override suspend fun release(version: ReleaseVersion): Release = error("Not used")
+    override suspend fun release(version: ReleaseVersion): Release =
+      listed.first { it.version == version }
+
+    override suspend fun releases(page: Int): List<Release> = if (page == 1) listed else emptyList()
   }
 
   private class FakeInstaller(

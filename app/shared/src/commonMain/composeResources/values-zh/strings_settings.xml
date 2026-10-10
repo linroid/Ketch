@@ -304,6 +304,18 @@
   <string name="settings_about_update_restart">重新启动以更新</string>
   <string name="settings_about_update_open_installer">打开安装程序</string>
   <string name="settings_about_update_release_page">发布页面</string>
+  <string name="settings_about_update_installed">已更新到 Ketch %1$s</string>
+  <string name="settings_about_update_whats_new">新功能</string>
+  <string name="settings_about_notes_loading">正在加载发布说明…</string>
+  <string name="settings_about_notes_failed">无法加载发布说明</string>
+  <string name="settings_about_notes_released">发布于 %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="other">%2$s 之后的 %1$d 个版本</item>
+  </plurals>
+  <string name="settings_about_notes_new">新功能</string>
+  <string name="settings_about_notes_fixed">修复</string>
+  <string name="settings_about_notes_improved">改进</string>
+  <string name="settings_about_notes_quiet">维护和后台改进。</string>
   <string name="settings_logs_open">打开日志文件夹</string>
   <string name="settings_logs_open_failed">无法打开日志文件夹：%1$s</string>
   <string name="settings_logs_share">分享日志</string>

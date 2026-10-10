@@ -74,6 +74,9 @@ interface AppUpdates {
   /** Where the update stands. */
   val state: StateFlow<AppUpdateState>
 
+  /** The release the app runs, such as `0.3.1`; `null` for a build that is not a release. */
+  val currentVersion: String?
+
   /** Looks for a newer release now. */
   fun check()
 
@@ -88,6 +91,14 @@ interface AppUpdates {
    * checkForUpdates` themselves.
    */
   fun setCheckAutomatically(enabled: Boolean)
+
+  /**
+   * The notes of the releases after [since] up to [version], newest first, from where the
+   * updater finds its releases; only [version]'s when [since] is `null` or not an older release.
+   *
+   * @throws Exception when they cannot be read, with a message that says why.
+   */
+  suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes>
 }
 
 /** [AppUpdates] of the running app, `null` where the app does not update itself. */

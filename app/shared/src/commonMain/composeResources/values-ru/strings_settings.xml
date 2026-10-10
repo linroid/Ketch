@@ -316,6 +316,21 @@
   <string name="settings_about_update_restart">Перезапустить и обновить</string>
   <string name="settings_about_update_open_installer">Открыть установщик</string>
   <string name="settings_about_update_release_page">Страница выпуска</string>
+  <string name="settings_about_update_installed">Ketch обновлён до %1$s</string>
+  <string name="settings_about_update_whats_new">Что нового</string>
+  <string name="settings_about_notes_loading">Загрузка заметок о выпуске…</string>
+  <string name="settings_about_notes_failed">Не удалось загрузить заметки о выпуске</string>
+  <string name="settings_about_notes_released">Выпущено %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d выпуск после %2$s</item>
+    <item quantity="few">%1$d выпуска после %2$s</item>
+    <item quantity="many">%1$d выпусков после %2$s</item>
+    <item quantity="other">%1$d выпуска после %2$s</item>
+  </plurals>
+  <string name="settings_about_notes_new">Новое</string>
+  <string name="settings_about_notes_fixed">Исправлено</string>
+  <string name="settings_about_notes_improved">Улучшено</string>
+  <string name="settings_about_notes_quiet">Обслуживание и внутренние улучшения.</string>
   <string name="settings_logs_open">Открыть папку журналов</string>
   <string name="settings_logs_open_failed">Не удалось открыть папку журналов: %1$s</string>
   <string name="settings_logs_share">Поделиться журналами</string>

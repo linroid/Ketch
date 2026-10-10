@@ -297,7 +297,7 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
     createAppUpdates(
       scope = viewModelScope,
       app = getApplication<KetchApplication>(),
-      messages = checkNotNull(controller).messages,
+      controller = checkNotNull(controller),
     )
   }
 

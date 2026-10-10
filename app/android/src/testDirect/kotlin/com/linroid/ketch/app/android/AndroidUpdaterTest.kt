@@ -18,6 +18,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
@@ -213,6 +214,30 @@ class AndroidUpdaterTest {
     assertEquals(1, installs.size)
   }
 
+  @Test
+  fun updatedFrom_olderReleaseRanLast_namesIt() = runTest {
+    assertEquals("0.0.1-rc2", updater(current = ReleaseVersion(0, 0, 1)).updatedFrom("0.0.1-rc2"))
+  }
+
+  @Test
+  fun updatedFrom_firstRunSameNewerOrUnknownVersion_isNull() = runTest {
+    val updater = updater(current = ReleaseVersion(0, 0, 1))
+    for (lastVersion in listOf(null, "0.0.1", "0.0.2", "dev")) {
+      assertNull(updater.updatedFrom(lastVersion))
+    }
+    assertNull(updater(current = null).updatedFrom("0.0.1"))
+  }
+
+  @Test
+  fun releaseNotes_readsTheChangesTheReleaseLists() = runTest {
+    latest = release.copy(notes = "* fix: keep the queue by @linroid in https://x.test/pull/7")
+
+    val notes = updater().releaseNotes("0.0.2", since = null).single()
+
+    assertEquals("0.0.2", notes.version)
+    assertEquals(listOf("Keep the queue"), notes.changes.map { it.summary })
+  }
+
   private fun TestScope.available(): AndroidUpdater = updater().also {
     it.check()
     runCurrent()
@@ -223,7 +248,10 @@ class AndroidUpdaterTest {
     runCurrent()
   }
 
-  private fun TestScope.updater(automaticChecks: Boolean = true) = AndroidUpdater(
+  private fun TestScope.updater(
+    automaticChecks: Boolean = true,
+    current: ReleaseVersion? = ReleaseVersion(0, 0, 1),
+  ) = AndroidUpdater(
     scope = backgroundScope,
     feed = object : ReleaseFeed {
       override suspend fun latest(): Release {
@@ -231,9 +259,11 @@ class AndroidUpdaterTest {
         checkFailure?.let { throw it }
         return latest
       }
-      override suspend fun release(version: ReleaseVersion): Release = error("unused")
+      override suspend fun release(version: ReleaseVersion): Release = latest
+
+      override suspend fun releases(page: Int): List<Release> = emptyList()
     },
-    current = ReleaseVersion(0, 0, 1),
+    current = current,
     workDir = File("unused-update-cache"),
     download = { asset, _, progress ->
       downloads++

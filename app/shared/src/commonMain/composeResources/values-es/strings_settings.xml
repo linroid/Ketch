@@ -308,6 +308,19 @@
   <string name="settings_about_update_restart">Reiniciar para actualizar</string>
   <string name="settings_about_update_open_installer">Abrir instalador</string>
   <string name="settings_about_update_release_page">Página de la versión</string>
+  <string name="settings_about_update_installed">Ketch se actualizó a %1$s</string>
+  <string name="settings_about_update_whats_new">Novedades</string>
+  <string name="settings_about_notes_loading">Cargando las notas de la versión…</string>
+  <string name="settings_about_notes_failed">No se pudieron cargar las notas de la versión</string>
+  <string name="settings_about_notes_released">Publicada el %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d versión desde %2$s</item>
+    <item quantity="other">%1$d versiones desde %2$s</item>
+  </plurals>
+  <string name="settings_about_notes_new">Nuevo</string>
+  <string name="settings_about_notes_fixed">Corregido</string>
+  <string name="settings_about_notes_improved">Mejorado</string>
+  <string name="settings_about_notes_quiet">Mantenimiento y mejoras internas.</string>
   <string name="settings_logs_open">Abrir la carpeta de registros</string>
   <string name="settings_logs_open_failed">No se pudo abrir la carpeta de registros: %1$s</string>
   <string name="settings_logs_share">Compartir registros</string>

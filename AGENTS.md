@@ -607,6 +607,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   macOS menu bar, the tray and the Dock menu are generated from `KetchCommands`
   (`DesktopMenuBar`, `DesktopTray`, `TaskbarFeedback` for the Dock and taskbar badge and
   progress)
+- Release notes (desktop, direct Android): What's new on the update toasts, and Settings → About,
+  opens `ReleaseNotesDialog` (`ui/settings`; `AppState.releaseNotesRequest` for the toasts),
+  which reads `AppUpdates.releaseNotes(version, since)`: the GitHub releases after `since`
+  (`releasesBetween`), whose generated pull request lines `releaseChanges` groups into New, Fixed
+  and Improved, leaving out developer-only types and `deps`. Each launch records its version as
+  `[ui] lastVersion`; a newer one toasts "Updated to Ketch …". See
+  [updates](docs/updates.md#release-notes)
 - Self-update (Android): `direct` and `play` distribution flavors; only `direct` supplies
   `AndroidUpdater` through `LocalAppUpdates` in Settings → About. It reuses `GitHubReleases`
   and `ReleaseDownloader`, checks the APK package, release version and increasing version code,
@@ -772,7 +779,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### Self-update (`updater`)
 - Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest (or a tagged)
-  release from the GitHub API, `Release.asset` / `androidAsset` pick the file by the workflow's
+  release, or a page of them with their notes (`ReleaseFeed.releases`, `releasesBetween`), from
+  the GitHub API, `Release.asset` / `androidAsset` pick the file by the workflow's
   names, and
   `ReleaseDownloader` downloads it with a private Ketch engine and checks the SHA-256 digest
   GitHub publishes per asset (files without one are refused). Pass it the process's logger:

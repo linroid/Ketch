@@ -304,6 +304,18 @@
   <string name="settings_about_update_restart">再起動してアップデート</string>
   <string name="settings_about_update_open_installer">インストーラを開く</string>
   <string name="settings_about_update_release_page">リリースページ</string>
+  <string name="settings_about_update_installed">Ketch %1$sにアップデートしました</string>
+  <string name="settings_about_update_whats_new">新機能</string>
+  <string name="settings_about_notes_loading">リリースノートを読み込んでいます…</string>
+  <string name="settings_about_notes_failed">リリースノートを読み込めませんでした</string>
+  <string name="settings_about_notes_released">%1$sにリリース</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="other">%2$s以降の%1$d件のリリース</item>
+  </plurals>
+  <string name="settings_about_notes_new">新機能</string>
+  <string name="settings_about_notes_fixed">修正</string>
+  <string name="settings_about_notes_improved">改善</string>
+  <string name="settings_about_notes_quiet">メンテナンスと内部の改善。</string>
   <string name="settings_logs_open">ログフォルダを開く</string>
   <string name="settings_logs_open_failed">ログフォルダを開けませんでした：%1$s</string>
   <string name="settings_logs_share">ログを共有</string>
