@@ -42,8 +42,9 @@ internal class TorrentV2Swarm(
   /** The session's own upload bucket, applied after the runtime's. */
   val sessionUploadRate: TorrentRateLimiter = TorrentRateLimiter(),
   /**
-   * Runs once, when every selected piece is verified (possibly at start). True keeps the loop
-   * serving peers as a seed until the upload policy leaves seeding; false ends it.
+   * Runs when every selected piece is verified (possibly at start), and again each time a
+   * selection that grew is complete. True keeps the loop serving peers as a seed until the
+   * upload policy leaves seeding; false ends it.
    */
   val onCompleted: suspend () -> Boolean = { false },
   /** Counts payload bytes a peer on a v1 route confirmed, as a hybrid's v1 swarm's share. */
@@ -53,6 +54,11 @@ internal class TorrentV2Swarm(
    * it has none, peers that dial us are closed unanswered, as a v1 swarm does.
    */
   val onRoom: (Boolean) -> Unit = {},
+  /**
+   * A selection change left a complete swarm with pieces to download: it downloads again, and
+   * uploads as the policy allows while downloading, until [onCompleted] runs once more.
+   */
+  val onIncomplete: suspend () -> Unit = {},
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -69,6 +75,12 @@ internal object TorrentV2SessionLoop {
 
     /** The runtime's upload policy changed; the loop reads it again. */
     data object PolicyChanged : Control
+
+    /**
+     * The store's selection changed: the loop wants the pieces it now selects, without
+     * dropping a peer, and completes [done] once it does. A loop that stops first never does.
+     */
+    class Select(val done: CompletableDeferred<Unit>) : Control
   }
 
   private sealed interface Event {
@@ -200,6 +212,8 @@ internal object TorrentV2SessionLoop {
       }
 
       suspend fun pump() {
+        // Unwanted pieces go once their last request is answered.
+        pieces.evictUnwanted()
         pieces.submitReady(worker)
         for ((peer, view) in peers) {
           if (view.rateRetryAt <= nowMs()) view.rateRetryAt = 0
@@ -481,7 +495,27 @@ internal object TorrentV2SessionLoop {
         }
       }
 
-      fun control(value: Control) {
+      /** Follows the store's selection and verified pieces; peers learn what we gained. */
+      suspend fun retarget() {
+        val change = pieces.retarget(store.selectedIds(), store.verifiedPieces())
+        if (change.gained.isNotEmpty() || change.lost.isNotEmpty()) {
+          for ((peer, view) in peers) {
+            for (index in change.gained) if (rarity.has(peer, index)) view.needed++
+            for (index in change.lost) if (rarity.has(peer, index)) {
+              check(view.needed > 0)
+              view.needed--
+            }
+          }
+        }
+        change.verified.forEach { uploads?.committed(it) }
+        log.d {
+          "V2 swarm $label: selection now needs ${change.gained.size} more and " +
+            "${change.lost.size} fewer piece(s), ${change.evicted} assembly(ies) dropped"
+        }
+        wakeAdmission()
+      }
+
+      suspend fun control(value: Control) {
         val candidates = checkNotNull(book)
         when (value) {
           is Control.SetLimit -> {
@@ -512,6 +546,18 @@ internal object TorrentV2SessionLoop {
           }
           // Every pass reads the policy; this only wakes the loop to do so.
           Control.PolicyChanged -> Unit
+          is Control.Select -> {
+            retarget()
+            if (complete && !pieces.completed()) {
+              // Download again; the next completion runs onCompleted once more.
+              complete = false
+              seeding = false
+              log.d { "V2 swarm $label: incomplete after a selection change" }
+              checkNotNull(swarm).onIncomplete()
+            }
+            onProgress()
+            value.done.complete(Unit)
+          }
         }
       }
 
@@ -525,6 +571,8 @@ internal object TorrentV2SessionLoop {
         if (swarm == null) {
           if (pieces.completed()) break
         } else {
+          // The store decides: a selection it took before this loop heard of it is followed first.
+          if (!complete && pieces.completed() && !store.completed()) retarget()
           if (!complete && pieces.completed()) {
             complete = true
             // A seed retries nobody; peers it has not tried are still dialed.
@@ -643,21 +691,32 @@ internal object TorrentV2SessionLoop {
           is Event.Served -> when (val result = event.value.getOrNull()) {
             // The worker only stops with the transfer.
             null -> servingOpen = false
-            is TorrentV2ServeWorker.Result.Piece -> checkNotNull(uploads).result(result, peers)
+            is TorrentV2ServeWorker.Result.Piece -> if (
+              result.outcome is TorrentV2PieceStore.ReadOutcome.Revoked &&
+              !pieces.isWanted(result.index)) {
+              // Outside the selection, as a deleted deselected file: nobody gets it any more,
+              // and the session carries on. A wanted piece fails it below.
+              pieces.revoke(result.index)
+              checkNotNull(uploads).revoked(result.index, peers)
+              log.d { "V2 swarm $label: revoked piece ${result.index} outside the selection" }
+            } else checkNotNull(uploads).result(result, peers)
             is TorrentV2ServeWorker.Result.Hashes -> verdict(result.peer,
               checkNotNull(hashes).proved(result, peers), "too many hash answers waiting")
             is TorrentV2ServeWorker.Result.HashesRejected -> verdict(result.peer,
               checkNotNull(hashes).unproved(result, peers), "too many hash answers waiting")
           }
           is Event.Commit -> {
+            val index = event.value.ticket.index
+            // A piece the selection dropped meanwhile no longer counts for any peer.
+            val needed = pieces.isNeeded(index)
             check(pieces.completed(event.value)) { "Unknown commit completion" }
             if (event.value is TorrentV2CommitWorker.Completion.Failed) throw event.value.cause
             if (event.value is TorrentV2CommitWorker.Completion.Committed && event.value.verified) {
-              for ((peer, view) in peers) if (rarity.has(peer, event.value.ticket.index)) {
+              if (needed) for ((peer, view) in peers) if (rarity.has(peer, index)) {
                 check(view.needed > 0)
                 view.needed--
               }
-              uploads?.committed(event.value.ticket.index)
+              uploads?.committed(index)
             }
             onProgress()
             wakeAdmission()
@@ -711,7 +770,10 @@ internal object TorrentV2SessionLoop {
           } finally { event.value.close() }
         }
       }
-      check(store.completed()) { "Selected store completion does not match session state" }
+      // A swarm's selection may grow while it ends; its owner sees that and downloads again.
+      if (swarm == null) {
+        check(store.completed()) { "Selected store completion does not match session state" }
+      }
     } finally {
       peers.values.forEach { it.close() }
       resets.forEach { it.done.complete(Unit) }

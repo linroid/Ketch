@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,11 +17,16 @@ import okio.FileSystem
 import okio.IOException
 import okio.Path
 import okio.use
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.CoroutineContext
 
-/** Owned v2/hybrid storage; existing roots require a bound checkpoint and OS identity checks. */
+/**
+ * Owned v2/hybrid storage; existing roots require a bound checkpoint and OS identity checks. The
+ * selection can change while the store is open ([changeSelection]): deselected files keep their
+ * verified pieces and stay readable, and commits for them are discarded.
+ */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2PieceStore(
   private val document: TorrentV2Document,
@@ -31,14 +37,26 @@ internal class TorrentV2PieceStore(
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val creationLogPath: Path? = null,
+  /**
+   * Selections an older build may have bound the creation log to, besides this store's own and
+   * its checkpoint's, such as the one a task's resume state mirrors.
+   */
+  private val legacySelections: List<Set<String>> = emptyList(),
 ) {
+  private val log = KetchLogger("TorrentSession")
   private val verifier = TorrentPayloadVerifier(document)
   private val mapping = TorrentOutputMapping.from(document)
   private val mutex = Mutex()
-  private val selected = selectedIds.ifEmpty { mapping.files.map { it.id }.toSet() }.toSet()
+  private val allIds: Set<String> = mapping.files.mapTo(LinkedHashSet()) { it.id }
+  private val initialSelection: Set<String> = selectedIds.ifEmpty { allIds }.toSet()
+  // Replaced whole by changeSelection under the mutex; readers take one snapshot.
+  @Volatile private var selected: Set<String> = initialSelection
   private val filesById = mapping.files.associateBy { it.id }
+  private val layoutFiles = verifier.layout.files.associateBy { it.id }
   private val progress = LongArray(mapping.files.size)
   private val verified: BooleanArray
+  // Files whose pieces were checked or committed since this store opened, by v2 index.
+  private val checkedFiles = BooleanArray(mapping.files.size)
   private data class Ownership(val identity: String, val directory: Boolean)
   private val owned = linkedMapOf<Path, Ownership>()
   private var layoutGeneration = 0L
@@ -48,11 +66,12 @@ internal class TorrentV2PieceStore(
   private val uploadedCounter = AtomicLong(0)
   private var root: Path? = null
   private var creationLog: TorrentV2CreationLog? = null
+  // The selection a legacy creation log is bound to; null once it is bound without one.
+  private var logSelection: Set<String>? = null
+  private var restoredSelection: Set<String>? = null
   private var initialized = false
   private var closed = false
-  private val totalSelected = document.info.files.indices.sumOf { index ->
-    if (mapping.files[index].id in selected) document.info.files[index].length else 0
-  }
+  @Volatile private var totalSelected = totalOf(initialSelection)
 
   init {
     require(taskId.length in 1..128 && taskId.all { it.isLetterOrDigit() || it == '-' })
@@ -62,6 +81,19 @@ internal class TorrentV2PieceStore(
     // The runtime session must admit metadata/layout state before constructing this adapter.
     require(verifier.layout.pieceCount <= 1_000_000) { "Piece index exceeds desktop profile" }
     verified = BooleanArray(verifier.layout.pieceCount.toInt())
+  }
+
+  /** IDs of the selected files; changes only through [changeSelection]. */
+  fun selectedIds(): Set<String> = selected
+
+  /** Whether every file is selected; trackers hear `completed` only for a whole torrent. */
+  fun selectsAll(): Boolean = selected.size == mapping.files.size
+
+  /** Total bytes of the selected files. */
+  val totalSelectedBytes: Long get() = totalSelected
+
+  private fun totalOf(ids: Set<String>): Long = mapping.files.sumOf { file ->
+    if (file.id in ids) document.info.files[file.v2Index].length else 0L
   }
 
   /** Validate session wiring before starting any filesystem or network operation. */
@@ -90,38 +122,112 @@ internal class TorrentV2PieceStore(
       }
       validateOwned(destination, directory = true)
       for (file in mapping.files.filter { it.id in selected }) {
-        var parent = destination
-        for (component in file.components.dropLast(1)) {
-          parent /= component
-          if (parent !in owned) {
-            fileSystem.createDirectory(parent, mustCreate = true)
-            record(parent, directory = true)
-          }
-          validateOwned(parent, directory = true)
+        if (ensureFile(destination, file, replaceMissing = false)) {
+          checkedFiles[file.v2Index] = true
         }
-        val path = parent / file.components.last()
-        if (path !in owned) {
-          fileSystem.openReadWrite(path, mustCreate = true).use { handle ->
-            record(path, directory = false)
-            handle.flush()
-          }
-        } else {
-          validateOwned(path, directory = false)
-          fileSystem.openReadWrite(path, mustExist = true).use { handle ->
-            if (document.info.files[file.v2Index].length == 0L) handle.resize(0)
-            handle.flush()
-          }
-        }
-        validateOwned(path, directory = false)
       }
     }
     currentCoroutineContext().ensureActive()
     initialized = true
   }
 
+  /**
+   * Under the mutex, on the storage dispatcher: creates [file] and its missing parents, or checks
+   * the owned ones. True when it created the file, which is then empty. A path in the way that
+   * this store does not own fails with [IOException]. With [replaceMissing], an owned path that
+   * no longer exists is created again rather than failing.
+   */
+  private fun ensureFile(
+    destination: Path,
+    file: TorrentOutputMapping.File,
+    replaceMissing: Boolean,
+  ): Boolean {
+    var parent = destination
+    for (component in file.components.dropLast(1)) {
+      parent /= component
+      if (parent !in owned || replaceMissing && forgetMissing(parent)) {
+        if (fileSystem.metadataOrNull(parent) != null) throw IOException(IN_THE_WAY)
+        fileSystem.createDirectory(parent, mustCreate = true)
+        record(parent, directory = true)
+      }
+      validateOwned(parent, directory = true)
+    }
+    val path = parent / file.components.last()
+    val created = path !in owned || replaceMissing && forgetMissing(path)
+    if (created) {
+      if (fileSystem.metadataOrNull(path) != null) throw IOException(IN_THE_WAY)
+      fileSystem.openReadWrite(path, mustCreate = true).use { handle ->
+        record(path, directory = false)
+        handle.flush()
+      }
+    } else {
+      validateOwned(path, directory = false)
+      fileSystem.openReadWrite(path, mustExist = true).use { handle ->
+        if (document.info.files[file.v2Index].length == 0L) handle.resize(0)
+        handle.flush()
+      }
+    }
+    validateOwned(path, directory = false)
+    return created
+  }
+
+  /** An owned [path] that no longer exists, with every claim below it, stops being owned. */
+  private fun forgetMissing(path: Path): Boolean {
+    if (fileSystem.metadataOrNull(path) != null) return false
+    val prefix = path.segments
+    owned.keys.removeAll { it.segments.size >= prefix.size &&
+      it.segments.subList(0, prefix.size) == prefix }
+    return true
+  }
+
+  /**
+   * Selects [ids] instead, without stopping transfers. Newly selected files are created, or,
+   * when this store owns them from before and has not checked them since it opened, rechecked;
+   * deselected files keep their verified pieces and stay readable. A path in the way that Ketch
+   * does not own fails with [IOException] before the selection changes. A legacy creation log is
+   * bound again without a selection, so later changes need no rewrite.
+   */
+  suspend fun changeSelection(ids: Set<String>) = mutex.withLock {
+    check(!closed)
+    require(ids.isNotEmpty() && ids.all { it in filesById }) { "Unknown selected file" }
+    val current = selected
+    if (ids == current) return@withLock
+    if (initialized) {
+      val context = currentCoroutineContext()
+      val destination = checkNotNull(root)
+      for (file in mapping.files) {
+        if (file.id !in ids || file.id in current) continue
+        context.ensureActive()
+        val created = storageOperation { ensureFile(destination, file, replaceMissing = true) }
+        val layoutFile = layoutFiles.getValue(file.id)
+        if (created) {
+          // A file made again starts empty, whatever its pieces were before.
+          pieceRange(layoutFile)?.let { verified.fill(false, it.first, it.last + 1) }
+          progress[file.v2Index] = 0
+          checkedFiles[file.v2Index] = true
+        } else if (!checkedFiles[file.v2Index]) {
+          checkFile(layoutFile, context)
+        }
+      }
+      storageOperation { rebindCreationLog(ids) }
+      context.ensureActive()
+    }
+    selected = ids.toSet()
+    totalSelected = totalOf(ids)
+    selectionGeneration++
+  }
+
+  /** The v2 pieces of [file], or null for an empty file, which has none. */
+  private fun pieceRange(file: TorrentContentLayout.File): IntRange? {
+    if (file.length == 0L) return null
+    val first = (file.offset / verifier.layout.pieceLength).toInt()
+    val count = ((file.length - 1) / verifier.layout.pieceLength + 1).toInt()
+    return first until first + count
+  }
+
   /** Hash mismatch writes nothing. Verified progress is published only after the write returns. */
-  suspend fun commit(index: Int, payload: ByteArray): Boolean = mutex.withLock {
-    validateCommit(index, payload.size)
+  suspend fun commit(index: Int, payload: ByteArray): CommitOutcome = mutex.withLock {
+    if (!validateCommit(index, payload.size)) return@withLock CommitOutcome.NOT_WANTED
     val lease = checkNotNull(buffers.reserve(payload.size)) { "Payload buffer budget exhausted" }
     try {
       // Ordinary caller buffers remain mutable, so hash and write a privately admitted copy.
@@ -132,26 +238,28 @@ internal class TorrentV2PieceStore(
   }
 
   /** Only for sealed assemblies: caller retains admission and immutability until this returns. */
-  suspend fun commitOwned(index: Int, payload: ByteArray): Boolean = mutex.withLock {
-    validateCommit(index, payload.size)
+  suspend fun commitOwned(index: Int, payload: ByteArray): CommitOutcome = mutex.withLock {
+    if (!validateCommit(index, payload.size)) return@withLock CommitOutcome.NOT_WANTED
     commitBuffer(index, payload)
   }
 
-  private fun validateCommit(index: Int, size: Int) {
+  /** False when the piece's file is not selected, so nothing is written for it. */
+  private fun validateCommit(index: Int, size: Int): Boolean {
     check(initialized && !closed)
     require(index in verified.indices)
     val extent = verifier.layout.v2Piece(index.toLong())
-    require(extent.fileId in selected && size.toLong() == extent.length)
+    require(size.toLong() == extent.length)
+    return extent.fileId in selected
   }
 
   /** Both ownership paths share integrity, file ownership and the flush/publication barrier. */
-  private suspend fun commitBuffer(index: Int, bytes: ByteArray): Boolean {
+  private suspend fun commitBuffer(index: Int, bytes: ByteArray): CommitOutcome {
     val extent = verifier.layout.v2Piece(index.toLong())
     val file = filesById.getValue(checkNotNull(extent.fileId))
     val verification = verifier.piece(index.toLong())
     verification.update(bytes)
-    if (!verification.verify()) return false
-    if (verified[index]) return true
+    if (!verification.verify()) return CommitOutcome.CORRUPT
+    if (verified[index]) return CommitOutcome.VERIFIED
     storageOperation {
       val path = destination(file)
       validateOwned(path, directory = false)
@@ -168,7 +276,8 @@ internal class TorrentV2PieceStore(
     currentCoroutineContext().ensureActive()
     verified[index] = true
     progress[file.v2Index] += extent.length
-    return true
+    checkedFiles[file.v2Index] = true
+    return CommitOutcome.VERIFIED
   }
 
   /** The consumer owns this reservation until it finishes using [bytes]. */
@@ -250,68 +359,80 @@ internal class TorrentV2PieceStore(
   /** Rebuilds committed availability from owned files with at most 64 KiB of payload scratch. */
   suspend fun recheck(): BooleanArray = mutex.withLock {
     check(initialized && !closed)
-    val largest = verifier.layout.files.filter { it.id in selected }.maxOfOrNull { it.length } ?: 0
-    val scratchSize = minOf(largest, verifier.layout.pieceLength, 65_536L).toInt()
-    val lease = if (scratchSize == 0) null else
-      checkNotNull(buffers.reserve(scratchSize)) { "Recheck budget exhausted" }
+    val current = selected
+    verified.fill(false)
+    progress.fill(0)
+    // Deselected files lost their bits too: selecting one again checks it first.
+    checkedFiles.fill(false)
+    val context = currentCoroutineContext()
+    for (layoutFile in verifier.layout.files) {
+      context.ensureActive()
+      if (layoutFile.id in current) checkFile(layoutFile, context)
+    }
+    verified.copyOf()
+  }
+
+  /**
+   * Under the mutex: hashes [layoutFile]'s pieces as stored, through at most 64 KiB of scratch,
+   * and publishes the ones that match. A file that cannot be read keeps none.
+   */
+  private suspend fun checkFile(layoutFile: TorrentContentLayout.File, context: CoroutineContext) {
+    val file = filesById.getValue(layoutFile.id)
+    val range = pieceRange(layoutFile)
+    progress[file.v2Index] = 0
+    if (range == null) {
+      checkedFiles[file.v2Index] = true
+      return
+    }
+    verified.fill(false, range.first, range.last + 1)
+    val scratchSize = minOf(layoutFile.length, verifier.layout.pieceLength, 65_536L).toInt()
+    val lease = checkNotNull(buffers.reserve(scratchSize)) { "Recheck budget exhausted" }
+    var published = false
     try {
       val scratch = ByteArray(scratchSize)
-      verified.fill(false)
-      progress.fill(0)
-      val context = currentCoroutineContext()
-      for (layoutFile in verifier.layout.files) {
-        context.ensureActive()
-        if (layoutFile.id !in selected || layoutFile.length == 0L) continue
-        val file = filesById.getValue(layoutFile.id)
-        val first = (layoutFile.offset / verifier.layout.pieceLength).toInt()
-        val count = ((layoutFile.length - 1) / verifier.layout.pieceLength + 1).toInt()
-        var published = false
-        try {
-          val matchedBytes = storageOperation {
-            val path = destination(file)
-            validateOwned(path, directory = false)
-            fileSystem.openReadWrite(path, mustExist = true).use { handle ->
-              var matched = 0L
-              for (index in first until first + count) {
-                context.ensureActive()
-                val extent = verifier.layout.v2Piece(index.toLong())
-                val verification = verifier.piece(index.toLong())
-                val valid = try {
-                  var offset = 0L
-                  while (offset < extent.length) {
-                    val size = minOf(scratch.size.toLong(), extent.length - offset).toInt()
-                    readFully(handle, extent.fileOffset + offset, scratch, size, context)
-                    verification.update(scratch, 0, size)
-                    offset += size
-                  }
-                  verification.verify()
-                } catch (_: IOException) {
-                  false
-                }
-                // Tentative under the mutex; finally clears these if flush/return is interrupted.
-                verified[index] = valid
-                if (valid) matched += extent.length
+      val matchedBytes = storageOperation {
+        val path = destination(file)
+        validateOwned(path, directory = false)
+        fileSystem.openReadWrite(path, mustExist = true).use { handle ->
+          var matched = 0L
+          for (index in range) {
+            context.ensureActive()
+            val extent = verifier.layout.v2Piece(index.toLong())
+            val verification = verifier.piece(index.toLong())
+            val valid = try {
+              var offset = 0L
+              while (offset < extent.length) {
+                val size = minOf(scratch.size.toLong(), extent.length - offset).toInt()
+                readFully(handle, extent.fileOffset + offset, scratch, size, context)
+                verification.update(scratch, 0, size)
+                offset += size
               }
-              if (matched == layoutFile.length && handle.size() > layoutFile.length) {
-                handle.resize(layoutFile.length)
-              }
-              if (matched > 0) handle.flush()
-              validateOwned(path, directory = false)
-              matched
+              verification.verify()
+            } catch (_: IOException) {
+              false
             }
+            // Tentative under the mutex; finally clears these if flush/return is interrupted.
+            verified[index] = valid
+            if (valid) matched += extent.length
           }
-          context.ensureActive()
-          progress[file.v2Index] = matchedBytes
-          published = true
-        } catch (_: IOException) {
-          // A failed file flush cannot authorize any of this file's tentative pieces.
-        } finally {
-          if (!published) verified.fill(false, first, first + count)
+          if (matched == layoutFile.length && handle.size() > layoutFile.length) {
+            handle.resize(layoutFile.length)
+          }
+          if (matched > 0) handle.flush()
+          validateOwned(path, directory = false)
+          matched
         }
       }
-      verified.copyOf()
+      context.ensureActive()
+      progress[file.v2Index] = matchedBytes
+      checkedFiles[file.v2Index] = true
+      published = true
+    } catch (_: IOException) {
+      // A failed file flush cannot authorize any of this file's tentative pieces.
+      checkedFiles[file.v2Index] = true
     } finally {
-      lease?.close()
+      if (!published) verified.fill(false, range.first, range.last + 1)
+      lease.close()
     }
   }
 
@@ -367,12 +488,14 @@ internal class TorrentV2PieceStore(
     return checkpoint
   }
 
-  /** Validates all claims before adoption; initialize/recheck follow successful restore. */
+  /**
+   * Validates all claims before adoption; initialize/recheck follow successful restore. The
+   * checkpoint may hold another selection: claims of files that are no longer needed and changed
+   * or disappeared are dropped, and the selection generation moves past the checkpoint's.
+   */
   suspend fun restore(checkpoint: TorrentV2Checkpoint) = mutex.withLock {
     check(!closed && !initialized && root == null && owned.isEmpty())
-    require(checkpoint.taskId == taskId && checkpoint.selected == selected) {
-      "Checkpoint task or selection mismatch"
-    }
+    require(checkpoint.taskId == taskId) { "Checkpoint task mismatch" }
     checkpoint.validateContent(document)
     val recovered = storageOperation {
       val destination = fileSystem.canonicalize(checkNotNull(output.parent)) / output.name
@@ -384,7 +507,9 @@ internal class TorrentV2PieceStore(
     root = recovered.first
     owned.putAll(recovered.second)
     layoutGeneration = checkpoint.layoutGeneration
-    selectionGeneration = checkpoint.selectionGeneration
+    selectionGeneration = checkpoint.selectionGeneration +
+      if (checkpoint.selected == selected) 0 else 1
+    restoredSelection = checkpoint.selected
     receivedCounter.store(checkpoint.receivedBytes)
     uploadedCounter.store(checkpoint.uploadedBytes)
     // Never adopt verifiedHint: current payloads must pass commit or recheck before publication.
@@ -393,12 +518,20 @@ internal class TorrentV2PieceStore(
   }
 
   suspend fun progress(): Map<String, Long> = mutex.withLock {
-    mapping.files.filter { it.id in selected }.associate { it.id to progress[it.v2Index] }
+    val current = selected
+    mapping.files.filter { it.id in current }.associate { it.id to progress[it.v2Index] }
   }
 
+  /** Every selected piece is verified; deselected files count for nothing. */
   suspend fun completed(): Boolean = mutex.withLock {
-    initialized && !closed && progress.sum() == totalSelected
+    val current = selected
+    initialized && !closed && mapping.files.sumOf { file ->
+      if (file.id in current) progress[file.v2Index] else 0L
+    } == totalOf(current)
   }
+
+  /** The selection's generation, raised by every change; checkpoints carry it. */
+  suspend fun selectionGeneration(): Long = mutex.withLock { selectionGeneration }
 
   /** Counts payload received from peers, verified or not; never takes the store lock. */
   fun recordReceived(bytes: Int) = add(receivedCounter, bytes)
@@ -466,18 +599,39 @@ internal class TorrentV2PieceStore(
   private fun destination(file: TorrentOutputMapping.File): Path =
     file.components.fold(checkNotNull(root)) { path, component -> path / component }
 
+  /**
+   * The claims in [entries] that still hold. A claim that no longer holds fails, unless it is
+   * neither the root nor a selected file or one of its parents: such a claim, a file deselected
+   * and then deleted or replaced, is dropped with the claims below it.
+   */
   private fun validateRecords(
     destination: Path,
     entries: List<TorrentV2Checkpoint.Owned>,
   ): LinkedHashMap<Path, Ownership> {
+    val current = selected
+    val needed = hashSetOf(emptyList<String>())
+    for (file in mapping.files) {
+      if (file.id !in current) continue
+      for (size in 1..file.components.size) needed += file.components.subList(0, size)
+    }
     val records = linkedMapOf<Path, Ownership>()
+    val dropped = hashSetOf<List<String>>()
     for (entry in entries.sortedBy { it.components.size }) {
       val path = entry.components.fold(destination) { parent, component -> parent / component }
-      val metadata = fileSystem.metadataOrNull(path)
-      require(metadata != null && metadata.symlinkTarget == null &&
+      val orphan = entry.components.isNotEmpty() && entry.components.dropLast(1) in dropped
+      val metadata = if (orphan) null else fileSystem.metadataOrNull(path)
+      val holds = metadata != null && metadata.symlinkTarget == null &&
         (if (entry.directory) metadata.isDirectory else metadata.isRegularFile) &&
-        torrentFileIdentity(path) == entry.identity) { "Checkpoint ownership changed" }
-      records[path] = Ownership(entry.identity, entry.directory)
+        torrentFileIdentity(path) == entry.identity
+      if (holds) {
+        records[path] = Ownership(entry.identity, entry.directory)
+      } else {
+        require(entry.components !in needed) { "Checkpoint ownership changed" }
+        dropped += entry.components
+      }
+    }
+    if (dropped.isNotEmpty()) {
+      log.d { "Dropped ${dropped.size} stale ownership claim(s) of taskId=$taskId" }
     }
     return records
   }
@@ -491,15 +645,15 @@ internal class TorrentV2PieceStore(
       require(path.segments.take(destination.segments.size) != destination.segments) {
         "Creation log must be outside payload storage"
       }
-      val binding = sha256Digest(Bencode.encode(mapOf(
-        "kind" to "ketch-v2-creation", "mapping" to 1L, "task" to taskId,
-        "v2" to document.info.hash.toBytes(),
-        "v1" to (document.identity.v1?.toBytes() ?: ByteArray(0)),
-        "output" to destination.toString(), "selected" to selected.sorted()
-      )))
-      val candidate = TorrentV2CreationLog(path, binding, fileSystem)
+      // The selection-free binding first, then those older builds bound logs to.
+      val candidates = (listOf(null, selected, initialSelection, restoredSelection) +
+        legacySelections.map { it.ifEmpty { allIds } } + listOf(allIds)).distinct()
+      val bindings = candidates.map { creationBinding(destination, it) }
+      val candidate = TorrentV2CreationLog(path, fileSystem)
+      // A new log is bound to the selection, so older builds can read it until it changes.
+      val opened = candidate.open(bindings, initial = 1)
       val entries = linkedMapOf<List<String>, TorrentV2Checkpoint.Owned>()
-      for (entry in candidate.open() + owned.map { (path, claim) ->
+      for (entry in opened.records + owned.map { (path, claim) ->
         ownershipRecord(destination, path, claim)
       }) {
         val previous = entries.put(entry.components, entry)
@@ -514,11 +668,42 @@ internal class TorrentV2PieceStore(
         root = destination
       }
       creationLog = candidate
+      logSelection = candidates[opened.matched]
     }
+    rebindCreationLog(selected, destination)
     // Retry any failed append from this live instance before creating additional paths.
     for ((path, claim) in owned) {
       checkNotNull(creationLog).append(ownershipRecord(destination, path, claim))
     }
+  }
+
+  /**
+   * Binds a creation log that is still bound to another selection than [ids] without one, so
+   * selection changes never touch it again. A log bound to [ids] is left as it is: older builds
+   * read it as long as the selection does not change.
+   */
+  private fun rebindCreationLog(ids: Set<String>, destination: Path = checkNotNull(root)) {
+    val current = creationLog ?: return
+    val bound = logSelection ?: return
+    if (bound == ids) return
+    current.rewrite(creationBinding(destination, null), current.records())
+    logSelection = null
+    log.d { "Bound the creation log of taskId=$taskId without a selection" }
+  }
+
+  /**
+   * What a creation log is bound to: this task's content and output, and with [selection] the
+   * selection older builds bound it to as well.
+   */
+  private fun creationBinding(destination: Path, selection: Set<String>?): ByteArray {
+    val values = mutableMapOf<String, Any>(
+      "kind" to "ketch-v2-creation", "mapping" to 1L, "task" to taskId,
+      "v2" to document.info.hash.toBytes(),
+      "v1" to (document.identity.v1?.toBytes() ?: ByteArray(0)),
+      "output" to destination.toString(),
+    )
+    if (selection == null) values["binding"] = 2L else values["selected"] = selection.sorted()
+    return sha256Digest(Bencode.encode(values))
   }
 
   private fun ownershipRecord(destination: Path, path: Path, claim: Ownership) =
@@ -550,5 +735,9 @@ internal class TorrentV2PieceStore(
       "Storage path changed"
     }
     if (!directory) validateParents(path)
+  }
+
+  private companion object {
+    const val IN_THE_WAY = "A file Ketch does not own is in the way"
   }
 }

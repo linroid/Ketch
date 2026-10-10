@@ -26,14 +26,18 @@ class TorrentV2StoreRecoveryTest {
     torrentFileSystem.createDirectory(it)
   }
 
-  private fun store(root: Path, doc: TorrentV2Document = document) = TorrentV2PieceStore(
-    doc, root / "payload", emptySet(), "task", TorrentBufferBudget(65_536), Semaphore(1)
+  private fun store(
+    root: Path,
+    doc: TorrentV2Document = document,
+    selected: Set<String> = emptySet(),
+  ) = TorrentV2PieceStore(
+    doc, root / "payload", selected, "task", TorrentBufferBudget(65_536), Semaphore(1)
   )
 
   private suspend fun saved(root: Path): TorrentV2Checkpoint {
     val original = store(root)
     original.initialize()
-    assertTrue(original.commit(0, payload))
+    assertEquals(CommitOutcome.VERIFIED, original.commit(0, payload))
     val checkpoint = original.checkpoint(TorrentContentCatalog(root / "catalog"),
       receivedBytes = 100, uploadedBytes = 50)
     original.close()
@@ -87,9 +91,13 @@ class TorrentV2StoreRecoveryTest {
       )
       val restored = store(root)
       for (wrong in listOf(changed(task = "other"),
-        changed(output = (root / "other").toString()), changed(selected = setOf("0")))) {
+        changed(output = (root / "other").toString()))) {
         assertFailsWith<IllegalArgumentException> { restored.restore(wrong) }
       }
+      // Another selection is no mismatch: the task may have changed its files since.
+      val other = store(root)
+      other.restore(changed(selected = setOf("0")))
+      other.close()
       restored.restore(snapshot)
       restored.initialize()
       assertContentEquals(booleanArrayOf(true), restored.recheck())
@@ -132,7 +140,7 @@ class TorrentV2StoreRecoveryTest {
       assertContentEquals(booleanArrayOf(false), restored.recheck())
       assertFalse(restored.completed())
       assertFailsWith<IllegalStateException> { restored.read(0) }
-      assertTrue(restored.commit(0, payload))
+      assertEquals(CommitOutcome.VERIFIED, restored.commit(0, payload))
       assertTrue(restored.completed())
       restored.cleanup()
     } finally {
@@ -159,6 +167,69 @@ class TorrentV2StoreRecoveryTest {
       assertEquals(3L, torrentFileSystem.metadata(file).size)
       assertEquals(0L, torrentFileSystem.metadata(empty).size)
       restored.cleanup()
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun restore_otherSelection_advancesGeneration() = runTest {
+    val root = root()
+    try {
+      val snapshot = saved(root)
+      assertEquals(setOf("0", "1"), snapshot.selected)
+      val same = store(root)
+      same.restore(snapshot)
+      same.initialize()
+      assertEquals(0L, same.checkpoint().selectionGeneration)
+      same.close()
+      val restored = store(root, selected = setOf("0"))
+      restored.restore(snapshot)
+      restored.initialize()
+      assertContentEquals(booleanArrayOf(true), restored.recheck())
+      val next = restored.checkpoint()
+      assertEquals(1L, next.selectionGeneration)
+      assertEquals(setOf("0"), next.selected)
+      restored.cleanup()
+      assertFalse(torrentFileSystem.exists(root / "payload"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun restore_deselectedFileDeleted_dropsTheRecord() = runTest {
+    val root = root()
+    try {
+      val snapshot = saved(root)
+      torrentFileSystem.delete(root / "payload" / "empty")
+      // Only dir/file is selected now, so the deleted empty file's claim is simply dropped.
+      val restored = store(root, selected = setOf("0"))
+      restored.restore(snapshot)
+      restored.initialize()
+      assertContentEquals(booleanArrayOf(true), restored.recheck())
+      assertTrue(restored.completed())
+      val owned = restored.checkpoint().owned.map { it.components }
+      assertFalse(listOf("empty") in owned)
+      assertTrue(listOf("dir", "file") in owned)
+      restored.cleanup()
+      assertFalse(torrentFileSystem.exists(root / "payload"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun restore_selectedFileDeleted_stillFails() = runTest {
+    val root = root()
+    try {
+      val snapshot = saved(root)
+      torrentFileSystem.delete(root / "payload" / "dir" / "file")
+      val restored = store(root, selected = setOf("0"))
+      assertFailsWith<IllegalArgumentException> { restored.restore(snapshot) }
+      restored.cleanup()
+      // Nothing was adopted, so nothing was deleted.
+      assertTrue(torrentFileSystem.exists(root / "payload" / "empty"))
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

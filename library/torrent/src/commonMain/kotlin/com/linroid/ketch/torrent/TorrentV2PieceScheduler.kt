@@ -1,6 +1,10 @@
 package com.linroid.ketch.torrent
 
-/** One session actor owns assignments; peers and the commit worker retain their separate leases. */
+/**
+ * One session actor owns assignments; peers and the commit worker retain their separate leases.
+ * The wanted pieces follow the selection through [retarget]; unwanted pieces are never begun,
+ * requested or committed, and their assemblies go once no request is out for them.
+ */
 internal class TorrentV2PieceScheduler private constructor(
   private val layout: TorrentContentLayout,
   private var wanted: BooleanArray,
@@ -23,9 +27,77 @@ internal class TorrentV2PieceScheduler private constructor(
   val pendingCommitCount: Int get() = commits.size
   val activeCount: Int get() = assemblies.size + commits.size
 
+  /** What [retarget] changed. */
+  class Retarget internal constructor(
+    /** Unwanted assemblies closed because no request was out for them. */
+    val evicted: Int,
+    /** Pieces needed now that were not before. */
+    val gained: IntArray,
+    /** Pieces needed before that are not now. */
+    val lost: IntArray,
+    /** Pieces the store verified that this scheduler did not know of. */
+    val verified: IntArray,
+  )
+
   fun isVerified(index: Int): Boolean {
     check(!closed)
     return verified[index]
+  }
+
+  fun isWanted(index: Int): Boolean {
+    check(!closed)
+    return wanted[index]
+  }
+
+  /**
+   * Follows a new selection: wants the pieces of [selectedIds], and takes the store's verified
+   * bits, [storeVerified], for every piece not being assembled or committed. Unwanted assemblies
+   * without requests out are closed; the rest go once their requests are answered.
+   */
+  fun retarget(selectedIds: Set<String>, storeVerified: BooleanArray): Retarget {
+    check(!closed)
+    require(storeVerified.size == verified.size)
+    val next = wantedPieces(layout, selectedIds, verified.size)
+    val gained = mutableListOf<Int>()
+    val lost = mutableListOf<Int>()
+    val newlyVerified = mutableListOf<Int>()
+    for (index in verified.indices) {
+      val before = wanted[index] && !verified[index]
+      if (!isBusy(index)) {
+        if (storeVerified[index] && !verified[index]) newlyVerified += index
+        verified[index] = storeVerified[index]
+      }
+      wanted[index] = next[index]
+      val after = wanted[index] && !verified[index]
+      if (after && !before) gained += index else if (before && !after) lost += index
+    }
+    remaining = wanted.indices.count { wanted[it] && !verified[it] }
+    return Retarget(evictUnwanted(), gained.toIntArray(), lost.toIntArray(),
+      newlyVerified.toIntArray())
+  }
+
+  /** A verified piece could no longer be read back; it is needed again if it is wanted. */
+  fun revoke(index: Int) {
+    check(!closed)
+    if (!verified[index]) return
+    verified[index] = false
+    if (wanted[index]) remaining++
+  }
+
+  /** Closes unwanted assemblies no request is out for; returns how many. */
+  fun evictUnwanted(): Int {
+    check(!closed)
+    val unwanted = assemblies.keys.filter { !wanted[it] }
+    if (unwanted.isEmpty()) return 0
+    val requested = assignments.keys.mapTo(HashSet()) { it.index }
+    var count = 0
+    for (index in unwanted) {
+      if (index in requested) continue
+      checkNotNull(assemblies.remove(index)).close()
+      markBusy(index, false)
+      count++
+    }
+    return count
   }
 
   /** Verified pieces as a wire bitfield, spare bits zero. */
@@ -103,7 +175,7 @@ internal class TorrentV2PieceScheduler private constructor(
   fun planNext(peer: PeerBlockExchange, available: (Int) -> Boolean): RequestPlan? {
     check(!closed)
     for (assembly in assemblies.values) {
-      if (!available(assembly.index)) continue
+      if (!wanted[assembly.index] || !available(assembly.index)) continue
       for (slot in assembly.missingBlocks()) {
         val request = assembly.request(slot)
         if (request !in assignments) return reserve(peer, request)
@@ -140,7 +212,7 @@ internal class TorrentV2PieceScheduler private constructor(
     if (!peer.localInterested && !updateInterest(peer)) return null
     var attempts = 0
     for (assembly in assemblies.values) {
-      if (!peer.canRequest(assembly.index)) continue
+      if (!wanted[assembly.index] || !peer.canRequest(assembly.index)) continue
       for (slot in assembly.missingBlocks()) {
         val request = assembly.request(slot)
         if (request in assignments) continue
@@ -215,7 +287,8 @@ internal class TorrentV2PieceScheduler private constructor(
   fun submitReady(worker: TorrentV2CommitWorker): Int {
     check(!closed)
     var count = 0
-    val ready = assemblies.filterValues { it.complete }.keys
+    // An unwanted piece is not written; its assembly waits to be evicted.
+    val ready = assemblies.filter { (index, assembly) -> assembly.complete && wanted[index] }.keys
     for (index in ready) {
       val ticket = worker.trySubmit(assemblies.getValue(index)) ?: break
       assemblies.remove(index)
@@ -225,16 +298,23 @@ internal class TorrentV2PieceScheduler private constructor(
     return count
   }
 
-  /** Only matching tickets publish state; failed or corrupt commits make the piece retryable. */
+  /**
+   * Only matching tickets publish state; failed, corrupt or discarded commits make the piece
+   * retryable. A verified piece counts against [completed] only while it is wanted.
+   */
   fun completed(completion: TorrentV2CommitWorker.Completion): Boolean {
     if (closed) return false
     val index = commits.remove(completion.ticket) ?: return false
     markBusy(index, false)
-    verified[index] = completion is TorrentV2CommitWorker.Completion.Committed &&
-      completion.verified
-    if (verified[index]) remaining--
+    if (completion is TorrentV2CommitWorker.Completion.Committed && completion.verified &&
+      !verified[index]) {
+      verified[index] = true
+      if (wanted[index]) remaining--
+    }
     return true
   }
+
+  private fun isBusy(index: Int): Boolean = busy[index / 8].toInt() and (128 ushr (index % 8)) != 0
 
   private fun markBusy(index: Int, value: Boolean) {
     val byte = index / 8
@@ -271,30 +351,40 @@ internal class TorrentV2PieceScheduler private constructor(
       require(verified.size.toLong() == layout.pieceCount && maxActive in 1..1024)
       require(layout.files.size <= 100_000 && selectedIds.size <= layout.files.size)
       // Wanted/verified/busy indexes, selection validation and actual maximum blocks per piece.
+      // Every file is charged: the selection may grow to all of them while the session runs.
       val blockCount = (layout.pieceLength / PeerWire.BLOCK_SIZE).toInt()
       val perPiece = 256 + blockCount * 256
       val bytes = verified.size * 2 + (verified.size + 7) / 8 +
-        layout.files.size * 64 + selectedIds.size * 64 +
-        maxActive * perPiece + 1024
+        layout.files.size * 128 + maxActive * perPiece + 1024
       val lease = state.reserve(bytes) ?: return null
       try {
         val fileIds = layout.files.map { it.id }.toSet()
         require(fileIds.containsAll(selectedIds)) {
           "Unknown selected file"
         }
-        val wanted = BooleanArray(verified.size)
-        for (file in layout.files) {
-          if (selectedIds.isNotEmpty() && file.id !in selectedIds) continue
-          val first = (file.offset / layout.pieceLength).toInt()
-          val count = file.length / layout.pieceLength +
-            if (file.length % layout.pieceLength == 0L) 0 else 1
-          wanted.fill(true, first, first + count.toInt())
-        }
+        val wanted = wantedPieces(layout, selectedIds, verified.size)
         return TorrentV2PieceScheduler(layout, wanted, verified.copyOf(), buffers, maxActive, lease)
       } catch (error: Throwable) {
         lease.close()
         throw error
       }
+    }
+
+    /** The pieces of [selectedIds]' files, every file's when it is empty. */
+    private fun wantedPieces(
+      layout: TorrentContentLayout,
+      selectedIds: Set<String>,
+      count: Int,
+    ): BooleanArray {
+      val wanted = BooleanArray(count)
+      for (file in layout.files) {
+        if (selectedIds.isNotEmpty() && file.id !in selectedIds) continue
+        val first = (file.offset / layout.pieceLength).toInt()
+        val pieces = file.length / layout.pieceLength +
+          if (file.length % layout.pieceLength == 0L) 0 else 1
+        wanted.fill(true, first, first + pieces.toInt())
+      }
+      return wanted
     }
   }
 }

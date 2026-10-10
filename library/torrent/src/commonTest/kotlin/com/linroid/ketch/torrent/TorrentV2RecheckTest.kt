@@ -31,7 +31,7 @@ class TorrentV2RecheckTest {
       store.initialize()
       assertFailsWith<IllegalStateException> { store.read(0) }
       assertEquals(0, budget.allocated)
-      assertTrue(store.commit(0, payload))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, payload))
       val read = store.read(0)
       try {
         assertContentEquals(payload, read.bytes)
@@ -55,7 +55,7 @@ class TorrentV2RecheckTest {
     val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
-      assertTrue(store.commit(0, payload))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, payload))
       torrentFileSystem.atomicMove(root / "file", root / "moved")
       torrentFileSystem.write(root / "file") { writeUtf8("replacement") }
       assertFailsWith<IllegalArgumentException> { store.read(0) }
@@ -77,7 +77,7 @@ class TorrentV2RecheckTest {
     val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
-      assertTrue(store.commit(0, payload))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, payload))
       torrentFileSystem.openReadWrite(root / "file", mustExist = true).use { handle ->
         handle.write(0, byteArrayOf(99), 0, 1)
         handle.flush()

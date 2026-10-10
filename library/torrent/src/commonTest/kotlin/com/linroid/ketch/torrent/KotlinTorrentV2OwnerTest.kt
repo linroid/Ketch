@@ -110,7 +110,7 @@ class KotlinTorrentV2OwnerTest {
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
         try {
           original.initialize()
-          assertTrue(original.commit(0, bytes))
+          assertEquals(CommitOutcome.VERIFIED, original.commit(0, bytes))
           val catalog = TorrentContentCatalog(root / "catalog")
           val saved = original.checkpoint(catalog)
           TorrentCheckpointFile(root / "state", "restart", catalog).save(document, saved)
@@ -174,7 +174,7 @@ class KotlinTorrentV2OwnerTest {
     val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
     try {
       original.initialize()
-      assertTrue(original.commit(0, bytes))
+      assertEquals(CommitOutcome.VERIFIED, original.commit(0, bytes))
       val checkpoint = original.checkpoint(TorrentContentCatalog(root / "catalog"))
       original.close()
       engine.start()

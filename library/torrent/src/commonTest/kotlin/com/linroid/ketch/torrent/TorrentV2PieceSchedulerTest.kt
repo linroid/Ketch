@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import okio.FileSystem
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -449,5 +450,134 @@ class TorrentV2PieceSchedulerTest {
     try { assertFalse(all.begin(0)) } finally { all.close() }
     assertEquals(0, buffers.allocated)
     assertEquals(0, state.allocated)
+  }
+
+  /** A scheduler over a and b, both wanted, and a ready peer; leak checks follow [block]. */
+  private fun retargeting(
+    block: suspend (TorrentV2PieceScheduler, Peer, TorrentBufferBudget) -> Unit,
+  ) = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state))
+    val peer = Peer(buffers, layout)
+    try {
+      peer.ready()
+      block(scheduler, peer, buffers)
+    } finally {
+      scheduler.removePeer(peer.exchange)
+      scheduler.close()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  /** Delivers every block [scheduler] asks [peer] for; b's byte is [last]. */
+  private suspend fun fill(scheduler: TorrentV2PieceScheduler, peer: Peer, last: Byte = 9) {
+    while (true) {
+      val ticket = scheduler.requestNext(peer.exchange) ?: break
+      val request = ticket.request
+      val payload = if (request.index == 0) bytes.copyOfRange(request.begin,
+        request.begin + request.length) else byteArrayOf(last)
+      assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Block>(
+        peer.receive(PeerMessage.Piece(request.index, request.begin, payload)))))
+    }
+  }
+
+  @Test
+  fun retarget_evictsUnassignedUnwantedAssemblies() = retargeting { scheduler, _, buffers ->
+    assertTrue(scheduler.begin(0))
+    assertTrue(scheduler.begin(1))
+    val held = buffers.allocated
+    val change = scheduler.retarget(setOf("0"), BooleanArray(2))
+    // b's assembly had no request out, so it goes at once with its buffer.
+    assertEquals(1, change.evicted)
+    assertContentEquals(intArrayOf(1), change.lost)
+    assertTrue(change.gained.isEmpty())
+    assertTrue(buffers.allocated < held)
+    assertEquals(1, scheduler.activeCount)
+    assertFalse(scheduler.isWanted(1))
+    assertFalse(scheduler.canBegin(1))
+    assertFalse(scheduler.isNeeded(1))
+    assertFalse(scheduler.completed())
+    // Wanted again, it is needed again.
+    assertContentEquals(intArrayOf(1), scheduler.retarget(emptySet(), BooleanArray(2)).gained)
+    assertTrue(scheduler.canBegin(1))
+  }
+
+  @Test
+  fun retarget_keepsAssignedAssemblyUntilDrained() = retargeting { scheduler, peer, _ ->
+    assertTrue(scheduler.begin(1))
+    val ticket = assertNotNull(scheduler.requestNext(peer.exchange))
+    assertEquals(0, scheduler.retarget(setOf("0"), BooleanArray(2)).evicted)
+    assertEquals(1, scheduler.activeCount)
+    // Nothing more is asked for it while its request is out.
+    assertNull(scheduler.planNext(peer.exchange) { true })
+    assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Block>(
+      peer.receive(PeerMessage.Piece(1, ticket.request.begin, byteArrayOf(9))))))
+    assertEquals(1, scheduler.evictUnwanted())
+    assertEquals(0, scheduler.activeCount)
+  }
+
+  @Test
+  fun submitReady_skipsUnwantedCompleteAssemblies() = retargeting { scheduler, peer, _ ->
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-scheduler-unwanted-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val store = TorrentV2PieceStore(document, path, emptySet(), "test",
+      TorrentBufferBudget(200_000), Semaphore(1))
+    try {
+      store.initialize()
+      assertTrue(scheduler.begin(1))
+      fill(scheduler, peer)
+      scheduler.retarget(setOf("0"), BooleanArray(2))
+      TorrentV2CommitWorker.run(store) { worker ->
+        // b is complete but no longer wanted: nothing is written for it.
+        assertEquals(0, scheduler.submitReady(worker))
+        assertEquals(0, scheduler.activeCount)
+      }
+      assertEquals(0L, torrentFileSystem.metadata(path / "b").size)
+      assertFalse(store.verifiedPieces()[1])
+    } finally {
+      store.cleanup()
+    }
+  }
+
+  @Test
+  fun completed_discardedCommit_keepsRemaining() = retargeting { scheduler, peer, _ ->
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-scheduler-discarded-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    // The store already dropped b, which the scheduler still wants until it hears of it.
+    val store = TorrentV2PieceStore(document, path, setOf("0"), "test",
+      TorrentBufferBudget(200_000), Semaphore(1))
+    try {
+      store.initialize()
+      assertTrue(scheduler.begin(1))
+      fill(scheduler, peer)
+      TorrentV2CommitWorker.run(store) { worker ->
+        assertEquals(1, scheduler.submitReady(worker))
+        val completion = worker.completions.receive()
+        assertIs<TorrentV2CommitWorker.Completion.Discarded>(completion)
+        assertTrue(scheduler.completed(completion))
+      }
+      assertFalse(scheduler.isVerified(1))
+      assertTrue(scheduler.isNeeded(1))
+      assertFalse(scheduler.completed())
+      // Retryable, once the scheduler wants it at all.
+      assertTrue(scheduler.canBegin(1))
+      assertFalse(torrentFileSystem.exists(path / "b"))
+    } finally {
+      store.cleanup()
+    }
+  }
+
+  @Test
+  fun retarget_newlyVerifiedStorePieces_areReported() = retargeting { scheduler, _, _ ->
+    val change = scheduler.retarget(emptySet(), booleanArrayOf(false, true))
+    assertContentEquals(intArrayOf(1), change.verified)
+    assertContentEquals(intArrayOf(1), change.lost)
+    assertTrue(scheduler.isVerified(1))
+    scheduler.revoke(1)
+    assertFalse(scheduler.isVerified(1))
+    assertTrue(scheduler.isNeeded(1))
   }
 }

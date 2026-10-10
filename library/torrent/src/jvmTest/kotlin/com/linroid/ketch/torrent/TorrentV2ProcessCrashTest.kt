@@ -36,22 +36,62 @@ class TorrentV2ProcessCrashTest {
   @Test
   fun exitAfterReplacementLoadsTheNewCompleteCheckpoint() = runTest { crash("after-replace") }
 
+  @Test
+  fun selectionChange_killMidRebind_restartRecovers() = runTest {
+    // Killed before the new creation log replaces the old one, and right after.
+    for (mode in listOf("rebind-before", "rebind-after")) withContext(Dispatchers.IO) {
+      val root = Files.createTempDirectory("ketch-v2-rebind").toFile()
+      root.resolve("neighbor").writeText("keep")
+      var child: Process? = null
+      try {
+        child = runChild(root, mode)
+        val path = root.absolutePath.toPath()
+        // The task now selects a and b; the log may still be bound to a, as the old selection.
+        val store = CrashingV2TorrentProcess.store(path, selected = setOf("0", "1"),
+          legacy = listOf(setOf("0")))
+        store.initialize()
+        assertContentEquals(booleanArrayOf(true, false), store.recheck())
+        assertEquals(CommitOutcome.VERIFIED, store.commit(1, byteArrayOf(5, 6, 7, 8)))
+        assertTrue(store.completed())
+        store.cleanup()
+        assertFalse(root.resolve("payload").exists(), mode)
+        assertEquals("keep", root.resolve("neighbor").readText())
+      } finally {
+        child?.let(::stop)
+        root.deleteRecursively()
+      }
+    }
+  }
+
+  /** Runs the crashing process in [mode] and waits for it to exit at its crash boundary. */
+  private fun runChild(root: File, mode: String): Process {
+    val urls = generateSequence(javaClass.classLoader) { it.parent }
+      .filterIsInstance<URLClassLoader>().flatMap { it.urLs.asSequence() }
+      .map { File(it.toURI()).absolutePath }.toList()
+    val classpath = (urls + System.getProperty("java.class.path").split(File.pathSeparator))
+      .distinct().joinToString(File.pathSeparator)
+    val child = ProcessBuilder(File(System.getProperty("java.home"), "bin/java").absolutePath,
+      "-cp", classpath, "com.linroid.ketch.torrent.CrashingV2TorrentProcess",
+      root.absolutePath, mode).redirectErrorStream(true)
+      .redirectOutput(root.resolve("child.log")).start()
+    assertTrue(child.waitFor(20, TimeUnit.SECONDS), "Child did not reach its crash boundary")
+    assertEquals(73, child.exitValue(), root.resolve("child.log").readText().take(4000))
+    return child
+  }
+
+  private fun stop(process: Process) {
+    if (process.isAlive) {
+      process.destroyForcibly()
+      check(process.waitFor(5, TimeUnit.SECONDS)) { "Child did not terminate" }
+    }
+  }
+
   private suspend fun crash(mode: String) = withContext(Dispatchers.IO) {
     val root = Files.createTempDirectory("ketch-v2-crash").toFile()
     root.resolve("neighbor").writeText("keep")
     var child: Process? = null
     try {
-      val urls = generateSequence(javaClass.classLoader) { it.parent }
-        .filterIsInstance<URLClassLoader>().flatMap { it.urLs.asSequence() }
-        .map { File(it.toURI()).absolutePath }.toList()
-      val classpath = (urls + System.getProperty("java.class.path").split(File.pathSeparator))
-        .distinct().joinToString(File.pathSeparator)
-      child = ProcessBuilder(File(System.getProperty("java.home"), "bin/java").absolutePath,
-        "-cp", classpath, "com.linroid.ketch.torrent.CrashingV2TorrentProcess",
-        root.absolutePath, mode).redirectErrorStream(true)
-        .redirectOutput(root.resolve("child.log")).start()
-      assertTrue(child.waitFor(20, TimeUnit.SECONDS), "Child did not reach its crash boundary")
-      assertEquals(73, child.exitValue(), root.resolve("child.log").readText().take(4000))
+      child = runChild(root, mode)
       val path = root.absolutePath.toPath()
       val store = CrashingV2TorrentProcess.store(path)
       val catalog = TorrentContentCatalog(path / "catalog")
@@ -67,19 +107,14 @@ class TorrentV2ProcessCrashTest {
       assertContentEquals(booleanArrayOf(false, false), store.verifiedPieces())
       assertContentEquals(booleanArrayOf(mode != "write", mode.endsWith("replace")),
         store.recheck())
-      assertTrue(store.commit(0, byteArrayOf(1, 2, 3, 4)))
-      assertTrue(store.commit(1, byteArrayOf(5, 6, 7, 8)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, byteArrayOf(1, 2, 3, 4)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(1, byteArrayOf(5, 6, 7, 8)))
       assertTrue(store.completed())
       store.cleanup()
       assertFalse(root.resolve("payload").exists())
       assertEquals("keep", root.resolve("neighbor").readText())
     } finally {
-      child?.let {
-        if (it.isAlive) {
-          it.destroyForcibly()
-          check(it.waitFor(5, TimeUnit.SECONDS)) { "Child did not terminate" }
-        }
-      }
+      child?.let(::stop)
       root.deleteRecursively()
     }
   }
@@ -97,9 +132,14 @@ internal object CrashingV2TorrentProcess {
     )
   ), "piece layers" to emptyMap<String, Any>())))
 
-  fun store(root: Path, fileSystem: FileSystem = torrentFileSystem) = TorrentV2PieceStore(
-    document(), root / "payload", emptySet(), "crash", TorrentBufferBudget(65_536), Semaphore(1),
-    fileSystem, root / "creation"
+  fun store(
+    root: Path,
+    fileSystem: FileSystem = torrentFileSystem,
+    selected: Set<String> = emptySet(),
+    legacy: List<Set<String>> = emptyList(),
+  ) = TorrentV2PieceStore(
+    document(), root / "payload", selected, "crash", TorrentBufferBudget(65_536), Semaphore(1),
+    fileSystem, root / "creation", legacy
   )
 
   @JvmStatic
@@ -109,11 +149,13 @@ internal object CrashingV2TorrentProcess {
     var replace = false
     val provider = object : ForwardingFileSystem(torrentFileSystem) {
       override fun atomicMove(source: Path, target: Path) {
-        if (replace && target.name == "checkpoint" && mode == "before-replace") {
+        if (replace && target.name == "checkpoint" && mode == "before-replace" ||
+          target.name == "creation" && mode == "rebind-before") {
           Runtime.getRuntime().halt(73)
         }
         super.atomicMove(source, target)
-        if (replace && target.name == "checkpoint" && mode == "after-replace") {
+        if (replace && target.name == "checkpoint" && mode == "after-replace" ||
+          target.name == "creation" && mode == "rebind-after") {
           Runtime.getRuntime().halt(73)
         }
       }
@@ -148,6 +190,14 @@ internal object CrashingV2TorrentProcess {
           override fun protectedClose() = delegate.close()
         }
       }
+    }
+    if (mode.startsWith("rebind")) {
+      // An older build bound the log to a alone; selecting b too binds it without a selection.
+      val store = store(root, provider, selected = setOf("0"))
+      store.initialize()
+      store.commit(0, byteArrayOf(1, 2, 3, 4))
+      store.changeSelection(setOf("0", "1"))
+      error("Crash boundary was not reached")
     }
     val store = store(root, provider)
     val catalog = TorrentContentCatalog(root / "catalog")
