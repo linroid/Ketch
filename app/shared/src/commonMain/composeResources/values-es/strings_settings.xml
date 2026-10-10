@@ -290,7 +290,7 @@
   <string name="settings_ai_access_add_invalid">Escribe el nombre de un sitio web, como ubuntu.com.</string>
   <string name="settings_ai_access_footer">Las búsquedas limitadas a sitios web que indiques nunca preguntan.</string>
 
-  <string name="settings_about_name_line">Un ketch es un velero de dos mástiles.</string>
+  <string name="settings_about_name_line">Un ketch es un velero de dos mástiles. Ketch divide cada descarga en carriles, como sus velas.</string>
   <string name="settings_about_discover_elsewhere">Descubrir funciona en las apps de escritorio y Android.</string>
   <string name="settings_about_version">Versión</string>
   <string name="settings_about_build">Compilación</string>

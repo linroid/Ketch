@@ -285,7 +285,7 @@
   <string name="settings_ai_access_add_invalid">ubuntu.com 같은 웹사이트 이름을 입력하세요.</string>
   <string name="settings_ai_access_footer">직접 지정한 웹사이트로 제한한 검색은 묻지 않습니다.</string>
 
-  <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다.</string>
+  <string name="settings_about_name_line">케치(ketch)는 돛대가 두 개인 범선입니다. Ketch는 돛처럼 모든 다운로드를 여러 레인으로 나눕니다.</string>
   <string name="settings_about_discover_elsewhere">찾기는 데스크톱 및 Android 앱에서 사용할 수 있습니다.</string>
   <string name="settings_about_version">버전</string>
   <string name="settings_about_build">빌드</string>

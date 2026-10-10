@@ -290,7 +290,7 @@
   <string name="settings_ai_access_add_invalid">Gib den Namen einer Website ein, z. B. ubuntu.com.</string>
   <string name="settings_ai_access_footer">Suchen, die du auf bestimmte Websites beschränkst, fragen nie.</string>
 
-  <string name="settings_about_name_line">Eine Ketsch ist ein Segelboot mit zwei Masten.</string>
+  <string name="settings_about_name_line">Eine Ketsch ist ein Segelboot mit zwei Masten. Wie ihre Segel teilt Ketch jeden Download in Spuren auf.</string>
   <string name="settings_about_discover_elsewhere">Entdecken läuft in der Desktop- und der Android-App.</string>
   <string name="settings_about_version">Version</string>
   <string name="settings_about_build">Build</string>

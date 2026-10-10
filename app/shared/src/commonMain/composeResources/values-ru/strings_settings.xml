@@ -300,7 +300,7 @@
   <string name="settings_ai_access_add_invalid">Введите адрес сайта, например ubuntu.com.</string>
   <string name="settings_ai_access_footer">Запросы только по указанным вами сайтам разрешения не требуют.</string>
 
-  <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно.</string>
+  <string name="settings_about_name_line">Кеч — двухмачтовое парусное судно. Ketch делит каждую загрузку на дорожки, как его паруса.</string>
   <string name="settings_about_discover_elsewhere">Поиск работает в настольном приложении и в приложении для Android.</string>
   <string name="settings_about_version">Версия</string>
   <string name="settings_about_build">Сборка</string>
