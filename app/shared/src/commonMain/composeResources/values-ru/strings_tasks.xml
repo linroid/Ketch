@@ -138,10 +138,8 @@
   <string name="action_row_open_source_page">Открыть исходную страницу</string>
   <string name="action_row_copy_error">Копировать ошибку</string>
   <string name="action_row_copy_details">Копировать подробности</string>
-  <string name="action_row_stop_and_discard">Остановить и сбросить прогресс…</string>
-  <string name="action_row_remove">Удалить из списка</string>
-  <string name="action_row_remove_and_trash">Удалить и переместить файл в корзину…</string>
-  <string name="action_row_remove_and_delete">Удалить вместе с файлами…</string>
+  <string name="action_row_stop_and_discard">Отменить загрузку…</string>
+  <string name="action_row_remove">Удалить…</string>
   <plurals name="batch_pause">
     <item quantity="one">Приостановить %1$d загрузку</item>
     <item quantity="few">Приостановить %1$d загрузки</item>
@@ -192,28 +190,22 @@
     <item quantity="other">Скачать снова %1$d файла</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Сбросить прогресс %1$d загрузки…</item>
-    <item quantity="few">Сбросить прогресс %1$d загрузок…</item>
-    <item quantity="many">Сбросить прогресс %1$d загрузок…</item>
-    <item quantity="other">Сбросить прогресс %1$d загрузки…</item>
+    <item quantity="one">Отменить %1$d загрузку…</item>
+    <item quantity="few">Отменить %1$d загрузки…</item>
+    <item quantity="many">Отменить %1$d загрузок…</item>
+    <item quantity="other">Отменить %1$d загрузки…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Удалить из списка %1$d загрузку</item>
-    <item quantity="few">Удалить из списка %1$d загрузки</item>
-    <item quantity="many">Удалить из списка %1$d загрузок</item>
-    <item quantity="other">Удалить из списка %1$d загрузки</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Удалить %1$d загрузку вместе с файлами…</item>
-    <item quantity="few">Удалить %1$d загрузки вместе с файлами…</item>
-    <item quantity="many">Удалить %1$d загрузок вместе с файлами…</item>
-    <item quantity="other">Удалить %1$d загрузки вместе с файлами…</item>
+    <item quantity="one">Удалить %1$d загрузку…</item>
+    <item quantity="few">Удалить %1$d загрузки…</item>
+    <item quantity="many">Удалить %1$d загрузок…</item>
+    <item quantity="other">Удалить %1$d загрузки…</item>
   </plurals>
   <string name="bar_speed">Скорость</string>
   <string name="bar_copy_links">Копировать ссылки</string>
   <string name="bar_remove">Удалить…</string>
   <string name="bar_copy_paths">Копировать пути к файлам</string>
-  <string name="bar_discard">Сбросить прогресс…</string>
+  <string name="bar_discard">Отменить загрузки…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s: %2$d из %3$d выбранных</string>

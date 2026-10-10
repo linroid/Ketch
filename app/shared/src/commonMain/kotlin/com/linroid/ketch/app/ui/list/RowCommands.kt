@@ -145,9 +145,9 @@ internal class RowCommands(
   }
 
   /**
-   * Runs [action] on [row]. Actions that open a panel, a menu or a dialog, such as
-   * [RowAction.SpeedLimit] or [RowAction.RemoveAndDelete], belong to the caller and do nothing
-   * here. [RowAction.StopAndDiscard] discards at once, so the caller confirms it first.
+   * Runs [action] on [row]. Actions that open a panel or a menu, such as [RowAction.SpeedLimit],
+   * belong to the caller and do nothing here. [RowAction.StopAndDiscard] and [RowAction.Remove]
+   * act at once, so the caller confirms them first where it should.
    */
   fun run(action: RowAction, row: TaskRow) {
     val task = row.task
@@ -197,9 +197,7 @@ internal class RowCommands(
       RowAction.Priority,
       RowAction.StartLater,
       RowAction.SendTo,
-      RowAction.Details,
-      RowAction.RemoveAndTrash,
-      RowAction.RemoveAndDelete -> Unit
+      RowAction.Details -> Unit
     }
   }
 

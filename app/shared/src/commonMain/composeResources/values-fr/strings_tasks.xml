@@ -132,10 +132,8 @@
   <string name="action_row_open_source_page">Ouvrir la page source</string>
   <string name="action_row_copy_error">Copier l'erreur</string>
   <string name="action_row_copy_details">Copier les détails</string>
-  <string name="action_row_stop_and_discard">Arrêter et abandonner la progression…</string>
-  <string name="action_row_remove">Retirer de la liste</string>
-  <string name="action_row_remove_and_trash">Retirer et mettre le fichier à la corbeille…</string>
-  <string name="action_row_remove_and_delete">Retirer et supprimer les fichiers…</string>
+  <string name="action_row_stop_and_discard">Annuler le téléchargement…</string>
+  <string name="action_row_remove">Retirer…</string>
   <plurals name="batch_pause">
     <item quantity="one">Mettre en pause %1$d téléchargement</item>
     <item quantity="other">Mettre en pause %1$d téléchargements</item>
@@ -170,22 +168,18 @@
     <item quantity="other">Retélécharger %1$d fichiers</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Abandonner la progression de %1$d téléchargement…</item>
-    <item quantity="other">Abandonner la progression de %1$d téléchargements…</item>
+    <item quantity="one">Annuler %1$d téléchargement…</item>
+    <item quantity="other">Annuler %1$d téléchargements…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Retirer %1$d téléchargement de la liste</item>
-    <item quantity="other">Retirer %1$d téléchargements de la liste</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Retirer %1$d téléchargement et son fichier…</item>
-    <item quantity="other">Retirer %1$d téléchargements et leurs fichiers…</item>
+    <item quantity="one">Retirer %1$d téléchargement…</item>
+    <item quantity="other">Retirer %1$d téléchargements…</item>
   </plurals>
   <string name="bar_speed">Vitesse</string>
   <string name="bar_copy_links">Copier les liens</string>
   <string name="bar_remove">Retirer…</string>
   <string name="bar_copy_paths">Copier les chemins des fichiers</string>
-  <string name="bar_discard">Abandonner la progression…</string>
+  <string name="bar_discard">Annuler les téléchargements…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s %2$d sur %3$d sélectionnés</string>

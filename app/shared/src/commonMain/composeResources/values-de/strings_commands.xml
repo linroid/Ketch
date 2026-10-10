@@ -36,7 +36,7 @@
   <string name="command_list_toggle">Pausieren oder fortsetzen</string>
   <string name="command_list_open">Öffnen</string>
   <string name="command_list_reveal">Im Ordner anzeigen</string>
-  <string name="command_list_remove">Aus der Liste entfernen</string>
+  <string name="command_list_remove">Entfernen</string>
   <string name="command_list_remove_and_trash">Entfernen und Dateien in den Papierkorb legen…</string>
   <string name="command_list_copy_link">Link kopieren</string>
   <string name="command_list_copy_path">Dateipfad kopieren</string>

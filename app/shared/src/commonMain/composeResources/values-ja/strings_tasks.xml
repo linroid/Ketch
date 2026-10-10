@@ -129,10 +129,8 @@
   <string name="action_row_open_source_page">ソースページを開く</string>
   <string name="action_row_copy_error">エラーをコピー</string>
   <string name="action_row_copy_details">詳細をコピー</string>
-  <string name="action_row_stop_and_discard">停止して進捗を破棄…</string>
-  <string name="action_row_remove">リストから削除</string>
-  <string name="action_row_remove_and_trash">リストから削除してファイルをゴミ箱へ…</string>
-  <string name="action_row_remove_and_delete">リストから削除してファイルも削除…</string>
+  <string name="action_row_stop_and_discard">ダウンロードをキャンセル…</string>
+  <string name="action_row_remove">削除…</string>
   <plurals name="batch_pause">
     <item quantity="other">%1$d件のダウンロードを一時停止</item>
   </plurals>
@@ -159,19 +157,16 @@
     <item quantity="other">%1$d個のファイルをもう一度ダウンロード</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="other">%1$d件のダウンロードの進捗を破棄…</item>
+    <item quantity="other">%1$d件のダウンロードをキャンセル…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="other">%1$d件のダウンロードをリストから削除</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="other">%1$d件のダウンロードとファイルを削除…</item>
+    <item quantity="other">%1$d件のダウンロードを削除…</item>
   </plurals>
   <string name="bar_speed">速度</string>
   <string name="bar_copy_links">リンクをコピー</string>
   <string name="bar_remove">削除…</string>
   <string name="bar_copy_paths">ファイルパスをコピー</string>
-  <string name="bar_discard">進捗を破棄…</string>
+  <string name="bar_discard">ダウンロードをキャンセル…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">選択した%3$d件中%2$d件を%1$s</string>

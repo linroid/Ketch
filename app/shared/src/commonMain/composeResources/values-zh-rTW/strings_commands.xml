@@ -36,7 +36,7 @@
   <string name="command_list_toggle">暫停或繼續</string>
   <string name="command_list_open">開啟</string>
   <string name="command_list_reveal">在資料夾中顯示</string>
-  <string name="command_list_remove">從清單中移除</string>
+  <string name="command_list_remove">移除</string>
   <string name="command_list_remove_and_trash">移除並將檔案移到垃圾桶…</string>
   <string name="command_list_copy_link">複製連結</string>
   <string name="command_list_copy_path">複製檔案路徑</string>
