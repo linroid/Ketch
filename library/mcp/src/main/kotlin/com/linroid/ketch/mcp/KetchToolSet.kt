@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
 import kotlinx.serialization.json.Json
@@ -226,7 +227,14 @@ class KetchToolSet(
       properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
       requestId = requestId.ifEmpty { null },
     )
-    val task = connect().download(request)
+    val ketch = connect()
+    // An instance without request IDs would drop it and add the download again on a retry.
+    if (request.requestId != null && KetchFeatures.REQUEST_ID !in ketch.status().features) {
+      throw IllegalArgumentException(
+        "This Ketch instance does not support requestId; update it, or call without one.",
+      )
+    }
+    val task = ketch.download(request)
     return json.encodeToString(taskToJson(task))
   }
 

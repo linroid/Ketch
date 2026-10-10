@@ -10,6 +10,7 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.server.KetchServer
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -48,21 +49,21 @@ class ServeDaemonTest {
     assertFalse(daemon.isAlive)
   }
 
+  // Clients that find the server through what onReady publishes must see every task.
   @Test
-  fun `serveDaemon announces the server once it listens, before restoring tasks`() {
+  fun `serveDaemon is ready once it listens and has restored the tasks`() {
     val ketch = Ketch(UnreachableHttpEngine(), taskStore = SavedTaskStore(pausedRecord("saved")))
     val server = KetchServer(ketch, host = "127.0.0.1", port = 0, mdnsEnabled = false)
-    var announced: Pair<Int, Int>? = null
+    val ready = CompletableDeferred<Pair<Int, Int>>()
     val daemon = thread {
       serveDaemon(server, ketch) {
-        announced = runBlocking { server.port() } to ketch.tasks.value.size
+        ready.complete(runBlocking { server.port() } to ketch.tasks.value.size)
       }
     }
     try {
-      runBlocking { withTimeout(5.seconds) { ketch.tasks.first { it.isNotEmpty() } } }
-      val (port, tasks) = checkNotNull(announced)
+      val (port, tasks) = runBlocking { withTimeout(5.seconds) { ready.await() } }
       assertTrue(port > 0)
-      assertEquals(0, tasks)
+      assertEquals(1, tasks)
     } finally {
       server.stop()
       daemon.join(5_000)

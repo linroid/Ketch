@@ -620,12 +620,13 @@ private fun instanceLocator(target: Target) = InstanceLocator(
  * tasks saved by earlier runs, so a daemon that cannot start, e.g. because another one uses
  * the port, never resumes downloads into the same files.
  *
- * @param onListening called once the server listens, before the tasks are restored
+ * @param onReady called once the server listens and the tasks are restored, so a client it lets
+ *   find the server sees every task
  */
-internal fun serveDaemon(server: KetchServer, ketch: KetchApi, onListening: () -> Unit = {}) {
+internal fun serveDaemon(server: KetchServer, ketch: KetchApi, onReady: () -> Unit = {}) {
   server.start(wait = false)
-  onListening()
   runBlocking { ketch.start() }
+  onReady()
   server.awaitStop()
 }
 
@@ -979,16 +980,17 @@ private fun runStandaloneMcp(
   })
 
   apiServer.start(wait = false)
-  instance.publish(
-    CliInstance.Info(
-      command = STANDALONE_MCP_COMMAND,
-      pid = ProcessHandle.current().pid(),
-      url = loopbackUrl("127.0.0.1", runBlocking { apiServer.port() }),
-      token = apiToken,
-    )
-  )
   runBlocking {
     ketch.start()
+    // Once the tasks are restored, so the attaching commands see every one.
+    instance.publish(
+      CliInstance.Info(
+        command = STANDALONE_MCP_COMMAND,
+        pid = ProcessHandle.current().pid(),
+        url = loopbackUrl("127.0.0.1", apiServer.port()),
+        token = apiToken,
+      )
+    )
     KetchMcpServer(ketch).startStdio(output = protocolOut)
   }
 }

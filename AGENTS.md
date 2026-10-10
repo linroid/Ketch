@@ -604,11 +604,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   apps show the server's message, except for `path_rejected`, which their own text explains
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
-  cannot bind never resumes them
+  cannot bind never resumes them; `Ketch.start` keeps downloads added meanwhile in the list
 - Only one engine runs the downloads of a config directory: `ketch server` and
   `ketch mcp --standalone` refuse to start while the desktop app runs (`DesktopApp.isRunning`) or
-  another one holds `instance.lock` (`claimDownloads`, `CliInstance`), and describe themselves in
-  the owner-only `instance.json` (command, pid, loopback URL, token) for the attaching commands
+  another one holds `instance.lock` (`claimDownloads`, `CliInstance`), and once their tasks are
+  restored describe themselves in the owner-only `instance.json` (command, pid, loopback URL,
+  token) for the attaching commands
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -666,7 +667,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   missing or malformed argument is a `ToolException.ValidationFailure`
 - `KetchToolSet` and `KetchMcpServer` take `connect: suspend () -> KetchApi`, asked on every
   call (or a `KetchApi`); what it throws fails the call with its message. `startDownload` takes
-  an optional `requestId`
+  an optional `requestId`, refused by an instance without `KetchFeatures.REQUEST_ID`
 - `ketch mcp` attaches to the instance the CLI's `InstanceLocator` finds (`InstanceConnection`):
   when a tool first needs it, and again once the `RemoteKetch` is no longer connected, as when
   the app restarts on another port. `--standalone` runs its own engine on `ketch.db` instead,

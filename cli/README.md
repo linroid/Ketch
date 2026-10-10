@@ -457,7 +457,7 @@ Each tool returns a JSON document as the text of its result. Parameters that hav
 such as everything but `url` in `startDownload`, are optional in the tool's input schema.
 `startDownload` takes a `requestId`, a UUID the agent makes up: calling it again with the same
 `requestId` and arguments, such as after a timeout, returns the download it started instead of
-adding another.
+adding another. An older Ketch without request IDs refuses it.
 
 Stdout carries only the MCP protocol; the banner and all logs go to stderr. The server exits once
 the client closes stdin, after answering the requests it has already read, so it can also be

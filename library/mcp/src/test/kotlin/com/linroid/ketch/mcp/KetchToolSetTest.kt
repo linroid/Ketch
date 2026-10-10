@@ -10,11 +10,13 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -97,6 +99,24 @@ class KetchToolSetTest {
     assertTrue(ketch.requests.isEmpty())
   }
 
+  // An instance without request IDs drops the field, so a retried call would add the download
+  // again.
+  @Test
+  fun startDownload_requestIdOnAnInstanceWithoutRequestIds_isRejected() = runTest {
+    val ketch = RecordingKetchApi(features = emptySet())
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(
+        url = "https://example.com/a.iso",
+        requestId = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a",
+      )
+    }
+    assertTrue(ketch.requests.isEmpty())
+
+    KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso")
+    assertEquals(1, ketch.requests.size)
+  }
+
   // `ketch mcp` hands its tools the instance it is attached to, which changes when the instance
   // restarts, so every call asks for it again.
   @Test
@@ -170,6 +190,7 @@ class KetchToolSetTest {
 
   private class RecordingKetchApi(
     tasks: List<DownloadTask> = emptyList(),
+    private val features: Set<String> = setOf(KetchFeatures.REQUEST_ID),
   ) : KetchApi {
     val requests = mutableListOf<DownloadRequest>()
     val resolveProperties = mutableListOf<Map<String, String>>()
@@ -199,7 +220,28 @@ class KetchToolSetTest {
 
     override suspend fun start() {}
 
-    override suspend fun status(): KetchStatus = throw UnsupportedOperationException()
+    override suspend fun status(): KetchStatus = KetchStatus(
+      name = "Ketch",
+      version = "1.0.0",
+      revision = "abc1234",
+      uptime = 0,
+      config = DownloadConfig(),
+      system = SystemInfo(
+        os = "TestOS",
+        arch = "test",
+        separator = "/",
+        javaVersion = "21",
+        availableProcessors = 1,
+        maxMemory = 0,
+        totalMemory = 0,
+        freeMemory = 0,
+        downloadDirectory = "/downloads",
+        totalSpace = 0,
+        freeSpace = 0,
+        usableSpace = 0,
+      ),
+      features = features,
+    )
 
     override suspend fun updateConfig(config: DownloadConfig) {}
 
