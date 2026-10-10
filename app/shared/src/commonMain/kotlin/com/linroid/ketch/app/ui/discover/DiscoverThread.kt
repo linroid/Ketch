@@ -83,9 +83,15 @@ private fun LazyItemScope.ThreadItemView(
   val controller = state.aiDiscover
   val spacing = KetchTheme.spacing
   val turn = item.turn
-  // Rows and cards come and go, as results are discarded and requests answered.
+  // Rows and cards come and go, as results are discarded and requests answered. Placeholder rows
+  // leave at once: fading, they would show through the results or the failure that replace them.
+  val animate = when {
+    KetchTheme.reduceMotion -> Modifier
+    item is ThreadItem.Skeleton -> Modifier.animateItem(fadeOutSpec = null)
+    else -> Modifier.animateItem()
+  }
   val column = Modifier
-    .then(if (KetchTheme.reduceMotion) Modifier else Modifier.animateItem())
+    .then(animate)
     .widthIn(max = ThreadWidth)
     .fillMaxWidth()
   val content = column.padding(horizontal = inset)
