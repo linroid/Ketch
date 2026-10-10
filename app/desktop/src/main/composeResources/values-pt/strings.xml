@@ -83,6 +83,11 @@
     <item quantity="other">%1$d links copiados</item>
   </plurals>
   <string name="message_window_error">Algo deu errado</string>
+  <string name="message_downloads_run_by">%1$s (processo %2$d) está executando os downloads deste computador</string>
+  <string name="message_downloads_run_elsewhere">Outro processo do Ketch está executando os downloads deste computador</string>
+  <string name="message_downloads_run_hint">Pare-o e depois saia do Ketch e abra-o novamente para executá-los aqui</string>
+  <string name="message_command_stopped">%1$s parou</string>
+  <string name="message_command_stopped_hint">Saia do Ketch e abra-o novamente para executar aqui os downloads deste computador</string>
   <string name="open_torrent_title">Abrir arquivo torrent</string>
 
   <string name="close_keep_running_title">Continuar baixando em segundo plano?</string>

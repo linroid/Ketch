@@ -637,11 +637,21 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
   cannot bind never resumes them; `Ketch.start` keeps downloads added meanwhile in the list
-- Only one engine runs the downloads of a config directory: `ketch server` and
-  `ketch mcp --standalone` refuse to start while the desktop app runs (`DesktopApp.isRunning`) or
-  another one holds `instance.lock` (`claimDownloads`, `CliInstance`), and once their tasks are
-  restored describe themselves in the owner-only `instance.json` (command, pid, loopback URL,
-  token) for the attaching commands
+- Only one engine runs the downloads of a config directory, holding its `instance.lock` while it
+  has `ketch.db` open. `ketch server` and `ketch mcp --standalone` (`claimDownloads`,
+  `CliInstance`) refuse to start while another process holds it, naming the command
+  `instance.json` describes while its pid runs, else the desktop app (`otherEngine`), and while
+  the app runs at all, as one from before the lock runs them without it. Once their tasks are
+  restored, they describe themselves in the owner-only `instance.json` (command, pid, loopback
+  URL, token) for the attaching commands and the app
+- The desktop app takes the lock before it opens `ketch.db` and keeps it until its process exits,
+  removing an `instance.json` a stopped command left (`DownloadsLock`). Opened while a command
+  holds it, it waits up to 3 s for the command to say where it listens, then starts without an
+  engine (`DownloadsClaim.Taken`): the command's API, only at an `http` address of this machine
+  (`CliEngine.device`), is a device named after the command (`InstanceManager.standIn`, listed
+  first, shown at launch and never saved), `LocalApiServer` serves a client of it (and refuses
+  clients when there is none), and banners name the command and pid and, once it exits, say to
+  reopen the app to run the downloads there
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -737,8 +747,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   launcher run with `--native-messaging-host` (`app/desktop`: `NativeMessagingHost`,
   `NativeHostRegistration`, `LocalApiServer`). The host asks the running app over
   `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
-  per-run token, separate from the Settings server; the `ketch` CLI asks for the same server
-  (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection. The app
+  per-run token, separate from the Settings server, over the app's engine or, while a
+  `ketch server` runs the downloads instead, a client of it; the `ketch` CLI asks for the same
+  server (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection. The app
   registers the host with installed browsers on every launch; the Chromium extension id is pinned
   by the manifest `key`. The browser reads the host's stdout as length-prefixed messages, so
   nothing else may write there: the launcher sends the JVM's own warnings to stderr (`-Xlog` in
@@ -884,8 +895,6 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
    the web app report AI discovery as unavailable
 8. AI API tokens are stored in plain text in `config.toml`, like the server
    `apiToken`; use environment variables on shared machines
-9. The desktop app does not check for a `ketch server` or `ketch mcp --standalone` that already
-   runs the downloads of its config directory; only they refuse to start while the app runs
 
 ## Roadmap
 

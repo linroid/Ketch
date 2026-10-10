@@ -34,6 +34,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
@@ -41,6 +42,7 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
+import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
 import com.linroid.ketch.app.feedback.UnreadableFile
@@ -91,6 +93,7 @@ import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -98,6 +101,7 @@ import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
@@ -109,6 +113,11 @@ import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.keep_awake_reason
+import ketch.app.desktop.generated.resources.message_command_stopped
+import ketch.app.desktop.generated.resources.message_command_stopped_hint
+import ketch.app.desktop.generated.resources.message_downloads_run_by
+import ketch.app.desktop.generated.resources.message_downloads_run_elsewhere
+import ketch.app.desktop.generated.resources.message_downloads_run_hint
 import ketch.app.desktop.generated.resources.message_window_error
 import ketch.app.desktop.generated.resources.notify_added
 import ketch.app.desktop.generated.resources.notify_names_more
@@ -131,6 +140,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -251,6 +261,9 @@ fun main(args: Array<String>) {
   registerNativeHost(registration, integration, logger)
   // Before the UI thread starts: this can run a command and, as a last resort, wait on a lookup.
   val hostName = localHostName()
+  // Also before: this waits a moment for a `ketch` command that has just taken the lock.
+  val downloads = DownloadsLock.claim(configDir)
+  val standIn = (downloads as? DownloadsClaim.Taken)?.let { serveStandIn(it, localApiServer) }
 
   val launch = LaunchContext(
     configDir = configDir,
@@ -259,6 +272,8 @@ fun main(args: Array<String>) {
     windowRequests = windowRequests.receiveAsFlow(),
     background = background,
     singleInstance = singleInstance,
+    downloads = downloads,
+    standIn = standIn,
     localApiServer = localApiServer,
     integration = integration,
     logger = logger,
@@ -284,6 +299,10 @@ fun main(args: Array<String>) {
  *
  * @property windowRequests emits when the window should come forward.
  * @property background whether the app starts hidden ([BACKGROUND_FLAG]).
+ * @property downloads who runs this computer's downloads. The app holds the lock until the
+ *   process exits, and never closes it, as its engine may still save downloads once closed.
+ * @property standIn the device of the `ketch` command that runs them instead, when it can be
+ *   reached.
  * @property integration how Ketch is wired into the browsers and the system, for Settings.
  * @property discoverHistory the Discover sessions, kept in `discover-history.json`.
  * @property openFiles adds `.torrent` files, as if opened from the file manager.
@@ -295,6 +314,8 @@ private class LaunchContext(
   val windowRequests: Flow<Unit>,
   val background: Boolean,
   val singleInstance: SingleInstance,
+  val downloads: DownloadsClaim,
+  val standIn: RemoteConfig?,
   val localApiServer: LocalApiServer,
   val integration: DesktopIntegrationStatus,
   val logger: Logger,
@@ -347,6 +368,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       unreadableFiles = unreadableFiles,
       discoverHistory = launch.discoverHistory,
     ).also { localSpeed.follow(it.pulse) }
+  }
+  LaunchedEffect(controller) {
+    (launch.downloads as? DownloadsClaim.Taken)?.let { announceDownloadsElsewhere(controller, it) }
   }
   val resources = remember { AppResources(controller, localSpeed, launch) }
   DisposableEffect(resources) {
@@ -583,11 +607,21 @@ private fun createInstanceManager(
 ): InstanceManager {
   val configDir = launch.configDir
   val config = configStore.load()
+  val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
+  if (launch.downloads is DownloadsClaim.Taken) {
+    // Another process runs this computer's downloads: no engine, so ketch.db stays closed, and
+    // that process's device in the engine's place, when the app can reach it.
+    return InstanceManager(
+      factory = InstanceFactory(deviceName = instanceName),
+      initialRemotes = config.remotes,
+      configStore = configStore,
+      standIn = launch.standIn,
+    )
+  }
   val driverFactory = DriverFactory(File(configDir, "ketch.db").path) { unreadable ->
     unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
   }
   val taskStore = createSqliteTaskStore(driverFactory)
-  val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(
       stateDirectory = File(configDir, "torrent-state").path,
@@ -656,6 +690,57 @@ private fun createInstanceManager(
     initialRemotes = config.remotes,
     configStore = configStore,
   )
+}
+
+/**
+ * Serves the downloads [claim]'s process runs to the browser extension and the `ketch` commands
+ * through [server], with a client of its own, or turns them away when the app can't reach it.
+ *
+ * @return the process's device, or `null` when the app can't reach it.
+ */
+private fun serveStandIn(claim: DownloadsClaim.Taken, server: LocalApiServer): RemoteConfig? {
+  val device = claim.engine?.device()
+  if (device == null) {
+    claim.engine?.let { engine ->
+      val url = engine.url?.let(::redactUrl)
+      log.w { "${engine.describe()} gave no address on this machine: $url" }
+    }
+    server.refuse("Another Ketch process that the app can't reach runs this computer's downloads")
+    return null
+  }
+  val client = RemoteKetch(device.host, device.port, device.apiToken, device.secure)
+  // Only launches the connection, which retries while the process is unreachable.
+  runBlocking { client.start() }
+  server.attach(client, owned = true)
+  return device
+}
+
+/**
+ * Tells the user in banners that [claim]'s process runs this computer's downloads instead of the
+ * app, and when it stops, as the app runs them only once it is opened again.
+ */
+private fun announceDownloadsElsewhere(controller: AppController, claim: DownloadsClaim.Taken) {
+  val engine = claim.engine
+  val notice = controller.messages.post(
+    level = MessageLevel.Info,
+    title = engine?.let { Res.string.message_downloads_run_by.text(it.command, it.pid) }
+      ?: Res.string.message_downloads_run_elsewhere.text(),
+    detail = Res.string.message_downloads_run_hint.text(),
+    placement = MessagePlacement.Banner,
+  )
+  if (engine == null) return
+  val process = ProcessHandle.of(engine.pid).orElse(null) ?: return
+  controller.scope.launch {
+    process.onExit().await()
+    log.i { "${engine.describe()} stopped" }
+    controller.messages.dismiss(notice.id)
+    controller.messages.post(
+      level = MessageLevel.Warning,
+      title = Res.string.message_command_stopped.text(engine.command),
+      detail = Res.string.message_command_stopped_hint.text(),
+      placement = MessagePlacement.Banner,
+    )
+  }
 }
 
 /**

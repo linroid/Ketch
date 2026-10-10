@@ -76,6 +76,11 @@
     <item quantity="other">已複製 %1$d 個連結</item>
   </plurals>
   <string name="message_window_error">發生錯誤</string>
+  <string name="message_downloads_run_by">%1$s（處理程序 %2$d）正在執行這台電腦的下載項目</string>
+  <string name="message_downloads_run_elsewhere">另一個 Ketch 處理程序正在執行這台電腦的下載項目</string>
+  <string name="message_downloads_run_hint">停止它，再結束並重新開啟 Ketch，即可在這裡執行</string>
+  <string name="message_command_stopped">%1$s 已停止</string>
+  <string name="message_command_stopped_hint">結束並重新開啟 Ketch，即可在這裡執行這台電腦的下載項目</string>
   <string name="open_torrent_title">開啟種子檔案</string>
 
   <string name="close_keep_running_title">要在背景繼續下載嗎？</string>

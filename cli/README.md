@@ -276,7 +276,10 @@ Only one Ketch runs the downloads in the task database at a time, so the same do
 resumed twice into the same files. `ketch server` stops with status 1 when the Ketch app is
 running, or another `ketch server` or `ketch mcp --standalone` already is. Use the
 [commands above](#work-on-a-running-ketch) and `ketch mcp`, which work through the one that
-runs, or turn on **Settings → Sharing** in the app for other devices.
+runs, or turn on **Settings → Sharing** in the app for other devices. The other way round, the
+Ketch app opened while `ketch server` runs leaves the downloads to it: it shows them through the
+server, as a device named `ketch server`, and runs them itself again once you stop the server
+and reopen the app.
 
 ```bash
 ketch server [options]
@@ -441,8 +444,9 @@ client may start before Ketch does. While none runs, tools fail with `Ketch isn'
 
 `--standalone` runs the downloads itself instead, as earlier versions did, for a machine where no
 Ketch app or server runs: it uses the same config file and [task database](#database) as
-`ketch server`, restores saved tasks when it starts, and the commands above work through it
-while it runs. Like `ketch server`, it refuses to start while another Ketch runs those downloads.
+`ketch server`, restores saved tasks when it starts, and the commands above and the Ketch app
+work through it while it runs. Like `ketch server`, it refuses to start while another Ketch runs
+those downloads.
 
 | Option | Description |
 |---|---|
@@ -733,8 +737,9 @@ directory, which the Ketch app shares:
 | Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` (default: `~/.config/ketch/ketch.db`) |
 | Windows | `%APPDATA%\ketch\ketch.db` |
 
-BitTorrent DHT state is kept in the `torrent-state` folder of the same directory. While one of
-the two runs, it holds `instance.lock` there, so no other opens the database, and describes
-itself in `instance.json`, readable by your user only as it holds the access token, so the
-[commands above](#work-on-a-running-ketch) can find it. The Ketch app is found through its own
-`app.endpoint` instead.
+BitTorrent DHT state is kept in the `torrent-state` folder of the same directory. Whichever of
+the two or the Ketch app runs the downloads holds `instance.lock` there while it does, so no
+other opens the database. The two also describe themselves in `instance.json`, readable by your
+user only as it holds the access token, so the [commands above](#work-on-a-running-ketch) can
+find them, and so can the Ketch app, which shows their downloads through them instead of
+opening the database. The Ketch app is found through its own `app.endpoint` instead.
