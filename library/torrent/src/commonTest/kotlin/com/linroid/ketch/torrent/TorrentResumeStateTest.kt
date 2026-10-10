@@ -47,4 +47,17 @@ class TorrentResumeStateTest {
     val decoded = Json.decodeFromString<TorrentResumeState>(json)
     assertEquals(emptySet(), decoded.selectedFileIds)
   }
+
+  @Test
+  fun decode_unknownKeys_areIgnored() {
+    // A newer build may add fields; every decode site reads them leniently.
+    val state = decodeResumeState("""
+      {"infoHash":"0123456789abcdef0123456789abcdef01234567","totalBytes":7,
+       "resumeData":"","selectedFileIds":["1"],"savePath":"/tmp","metainfo":"",
+       "version":2,"privacy":"PUBLIC","selectionGeneration":4,"seeding":{"intent":true}}
+    """.trimIndent())
+    assertEquals(setOf("1"), state.selectedFileIds)
+    assertEquals(2, state.version)
+    assertEquals(TorrentDiscoveryPrivacy.PUBLIC, state.privacy)
+  }
 }

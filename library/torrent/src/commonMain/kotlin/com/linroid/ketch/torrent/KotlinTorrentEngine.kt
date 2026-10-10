@@ -60,6 +60,11 @@ internal data class TorrentV2TaskSpec(
   /** The swarm [discover]'s endpoints are in; a hybrid dials v1 ones in v1 mode. */
   val discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
   /**
+   * Selections an older build may have bound the creation log to, such as the one the task's
+   * resume state mirrors; see [TorrentV2PieceStore].
+   */
+  val legacySelections: List<Set<String>> = emptyList(),
+  /**
    * Only seed: a recheck that finds the selection incomplete stops the owner with
    * [IncompleteSeedException] instead of downloading, before any discovery.
    */
@@ -704,7 +709,7 @@ internal class KotlinTorrentEngine(
       val store = TorrentV2PieceStore(document, output, selection, spec.taskId, budget,
         storageSlots, creationLogPath = if (spec.recoverCreations) {
           v2CreationLog(output, spec.taskId)
-        } else null)
+        } else null, legacySelections = spec.legacySelections)
       val custom = spec.discover
       val discovery: suspend (TorrentV2DiscoverySink) -> Unit = if (custom != null) {
         val topic = if (spec.discoverMode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1

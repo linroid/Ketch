@@ -45,6 +45,21 @@
       "id": "hybrid.transmission.v1-peer-download",
       "class": "com.linroid.ketch.torrent.HybridTransmissionInteropTest",
       "method": "hybridTaskDownloadsFromTransmissionV1Seeder"
+    },
+    {
+      "id": "v1.libtorrent.live-selection-expand",
+      "class": "com.linroid.ketch.torrent.IndependentSeederTest",
+      "method": "liveSelectionExpand_keepsTheIndependentSeederConnection"
+    },
+    {
+      "id": "v2.libtorrent.live-selection-expand",
+      "class": "com.linroid.ketch.torrent.PublicV2IndependentSeederTest",
+      "method": "liveSelectionExpand_pureV2FromIndependentSeeder"
+    },
+    {
+      "id": "v1.transmission.live-selection-expand",
+      "class": "com.linroid.ketch.torrent.TransmissionInteropTest",
+      "method": "publicSource_expandsSelectionWhileDownloadingFromTransmission"
     }
   ]
 }
