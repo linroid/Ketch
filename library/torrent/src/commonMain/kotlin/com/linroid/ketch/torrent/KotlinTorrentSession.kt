@@ -17,6 +17,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,6 +52,13 @@ internal class KotlinTorrentSession(
   private val allowLocalPeers: Boolean = false,
   /** Our listen port as a peer at that address reaches it (BEP 10 `p`); 0 leaves it out. */
   private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
+  /**
+   * Only seed: when the file check finds the selection incomplete, stop with
+   * [IncompleteSeedException] before any discovery instead of downloading.
+   */
+  private val seedOnly: Boolean = false,
+  /** The swarm's clock, for its peer deadlines; tests pass virtual time. */
+  private val nowMs: () -> Long = monotonicClock(),
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -61,6 +69,8 @@ internal class KotlinTorrentSession(
   private val lifecycle = Mutex()
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
+  /** One selection change at a time; the swarm completes each once it follows the store. */
+  private val selectionSignals = Channel<CompletableDeferred<Unit>>(1)
 
   suspend fun trackerTiers(): List<List<String>> =
     store.currentTrackerConfiguration()?.tiers ?: store.metadata.trackerTiers
@@ -205,6 +215,10 @@ internal class KotlinTorrentSession(
   private var sampleBytes = 0L
   private val currentSpeed = AtomicLong(0)
   private val lastPayload = AtomicLong(0)
+  private val uploadSampleTime = AtomicLong(clock())
+  private val uploadSampleBytes = AtomicLong(uploaded.load())
+  private val currentUploadSpeed = AtomicLong(0)
+  private val lastUpload = AtomicLong(0)
   private var job: Job? = null
   private var closed = false
   private var filesDeleted = false
@@ -223,6 +237,95 @@ internal class KotlinTorrentSession(
   val uploadedBytes: Long get() = uploaded.load()
   override val downloadSpeed: Long get() = if (clock() - lastPayload.load() > 2000) 0
     else currentSpeed.load()
+  val uploadSpeed: Long get() = if (clock() - lastUpload.load() > 2000) 0
+    else currentUploadSpeed.load()
+  override val selectedFileIds: Set<String>
+    get() = store.selectedIndices.mapTo(LinkedHashSet()) { it.toString() }
+
+  /** Whether every file is selected; trackers hear `completed` only for a whole torrent. */
+  fun selectsAllFiles(): Boolean = store.selectsAllFiles()
+
+  override suspend fun payloadCounters(): TorrentPayloadCounters =
+    TorrentPayloadCounters(received.load(), uploaded.load(), uploadSpeed)
+
+  private fun countUploaded(bytes: Int) {
+    val total = uploaded.addAndFetch(bytes.toLong())
+    val now = clock()
+    lastUpload.store(now)
+    val since = uploadSampleTime.load()
+    if (now - since >= 1000 && uploadSampleTime.compareAndSet(since, now)) {
+      val base = uploadSampleBytes.exchange(total)
+      currentUploadSpeed.store(((total - base) * 1000.0 / (now - since)).toLong())
+    }
+  }
+
+  override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    val indices = fileIds.mapTo(LinkedHashSet()) { id ->
+      requireNotNull(id.toIntOrNull()?.takeIf { it in store.metadata.files.indices }) {
+        "Unknown file id"
+      }
+    }
+    require(indices.isNotEmpty()) { "Select at least one file" }
+    check(scope.coroutineContext[Job]?.isActive == true) { "Torrent session is closed" }
+    // Applied in the session's scope, so a canceled caller never leaves a check stopped.
+    val pending = scope.async {
+      lifecycle.withLock {
+        check(!closed) { "Torrent session is closed" }
+        val running = job?.takeIf { it.isActive }
+        when {
+          // No peer is connected while the files are checked: check again with the change.
+          running != null && _state.value == TorrentSessionState.CHECKING_FILES -> {
+            stopLocked()
+            try {
+              store.changeSelection(indices)
+            } finally {
+              if (currentCoroutineContext()[Job]?.isActive == true) resumeLocked()
+            }
+            Applied.Restarted
+          }
+          running != null -> {
+            store.changeSelection(indices)
+            _downloadedBytes.value = store.progress().sum()
+            Applied.Running(running)
+          }
+          else -> {
+            store.changeSelection(indices)
+            _downloadedBytes.value = store.progress().sum()
+            Applied.Saved
+          }
+        }
+      }
+    }
+    val applied = try { pending.await() } finally {
+      withContext(NonCancellable) { pending.cancelAndJoin() }
+    }
+    log.i {
+      "Torrent $label selection: files=${indices.size}/${store.metadata.files.size}, " +
+        "wanted=${store.totalSelectedBytes}"
+    }
+    val swarm = when (applied) {
+      Applied.Restarted -> return true
+      Applied.Saved -> return false
+      is Applied.Running -> applied.job
+    }
+    // No lock is held while the swarm takes the change; a swarm that ends first did not.
+    val done = CompletableDeferred<Unit>()
+    val sent = select {
+      selectionSignals.onSend(done) { true }
+      swarm.onJoin { false }
+    }
+    if (!sent) return false
+    return select {
+      done.onAwait { true }
+      swarm.onJoin { false }
+    }
+  }
+
+  private sealed interface Applied {
+    data object Restarted : Applied
+    data object Saved : Applied
+    class Running(val job: Job) : Applied
+  }
 
   suspend fun verifiedPieces(): BooleanArray = store.verifiedPieces()
   suspend fun fileProgress(): LongArray = store.progress()
@@ -234,6 +337,8 @@ internal class KotlinTorrentSession(
     scope.coroutineContext.ensureActive()
     if (job?.isActive == true) return
     _failure.value = null
+    // A change sent to an earlier swarm was saved in the store, which this run reads.
+    while (selectionSignals.tryReceive().isSuccess) { }
     job = scope.launch {
       try {
         _state.value = TorrentSessionState.CHECKING_FILES
@@ -245,8 +350,15 @@ internal class KotlinTorrentSession(
           "Checked files for $label: ${verified.count { it }}/${verified.size} pieces verified, " +
             "${_downloadedBytes.value}/${store.totalSelectedBytes} bytes"
         }
-        if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
-          store.finish()
+        if (seedOnly && !store.completed()) {
+          // No discovery or peer: seeding only serves a completed selection.
+          log.i { "Completed torrent $label changed on disk; not seeding" }
+          _failure.value = IncompleteSeedException()
+          _state.value = TorrentSessionState.STOPPED
+          return@launch
+        }
+        if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION &&
+          store.finishIfComplete()) {
           store.persistCheckpoint(received.load(), uploaded.load())
           _state.value = TorrentSessionState.FINISHED
           log.i { "Torrent $label is already complete" }
@@ -257,6 +369,9 @@ internal class KotlinTorrentSession(
           sampleBytes = received.load()
           currentSpeed.store(0)
         }
+        uploadSampleTime.store(clock())
+        uploadSampleBytes.store(uploaded.load())
+        currentUploadSpeed.store(0)
         _state.value = TorrentSessionState.DOWNLOADING
         log.i {
           "Downloading $label with up to ${connectionLimit.load()} peer(s), " +
@@ -288,7 +403,7 @@ internal class KotlinTorrentSession(
                 downloadThrottle(bytes)
               },
               uploadRate = engineUploadRate, sessionUploadRate = uploadRate,
-              onUploaded = { bytes -> uploaded.fetchAndAdd(bytes.toLong()) },
+              onUploaded = ::countUploaded,
               onProgress = { _downloadedBytes.value = it },
               onCompleted = {
                 store.persistCheckpoint(received.load(), uploaded.load())
@@ -300,8 +415,13 @@ internal class KotlinTorrentSession(
                     "uploaded=${uploaded.load()}, state=${_state.value}"
                 }
               },
+              onIncomplete = {
+                _state.value = TorrentSessionState.DOWNLOADING
+                log.i { "Torrent $label is downloading again for its selection" }
+              },
+              nowMs = nowMs,
               logLabel = label,
-            ).run(peers, incoming, resets)
+            ).run(peers, incoming, resets, selectionSignals)
             // A swarm returns while seeding only once the policy stops seeding.
             if (_state.value == TorrentSessionState.SEEDING) {
               store.persistCheckpoint(received.load(), uploaded.load())
@@ -419,13 +539,6 @@ internal class KotlinTorrentSession(
   fun setConnections(value: Int) {
     require(value in 1..512)
     if (connectionLimit.exchange(value) != value) log.d { "Peer limit for $label: $value" }
-  }
-
-  override fun setFilePriorities(priorities: Map<Int, Int>) {
-    require(priorities.values.all { it in 0..7 })
-    require(priorities.filterValues { it > 0 }.keys == store.selectedIndices) {
-      "Change file selection by creating a new task"
-    }
   }
 
   suspend fun close(deleteFiles: Boolean = false) = lifecycle.withLock {

@@ -18,7 +18,7 @@ internal interface TorrentSession {
   /** Observable torrent state. */
   val state: StateFlow<TorrentSessionState>
 
-  /** Total bytes of selected files. */
+  /** Total bytes of the selected files; follows [changeSelection]. */
   val totalBytes: Long
 
   /** Current download speed in bytes/sec. */
@@ -30,12 +30,19 @@ internal interface TorrentSession {
   /** Resumes a paused torrent. */
   suspend fun resume()
 
+  /** IDs of the files this session downloads: metainfo indices (v1) or output mapping IDs (v2). */
+  val selectedFileIds: Set<String>
+
   /**
-   * Sets file priorities. Index 0 = skip, 4 = normal, 7 = high.
-   *
-   * @param priorities map of file index to priority (0=skip, 4=normal)
+   * Applies [fileIds], a non-empty set of known file IDs, without reconnecting. True when this
+   * session will deliver them before it finishes: a running transfer or seeding swarm took the
+   * change, or a file check restarted with it. False when it only saved them because it is
+   * paused, finished or stopped; the next [resume] downloads them.
    */
-  fun setFilePriorities(priorities: Map<Int, Int>)
+  suspend fun changeSelection(fileIds: Set<String>): Boolean
+
+  /** Payload received from and sent to peers, and the current upload speed when tracked. */
+  suspend fun payloadCounters(): TorrentPayloadCounters
 
   /** Sets per-torrent download rate limit (bytes/sec, 0=unlimited). */
   fun setDownloadRateLimit(bytesPerSecond: Long)
@@ -53,6 +60,16 @@ internal interface TorrentSession {
    */
   suspend fun saveResumeData(): ByteArray?
 }
+
+/** What a session received and uploaded; [uploadSpeed] is null where it is not tracked. */
+internal data class TorrentPayloadCounters(
+  val received: Long,
+  val uploaded: Long,
+  val uploadSpeed: Long?,
+)
+
+/** A seed-only start found a completed torrent's files changed on disk, so it did not seed. */
+internal class IncompleteSeedException : IllegalStateException("Completed torrent changed on disk")
 
 /** State of a torrent session. */
 internal enum class TorrentSessionState {

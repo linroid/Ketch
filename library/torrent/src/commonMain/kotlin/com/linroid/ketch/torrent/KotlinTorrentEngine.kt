@@ -593,6 +593,7 @@ internal class KotlinTorrentEngine(
         privacy = spec.privacy,
         allowLocalPeers = allowLocalPeers,
         listenPortFor = { advertisedPort.current() },
+        seedOnly = spec.seedOnly,
       )
       target = session
       entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())
@@ -892,7 +893,7 @@ internal class KotlinTorrentEngine(
       val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
         TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
         nowMs = nowMs,
-        announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+        announceCompletion = session::selectsAllFiles,
       )
       discovery.observeStatus(session::updateTrackerStatus)
       try {
@@ -939,7 +940,7 @@ internal class KotlinTorrentEngine(
       for (url in extraTrackers(trackerTiers.flatten())) launch {
         val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
           TrackerTiers(listOf(listOf(url)), tracker::announce), nowMs = nowMs,
-          announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+          announceCompletion = session::selectsAllFiles,
         )
         announceExtra(listOf(discovery), { topic, stopped ->
           topic.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,

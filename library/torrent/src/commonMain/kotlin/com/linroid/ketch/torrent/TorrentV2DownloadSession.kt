@@ -150,9 +150,27 @@ internal class TorrentV2DownloadSession private constructor(
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
-  override fun setFilePriorities(priorities: Map<Int, Int>) {
-    error("File selection is fixed for this session")
+  override val selectedFileIds: Set<String> = selected.ifEmpty {
+    TorrentOutputMapping.from(document).files.mapTo(LinkedHashSet()) { it.id }
   }
+
+  /**
+   * Accepts only the current selection until v2 sessions change files live: true while a check
+   * or transfer runs, which delivers it. Any other set throws [UnsupportedOperationException]
+   * before anything changes.
+   */
+  override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    if (fileIds != selectedFileIds) {
+      throw UnsupportedOperationException("Changing the files of a v2 torrent is not supported yet")
+    }
+    return mutableState.value == TorrentSessionState.CHECKING_FILES ||
+      mutableState.value == TorrentSessionState.DOWNLOADING ||
+      mutableState.value == TorrentSessionState.SEEDING
+  }
+
+  /** Upload speed is not tracked for v2 sessions yet. */
+  override suspend fun payloadCounters(): TorrentPayloadCounters =
+    TorrentPayloadCounters(store.receivedBytes(), store.uploadedBytes(), uploadSpeed = null)
 
   override suspend fun saveResumeData(): ByteArray? = store.resumeData()
 
