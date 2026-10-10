@@ -30,7 +30,7 @@ import kotlin.test.assertNull
 class SettingsPageTest {
   @Test
   fun generalSummary_lightSignal_namesThemeAndAccent() = runTest {
-    assertEquals("Light · Signal", generalSummary(ThemeMode.Light, KetchAccent.Signal).load())
+    assertEquals("Light · Indigo", generalSummary(ThemeMode.Light, KetchAccent.Indigo).load())
   }
 
   @Test

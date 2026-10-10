@@ -40,10 +40,10 @@ class SettingsSearchTest {
 
   @Test
   fun searchSettings_accentNames_findTheAccentColor() = runTest {
-    val hits = searchSettings("harbor", every, allFeatures, loadSettingsSearchIndex())
+    val hits = searchSettings("teal", every, allFeatures, loadSettingsSearchIndex())
 
     assertEquals("Accent color", hits.first().entry.title)
-    assertEquals("Signal, Harbor, Fathom or Beacon", hits.first().entry.description)
+    assertEquals("Indigo, Purple, Pink, Orange, Green, Teal or Blue", hits.first().entry.description)
   }
 
   @Test

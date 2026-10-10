@@ -169,7 +169,7 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Activo mientras descarga** — Las apps de escritorio y Android evitan que el sistema entre en
   reposo por sí mismo mientras hay descargas en curso; la pantalla puede apagarse igualmente
   (**Ajustes → General**).
-- **Tu estilo y tu idioma** — Temas claro y oscuro con cuatro colores de acento, en English,
+- **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
   ([traducciones](docs/development/localization.md)).
 

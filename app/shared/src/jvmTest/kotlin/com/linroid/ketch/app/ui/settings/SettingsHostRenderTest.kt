@@ -66,8 +66,8 @@ class SettingsHostRenderTest {
   fun settingsNav_pageItem_announcesItsSummaryAsItsState() {
     runSettings { scene ->
       val states = scene.stateDescriptions()
-      assertTrue("Light · Signal" in states, "The General item's state: $states")
-      assertTrue("light · signal" !in scene.texts(), "The summary shows: ${scene.texts()}")
+      assertTrue("Light · Indigo" in states, "The General item's state: $states")
+      assertTrue("light · indigo" !in scene.texts(), "The summary shows: ${scene.texts()}")
     }
   }
 

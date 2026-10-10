@@ -156,7 +156,7 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   on the desktop; downloads that keep running in the background on Android and on iOS 26.
 - **Awake while it downloads** — The desktop and Android apps keep the system from going to sleep
   on its own while downloads run; the screen can still turn off (**Settings → General**).
-- **Your look, your language** — Light and dark themes with four accent colors, in English,
+- **Your look, your language** — Light and dark themes with seven accent colors, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch and Français
   ([translating](docs/development/localization.md)).
 

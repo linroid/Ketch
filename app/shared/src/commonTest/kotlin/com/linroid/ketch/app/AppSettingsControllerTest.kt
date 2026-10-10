@@ -57,15 +57,15 @@ class AppSettingsControllerTest {
       DownloadConfig(maxConcurrentDownloads = 5),
     )
     controller.saveServer(ServerConfig(port = 9100))
-    controller.saveAccent(KetchAccent.Beacon)
+    controller.saveAccent(KetchAccent.Orange)
 
     val saved = store.load()
     assertEquals("laptop", saved.name)
     assertEquals("sk", saved.ai.llm.apiKey)
     assertEquals(5, saved.download.maxConcurrentDownloads)
     assertEquals(9100, saved.server.port)
-    assertEquals(AccentColor.Beacon, saved.appearance.accent)
-    assertEquals(KetchAccent.Beacon, controller.accent)
+    assertEquals(AccentColor.Orange, saved.appearance.accent)
+    assertEquals(KetchAccent.Orange, controller.accent)
   }
 
   @Test
@@ -91,13 +91,13 @@ class AppSettingsControllerTest {
     val store = RecordingConfigStore()
     val controller = AppSettingsController(store)
     controller.saveThemeMode(ThemeMode.Dark)
-    controller.saveAccent(KetchAccent.Harbor)
+    controller.saveAccent(KetchAccent.Teal)
     assertEquals(ThemeMode.Dark, store.load().appearance.theme)
-    assertEquals(AccentColor.Harbor, store.load().appearance.accent)
+    assertEquals(AccentColor.Teal, store.load().appearance.accent)
 
     controller.saveThemeMode(ThemeMode.Light)
     assertEquals(ThemeMode.Light, controller.themeMode)
-    assertEquals(KetchAccent.Harbor, controller.accent)
+    assertEquals(KetchAccent.Teal, controller.accent)
   }
 
   @Test
