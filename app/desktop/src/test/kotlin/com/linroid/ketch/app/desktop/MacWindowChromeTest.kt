@@ -123,6 +123,52 @@ class MacWindowChromeTest {
     }
   }
 
+  @Test
+  fun onStillClick_clickInPlace_runsTheAction() {
+    assertEquals(1, stillClicks(pressedAt = Offset(500f, 300f), releasedAt = Offset(500f, 300f)))
+  }
+
+  @Test
+  fun onStillClick_pressThatDragsTheWindow_isNoClick() {
+    // The window follows the pointer, so only its place on the screen changes.
+    assertEquals(0, stillClicks(pressedAt = Offset(500f, 300f), releasedAt = Offset(560f, 340f)))
+  }
+
+  /** Presses and releases at the same place in a window, at the given places on the screen. */
+  private fun stillClicks(pressedAt: Offset, releasedAt: Offset): Int {
+    var clicks = 0
+    val scene = ImageComposeScene(width = 100, height = 100, density = Density(1f)) {
+      Box(Modifier.fillMaxSize().onStillClick { clicks++ })
+    }
+    try {
+      scene.render()
+      val position = Offset(10f, 10f)
+      val source = Canvas()
+      fun mouse(id: Int, screen: Offset) = MouseEvent(
+        source, id, 0L, InputEvent.BUTTON1_DOWN_MASK, position.x.toInt(), position.y.toInt(),
+        screen.x.toInt(), screen.y.toInt(), 1, false, MouseEvent.BUTTON1,
+      )
+      scene.sendPointerEvent(PointerEventType.Move, position)
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Press,
+        position = position,
+        buttons = PointerButtons(isPrimaryPressed = true),
+        button = PointerButton.Primary,
+        nativeEvent = mouse(MouseEvent.MOUSE_PRESSED, pressedAt),
+      )
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Release,
+        position = position,
+        buttons = PointerButtons(),
+        button = PointerButton.Primary,
+        nativeEvent = mouse(MouseEvent.MOUSE_RELEASED, releasedAt),
+      )
+    } finally {
+      scene.close()
+    }
+    return clicks
+  }
+
   /** A [TitleBarLayout] 60 px tall over content with a 40 px button at the top left. */
   private class TitleBarScene {
     var titleBarPresses = 0

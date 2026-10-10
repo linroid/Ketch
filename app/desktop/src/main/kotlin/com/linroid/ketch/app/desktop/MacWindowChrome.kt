@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.desktop
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +33,7 @@ import ketch.app.desktop.generated.resources.app_title_status
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.hypot
 
 /**
  * System property that keeps the system's title bar on macOS, in case the full-window layout
@@ -102,12 +106,16 @@ internal fun FrameWindowScope.MacTitleBar(fullWindowContent: Boolean, darkTheme:
 
 /**
  * Lays [content] over the top [TitleBarHeight] of the window, which acts as a title bar wherever
- * [content] has nothing to click: dragging it moves the window, and double-clicking it does what
- * System Settings says a title bar does, zooming the window [state] by default. Full screen has
- * no title bar to stand in for.
+ * [content] has nothing to click: dragging it moves the window, clicking it without moving runs
+ * [onClick], and double-clicking it does what System Settings says a title bar does, zooming the
+ * window [state] by default. Full screen has no title bar to stand in for.
  */
 @Composable
-internal fun FrameWindowScope.TitleBarArea(state: WindowState, content: @Composable () -> Unit) {
+internal fun FrameWindowScope.TitleBarArea(
+  state: WindowState,
+  onClick: () -> Unit,
+  content: @Composable () -> Unit,
+) {
   val scope = rememberCoroutineScope()
   val onDoubleClick: () -> Unit = remember(state, scope) {
     { scope.launch { titleBarDoubleClicked(state) } }
@@ -116,7 +124,9 @@ internal fun FrameWindowScope.TitleBarArea(state: WindowState, content: @Composa
   TitleBarLayout(
     height = TitleBarHeight,
     titleBar = { modifier ->
-      if (!fullScreen) WindowDraggableArea(modifier.onDoubleClick(onDoubleClick))
+      if (!fullScreen) {
+        WindowDraggableArea(modifier.onDoubleClick(onDoubleClick).onStillClick(onClick))
+      }
     },
     content = content,
   )
@@ -148,6 +158,23 @@ internal fun Modifier.onDoubleClick(action: () -> Unit): Modifier = pointerInput
         action()
       }
     }
+  }
+}
+
+/**
+ * Runs [action] when the primary button is pressed and released without the pointer moving on
+ * the screen, so a press that drags the window is no click. The pointer keeps its place in a
+ * window it drags, so the screen position tells the two apart.
+ */
+internal fun Modifier.onStillClick(action: () -> Unit): Modifier = pointerInput(action) {
+  awaitEachGesture {
+    awaitFirstDown()
+    if (!currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+    val start = currentEvent.awtEventOrNull?.locationOnScreen ?: return@awaitEachGesture
+    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+    val end = currentEvent.awtEventOrNull?.locationOnScreen ?: return@awaitEachGesture
+    val moved = hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble())
+    if (!up.isConsumed && moved <= viewConfiguration.touchSlop) action()
   }
 }
 

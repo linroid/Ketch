@@ -408,6 +408,14 @@ class AppState(
   /** Emits when the search field should take focus, such as on ⌘F. */
   val focusSearchRequests: SharedFlow<Unit> = focusSearch.asSharedFlow()
 
+  private val titleBarClicks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+  /**
+   * Emits when the window's title bar, which a host may lay under the page header, is clicked
+   * where nothing in the app takes the click; see [titleBarClicked].
+   */
+  val titleBarClickRequests: SharedFlow<Unit> = titleBarClicks.asSharedFlow()
+
   private val showDownloadsRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
   /** Emits when the shell should show the Downloads list, such as after adding from Discover. */
@@ -875,6 +883,14 @@ class AppState(
   fun closeInspector() {
     inspectedTask = null
     if (selectedKeys.size >= 2) selectedKeys = emptySet()
+  }
+
+  /**
+   * Tells the page that the host's title bar was clicked: on the Downloads page that deselects
+   * the rows and closes the inspector, as a click on the header's empty space does.
+   */
+  fun titleBarClicked() {
+    titleBarClicks.tryEmit(Unit)
   }
 
   /** Asks the search field to take focus. */

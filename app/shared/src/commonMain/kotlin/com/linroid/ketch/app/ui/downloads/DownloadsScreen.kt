@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.input.onContextClick
+import com.linroid.ketch.app.input.onEmptyClick
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.localDeviceNoun
@@ -389,6 +390,14 @@ private fun WideDownloads(
   val hover = remember { MutableInteractionSource() }
   val hovering by hover.collectIsHoveredAsState()
   LaunchedEffect(hovering) { page.hovering = hovering }
+  // A click on the header's empty space deselects the rows and closes the inspector. Where the
+  // host's title bar lies under the header, the click reaches the title bar, which reports it.
+  val clearSelection = {
+    page.actions.selection.clear()
+    state.closeInspector()
+  }
+  LaunchedEffect(page) { state.titleBarClickRequests.collect { clearSelection() } }
+  val underTitleBar = KetchTheme.windowChrome.top > 0.dp
   Column(Modifier.fillMaxSize()) {
     DownloadsHeader(
       page = page,
@@ -397,6 +406,7 @@ private fun WideDownloads(
       tableFits = tableFits,
       showsTable = showsTable,
       hasRows = !firstRun,
+      modifier = if (underTitleBar) Modifier else Modifier.onEmptyClick(clearSelection),
     )
     if (!firstRun) TabArea(page, view, showsTable)
     if (!firstRun && !view.query.isEmpty) SearchFacetRow(state, view)

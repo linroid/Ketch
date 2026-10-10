@@ -592,7 +592,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
               App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
             }
           }
-          if (fullWindowContent) TitleBarArea(windowState, app) else app()
+          if (fullWindowContent) {
+            TitleBarArea(windowState, onClick = controller.state::titleBarClicked, content = app)
+          } else {
+            app()
+          }
         }
       }
     }
