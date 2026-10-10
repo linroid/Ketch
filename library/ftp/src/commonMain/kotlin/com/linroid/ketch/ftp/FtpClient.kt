@@ -24,12 +24,15 @@ internal interface FtpClient {
   suspend fun connect()
 
   /**
-   * Upgrades the control connection to TLS (AUTH TLS / PBSZ / PROT).
+   * Upgrades the control connection to TLS (AUTH TLS / PBSZ / PROT P).
+   * Later data connections are then wrapped in TLS as well.
    *
    * @throws com.linroid.ketch.api.KetchError.Unsupported if TLS
    *   is not available on this platform
    * @throws com.linroid.ketch.api.KetchError.Network on TLS
    *   handshake failure
+   * @throws com.linroid.ketch.api.KetchError if the server refuses
+   *   `PROT P`, rather than sending file data in clear text
    */
   suspend fun upgradeToTls()
 
@@ -77,7 +80,9 @@ internal interface FtpClient {
    * If [offset] is non-zero, a REST command is sent before RETR
    * to resume from that position.
    *
-   * Uses passive mode (PASV or EPSV) for the data connection.
+   * Uses passive mode (PASV or EPSV) for the data connection, in TLS
+   * after [upgradeToTls]; a failed data handshake throws
+   * [com.linroid.ketch.api.KetchError.Network].
    *
    * @param path remote file path
    * @param offset byte offset to start from (0 for full download)

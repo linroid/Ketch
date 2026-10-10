@@ -2,9 +2,12 @@ package com.linroid.ketch.ftp
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.Connection
 import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.connection
 import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteReadChannel
@@ -12,36 +15,57 @@ import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * FTP client implementation using ktor-network raw sockets.
  *
  * Manages a control connection for sending FTP commands and opens
- * separate passive data connections for file transfer.
+ * separate passive data connections for file transfer. Once
+ * [upgradeToTls] has negotiated `PROT P`, every data connection is
+ * wrapped in TLS too, with the control connection's server name.
  *
  * Not thread-safe: use one instance per coroutine.
  *
  * @param host FTP server hostname
  * @param port FTP server port
  * @param bufferSize read buffer size for data transfers
+ * @param secureSocket wraps a connection in TLS, or returns null
+ *   where TLS is unavailable
  */
 internal class RealFtpClient(
   private val host: String,
   private val port: Int,
   private val bufferSize: Int = 8192,
+  private val secureSocket: suspend (
+    connection: Connection,
+    serverName: String,
+    context: CoroutineContext,
+  ) -> Socket? = ::tlsUpgrade,
 ) : FtpClient {
   private val log = KetchLogger("FtpClient")
+
+  // TLS record loops run outside the caller's job, as ktor advises: a loop
+  // failing after a broken handshake must not cancel the download, and the
+  // loops end when their socket closes.
+  private val tlsContext = Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+    log.d { "TLS session ended: ${e.describeCauses()}" }
+  }
 
   private var selectorManager: SelectorManager? = null
   private var controlSocket: Socket? = null
   private var reader: ByteReadChannel? = null
   private var writer: ByteWriteChannel? = null
   private var restSupported: Boolean? = null
+
+  /** True once the server accepted `PROT P`: data connections use TLS. */
+  private var protectData = false
 
   override val isConnected: Boolean
     get() = controlSocket != null
@@ -71,9 +95,11 @@ internal class RealFtpClient(
 
   override suspend fun upgradeToTls() {
     val socket = controlSocket
-      ?: throw KetchError.Network(
-        Exception("Not connected")
-      )
+    val input = reader
+    val output = writer
+    if (socket == null || input == null || output == null) {
+      throw KetchError.Network(Exception("Not connected"))
+    }
 
     log.d { "Upgrading to TLS for $host:$port" }
 
@@ -84,11 +110,8 @@ internal class RealFtpClient(
       throw FtpError.fromReply(authReply)
     }
 
-    val upgraded = tlsUpgrade(socket, host, port)
-    if (upgraded == null) {
-      log.e { "TLS not available on this platform" }
-      throw KetchError.Unsupported()
-    }
+    // The handshake continues on the channels connect() opened.
+    val upgraded = secure(Connection(socket, input, output), "control")
 
     controlSocket = upgraded
     reader = upgraded.openReadChannel()
@@ -100,10 +123,13 @@ internal class RealFtpClient(
       log.w { "PBSZ failed: $pbszReply" }
     }
 
+    // Without PROT P the file would travel in clear text under an ftps:// URL.
     val protReply = sendCommand("PROT P")
     if (!protReply.isPositiveCompletion) {
-      log.w { "PROT P failed: $protReply" }
+      log.e { "PROT P rejected, refusing clear-text data: $protReply" }
+      throw FtpError.fromReply(protReply)
     }
+    protectData = true
 
     log.d { "TLS upgrade complete for $host:$port" }
   }
@@ -196,6 +222,7 @@ internal class RealFtpClient(
   ) {
     log.d { "RETR $path (offset=$offset)" }
     val dataSocket = openPassiveDataConnection()
+    var transferSocket = dataSocket
     try {
       if (offset > 0) {
         val restReply = sendCommand("REST $offset")
@@ -213,7 +240,11 @@ internal class RealFtpClient(
         throw FtpError.fromReply(retrReply)
       }
 
-      val dataReader = dataSocket.openReadChannel()
+      // Servers start the data connection's TLS handshake after the
+      // preliminary reply, so it must come after RETR, as in RFC 4217.
+      if (protectData) transferSocket = secure(dataSocket.connection(), "data")
+
+      val dataReader = transferSocket.openReadChannel()
       val buffer = ByteArray(bufferSize)
       while (true) {
         currentCoroutineContext().ensureActive()
@@ -229,7 +260,7 @@ internal class RealFtpClient(
     } finally {
       withContext(Dispatchers.IO) {
         try {
-          dataSocket.close()
+          transferSocket.close()
         } catch (_: Exception) {
           // Ignore close errors
         }
@@ -262,7 +293,38 @@ internal class RealFtpClient(
       reader = null
       writer = null
       selectorManager = null
+      protectData = false
     }
+  }
+
+  /**
+   * Wraps [connection] in TLS for the control host.
+   *
+   * ktor-network-tls cannot resume TLS sessions, so servers that
+   * require the data connection to reuse the control connection's
+   * session refuse it, and this fails.
+   *
+   * @param channel "control" or "data", for logs and errors
+   * @throws KetchError.Network when the handshake fails
+   * @throws KetchError.Unsupported where TLS is unavailable
+   */
+  private suspend fun secure(connection: Connection, channel: String): Socket {
+    val upgraded = try {
+      secureSocket(connection, host, tlsContext)
+    } catch (e: Exception) {
+      // A TLS channel closed under the handshake also throws
+      // CancellationException; only a cancelled caller rethrows it.
+      if (e is CancellationException) currentCoroutineContext().ensureActive()
+      log.w { "TLS handshake failed on the $channel connection: ${e.describeCauses()}" }
+      throw KetchError.Network(
+        Exception("TLS handshake failed on the FTPS $channel connection", e)
+      )
+    }
+    if (upgraded == null) {
+      log.e { "TLS not available on this platform" }
+      throw KetchError.Unsupported()
+    }
+    return upgraded
   }
 
   /**
@@ -373,7 +435,7 @@ internal class RealFtpClient(
     }
 
     val firstLine = lines.first()
-    val code = firstLine.substring(0, 3).toIntOrNull()
+    val code = firstLine.take(3).toIntOrNull()
       ?: throw KetchError.Network(
         Exception("Invalid FTP reply: $firstLine")
       )
