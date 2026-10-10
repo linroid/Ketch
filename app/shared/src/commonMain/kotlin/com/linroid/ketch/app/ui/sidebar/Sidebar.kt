@@ -44,12 +44,12 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AppearanceToggle
 import com.linroid.ketch.app.ui.shell.NavBadge
 import com.linroid.ketch.app.ui.shell.ShellState
@@ -64,7 +64,7 @@ import org.jetbrains.compose.resources.stringResource
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
  * sidebar toggle and the [AppearanceToggle] (beside the traffic lights on macOS, after the Ketch
  * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with
- * its health and live line, its menu and its drops), and Settings at the bottom.
+ * its health and live line, its menu and its drops, shown from two devices on), and Settings at the bottom.
  *
  * The destination [shell] shows sits on the selected pill, or Settings while it shows; the toggle
  * collapses the sidebar to the rail.
@@ -106,33 +106,12 @@ internal fun Sidebar(
         )
       }
     }
-    // The devices take the room left above Settings, and scroll in a short window.
-    val devicesHover = remember { MutableInteractionSource() }
-    val hovered by devicesHover.collectIsHoveredAsState()
-    Column(Modifier.weight(1f).hoverable(devicesHover)) {
-      DevicesEyebrow(showShortcut = hovered)
-      Column(
-        Modifier
-          .weight(1f, fill = false)
-          .heightIn(max = (KetchTheme.density.deviceRow + spacing.s1) * VISIBLE_DEVICE_ROWS)
-          .verticalScroll(rememberScrollState()),
-      ) {
-        val all = scope == DeviceScope.All
-        if (devices.size >= DeviceScope.MIN_DEVICES) {
-          AllDevicesRow(devices = devices, selected = all, onClick = { state.showAllDevices() })
-        }
-        devices.forEachIndexed { index, device ->
-          key(device.deviceId) {
-            SidebarDeviceRow(
-              state = state,
-              device = device,
-              number = index + 1,
-              active = !all && device.deviceId == active?.deviceId,
-            )
-          }
-        }
-      }
-      AddDeviceRow(onClick = { state.addDevice() })
+    // The devices take the room left above Settings, and scroll in a short window. A lone
+    // device needs no list; devices are added from the Devices page.
+    if (devices.size < DeviceScope.MIN_DEVICES) {
+      Spacer(Modifier.weight(1f))
+    } else {
+      DeviceSection(state, devices, scope, active?.deviceId, Modifier.weight(1f))
     }
     val settings = stringResource(Res.string.shell_settings)
     KetchTooltip(text = settings, shortcut = KetchCommands.Settings.shortcutLabel()) {
@@ -143,6 +122,45 @@ internal fun Sidebar(
         onClick = { state.openSettings() },
         modifier = Modifier.padding(bottom = spacing.s2),
       )
+    }
+  }
+}
+
+/**
+ * The DEVICES of the sidebar, shown from two devices on: All devices, then each device with its
+ * health and live line, its menu and its drops.
+ */
+@Composable
+private fun DeviceSection(
+  state: AppState,
+  devices: List<DevicePresence>,
+  scope: DeviceScope,
+  activeId: String?,
+  modifier: Modifier = Modifier,
+) {
+  val spacing = KetchTheme.spacing
+  val devicesHover = remember { MutableInteractionSource() }
+  val hovered by devicesHover.collectIsHoveredAsState()
+  Column(modifier.hoverable(devicesHover)) {
+    DevicesEyebrow(showShortcut = hovered)
+    Column(
+      Modifier
+        .weight(1f, fill = false)
+        .heightIn(max = (KetchTheme.density.deviceRow + spacing.s1) * VISIBLE_DEVICE_ROWS)
+        .verticalScroll(rememberScrollState()),
+    ) {
+      val all = scope == DeviceScope.All
+      AllDevicesRow(devices = devices, selected = all, onClick = { state.showAllDevices() })
+      devices.forEachIndexed { index, device ->
+        key(device.deviceId) {
+          SidebarDeviceRow(
+            state = state,
+            device = device,
+            number = index + 1,
+            active = !all && device.deviceId == activeId,
+          )
+        }
+      }
     }
   }
 }

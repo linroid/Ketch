@@ -38,7 +38,6 @@
   <string name="shell_devices_online">%2$d台中%1$d台がオンライン</string>
 
   <string name="sidebar_all_devices_tooltip">すべてのデバイスのダウンロード</string>
-  <string name="sidebar_add_device">デバイスを追加</string>
   <string name="sidebar_device_menu">デバイスメニュー</string>
   <string name="sidebar_menu_pause_all">このデバイスですべて一時停止</string>
   <string name="sidebar_menu_resume_all">このデバイスですべて再開</string>

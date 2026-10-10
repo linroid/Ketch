@@ -38,7 +38,6 @@
   <string name="shell_devices_online">%1$d/%2$d 台在线</string>
 
   <string name="sidebar_all_devices_tooltip">所有设备的下载</string>
-  <string name="sidebar_add_device">添加设备</string>
   <string name="sidebar_device_menu">设备菜单</string>
   <string name="sidebar_menu_pause_all">暂停此设备上的全部下载</string>
   <string name="sidebar_menu_resume_all">继续此设备上的全部下载</string>

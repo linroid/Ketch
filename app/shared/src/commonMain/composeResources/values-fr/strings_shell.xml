@@ -42,7 +42,6 @@
   <string name="shell_devices_online">%1$d sur %2$d en ligne</string>
 
   <string name="sidebar_all_devices_tooltip">Les téléchargements de tous les appareils</string>
-  <string name="sidebar_add_device">Ajouter un appareil</string>
   <string name="sidebar_device_menu">Menu de l'appareil</string>
   <string name="sidebar_menu_pause_all">Tout mettre en pause ici</string>
   <string name="sidebar_menu_resume_all">Tout reprendre ici</string>
