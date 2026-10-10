@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.TaskKey
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -154,6 +155,48 @@ class ActivityMonitorTest {
 
     assertEquals(
       listOf<ActivityEvent>(ActivityEvent.Failed(TaskKey(DEVICE, "a"), running.request, failure)),
+      harness.events
+    )
+  }
+
+  @Test
+  fun awaitingFiles_postsChooseFilesMessage() = runTest {
+    val magnet = task("a", DownloadState.Queued)
+    val harness = monitor(listOf(magnet, task("b", downloading())))
+    harness.events.clear()
+
+    magnet.state.value = DownloadState.Paused(DownloadProgress(0, 0), PauseReason.User)
+    runCurrent()
+    magnet.state.value =
+      DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+    runCurrent()
+    magnet.state.value =
+      DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+    runCurrent()
+
+    assertEquals(
+      listOf<ActivityEvent>(ActivityEvent.FilesNeeded(TaskKey(DEVICE, "a"), magnet.request)),
+      harness.events
+    )
+  }
+
+  @Test
+  fun completedSeedingCopy_doesNotRenotify() = runTest {
+    val running = task("a", downloading())
+    val harness = monitor(listOf(running))
+    harness.events.clear()
+
+    running.state.value = completed(1000)
+    runCurrent()
+    running.state.value = completed(1000).copy(seeding = true)
+    runCurrent()
+    running.state.value = completed(1000)
+    runCurrent()
+
+    assertEquals(
+      listOf<ActivityEvent>(
+        ActivityEvent.Completed(TaskKey(DEVICE, "a"), running.request, completed(1000))
+      ),
       harness.events
     )
   }

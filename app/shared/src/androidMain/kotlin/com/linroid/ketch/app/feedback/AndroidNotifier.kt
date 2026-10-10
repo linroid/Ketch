@@ -215,6 +215,7 @@ class AndroidNotifier(
         groupDone(tag)
       }
       is ActivityEvent.Added,
+      is ActivityEvent.FilesNeeded,
       is ActivityEvent.Recovered,
       is ActivityEvent.DeviceOffline,
       is ActivityEvent.DeviceOnline -> log.d { "No notification for ${event::class.simpleName}" }

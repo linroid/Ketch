@@ -461,6 +461,63 @@ class IntakeStateTest {
   }
 
   @Test
+  fun addAnyway_magnetOnSupportingDevice_awaitsFiles() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(
+      check = { _, _ -> metadata.await() },
+      features = setOf(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertTrue(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun addAnyway_olderDevice_downloadsEveryFile() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(check = { _, _ -> metadata.await() })
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    assertFalse(api.base.requests.single().awaitFileSelection)
+  }
+
+  @Test
+  fun submit_magnetWithItsFileList_doesNotAwaitFiles() = runTest {
+    val api = IntakeTestApi(
+      check = { url, _ -> torrent(url) },
+      features = setOf(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.submit {}
+    runCurrent()
+
+    assertFalse(api.base.requests.single().awaitFileSelection)
+  }
+
+  @Test
+  fun torrentSort_chosen_isRememberedForTheNextSheet() = runTest {
+    val (state, session) = stateAndSession(IntakeTestApi(), IntakeRequest(links.first()))
+
+    assertEquals(FileSort(FileOrder.Name), session.torrentSort)
+    session.torrentSort = FileSort(FileOrder.Size).reverse()
+
+    assertEquals("size:asc", state.appSettings.ui.sort[FileSortSurface.Intake.key])
+    assertEquals(FileSort(FileOrder.Size, descending = false), session.torrentSort)
+  }
+
+  @Test
   fun start_bareInfoHashAndMissingScheme_becomeLinks() = runTest {
     val hash = "0123456789abcdef0123456789abcdef01234567"
     val session = session(IntakeTestApi(), IntakeRequest("$hash\nexample.com/files/a.iso"))

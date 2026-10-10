@@ -79,7 +79,7 @@ class FilesTabRenderTest {
         KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
           Column(Modifier.verticalScroll(rememberScrollState())) {
             Box(Modifier.onSizeChanged { height = it.height }) {
-              FilesTab(row, maxHeight = maxHeight)
+              FilesTabContent(row, maxHeight = maxHeight)
             }
           }
         }

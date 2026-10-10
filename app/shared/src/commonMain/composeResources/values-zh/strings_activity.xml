@@ -193,6 +193,7 @@
   <string name="feedback_send_sign_in">登录信息将发送到 %1$s。</string>
 
   <string name="feedback_added">已添加 %1$s</string>
+  <string name="feedback_choose_files">选择要下载“%1$s”中的哪些文件</string>
   <plurals name="feedback_recovered">
     <item quantity="other">正在继续上次的 %1$d 个下载</item>
   </plurals>

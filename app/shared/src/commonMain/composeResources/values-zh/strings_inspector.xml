@@ -174,10 +174,19 @@
   <string name="inspector_files_filter">筛选文件</string>
   <string name="inspector_files_no_match">没有与“%1$s”匹配的文件</string>
   <string name="inspector_files_sort">排序文件</string>
-  <string name="inspector_sort_incomplete">未完成的优先</string>
-  <string name="inspector_sort_name">名称</string>
-  <string name="inspector_sort_size">大小</string>
   <string name="inspector_file_unnamed">文件 %1$d</string>
   <string name="inspector_file_description">%1$s，%2$s，%3$s</string>
   <string name="inspector_file_description_no_share">%1$s，%2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="other">%1$d 个文件 · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">应用</string>
+  <string name="inspector_files_reset">重置</string>
+  <string name="inspector_files_start">下载</string>
+  <string name="inspector_files_choose">选择要下载的文件</string>
+  <string name="inspector_files_keep_one">请至少保留一个文件</string>
+  <string name="inspector_files_hint">勾选的文件会下载，未勾选的文件保留在原处。</string>
+  <string name="inspector_seeding_status">做种中 · ↑ %1$s · 已上传 %2$s</string>
+  <string name="inspector_seeding_stop">停止做种</string>
+  <string name="inspector_seeding_start">做种</string>
 </resources>

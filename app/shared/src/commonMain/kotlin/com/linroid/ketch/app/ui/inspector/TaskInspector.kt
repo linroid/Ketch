@@ -50,6 +50,7 @@ import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
 import com.linroid.ketch.app.ui.inspector.tabs.InspectorTab
 import com.linroid.ketch.app.ui.inspector.tabs.count
+import com.linroid.ketch.app.ui.inspector.tabs.rememberFeatures
 import com.linroid.ketch.app.ui.inspector.tabs.rememberInspectorTabs
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.config.SpeedLimitMode
@@ -130,6 +131,14 @@ internal fun InspectorContent(
   }
   // The tab stays as other downloads are inspected; the scroll position starts over.
   var tab by rememberSaveable { mutableStateOf(InspectorTab.Overview) }
+  // Choose files asks for the Files tab of the task it opens.
+  val filesRequest = state.filesRequest
+  LaunchedEffect(filesRequest, taskKey) {
+    if (filesRequest != null && filesRequest == taskKey) {
+      tab = InspectorTab.Files
+      state.filesRequestHandled()
+    }
+  }
   val shows = when (shown) {
     is Shown.Selection -> "selection"
     is Shown.Task -> shown.row.key
@@ -239,6 +248,7 @@ private fun TaskView(
   )
   ActionBar(state, row, runner)
   val tabs = rememberInspectorTabs(state, row)
+  val features = rememberFeatures(state, row)
   val shown = if (tab in tabs) tab else InspectorTab.Overview
   if (tabs.size > 1) {
     KetchSegmented(
@@ -246,13 +256,13 @@ private fun TaskView(
       selected = shown,
       onSelect = onTab,
       label = { it.title.resolve() },
-      count = { it.count(row) },
+      count = { it.count(row, features) },
     )
   }
   when (shown) {
     InspectorTab.Overview -> Overview(state, row, device, runner, pending, copier)
     InspectorTab.Connections -> ConnectionsTab(state, row, onHighlight = { highlight = it })
-    InspectorTab.Files -> FilesTab(row, tabFill.modifier, maxHeight = tabFill.height)
+    InspectorTab.Files -> FilesTab(state, row, tabFill.modifier, maxHeight = tabFill.height)
     InspectorTab.Activity -> ActivityTab(state, row)
   }
 }
@@ -272,6 +282,7 @@ private fun Overview(
     ProblemCard(row, error, runner, inBar = setOfNotNull(runner.primary(row)))
   }
   if (row.state.hasControls) InspectorControls(state, listOf(row), runner, pending)
+  SeedingControl(state, row, runner, pending)
   TaskDetails(state, row, device, runner, copier)
 }
 

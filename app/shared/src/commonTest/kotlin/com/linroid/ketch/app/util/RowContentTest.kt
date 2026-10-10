@@ -15,6 +15,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowCapabilities
+import com.linroid.ketch.app.state.taskActions
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.UtcOffset
@@ -204,6 +205,47 @@ class RowContentTest {
       content.detail.load()
     )
     assertEquals(RowAction.StartNow, content.primary)
+  }
+
+  @Test
+  fun rowContent_awaitingFiles_saysChooseFiles() = runTest {
+    val state = DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+
+    val content = rowContent(request, state, now, context)
+
+    assertEquals(RowStatus.Paused, content.status)
+    assertEquals("Choose files to download", content.detail.load())
+    assertEquals(RowAction.ChooseFiles, content.primary)
+    val actions = taskActions(request, state, local)
+    assertEquals(
+      listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles),
+      actions.menu.take(2)
+    )
+    assertFalse(RowAction.Resume in actions.menu)
+  }
+
+  @Test
+  fun rowContent_completedSeeding_saysSeeding() = runTest {
+    val state = DownloadState.Completed(
+      outputPath = "/tmp/Show",
+      totalBytes = 10_485_760,
+      downloadTime = 4.seconds,
+      seeding = true,
+    )
+
+    val content = rowContent(request, state, now, context)
+    val remoteContent = rowContent(request, state, now, context.copy(device = remote))
+
+    assertEquals(RowStatus.Completed, content.status)
+    assertEquals(
+      "Seeding · took 4s · avg 2.5 MB/s · releases.example.com",
+      content.detail.load()
+    )
+    assertEquals("Seeding · Saved on NAS-Basement", remoteContent.detail.load())
+    assertTrue(RowAction.StopSeeding in taskActions(request, state, local).menu)
+    assertFalse(
+      RowAction.StopSeeding in taskActions(request, state.copy(seeding = false), local).menu
+    )
   }
 
   @Test

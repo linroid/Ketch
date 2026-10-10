@@ -188,10 +188,20 @@
   <string name="inspector_files_filter">Dateien filtern</string>
   <string name="inspector_files_no_match">Keine Dateien passen zu „%1$s“</string>
   <string name="inspector_files_sort">Dateien sortieren</string>
-  <string name="inspector_sort_incomplete">Unvollständige zuerst</string>
-  <string name="inspector_sort_name">Name</string>
-  <string name="inspector_sort_size">Größe</string>
   <string name="inspector_file_unnamed">Datei %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d Datei · %2$s</item>
+    <item quantity="other">%1$d Dateien · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Übernehmen</string>
+  <string name="inspector_files_reset">Zurücksetzen</string>
+  <string name="inspector_files_start">Herunterladen</string>
+  <string name="inspector_files_choose">Wähle die Dateien zum Herunterladen</string>
+  <string name="inspector_files_keep_one">Behalte mindestens eine Datei</string>
+  <string name="inspector_files_hint">Markierte Dateien werden heruntergeladen, nicht markierte bleiben, wo sie sind.</string>
+  <string name="inspector_seeding_status">Seedet · ↑ %1$s · %2$s hochgeladen</string>
+  <string name="inspector_seeding_stop">Seeden beenden</string>
+  <string name="inspector_seeding_start">Seeden</string>
 </resources>

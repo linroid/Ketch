@@ -55,10 +55,13 @@ import com.linroid.ketch.app.i18n.sizeText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.state.FileSort
+import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.IntakeEntry
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.MenuLabel
+import com.linroid.ketch.app.ui.files.fileSortItems
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.intake_collapse
@@ -91,12 +94,14 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
   val files = entry.files
-  var sort by remember(entry) { mutableStateOf(TorrentSort.Name) }
-  val tree = remember(files, sort) { TorrentTree(files, sort) }
+  val sort = session.torrentSort
+  val selection = entry.selectedFiles.orEmpty()
+  // Selected first sorts by the choice when the order is picked, so rows stay put as they are
+  // checked.
+  val tree = remember(files, sort) { TorrentTree(files, sort, selection) }
   var filter by remember(entry) { mutableStateOf("") }
   var collapsed by remember(entry) { mutableStateOf(emptySet<String>()) }
   var lastClicked by remember(entry) { mutableStateOf<String?>(null) }
-  val selection = entry.selectedFiles.orEmpty()
   val rows = remember(tree, collapsed, filter) { tree.visible(collapsed, filter) }
   val skipped = remember(entry, tree) { tree.extras().filter { it !in selection }.toSet() }
   val pickerHeight = LocalTreeHeight.current
@@ -150,7 +155,7 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
         leadingIcon = KetchIcon.Search,
         modifier = Modifier.weight(1f),
       )
-      SortButton(sort, onSort = { sort = it })
+      SortButton(sort, onSort = { session.torrentSort = it })
     }
     FlowRow(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -277,12 +282,12 @@ private fun KindChip(
 }
 
 @Composable
-private fun SortButton(sort: TorrentSort, onSort: (TorrentSort) -> Unit) {
+private fun SortButton(sort: FileSort, onSort: (FileSort) -> Unit) {
   var expanded by remember { mutableStateOf(false) }
   Box {
     MenuLabel(
       label = stringResource(Res.string.intake_sort),
-      value = stringResource(sort.label),
+      value = sort.order.label.resolve(),
       open = expanded,
       onClick = { expanded = true },
     )
@@ -291,9 +296,7 @@ private fun SortButton(sort: TorrentSort, onSort: (TorrentSort) -> Unit) {
       onDismissRequest = { expanded = false },
       title = stringResource(Res.string.intake_sort_files),
     ) {
-      for (option in TorrentSort.entries) {
-        item(label = option.label.text(), checked = option == sort, onClick = { onSort(option) })
-      }
+      fileSortItems(sort, FileSortSurface.Intake.orders, onSort)
     }
   }
 }

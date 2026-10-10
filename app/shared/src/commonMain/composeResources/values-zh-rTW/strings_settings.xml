@@ -526,7 +526,7 @@
   <string name="settings_torrent_upload_seed">持續做種</string>
   <string name="settings_torrent_upload_off_hint">對等端無法從此裝置下載任何內容。</string>
   <string name="settings_torrent_upload_while_downloading_hint">種子下載期間，對等端可以下載已有的區塊。</string>
-  <string name="settings_torrent_upload_seed_hint">Ketch 執行期間，已完成的種子會持續上傳，直到將其移除或關閉此選項。等待下載的種子優先。</string>
+  <string name="settings_torrent_upload_seed_hint">已完成的種子會持續上傳，直到手動停止或關閉此選項，Ketch 重新啟動後依然如此。</string>
   <string name="settings_torrent_upload_limit">上傳速度限制</string>
   <string name="settings_torrent_upload_limit_hint">所有種子共用。</string>
   <string name="settings_torrent_upload_footer">接收上傳的對等端可以看到此裝置的 IP 位址。私人種子只與其 Tracker 提供的對等端分享。</string>

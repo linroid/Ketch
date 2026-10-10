@@ -174,10 +174,19 @@
   <string name="inspector_files_filter">파일 필터</string>
   <string name="inspector_files_no_match">“%1$s”에 해당하는 파일 없음</string>
   <string name="inspector_files_sort">파일 정렬</string>
-  <string name="inspector_sort_incomplete">미완료 항목 먼저</string>
-  <string name="inspector_sort_name">이름</string>
-  <string name="inspector_sort_size">크기</string>
   <string name="inspector_file_unnamed">파일 %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="other">파일 %1$d개 · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">적용</string>
+  <string name="inspector_files_reset">초기화</string>
+  <string name="inspector_files_start">다운로드</string>
+  <string name="inspector_files_choose">다운로드할 파일을 선택하세요</string>
+  <string name="inspector_files_keep_one">파일을 하나 이상 남겨 두세요</string>
+  <string name="inspector_files_hint">선택한 파일은 다운로드되고, 선택 해제한 파일은 그대로 남습니다.</string>
+  <string name="inspector_seeding_status">시딩 중 · ↑ %1$s · %2$s 업로드됨</string>
+  <string name="inspector_seeding_stop">시딩 중지</string>
+  <string name="inspector_seeding_start">시드</string>
 </resources>

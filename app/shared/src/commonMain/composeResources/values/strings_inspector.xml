@@ -253,9 +253,6 @@
   <!-- %1$s is what was typed in the filter. -->
   <string name="inspector_files_no_match">No files match “%1$s”</string>
   <string name="inspector_files_sort">Sort files</string>
-  <string name="inspector_sort_incomplete">Incomplete first</string>
-  <string name="inspector_sort_name">Name</string>
-  <string name="inspector_sort_size">Size</string>
   <!-- A file the torrent does not name. %1$d is its place in the torrent, counting from 1. -->
   <string name="inspector_file_unnamed">File %1$d</string>
   <!-- A file to a screen reader. %1$s is its name, %2$s its size, %3$s how much is done, such
@@ -263,4 +260,26 @@
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <!-- The same for a file of unknown size. -->
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <!-- The bar under a torrent's files once checks change. %1$d is how many files are checked,
+       %2$s their size, such as "4.2 GB". -->
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d file · %2$s</item>
+    <item quantity="other">%1$d files · %2$s</item>
+  </plurals>
+  <!-- Buttons of that bar: download the checked files, or go back to the files downloading. -->
+  <string name="inspector_files_apply">Apply</string>
+  <string name="inspector_files_reset">Reset</string>
+  <!-- The bar's button for a torrent that waits for its files to be chosen. -->
+  <string name="inspector_files_start">Download</string>
+  <!-- Above the files of a torrent that waits for its files to be chosen. -->
+  <string name="inspector_files_choose">Choose the files to download</string>
+  <!-- Shown when the last checked file is unchecked, which is refused. -->
+  <string name="inspector_files_keep_one">Keep at least one file</string>
+  <string name="inspector_files_hint">Checked files download; unchecked files stay where they are.</string>
+  <!-- A finished torrent that shares its files. %1$s is the upload speed, such as "1.2 MB/s",
+       %2$s how much it uploaded, such as "3.4 GB". -->
+  <string name="inspector_seeding_status">Seeding · ↑ %1$s · %2$s uploaded</string>
+  <!-- Buttons that stop or start sharing a finished torrent's files with other peers. -->
+  <string name="inspector_seeding_stop">Stop seeding</string>
+  <string name="inspector_seeding_start">Seed</string>
 </resources>

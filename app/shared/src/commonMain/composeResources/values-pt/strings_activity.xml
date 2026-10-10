@@ -226,6 +226,7 @@
   <string name="feedback_send_sign_in">Os dados de login serão enviados para %1$s.</string>
 
   <string name="feedback_added">%1$s adicionado</string>
+  <string name="feedback_choose_files">Escolha quais arquivos de “%1$s” baixar</string>
   <plurals name="feedback_recovered">
     <item quantity="one">Retomando %1$d download da sua última sessão</item>
     <item quantity="other">Retomando %1$d downloads da sua última sessão</item>

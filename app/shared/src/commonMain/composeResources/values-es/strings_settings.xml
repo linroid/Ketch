@@ -538,7 +538,7 @@
   <string name="settings_torrent_upload_seed">Seguir sembrando</string>
   <string name="settings_torrent_upload_off_hint">Los pares no pueden descargar nada de este dispositivo.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Mientras se descargan tus torrents, los pares pueden descargar las piezas que ya tienes.</string>
-  <string name="settings_torrent_upload_seed_hint">Los torrents completados siguen subiendo mientras Ketch esté en marcha, hasta que los quites o desactives esto. Los torrents que esperan para descargarse van primero.</string>
+  <string name="settings_torrent_upload_seed_hint">Los torrents completados siguen subiendo hasta que los detengas o desactives esto, también después de reiniciar Ketch.</string>
   <string name="settings_torrent_upload_limit">Límite de subida</string>
   <string name="settings_torrent_upload_limit_hint">Compartido por todos los torrents.</string>
   <string name="settings_torrent_upload_footer">Los pares a los que subes datos ven la dirección IP de este dispositivo. Los torrents privados solo comparten con los pares de su tracker.</string>

@@ -174,10 +174,19 @@
   <string name="inspector_files_filter">ファイルを絞り込む</string>
   <string name="inspector_files_no_match">「%1$s」に一致するファイルはありません</string>
   <string name="inspector_files_sort">ファイルを並べ替え</string>
-  <string name="inspector_sort_incomplete">未完了を先に</string>
-  <string name="inspector_sort_name">名前</string>
-  <string name="inspector_sort_size">サイズ</string>
   <string name="inspector_file_unnamed">ファイル%1$d</string>
   <string name="inspector_file_description">%1$s、%2$s、%3$s</string>
   <string name="inspector_file_description_no_share">%1$s、%2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="other">%1$d個のファイル · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">適用</string>
+  <string name="inspector_files_reset">リセット</string>
+  <string name="inspector_files_start">ダウンロード</string>
+  <string name="inspector_files_choose">ダウンロードするファイルを選択してください</string>
+  <string name="inspector_files_keep_one">ファイルを1つ以上残してください</string>
+  <string name="inspector_files_hint">チェックしたファイルはダウンロードされ、チェックを外したファイルはそのまま残ります。</string>
+  <string name="inspector_seeding_status">シード中 · ↑ %1$s · %2$sアップロード済み</string>
+  <string name="inspector_seeding_stop">シードを停止</string>
+  <string name="inspector_seeding_start">シード</string>
 </resources>

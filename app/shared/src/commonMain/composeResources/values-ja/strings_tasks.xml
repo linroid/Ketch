@@ -24,6 +24,8 @@
   <string name="row_saved_on">%1$sに保存済み</string>
   <string name="row_missing_file">ファイルが移動または削除されました</string>
   <string name="row_completed">完了</string>
+  <string name="row_choose_files">ダウンロードするファイルを選択</string>
+  <string name="row_seeding">シード中</string>
   <string name="row_took">所要時間：%1$s</string>
   <plurals name="row_files">
     <item quantity="other">%1$d個のファイル</item>
@@ -59,6 +61,10 @@
   <string name="sort_origin">追加元</string>
   <string name="sort_priority">優先度</string>
   <string name="sort_device">デバイス</string>
+  <string name="sort_kind">種類</string>
+  <string name="sort_selected_first">選択済みを先頭に</string>
+  <string name="sort_torrent_order">トレントの順序</string>
+  <string name="sort_reverse">逆順</string>
   <string name="group_smart">スマート</string>
   <string name="group_status">状態</string>
   <string name="group_day">日付</string>
@@ -131,6 +137,10 @@
   <string name="action_row_copy_details">詳細をコピー</string>
   <string name="action_row_stop_and_discard">ダウンロードをキャンセル…</string>
   <string name="action_row_remove">削除…</string>
+  <string name="action_row_choose_files">ファイルを選択…</string>
+  <string name="action_row_download_all_files">すべてのファイルをダウンロード</string>
+  <string name="action_row_stop_seeding">シードを停止</string>
+  <string name="action_row_seed">シード</string>
   <plurals name="batch_pause">
     <item quantity="other">%1$d件のダウンロードを一時停止</item>
   </plurals>

@@ -225,6 +225,8 @@
   <string name="downloads_failed_priority">无法在 %2$s 上设置 %1$s 的优先级</string>
   <string name="downloads_failed_connections">无法在 %2$s 上设置 %1$s 的连接数</string>
   <string name="downloads_failed_reschedule">无法更改 %2$s 上 %1$s 的开始时间</string>
+  <string name="downloads_failed_files">无法在 %2$s 上更改 %1$s 的文件</string>
+  <string name="downloads_failed_seeding">无法在 %2$s 上更改 %1$s 的做种</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">已暂停 %1$d 个下载</item>
