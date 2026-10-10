@@ -335,6 +335,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Segmented parallel downloads via multiple FTP connections with REST offsets
 - Resume support with MDTM-based server file change validation
 - FTPS on JVM/Android via ktor-network-tls; iOS deferred (no ktor TLS support)
+- FTPS (`AUTH TLS`, `PBSZ 0`, `PROT P`) wraps every data connection in TLS too, after the `RETR`
+  preliminary reply, checked against the control host; a server refusing `PROT P` fails the
+  connection rather than sending clear data, and a failed data handshake is `KetchError.Network`.
+  ktor-network-tls cannot resume TLS sessions, so servers requiring data connections to reuse
+  the control session refuse transfers. `RealFtpClientTlsTest` (jvmTest) runs a scripted JSSE
+  server
 - Passive mode only (PASV/EPSV); FTP URL parsing with credentials
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
 
