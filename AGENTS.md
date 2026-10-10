@@ -505,8 +505,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   ends. Each keeps the system from sleeping while idle only, never stopping the user's own sleep,
   lid close or the display turning off: desktop's `systemSleepInhibitor` takes an IOKit
   `PreventUserIdleSystemSleep` assertion on macOS, `SetThreadExecutionState` from a thread of its
-  own on Windows and a logind `idle` lock through `systemd-inhibit` on Linux (a `sleep` lock would
-  need an administrator for the user's own suspend; GNOME ignores `idle` locks); Android's
+  own on Windows and a logind `idle` lock through `systemd-inhibit` on Linux, taken again with
+  backoff when it ends while still wanted (a `sleep` lock would need an administrator for the
+  user's own suspend; GNOME ignores `idle` locks); Android's
   `WakeLockInhibitor` is a partial `WakeLock`, held only while `KetchService` is in the
   foreground, which keeps it out of Android vitals' excessive wake lock count
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide

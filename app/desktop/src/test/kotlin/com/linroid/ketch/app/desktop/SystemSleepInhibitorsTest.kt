@@ -1,11 +1,14 @@
 package com.linroid.ketch.app.desktop
 
+import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Each system lists what keeps it awake, so these check that the native calls reach it: on macOS
@@ -40,6 +43,49 @@ class SystemSleepInhibitorsTest {
     assertTrue(eventually { reason !in logindLocks().orEmpty() })
   }
 
+  @Test
+  fun logindIdleInhibitor_lockEndsWhileHeld_takesItAgainUpToTheLimit() {
+    if (DesktopOs.current == DesktopOs.WINDOWS) return
+    withStartLog { starts, inhibitor ->
+      inhibitor.acquire()
+      // The first start and each of the 3 retries.
+      assertTrue(eventually { starts() == 4 })
+      Thread.sleep(SETTLE_MS)
+      assertEquals(4, starts())
+      inhibitor.release()
+    }
+  }
+
+  @Test
+  fun logindIdleInhibitor_released_stopsRetrying() {
+    if (DesktopOs.current == DesktopOs.WINDOWS) return
+    withStartLog { starts, inhibitor ->
+      inhibitor.acquire()
+      assertTrue(eventually { starts() >= 2 })
+      inhibitor.release()
+      Thread.sleep(SETTLE_MS)
+      val released = starts()
+      Thread.sleep(SETTLE_MS)
+      assertEquals(released, starts())
+    }
+  }
+
+  // An inhibitor whose lock ends as soon as it starts, and how often it started.
+  private fun withStartLog(block: (starts: () -> Int, LogindIdleInhibitor) -> Unit) {
+    val log = File.createTempFile("ketch-inhibit", ".log")
+    try {
+      val inhibitor = LogindIdleInhibitor(
+        reason = reason,
+        command = listOf("sh", "-c", "echo started >> '${log.path}'"),
+        retryDelay = 20.milliseconds,
+        maxRetries = 3,
+      )
+      block({ log.readLines().size }, inhibitor)
+    } finally {
+      log.delete()
+    }
+  }
+
   // The locks logind holds, or null without logind.
   private fun logindLocks(): String? = run("systemd-inhibit", "--list", "--no-pager")
 
@@ -62,5 +108,10 @@ class SystemSleepInhibitorsTest {
     output.takeIf { exited && process.exitValue() == 0 }
   } catch (e: IOException) {
     null
+  }
+
+  private companion object {
+    // Longer than every retry together: 20 + 40 + 80 ms.
+    const val SETTLE_MS = 500L
   }
 }

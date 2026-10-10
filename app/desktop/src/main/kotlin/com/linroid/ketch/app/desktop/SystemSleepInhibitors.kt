@@ -10,6 +10,14 @@ import com.sun.jna.ptr.IntByReference
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 private val log = KetchLogger("KeepAwake")
 
@@ -148,52 +156,117 @@ internal class WindowsExecutionState : SleepInhibitor {
 /**
  * A logind inhibitor lock on idle, held by `systemd-inhibit` while its child `cat` waits for input
  * from Ketch that never comes. Releasing closes that input; so does Ketch ending, however it ends,
- * and `cat` then exits, which releases the lock.
+ * and `cat` then exits, which releases the lock. A lock that ends by itself while still wanted,
+ * such as when logind restarts, is taken again after [retryDelay], doubling up to [maxRetries]
+ * times in a row; one that held for a minute or more starts that count over.
  *
  * It does not block sleep itself: logind asks for an administrator to let a user suspend while
  * another application blocks it, which would stop the user's own suspend and lid close. Desktops
  * that ignore logind's idle locks, such as GNOME, still sleep on their own idle timer.
+ *
+ * @param command runs the lock until its input ends.
  */
-internal class LogindIdleInhibitor(private val reason: String) : SleepInhibitor {
-  // Also read when the process exits, on another thread.
-  @Volatile private var process: Process? = null
+internal class LogindIdleInhibitor(
+  reason: String,
+  private val command: List<String> = listOf(
+    "systemd-inhibit", "--what=idle", "--who=Ketch", "--why=$reason", "--mode=block", "cat"
+  ),
+  private val retryDelay: Duration = 5.seconds,
+  private val maxRetries: Int = 5,
+) : SleepInhibitor {
+  // Guards the fields below: the process exits and retries run on other threads.
+  private val lock = Any()
+  private var wanted = false
+  private var process: Process? = null
+  private var retry: ScheduledFuture<*>? = null
+  private var retries = 0
 
   // Without logind it fails each time downloads start, so it warns once.
-  @Volatile private var failed = false
+  private var failed = false
+
+  private val scheduler: ScheduledExecutorService by lazy {
+    Executors.newSingleThreadScheduledExecutor { task ->
+      Thread(task, "ketch-keep-awake").apply { isDaemon = true }
+    }
+  }
 
   override fun acquire() {
-    if (process != null) return
-    val command = listOf(
-      "systemd-inhibit", "--what=idle", "--who=Ketch", "--why=$reason", "--mode=block", "cat"
-    )
+    synchronized(lock) {
+      if (wanted) return
+      wanted = true
+      retries = 0
+      start()
+    }
+    log.i { "Keeping the system awake" }
+  }
+
+  override fun release() {
+    val held = synchronized(lock) {
+      if (!wanted) return
+      wanted = false
+      retry?.cancel(false)
+      retry = null
+      process.also { process = null }
+    }
+    if (held != null) stop(held)
+    log.i { "Letting the system sleep" }
+  }
+
+  // Called while holding the lock.
+  private fun start() {
     val started = try {
       ProcessBuilder(command).redirectErrorStream(true).start()
     } catch (e: IOException) {
       failure { "Couldn't keep the system awake: ${e.describeCauses()}" }
+      retryLater()
       return
     }
     process = started
-    log.i { "Keeping the system awake" }
-    started.onExit().thenAccept { exited ->
-      // Only a lock that ended by itself, such as without logind, is worth a word.
-      if (process !== exited) return@thenAccept
-      val output = exited.inputStream.bufferedReader().use { it.readText() }.trim()
+    val startedAt = TimeSource.Monotonic.markNow()
+    started.onExit().thenAccept { exited -> onExit(exited, startedAt) }
+  }
+
+  private fun onExit(exited: Process, startedAt: TimeMark) {
+    // A lock Ketch released ended as it should.
+    if (synchronized(lock) { process !== exited }) return
+    val output = exited.inputStream.bufferedReader().use { it.readText() }.trim()
+    synchronized(lock) {
+      if (process !== exited) return
+      process = null
       failure { "systemd-inhibit exited with ${exited.exitValue()}: ${output.take(MAX_OUTPUT)}" }
+      if (startedAt.elapsedNow() >= STABLE) retries = 0
+      retryLater()
     }
   }
 
-  override fun release() {
-    val held = process ?: return
-    process = null
+  // Called while holding the lock.
+  private fun retryLater() {
+    if (!wanted) return
+    if (retries >= maxRetries) {
+      failure { "Gave up keeping the system awake after $retries retries" }
+      return
+    }
+    val delay = retryDelay * (1 shl retries)
+    retries++
+    val restart = Runnable {
+      synchronized(lock) {
+        retry = null
+        if (wanted && process == null) start()
+      }
+    }
+    retry = scheduler.schedule(restart, delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+  }
+
+  private fun stop(held: Process) {
     try {
       held.outputStream.close()
     } catch (e: IOException) {
       log.d { "Couldn't close the input of systemd-inhibit: ${e.describeCauses()}" }
     }
     held.destroy()
-    log.i { "Letting the system sleep" }
   }
 
+  // Called while holding the lock.
   private fun failure(message: () -> String) {
     if (failed) {
       log.d(message = message)
@@ -205,5 +278,6 @@ internal class LogindIdleInhibitor(private val reason: String) : SleepInhibitor 
 
   private companion object {
     const val MAX_OUTPUT = 500
+    val STABLE = 1.minutes
   }
 }
