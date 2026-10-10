@@ -271,8 +271,9 @@ resources in `library:endpoints` (`Api`) and shared with the client:
 - **Health**: `GET /api/health`, without the token, answers `200` once the tasks are served
   and `503` before: `ketch server` listens first, so a daemon that cannot bind never resumes
   downloads, and calls `markReady()` once `KetchApi.start()` restored them (`KetchServer(ready =
-  false)`); other embedders are ready from the start. `ketch health` and the Docker image's
-  `HEALTHCHECK` ask it
+  false)`); other embedders are ready from the start. Until then the other API routes but
+  pairing answer `503 starting` (`startupGate`), so no download races the restore. `ketch
+  health` and the Docker image's `HEALTHCHECK` ask it
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
 
 `RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`

@@ -654,8 +654,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Health: `GET /api/health` (`Api.Health`, no token) answers `200 {"status":"ready"}` once the
   tasks are restored and `503 {"status":"starting"}` before. `KetchServer(ready = false)` plus
   `markReady()`, which `serveDaemon` calls after `KetchApi.start()`; other embedders are ready
-  from the start. `ketch health` asks it (0 ready, 1 not, 2 usage), finding the port through the
-  same config file and environment variables, and loopback for a server on every interface
+  from the start. Until then `startupGate` answers every other API route but pairing with `503`
+  `starting` and `Retry-After: 1`, so no download races the restore. `ketch health` asks it (0
+  ready, 1 not, 2 usage) at the URL the server published in `instance.json`, which follows its
+  options, else where the config file and environment variables say (`healthCheckUrl`)
 - `ketch server` configuration layers: flags over `KETCH_*` environment variables
   (`ServerEnv`, `applyServerEnvironment`; blank counts as unset, an unusable value exits 2 naming
   it) over `config.toml`. It exits 1 when it cannot start and 2 for invalid options

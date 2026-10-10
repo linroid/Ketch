@@ -374,7 +374,9 @@ variable.
 `GET /api/health` answers without the token: `200 {"status":"ready"}` once the server has
 restored the tasks saved by earlier runs, and `503 {"status":"starting"}` while it does. The
 server listens before restoring them, so a second server that cannot get the port never resumes
-the same downloads. [`ketch health`](#health-check) asks it.
+the same downloads. Meanwhile every other endpoint but pairing answers `503` with a `starting`
+error and `Retry-After: 1`, so nothing is added while the tasks load; the apps reconnect on
+their own. [`ketch health`](#health-check) asks it.
 
 #### Access token
 
@@ -594,9 +596,11 @@ ketch ai-discover --yes "blender 4.2 macOS" > results.txt
 ### Health check
 
 Check whether the `ketch server` of this machine is ready, as container health checks and service
-managers do. It finds the server through the same config file and
-[environment variables](#environment-variables) as the server, and asks its
-[health endpoint](#health): a server on every interface is asked on `127.0.0.1`.
+managers do. It asks the server's [health endpoint](#health) where the running server says it
+listens, in `instance.json` in the config directory, so options such as `--port` are followed.
+Until the server has written it, which it does once ready, it asks where the config file and
+the [environment variables](#environment-variables) say; a server on every interface is asked on
+`127.0.0.1`.
 
 ```bash
 ketch health [options]

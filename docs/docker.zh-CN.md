@@ -146,8 +146,10 @@ NAS 上的其他 BitTorrent 客户端需要使用不同的端口。
 
 镜像的 `HEALTHCHECK` 运行 `ketch health`，它会请求服务器的 `GET /api/health`：Ketch 恢复完之前保存的
 下载后返回 `200 {"status":"ready"}`，在此之前返回 `503 {"status":"starting"}`。之后 Docker 会把容器
-显示为 `healthy`，服务器停止响应时则显示为 `unhealthy`。这个接口不需要访问码，Uptime Kuma 等监控
-工具也可以使用。
+显示为 `healthy`，服务器停止响应时则显示为 `unhealthy`。`ketch health` 会请求正在运行的服务器所报告
+的地址，所以作为容器命令传入的 `--port` 等选项也会生效。这个接口不需要访问码，Uptime Kuma 等监控
+工具也可以使用。Ketch 恢复下载期间（通常只需片刻），其他 API 都会返回 `503`，App 会在恢复完成后
+连上。
 
 ## 网络
 

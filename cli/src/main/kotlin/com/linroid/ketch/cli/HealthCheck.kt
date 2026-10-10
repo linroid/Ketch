@@ -1,13 +1,13 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.config.ServerConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
-import java.net.URI
 
 /** Exit statuses of `ketch health`, which container health checks read. */
 internal object HealthExit {
@@ -70,18 +70,24 @@ internal fun parseHealthArgs(args: List<String>): HealthArgs {
 }
 
 /**
- * The address `ketch health` asks a server that binds to [bindHost]: loopback for a server on
- * every interface, which also passes its `Host` check without a token, else the address itself.
+ * The health endpoint `ketch health` asks: at the host and port [check] names, when it names
+ * either; else at the URL the running server published in `instance.json` ([running]), which
+ * follows the options it was started with; else where [server] listens. A server on every
+ * interface is asked on loopback, which also passes its `Host` check without a token.
  */
-internal fun healthCheckHost(bindHost: String): String = when (bindHost.trim()) {
-  "", "0.0.0.0" -> "127.0.0.1"
-  "::", "[::]" -> "::1"
-  else -> bindHost.trim().removePrefix("[").removeSuffix("]")
+internal fun healthCheckUrl(
+  check: HealthArgs.Check,
+  server: ServerConfig,
+  running: CliInstance.Info?,
+): String {
+  val base = when {
+    check.host != null || check.port != null ->
+      loopbackUrl(check.host ?: server.host, check.port ?: server.port)
+    running?.command == SERVER_COMMAND && running.url != null -> running.url
+    else -> loopbackUrl(server.host, server.port)
+  }
+  return "${base.trimEnd('/')}$HEALTH_PATH"
 }
-
-/** URL of the health endpoint of the server at [host] and [port], an IPv6 one bracketed. */
-internal fun healthUrl(host: String, port: Int): String =
-  URI("http", null, host, port, "/api/health", null, null).toString()
 
 /**
  * Asks the server at [url] whether it is ready, printing its answer, and returns one of
@@ -116,5 +122,7 @@ internal fun checkHealth(url: String): Int = runBlocking {
     }
   }
 }
+
+private const val HEALTH_PATH = "/api/health"
 
 private const val HEALTH_TIMEOUT_MS = 5_000L

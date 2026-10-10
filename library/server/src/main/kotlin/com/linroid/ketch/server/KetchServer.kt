@@ -107,6 +107,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * ### Health
  * - `GET /api/health` — `200` once [ketch] serves its saved tasks, `503` before ([markReady])
  *
+ * Until [markReady], every other API endpoint but pairing answers `503 Service Unavailable` with
+ * a `starting` `ErrorResponse` and `Retry-After: 1`, so no download is added while the saved
+ * tasks load.
+ *
  * ## Access token
  *
  * With an [apiToken], every API request but the pairing and health endpoints must carry it as
@@ -203,7 +207,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
  * @param ready whether [ketch] already serves its saved tasks, as `GET /api/health` reports.
- *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then.
+ *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then;
+ *   until then the other API endpoints answer `503`.
  */
 class KetchServer(
   private val ketch: KetchApi,
@@ -367,6 +372,9 @@ class KetchServer(
         allowHeader(HttpHeaders.Authorization)
       }
     }
+
+    // Before authentication too: the API is closed to everyone while the tasks are restored.
+    install(startupGate { ready })
 
     if (apiToken != null) {
       // Before authentication, so an address guessing tokens is turned away unchecked.

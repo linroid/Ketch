@@ -561,7 +561,7 @@ private fun runServer(args: Array<String>): Int {
 }
 
 /** How [CliInstance.Info] names `ketch server`. */
-private const val SERVER_COMMAND = "ketch server"
+internal const val SERVER_COMMAND = "ketch server"
 
 /** How [CliInstance.Info] names `ketch mcp --standalone`. */
 private const val STANDALONE_MCP_COMMAND = "ketch mcp --standalone"
@@ -1070,8 +1070,9 @@ private fun runStandaloneMcp(
 
 /**
  * Runs `ketch health` with [args], the arguments after `health`: asks the `ketch server` this
- * machine runs, found through the same config file and environment variables, whether it is
- * ready, and returns one of [HealthExit].
+ * machine runs, found through its `instance.json` once it is ready and through the same config
+ * file and environment variables until then, whether it is ready, and returns one of
+ * [HealthExit].
  */
 private fun runHealth(args: List<String>): Int {
   val check = when (val parsed = parseHealthArgs(args)) {
@@ -1100,20 +1101,21 @@ private fun runHealth(args: List<String>): Int {
     System.err.println("Error: ${e.message}")
     return HealthExit.USAGE
   }
-  val host = check.host ?: healthCheckHost(server.host)
-  return checkHealth(healthUrl(host, check.port ?: server.port))
+  val running = CliInstance.read(File(defaultConfigDir()))
+  return checkHealth(healthCheckUrl(check, server, running))
 }
 
 private fun printHealthUsage() {
   println("Usage: ketch health [options]")
   println()
   println("Check whether the `ketch server` on this machine is ready, as")
-  println("container health checks do. It reads the config file and the")
-  println("KETCH_* environment variables the server reads to find it.")
+  println("container health checks do. It asks where the running server")
+  println("says it listens, else where its config file and KETCH_*")
+  println("environment variables say.")
   println()
   println("Options:")
-  println("  --host <address>  Address to ask (default: 127.0.0.1 for a")
-  println("                    server on every interface, else its address)")
+  println("  --host <address>  Address to ask (default: the server's;")
+  println("                    127.0.0.1 for one on every interface)")
   println("  --port <number>   Port to ask (default: the server's)")
   println("  --config <path>   Config file the server was started with")
   println("  --help, -h        Show this help message")

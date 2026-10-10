@@ -153,8 +153,11 @@ Settings without a variable, such as extra trackers or retries, go in
 The image's `HEALTHCHECK` runs `ketch health`, which asks the server's `GET /api/health`: it
 answers `200 {"status":"ready"}` once Ketch has restored the downloads saved by earlier runs, and
 `503 {"status":"starting"}` before. Docker shows the container as `healthy` from then on, or
-`unhealthy` when the server stops answering. The endpoint needs no access code, so monitors
-such as Uptime Kuma can ask it too.
+`unhealthy` when the server stops answering. `ketch health` asks where the running server says it
+listens, so it follows options given as the container's command, such as `--port`. The endpoint
+needs no access code, so monitors such as Uptime Kuma can ask it too. While Ketch restores the
+downloads, which takes a moment, the rest of the API answers `503` and the apps connect once it
+is done.
 
 ## Networking
 

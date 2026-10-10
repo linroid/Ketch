@@ -89,7 +89,8 @@ class ServeDaemonTest {
       KetchServer(ketch, host = "127.0.0.1", port = 0, mdnsEnabled = false, ready = false)
     val daemon = thread { serveDaemon(server, ketch) }
     try {
-      val url = healthUrl("127.0.0.1", runBlocking { withTimeout(5.seconds) { server.port() } })
+      val port = runBlocking { withTimeout(5.seconds) { server.port() } }
+      val url = "${loopbackUrl("127.0.0.1", port)}/api/health"
       assertEquals(HealthExit.NOT_READY, checkHealth(url))
 
       restore.complete(Unit)
