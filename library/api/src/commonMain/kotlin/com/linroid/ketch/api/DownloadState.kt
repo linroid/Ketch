@@ -21,7 +21,7 @@ import kotlin.time.Instant
  *
  * A task paused for [PauseReason.Preempted] still waits in the queue. One that asked to wait for
  * a file selection goes from Queued to Paused([PauseReason.AwaitingFileSelection]) once its files
- * are known, and a completed task whose selection gains files goes back to Queued.
+ * or variants are known, and a completed task whose selection gains files goes back to Queued.
  *
  * @see DownloadTask.state
  */

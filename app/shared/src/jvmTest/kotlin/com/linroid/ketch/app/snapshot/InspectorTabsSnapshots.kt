@@ -21,6 +21,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -45,7 +46,7 @@ import com.linroid.ketch.app.ui.inspector.tabs.FilesTabContent
 import com.linroid.ketch.app.state.FileOrder
 import com.linroid.ketch.app.state.FileSort
 import com.linroid.ketch.app.state.FileSortSurface
-import com.linroid.ketch.app.state.TorrentFilesModel
+import com.linroid.ketch.app.state.FileSelectionModel
 import com.linroid.ketch.app.state.appliedSelection
 import kotlinx.coroutines.Job
 import com.linroid.ketch.app.util.SegmentRate
@@ -197,6 +198,27 @@ class InspectorTabsSnapshots {
           TabCard("Waiting for files", DockedWidth) { SelectableFiles(waitingSeason()) }
           TabCard("By kind", DockedWidth) {
             SelectableFiles(season(selected = chosen), sort = FileSort(FileOrder.Kind))
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun files_singleChoice_rendersRadioButtons() {
+    val size = SnapshotSize(1104.dp, 420.dp, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("files-single-choice", size, theme) {
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+          modifier = Modifier.padding(KetchTheme.spacing.s4),
+        ) {
+          TabCard("Variants", DockedWidth) { SelectableFiles(variants()) }
+          TabCard("Variants · changed", DockedWidth) {
+            SelectableFiles(variants(), chooses = "2")
+          }
+          TabCard("Waiting for a variant", DockedWidth) {
+            SelectableFiles(variants(waiting = true))
           }
         }
       }
@@ -381,20 +403,22 @@ private fun rates(segments: List<Segment>): List<SegmentRate> =
   }
 
 /**
- * The Files tab of [row] with checkboxes, as on a device that changes a torrent's files, after
- * clicking [toggles], in [sort].
+ * The Files tab of [row] with checkboxes (radio buttons for a single choice), as on a device that
+ * changes a task's files, after clicking [toggles] or choosing the variant [chooses], in [sort].
  */
 @Composable
 private fun SelectableFiles(
   row: TaskRow,
   toggles: List<String> = emptyList(),
+  chooses: String? = null,
   sort: FileSort = FileSortSurface.Inspector.default,
 ) {
   val model = remember(row) {
-    TorrentFilesModel(row.task, controller = null, launch = { Job() }).apply {
+    FileSelectionModel(row.task, controller = null, launch = { Job() }).apply {
       val files = row.request.resolvedSource?.files.orEmpty()
       val applied = appliedSelection(row.request, row.state, files)
       toggles.forEach { toggle(listOf(it), applied) }
+      chooses?.let { choose(it, applied) }
     }
   }
   var shown by remember { mutableStateOf(sort) }
@@ -424,6 +448,36 @@ private fun seasonFiles(): Pair<List<String>, List<Long>> {
   val names = (episodes + listOf("Subs/English.srt", "README.nfo")).map { "The.Show.S01/$it" }
   val sizes = List(12) { 1_180_000_000L + it * 7_340_032L } + listOf(84_000L, 3_000L)
   return names to sizes
+}
+
+/**
+ * A stream whose source offers three variants, one of which downloads: the first, a third done,
+ * or none yet while it [waits][waiting] for a choice.
+ */
+private fun variants(waiting: Boolean = false): TaskRow {
+  val url = "https://media.example.com/show/master.m3u8"
+  val files = listOf(
+    SourceFile("0", "The.Show.S01E01.1080p.ts", 1_420_000_000L),
+    SourceFile("1", "The.Show.S01E01.720p.ts", 760_000_000L),
+    SourceFile("2", "The.Show.S01E01.480p.ts", 310_000_000L),
+  )
+  val source = ResolvedSource(
+    url, "hls", -1, false, "The.Show.S01E01.ts", 1,
+    files = files,
+    selectionMode = FileSelectionMode.SINGLE,
+  )
+  val total = files.first().size
+  val state = if (waiting) {
+    DownloadState.Paused(DownloadProgress(0, -1), PauseReason.AwaitingFileSelection)
+  } else {
+    DownloadState.Downloading(DownloadProgress(total / 3, total, 6_200_000))
+  }
+  return ListFixtures.row(
+    id = if (waiting) "variants-waiting" else "variants",
+    state = state,
+    request = DownloadRequest(url = url, resolvedSource = source),
+    now = SampleData.NOW,
+  )
 }
 
 /** A pack of 300 files. */

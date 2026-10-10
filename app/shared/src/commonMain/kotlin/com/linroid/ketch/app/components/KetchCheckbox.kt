@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.material3.Text
@@ -100,6 +101,41 @@ fun KetchTriStateCheckbox(
   }
   ToggleRow(label, enabled, focus, toggle, modifier) {
     CheckBox(state, interactions, enabled, focus.visible && label == null)
+  }
+}
+
+/**
+ * A radio button, one of a group of which exactly one is selected, with its [label] to the right
+ * when given. The whole row selects it.
+ *
+ * @param onClick `null` makes it read-only, for a parent row that selects it.
+ */
+@Composable
+fun KetchRadio(
+  selected: Boolean,
+  onClick: (() -> Unit)?,
+  modifier: Modifier = Modifier,
+  enabled: Boolean = true,
+  label: String? = null,
+) {
+  val interactions = remember { MutableInteractionSource() }
+  val focus = rememberFocusVisibility()
+  val select = if (onClick != null) {
+    Modifier
+      .trackFocusVisibility(focus)
+      .selectable(
+        selected = selected,
+        interactionSource = interactions,
+        indication = null,
+        enabled = enabled,
+        role = Role.RadioButton,
+        onClick = onClick,
+      )
+  } else {
+    Modifier
+  }
+  ToggleRow(label, enabled, focus, select, modifier) {
+    RadioDot(selected, interactions, enabled, focus.visible && label == null)
   }
 }
 
@@ -268,6 +304,38 @@ private fun CheckBox(
   }
 }
 
+@Composable
+private fun RadioDot(
+  selected: Boolean,
+  interactions: MutableInteractionSource,
+  enabled: Boolean,
+  ring: Boolean,
+) {
+  val colors = KetchTheme.colors
+  val shape = KetchTheme.shapes.full
+  val hovered by interactions.collectIsHoveredAsState()
+  val border by animateColorAsState(
+    targetValue = when {
+      selected && hovered && enabled -> colors.accentHover
+      selected -> colors.accent
+      hovered && enabled -> colors.textTertiary
+      else -> colors.borderStrong
+    },
+    animationSpec = tween(KetchTheme.motion.micro),
+  )
+  val side = KetchTheme.density.checkbox
+  Box(
+    contentAlignment = Alignment.Center,
+    modifier = Modifier
+      .focusRing(ring, shape, colors.focusRing)
+      .size(side)
+      .background(colors.surface, shape)
+      .border(if (selected) RadioRing else 1.dp, border, shape),
+  ) {
+    if (selected) Box(Modifier.size(side / 2).background(border, shape))
+  }
+}
+
 private val KetchDensity.switchTrack: DpSize
   get() = if (this == KetchDensity.Comfortable) DpSize(40.dp, 24.dp) else DpSize(32.dp, 18.dp)
 
@@ -276,3 +344,4 @@ private val KetchDensity.checkbox: Dp
 
 private val SwitchInset = 2.dp
 private val CheckInset = 4.dp
+private val RadioRing = 1.5.dp

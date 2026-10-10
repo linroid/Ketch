@@ -6,6 +6,7 @@ import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.SpeedLimit
@@ -210,9 +211,9 @@ private fun runDownload(args: DownloadArgs.Download) {
 }
 
 /**
- * Lists the files of [args]' URL, such as a torrent's, without downloading it: one `ID  SIZE
- * PATH` row each, in the order `--sort` and `--reverse` ask for. Returns 0, or 1 when the URL
- * cannot be resolved or has no files to choose.
+ * Lists the files or variants of [args]' URL, such as a torrent's files, without downloading
+ * it: one `ID  SIZE  PATH` row each, in the order `--sort` and `--reverse` ask for. Returns 0, or
+ * 1 when the URL cannot be resolved or has no files to choose.
  */
 private fun runListFiles(args: DownloadArgs.Download): Int {
   val fileConfig = readDefaultConfig()
@@ -236,6 +237,9 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
       1
     } else {
       rows.forEach(::println)
+      if (source.selectionMode == FileSelectionMode.SINGLE) {
+        System.err.println("These are variants: choose one with --files <id>.")
+      }
       0
     }
   } catch (e: Exception) {
@@ -1334,13 +1338,16 @@ private fun printUsage() {
   println("                           Default: [download.proxy] in the config")
   println("                           file, else https_proxy, http_proxy,")
   println("                           all_proxy and no_proxy")
-  println("  --files <ids>            Download only these files of a torrent,")
-  println("                           comma-separated IDs from --list-files")
-  println("  --list-files             List the files of a torrent or magnet")
-  println("                           with their IDs instead of downloading")
+  println("  --files <ids>            Download only these files of a torrent")
+  println("                           or the like, comma-separated IDs from")
+  println("                           --list-files; one ID for a choice of")
+  println("                           variants")
+  println("  --list-files             List the files or variants of a URL,")
+  println("                           such as a torrent or magnet, with their")
+  println("                           IDs instead of downloading")
   println("  --sort <order>           Order of --list-files: name, size or")
   println("                           type (by extension); default: the")
-  println("                           torrent's own order")
+  println("                           download's own order")
   println("  --reverse                Reverse the order of --list-files")
   println()
   println("Running Ketch (the app, or `ketch server`):")

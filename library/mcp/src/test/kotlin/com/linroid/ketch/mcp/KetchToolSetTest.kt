@@ -10,6 +10,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
@@ -215,6 +216,30 @@ class KetchToolSetTest {
   }
 
   @Test
+  fun selectDownloadFiles_singleChoiceWithTwoIds_failsValidation() = runTest {
+    val task = QueuedTask(variantRequest())
+
+    assertFailsWith<ToolException.ValidationFailure> {
+      KetchToolSet(RecordingKetchApi(listOf(task))).selectDownloadFiles(task.taskId, "0,1")
+    }
+    assertTrue(task.selections.isEmpty())
+  }
+
+  @Test
+  fun listDownloadFiles_singleChoiceWithoutSelection_marksTheFirstVariant() = runTest {
+    val task = QueuedTask(variantRequest())
+
+    val json = Json.parseToJsonElement(
+      KetchToolSet(RecordingKetchApi(listOf(task))).listDownloadFiles(task.taskId),
+    ).jsonObject
+
+    assertEquals("SINGLE", json.getValue("selectionMode").jsonPrimitive.content)
+    val files = json.getValue("files").jsonArray.map { it.jsonObject }
+    val selected = files.map { it.getValue("selected").jsonPrimitive.boolean }
+    assertEquals(listOf(true, false, false), selected)
+  }
+
+  @Test
   fun listDownloadFiles_pagesTheController() = runTest {
     val task = QueuedTask(torrentRequest())
     val controller = PagingController()
@@ -387,6 +412,12 @@ class KetchToolSetTest {
       SourceFile("1", "Pack/notes.txt", 100, mapOf("path" to "Pack/notes.txt")),
       SourceFile("2", "Pack/Episode 10.mkv", 300, mapOf("path" to "Pack/Episode 10.mkv")),
     ),
+  )
+
+  /** A request whose source offers its files as variants, one of which downloads. */
+  private fun variantRequest() = DownloadRequest(
+    url = "https://example.com/stream.m3u8",
+    resolvedSource = torrentSource().copy(selectionMode = FileSelectionMode.SINGLE),
   )
 
   private fun torrentRequest(selected: Set<String> = emptySet()) = DownloadRequest(
