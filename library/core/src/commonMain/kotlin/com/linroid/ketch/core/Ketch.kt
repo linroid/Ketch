@@ -1,5 +1,6 @@
 package com.linroid.ketch.core
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -27,10 +28,6 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentRevision
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -41,20 +38,21 @@ import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.SINGLE_CHOICE_MESSAGE
-import com.linroid.ketch.core.engine.SeedingOutcome
-import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SelectionDelivery
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.SourceExtension
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
-import com.linroid.ketch.core.engine.TorrentControlSource
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.task.ControlCommand
+import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlOutcome
+import com.linroid.ketch.core.task.ControlRevision
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
 import com.linroid.ketch.core.task.TaskCommandRecord
@@ -65,7 +63,6 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.core.task.awaitsFileSelection
-import com.linroid.ketch.core.torrent.KetchTorrentController
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +73,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -102,7 +98,8 @@ import kotlin.uuid.Uuid
  * @param name user-visible instance name included in [status]
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
- *   (e.g., torrent, media). HTTP is always included as a fallback.
+ *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
+ *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param logger logging backend
  * @param dispatchers dedicated dispatchers for task management,
  *   network operations, and file I/O. The default pools have a fixed
@@ -139,14 +136,8 @@ class Ketch(
     additionalSources + httpSource,
   )
 
-  /** Sources with torrent controls, such as seeding completed tasks. */
-  private val controlSources: List<Pair<DownloadSource, TorrentControlSource>> =
-    additionalSources.mapNotNull { source ->
-      (source as? TorrentControlSource)?.let { source to it }
-    }
-
-  /** Set once [start] began following the control sources' seeding. */
-  private val seedingFollowed = AtomicBoolean(false)
+  /** Set once [start] started the sources' extensions. */
+  private val extensionsStarted = AtomicBoolean(false)
 
   private val features: Set<String> = buildSet {
     add(KetchFeatures.AUTO_CONNECTIONS)
@@ -301,134 +292,9 @@ class Ketch(
   override suspend fun start() {
     log.i { "Start" }
     loadTasks()
-    if (controlSources.isNotEmpty() && seedingFollowed.compareAndSet(false, true)) {
-      scope.launch { followSeeding() }
-      scope.launch { restoreSeeding() }
+    if (extensionsStarted.compareAndSet(false, true)) {
+      extensions.forEach { (_, extension) -> extension.start() }
     }
-  }
-
-  /** Every task the control sources report seeding now. */
-  private fun seedingTaskIds(): Set<String> =
-    controlSources.flatMapTo(HashSet()) { it.second.seedingTaskIds.value }
-
-  /** Shows on every completed task whether its source seeds it, as the sources report it. */
-  private suspend fun followSeeding() {
-    combine(controlSources.map { it.second.seedingTaskIds }) { sets ->
-      sets.flatMapTo(HashSet()) { it }
-    }.collect { ids ->
-      for (task in _tasks.value) {
-        (task as? RealDownloadTask)?.let { syncSeeding(it, ids) }
-      }
-    }
-  }
-
-  /**
-   * Publishes whether a completed task seeds, as a copy of its [DownloadState.Completed], and
-   * saves the intent to seed it again after a restart once it does. Nothing here clears the
-   * intent: a seeder that a download stopped, or that stopped with Ketch, seeds again later.
-   */
-  private suspend fun syncSeeding(handle: TaskHandle, ids: Set<String>) {
-    val taskId = handle.taskId
-    val seeding = taskId in ids
-    val current = handle.mutableState.value as? DownloadState.Completed ?: return
-    if (current.seeding != seeding) {
-      val updated = current.copy(seeding = seeding)
-      if (handle.mutableState.compareAndSet(current, updated)) {
-        log.i { if (seeding) "Seeding taskId=$taskId" else "Stopped seeding taskId=$taskId" }
-        // The queue skips a completion whose state was replaced meanwhile, and a later copy may
-        // equal the state it skipped, so the copy releases the slot itself. Releasing is
-        // idempotent, and a task that started again since is never touched.
-        queue.onTaskCompleted(taskId, updated)
-      }
-    }
-    if (seeding && handle.record.value.control?.seeding != true) {
-      scope.launch { saveSeedingIntent(handle, true) }
-    }
-  }
-
-  /** Saves whether [handle]'s completed task seeds again after a restart. */
-  private suspend fun saveSeedingIntent(handle: TaskHandle, seeding: Boolean) {
-    handle.controlLock.withLock {
-      val record = handle.record.value
-      if ((record.control?.seeding ?: false) == seeding) return@withLock
-      if (seeding && record.state != TaskState.COMPLETED) return@withLock
-      handle.record.update {
-        it.copy(
-          control = (it.control ?: TaskControl()).copy(seeding = seeding),
-          updatedAt = Clock.System.now(),
-        )
-      }
-      log.d { "Saved seeding intent of taskId=${handle.taskId}: $seeding" }
-    }
-  }
-
-  /**
-   * Seeds the completed tasks that seeded before Ketch last stopped, oldest completion first,
-   * through sources that restore seeding: each checks its files first and only takes a free
-   * slot. The walk stops at the first that finds no slot or seeding switched off.
-   */
-  private suspend fun restoreSeeding() {
-    for ((source, control) in controlSources) {
-      if (!control.restoresSeeding) continue
-      val candidates = _tasks.value.mapNotNull { it as? RealDownloadTask }.filter {
-        val record = it.record.value
-        record.state == TaskState.COMPLETED && record.control?.seeding == true &&
-          record.sourceType == source.type
-      }.sortedBy { it.record.value.completedAt }
-      if (candidates.isEmpty()) continue
-      log.i { "Restoring seeding of ${candidates.size} task(s) from ${source.type}" }
-      for (handle in candidates) {
-        val taskId = handle.taskId
-        val record = handle.record.value
-        // The task may have started again, or stopped seeding for good, since the walk began.
-        if (handle.mutableState.value !is DownloadState.Completed ||
-          record.state != TaskState.COMPLETED || record.control?.seeding != true
-        ) continue
-        when (val outcome = seed(handle, control)) {
-          SeedingOutcome.SEEDING -> log.i { "Restored seeding of taskId=$taskId" }
-          SeedingOutcome.NO_SLOT, SeedingOutcome.POLICY_OFF -> {
-            log.i { "Stopped restoring seeding at taskId=$taskId: $outcome" }
-            return
-          }
-          SeedingOutcome.CHANGED_ON_DISK -> {}
-          SeedingOutcome.ALREADY_ACTIVE, SeedingOutcome.UNSUPPORTED, SeedingOutcome.FAILED ->
-            log.i { "Did not restore seeding of taskId=$taskId: $outcome" }
-          null -> {}
-        }
-      }
-    }
-  }
-
-  /**
-   * Starts seeding [handle]'s completed task through [control] and waits until it seeds or stops
-   * trying. A task whose files changed on disk loses its intent to seed. Returns `null` when the
-   * task has nothing saved to seed from.
-   */
-  private suspend fun seed(handle: TaskHandle, control: TorrentControlSource): SeedingOutcome? {
-    val taskId = handle.taskId
-    val record = handle.record.value
-    val resumeState = record.sourceResumeState
-    val outputPath = record.outputPath
-    if (resumeState == null || outputPath == null) {
-      log.w { "Cannot seed taskId=$taskId: nothing saved to seed from" }
-      return null
-    }
-    val outcome = try {
-      control.startSeeding(
-        SeedingTask(taskId, record.request.url, resumeState, outputPath,
-          record.request.selectedFileIds)
-      )
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.w { "Seeding taskId=$taskId failed: ${e.describeCauses()}" }
-      SeedingOutcome.FAILED
-    }
-    if (outcome == SeedingOutcome.CHANGED_ON_DISK) {
-      saveSeedingIntent(handle, false)
-      log.w { "Files of taskId=$taskId changed on disk since it completed; not seeding it" }
-    }
-    return outcome
   }
 
   override suspend fun status(): KetchStatus {
@@ -566,9 +432,9 @@ class Ketch(
       }
     }
 
-    override suspend fun setSeeding(
+    override suspend fun setSharing(
       handle: TaskHandle,
-      seeding: Boolean,
+      sharing: Boolean,
       command: ControlCommand,
     ): ControlOutcome = handle.controlLock.withLock {
       val taskId = handle.taskId
@@ -578,22 +444,22 @@ class Ketch(
       if (handle.mutableState.value !is DownloadState.Completed ||
         record.state != TaskState.COMPLETED
       ) {
-        throw IllegalStateException("Only completed downloads can seed")
+        throw IllegalStateException("Only completed downloads can be shared")
       }
       val generation = record.control?.selectionGeneration ?: 0
-      val revision = command.reserve(generation, seeding)
-      val entry = ledger.entry(command, revision, generation, seeding)
+      val revision = command.reserve(generation, sharing)
+      val entry = ledger.entry(command, revision, generation, sharing)
       handle.record.update {
         it.copy(
           control = (it.control ?: TaskControl()).copy(
-            seeding = seeding,
+            sharing = sharing,
             commands = ledger.entries + entry,
           ),
           updatedAt = Clock.System.now(),
         )
       }
-      log.i { "Seeding intent of taskId=$taskId: $seeding" }
-      ControlOutcome(generation, seeding, revision, replayed = false)
+      log.i { "Sharing intent of taskId=$taskId: $sharing" }
+      ControlOutcome(generation, sharing, revision, replayed = false)
     }
 
     override suspend fun reschedule(
@@ -615,29 +481,82 @@ class Ketch(
     }
   }
 
-  /**
-   * Typed torrent controls over the first source that offers them, a [TorrentControlSource], or
-   * `null` without one.
-   */
-  override val torrents: TorrentController? by lazy {
-    controlSources.firstOrNull()?.let { (source, control) ->
-      KetchTorrentController(
-        source = control,
-        sourceType = source.type,
-        tasks = tasks,
-        handlesUrl = source::canHandle,
-        controller = taskController,
-        seed = { handle ->
-          scope.launch {
-            val outcome = seed(handle, control)
-            if (outcome != SeedingOutcome.SEEDING) {
-              log.i { "Did not seed taskId=${handle.taskId}: $outcome" }
-            }
-          }
-        },
-      )
+  /** What the sources' extensions see and do of this instance's tasks. */
+  private val host = object : SourceHost {
+    override val tasks: StateFlow<List<DownloadTask>> get() = this@Ketch.tasks
+
+    override val scope: CoroutineScope get() = this@Ketch.scope
+
+    // A task removed meanwhile keeps its last record, so readers racing a removal never fail.
+    override fun record(task: DownloadTask): TaskRecord? =
+      (task as? RealDownloadTask)?.record?.value
+
+    override suspend fun selectFiles(
+      task: DownloadTask,
+      fileIds: Set<String>,
+      command: ControlCommand,
+    ): ControlOutcome = taskController.selectFiles(requireHandle(task), fileIds, command)
+
+    override suspend fun setSharing(
+      task: DownloadTask,
+      sharing: Boolean,
+      command: ControlCommand,
+    ): ControlOutcome = taskController.setSharing(requireHandle(task), sharing, command)
+
+    override suspend fun showSharing(task: DownloadTask, sharing: Boolean) {
+      val handle = handleOf(task) ?: return
+      val current = handle.mutableState.value as? DownloadState.Completed ?: return
+      if (current.sharing == sharing) return
+      val updated = current.copy(sharing = sharing)
+      if (handle.mutableState.compareAndSet(current, updated)) {
+        log.i {
+          if (sharing) "Sharing taskId=${task.taskId}" else "Stopped sharing taskId=${task.taskId}"
+        }
+        // The queue skips a completion whose state was replaced meanwhile, and a later copy may
+        // equal the state it skipped, so the copy releases the slot itself. Releasing is
+        // idempotent, and a task that started again since is never touched.
+        queue.onTaskCompleted(task.taskId, updated)
+      }
+    }
+
+    override suspend fun saveSharingIntent(task: DownloadTask, sharing: Boolean) {
+      val handle = handleOf(task) ?: return
+      handle.controlLock.withLock {
+        val record = handle.record.value
+        if ((record.control?.sharing ?: false) == sharing) return@withLock
+        if (sharing && record.state != TaskState.COMPLETED) return@withLock
+        handle.record.update {
+          it.copy(
+            control = (it.control ?: TaskControl()).copy(sharing = sharing),
+            updatedAt = Clock.System.now(),
+          )
+        }
+        log.d { "Saved sharing intent of taskId=${handle.taskId}: $sharing" }
+      }
     }
   }
+
+  /** [task] when it is a task of this instance. */
+  private fun handleOf(task: DownloadTask): RealDownloadTask? =
+    (task as? RealDownloadTask)?.takeIf { real -> _tasks.value.any { it === real } }
+
+  private fun requireHandle(task: DownloadTask): RealDownloadTask =
+    handleOf(task) ?: throw IllegalArgumentException("Unknown download")
+
+  /**
+   * The extensions of the sources that offer one, with the type of their source. Declared after
+   * everything [host] uses, as the sources attach while this instance is created.
+   */
+  private val extensions: List<Pair<String, SourceExtension>> =
+    additionalSources.mapNotNull { source -> source.attach(host)?.let { source.type to it } }
+
+  /** The extension of the source of type [sourceType], if it has one. */
+  private fun extensionOf(sourceType: String?): SourceExtension? =
+    extensions.firstOrNull { it.first == sourceType }?.second
+
+  /** The controller the first source extension offering one for [key] contributes. */
+  override fun <T : Any> control(key: ControlKey<T>): T? =
+    extensions.firstNotNullOfOrNull { (_, extension) -> extension.control(key) }
 
   /**
    * Validates, saves and applies a file selection; the caller holds the task's control lock.
@@ -678,10 +597,10 @@ class Ketch(
     if (!plan.changed && !awaiting) {
       log.d { "Selection of taskId=$taskId is unchanged" }
       if (command == null || ledger == null) {
-        return ControlOutcome(control.selectionGeneration, control.seeding, null, replayed = false)
+        return ControlOutcome(control.selectionGeneration, control.sharing, null, replayed = false)
       }
-      val revision = command.reserve(control.selectionGeneration, control.seeding)
-      val entry = ledger.entry(command, revision, control.selectionGeneration, seeding = null)
+      val revision = command.reserve(control.selectionGeneration, control.sharing)
+      val entry = ledger.entry(command, revision, control.selectionGeneration, sharing = null)
       handle.record.update {
         it.copy(
           control = (it.control ?: TaskControl()).copy(commands = ledger.entries + entry),
@@ -689,15 +608,15 @@ class Ketch(
         )
       }
       return ControlOutcome(
-        control.selectionGeneration, control.seeding, revision, replayed = false,
+        control.selectionGeneration, control.sharing, revision, replayed = false,
       )
     }
     val running = coordinator.isActive(taskId)
     val reopen = !running && state is DownloadState.Completed && plan.expands
     val generation = control.selectionGeneration + if (plan.changed) 1 else 0
-    val revision = command?.reserve(generation, control.seeding)
+    val revision = command?.reserve(generation, control.sharing)
     val entry = if (command != null && ledger != null && revision != null) {
-      ledger.entry(command, revision, generation, seeding = null)
+      ledger.entry(command, revision, generation, sharing = null)
     } else {
       null
     }
@@ -756,9 +675,9 @@ class Ketch(
       }
       else -> {
         if (state is DownloadState.Completed && plan.changed) {
-          // A seeding session keeps running on the smaller selection rather than reopening.
-          controlSources.firstOrNull { it.first.type == source.type }?.second
-            ?.changeSeedingSelection(taskId, plan.fileIds)
+          // What the source shares follows the smaller selection rather than reopening.
+          val task = handle as? DownloadTask
+          if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
         }
         showStopped(handle, plan, handle.record.value.segments)
       }
@@ -768,7 +687,7 @@ class Ketch(
         "totalBytes=${plan.totalBytes}, generation=$generation" +
         if (reopen) ", reopened" else ""
     }
-    return ControlOutcome(generation, control.seeding, revision, replayed = false)
+    return ControlOutcome(generation, control.sharing, revision, replayed = false)
   }
 
   /**
@@ -782,23 +701,23 @@ class Ketch(
     val entries = control.commands.filter { it.recordedAtMs >= nowMs - LEDGER_WINDOW_MS }
     entries.firstOrNull { it.key == command.key }?.let { entry ->
       if (entry.digest != command.digest) {
-        throw TorrentCommandException(
-          TorrentCommandError.KEY_REUSED,
+        throw ControlLedgerException(
+          ControlLedgerException.Reason.KEY_REUSED,
           "This idempotency key was used for another command",
         )
       }
       val outcome = ControlOutcome(
         generation = entry.selectionGeneration,
-        seeding = entry.seeding ?: control.seeding,
-        revision = TorrentRevision(entry.epoch, entry.sequence),
+        sharing = entry.sharing ?: control.sharing,
+        revision = ControlRevision(entry.epoch, entry.sequence),
         replayed = true,
       )
       return Ledger(entries, outcome)
     }
     command.precondition()
     if (entries.size >= TaskControl.MAX_COMMANDS) {
-      throw TorrentCommandException(
-        TorrentCommandError.RESOURCE_EXHAUSTED,
+      throw ControlLedgerException(
+        ControlLedgerException.Reason.FULL,
         "Too many recent commands for this download; try again later",
       )
     }
@@ -809,16 +728,16 @@ class Ketch(
   private class Ledger(val entries: List<TaskCommandRecord>, val replay: ControlOutcome?) {
     fun entry(
       command: ControlCommand,
-      revision: TorrentRevision,
+      revision: ControlRevision,
       generation: Long,
-      seeding: Boolean?,
+      sharing: Boolean?,
     ) = TaskCommandRecord(
       key = command.key,
       digest = command.digest,
       epoch = revision.epoch,
       sequence = revision.sequence,
       selectionGeneration = generation,
-      seeding = seeding,
+      sharing = sharing,
       recordedAtMs = Clock.System.now().toEpochMilliseconds(),
     )
   }
@@ -981,7 +900,7 @@ class Ketch(
         totalBytes = record.totalBytes.takeIf { it >= 0 },
         downloadTime = record.downloadTime,
         completedAt = record.completedAt,
-        seeding = false,
+        sharing = false,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -1009,7 +928,7 @@ class Ketch(
           when (state) {
             is DownloadState.Completed -> {
               queue.onTaskCompleted(taskId, state)
-              if (controlSources.isNotEmpty()) syncSeeding(handle, seedingTaskIds())
+              extensionOf(handle.record.value.sourceType)?.taskCompleted(handle)
             }
             is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
             is DownloadState.Canceled -> queue.onTaskCanceled(taskId, state)

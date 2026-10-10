@@ -188,7 +188,7 @@ class ActivityMonitorTest {
 
     running.state.value = completed(1000)
     runCurrent()
-    running.state.value = completed(1000).copy(seeding = true)
+    running.state.value = completed(1000).copy(sharing = true)
     runCurrent()
     running.state.value = completed(1000)
     runCurrent()

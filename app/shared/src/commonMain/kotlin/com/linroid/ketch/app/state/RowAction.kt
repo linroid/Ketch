@@ -273,7 +273,7 @@ fun taskActions(
       val startNow = RowAction.StartNow.takeIf { capabilities.canReschedule }
       waitingOrRunning(startNow, listOfNotNull(startNow), capabilities)
     }
-    is DownloadState.Completed -> completed(capabilities, fileMissing, state.seeding)
+    is DownloadState.Completed -> completed(capabilities, fileMissing, state.sharing)
     is DownloadState.Failed -> failed(request, state, device, retryCount)
     is DownloadState.Canceled -> restartable()
   }

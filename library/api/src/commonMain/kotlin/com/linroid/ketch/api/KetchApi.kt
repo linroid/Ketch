@@ -1,6 +1,5 @@
 package com.linroid.ketch.api
 
-import com.linroid.ketch.api.torrent.TorrentController
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -13,15 +12,13 @@ interface KetchApi {
   val backendLabel: String
 
   /**
-   * Optional typed torrent controls exposed by this backend. Null preserves compatibility with
-   * backends that support legacy torrent downloads but have not implemented the control protocol.
-   * The in-process engine returns one when a registered download source offers torrent controls
-   * (the torrent source does); a remote backend always returns one that fails closed against
-   * servers without them. Before relying on its commands, check that [KetchStatus.features]
-   * lists [KetchFeatures.TORRENT_CONTROL]; a controller of a backend without it fails its
-   * commands with [com.linroid.ketch.api.torrent.TorrentCommandError.UNSUPPORTED].
+   * The optional controller this backend offers for [key], or `null` when it offers none. Modules
+   * beside this one define controllers and their keys; the in-process engine returns those its
+   * download sources contribute, and a remote backend those its client knows how to reach on the
+   * server. Before relying on a controller's commands, check the feature its module names in
+   * [KetchStatus.features]: a remote controller fails closed against servers without it.
    */
-  val torrents: TorrentController? get() = null
+  fun <T : Any> control(key: ControlKey<T>): T? = null
 
   /** Reactive task list updated on any state change. */
   val tasks: StateFlow<List<DownloadTask>>

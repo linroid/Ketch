@@ -1,5 +1,6 @@
-package com.linroid.ketch.api.torrent
+package com.linroid.ketch.torrent.api
 
+import com.linroid.ketch.api.FileOrder
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -115,6 +116,11 @@ class TorrentContractsTest {
       assertEquals(it, TorrentFileOrder.fromWire(it.wireName))
     }
     assertEquals(null, TorrentFileOrder.fromWire("kind"))
+  }
+
+  @Test
+  fun fileOrder_everyGenericOrderHasATorrentOrder() {
+    FileOrder.entries.forEach { assertEquals(it, TorrentFileOrder.of(it).order) }
   }
 
   @Test

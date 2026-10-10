@@ -1,22 +1,23 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapabilities
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentCommandResult
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileEntry
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentFilePage
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.TorrentRevision
-import com.linroid.ketch.api.torrent.TorrentSnapshot
 import com.linroid.ketch.endpoints.model.ErrorResponse
-import com.linroid.ketch.endpoints.model.TorrentSeedingRequest
-import com.linroid.ketch.endpoints.model.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentCommandResult
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileEntry
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** The `/api/torrents` routes over a scripted [TorrentController]. */
@@ -115,8 +117,12 @@ class TorrentRoutesTest {
 
   private class ControlledKetch(
     delegate: KetchApi,
-    override val torrents: TorrentController?,
-  ) : KetchApi by delegate
+    private val torrents: TorrentController,
+  ) : KetchApi by delegate {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> control(key: ControlKey<T>): T? =
+      if (key === TorrentController.Key) torrents as T else null
+  }
 
   private suspend fun HttpResponse.error(): ErrorResponse = json.decodeFromString(bodyAsText())
 
@@ -124,19 +130,16 @@ class TorrentRoutesTest {
     createTestServer(ControlledKetch(createTestKetch(), controller))
 
   @Test
-  fun capabilities_withoutController_isEmpty() = testApplication {
+  fun routes_withoutController_areNotInstalled() = testApplication {
     application { with(createTestServer()) { configureServer() } }
 
     val capabilities = client.get("/api/torrents/capabilities")
     val snapshot = client.get("/api/torrents/t1")
 
-    assertEquals(HttpStatusCode.OK, capabilities.status)
-    assertEquals(
-      emptySet(),
-      json.decodeFromString<TorrentCapabilities>(capabilities.bodyAsText()).names,
-    )
-    assertEquals(HttpStatusCode.NotImplemented, snapshot.status)
-    assertEquals("unsupported", snapshot.error().error)
+    // Without an error code, clients read the missing routes as no torrent controls.
+    assertEquals(HttpStatusCode.NotFound, capabilities.status)
+    assertEquals(HttpStatusCode.NotFound, snapshot.status)
+    assertFalse(capabilities.bodyAsText().contains("\"error\""))
   }
 
   @Test

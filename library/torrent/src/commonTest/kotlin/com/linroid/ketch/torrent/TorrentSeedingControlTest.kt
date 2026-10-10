@@ -4,20 +4,21 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapability
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.SeedingOutcome
-import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.control.SeedingOutcome
+import com.linroid.ketch.torrent.control.SeedingTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -140,11 +141,11 @@ class TorrentSeedingControlTest {
 
   private suspend fun DownloadTask.awaitSeeding(seeding: Boolean) =
     awaitStage("seeding=$seeding", this) {
-      state.first { it is DownloadState.Completed && it.seeding == seeding }
+      state.first { it is DownloadState.Completed && it.sharing == seeding }
     }
 
   private suspend fun TaskStore.intent(taskId: String): Boolean? =
-    load(taskId)?.control?.seeding
+    load(taskId)?.control?.sharing
 
   /** A seeding task of [record] to start through the source. */
   private fun seedingTask(record: TaskRecord) = SeedingTask(record.taskId, record.request.url,
@@ -200,7 +201,7 @@ class TorrentSeedingControlTest {
       outputPath = output.toString(), state = TaskState.COMPLETED, totalBytes = total,
       sourceType = TorrentDownloadSource.TYPE,
       sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE, state),
-      createdAt = at, updatedAt = at, completedAt = at, control = TaskControl(seeding = true))
+      createdAt = at, updatedAt = at, completedAt = at, control = TaskControl(sharing = true))
   }
 
   /** Flips one byte in the middle of [path]. */
@@ -239,7 +240,7 @@ class TorrentSeedingControlTest {
     assertEquals(setOf("1"), session.selectedFileIds)
     assertEquals(torrent.sizes[1].toLong(), session.totalBytes)
     val completed = assertIs<DownloadState.Completed>(task.state.value)
-    assertTrue(completed.seeding)
+    assertTrue(completed.sharing)
     assertEquals(setOf(task.taskId), source.seedingTaskIds.value)
     source.stopSeeding(task.taskId)
     source.assertNoLeaks()
@@ -292,7 +293,7 @@ class TorrentSeedingControlTest {
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.download(request(1))
-    assertFalse(task.awaitCompleted().seeding)
+    assertFalse(task.awaitCompleted().sharing)
     assertFalse(TorrentCapability.SEEDING.wireName in source.torrentCapabilities)
     assertFalse(source.restoresSeeding)
     assertEquals(SeedingOutcome.POLICY_OFF, source.seedingAvailability(task.taskId))
@@ -310,7 +311,7 @@ class TorrentSeedingControlTest {
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.download(request(0))
-    assertFalse(task.awaitCompleted().seeding)
+    assertFalse(task.awaitCompleted().sharing)
     assertEquals(SeedingOutcome.POLICY_OFF, source.seedingAvailability(task.taskId))
     source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
     assertTrue(source.restoresSeeding)
@@ -373,7 +374,7 @@ class TorrentSeedingControlTest {
     second.start()
     eventually("the intent to be cleared") { store.intent(task.taskId) == false }
     val restored = second.tasks.value.single()
-    assertFalse(assertIs<DownloadState.Completed>(restored.state.value).seeding)
+    assertFalse(assertIs<DownloadState.Completed>(restored.state.value).sharing)
     assertNull(secondSource.sessionOf(restored.taskId))
     // The recheck found the change before any tracker or peer was contacted.
     assertEquals(announced, announces.load())
@@ -413,7 +414,7 @@ class TorrentSeedingControlTest {
     ketch.start()
     eventually("the intent to be cleared") { store.intent(record.taskId) == false }
     val task = ketch.tasks.value.single()
-    assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
+    assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
     assertNull(source.sessionOf(task.taskId))
     assertEquals(0, networks.single().connects.load())
     source.assertNoLeaks()
@@ -434,7 +435,7 @@ class TorrentSeedingControlTest {
     checkNotNull(tasks["older"]).awaitSeeding(true)
     eventually("the walk to end") { source.seedingAvailability("newer") == SeedingOutcome.NO_SLOT }
     assertNull(source.sessionOf("newer"))
-    assertFalse(assertIs<DownloadState.Completed>(checkNotNull(tasks["newer"]).state.value).seeding)
+    assertFalse(assertIs<DownloadState.Completed>(checkNotNull(tasks["newer"]).state.value).sharing)
     assertEquals(true, store.intent("newer"))
     assertEquals(true, store.intent("older"))
     source.stopSeeding("older")
@@ -451,7 +452,7 @@ class TorrentSeedingControlTest {
     ketch.start()
     val task = ketch.tasks.value.single()
     delay(500)
-    assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
+    assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
     assertEquals(0, created.load())
     assertEquals(true, store.intent("kept"))
     source.assertNoLeaks()
@@ -478,7 +479,7 @@ class TorrentSeedingControlTest {
   }
 
   private suspend fun Ketch.context(taskId: String, key: String): TorrentCommandContext {
-    val snapshot = assertNotNull(assertNotNull(torrents).snapshot(taskId))
+    val snapshot = assertNotNull(assertNotNull(control(TorrentController)).snapshot(taskId))
     return TorrentCommandContext(key, snapshot.revision)
   }
 
@@ -492,7 +493,7 @@ class TorrentSeedingControlTest {
     task.awaitCompleted()
     task.awaitSeeding(true)
     eventually("the seeding intent to be saved") { store.intent(task.taskId) == true }
-    val controller = assertNotNull(ketch.torrents)
+    val controller = assertNotNull(ketch.control(TorrentController))
     eventually("the snapshot to show seeding") {
       controller.snapshot(task.taskId)?.activity == TorrentActivity.SEEDING
     }
@@ -518,7 +519,7 @@ class TorrentSeedingControlTest {
     val task = ketch.download(request(0, 2))
     task.awaitCompleted()
     task.awaitSeeding(true)
-    val controller = assertNotNull(ketch.torrents)
+    val controller = assertNotNull(ketch.control(TorrentController))
     val stopped = controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
     task.awaitSeeding(false)
     val connects = networks.single().connects.load()
@@ -547,8 +548,8 @@ class TorrentSeedingControlTest {
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.download(request(1))
-    assertFalse(task.awaitCompleted().seeding)
-    val controller = assertNotNull(ketch.torrents)
+    assertFalse(task.awaitCompleted().sharing)
+    val controller = assertNotNull(ketch.control(TorrentController))
     assertFalse(controller.capabilities().supports(TorrentCapability.SEEDING))
 
     val error = assertFailsWith<TorrentCommandException> {

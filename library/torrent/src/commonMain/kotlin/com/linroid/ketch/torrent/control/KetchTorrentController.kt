@@ -1,4 +1,4 @@
-package com.linroid.ketch.core.torrent
+package com.linroid.ketch.torrent.control
 
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
@@ -8,38 +8,36 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapabilities
-import com.linroid.ketch.api.torrent.TorrentCapability
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentCommandResult
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentCounters
-import com.linroid.ketch.api.torrent.TorrentFileEntry
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentFilePage
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.TorrentSnapshot
-import com.linroid.ketch.api.torrent.sortedByFileOrder
-import com.linroid.ketch.core.engine.LiveTorrent
-import com.linroid.ketch.core.engine.SeedingOutcome
+import com.linroid.ketch.api.sortedByFileOrder
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.TorrentControlSource
 import com.linroid.ketch.core.task.ControlCommand
+import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlOutcome
-import com.linroid.ketch.core.task.RealDownloadTask
-import com.linroid.ketch.core.task.TaskController
+import com.linroid.ketch.core.task.ControlRevision
 import com.linroid.ketch.core.task.TaskControl
-import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentCommandResult
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentCounters
+import com.linroid.ketch.torrent.api.TorrentFileEntry
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,8 +57,9 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Ketch's [TorrentController] over a [TorrentControlSource]: snapshots, file pages and
- * subscriptions from the task records Ketch owns and the source's live sessions, and selection
- * and seeding commands through [controller], which keeps their retry ledger in the task record.
+ * subscriptions from the task records Ketch owns ([SourceHost.record]) and the source's live
+ * sessions, and selection and seeding commands through [host], which keeps their retry ledger in
+ * the task record.
  *
  * @param sourceType the [com.linroid.ketch.core.engine.DownloadSource.type] of [source]
  * @param handlesUrl whether [source] downloads a URL, for tasks that have not resolved yet
@@ -69,13 +68,13 @@ import kotlin.time.Duration.Companion.seconds
 internal class KetchTorrentController(
   private val source: TorrentControlSource,
   private val sourceType: String,
-  private val tasks: StateFlow<List<DownloadTask>>,
+  private val host: SourceHost,
   private val handlesUrl: (String) -> Boolean,
-  private val controller: TaskController,
-  private val seed: (TaskHandle) -> Unit,
+  private val seed: (DownloadTask) -> Unit,
   private val revisions: TorrentRevisions = TorrentRevisions(),
 ) : TorrentController {
   private val log = KetchLogger("TorrentController")
+  private val tasks get() = host.tasks
   private val subscriptions = Semaphore(MAX_SUBSCRIPTIONS)
   private val cacheMutex = Mutex()
   // Access order: the least recently used file list is dropped first.
@@ -139,7 +138,7 @@ internal class KetchTorrentController(
             delay(1.seconds)
             val state = task.state.value
             if (state is DownloadState.Downloading ||
-              state is DownloadState.Completed && state.seeding
+              state is DownloadState.Completed && state.sharing
             ) {
               changes.trySend(Unit)
             }
@@ -171,7 +170,7 @@ internal class KetchTorrentController(
       TorrentCommandError.METADATA_UNAVAILABLE,
       "The file list is not known yet",
     )
-    val record = task.record.value
+    val record = recordOf(task)
     val generation = record.control?.selectionGeneration ?: 0
     val revision = revisions.publish(taskId, contentOf(task), currentControl(task))
     val offset = page.cursor?.let {
@@ -192,7 +191,7 @@ internal class KetchTorrentController(
     } ?: 0
     val selected = selectedIds(task, files)
     val sorted = files.sortedByFileOrder(
-      order = order,
+      order = order.order,
       descending = descending,
       path = { it.name },
       size = { it.size },
@@ -234,7 +233,7 @@ internal class KetchTorrentController(
     }
     val digest = sha256Hex("select\n" + fileIds.sorted().joinToString("\n"))
     val outcome = mapErrors {
-      controller.selectFiles(task, fileIds, command(task, context, digest) {})
+      host.selectFiles(task, fileIds, command(task, context, digest) {})
     }
     return result(taskId, outcome, seeding = null)
   }
@@ -248,7 +247,7 @@ internal class KetchTorrentController(
     var alreadyActive = false
     val digest = sha256Hex("seeding\n$seeding")
     val outcome = mapErrors {
-      controller.setSeeding(
+      host.setSharing(
         task,
         seeding,
         command(task, context, digest) {
@@ -284,12 +283,12 @@ internal class KetchTorrentController(
         seed(task)
       }
     }
-    return result(taskId, outcome, outcome.seeding)
+    return result(taskId, outcome, outcome.sharing)
   }
 
   /** The command [context] asks for, which checks the revision and then [check]. */
   private fun command(
-    task: RealDownloadTask,
+    task: DownloadTask,
     context: TorrentCommandContext,
     digest: String,
     check: suspend () -> Unit,
@@ -302,14 +301,17 @@ internal class KetchTorrentController(
       check()
     },
     reserve = { generation, seeding ->
-      revisions.markControl(task.taskId, TorrentRevisions.Control(generation, seeding))
+      val control = TorrentRevisions.Control(generation, seeding)
+      val revision = revisions.markControl(task.taskId, control)
+      ControlRevision(revision.epoch, revision.sequence)
     },
   )
 
   private fun result(taskId: String, outcome: ControlOutcome, seeding: Boolean?) =
     TorrentCommandResult(
       taskId = taskId,
-      revision = outcome.revision ?: throw IllegalStateException("Unrevised command outcome"),
+      revision = outcome.revision?.let { TorrentRevision(it.epoch, it.sequence) }
+        ?: throw IllegalStateException("Unrevised command outcome"),
       selectionGeneration = outcome.generation,
       seeding = seeding,
     )
@@ -327,6 +329,12 @@ internal class KetchTorrentController(
     throw e
   } catch (e: TorrentCommandException) {
     throw e
+  } catch (e: ControlLedgerException) {
+    val error = when (e.reason) {
+      ControlLedgerException.Reason.KEY_REUSED -> TorrentCommandError.KEY_REUSED
+      ControlLedgerException.Reason.FULL -> TorrentCommandError.RESOURCE_EXHAUSTED
+    }
+    throw TorrentCommandException(error, e.safeMessage(), cause = e)
   } catch (e: IllegalArgumentException) {
     throw TorrentCommandException(TorrentCommandError.INVALID_INPUT, e.safeMessage(), cause = e)
   } catch (e: IllegalStateException) {
@@ -354,18 +362,22 @@ internal class KetchTorrentController(
     TorrentCommandException(TorrentCommandError.NOT_FOUND, "No such torrent download")
 
   /** [taskId]'s task when it is a torrent of [source]; forgets removed tasks. */
-  private suspend fun torrentTask(taskId: String): RealDownloadTask? {
-    val task = tasks.value.firstOrNull { it.taskId == taskId } as? RealDownloadTask
-    if (task == null) {
+  private suspend fun torrentTask(taskId: String): DownloadTask? {
+    val task = tasks.value.firstOrNull { it.taskId == taskId }
+    val record = task?.let { host.record(it) }
+    if (task == null || record == null) {
       forget(taskId)
       return null
     }
-    val record = task.record.value
     val type = record.sourceType
       ?: record.request.resolvedSource?.sourceType
       ?: if (handlesUrl(record.request.url)) sourceType else null
     return task.takeIf { type == sourceType }
   }
+
+  /** The record of [task], one [torrentTask] returned. */
+  private fun recordOf(task: DownloadTask): TaskRecord =
+    host.record(task) ?: throw IllegalStateException("The download is gone")
 
   private suspend fun forget(taskId: String) {
     revisions.drop(taskId)
@@ -373,8 +385,8 @@ internal class KetchTorrentController(
   }
 
   /** Every content file of [task] in metainfo order, or `null` while unknown. */
-  private suspend fun filesOf(task: RealDownloadTask): List<SourceFile>? {
-    val record = task.record.value
+  private suspend fun filesOf(task: DownloadTask): List<SourceFile>? {
+    val record = recordOf(task)
     val resumeState = record.sourceResumeState
     val resolved = record.request.resolvedSource
     cacheMutex.withLock {
@@ -404,20 +416,20 @@ internal class KetchTorrentController(
   }
 
   /** The files [task] downloads: none while it waits for a choice, every file for legacy tasks. */
-  private fun selectedIds(task: RealDownloadTask, files: List<SourceFile>): Set<String> {
+  private fun selectedIds(task: DownloadTask, files: List<SourceFile>): Set<String> {
     val state = task.state.value
     if (state is DownloadState.Paused && state.reason == PauseReason.AwaitingFileSelection) {
       return emptySet()
     }
-    return task.record.value.request.selectedFileIds.ifEmpty { files.mapTo(HashSet()) { it.id } }
+    return recordOf(task).request.selectedFileIds.ifEmpty { files.mapTo(HashSet()) { it.id } }
   }
 
-  private fun currentControl(task: RealDownloadTask): TorrentRevisions.Control {
-    val control = task.record.value.control ?: TaskControl()
-    return TorrentRevisions.Control(control.selectionGeneration, control.seeding)
+  private fun currentControl(task: DownloadTask): TorrentRevisions.Control {
+    val control = recordOf(task).control ?: TaskControl()
+    return TorrentRevisions.Control(control.selectionGeneration, control.sharing)
   }
 
-  private suspend fun snapshotOf(task: RealDownloadTask): TorrentSnapshot {
+  private suspend fun snapshotOf(task: DownloadTask): TorrentSnapshot {
     val content = contentOf(task)
     val revision = revisions.publish(task.taskId, content, content.control)
     return TorrentSnapshot(
@@ -430,8 +442,8 @@ internal class KetchTorrentController(
     )
   }
 
-  private suspend fun contentOf(task: RealDownloadTask): Content {
-    val record = task.record.value
+  private suspend fun contentOf(task: DownloadTask): Content {
+    val record = recordOf(task)
     val state = task.state.value
     val files = filesOf(task)
     val live = source.liveTorrent(task.taskId)
@@ -442,12 +454,12 @@ internal class KetchTorrentController(
       generation = control.selectionGeneration,
       selectionComplete = state is DownloadState.Completed && counters != null,
       counters = counters,
-      seedingIntent = control.seeding,
+      seedingIntent = control.sharing,
     )
   }
 
   private fun countersOf(
-    task: RealDownloadTask,
+    task: DownloadTask,
     files: List<SourceFile>,
     state: DownloadState,
     segments: List<Segment>,

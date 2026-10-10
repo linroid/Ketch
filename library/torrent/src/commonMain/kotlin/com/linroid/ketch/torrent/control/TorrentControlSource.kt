@@ -1,19 +1,20 @@
-package com.linroid.ketch.core.engine
+package com.linroid.ketch.torrent.control
 
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
-import com.linroid.ketch.api.torrent.TorrentActivity
+import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.torrent.api.TorrentActivity
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Torrent controls a [DownloadSource] offers beyond downloading, which Ketch's
- * [com.linroid.ketch.api.torrent.TorrentController] is built on: inspecting the files and the
- * live session of a task, and sharing completed tasks. Ketch owns the task records; a source
- * only reports and acts on its sessions.
+ * Torrent controls a download source offers beyond downloading, which [KetchTorrentController]
+ * and [TorrentControls] are built on: inspecting the files and the live session of a task, and
+ * sharing completed tasks. Ketch owns the task records; a source only reports and acts on its
+ * sessions.
  */
-interface TorrentControlSource {
+internal interface TorrentControlSource {
   /**
-   * The [com.linroid.ketch.api.torrent.TorrentCapability] wire names this source carries out
+   * The [com.linroid.ketch.torrent.api.TorrentCapability] wire names this source carries out
    * now, besides `inspect`, which every implementation offers. It may change at runtime, such
    * as when sharing is switched off.
    */
@@ -74,7 +75,7 @@ interface TorrentControlSource {
  *   tracked
  * @property uploadBytesPerSecond the current upload speed, or `null` when not tracked
  */
-class LiveTorrent(
+internal class LiveTorrent(
   val activity: TorrentActivity,
   val receivedPayloadBytes: Long?,
   val uploadedPayloadBytes: Long?,
@@ -89,7 +90,7 @@ class LiveTorrent(
  * @property outputPath where the task saved its files
  * @property selectedFileIds the task's files; empty for every file
  */
-class SeedingTask(
+internal class SeedingTask(
   val taskId: String,
   val url: String,
   val resumeState: SourceResumeState,
@@ -98,7 +99,7 @@ class SeedingTask(
 )
 
 /** How an attempt to share a completed task ended, or why it would not start. */
-enum class SeedingOutcome {
+internal enum class SeedingOutcome {
   /** The task is being shared. */
   SEEDING,
 

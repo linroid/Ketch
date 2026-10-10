@@ -1,4 +1,28 @@
-package com.linroid.ketch.api.torrent
+package com.linroid.ketch.api
+
+/**
+ * How a list of files, such as the files of a [ResolvedSource] or of a task, is sorted with
+ * [sortedByFileOrder]. Ties keep the [SOURCE] order, so every order is total and stable.
+ */
+enum class FileOrder {
+  /** The order the source lists the files in (file ID order for torrents). */
+  SOURCE,
+
+  /**
+   * Case-insensitive natural order of the full path ([NaturalOrder]), so "Episode 2" comes before
+   * "Episode 10".
+   */
+  NAME,
+
+  /** File size, smallest first. */
+  SIZE,
+
+  /** Lowercased file extension ([fileExtension]), then [NAME]. */
+  EXTENSION,
+
+  /** Selected files first, then [NAME]. */
+  SELECTED,
+}
 
 /**
  * Case-insensitive natural order of strings such as file paths: runs of digits compare by their
@@ -76,13 +100,13 @@ fun fileExtension(path: String): String {
 }
 
 /**
- * These files, in torrent order, sorted by [order] the way [TorrentController.files] sorts them:
- * [descending] reverses the order, and files the order ranks equal keep their torrent order, so
- * the result is total and stable. [path], [size] and [selected] read a file's full path inside
- * the torrent, its size and whether it is chosen.
+ * These files, in their source's order, sorted by [order]: [descending] reverses the order, and
+ * files the order ranks equal keep their source order, so the result is total and stable. [path],
+ * [size] and [selected] read a file's full path inside the source, its size and whether it is
+ * chosen. Backends that sort file pages, such as the torrent controller, sort the same way.
  */
 fun <T> List<T>.sortedByFileOrder(
-  order: TorrentFileOrder,
+  order: FileOrder,
   descending: Boolean = false,
   path: (T) -> String,
   size: (T) -> Long,
@@ -92,12 +116,12 @@ fun <T> List<T>.sortedByFileOrder(
     NaturalOrder.compare(path(a.value), path(b.value))
   }
   val key: Comparator<IndexedValue<T>> = when (order) {
-    TorrentFileOrder.TORRENT -> compareBy { it.index }
-    TorrentFileOrder.NAME -> byName
-    TorrentFileOrder.SIZE -> compareBy { size(it.value) }
-    TorrentFileOrder.EXTENSION ->
+    FileOrder.SOURCE -> compareBy { it.index }
+    FileOrder.NAME -> byName
+    FileOrder.SIZE -> compareBy { size(it.value) }
+    FileOrder.EXTENSION ->
       compareBy<IndexedValue<T>> { fileExtension(path(it.value)) }.then(byName)
-    TorrentFileOrder.SELECTED ->
+    FileOrder.SELECTED ->
       compareBy<IndexedValue<T>> { !selected(it.value) }.then(byName)
   }
   val directed = if (descending) key.reversed() else key

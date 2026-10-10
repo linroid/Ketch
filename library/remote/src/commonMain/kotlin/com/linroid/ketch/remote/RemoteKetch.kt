@@ -1,31 +1,32 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
-import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import com.linroid.ketch.api.torrent.TorrentController
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.torrent.api.TorrentController
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
-import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.call.body
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -154,10 +155,18 @@ class RemoteKetch internal constructor(
   /**
    * Torrent controls of the server, over its `/api/torrents` routes. A server without them, an
    * older one or one without a torrent source, fails every command with
-   * [com.linroid.ketch.api.torrent.TorrentCommandError.UNSUPPORTED] before sending it.
+   * [com.linroid.ketch.torrent.api.TorrentCommandError.UNSUPPORTED] before sending it.
    */
-  override val torrents: TorrentController =
+  private val torrents: TorrentController =
     RemoteTorrentController(httpClient, connectionGeneration.asStateFlow(), json)
+
+  /**
+   * The server's controller for [key]: [TorrentController.Key] returns the server's torrent
+   * controls, which fail closed against servers without them. Other keys return `null`.
+   */
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> control(key: ControlKey<T>): T? =
+    if (key === TorrentController.Key) torrents as T else null
 
   override suspend fun download(
     request: DownloadRequest,

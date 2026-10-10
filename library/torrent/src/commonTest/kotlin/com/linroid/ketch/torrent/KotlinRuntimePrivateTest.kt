@@ -271,7 +271,7 @@ class KotlinRuntimePrivateTest {
           sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
             Json.encodeToString(state)),
           createdAt = now, updatedAt = now, completedAt = now,
-          control = TaskControl(seeding = true)))
+          control = TaskControl(sharing = true)))
         var created = 0
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = true,
           uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING), http).also {
@@ -285,9 +285,9 @@ class KotlinRuntimePrivateTest {
           ketch.start()
           delay(500)
           val task = ketch.tasks.value.single()
-          assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
+          assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
           // The seeding intent is kept, but nothing starts while uploads stop at completion.
-          assertEquals(true, store.load("private-seed")?.control?.seeding)
+          assertEquals(true, store.load("private-seed")?.control?.sharing)
           assertEquals(0, created)
           assertEquals(0, sockets.load())
           assertEquals(0, requests.load())

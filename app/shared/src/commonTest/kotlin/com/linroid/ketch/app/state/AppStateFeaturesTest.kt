@@ -8,6 +8,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.warmStrings
+import com.linroid.ketch.app.instance.EmbeddedFeatures
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.testStatus
 import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
@@ -90,7 +91,7 @@ class AppStateFeaturesTest {
 
   @Test
   fun featuresOf_embedded_isAll() = featuresTest { fleet ->
-    assertEquals(KetchFeatures.ALL, fleet.state.featuresOf(LOCAL_DEVICE_ID))
+    assertEquals(EmbeddedFeatures, fleet.state.featuresOf(LOCAL_DEVICE_ID))
   }
 
   @Test

@@ -30,6 +30,14 @@ interface DownloadSource {
   val features: Set<String> get() = emptySet()
 
   /**
+   * Gives this source a [SourceExtension] over the tasks of the [com.linroid.ketch.core.Ketch]
+   * that runs it, for typed controllers ([com.linroid.ketch.api.KetchApi.control]) and task
+   * lifecycle hooks; `null`, the default, for none. Each Ketch calls it once, while it is
+   * created, with its own [host]; the extension must not call the host before its hooks run.
+   */
+  fun attach(host: SourceHost): SourceExtension? = null
+
+  /**
    * Former source type names accepted for stored or pre-resolved tasks.
    * A former type matches only when [canHandle] also accepts the task URL.
    * An exact type match takes precedence over these migration aliases.

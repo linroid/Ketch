@@ -1,4 +1,4 @@
-package com.linroid.ketch.api.torrent
+package com.linroid.ketch.torrent.api
 
 import kotlinx.serialization.Serializable
 

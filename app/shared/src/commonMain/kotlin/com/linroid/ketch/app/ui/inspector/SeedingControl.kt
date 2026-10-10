@@ -17,11 +17,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapability
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentCounters
-import com.linroid.ketch.api.torrent.TorrentSnapshot
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -40,6 +35,11 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.inspector.tabs.rememberFeatures
 import com.linroid.ketch.app.ui.list.TaskCommand
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentCounters
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_seeding_start
 import ketch.app.shared.generated.resources.inspector_seeding_status
@@ -82,7 +82,7 @@ internal fun SeedingControl(
       controller.capabilities().supports(TorrentCapability.SEEDING)
     }.getOrDefault(false)
   }
-  val seeding = activity?.let { it == TorrentActivity.SEEDING } ?: row.state.seeding
+  val seeding = activity?.let { it == TorrentActivity.SEEDING } ?: row.state.sharing
   if (!seeding && !canSeed) return
   val busy = pending.any { (key, label) ->
     key == row.key && (label == TaskCommand.Seed.key || label == TaskCommand.StopSeeding.key)

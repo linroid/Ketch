@@ -3,11 +3,11 @@ package com.linroid.ketch.cli
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.FileOrder
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.torrent.TorrentFileOrder
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -231,7 +231,7 @@ class DownloadArgsTest {
     )
 
     assertTrue(download.listFiles)
-    assertEquals(TorrentFileOrder.TORRENT, download.fileOrder)
+    assertEquals(FileOrder.SOURCE, download.fileOrder)
     assertFalse(download.reverse)
   }
 
@@ -248,9 +248,9 @@ class DownloadArgsTest {
   @Test
   fun parse_listFilesSortAndReverse_setTheOrder() {
     val orders = mapOf(
-      "name" to TorrentFileOrder.NAME,
-      "SIZE" to TorrentFileOrder.SIZE,
-      "type" to TorrentFileOrder.EXTENSION,
+      "name" to FileOrder.NAME,
+      "SIZE" to FileOrder.SIZE,
+      "type" to FileOrder.EXTENSION,
     )
     for ((value, order) in orders) {
       val download = assertIs<DownloadArgs.Download>(
@@ -276,7 +276,7 @@ class DownloadArgsTest {
 
   @Test
   fun fileListRows_sortedBySize_printsAlignedRowsLargestFirst() {
-    val rows = fileListRows(torrent(), TorrentFileOrder.SIZE, reverse = true)
+    val rows = fileListRows(torrent(), FileOrder.SIZE, reverse = true)
 
     // Sizes follow the default locale's decimal separator.
     val sizes = listOf(formatBytes(1_048_576), formatBytes(204_800), formatBytes(100))
@@ -296,11 +296,11 @@ class DownloadArgsTest {
   fun fileListRows_byNameOrType_usesNaturalAndExtensionOrder() {
     assertEquals(
       listOf("0", "2", "1"),
-      fileListRows(torrent(), TorrentFileOrder.NAME).drop(1).map { it.substringBefore(' ') },
+      fileListRows(torrent(), FileOrder.NAME).drop(1).map { it.substringBefore(' ') },
     )
     assertEquals(
       listOf("0", "2", "1"),
-      fileListRows(torrent(), TorrentFileOrder.EXTENSION).drop(1).map { it.substringBefore(' ') },
+      fileListRows(torrent(), FileOrder.EXTENSION).drop(1).map { it.substringBefore(' ') },
     )
     assertEquals(
       listOf("0", "1", "2"),

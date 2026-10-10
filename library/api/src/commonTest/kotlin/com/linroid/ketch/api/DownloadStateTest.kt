@@ -113,13 +113,13 @@ class DownloadStateTest {
   }
 
   @Test
-  fun completed_jsonWithoutSeeding_decodesNotSeeding() {
+  fun completed_jsonWithoutSharing_decodesNotSharing() {
     val json = """{"type":"completed","outputPath":"/a","totalBytes":1}"""
 
     val state = Json.decodeFromString(DownloadState.serializer(), json)
 
     assertEquals(DownloadState.Completed("/a", 1), state)
-    assertFalse((state as DownloadState.Completed).seeding)
+    assertFalse((state as DownloadState.Completed).sharing)
   }
 
   @Test

@@ -37,6 +37,7 @@ kotlin {
     commonMain.dependencies {
       api(projects.library.api)
       api(projects.library.endpoints)
+      api(projects.library.torrentApi)
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
       implementation(libs.kotlinx.datetime)

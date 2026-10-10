@@ -46,6 +46,7 @@ include(":library:ftp")
 include(":library:hls")
 include(":library:dash")
 include(":library:torrent")
+include(":library:torrent-api")
 include(":library:server")
 include(":library:mcp")
 

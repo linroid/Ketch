@@ -1,10 +1,10 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.sortedByFileOrder
+import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
+import com.linroid.ketch.torrent.api.TorrentFileOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -39,7 +39,7 @@ class FileOrderTest {
   fun name_sameOrderAsTheServer() {
     val ours = sorted(FileSort(FileOrder.Name))
     val server = files.sortedByFileOrder(
-      order = TorrentFileOrder.NAME,
+      order = TorrentFileOrder.NAME.order,
       path = { it.path.orEmpty() },
       size = { it.size },
       selected = { it.selected },

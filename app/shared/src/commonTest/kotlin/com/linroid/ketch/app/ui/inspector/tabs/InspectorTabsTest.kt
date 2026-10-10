@@ -8,6 +8,7 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.app.state.ListFixtures.row
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,7 +21,7 @@ class InspectorTabsTest {
   fun inspectorTabs_waitingTorrent_showsFiles() {
     val listed = row("t", waiting, request = magnet(files = FILES))
     val unlisted = row("u", waiting, request = magnet(files = null))
-    val control = setOf(KetchFeatures.FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
+    val control = setOf(KetchFeatures.FILE_SELECTION, TorrentFeatures.CONTROL)
 
     assertEquals(
       listOf(InspectorTab.Overview, InspectorTab.Files),

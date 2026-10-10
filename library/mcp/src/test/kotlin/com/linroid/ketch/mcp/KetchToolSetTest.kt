@@ -1,6 +1,7 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolException
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -20,16 +21,16 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.api.torrent.TorrentCapabilities
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileEntry
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentFilePage
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.TorrentRevision
-import com.linroid.ketch.api.torrent.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileEntry
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -337,13 +338,13 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_seedingTorrent_includesSeedingAndSelectedFiles() = runTest {
-    val state = DownloadState.Completed("/d/Pack", 400, seeding = true)
+  fun getDownload_seedingTorrent_includesSharingAndSelectedFiles() = runTest {
+    val state = DownloadState.Completed("/d/Pack", 400, sharing = true)
     val task = QueuedTask(torrentRequest(selected = setOf("0", "2")), state)
 
     val json = getDownload(task)
 
-    assertTrue(json.getValue("seeding").jsonPrimitive.boolean)
+    assertTrue(json.getValue("sharing").jsonPrimitive.boolean)
     assertEquals(2, json.getValue("selectedFiles").jsonPrimitive.int)
     assertEquals(3, json.getValue("totalFiles").jsonPrimitive.int)
   }
@@ -472,9 +473,13 @@ class KetchToolSetTest {
   private class RecordingKetchApi(
     tasks: List<DownloadTask> = emptyList(),
     private val features: Set<String> = setOf(KetchFeatures.REQUEST_ID),
-    override val torrents: TorrentController? = null,
+    private val torrents: TorrentController? = null,
     private val resolved: ResolvedSource? = null,
   ) : KetchApi {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> control(key: ControlKey<T>): T? =
+      if (key === TorrentController.Key) torrents as T? else null
+
     val requests = mutableListOf<DownloadRequest>()
     val resolveProperties = mutableListOf<Map<String, String>>()
 

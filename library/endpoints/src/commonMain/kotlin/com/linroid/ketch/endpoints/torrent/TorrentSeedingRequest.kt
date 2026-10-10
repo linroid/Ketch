@@ -1,6 +1,6 @@
-package com.linroid.ketch.endpoints.model
+package com.linroid.ketch.endpoints.torrent
 
-import com.linroid.ketch.api.torrent.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandContext
 import kotlinx.serialization.Serializable
 
 /**

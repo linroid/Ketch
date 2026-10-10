@@ -11,8 +11,8 @@ import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentPageRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 

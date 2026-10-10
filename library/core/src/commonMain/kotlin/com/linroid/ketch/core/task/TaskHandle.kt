@@ -26,7 +26,7 @@ internal interface TaskHandle {
   val mutableQueuePosition: MutableStateFlow<Int?>
 
   /**
-   * Serializes the task's control changes: file selections, seeding and the per-task settings
+   * Serializes the task's control changes: file selections, sharing and the per-task settings
    * (speed limit, priority, connections), and the execution's sections that read them: the
    * section after a fresh start resolved its source, the context build of a resume and the
    * completion check.

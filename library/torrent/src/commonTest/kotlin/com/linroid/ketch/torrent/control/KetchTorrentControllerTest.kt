@@ -1,4 +1,4 @@
-package com.linroid.ketch.engine
+package com.linroid.ketch.torrent.control
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
@@ -8,28 +8,25 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapability
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.TorrentRevision
-import com.linroid.ketch.api.torrent.TorrentSnapshot
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.LiveTorrent
-import com.linroid.ketch.core.engine.SeedingOutcome
-import com.linroid.ketch.core.engine.SeedingTask
+import com.linroid.ketch.core.engine.SourceExtension
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.TorrentControlSource
-import com.linroid.ketch.core.task.RealDownloadTask
 import com.linroid.ketch.core.task.TaskCommandRecord
 import com.linroid.ketch.core.task.TaskControl
-import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -67,6 +64,9 @@ class KetchTorrentControllerTest {
   private class ControlledSource(
     val inner: SelectableSource = SelectableSource(),
   ) : DownloadSource by inner, TorrentControlSource {
+    override fun attach(host: SourceHost): SourceExtension =
+      TorrentControls(this, type, ::canHandle, host)
+
     var capabilities = mutableSetOf(TorrentCapability.FILE_SELECTION.wireName)
     override val torrentCapabilities: Set<String> get() = capabilities
     val seeding = MutableStateFlow<Set<String>>(emptySet())
@@ -102,13 +102,17 @@ class KetchTorrentControllerTest {
     }
   }
 
+  /** The stores of the Ketch instances the test created, which [saved] reads. */
+  private val stores = mutableListOf<RecordingTaskStore>()
+
   private fun TestScope.ketch(
     source: ControlledSource,
-    store: TaskStore = RecordingTaskStore(),
+    store: RecordingTaskStore = RecordingTaskStore(),
   ): Ketch {
+    stores += store
     val dispatcher = StandardTestDispatcher(testScheduler)
     return Ketch(
-      httpEngine = FakeHttpEngine(),
+      httpEngine = UnusedHttpEngine(),
       taskStore = store,
       config = DownloadConfig(retryCount = 0, saveIntervalMs = 60_000),
       additionalSources = listOf(source),
@@ -125,7 +129,7 @@ class KetchTorrentControllerTest {
   private fun context(key: String, revision: TorrentRevision) =
     TorrentCommandContext(key, revision)
 
-  private val Ketch.controller: TorrentController get() = assertNotNull(torrents)
+  private val Ketch.controller: TorrentController get() = assertNotNull(control(TorrentController))
 
   /** A paused task that downloads file 0, with its file list known. */
   private suspend fun TestScope.pausedTask(ketch: Ketch): DownloadTask {
@@ -162,7 +166,9 @@ class KetchTorrentControllerTest {
     return e
   }
 
-  private val DownloadTask.saved get() = (this as RealDownloadTask).record.value
+  /** The record Ketch last saved of this task. */
+  private val DownloadTask.saved: TaskRecord
+    get() = stores.asReversed().firstNotNullOf { it.latest(taskId) }
 
   @Test
   fun select_exactRetryAfterNewerChange_returnsOriginalResult() = runTest {
@@ -318,21 +324,29 @@ class KetchTorrentControllerTest {
 
   @Test
   fun select_expiredEntries_arePruned() = runTest {
-    val source = ControlledSource()
-    val ketch = ketch(source)
+    val store = RecordingTaskStore()
+    val first = ketch(ControlledSource(), store)
+    val taskId = try {
+      pausedTask(first).taskId
+    } finally {
+      first.close()
+    }
+    val expiredAt = (Clock.System.now() - 16.minutes).toEpochMilliseconds()
+    val digest = "0".repeat(64)
+    store.save(
+      assertNotNull(store.load(taskId)).copy(
+        control = TaskControl(
+          commands = List(TaskControl.MAX_COMMANDS) { i ->
+            TaskCommandRecord("old$i", digest, "epoch", 1, 0, null, expiredAt)
+          },
+        ),
+      ),
+    )
+    val ketch = ketch(ControlledSource(), store)
     try {
-      val task = pausedTask(ketch)
-      val expiredAt = (Clock.System.now() - 16.minutes).toEpochMilliseconds()
-      val digest = "0".repeat(64)
-      (task as RealDownloadTask).record.update { record ->
-        record.copy(
-          control = TaskControl(
-            commands = List(TaskControl.MAX_COMMANDS) { i ->
-              TaskCommandRecord("old$i", digest, "epoch", 1, 0, null, expiredAt)
-            },
-          ),
-        )
-      }
+      ketch.start()
+      runCurrent()
+      val task = ketch.tasks.value.single()
       val controller = ketch.controller
 
       controller.select(
@@ -756,15 +770,15 @@ class KetchTorrentControllerTest {
 
       assertEquals(true, on.seeding)
       assertEquals(listOf(task.taskId), source.started)
-      assertEquals(true, task.saved.control?.seeding)
-      assertEquals(true, (task.state.value as DownloadState.Completed).seeding)
+      assertEquals(true, task.saved.control?.sharing)
+      assertEquals(true, (task.state.value as DownloadState.Completed).sharing)
 
       val off = controller.setSeeding(task.taskId, false, context("off", on.revision))
       runCurrent()
 
       assertEquals(false, off.seeding)
       assertEquals(listOf(task.taskId), source.stopped)
-      assertEquals(false, task.saved.control?.seeding)
+      assertEquals(false, task.saved.control?.sharing)
       assertTrue(off.revision.sequence > on.revision.sequence)
       // An exact retry changes nothing and starts nothing.
       assertEquals(on, controller.setSeeding(task.taskId, true, context("on", on.revision)))
@@ -794,15 +808,15 @@ class KetchTorrentControllerTest {
   }
 
   @Test
-  fun torrents_withoutControlSource_isNull() = runTest {
+  fun control_withoutControlSource_isNull() = runTest {
     val dispatcher = StandardTestDispatcher(testScheduler)
     val ketch = Ketch(
-      httpEngine = FakeHttpEngine(),
+      httpEngine = UnusedHttpEngine(),
       additionalSources = listOf(SelectableSource()),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
     try {
-      assertNull(ketch.torrents)
+      assertNull(ketch.control(TorrentController))
     } finally {
       ketch.close()
     }

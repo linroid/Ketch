@@ -9,25 +9,24 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import com.linroid.ketch.api.torrent.TorrentActivity
-import com.linroid.ketch.api.torrent.TorrentCapability
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.LiveTorrent
-import com.linroid.ketch.core.engine.SeedingOutcome
-import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.SourceExtension
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.TorrentControlSource
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentFeatures
+import com.linroid.ketch.torrent.control.LiveTorrent
+import com.linroid.ketch.torrent.control.SeedingOutcome
+import com.linroid.ketch.torrent.control.SeedingTask
+import com.linroid.ketch.torrent.control.TorrentControlSource
+import com.linroid.ketch.torrent.control.TorrentControls
 import io.ktor.http.Url
 import io.ktor.http.decodeURLPart
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.io.encoding.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -58,6 +57,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import okio.IOException
 import okio.Path.Companion.toPath
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.io.encoding.Base64
 
 /**
  * Pure Kotlin BitTorrent v1, v2, and hybrid download source for JVM, Android, and iOS.
@@ -80,7 +84,7 @@ class TorrentDownloadSource(
   private val config: TorrentConfig = TorrentConfig(),
   httpEngine: HttpEngine? = null,
   private val restoreSeeding: Boolean = true,
-) : DownloadSource, TorrentControlSource {
+) : DownloadSource {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
@@ -126,9 +130,42 @@ class TorrentDownloadSource(
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
   override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
-    KetchFeatures.AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
+    KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL)
 
-  override val torrentCapabilities: Set<String>
+  /**
+   * The torrent controls of the Ketch that runs this source: the [TorrentController] that
+   * `ketch.control(TorrentController)` returns, and seeding of completed tasks.
+   *
+   * [TorrentController]: com.linroid.ketch.torrent.api.TorrentController
+   */
+  override fun attach(host: SourceHost): SourceExtension =
+    TorrentControls(controls, type, ::canHandle, host)
+
+  /** This source's controls, for [TorrentControls]. */
+  private val controls: TorrentControlSource = SourceControls(this)
+
+  private class SourceControls(private val source: TorrentDownloadSource) : TorrentControlSource {
+    override val torrentCapabilities: Set<String> get() = source.torrentCapabilities
+    override val seedingTaskIds: StateFlow<Set<String>> get() = source.seedingTaskIds
+    override val restoresSeeding: Boolean get() = source.restoresSeeding
+
+    override suspend fun torrentFiles(resumeState: SourceResumeState?, resolved: ResolvedSource?) =
+      source.torrentFiles(resumeState, resolved)
+
+    override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
+
+    override suspend fun seedingAvailability(taskId: String) = source.seedingAvailability(taskId)
+
+    override suspend fun startSeeding(task: SeedingTask) = source.startSeeding(task)
+
+    override suspend fun stopSeeding(taskId: String) = source.stopSeeding(taskId)
+
+    override suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>) =
+      source.changeSeedingSelection(taskId, fileIds)
+  }
+
+  /** What [TorrentControlSource.torrentCapabilities] reports. */
+  internal val torrentCapabilities: Set<String>
     get() = buildSet {
       add(TorrentCapability.FILE_SELECTION.wireName)
       add(TorrentCapability.V1.wireName)
@@ -140,10 +177,11 @@ class TorrentDownloadSource(
       }
     }
 
-  override val seedingTaskIds: StateFlow<Set<String>> = seeding.asStateFlow()
+  /** What [TorrentControlSource.seedingTaskIds] reports. */
+  internal val seedingTaskIds: StateFlow<Set<String>> = seeding.asStateFlow()
 
   /** Only while the live upload setting seeds, so switching it on needs no restart. */
-  override val restoresSeeding: Boolean
+  internal val restoresSeeding: Boolean
     get() = restoreSeeding &&
       uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION
 
@@ -403,7 +441,7 @@ class TorrentDownloadSource(
     }
   }
 
-  override suspend fun torrentFiles(
+  internal suspend fun torrentFiles(
     resumeState: SourceResumeState?,
     resolved: ResolvedSource?,
   ): List<SourceFile>? {
@@ -413,7 +451,7 @@ class TorrentDownloadSource(
     }
   }
 
-  override suspend fun liveTorrent(taskId: String): LiveTorrent? {
+  internal suspend fun liveTorrent(taskId: String): LiveTorrent? {
     val session = tasks.session(taskId)
     if (session == null) {
       return if (taskId in waitingForSlot.value) {
@@ -430,7 +468,7 @@ class TorrentDownloadSource(
     return LiveTorrent(activity, counters.received, counters.uploaded, counters.uploadSpeed)
   }
 
-  override suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {
+  internal suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {
     uploadPolicy.load() != TorrentUploadPolicy.SEED_AFTER_COMPLETION -> SeedingOutcome.POLICY_OFF
     tasks.isReserved(taskId) -> SeedingOutcome.ALREADY_ACTIVE
     !slots.hasFree() -> SeedingOutcome.NO_SLOT
@@ -442,7 +480,7 @@ class TorrentDownloadSource(
    * checks the files first and contacts no tracker or peer unless they are complete. The slot is
    * lent from the start, so a download that needs it stops the seeder even while it checks.
    */
-  override suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
+  internal suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
     val taskId = task.taskId
     seedingAvailability(taskId)?.let { return it }
     val plan = try {
@@ -591,7 +629,7 @@ class TorrentDownloadSource(
   }
 
   /** Stops the task's seeding session after it saved its state, and frees its slot. */
-  override suspend fun stopSeeding(taskId: String) {
+  internal suspend fun stopSeeding(taskId: String) {
     if (!slots.reclaim(taskId)) {
       log.d { "Torrent taskId=$taskId is not seeding" }
       return
@@ -616,7 +654,7 @@ class TorrentDownloadSource(
   }
 
   /** Applies a completed task's smaller selection to its seeding session, if it seeds. */
-  override suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
+  internal suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
     if (taskId !in seedingTaskIds.value) return false
     val session = tasks.session(taskId) ?: return false
     val live = session.changeSelection(fileIds)

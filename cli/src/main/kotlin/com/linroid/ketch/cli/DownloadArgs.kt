@@ -5,12 +5,12 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileOrder
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.sortedByFileOrder
+import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.core.engine.RequestHeaders
 import java.io.File
 
@@ -39,7 +39,7 @@ internal sealed interface DownloadArgs {
     /** `--list-files`: list the files of the URL instead of downloading it. */
     val listFiles: Boolean = false,
     /** `--sort` of `--list-files`. */
-    val fileOrder: TorrentFileOrder = TorrentFileOrder.TORRENT,
+    val fileOrder: FileOrder = FileOrder.SOURCE,
     /** `--reverse` of `--list-files`. */
     val reverse: Boolean = false,
   ) : DownloadArgs
@@ -156,9 +156,9 @@ private val valueOptions =
 
 /** The orders `--sort` names: `type` sorts by file extension. */
 private val FILE_ORDERS = mapOf(
-  "name" to TorrentFileOrder.NAME,
-  "size" to TorrentFileOrder.SIZE,
-  "type" to TorrentFileOrder.EXTENSION,
+  "name" to FileOrder.NAME,
+  "size" to FileOrder.SIZE,
+  "type" to FileOrder.EXTENSION,
 )
 
 /** The file IDs of a `--files` [value], or `null` when it is not comma-separated IDs. */
@@ -179,7 +179,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   val proxy = ProxyOptions()
   var fileIds = emptySet<String>()
   var listFiles = false
-  var fileOrder: TorrentFileOrder? = null
+  var fileOrder: FileOrder? = null
   var reverse = false
 
   var i = 0
@@ -247,7 +247,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     },
     fileIds = fileIds,
     listFiles = listFiles,
-    fileOrder = fileOrder ?: TorrentFileOrder.TORRENT,
+    fileOrder = fileOrder ?: FileOrder.SOURCE,
     reverse = reverse,
   )
 }
@@ -271,7 +271,7 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
  */
 internal fun fileListRows(
   source: ResolvedSource,
-  order: TorrentFileOrder = TorrentFileOrder.TORRENT,
+  order: FileOrder = FileOrder.SOURCE,
   reverse: Boolean = false,
 ): List<String> {
   if (source.files.isEmpty()) return emptyList()

@@ -118,7 +118,7 @@ class SqliteTaskStoreTest {
       val store = SqliteTaskStore(driver)
       val control = TaskControl(
         selectionGeneration = 3,
-        seeding = true,
+        sharing = true,
         commands = listOf(
           TaskCommandRecord(
             key = "retry-key",

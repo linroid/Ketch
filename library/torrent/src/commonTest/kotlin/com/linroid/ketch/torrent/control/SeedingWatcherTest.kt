@@ -1,4 +1,4 @@
-package com.linroid.ketch.engine
+package com.linroid.ketch.torrent.control
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
@@ -11,11 +11,9 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.LiveTorrent
-import com.linroid.ketch.core.engine.SeedingOutcome
-import com.linroid.ketch.core.engine.SeedingTask
+import com.linroid.ketch.core.engine.SourceExtension
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.TorrentControlSource
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -36,8 +34,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
- * Ketch shows on completed tasks whether their source seeds them, saves the intent to seed them
- * again, and restores seeding at start, oldest completion first, into free slots only.
+ * [TorrentControls] shows on completed tasks whether their source seeds them, saves the intent to
+ * seed them again, and restores seeding at start, oldest completion first, into free slots only.
  */
 class SeedingWatcherTest {
   private val folder = "/tmp/ketch-seeding-watcher/"
@@ -46,6 +44,9 @@ class SeedingWatcherTest {
   private class SeedingSource : DownloadSource, TorrentControlSource {
     override val type = TYPE
     override val managesOwnFileIo = true
+
+    override fun attach(host: SourceHost): SourceExtension =
+      TorrentControls(this, type, ::canHandle, host)
 
     val ids = MutableStateFlow<Set<String>>(emptySet())
     override val seedingTaskIds: StateFlow<Set<String>> = ids
@@ -114,7 +115,7 @@ class SeedingWatcherTest {
   ): Ketch {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return Ketch(
-      httpEngine = FakeHttpEngine(),
+      httpEngine = UnusedHttpEngine(),
       taskStore = store,
       config = config,
       additionalSources = listOf(source),
@@ -143,7 +144,7 @@ class SeedingWatcherTest {
       createdAt = at,
       updatedAt = at,
       completedAt = at,
-      control = seeding?.let { TaskControl(seeding = it) },
+      control = seeding?.let { TaskControl(sharing = it) },
     )
   }
 
@@ -157,20 +158,20 @@ class SeedingWatcherTest {
       ketch.start()
       runCurrent()
       val task = ketch.tasks.value.single()
-      assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
+      assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
 
       source.ids.value = setOf("done")
       runCurrent()
 
-      assertTrue(assertIs<DownloadState.Completed>(task.state.value).seeding)
-      assertEquals(true, store.load("done")?.control?.seeding)
+      assertTrue(assertIs<DownloadState.Completed>(task.state.value).sharing)
+      assertEquals(true, store.load("done")?.control?.sharing)
 
       // A seeder a download stopped, or one that stopped with Ketch, keeps its intent.
       source.ids.value = emptySet()
       runCurrent()
 
-      assertFalse(assertIs<DownloadState.Completed>(task.state.value).seeding)
-      assertEquals(true, store.load("done")?.control?.seeding)
+      assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+      assertEquals(true, store.load("done")?.control?.sharing)
     } finally {
       ketch.close()
     }
@@ -193,7 +194,7 @@ class SeedingWatcherTest {
       val third = ketch.download(request("seed:third"))
       runCurrent()
 
-      assertTrue(assertIs<DownloadState.Completed>(first.state.value).seeding)
+      assertTrue(assertIs<DownloadState.Completed>(first.state.value).sharing)
       assertIs<DownloadState.Downloading>(second.state.value)
       assertEquals(DownloadState.Queued, third.state.value)
       assertEquals(1, third.queuePosition.value)
@@ -205,7 +206,7 @@ class SeedingWatcherTest {
         source.ids.update { it + first.taskId }
         runCurrent()
       }
-      assertTrue(assertIs<DownloadState.Completed>(first.state.value).seeding)
+      assertTrue(assertIs<DownloadState.Completed>(first.state.value).sharing)
       assertIs<DownloadState.Downloading>(second.state.value)
       assertEquals(DownloadState.Queued, third.state.value)
       assertEquals(1, third.queuePosition.value)
@@ -228,13 +229,13 @@ class SeedingWatcherTest {
     val ketch = ketch(source, store)
     ketch.start()
     runCurrent()
-    assertTrue(assertIs<DownloadState.Completed>(ketch.tasks.value.single().state.value).seeding)
+    assertTrue(assertIs<DownloadState.Completed>(ketch.tasks.value.single().state.value).sharing)
 
     ketch.close()
     source.ids.value = emptySet()
     runCurrent()
 
-    assertEquals(true, store.load("done")?.control?.seeding)
+    assertEquals(true, store.load("done")?.control?.sharing)
   }
 
   @Test
@@ -252,7 +253,7 @@ class SeedingWatcherTest {
 
       assertEquals(listOf("early", "late"), source.started)
       val seeding = ketch.tasks.value.associate { task ->
-        task.taskId to (task.state.value as? DownloadState.Completed)?.seeding
+        task.taskId to (task.state.value as? DownloadState.Completed)?.sharing
       }
       assertEquals(true, seeding["early"])
       assertEquals(true, seeding["late"])
@@ -273,7 +274,7 @@ class SeedingWatcherTest {
       runCurrent()
 
       assertEquals(emptyList(), source.started)
-      assertEquals(true, store.load("done")?.control?.seeding)
+      assertEquals(true, store.load("done")?.control?.sharing)
     } finally {
       ketch.close()
     }
@@ -295,9 +296,9 @@ class SeedingWatcherTest {
 
       // Neither a change on disk nor a failure stops the walk.
       assertEquals(listOf("changed", "broken", "intact"), source.started)
-      assertEquals(false, store.load("changed")?.control?.seeding)
-      assertEquals(true, store.load("broken")?.control?.seeding)
-      assertEquals(true, store.load("intact")?.control?.seeding)
+      assertEquals(false, store.load("changed")?.control?.sharing)
+      assertEquals(true, store.load("broken")?.control?.sharing)
+      assertEquals(true, store.load("intact")?.control?.sharing)
     } finally {
       ketch.close()
     }
@@ -318,8 +319,8 @@ class SeedingWatcherTest {
 
       assertEquals(listOf("first", "second"), source.started)
       // Tasks that found no slot keep their intent for the next start.
-      assertEquals(true, store.load("second")?.control?.seeding)
-      assertEquals(true, store.load("third")?.control?.seeding)
+      assertEquals(true, store.load("second")?.control?.sharing)
+      assertEquals(true, store.load("third")?.control?.sharing)
     } finally {
       ketch.close()
     }
@@ -338,7 +339,7 @@ class SeedingWatcherTest {
       runCurrent()
 
       assertEquals(listOf("first"), source.started)
-      assertEquals(true, store.load("first")?.control?.seeding)
+      assertEquals(true, store.load("first")?.control?.sharing)
     } finally {
       ketch.close()
     }

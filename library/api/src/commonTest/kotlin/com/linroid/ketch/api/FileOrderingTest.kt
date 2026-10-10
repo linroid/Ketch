@@ -1,13 +1,13 @@
-package com.linroid.ketch.api.torrent
+package com.linroid.ketch.api
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class TorrentFileOrderingTest {
+class FileOrderingTest {
   private class File(val path: String, val size: Long, val selected: Boolean = true)
 
-  private fun List<File>.sorted(order: TorrentFileOrder, descending: Boolean = false) =
+  private fun List<File>.sorted(order: FileOrder, descending: Boolean = false) =
     sortedByFileOrder(order, descending, { it.path }, { it.size }, { it.selected }).map { it.path }
 
   @Test
@@ -63,9 +63,9 @@ class TorrentFileOrderingTest {
   )
 
   @Test
-  fun torrentOrder_keepsTheListAndReverses() {
-    assertEquals(files.map { it.path }, files.sorted(TorrentFileOrder.TORRENT))
-    assertEquals(files.map { it.path }.reversed(), files.sorted(TorrentFileOrder.TORRENT, true))
+  fun sourceOrder_keepsTheListAndReverses() {
+    assertEquals(files.map { it.path }, files.sorted(FileOrder.SOURCE))
+    assertEquals(files.map { it.path }.reversed(), files.sorted(FileOrder.SOURCE, true))
   }
 
   @Test
@@ -75,25 +75,25 @@ class TorrentFileOrderingTest {
         "Show/Episode 1.mkv", "Show/Episode 2.mkv", "Show/episode 2.srt", "Show/Episode 10.mkv",
         "Show/notes.txt",
       ),
-      files.sorted(TorrentFileOrder.NAME),
+      files.sorted(FileOrder.NAME),
     )
   }
 
   @Test
-  fun sizeOrder_breaksTiesByTorrentOrderInBothDirections() {
+  fun sizeOrder_breaksTiesBySourceOrderInBothDirections() {
     assertEquals(
       listOf(
         "Show/episode 2.srt", "Show/notes.txt", "Show/Episode 1.mkv", "Show/Episode 10.mkv",
         "Show/Episode 2.mkv",
       ),
-      files.sorted(TorrentFileOrder.SIZE),
+      files.sorted(FileOrder.SIZE),
     )
     assertEquals(
       listOf(
         "Show/Episode 10.mkv", "Show/Episode 2.mkv", "Show/Episode 1.mkv", "Show/episode 2.srt",
         "Show/notes.txt",
       ),
-      files.sorted(TorrentFileOrder.SIZE, descending = true),
+      files.sorted(FileOrder.SIZE, descending = true),
     )
   }
 
@@ -104,7 +104,7 @@ class TorrentFileOrderingTest {
         "Show/Episode 1.mkv", "Show/Episode 2.mkv", "Show/Episode 10.mkv", "Show/episode 2.srt",
         "Show/notes.txt",
       ),
-      files.sorted(TorrentFileOrder.EXTENSION),
+      files.sorted(FileOrder.EXTENSION),
     )
   }
 
@@ -115,27 +115,21 @@ class TorrentFileOrderingTest {
         "Show/Episode 1.mkv", "Show/Episode 2.mkv", "Show/Episode 10.mkv", "Show/episode 2.srt",
         "Show/notes.txt",
       ),
-      files.sorted(TorrentFileOrder.SELECTED),
+      files.sorted(FileOrder.SELECTED),
     )
     assertEquals(
       listOf(
         "Show/notes.txt", "Show/episode 2.srt", "Show/Episode 10.mkv", "Show/Episode 2.mkv",
         "Show/Episode 1.mkv",
       ),
-      files.sorted(TorrentFileOrder.SELECTED, descending = true),
+      files.sorted(FileOrder.SELECTED, descending = true),
     )
   }
 
   @Test
-  fun equalPaths_keepTorrentOrder() {
+  fun equalPaths_keepSourceOrder() {
     val same = listOf(File("a", 1), File("a", 2), File("a", 3))
-    val sorted = same.sortedByFileOrder(TorrentFileOrder.NAME, true, { it.path }, { 0 }, { true })
+    val sorted = same.sortedByFileOrder(FileOrder.NAME, true, { it.path }, { 0 }, { true })
     assertEquals(listOf(1L, 2L, 3L), sorted.map { it.size })
-  }
-
-  @Test
-  fun wireNames_roundTrip() {
-    TorrentFileOrder.entries.forEach { assertEquals(it, TorrentFileOrder.fromWire(it.wireName)) }
-    assertEquals(null, TorrentFileOrder.fromWire("kind"))
   }
 }

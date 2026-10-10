@@ -5,7 +5,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
@@ -13,6 +12,7 @@ import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.awaitsFileSelection
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_tab_activity
 import ketch.app.shared.generated.resources.inspector_tab_connections
@@ -41,7 +41,7 @@ enum class InspectorTab(private val resource: StringResource) {
 /**
  * The tabs the inspector offers for [row], in order, leaving out any with nothing to show:
  * Overview; for a torrent, Files once its files are known, or while it waits for them to be
- * chosen on a device that lists them ([KetchFeatures.TORRENT_CONTROL] among its [features]);
+ * chosen on a device that lists them ([TorrentFeatures.CONTROL] among its [features]);
  * for other tasks, Connections while an HTTP or FTP task has unfinished segments, and Files when
  * the source lists files or variants; and Activity once the task has a speed [history] or a
  * [timeline].
@@ -54,7 +54,7 @@ fun inspectorTabs(
 ): List<InspectorTab> = buildList {
   add(InspectorTab.Overview)
   if (row.isTorrent) {
-    val listsFiles = row.state.awaitsFileSelection && KetchFeatures.TORRENT_CONTROL in features
+    val listsFiles = row.state.awaitsFileSelection && TorrentFeatures.CONTROL in features
     if (taskFileCount(row, filesSelectable(row, features)) > 0 || listsFiles) {
       add(InspectorTab.Files)
     }

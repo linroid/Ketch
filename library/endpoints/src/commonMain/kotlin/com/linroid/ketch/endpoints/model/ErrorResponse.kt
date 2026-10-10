@@ -1,6 +1,6 @@
 package com.linroid.ketch.endpoints.model
 
-import com.linroid.ketch.api.torrent.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentRevision
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,8 +8,8 @@ import kotlinx.serialization.Serializable
  *
  * @property error a stable error code, such as `not_found`
  * @property message a description in English
- * @property revision the torrent task's current revision, for torrent commands that conflicted
- *   (`revision_conflict`); `null` otherwise
+ * @property revision the task's current controller revision, for torrent controller commands
+ *   that conflicted (`revision_conflict`); `null` otherwise
  */
 @Serializable
 data class ErrorResponse(

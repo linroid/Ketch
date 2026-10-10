@@ -1,5 +1,6 @@
-package com.linroid.ketch.api.torrent
+package com.linroid.ketch.torrent.api
 
+import com.linroid.ketch.api.FileOrder
 import kotlinx.serialization.Serializable
 
 /**
@@ -50,29 +51,34 @@ data class TorrentFilePage(
 }
 
 /**
- * How [TorrentController.files] orders a torrent's files. Ties break by [TORRENT] order, so every
- * order is total and stable.
+ * How [TorrentController.files] orders a torrent's files: the generic [FileOrder] it names, with
+ * the name REST and agents use for it. Ties break by [TORRENT] order, so every order is total and
+ * stable.
  *
  * @property wireName the value of the REST `sort` query parameter
+ * @property order the generic order, which [com.linroid.ketch.api.sortedByFileOrder] sorts by
  */
-enum class TorrentFileOrder(val wireName: String) {
+enum class TorrentFileOrder(val wireName: String, val order: FileOrder) {
   /** The order of the torrent's metainfo (file ID order). */
-  TORRENT("torrent"),
+  TORRENT("torrent", FileOrder.SOURCE),
 
   /** Case-insensitive natural order of the full path, so "Episode 2" comes before "Episode 10". */
-  NAME("name"),
+  NAME("name", FileOrder.NAME),
 
   /** File size, smallest first. */
-  SIZE("size"),
+  SIZE("size", FileOrder.SIZE),
 
   /** Lowercased file extension, then [NAME]. */
-  EXTENSION("extension"),
+  EXTENSION("extension", FileOrder.EXTENSION),
 
   /** Selected files first, then [NAME]. */
-  SELECTED("selected");
+  SELECTED("selected", FileOrder.SELECTED);
 
   companion object {
     /** The order named [name], or `null` for a name this version does not know. */
     fun fromWire(name: String?): TorrentFileOrder? = entries.firstOrNull { it.wireName == name }
+
+    /** The torrent order that names [order]. */
+    fun of(order: FileOrder): TorrentFileOrder = entries.first { it.order == order }
   }
 }

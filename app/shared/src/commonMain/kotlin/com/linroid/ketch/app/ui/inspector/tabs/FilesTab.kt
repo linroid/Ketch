@@ -69,11 +69,11 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSelectionModel
 import com.linroid.ketch.app.state.FileSort
 import com.linroid.ketch.app.state.FileSortKey
 import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.FileSelectionModel
 import com.linroid.ketch.app.state.awaitsFileSelection
 import com.linroid.ketch.app.state.selectionMode
 import com.linroid.ketch.app.state.sortedByFiles
@@ -111,7 +111,7 @@ import org.jetbrains.compose.resources.stringResource
  * bytes.
  *
  * Names come from the task's resolved file list, by id; for a torrent, a device listing
- * [KetchFeatures.TORRENT_CONTROL] is asked for them when the task has none
+ * [com.linroid.ketch.torrent.api.TorrentFeatures.CONTROL] is asked for them when the task has none
  * ([FileSelectionModel.load]), and only a file neither names is "File 12". On a device listing
  * [KetchFeatures.FILE_SELECTION] every file of a task that is not canceled is listed with a
  * checkbox, or with a radio button when its source offers a single choice

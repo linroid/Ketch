@@ -13,13 +13,14 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.defaultSelection
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentFilePage
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.sortedByFileOrder
+import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.api.withoutBulkMetadata
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -364,7 +365,7 @@ class KetchToolSet(
   /**
    * A page of the files or variants of task [taskId], sorted by [sort] (a [TorrentFileOrder] wire
    * name) and reversed when [descending], from the instance's
-   * [com.linroid.ketch.api.torrent.TorrentController]. An instance without one, or one that
+   * [com.linroid.ketch.torrent.api.TorrentController]. An instance without one, or one that
    * cannot list them, pages the task's [DownloadRequest.resolvedSource] files instead.
    */
   suspend fun listDownloadFiles(
@@ -386,7 +387,7 @@ class KetchToolSet(
     val task = ketch.tasks.value.find { it.taskId == taskId } ?: return notFound(taskId)
     if (!cursor.startsWith(LOCAL_CURSOR_PREFIX)) {
       val page = try {
-        ketch.torrents?.files(
+        ketch.control(TorrentController)?.files(
           taskId = taskId,
           page = TorrentPageRequest(limit, cursor.ifEmpty { null }),
           order = order,
@@ -515,7 +516,7 @@ class KetchToolSet(
       .orEmpty()
     fun isSelected(file: SourceFile) = !waiting && file.id in chosen
     val sorted = files.sortedByFileOrder(
-      order = order,
+      order = order.order,
       descending = descending,
       path = { it.path() },
       size = { it.size },
@@ -605,7 +606,7 @@ class KetchToolSet(
           state.totalBytes?.let { put("totalBytes", it) }
           state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
           state.completedAt?.let { put("completedAt", it.toString()) }
-          put("seeding", state.seeding)
+          put("sharing", state.sharing)
         }
         is DownloadState.Failed -> {
           put("error", state.error.message ?: "Unknown error")

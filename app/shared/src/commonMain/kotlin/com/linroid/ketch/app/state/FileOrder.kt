@@ -1,6 +1,6 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.api.torrent.NaturalOrder
+import com.linroid.ketch.api.NaturalOrder
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.util.FileKind

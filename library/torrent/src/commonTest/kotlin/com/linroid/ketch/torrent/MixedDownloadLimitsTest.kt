@@ -198,7 +198,7 @@ class MixedDownloadLimitsTest {
           sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
             Json.encodeToString(state)),
           createdAt = now, updatedAt = now, completedAt = now,
-          control = TaskControl(seeding = true)))
+          control = TaskControl(sharing = true)))
         var seedEngine: KotlinTorrentEngine? = null
         val seedSource = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), UnusedHttp).also {
@@ -213,7 +213,7 @@ class MixedDownloadLimitsTest {
           seedKetch.start()
           val restored = seedKetch.tasks.value.single()
           awaitStage("the restored task to seed", restored) {
-            restored.state.first { it is DownloadState.Completed && it.seeding }
+            restored.state.first { it is DownloadState.Completed && it.sharing }
           }
           leechKetch.start()
           val magnet = MagnetUri(torrent.metadata.infoHash,

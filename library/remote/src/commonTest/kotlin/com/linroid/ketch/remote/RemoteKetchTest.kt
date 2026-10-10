@@ -5,10 +5,11 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentRevision
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -19,6 +20,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class RemoteKetchTest {
   private fun status(features: Set<String>) = KetchStatus(
@@ -69,7 +71,7 @@ class RemoteKetchTest {
     })
     try {
       val error = assertFailsWith<TorrentCommandException> {
-        remote.torrents.select(
+        assertNotNull(remote.control(TorrentController)).select(
           "t1", setOf("0"), TorrentCommandContext("k", TorrentRevision("e", 0)),
         )
       }

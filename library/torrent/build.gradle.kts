@@ -51,6 +51,7 @@ kotlin {
 
     commonMain.dependencies {
       api(projects.library.core)
+      api(projects.library.torrentApi)
       implementation(libs.okio)
       implementation(libs.ktor.network)
       implementation(libs.ktor.http)

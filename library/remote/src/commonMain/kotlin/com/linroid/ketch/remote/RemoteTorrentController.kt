@@ -1,24 +1,25 @@
 package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.torrent.TorrentCapabilities
-import com.linroid.ketch.api.torrent.TorrentCapability
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentCommandResult
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentFilePage
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.api.torrent.TorrentRevision
-import com.linroid.ketch.api.torrent.TorrentRevisionDecision
-import com.linroid.ketch.api.torrent.TorrentSnapshot
-import com.linroid.ketch.api.torrent.compareIncoming
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
-import com.linroid.ketch.endpoints.model.TorrentSeedingRequest
-import com.linroid.ketch.endpoints.model.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.Torrents
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentCommandResult
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentRevisionDecision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.compareIncoming
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.resources.get
@@ -26,8 +27,8 @@ import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -66,7 +67,7 @@ internal class RemoteTorrentController(
   override suspend fun capabilities(): TorrentCapabilities {
     val current = generation.value
     mutex.withLock { cached?.takeIf { it.first == current }?.let { return it.second } }
-    val response = httpClient.get(Api.Torrents.Capabilities())
+    val response = httpClient.get(Torrents.Capabilities())
     val capabilities = if (response.status.isSuccess()) {
       response.body<TorrentCapabilities>()
     } else {
@@ -87,7 +88,7 @@ internal class RemoteTorrentController(
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {
     requireCapability(TorrentCapability.INSPECT)
-    return call(notFoundIsNull = true) { httpClient.get(Api.Torrents.ById(id = taskId)) }
+    return call(notFoundIsNull = true) { httpClient.get(Torrents.ById(id = taskId)) }
   }
 
   override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
@@ -194,8 +195,8 @@ internal class RemoteTorrentController(
     requireCapability(TorrentCapability.INSPECT)
     return call(notFoundIsNull = true) {
       httpClient.get(
-        Api.Torrents.ById.Files(
-          parent = Api.Torrents.ById(id = taskId),
+        Torrents.ById.Files(
+          parent = Torrents.ById(id = taskId),
           limit = page.limit,
           cursor = page.cursor,
           sort = order.wireName.takeIf { order != TorrentFileOrder.TORRENT },
@@ -212,7 +213,7 @@ internal class RemoteTorrentController(
   ): TorrentCommandResult {
     requireCapability(TorrentCapability.FILE_SELECTION)
     return call(notFoundIsNull = false) {
-      httpClient.put(Api.Torrents.ById.Selection(parent = Api.Torrents.ById(id = taskId))) {
+      httpClient.put(Torrents.ById.Selection(parent = Torrents.ById(id = taskId))) {
         contentType(ContentType.Application.Json)
         setBody(TorrentSelectionRequest(fileIds, context))
       }
@@ -227,7 +228,7 @@ internal class RemoteTorrentController(
     // Whether the server seeds now is its decision (policy_denied), not a capability to check.
     requireCapability(TorrentCapability.INSPECT)
     return call(notFoundIsNull = false) {
-      httpClient.put(Api.Torrents.ById.Seeding(parent = Api.Torrents.ById(id = taskId))) {
+      httpClient.put(Torrents.ById.Seeding(parent = Torrents.ById(id = taskId))) {
         contentType(ContentType.Application.Json)
         setBody(TorrentSeedingRequest(seeding, context))
       }

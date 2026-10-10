@@ -160,6 +160,7 @@ dependencies {
   implementation(projects.library.hls)
   implementation(projects.library.dash)
   implementation(projects.library.torrent)
+  implementation(projects.library.torrentApi)
   implementation(projects.updater)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)

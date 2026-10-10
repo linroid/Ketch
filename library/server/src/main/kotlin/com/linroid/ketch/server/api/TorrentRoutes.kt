@@ -1,17 +1,15 @@
 package com.linroid.ketch.server.api
 
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.torrent.TorrentCapabilities
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileOrder
-import com.linroid.ketch.api.torrent.TorrentPageRequest
-import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
-import com.linroid.ketch.endpoints.model.TorrentSeedingRequest
-import com.linroid.ketch.endpoints.model.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.Torrents
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentPageRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
 import io.ktor.server.resources.put
@@ -33,22 +31,23 @@ private const val MAX_PAGE_LIMIT = 1000
 private const val MAX_CURSOR_LENGTH = 4096
 
 /**
- * Installs the `/api/torrents` routes over [KetchApi.torrents]. Command failures throw
- * [TorrentCommandException], which the server's status pages answer with the error's wire name
- * ([torrentErrorStatus]).
+ * Installs the `/api/torrents` routes over [controller], the served instance's
+ * `control(TorrentController)`; a server whose instance has none installs no routes, so clients
+ * read their absence as no torrent controls. Command failures throw [TorrentCommandException],
+ * which the server's status pages answer with the error's wire name ([torrentErrorStatus]).
  */
-internal fun Route.torrentRoutes(ketch: KetchApi) {
-  get<Api.Torrents.Capabilities> {
-    call.respond(ketch.torrents?.capabilities() ?: TorrentCapabilities())
+internal fun Route.torrentRoutes(controller: TorrentController) {
+  get<Torrents.Capabilities> {
+    call.respond(controller.capabilities())
   }
 
-  get<Api.Torrents.ById> { resource ->
+  get<Torrents.ById> { resource ->
     log.d { "GET /api/torrents/${resource.id}" }
-    val snapshot = controller(ketch).snapshot(resource.id) ?: throw notFound(resource.id)
+    val snapshot = controller.snapshot(resource.id) ?: throw notFound(resource.id)
     call.respond(snapshot)
   }
 
-  get<Api.Torrents.ById.Files> { resource ->
+  get<Torrents.ById.Files> { resource ->
     val taskId = resource.parent.id
     log.d { "GET /api/torrents/$taskId/files" }
     val limit = resource.limit ?: TorrentPageRequest().limit
@@ -66,7 +65,7 @@ internal fun Route.torrentRoutes(ketch: KetchApi) {
         }
       )
     } ?: TorrentFileOrder.TORRENT
-    val page = controller(ketch).files(
+    val page = controller.files(
       taskId = taskId,
       page = TorrentPageRequest(limit, cursor),
       order = order,
@@ -75,28 +74,23 @@ internal fun Route.torrentRoutes(ketch: KetchApi) {
     call.respond(page)
   }
 
-  put<Api.Torrents.ById.Selection> { resource ->
+  put<Torrents.ById.Selection> { resource ->
     val taskId = resource.parent.id
     log.d { "PUT /api/torrents/$taskId/selection" }
     val body = call.receiveJson<TorrentSelectionRequest>()
-    call.respond(controller(ketch).select(taskId, body.fileIds, body.context))
+    call.respond(controller.select(taskId, body.fileIds, body.context))
   }
 
-  put<Api.Torrents.ById.Seeding> { resource ->
+  put<Torrents.ById.Seeding> { resource ->
     val taskId = resource.parent.id
     val body = call.receiveJson<TorrentSeedingRequest>()
     log.d { "PUT /api/torrents/$taskId/seeding seeding=${body.seeding}" }
-    call.respond(controller(ketch).setSeeding(taskId, body.seeding, body.context))
+    call.respond(controller.setSeeding(taskId, body.seeding, body.context))
   }
 
   sse("/api/torrents/{id}/events") {
     val taskId = call.parameters["id"]!!
     log.d { "SSE client connected to /api/torrents/$taskId/events" }
-    val controller = ketch.torrents
-    if (controller == null) {
-      sendError(unsupported())
-      return@sse
-    }
     try {
       controller.observe(taskId)
         .transformWhile { snapshot ->
@@ -145,13 +139,6 @@ private suspend fun ServerSSESession.sendError(e: TorrentCommandException) {
     ),
   )
 }
-
-private fun controller(ketch: KetchApi): TorrentController = ketch.torrents ?: throw unsupported()
-
-private fun unsupported() = TorrentCommandException(
-  TorrentCommandError.UNSUPPORTED,
-  "This server has no torrent controls",
-)
 
 private fun notFound(taskId: String) = TorrentCommandException(
   TorrentCommandError.NOT_FOUND,

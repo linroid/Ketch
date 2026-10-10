@@ -78,6 +78,7 @@ kotlin {
       // FileLogger takes okio paths.
       api(libs.okio)
       implementation(projects.library.remote)
+      implementation(projects.library.torrentApi)
 
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.datetime)

@@ -336,7 +336,7 @@ private fun completedContent(
   val device = context.device
   val size = state.totalBytes?.let(::sizeText)
   // A torrent that shares its files says so first: "Seeding · 4.2 MB/s avg · example.com".
-  val seeding = Res.string.row_seeding.text().takeIf { state.seeding }
+  val seeding = Res.string.row_seeding.text().takeIf { state.sharing }
   val detail = when {
     missing -> Res.string.row_missing_file.text()
     device.capabilities.isRemote ->

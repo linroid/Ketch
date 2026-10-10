@@ -7,9 +7,6 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentRevision
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.load
@@ -27,6 +24,9 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.util.errorDetails
 import com.linroid.ketch.app.util.referer
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentRevision
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.downloads_copied_details
 import ketch.app.shared.generated.resources.downloads_copied_error

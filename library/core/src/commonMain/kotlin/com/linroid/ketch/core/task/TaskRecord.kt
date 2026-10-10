@@ -20,8 +20,8 @@ import kotlin.time.Instant
  *   created before it was tracked, which keep it unknown rather than undercount it
  * @property completedAt when the task last completed; `null` before completion, for records
  *   completed before it was tracked, and while a selection that added files reopens the task
- * @property control state of typed controls (torrent selections and seeding) that Ketch owns;
- *   `null` until the first control change
+ * @property control state of typed controls (selection generations, the sharing intent and the
+ *   retry ledger of controller commands) that Ketch owns; `null` until the first control change
  */
 @Serializable
 data class TaskRecord(
@@ -42,17 +42,19 @@ data class TaskRecord(
 )
 
 /**
- * Control state of sources with typed controls (torrents). Ketch owns it, never the sources, and
- * saves it with the change it describes in one [TaskStore.save].
+ * Control state of tasks whose sources offer typed controls
+ * ([com.linroid.ketch.core.engine.SourceExtension]). Ketch owns it, never the sources, and saves it
+ * with the change it describes in one [TaskStore.save].
  *
  * @property selectionGeneration counts the selection changes of the task; 0 until the first
- * @property seeding seed this completed task whenever its source can, including after a restart
+ * @property sharing share this completed task with others whenever its source can, including
+ *   after a restart
  * @property commands the retry ledger of controller commands, at most [MAX_COMMANDS] entries
  */
 @Serializable
 data class TaskControl(
   val selectionGeneration: Long = 0,
-  val seeding: Boolean = false,
+  val sharing: Boolean = false,
   val commands: List<TaskCommandRecord> = emptyList(),
 ) {
   init {
@@ -74,7 +76,7 @@ data class TaskControl(
  * @property epoch the revision epoch the outcome was published at
  * @property sequence the revision sequence the outcome was published at
  * @property selectionGeneration the selection generation after the command
- * @property seeding the seeding intent after a seeding command; `null` for other commands
+ * @property sharing the sharing intent after a sharing command; `null` for other commands
  * @property recordedAtMs when the command ran, in epoch milliseconds
  */
 @Serializable
@@ -84,7 +86,7 @@ data class TaskCommandRecord(
   val epoch: String,
   val sequence: Long,
   val selectionGeneration: Long,
-  val seeding: Boolean? = null,
+  val sharing: Boolean? = null,
   val recordedAtMs: Long,
 ) {
   init {

@@ -256,7 +256,7 @@ class RowContentTest {
       outputPath = "/tmp/Show",
       totalBytes = 10_485_760,
       downloadTime = 4.seconds,
-      seeding = true,
+      sharing = true,
     )
 
     val content = rowContent(request, state, now, context)
@@ -270,7 +270,7 @@ class RowContentTest {
     assertEquals("Seeding · Saved on NAS-Basement", remoteContent.detail.load())
     assertTrue(RowAction.StopSeeding in taskActions(request, state, local).menu)
     assertFalse(
-      RowAction.StopSeeding in taskActions(request, state.copy(seeding = false), local).menu
+      RowAction.StopSeeding in taskActions(request, state.copy(sharing = false), local).menu
     )
   }
 

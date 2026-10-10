@@ -13,7 +13,6 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
@@ -21,7 +20,6 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import com.linroid.ketch.api.torrent.TorrentController
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
@@ -39,6 +37,7 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
+import com.linroid.ketch.app.instance.EmbeddedFeatures
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
@@ -61,6 +60,8 @@ import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
@@ -897,11 +898,12 @@ class AppState(
 
   /**
    * The torrent controller of the device [deviceId] when its features list
-   * [KetchFeatures.TORRENT_CONTROL]; `null` otherwise.
+   * [TorrentFeatures.CONTROL]; `null` otherwise.
    */
   fun torrentControllerOf(deviceId: String): TorrentController? {
-    if (KetchFeatures.TORRENT_CONTROL !in featuresOf(deviceId)) return null
-    return instances.value.firstOrNull { it.deviceId == deviceId }?.instance?.torrents
+    if (TorrentFeatures.CONTROL !in featuresOf(deviceId)) return null
+    return instances.value.firstOrNull { it.deviceId == deviceId }?.instance
+      ?.control(TorrentController)
   }
 
   /**
@@ -1775,7 +1777,7 @@ class AppState(
    */
   fun featuresOf(deviceId: String): Set<String> {
     val entry = instances.value.firstOrNull { it.deviceId == deviceId } ?: return emptySet()
-    if (entry !is RemoteInstance) return KetchFeatures.ALL
+    if (entry !is RemoteInstance) return EmbeddedFeatures
     return instanceManager.presence.value.firstOrNull { it.deviceId == deviceId }
       ?.status?.features.orEmpty()
   }
@@ -1783,7 +1785,7 @@ class AppState(
   /** [featuresOf] the device of [entry], as it changes. */
   internal fun featuresFlow(entry: InstanceEntry): Flow<Set<String>> {
     // The embedded engine is this build of Ketch, which supports everything it lists.
-    if (entry !is RemoteInstance) return flowOf(KetchFeatures.ALL)
+    if (entry !is RemoteInstance) return flowOf(EmbeddedFeatures)
     val deviceId = entry.deviceId
     return instanceManager.presence
       .map { devices ->

@@ -7,16 +7,16 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.torrent.TorrentCommandContext
-import com.linroid.ketch.api.torrent.TorrentCommandError
-import com.linroid.ketch.api.torrent.TorrentCommandException
-import com.linroid.ketch.api.torrent.TorrentController
-import com.linroid.ketch.api.torrent.TorrentFileOrder
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.prepareGet
@@ -95,7 +95,7 @@ class TorrentRemoteSelectionTest {
       started.await()
     }
 
-    val torrents: TorrentController get() = remote.torrents
+    val torrents: TorrentController get() = assertNotNull(remote.control(TorrentController))
 
     fun capturedEvents(): String = synchronized(events) { events.toString() }
 

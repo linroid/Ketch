@@ -23,8 +23,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *   `too_many_attempts` (429) once this address sent too many wrong access tokens;
  *   `selection_unavailable` (409) when a task's files cannot change now, such as while its file
  *   list is not known yet. Torrent controller failures carry the wire names of
- *   [com.linroid.ketch.api.torrent.TorrentCommandError] and surface as
- *   [com.linroid.ketch.api.torrent.TorrentCommandException] instead
+ *   [com.linroid.ketch.torrent.api.TorrentCommandError] and surface as
+ *   [com.linroid.ketch.torrent.api.TorrentCommandException] instead
  * @property retryAfterSeconds how long the server asks to wait before trying again, from its
  *   `Retry-After` header, when it sent one
  */

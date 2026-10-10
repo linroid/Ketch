@@ -13,6 +13,8 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -194,7 +196,7 @@ class TorrentDownloadSourceTest {
   @Test
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
-      KetchFeatures.AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL), source.features)
+      KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL), source.features)
     assertEquals(setOf("file-selection", "v1", "v2", "hybrid"), source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)
@@ -210,8 +212,8 @@ class TorrentDownloadSourceTest {
       val features = ketch.status().features
       assertTrue(KetchFeatures.FILE_SELECTION in features)
       assertTrue(KetchFeatures.AWAIT_FILE_SELECTION in features)
-      assertTrue(KetchFeatures.TORRENT_CONTROL in features)
-      assertNotNull(ketch.torrents)
+      assertTrue(TorrentFeatures.CONTROL in features)
+      assertNotNull(ketch.control(TorrentController))
     } finally {
       ketch.close()
     }

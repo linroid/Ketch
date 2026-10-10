@@ -66,8 +66,8 @@ sealed class DownloadState {
    *   selection that adds files clears it until then); `null` if unknown, such as for a task
    *   that finished in a version of Ketch that did not record it, or one reported by an older
    *   server
-   * @property seeding `true` while its source shares the finished content with other peers (a
-   *   seeding torrent). Not persisted; `false` from servers that do not report it.
+   * @property sharing `true` while its source shares the finished content with others, such as a
+   *   torrent that seeds. Not persisted; `false` from servers that do not report it.
    */
   @Serializable
   @SerialName("completed")
@@ -76,7 +76,7 @@ sealed class DownloadState {
     val totalBytes: Long? = null,
     val downloadTime: Duration? = null,
     val completedAt: Instant? = null,
-    val seeding: Boolean = false,
+    val sharing: Boolean = false,
   ) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */
