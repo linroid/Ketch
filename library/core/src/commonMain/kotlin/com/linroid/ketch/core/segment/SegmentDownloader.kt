@@ -2,6 +2,7 @@ package com.linroid.ketch.core.segment
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.FileAccessor
@@ -24,6 +25,7 @@ internal class SegmentDownloader(
     url: String,
     segment: Segment,
     headers: Map<String, String> = emptyMap(),
+    handle: ConnectionHandle = ConnectionHandle.None,
     onProgress: suspend (bytesDownloaded: Long) -> Unit,
   ): Segment {
     if (segment.isComplete) {
@@ -58,6 +60,7 @@ internal class SegmentDownloader(
         throw KetchError.Disk(e)
       }
       downloadedBytes += data.size
+      handle.received(data.size)
       onProgress(downloadedBytes)
     }
 

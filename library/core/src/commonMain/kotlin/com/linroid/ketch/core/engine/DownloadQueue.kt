@@ -427,25 +427,14 @@ internal class DownloadQueue(
   }
 
   companion object {
-    private val AUTHORITY = Regex("""^([A-Za-z][A-Za-z0-9+.\-]*)://([^/?#]*)""")
-
     /**
      * Returns the key used for the per-host limit: the URL host in lower
      * case, without user info, port or IPv6 brackets. Returns `null` for
      * URIs without a network host — magnet links, `torrent:` identifiers,
      * `file:` URLs and local paths — which the per-host limit ignores.
      */
-    internal fun extractHost(url: String): String? {
-      val match = AUTHORITY.find(url.trim()) ?: return null
-      if (match.groupValues[1].equals("file", ignoreCase = true)) return null
-      val hostPort = match.groupValues[2].substringAfterLast('@')
-      val host = if (hostPort.startsWith('[')) {
-        hostPort.substring(1).substringBefore(']')
-      } else {
-        hostPort.substringBefore(':')
-      }
-      return host.lowercase().ifEmpty { null }
-    }
+    internal fun extractHost(url: String): String? =
+      UrlAuthority.parse(url)?.takeUnless { it.scheme == "file" }?.host
 
     private fun effectiveLimit(value: Int): Int =
       if (value > 0) value else Int.MAX_VALUE

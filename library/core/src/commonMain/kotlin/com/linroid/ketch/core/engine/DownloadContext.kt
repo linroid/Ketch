@@ -56,6 +56,10 @@ import kotlinx.coroutines.flow.update
  *   the run starts with; [com.linroid.ketch.api.DownloadTask.selectFiles] sends a new revision
  *   while it runs. Sources that implement [DownloadSource.planSelection] apply each revision live
  *   and confirm it with [acknowledgeSelection].
+ * @property connections opens the task's live network connections, which
+ *   [com.linroid.ketch.api.KetchApi.activeConnections] reports. Sources open a handle when a
+ *   transfer starts, count its bytes and close it when the transfer ends, also on failure and
+ *   cancellation.
  */
 class DownloadContext(
   val taskId: String,
@@ -77,6 +81,7 @@ class DownloadContext(
   val config: DownloadConfig = DownloadConfig.Default,
   val selection: StateFlow<SelectionUpdate> =
     MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
+  val connections: ConnectionReporter = ConnectionReporter.None,
 ) {
   private val acknowledged = MutableStateFlow(0)
 

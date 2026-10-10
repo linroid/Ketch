@@ -88,6 +88,8 @@ class LiveTorrent(
  * @property resumeState the task's saved source state
  * @property outputPath where the task saved its files
  * @property selectedFileIds the task's files; empty for every file
+ * @property connections opens the task's live network connections while it seeds, as
+ *   [DownloadContext.connections] does while it downloads
  */
 class SeedingTask(
   val taskId: String,
@@ -95,6 +97,7 @@ class SeedingTask(
   val resumeState: SourceResumeState,
   val outputPath: String,
   val selectedFileIds: Set<String>,
+  val connections: ConnectionReporter = ConnectionReporter.None,
 )
 
 /** How an attempt to share a completed task ended, or why it would not start. */

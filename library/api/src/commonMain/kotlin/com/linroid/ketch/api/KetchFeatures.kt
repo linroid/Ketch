@@ -34,9 +34,13 @@ object KetchFeatures {
   /** [KetchApi.torrents] executes commands: REST `/api/torrents` and its event stream. */
   const val TORRENT_CONTROL: String = "torrent.control"
 
+  /** [KetchApi.activeConnections] reports live connections. */
+  const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
+
   /** Every feature this version of Ketch supports, including optional sources. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
-    CATEGORY_FOLDERS, TORRENT_FILE_SELECTION, TORRENT_AWAIT_FILE_SELECTION, TORRENT_CONTROL
+    CATEGORY_FOLDERS, TORRENT_FILE_SELECTION, TORRENT_AWAIT_FILE_SELECTION, TORRENT_CONTROL,
+    ACTIVE_CONNECTIONS
   )
 }

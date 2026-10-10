@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
  * @param config provides the current global configuration; each start or
  *   resume takes a snapshot of it, with the task's own [DownloadRequest.proxy] if it has one
  * @param clock stamps when downloads complete
+ * @param connections the reporter of a task's live connections
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -48,6 +49,7 @@ internal class DownloadCoordinator(
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val dispatchers: KetchDispatchers,
   private val clock: Clock = Clock.System,
+  private val connections: (taskId: String) -> ConnectionReporter = { ConnectionReporter.None },
 ) {
   private val scope: CoroutineScope = CoroutineScope(dispatchers.network)
   private val log = KetchLogger("Coordinator")
@@ -375,6 +377,7 @@ internal class DownloadCoordinator(
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
       clock = clock,
+      connections = connections(handle.taskId),
     )
   }
 

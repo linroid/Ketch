@@ -67,7 +67,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
-  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`
+  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
   `redactUrl()`, `describeCauses()`
 - `com.linroid.ketch.api.torrent` -- `TorrentController` (optional `KetchApi.torrents`:
@@ -87,7 +88,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `TorrentControlSource` (with
   `LiveTorrent`, `SeedingTask`, `SeedingOutcome`),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
-  `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`
+  `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
+  `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
   `SegmentedDownloadHelper`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
@@ -284,6 +286,24 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   resolved by the proxy). The interface-bound engines reach proxies through their address or
   network; a custom `HttpClient` only follows SYSTEM. `RemoteKetch` refuses a proxy for servers
   without `KetchFeatures.PROXY` (`http.proxy`). See [proxies](docs/proxy.md)
+
+### Live Connections (`ConnectionRegistry`)
+- `KetchApi.activeConnections(limit)` streams `ActiveConnections` snapshots, listed as
+  `KetchFeatures.ACTIVE_CONNECTIONS` (`net.activeConnections`); the default implementation throws
+  `UnsupportedOperationException` when collected. `limit` must be in 1..1024 (default 256): a
+  snapshot keeps the fastest connections, ordered by when they opened, while `total`,
+  `downloadBps` and `uploadBps` cover all of them
+- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`). Sources open
+  a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
+  seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
+  `close` close what a source leaked. Its sampler reads the counters once a second, rates over
+  the last two samples, and runs only while collected; idle repeats are not sent
+- HTTP: one connection per segment request (the unknown-size stream is one), with the URL's host
+  and port. FTP: one per segment transfer, the control
+  host and port (FTPS leaves `secure` unknown: its data channel is not encrypted yet). HLS/DASH:
+  one per task, following the host of the part being fetched. HEAD, probes, manifests and
+  `resolve` are never reported. Hosts and peer addresses are never logged (`ConnectionSpec`'s
+  `toString` leaves the host out)
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
@@ -1062,7 +1082,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TrackerList", "TorrentController", "RemoteKetch", "RemoteTask",
+  "TorrentTracker", "TrackerList", "TorrentController", "Connections", "RemoteKetch", "RemoteTask",
   "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore",
   "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "EventRoutes",
   "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
