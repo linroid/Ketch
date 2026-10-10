@@ -127,7 +127,7 @@ internal fun SettingsWindowState(state: AppState): SettingsWindowState =
   SettingsWindowState(takeRequest = { state.settingsRequest?.also { state.closeSettings() } })
 
 /** Size of the Settings window, width by height, until the user resizes it. */
-internal val SettingsWindowSize = 860 to 640
+internal val SettingsWindowSize = 720 to 580
 
 /** Smallest size of the Settings window, width by height. */
 internal val MinSettingsWindowSize = 640 to 480
