@@ -2,6 +2,7 @@ package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.UiText
@@ -179,6 +180,12 @@ internal class DevicePresenceModel(
       health = when (entry) {
         is RemoteInstance -> entry.connectionState.map { it.toDeviceHealth() }
         else -> serverState.map { it.toDeviceHealth() }
+      },
+      // The embedded engine is this build of Ketch, which supports everything it lists.
+      features = when (entry) {
+        is RemoteInstance -> statuses.map { it[deviceId]?.status?.features.orEmpty() }
+          .distinctUntilChanged()
+        else -> flowOf(KetchFeatures.ALL)
       },
     )
   }

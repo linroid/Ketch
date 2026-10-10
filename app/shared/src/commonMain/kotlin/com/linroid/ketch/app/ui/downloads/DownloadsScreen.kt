@@ -347,7 +347,7 @@ private fun pageContent(state: AppState, view: TaskListView): PageContent {
     rows.isEmpty() -> PageContent.Blank
     view.rows.isNotEmpty() -> PageContent.Rows
     // The view trails the rows for a moment after they first arrive.
-    view.query.isEmpty && rows.any { view.filter.matches(it.state) } -> PageContent.Blank
+    view.query.isEmpty && rows.any { view.filter.matches(it) } -> PageContent.Blank
     else -> PageContent.Empty
   }
 }
@@ -629,7 +629,7 @@ private fun SearchFacetRow(state: AppState, view: TaskListView) {
   val filter = view.filter
   FacetRow(
     query = view.query,
-    rows = remember(rows, filter) { rows.filter { filter.matches(it.state) } },
+    rows = remember(rows, filter) { rows.filter { filter.matches(it) } },
     matched = view.matched,
     total = view.total,
     onQueryChange = { state.searchQuery = it.format() },

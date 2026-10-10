@@ -406,7 +406,13 @@ private suspend fun downloadItem(
 // running or queued task, resumes a paused one and fixes a failed one. Anything else, such as a
 // scheduled task, shows in the inspector.
 private fun primaryAction(source: PaletteSource, row: TaskRow): RowAction {
-  val menu = taskActions(row.request, row.state, row.device, stalled = row.isStalled).menu
+  val menu = taskActions(
+    request = row.request,
+    state = row.state,
+    device = row.device,
+    stalled = row.isStalled,
+    starting = row.isStarting,
+  ).menu
   fun offered(action: RowAction) = action.takeIf { it in menu && source.canRun(it, row) }
   val action = when (row.state) {
     is DownloadState.Completed -> offered(RowAction.Open)
@@ -425,7 +431,7 @@ private fun primaryAction(source: PaletteSource, row: TaskRow): RowAction {
 }
 
 private suspend fun navigationItems(source: PaletteSource): List<PaletteItem> = buildList {
-  val counts = StatusFilter.counts(source.rows.map { it.state })
+  val counts = StatusFilter.counts(source.rows)
   for (filter in StatusFilter.entries) {
     val command = KetchCommands.tab(filter)
     val count = counts.getValue(filter)

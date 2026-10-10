@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
@@ -59,6 +60,7 @@ class PulseStateTest {
     val id: String,
     tasks: List<DownloadTask> = emptyList(),
     usableSpace: Long = 0,
+    val features: Set<String> = emptySet(),
   ) {
     val tasks = MutableStateFlow(tasks)
     val config = MutableStateFlow<DownloadConfig?>(DownloadConfig())
@@ -83,6 +85,7 @@ class PulseStateTest {
         )
       },
       health = health,
+      features = MutableStateFlow(features),
     )
   }
 
@@ -157,6 +160,22 @@ class PulseStateTest {
     runCurrent()
 
     assertEquals(PulseCounts(downloading = 1), model.state.value.counts)
+  }
+
+  @Test
+  fun state_startingTask_countsAsDownloading() = runTest {
+    val starting = fakeTask("starting", DownloadState.Queued)
+    val queued = ListTestTask(
+      taskId = "queued",
+      state = DownloadState.Queued,
+      queuePosition = MutableStateFlow(1),
+    )
+    val tasks = listOf(starting, queued)
+    val capable = model(FakeDevice("local", tasks, features = KetchFeatures.ALL))
+    val older = model(FakeDevice("nas", tasks))
+
+    assertEquals(PulseCounts(downloading = 1, waiting = 1), capable.state.value.counts)
+    assertEquals(PulseCounts(waiting = 2), older.state.value.counts)
   }
 
   @Test

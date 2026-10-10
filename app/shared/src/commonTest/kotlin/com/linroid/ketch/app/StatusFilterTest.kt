@@ -4,9 +4,13 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.StatusFilter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 class StatusFilterTest {
@@ -54,12 +58,32 @@ class StatusFilterTest {
   @Test
   fun counts_everyTab_matchesItsDefinition() {
     val states = allStates + listOf(downloading, queued, canceled)
+    val rows = states.mapIndexed { index, state -> ListFixtures.row("t$index", state) }
 
-    val counts = StatusFilter.counts(states)
+    val counts = StatusFilter.counts(rows)
 
     StatusFilter.entries.forEach { filter ->
       assertEquals(states.count { filter.matches(it) }, counts[filter], "count of $filter")
     }
     assertEquals(states.size, counts.filterKeys { it != StatusFilter.All }.values.sum())
+  }
+
+  @Test
+  fun matches_starting_isDownloadingNotWaiting() {
+    val starting = ListFixtures.row("s", queued, features = KetchFeatures.ALL)
+    val waiting = ListFixtures.row("w", queued, queuePosition = 1, features = KetchFeatures.ALL)
+
+    assertTrue(StatusFilter.Downloading.matches(starting))
+    assertFalse(StatusFilter.Waiting.matches(starting))
+    assertTrue(StatusFilter.Waiting.matches(waiting))
+    assertEquals(1, StatusFilter.counts(listOf(starting, waiting))[StatusFilter.Downloading])
+  }
+
+  @Test
+  fun matches_queuedOnDeviceWithoutPositions_staysWaiting() {
+    val queuedRow = ListFixtures.row("q", queued)
+
+    assertTrue(StatusFilter.Waiting.matches(queuedRow))
+    assertFalse(StatusFilter.Downloading.matches(queuedRow))
   }
 }

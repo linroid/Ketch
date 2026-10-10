@@ -89,12 +89,13 @@ internal class ListActions(
   }
 
   /**
-   * A double-click on [row]: pauses a downloading task and resumes a paused one, opens a finished
-   * file, and shows any other row in the inspector.
+   * A double-click on [row]: pauses a downloading or starting task and resumes a paused one,
+   * opens a finished file, and shows any other row in the inspector.
    */
   fun doubleClick(row: TaskRow) {
     val action = when (val state = row.state) {
       is DownloadState.Downloading -> RowAction.Pause
+      is DownloadState.Queued -> RowAction.Pause.takeIf { row.isStarting }
       // Paused for an urgent download, it still waits in the queue: Resume would do nothing.
       is DownloadState.Paused -> RowAction.Resume.takeIf { state.isPausedUntilResumed }
       is DownloadState.Completed -> RowAction.Open
