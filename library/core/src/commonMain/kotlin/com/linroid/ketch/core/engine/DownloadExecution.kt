@@ -79,6 +79,7 @@ internal class DownloadExecution(
   private val clock: Clock = Clock.System,
   private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
     ::createFileAccessor,
+  private val connections: ConnectionReporter = ConnectionReporter.None,
 ) {
   private val log = KetchLogger("Execution")
 
@@ -848,6 +849,7 @@ internal class DownloadExecution(
       maxConnections = MutableStateFlow(request.connections),
       config = config,
       selection = selection,
+      connections = connections,
     )
   }
 

@@ -1,7 +1,9 @@
 package com.linroid.ketch.api
 
 import com.linroid.ketch.api.torrent.TorrentController
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 
 /**
  * Service interface for managing downloads. Both core (in-process)
@@ -127,9 +129,24 @@ interface KetchApi {
     throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
   }
 
+  /**
+   * Live network connections of every task: HTTP requests, FTP transfers, media fetches and
+   * torrent peers, sampled once a second while collected. Emits a snapshot right away, then one
+   * each time something changes (rates, opens, closes), at most once a second.
+   *
+   * Check that [KetchStatus.features] lists [KetchFeatures.ACTIVE_CONNECTIONS] first; without
+   * it, collecting the flow throws [UnsupportedOperationException].
+   *
+   * @param limit the most connections a snapshot holds, in 1..[ActiveConnections.MAX_LIMIT]
+   * @throws IllegalArgumentException if [limit] is out of range
+   */
+  fun activeConnections(limit: Int = ActiveConnections.DEFAULT_LIMIT): Flow<ActiveConnections> {
+    require(limit in 1..ActiveConnections.MAX_LIMIT) { "limit must be in 1..1024" }
+    return flow { throw UnsupportedOperationException("Active connections are not supported") }
+  }
+
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
-
 
   companion object {
     /** Library version string (e.g., "0.0.1-dev"). */

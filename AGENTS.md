@@ -67,7 +67,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
-  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`
+  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
   `redactUrl()`, `describeCauses()`
 - `com.linroid.ketch.api.torrent` -- `TorrentController` (optional `KetchApi.torrents`:
@@ -87,7 +88,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `TorrentControlSource` (with
   `LiveTorrent`, `SeedingTask`, `SeedingOutcome`),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
-  `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`
+  `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
+  `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
+  `HttpExchangeObserver`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
   `SegmentedDownloadHelper`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
@@ -122,10 +125,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
-  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`
+  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`
 
 ### `library:endpoints`
-- `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API)
+- `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API),
+  `ConnectionEvents` (live connection stream event names and error codes)
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
   `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `TorrentSelectionRequest`,
@@ -148,9 +152,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
-  `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`, `KeepAwake`,
-  `SleepInhibitor`, `TorrentFilesModel`, `FileOrder`, `AiDiscoverController`, `DiscoverSession`,
-  `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
+  `ConnectionGridModel`, `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`,
+  `KeepAwake`, `SleepInhibitor`, `TorrentFilesModel`, `FileOrder`, `AiDiscoverController`,
+  `DiscoverSession`, `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
   (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
   `CommandScope`, `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`,
@@ -284,6 +288,36 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   resolved by the proxy). The interface-bound engines reach proxies through their address or
   network; a custom `HttpClient` only follows SYSTEM. `RemoteKetch` refuses a proxy for servers
   without `KetchFeatures.PROXY` (`http.proxy`). See [proxies](docs/proxy.md)
+
+### Live Connections (`ConnectionRegistry`)
+- `KetchApi.activeConnections(limit)` streams `ActiveConnections` snapshots, listed as
+  `KetchFeatures.ACTIVE_CONNECTIONS` (`net.activeConnections`); the default implementation throws
+  `UnsupportedOperationException` when collected. `limit` must be in 1..1024 (default 256): a
+  snapshot keeps the fastest connections, ordered by when they opened, while `total`,
+  `downloadBps` and `uploadBps` cover all of them
+- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`). Sources open
+  a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
+  seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
+  `close` close what a source leaked. Its sampler reads the counters once a second, rates over
+  the last two samples, and runs only while collected; idle repeats are not sent
+- HTTP: one connection per segment request (the unknown-size stream is one), with the URL's host
+  and port until the engine reports more. Sources run each GET under an `HttpExchangeObserver`
+  (a coroutine context element, so wrapping engines pass it on unchanged); `KtorHttpEngine`
+  reports every hop's host, port, TLS, HTTP version (`HTTP/1.1`, `HTTP/2`) and `ProxyRoute`, the
+  final hop last, and engines that report nothing leave the URL's values
+- FTP: one per segment transfer, with the control host and port (FTPS leaves `secure` unknown:
+  its data channel is not encrypted yet). HLS/DASH: one per task, following the host of the part
+  being fetched. HEAD, probes, manifests and `resolve` are never reported. Hosts and peer
+  addresses are never logged (`ConnectionSpec`'s `toString` leaves the host out)
+- Torrent: one per connected peer once its handshake succeeds, v1 (`TorrentSwarm`'s workers) and
+  v2/hybrid (the session loop, from `Ready` to `Closed`, on `TorrentV2PeerView`), either
+  direction, through `PeerTraffic`: protocol `BitTorrent`, `PeerDetails.wire` `v1` (also a
+  hybrid's v1-swarm peers) or `v2`, choke and interest state as it changes, the peer's IP and port
+  (an incoming peer's source port until BEP 10 `p` names its listen port), and payload on the
+  wire both ways (a v1 route's padding included). `TorrentTaskSpec`/`TorrentV2TaskSpec`
+  `.connections` carry the task's reporter for the session's life, so a seeding session (lent
+  after its download returned, started by `startSeeding`, restored or adopted) keeps reporting.
+  Magnet metadata peers, trackers and DHT are not reported
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
@@ -660,6 +694,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   download" (Choose files…, Download all files) and a seeding one "Seeding" (Stop seeding; Seed
   is in the inspector only). Auto connections and queue positions only show for devices whose
   `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
+- Live connections grid: on the Downloads page the Pulse bar shows, left of the device's
+  connection from 540 dp, three rows of up to twelve squares, one per live connection of the
+  shown devices listing `net.activeConnections` (oldest top left, then "+N"); hovering one names
+  it, a click opens `ConnectionsPopover` (count and speeds, a legend, cells grouped by task in
+  list order and under All devices by device, the hovered, focused or picked cell's details with
+  Show task, which opens the inspector on its Connections tab for HTTP and FTP, and "N devices
+  don't report connections"). Phones show a 3×8 mini strip after the summary line and the
+  popover's content in the Pulse sheet. `ConnectionGridModel` asks each online device for its own
+  stream (`AppState.connectionGrid.state(36)` and `state(512)`, the limit split between
+  devices) only while one is on screen, stopping 5 s after, and asks again with backoff (1 s
+  doubling to 30 s) when one fails or ends; a device refusing it as unsupported is listed, not
+  asked again. Cells draw on one canvas (`components/KetchCellGrid`, hit-testing, arrow keys and
+  Enter, a live-region description of the picked cell) in `KetchColors.traffic`: download is the
+  accent, upload the seeding teal (Purple's fill for the Teal, Green and Blue accents,
+  `TrafficColorsTest` keeps them ΔE ≥ 20 apart), in four levels by fixed rates (under 16 KB/s,
+  256 KB/s, 2 MB/s, and more); download solid, upload a ring, both split along the diagonal,
+  idle a hairline outline
 - Torrent files: the inspector's Files tab checks and unchecks files with an Apply bar
   (`TorrentFilesModel`, at least one file stays checked) on devices listing
   `torrent.fileSelection`, and starts a waiting torrent; the add sheet and the Files tab sort
@@ -745,6 +796,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`), `selection` and
   `seeding` commands guarded by a revision and an idempotency key, and an SSE `events` stream of
   snapshots. Command failures answer with the `TorrentCommandError` wire name
+- Live connections (`ConnectionRoutes`): `GET /api/connections?limit=1..1024` answers the first
+  `ActiveConnections` snapshot and `/api/connections/events` streams `snapshot` events (id: a
+  per-stream count), repeating the last one every 15 s while nothing changes; `error`
+  (`ErrorResponse`) ends it. Another limit is 400 `invalid_limit`, an engine without them 501
+  `unsupported` (or that `error` event), and past 16 open streams (`ConnectionStreams`) 429
+  `too_many_streams`. Behind the token and startup gate like every route; hosts and peer
+  addresses never go on `/api/events`. Event names and codes: `ConnectionEvents` in endpoints.
+  `RemoteKetch.activeConnections` asks `features()` first and fails with
+  `UnsupportedOperationException` without opening the stream for servers lacking
+  `net.activeConnections` (and for a 404/405 without a body, 501 or `unsupported`); it reads the
+  stream as text in a `channelFlow` (Darwin runs `execute` elsewhere), drops repeats, and ends
+  with the failure when the stream drops or closes, never reconnecting
 - Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
   `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
   without a token. Tokens are compared in constant time (SHA-256 digests,
@@ -1062,10 +1125,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TrackerList", "TorrentController", "RemoteKetch", "RemoteTask",
+  "TorrentTracker", "TrackerList", "TorrentController", "Connections", "RemoteKetch", "RemoteTask",
   "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore",
-  "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "EventRoutes",
-  "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
+  "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "ConnectionRoutes",
+  "EventRoutes", "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable

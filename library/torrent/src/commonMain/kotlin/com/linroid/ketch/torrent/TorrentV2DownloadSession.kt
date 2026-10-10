@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.ConnectionReporter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -79,6 +80,11 @@ internal class TorrentV2SessionOptions(
    * [IncompleteSeedException] before any discovery instead of downloading.
    */
   val seedOnly: Boolean = false,
+  /**
+   * Reports each ready peer among the task's live connections, for as long as the owner runs,
+   * seeding included.
+   */
+  val connections: ConnectionReporter = ConnectionReporter.None,
 )
 
 /** Discovery's only view of a session, valid for one transfer. */
@@ -145,6 +151,7 @@ internal class TorrentV2DownloadSession private constructor(
   private val privacy = options.privacy
   private val waitForPeers = options.waitForPeers
   private val seedOnly = options.seedOnly
+  private val reporter = options.connections
   private val fileIds: Set<String> = TorrentOutputMapping.from(document).files.mapTo(HashSet()) {
     it.id
   }
@@ -586,6 +593,7 @@ internal class TorrentV2DownloadSession private constructor(
                 buffers, memory,
                 maxPeers = maxPeers, maxActive = activePieces(layout, buffers),
                 connections = dialer.connections, onProgress = ::updateProgress,
+                reporter = reporter,
                 requestDelay = { bytes, admit ->
                   if (!admitted(bytes)) 50L else globalRate.requestDelay(bytes, downloadRate) {
                     admit().also { sent -> if (sent) credits.update { it - bytes } }

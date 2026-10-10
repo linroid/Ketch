@@ -124,4 +124,44 @@
   <string name="pulse_timeline_limit">Limite → %1$s</string>
   <string name="pulse_timeline_limit_removed">Limite removido</string>
   <string name="pulse_timeline_priority">Prioridade → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Conexões</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d conexão</item>
+    <item quantity="other">%1$d conexões</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">mais %1$d</item>
+    <item quantity="other">mais %1$d</item>
+  </plurals>
+  <string name="pulse_connections_none">Nenhuma conexão ativa</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d dispositivo não informa as conexões</item>
+    <item quantity="other">%1$d dispositivos não informam as conexões</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Baixando</string>
+  <string name="pulse_connections_legend_upload">Enviando</string>
+  <string name="pulse_connections_legend_both">Ambos</string>
+  <string name="pulse_connections_legend_idle">Ocioso</string>
+  <string name="pulse_connection_outgoing">De saída</string>
+  <string name="pulse_connection_incoming">De entrada</string>
+  <string name="pulse_connection_direct">Direta</string>
+  <string name="pulse_connection_via_http_proxy">Via proxy HTTP</string>
+  <string name="pulse_connection_via_socks_proxy">Via proxy SOCKS5</string>
+  <string name="pulse_connection_secure">Criptografada</string>
+  <string name="pulse_connection_received">Recebido %1$s</string>
+  <string name="pulse_connection_sent">Enviado %1$s</string>
+  <string name="pulse_connection_open_for">Aberta há %1$s</string>
+  <string name="pulse_connection_peer_choking">O peer não está enviando dados</string>
+  <string name="pulse_connection_upload_slot">Enviando para este peer</string>
+  <string name="pulse_connection_show_task">Mostrar download</string>
+  <string name="pulse_connections_tooltip">Conexões ativas</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, recebendo %4$s, enviando %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d conexão, %2$d baixando, %3$d enviando</item>
+    <item quantity="other">%1$d conexões, %2$d baixando, %3$d enviando</item>
+  </plurals>
 </resources>

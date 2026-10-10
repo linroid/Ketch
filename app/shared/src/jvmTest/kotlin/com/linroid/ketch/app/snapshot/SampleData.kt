@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.snapshot
 
+import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -55,12 +56,14 @@ import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
 import kotlin.math.PI
@@ -85,6 +88,7 @@ import kotlin.time.Instant
  * @property remotes remote devices; they are never connected, so they show as offline.
  * @property deviceName name of the embedded device.
  * @property ui UI preferences on top of the snapshot's theme and density.
+ * @property connections the live connections the embedded device reports; none by default.
  */
 internal class SampleData(
   val tasks: List<ListTestTask>,
@@ -92,6 +96,7 @@ internal class SampleData(
   val remotes: List<RemoteConfig> = listOf(NAS),
   val deviceName: String = DEVICE_NAME,
   val ui: (UiPreferences) -> UiPreferences = { it },
+  val connections: ActiveConnections = ActiveConnections(NOW),
 ) {
   /** The task shown as [name], such as `"q3-report.pdf"`. */
   fun task(name: String): ListTestTask =
@@ -355,7 +360,7 @@ internal fun lanes(total: Long, done: List<Double>): List<Segment> {
 
 /**
  * A device of the snapshots named [name], on [os] with its downloads in [directory]: its tasks,
- * starting from [initial], its settings and its disk.
+ * starting from [initial], its settings, its disk and the live [connections] it reports.
  */
 internal class SampleKetchApi(
   private val name: String,
@@ -364,9 +369,18 @@ internal class SampleKetchApi(
   private val os: String = "Mac OS X",
   private val directory: String = SampleData.DOWNLOAD_DIR,
   private val version: String = KetchApi.VERSION,
+  private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
 ) : KetchApi {
   /** The embedded device of [data]. */
-  constructor(data: SampleData) : this(data.deviceName, data.tasks, data.downloadConfig)
+  constructor(data: SampleData) : this(
+    name = data.deviceName,
+    initial = data.tasks,
+    config = data.downloadConfig,
+    connections = data.connections,
+  )
+
+  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
+    fixedConnections(connections, limit)
 
   private val taskList = MutableStateFlow(initial)
 
@@ -448,7 +462,11 @@ internal class SampleDeviceApi(
   private val networks: NetworkInterfaces = NetworkInterfaces(),
   private val download: ((DownloadRequest) -> DownloadTask)? = null,
   private val resolve: (suspend (String) -> ResolvedSource)? = null,
+  private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
 ) : KetchApi {
+  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
+    fixedConnections(connections, limit)
+
   override val backendLabel: String = status.name
   override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
 
@@ -470,6 +488,19 @@ internal class SampleDeviceApi(
 
   override fun close() {}
 }
+
+/**
+ * [connections] cut to the [limit] busiest, as an engine reports them, sent once and kept open.
+ */
+internal fun fixedConnections(connections: ActiveConnections, limit: Int): Flow<ActiveConnections> =
+  flow {
+    val kept = connections.connections
+      .sortedByDescending { it.downloadBps + it.uploadBps }
+      .take(limit)
+      .sortedBy { it.openedAt }
+    emit(connections.copy(connections = kept))
+    awaitCancellation()
+  }
 
 /** What a remote device of the snapshots named [name] reports, up for [uptime]. */
 internal fun sampleStatus(

@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.core.engine.ConnectionReporter
+
 /**
  * Internal interface for the torrent engine backend.
  *
@@ -103,4 +105,6 @@ internal data class TorrentTaskSpec(
    * [IncompleteSeedException] instead of downloading, before any discovery.
    */
   val seedOnly: Boolean = false,
+  /** Reports the session's peers among the task's live connections. */
+  val connections: ConnectionReporter = ConnectionReporter.None,
 )

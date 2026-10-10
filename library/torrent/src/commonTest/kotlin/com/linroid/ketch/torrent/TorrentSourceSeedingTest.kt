@@ -2,7 +2,11 @@ package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.ConnectionDirection
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.SeedingOutcome
+import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.CoroutineScope
@@ -43,11 +47,16 @@ class TorrentSourceSeedingTest {
     override suspend fun preallocate(size: Long): Unit = error("Source owns I/O")
   }
 
-  private fun context(taskId: String, resolved: ResolvedSource, output: String) = DownloadContext(
+  private fun context(
+    taskId: String,
+    resolved: ResolvedSource,
+    output: String,
+    connections: ConnectionReporter = ConnectionReporter.None,
+  ) = DownloadContext(
     taskId = taskId, url = resolved.url, request = DownloadRequest(resolved.url),
     fileAccessor = UnusedFileAccessor, segments = MutableStateFlow(emptyList()),
     onProgress = { _, _ -> }, throttle = {}, headers = emptyMap(), preResolved = resolved,
-    outputPath = output,
+    outputPath = output, connections = connections,
   )
 
   private fun v1Metainfo(name: String) = Bencode.encode(mapOf("info" to mapOf(
@@ -224,13 +233,14 @@ class TorrentSourceSeedingTest {
     taskId: String,
     fixture: TorrentV2Fixture,
     output: Path,
+    connections: ConnectionReporter = ConnectionReporter.None,
   ) {
     val checkpoint = fixture.preseed(output, taskId)
     val resolved = resolveMetainfo(fixture.metainfo)
     val state = TorrentResumeState(fixture.document.info.hash.hex, resolved.totalBytes,
       encodeBase64(checkpoint.encode()), resolved.files.map { it.id }.toSet(), output.toString(),
       encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
-    resume(context(taskId, resolved, output.toString()),
+    resume(context(taskId, resolved, output.toString(), connections),
       SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(state)))
   }
 
@@ -340,5 +350,105 @@ class TorrentSourceSeedingTest {
     assertTrue(engine().hasFreeSlot())
     assertEquals(0, engine().admittedSessionBytes)
     assertFailsWith<IllegalStateException> { source.setTaskUploadRateLimit("seeder", 0) }
+  }
+
+  @Test
+  fun lentV2SeederKeepsReportingItsPeers() = v2Seeding { source, engine, root ->
+    val recorder = RecordingConnections()
+    // The download returns at once and its session keeps seeding on the lent slot.
+    source.resumeSeeded("seeder", fixture, root / "seeding", recorder)
+    val network = createTorrentNetwork()
+    try {
+      val connection = network.connect(PeerEndpoint("127.0.0.1", engine().listenPort))
+      PeerIdentityHandshake(fixture.document.identity).initiate(connection,
+        PeerIdentityHandshake.Mode.V2, torrentRandomBytes(20).toByteString(),
+        TorrentBufferBudget(65_536))
+      val wire = PeerWire(connection, pieceCount = fixture.layout.pieceCount.toInt())
+      takeBlock(wire, 16_384)
+      eventually("the peer's upload") { recorder.opened.singleOrNull()?.sent == 16_384L }
+      val peer = recorder.opened.single()
+      assertEquals(ConnectionDirection.INCOMING, peer.spec.direction)
+      assertEquals("127.0.0.1", peer.spec.host)
+      assertEquals(PeerTraffic.PROTOCOL, peer.spec.protocol)
+      assertEquals("v2", peer.spec.peer?.wire)
+      assertEquals(0, peer.received)
+      eventually("the peer's upload slot") {
+        peer.spec.peer?.let { it.uploadSlot && it.peerInterested } ?: false
+      }
+      // The peer leaves: its connection closes at once.
+      connection.close()
+      eventually("the peer to close") { peer.closed }
+    } finally { network.close() }
+    source.release("seeder", null)
+    assertEquals(emptyList(), recorder.open)
+  }
+
+  @Test
+  fun startedV1SeederReportsItsPeers() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        val root = (FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-source-seed-v1-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}")
+          .also { torrentFileSystem.createDirectories(it) }
+        val metainfo = v1Metainfo("data")
+        val metadata = TorrentMetadata.fromBencode(metainfo)
+        val output = root / "data"
+        torrentFileSystem.write(output) { write(byteArrayOf(1, 2, 3, 4)) }
+        var engine: KotlinTorrentEngine? = null
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION)).also {
+          it.engineFactory = { config ->
+            KotlinTorrentEngine(config, listenHost = "127.0.0.1").also { created ->
+              engine = created
+            }
+          }
+        }
+        val recorder = RecordingConnections()
+        val network = createTorrentNetwork()
+        try {
+          val ids = TorrentFileTable.parse(metainfo, TorrentConfig()).ids
+          val state = TorrentResumeState(metadata.infoHash.hex, 4, "", ids, output.toString(),
+            encodeBase64(metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
+            "http://fixture/seeder.torrent",
+            SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(state)),
+            output.toString(), ids, recorder)))
+          val connection = network.connect(PeerEndpoint("127.0.0.1",
+            checkNotNull(engine).listenPort))
+          val wire = PeerWire(connection, metadata)
+          wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), false, false))
+          takeBlock(wire, 4)
+          eventually("the peer's upload") { recorder.opened.singleOrNull()?.sent == 4L }
+          val peer = recorder.opened.single()
+          assertEquals(ConnectionDirection.INCOMING, peer.spec.direction)
+          assertEquals("v1", peer.spec.peer?.wire)
+          connection.close()
+          eventually("the peer to close") { peer.closed }
+          source.stopSeeding("seeder")
+          source.assertNoLeaks()
+        } finally {
+          network.close()
+          source.close()
+          engine?.stop()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+        assertEquals(emptyList(), recorder.open)
+        checkNotNull(engine).assertNoLeaks()
+      }
+    }
+  }
+
+  /** Asks for the first [length] bytes of piece 0 once unchoked, and waits for them. */
+  private suspend fun takeBlock(wire: PeerWire, length: Int) {
+    suspend fun next(match: (PeerMessage) -> Boolean): PeerMessage {
+      while (true) {
+        val message = wire.read()
+        if (match(message)) return message
+      }
+    }
+    wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+    next { it == PeerMessage.Control(PeerMessage.Signal.UNCHOKE) }
+    wire.send(PeerMessage.Request(0, 0, length))
+    assertEquals(length, assertIs<PeerMessage.Piece>(next { it is PeerMessage.Piece }).bytes.size)
   }
 }

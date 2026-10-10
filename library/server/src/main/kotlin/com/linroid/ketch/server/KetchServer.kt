@@ -5,8 +5,10 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.torrent.TorrentCommandException
 import com.linroid.ketch.core.file.PathRejectedException
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.server.api.ConnectionStreams
 import com.linroid.ketch.server.api.PayloadTooLargeException
 import com.linroid.ketch.server.api.ServerJson
+import com.linroid.ketch.server.api.connectionRoutes
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
@@ -116,6 +118,17 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
  * - `PUT /api/torrents/{id}/seeding`   — start or stop seeding it, guarded by a revision
  * - `GET /api/torrents/{id}/events`    — SSE: `snapshot` events, then `removed` or `error`
+ *
+ * ### Live connections
+ *
+ * Served from [KetchApi.activeConnections]; servers listing `net.activeConnections` report
+ * them. Both take `?limit=1..1024` (default 256; `400` `invalid_limit` otherwise), and an engine
+ * that does not report connections answers `501` `unsupported`. They carry hosts and peer
+ * addresses, which `/api/events` never does.
+ * - `GET /api/connections`        — a snapshot of the live connections
+ * - `GET /api/connections/events` — SSE: a `snapshot` event right away, then one when the
+ *   connections change and every 15 seconds while they do not; an `error` event ends it. At
+ *   most 16 streams run at once; more are `429` `too_many_streams`
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -261,6 +274,7 @@ class KetchServer(
     enabled = apiToken == null || allowedDirectories.isNotEmpty(),
   )
   private val throttle = AuthThrottle()
+  private val connectionStreams = ConnectionStreams()
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -478,10 +492,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, destinations)
+          apiRoutes(ketch, destinations, connectionStreams)
         }
       } else {
-        apiRoutes(ketch, destinations)
+        apiRoutes(ketch, destinations, connectionStreams)
       }
       pairing?.let { pairingRoutes(it) }
       healthRoutes { ready }
@@ -510,10 +524,15 @@ private fun CORSConfig.allowCorsEntry(entry: String) {
   }
 }
 
-private fun Route.apiRoutes(ketch: KetchApi, destinations: DestinationGuard) {
+private fun Route.apiRoutes(
+  ketch: KetchApi,
+  destinations: DestinationGuard,
+  connectionStreams: ConnectionStreams,
+) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
   torrentRoutes(ketch)
+  connectionRoutes(ketch, connectionStreams)
   eventRoutes(ketch)
 }
 

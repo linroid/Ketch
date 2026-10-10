@@ -1,5 +1,6 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
@@ -50,9 +51,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -286,6 +290,25 @@ class RemoteKetch internal constructor(
     }
     checkSuccess(response)
     return response.body()
+  }
+
+  /**
+   * The server's live connections, over `GET /api/connections/events`. A server whose
+   * [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], such as an older one, fails
+   * with [UnsupportedOperationException] before the stream is asked for. The flow ends with the
+   * failure when the connection to the server drops or the server ends the stream; it does not
+   * reconnect, so collect it again to resume.
+   */
+  override fun activeConnections(limit: Int): Flow<ActiveConnections> {
+    require(limit in 1..ActiveConnections.MAX_LIMIT) {
+      "limit must be in 1..${ActiveConnections.MAX_LIMIT}"
+    }
+    return flow {
+      if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
+        throw UnsupportedOperationException("This device does not report its connections")
+      }
+      emitAll(httpClient.activeConnectionEvents(limit, json))
+    }
   }
 
   override fun close() {

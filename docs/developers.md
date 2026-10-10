@@ -133,6 +133,7 @@ as `Authorization: Bearer <token>`.
 | `PUT /api/tasks/{id}/files` | Choose the files of a torrent task, at any time; the body is `{"fileIds": [...]}` |
 | `DELETE /api/tasks/{id}?deleteFiles=true` | Remove a task, and its files if asked |
 | `GET /api/events`, `/api/events/{id}` | Server-sent events: `task_added`, `task_removed`, `state_changed`, `progress` |
+| `GET /api/connections?limit=`, `/api/connections/events?limit=` | The live network connections (HTTP hosts, FTP servers, torrent peers), at most `limit` (1..1024, default 256) of them, and server-sent `snapshot` events of them; on servers listing `net.activeConnections`, at most 16 streams at once |
 | `GET /api/torrents/capabilities` | What the server's torrent controller can do, on servers listing `torrent.control` |
 | `GET /api/torrents/{id}`, `/api/torrents/{id}/events` | A torrent task's snapshot, and server-sent `snapshot` events of it |
 | `GET /api/torrents/{id}/files?limit=&cursor=&sort=&desc=true` | A page of its files, up to 1000, sorted `torrent`, `name`, `size`, `extension` or `selected` |
