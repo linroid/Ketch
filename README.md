@@ -79,6 +79,7 @@ available on Maven Central. [Start integrating Ketch →](docs/developers.md#qui
 | Web | [linroid.github.io/Ketch](http://linroid.github.io/Ketch), to control Ketch running on another device |
 | Browser extension | Chrome, Edge, Brave, Firefox and others: `.zip` from the [latest release][release] ([how to install](app/browser-extension/README.md#installing)) |
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |
+| Docker | NAS and home servers on x64 and ARM64: `ghcr.io/linroid/ketch` ([guide](docs/docker.md), with TrueNAS and fnOS) |
 
 The desktop apps bring their own runtime, and the command line is a single native binary: neither
 needs Java. Both update themselves from the releases here: the desktop app from Settings → About,
@@ -121,8 +122,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   keystroke, or open **All devices** to list every download in one table.
 - **Send downloads where they belong** — Add a link to any device, drop it on a device in the
   sidebar, or send or move a download to another device, without switching.
-- **Headless on a NAS or server** — `ketch server` runs the same engine with a REST API and the
-  web app built in, and the apps find it on your network.
+- **Headless on a NAS or server** — `ketch server`, also as a [Docker image](docs/docker.md),
+  runs the same engine with a REST API and the web app built in, and the apps find it on your
+  network.
 - **From a terminal** — `ketch add`, `list`, `pause`, `resume` and `watch` control the downloads
   of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
   ([CLI](cli/README.md#work-on-a-running-ketch)).
@@ -154,7 +156,7 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   on the desktop; downloads that keep running in the background on Android and on iOS 26.
 - **Awake while it downloads** — The desktop and Android apps keep the system from going to sleep
   on its own while downloads run; the screen can still turn off (**Settings → General**).
-- **Your look, your language** — Light and dark themes with four accent colors, in English,
+- **Your look, your language** — Light and dark themes with seven accent colors, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch and Français
   ([translating](docs/development/localization.md)).
 
@@ -206,6 +208,15 @@ ketch https://example.com/file.zip
 Set an access code, the port and other options in a [config file](cli/README.md#configuration-file);
 the [CLI documentation](cli/README.md) lists every command.
 
+On a NAS, or anywhere Docker runs, start the image instead. The [Docker guide](docs/docker.md)
+covers its settings and has steps for TrueNAS and fnOS:
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## Roadmap
 
 - **Distribution before v1.0.0** — Signed Windows releases, signed and notarized macOS releases,
@@ -229,8 +240,6 @@ the [CLI documentation](cli/README.md) lists every command.
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
   once the queue is empty
 - **Automation hooks** — Run a command or call a webhook when a download finishes or fails
-- **Docker image** — An official image for NAS and home servers on x64 and ARM, with a health
-  check and a fixed torrent port
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own

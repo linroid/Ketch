@@ -85,6 +85,7 @@ Multiplatform está disponible en Maven Central.
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), para controlar Ketch en otro dispositivo |
 | Extensión del navegador | Chrome, Edge, Brave, Firefox y otros: `.zip` de la [última versión][release] ([instalación](app/browser-extension/README.md#installing)) |
 | Línea de comandos y servidor | macOS, Linux y Windows: [script de instalación](#run-ketch-on-a-server) o la [última versión][release] |
+| Docker | NAS y servidores domésticos x64 y ARM64: `ghcr.io/linroid/ketch` ([guía](docs/docker.md), con TrueNAS y fnOS) |
 
 Las aplicaciones de escritorio incluyen su entorno de ejecución y la herramienta de línea de
 comandos es un único binario nativo: ninguna necesita Java. Ambas se actualizan desde las versiones
@@ -133,8 +134,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   ellos con un atajo o abre **Todos los dispositivos** para ver todas las descargas en una tabla.
 - **Envía las descargas al dispositivo adecuado** — Añade un enlace a cualquier dispositivo,
   arrástralo sobre uno en la barra lateral o envía o mueve una descarga a otro sin cambiar de vista.
-- **Sin interfaz gráfica en un NAS o servidor** — `ketch server` ejecuta el mismo motor con una API
-  REST y la aplicación web integradas; las aplicaciones lo encuentran en tu red.
+- **Sin interfaz gráfica en un NAS o servidor** — `ketch server`, también como
+  [imagen Docker](docs/docker.md), ejecuta el mismo motor con una API REST y la aplicación web
+  integradas; las aplicaciones lo encuentran en tu red.
 - **Desde la terminal** — `ketch add`, `list`, `pause`, `resume` y `watch` gestionan las descargas
   de la aplicación o de un servidor desde una terminal o un script; `watch` emite líneas JSON
   ([CLI](cli/README.md#work-on-a-running-ketch)).
@@ -167,7 +169,7 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Activo mientras descarga** — Las apps de escritorio y Android evitan que el sistema entre en
   reposo por sí mismo mientras hay descargas en curso; la pantalla puede apagarse igualmente
   (**Ajustes → General**).
-- **Tu estilo y tu idioma** — Temas claro y oscuro con cuatro colores de acento, en English,
+- **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
   ([traducciones](docs/development/localization.md)).
 
@@ -226,6 +228,15 @@ Configura el código de acceso, el puerto y otras opciones en un
 [archivo de configuración](cli/README.md#configuration-file);
 la [documentación de la CLI](cli/README.md) enumera todos los comandos.
 
+En un NAS, o donde funcione Docker, inicia la imagen en su lugar. La
+[guía de Docker](docs/docker.md) describe sus ajustes e incluye los pasos para TrueNAS y fnOS:
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## Hoja de ruta
 
 - **Distribución antes de v1.0.0** — Versiones firmadas para Windows, firmadas y notarizadas para
@@ -250,8 +261,6 @@ la [documentación de la CLI](cli/README.md) enumera todos los comandos.
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
   la cola quede vacía
 - **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle
-- **Imagen Docker** — Una imagen oficial para NAS y servidores domésticos x64 y ARM, con
-  comprobación de estado y puerto fijo para torrents
 - **Transferencias entre dispositivos** — Enviar a y Mover a transfieren los datos ya descargados
   para que el otro dispositivo continúe en lugar de empezar de cero
   ([plan](docs/plans/task-transfer.md))

@@ -113,7 +113,8 @@ class KetchProxyTest {
     val ketch = Ketch(
       httpEngine = fake,
       taskStore = InMemoryTaskStore(),
-      config = config.copy(retryCount = 0),
+      // Android host tests have no application context to resolve the default folder.
+      config = config.copy(retryCount = 0, defaultDirectory = folder.toString()),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
     try {

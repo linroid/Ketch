@@ -760,6 +760,27 @@ internal class KotlinTorrentEngine(
       } }.awaitAll().flatten().distinct()
     }.also { peers -> log.d { "DHT lookup for ${logHash(hash.hex)} found ${peers.size} peer(s)" } }
 
+  /**
+   * Binds a DHT socket on [host] at the configured listen port, so a port forwarded for peers
+   * reaches DHT too, or at any port when none is configured or it cannot be had: dual-stack
+   * systems refuse an IPv6 socket on the port the IPv4 one holds.
+   */
+  private suspend fun bindDhtSocket(host: String): TorrentDatagramSocket {
+    if (config.listenPort != 0) {
+      try {
+        return network.bindUdp(PeerEndpoint(host, config.listenPort))
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.d {
+          "DHT cannot use UDP port ${config.listenPort} on $host, using any port: " +
+            e.describeWithoutUrls()
+        }
+      }
+    }
+    return network.bindUdp(PeerEndpoint(host, 0))
+  }
+
   private suspend fun dht(): List<DhtNode> = dhtMutex.withLock {
     nodes?.let { current ->
       if (current.isNotEmpty() && current.all { it.isRunning }) return@withLock current
@@ -770,8 +791,7 @@ internal class KotlinTorrentEngine(
     for (host in listOf("0.0.0.0", "::")) {
       val family = if (':' in host) "IPv6" else "IPv4"
       val node = attempt("Binding the $family DHT socket") {
-        DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope,
-          allowLocalAddresses = allowLocalDiscovery)
+        DhtNode(bindDhtSocket(host), scope, allowLocalAddresses = allowLocalDiscovery)
       } ?: continue
       node.start()
       result.add(node)

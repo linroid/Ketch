@@ -32,7 +32,8 @@ graalvmNative {
       buildArgs.addAll(
         "--no-fallback",
         // Runs the shutdown hooks on SIGINT and SIGTERM, as the JVM does: `ketch server` then
-        // pauses its downloads and stops announcing itself.
+        // pauses its downloads and stops announcing itself. Without them, PID 1 of a container,
+        // as in the Docker image, would even ignore `docker stop`'s SIGTERM.
         "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",

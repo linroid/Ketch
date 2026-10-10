@@ -154,8 +154,9 @@ Why this combination:
 9. **Plain words, nautical pictures.**
    - The ketch motif lives in visuals: the segmented-sail logo, lane illustrations, device
      pennants.
-   - It reaches copy in exactly two places: "Slow lane" and the accent names Signal, Harbor,
-     Fathom and Beacon.
+   - It reaches copy in exactly one place: "Slow lane". Accents are named after their color
+     (Indigo, Purple, Pink, Orange, Green, Teal and Blue), so the name says what the swatch
+     shows.
    - Status, error and button copy stays literal.
 10. **Tokens or nothing.** Colors, radii, spacing, type and durations all come from `KetchTheme`.
     A `jvmTest` fails the build on new literals.
@@ -228,7 +229,7 @@ different reviewers are merged into one row; all their ids are listed.
 | 31 | H | Links cannot reach Ketch from outside: no magnet handler, share target or text drop (`os-intake-channels`, `os-link-intake`, `link-intake`) | `FileDropTarget.kt:85,140`; `FileDrop.jvm.kt`; `OpenedFiles.kt:14-32`; `AndroidManifest.xml:29-56`; `Ketch-Info.plist`; `manifest.json` | `IncomingDownload.Links`, OS handlers, text drops (§4.9.7, §6) | W1, W2, W3 |
 | 32 | H | Flat layering, no depth, native title strip (`flat-layering`, `window-chrome-glass`, `shell-chrome-dedupe`, `mac-title-bar`) | Surface/background contrast 1.06:1; `SidebarNavigation.kt:64-75,131-161`; `main.kt:224-228` | Canvas + wash + floating card, full-window content on macOS (§3.9, §4.2) | W1, W3 |
 | 33 | H | Semantic color collisions; Material baseline pink leaks through (`semantic-color-collisions`, `status-dots-and-halo`) | `Color.kt:100,110`; `KetchColors.kt:94-106`; `PriorityBadge.kt:10-15`; `Theme.kt:99-130`; `ConnectionStatusDot.kt:41-46`; `DownloadListItem.kt:296-347` | Status palette, priority glyphs, every M3 slot mapped, dot + label (§3.2) | W1, W2 |
-| 34 | H | Accent buttons fail WCAG AA (Harbor, Fathom, dark danger, logo) (`contrast-failures-accents`) | `KetchButton.kt:72,75`; `SidebarNavigation.kt:148`; `ThemeContrastTest.kt:11-18` | New fills, computed `onAccent`, contrast test over every accent (§3.2.4) | W1 |
+| 34 | H | Accent buttons fail WCAG AA (Teal, Green, dark danger, logo) (`contrast-failures-accents`) | `KetchButton.kt:72,75`; `SidebarNavigation.kt:148`; `ThemeContrastTest.kt:11-18` | New fills, computed `onAccent`, contrast test over every accent (§3.2.4) | W1 |
 | 35 | H | No bundled fonts; numbers set in monospace (`typography-bundled-fonts`) | `KetchTypography.kt:32-34`; `KetchToolbar.kt:63`; `Theme.kt:141` | Inter + Inter Display + JetBrains Mono, tabular numerals (§3.3) | W1 |
 | 36 | H | iOS stops downloading in the background and never notifies (`ios-background-notifications`, `ios-background-honesty`) | `Ketch-Info.plist`; `MainViewController.kt` | `beginBackgroundTask` + clean pause, banner, local notifications (§6.3) | W2, W4 |
 | 37 | H | No first run: Android fires 3 permission prompts at once; web opens a raw form (`first-run`, `web-connect-landing`) | `MainActivity.kt:47-49`; `AppShell.kt:97-101` | Launchpad checklist (desktop), WelcomeFlow (phones), ConnectLanding (web) (§4.13) | W1 (permissions), W4 |
@@ -300,8 +301,8 @@ All pairs are given as **light / dark**. Every text-on-fill pair is at least 4.5
 | `surfaceSunken` | `#F4F6FA` | `#101217` | Inputs, segmented tracks, lane tracks, table header, Pulse bar, inspector wells |
 | `surfaceHover` | `#F1F3F8` | `#1F232A` | Row and item hover |
 | `surfacePressed` | `#E9ECF3` | `#272B33` | Press state |
-| `rowSelected` | accent @ 10% over `surface` (Signal ≈ `#EEF0FD`) | accent @ 16% over `surface` (Signal ≈ `#20243F`) | Selected row, with a 2 dp accent bar on the left |
-| `rowSelectedFocused` | accent @ 15% (Signal ≈ `#E5E7FB`) | accent @ 24% (Signal ≈ `#262D5C`) | Selected row while the table has keyboard focus |
+| `rowSelected` | accent @ 10% over `surface` (Indigo ≈ `#EEF0FD`) | accent @ 16% over `surface` (Indigo ≈ `#20243F`) | Selected row, with a 2 dp accent bar on the left |
+| `rowSelectedFocused` | accent @ 15% (Indigo ≈ `#E5E7FB`) | accent @ 24% (Indigo ≈ `#262D5C`) | Selected row while the table has keyboard focus |
 | `sidebarItemSelected` | `#FFFFFF` @ 72% | `#FFFFFF` @ 8% | Selected sidebar item pill (never the accent color) |
 | `sidebarItemHover` | `#FFFFFF` @ 45% | `#FFFFFF` @ 5% | |
 | `hairline` | `#E2E6EE` | `#2A2E37` | 1 dp borders on the card, menus and dividers between regions |
@@ -311,7 +312,7 @@ All pairs are given as **light / dark**. Every text-on-fill pair is at least 4.5
 
 Rule: **the wash is drawn only on the canvas.** The sidebar is transparent over it. Every surface
 that scrolls or updates live is opaque. No blur ships in Waves 1-6 (see §8). The selection tints
-are computed from the accent with the alphas above; the hex values are the Signal reference.
+are computed from the accent with the alphas above; the hex values are the Indigo reference.
 
 #### 3.2.2 Text
 
@@ -330,20 +331,29 @@ ratios: `textTertiary` is 5.0 / 5.3 on `surface`, 4.6 / 5.6 on `surfaceSunken`, 
 
 #### 3.2.3 Accents (Settings → General → Accent)
 
-`KetchAccent` keeps its names. **`onAccent` is computed** from the relative luminance of the fill
-(white when contrast is at least 4.5, otherwise `#141A26`), so `KetchButton` never hard-codes
-`Color.White` again (`KetchButton.kt:72,75`). Hover adds an 8% black overlay on the fill in
-light, and an 8% white overlay in dark.
+Each `KetchAccent` is named after its color, in the UI and in `config.toml` (`accent = "teal"`;
+the earlier names `signal`, `harbor`, `fathom` and `beacon` still load). **`onAccent` is
+computed** from the relative luminance of the fill (white when contrast is at least 4.5,
+otherwise `#141A26`), so `KetchButton` never hard-codes `Color.White` again
+(`KetchButton.kt:72,75`). Hover adds an 8% black overlay on the fill in light, and an 8% white
+overlay in dark.
+
+The swatches follow the color wheel from the default and wrap onto more lines where the row is
+narrow. There is no red, yellow or gray accent: the accent colors downloading rows, lanes and
+progress, which would then read as failed, paused or queued.
 
 | Accent | Fill light | Fill dark | `accentText` light / dark | `accentSoft` light / dark | White on fill |
 |---|---|---|---|---|---|
-| **Signal** (default) | `#4F5DE4` | `#5563F0` | `#3C47B7` / `#8E9BFF` | `#ECEEFE` / `#1D2140` | 5.2 / 4.7 |
-| Harbor | `#00818D` | `#00818D` | `#006A74` / `#4FD1DB` | `#DDF5F7` / `#0D2E33` | 4.6 / 4.6 |
-| Fathom | `#007F35` | `#007F35` | `#00692C` / `#5FD08A` | `#DCF3E3` / `#0E2C1A` | 5.1 / 5.1 |
-| Beacon | `#C9431C` | `#C9431C` | `#A8370F` / `#FF9A6B` | `#FFE9E0` / `#34160D` | 4.9 / 4.9 |
+| **Indigo** (default) | `#4F5DE4` | `#5563F0` | `#3C47B7` / `#8E9BFF` | `#ECEEFE` / `#1D2140` | 5.2 / 4.7 |
+| Purple | `#8A3FD1` | `#8A3FD1` | `#7232B0` / `#C79BFF` | `#F2E9FC` / `#271A3B` | 5.7 / 5.7 |
+| Pink | `#C8317A` | `#C8317A` | `#A82664` / `#FF8EC2` | `#FCE6F0` / `#361526` | 5.0 / 5.0 |
+| Orange | `#C9431C` | `#C9431C` | `#A8370F` / `#FF9A6B` | `#FFE9E0` / `#34160D` | 4.9 / 4.9 |
+| Green | `#007F35` | `#007F35` | `#00692C` / `#5FD08A` | `#DCF3E3` / `#0E2C1A` | 5.1 / 5.1 |
+| Teal | `#00818D` | `#00818D` | `#006A74` / `#4FD1DB` | `#DDF5F7` / `#0D2E33` | 4.6 / 4.6 |
+| Blue | `#1A6FDB` | `#1A6FDB` | `#155BB5` / `#7EB6FF` | `#E3EEFD` / `#11243D` | 4.8 / 4.8 |
 
-Signal's dark fill changes from azure `#319CFC` to indigo `#5563F0`. Signal is therefore one
-hue family in both themes, and white text on it passes AA.
+Indigo's dark fill changes from azure `#319CFC` to `#5563F0`. Indigo is therefore one hue
+family in both themes, and white text on it passes AA.
 
 #### 3.2.4 Status (`KetchColors.status: KetchStatusColors`)
 
@@ -640,7 +650,7 @@ illustration is static.
 | `KetchMenu` | `surfaceRaised`, r12, e3, 4 dp inset. Items h28, r6, `label`. Shortcut hints right-aligned in `labelS` `textTertiary`. Submenus open on hover after 150 ms or on →. Dividers are 1 dp `divider`. Destructive items use the failed text color. On touch, a menu opens as a `ModalBottomSheet` with 48 dp items. |
 | `KetchTooltip` | Inverse surface (`#141A26` with `#F4F6FA`; swapped in dark), r8, padding 6 × 10, `caption`, 500 ms delay. The shortcut sits at the end in a 60% alpha label ("Pause all   ⇧⌘P"). Touch devices show it on long-press. |
 | `KetchDialog` (via `AdaptiveModal`) | `surfaceRaised`, `xl`, e4, max width 520 (intake 640), padding 24, `titleL`. Footer right-aligned: Secondary, then Primary or Danger. Esc and scrim click dismiss unless there is unsaved typed input. Compact width: `ModalBottomSheet` with `xxl` top, chosen by **window width**, not `isMobilePlatform` (`AdaptiveModal.kt:49`). Touch dialogs anchor at 15% of the height (keeps the IME fix from #135). |
-| `KetchToast` | Inverse surface, `md`, e3, h40, max width 480, padding 12 × 16. 16 dp level icon, `bodyS` text, up to 2 text actions in `inverseAccent` (Signal: `#8E9BFF` in light, 6.9:1 on `#141A26`; `#3C47B7` in dark, 6.6:1 on `#EEF0F4`; other accents use their opposite-theme `accentText`). Info and Success last 4 s, or 8 s with an action. Errors stay until dismissed. Hover pauses the timer. At most 3 stacked, 8 dp apart. Swipe dismisses on touch. `liveRegion = Polite` (errors `Assertive`). |
+| `KetchToast` | Inverse surface, `md`, e3, h40, max width 480, padding 12 × 16. 16 dp level icon, `bodyS` text, up to 2 text actions in `inverseAccent` (Indigo: `#8E9BFF` in light, 6.9:1 on `#141A26`; `#3C47B7` in dark, 6.6:1 on `#EEF0F4`; other accents use their opposite-theme `accentText`). Info and Success last 4 s, or 8 s with an action. Errors stay until dismissed. Hover pauses the timer. At most 3 stacked, 8 dp apart. Swipe dismisses on touch. `liveRegion = Polite` (errors `Assertive`). |
 | `KetchBadge` / count pill | h20 `full`, `surfaceSunken`, `numeralS`. Failed count: white on `dangerFill` (never on `status.failed`, which is light in dark). |
 | `StatusDot` | 8 dp (6 dp in table rows) + `caption` `textSecondary` label. Only Failed colors its label. The Downloading pulse is drawn with `drawBehind` (the current halo is invisible: `DownloadListItem.kt:327-337`). |
 | `PriorityGlyph` | See §3.2.4. |
@@ -1959,7 +1969,7 @@ has no landing grid of category cards; the category list opens straight onto a p
   with a 24 dp `KetchHueTile` and the page name, like the app's sidebar. The phone's list of
   pages adds a live summary in `caption` `textTertiary`, which the nav items give screen readers
   as their state instead:
-  - General: "Light · Signal"
+  - General: "Light · Indigo"
   - Downloads: "~/Downloads · 2 at a time"
   - Speed: "Slow lane · 1 MB/s · Auto weekdays"
   - Network: "en0 + en7" (interface names)

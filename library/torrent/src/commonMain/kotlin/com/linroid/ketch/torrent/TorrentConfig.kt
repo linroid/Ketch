@@ -17,8 +17,8 @@ import kotlin.time.Duration.Companion.seconds
  *   1..512 for v1 and 1..500 for v2. `DownloadConfig.maxConnectionsPerDownload` counts HTTP
  *   segments and does not apply to torrents; [maxConnections] bounds all torrents together.
  * @property enableUpload whether to seed after download completes
- * @property listenPort port for incoming peer connections; 0 for
- *   random port
+ * @property listenPort port for incoming peer connections, over TCP, which DHT also uses over
+ *   UDP when it can; 0 lets the system pick a free port for each, at every start
  */
 data class TorrentConfig(
   val dhtEnabled: Boolean = true,

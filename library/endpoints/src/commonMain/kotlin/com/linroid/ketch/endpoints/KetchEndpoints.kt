@@ -39,6 +39,9 @@ import kotlinx.serialization.Serializable
  * - `POST   /api/pairing`      — ask the server's owner for its access token
  * - `GET    /api/pairing/{id}` — whether the owner answered
  * - `DELETE /api/pairing/{id}` — withdraw the request
+ *
+ * ### Health (without the access token)
+ * - `GET /api/health` — 200 once the server serves its saved tasks, 503 until then
  */
 @Serializable
 @Resource("/api")
@@ -47,6 +50,11 @@ class Api {
   @Serializable
   @Resource("status")
   data class Status(val parent: Api = Api())
+
+  /** Whether the server is ready, which health checks such as Docker's ask without the token. */
+  @Serializable
+  @Resource("health")
+  data class Health(val parent: Api = Api())
 
   @Serializable
   @Resource("config")

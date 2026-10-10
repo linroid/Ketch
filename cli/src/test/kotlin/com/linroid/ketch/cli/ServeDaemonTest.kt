@@ -26,6 +26,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.time.TimeSource
 
 class ServeDaemonTest {
 
@@ -80,6 +81,33 @@ class ServeDaemonTest {
   }
 
   @Test
+  fun `serveDaemon reports ready once the saved tasks are restored`() {
+    val restore = CompletableDeferred<Unit>()
+    val store = GatedTaskStore(restore, SavedTaskStore(pausedRecord("saved")))
+    val ketch = Ketch(UnreachableHttpEngine(), taskStore = store)
+    val server =
+      KetchServer(ketch, host = "127.0.0.1", port = 0, mdnsEnabled = false, ready = false)
+    val daemon = thread { serveDaemon(server, ketch) }
+    try {
+      val port = runBlocking { withTimeout(5.seconds) { server.port() } }
+      val url = "${loopbackUrl("127.0.0.1", port)}/api/health"
+      assertEquals(HealthExit.NOT_READY, checkHealth(url))
+
+      restore.complete(Unit)
+      val deadline = TimeSource.Monotonic.markNow() + 5.seconds
+      while (checkHealth(url) != HealthExit.READY) {
+        assertTrue(deadline.hasNotPassedNow(), "the server never reported ready")
+        Thread.sleep(50)
+      }
+      assertEquals(listOf("saved"), ketch.tasks.value.map { it.taskId })
+    } finally {
+      server.stop()
+      daemon.join(5_000)
+      ketch.close()
+    }
+  }
+
+  @Test
   fun `serveDaemon restores no tasks when the server cannot listen`() {
     val loopback = InetAddress.getLoopbackAddress()
     ServerSocket(0, 1, loopback).use { taken ->
@@ -127,6 +155,17 @@ private class SavedTaskStore(vararg records: TaskRecord) : TaskStore {
 
   override suspend fun remove(taskId: String) {
     records.remove(taskId)
+  }
+}
+
+/** A [TaskStore] whose saved records only load once [gate] completes. */
+private class GatedTaskStore(
+  private val gate: CompletableDeferred<Unit>,
+  private val delegate: TaskStore,
+) : TaskStore by delegate {
+  override suspend fun loadAll(): List<TaskRecord> {
+    gate.await()
+    return delegate.loadAll()
   }
 }
 

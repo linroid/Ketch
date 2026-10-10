@@ -17,6 +17,10 @@ import kotlinx.serialization.Serializable
  * @property trackerListUrl the one list Ketch 0.3.0 subscribed to, read from
  *   its config files: a custom one replaces the default [trackerListUrls]
  *   until the lists are changed ([withTrackerLists]).
+ * @property listenPort port `ketch server` accepts BitTorrent peers on, TCP,
+ *   and runs DHT on, UDP; `0` lets the system pick a free one at every launch.
+ *   The apps and the CLI's other commands always let the system pick, so they
+ *   never contend for the server's port.
  */
 @Serializable
 data class TorrentSettings(
@@ -24,7 +28,12 @@ data class TorrentSettings(
   val trackerList: Boolean = true,
   val trackerListUrls: List<String> = DEFAULT_TRACKER_LISTS,
   val trackerListUrl: String? = null,
+  val listenPort: Int = 0,
 ) {
+  init {
+    require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }
+  }
+
   /** The tracker lists configured, whether or not [trackerList] is on, without repeats. */
   val trackerListAddresses: List<String>
     get() {

@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -350,13 +352,18 @@ private val DensityMode.label: StringResource
     DensityMode.Comfortable -> Res.string.settings_density_comfortable
   }
 
-/** The four accents as swatches, each named under it, the selected one ringed and checked. */
+/**
+ * The accents as swatches, each named under it, the selected one ringed and checked. They wrap
+ * onto more lines where the row is too narrow for all of them, as on phones.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentPicker(selected: KetchAccent, onSelect: (KetchAccent) -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  Row(
+  FlowRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+    verticalArrangement = Arrangement.spacedBy(spacing.s1),
     modifier = Modifier.selectableGroup(),
   ) {
     KetchAccent.entries.forEach { accent ->

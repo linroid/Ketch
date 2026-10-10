@@ -89,10 +89,13 @@
   <string name="settings_theme_light">Claro</string>
   <string name="settings_theme_dark">Escuro</string>
   <string name="settings_general_accent">Cor de destaque</string>
-  <string name="settings_accent_signal">Sinal</string>
-  <string name="settings_accent_harbor">Porto</string>
-  <string name="settings_accent_fathom">Profundo</string>
-  <string name="settings_accent_beacon">Farol</string>
+  <string name="settings_accent_indigo">Índigo</string>
+  <string name="settings_accent_purple">Roxo</string>
+  <string name="settings_accent_pink">Rosa</string>
+  <string name="settings_accent_orange">Laranja</string>
+  <string name="settings_accent_green">Verde</string>
+  <string name="settings_accent_teal">Verde-azulado</string>
+  <string name="settings_accent_blue">Azul</string>
   <string name="settings_general_density">Densidade</string>
   <string name="settings_general_density_hint">Automática: compacta com mouse, mais espaçosa com toque.</string>
   <string name="settings_density_auto">Automática</string>
@@ -584,7 +587,7 @@
   <string name="settings_search_device_name_keywords">nome do host, hostname, computador, renomear, nome</string>
   <string name="settings_search_theme">Sistema, claro ou escuro</string>
   <string name="settings_search_theme_keywords">modo escuro, modo claro, tema escuro, aparência, noturno</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s ou %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s ou %7$s</string>
   <string name="settings_search_accent_keywords">cor, cores, destaque, aparência</string>
   <string name="settings_search_density">Automática, compacta ou confortável</string>
   <string name="settings_search_density_keywords">tamanho, espaçamento, toque, aparência</string>

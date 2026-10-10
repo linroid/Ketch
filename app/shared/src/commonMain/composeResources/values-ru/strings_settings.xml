@@ -97,10 +97,13 @@
   <string name="settings_theme_light">Светлая</string>
   <string name="settings_theme_dark">Тёмная</string>
   <string name="settings_general_accent">Акцентный цвет</string>
-  <string name="settings_accent_signal">Сигнал</string>
-  <string name="settings_accent_harbor">Гавань</string>
-  <string name="settings_accent_fathom">Глубина</string>
-  <string name="settings_accent_beacon">Маяк</string>
+  <string name="settings_accent_indigo">Индиго</string>
+  <string name="settings_accent_purple">Фиолетовый</string>
+  <string name="settings_accent_pink">Розовый</string>
+  <string name="settings_accent_orange">Оранжевый</string>
+  <string name="settings_accent_green">Зелёный</string>
+  <string name="settings_accent_teal">Сине-зелёный</string>
+  <string name="settings_accent_blue">Синий</string>
   <string name="settings_general_density">Плотность</string>
   <string name="settings_general_density_hint">Авто: компактно при работе с мышью, просторнее при касаниях.</string>
   <string name="settings_density_auto">Авто</string>
@@ -614,7 +617,7 @@
   <string name="settings_search_device_name_keywords">имя хоста, компьютер, переименовать, название</string>
   <string name="settings_search_theme">Как в системе, светлая или тёмная</string>
   <string name="settings_search_theme_keywords">тёмная тема, темная тема, светлая тема, ночной режим, оформление</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s или %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s или %7$s</string>
   <string name="settings_search_accent_keywords">цвет, оформление, акцент</string>
   <string name="settings_search_density">Авто, компактная или просторная</string>
   <string name="settings_search_density_keywords">размер, отступы, интервалы, сенсорный, оформление</string>

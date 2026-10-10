@@ -85,10 +85,13 @@
   <string name="settings_theme_light">ライト</string>
   <string name="settings_theme_dark">ダーク</string>
   <string name="settings_general_accent">アクセントカラー</string>
-  <string name="settings_accent_signal">シグナル</string>
-  <string name="settings_accent_harbor">ハーバー</string>
-  <string name="settings_accent_fathom">ファゾム</string>
-  <string name="settings_accent_beacon">ビーコン</string>
+  <string name="settings_accent_indigo">インディゴ</string>
+  <string name="settings_accent_purple">パープル</string>
+  <string name="settings_accent_pink">ピンク</string>
+  <string name="settings_accent_orange">オレンジ</string>
+  <string name="settings_accent_green">グリーン</string>
+  <string name="settings_accent_teal">ティール</string>
+  <string name="settings_accent_blue">ブルー</string>
   <string name="settings_general_density">表示密度</string>
   <string name="settings_general_density_hint">自動：マウスではコンパクトに、タッチではゆったり表示します。</string>
   <string name="settings_density_auto">自動</string>
@@ -569,7 +572,7 @@
   <string name="settings_search_device_name_keywords">ホスト名, コンピュータ名, 名前, 名前の変更</string>
   <string name="settings_search_theme">システム、ライト、ダーク</string>
   <string name="settings_search_theme_keywords">ダークモード, ライトモード, 外観, テーマ, 配色</string>
-  <string name="settings_search_accent">%1$s、%2$s、%3$s、%4$s</string>
+  <string name="settings_search_accent">%1$s、%2$s、%3$s、%4$s、%5$s、%6$s、%7$s</string>
   <string name="settings_search_accent_keywords">色, カラー, 外観, テーマ</string>
   <string name="settings_search_density">自動、コンパクト、ゆったり</string>
   <string name="settings_search_density_keywords">サイズ, 間隔, 余白, タッチ, 外観, 密度</string>

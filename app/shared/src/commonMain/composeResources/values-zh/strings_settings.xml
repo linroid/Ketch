@@ -85,10 +85,13 @@
   <string name="settings_theme_light">浅色</string>
   <string name="settings_theme_dark">深色</string>
   <string name="settings_general_accent">强调色</string>
-  <string name="settings_accent_signal">信号</string>
-  <string name="settings_accent_harbor">港湾</string>
-  <string name="settings_accent_fathom">深海</string>
-  <string name="settings_accent_beacon">灯塔</string>
+  <string name="settings_accent_indigo">靛蓝</string>
+  <string name="settings_accent_purple">紫色</string>
+  <string name="settings_accent_pink">粉色</string>
+  <string name="settings_accent_orange">橙色</string>
+  <string name="settings_accent_green">绿色</string>
+  <string name="settings_accent_teal">青绿</string>
+  <string name="settings_accent_blue">蓝色</string>
   <string name="settings_general_density">密度</string>
   <string name="settings_general_density_hint">自动：使用鼠标时紧凑，使用触控时宽松。</string>
   <string name="settings_density_auto">自动</string>
@@ -569,7 +572,7 @@
   <string name="settings_search_device_name_keywords">主机名, 电脑名, 计算机名, 设备名, 重命名</string>
   <string name="settings_search_theme">跟随系统、浅色或深色</string>
   <string name="settings_search_theme_keywords">深色模式, 浅色模式, 暗黑模式, 夜间模式, 外观, 主题</string>
-  <string name="settings_search_accent">%1$s、%2$s、%3$s 或 %4$s</string>
+  <string name="settings_search_accent">%1$s、%2$s、%3$s、%4$s、%5$s、%6$s 或 %7$s</string>
   <string name="settings_search_accent_keywords">颜色, 主题色, 强调色, 外观</string>
   <string name="settings_search_density">自动、紧凑或宽松</string>
   <string name="settings_search_density_keywords">大小, 间距, 触摸, 触控, 外观</string>

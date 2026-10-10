@@ -61,6 +61,7 @@ class DefaultConfigTest {
       assertEquals(listOf(remote), config.remotes)
       assertEquals(1, config.torrent.trackers.size)
       assertEquals(listOf("https://lists.example.org/trackers.txt"), config.torrent.trackerListUrls)
+      assertEquals(6881, config.torrent.listenPort)
     } finally {
       dir.deleteRecursively()
     }
