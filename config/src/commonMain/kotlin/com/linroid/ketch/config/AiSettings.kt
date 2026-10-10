@@ -110,6 +110,18 @@ data class LlmSettings(
     return copy(model = id, models = if (known) models else models + id)
   }
 
+  /**
+   * Offers [model] among [modelChoices], adding it to [models] when neither list has it. It
+   * becomes the one called only while no model is.
+   */
+  fun withCandidate(model: String): LlmSettings {
+    val id = model.trim()
+    if (id.isEmpty()) return this
+    if (effectiveModel.isBlank()) return withModel(id)
+    val known = id in models || id in provider.models
+    return if (known) this else copy(models = models + id)
+  }
+
   /** Forgets [model]: it leaves [models], and stops being the one called. */
   fun withoutModel(model: String): LlmSettings = copy(
     model = if (this.model == model) "" else this.model,

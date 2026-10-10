@@ -17,6 +17,7 @@ import com.linroid.ketch.app.snapshot.withSettings
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
+import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.PageAccessSettings
 import kotlin.test.Test
@@ -88,7 +89,7 @@ class AiDiscoverySettingsRenderTest {
       frames(FRAMES)
 
       assertTrue(field(PLACEHOLDER).isDisabled(), "The page access field follows the switch")
-      assertTrue(control("Gemini").isDisabled(), "The provider chips follow the switch")
+      assertTrue(control("Edit").isDisabled(), "The providers follow the switch")
       assertTrue(control("Ask for each new site").isDisabled(), "So does the page access menu")
       assertFalse(discoverSwitch().isDisabled(), "The switch itself stays usable")
 
@@ -98,6 +99,43 @@ class AiDiscoverySettingsRenderTest {
       assertTrue(ai.settings.enabled)
       assertFalse(field(PLACEHOLDER).isDisabled())
       assertEquals(listOf("ubuntu.com"), ai.settings.access.trustedSites, "Nothing is lost")
+    }
+  }
+
+  @Test
+  fun addProvider_chooseOpenAiAndTypeItsKey_addsItWithoutSwitchingToIt() {
+    runDiscoverPage { ai ->
+      nodes().first { it.ownText() == "Add provider" }.click()
+      frames(FRAMES)
+      nodes().first { it.ownText() == "OpenAI" }.click()
+      frames(FRAMES)
+      typeInto(field("sk-…"), "sk-typed")
+      nodes().last { it.ownText() == "Add" }.click()
+      frames(FRAMES)
+
+      assertEquals(listOf("anthropic", "openai"), ai.settings.providers.map { it.id })
+      assertEquals("sk-typed", ai.settings.entry("openai")?.apiKey)
+      assertEquals("anthropic", ai.settings.llm.id, "The provider in use stays in use")
+      assertTrue("Add provider" in texts(), "The dialog closes")
+    }
+  }
+
+  @Test
+  fun editProvider_renameAndAddAModel_savesBoth() {
+    runDiscoverPage { ai ->
+      nodes().first { it.ownText() == "Edit" }.click()
+      frames(FRAMES)
+      typeInto(field("Anthropic"), "Work")
+      typeInto(field("Add a model id"), "claude-next")
+      sendKey(Key.Enter)
+      frames(FRAMES)
+      nodes().last { it.ownText() == "Save" }.click()
+      frames(FRAMES)
+
+      val saved = ai.settings.llm
+      assertEquals("Work", saved.name)
+      assertEquals(listOf("claude-next"), saved.models)
+      assertEquals(LlmProvider.Anthropic.defaultModel, saved.effectiveModel)
     }
   }
 
@@ -159,6 +197,13 @@ class AiDiscoverySettingsRenderTest {
   /** Puts the keyboard in the add field and types [text] into it. */
   private suspend fun ImageComposeScene.typeIntoAddField(text: String) {
     val field = addField()
+    field.config[SemanticsActions.RequestFocus].action?.invoke()
+    field.config[SemanticsActions.SetText].action?.invoke(AnnotatedString(text))
+    frames(FRAMES)
+  }
+
+  /** Puts the keyboard in [field] and types [text] into it. */
+  private suspend fun ImageComposeScene.typeInto(field: SemanticsNode, text: String) {
     field.config[SemanticsActions.RequestFocus].action?.invoke()
     field.config[SemanticsActions.SetText].action?.invoke(AnnotatedString(text))
     frames(FRAMES)

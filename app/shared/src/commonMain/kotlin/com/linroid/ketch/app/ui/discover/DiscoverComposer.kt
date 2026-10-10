@@ -75,7 +75,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The chat's composer: one rounded surface holding the message, up to six lines before it
- * scrolls, the "Limit to websites" chip, and Find (a chat's first message) or Send, which turns
+ * scrolls, the "Limit to websites" and model chips, and Find (a chat's first message) or Send, which turns
  * into Stop while the session searches. The website field opens at the top of the surface,
  * above the message, from the chip.
  *
@@ -91,7 +91,9 @@ import org.jetbrains.compose.resources.stringResource
  *   follows [softKeyboard].
  * @param softKeyboard whether the platform types with an on-screen keyboard, as phones and
  *   tablets do: Enter starts a line, and sending puts the keyboard away.
- * @param target the device chip shown after the website chip, such as while no add bar shows
+ * @param model the chip of the model the next message searches with, after the website chip;
+ *   `null` for none.
+ * @param target the device chip shown after the model chip, such as while no add bar shows
  *   one; `null` for none.
  */
 @Composable
@@ -106,6 +108,7 @@ internal fun DiscoverComposer(
   onSend: () -> Unit,
   onStop: () -> Unit,
   modifier: Modifier = Modifier,
+  model: (@Composable () -> Unit)? = null,
   target: (@Composable () -> Unit)? = null,
 ) {
   val colors = KetchTheme.colors
@@ -200,6 +203,7 @@ internal fun DiscoverComposer(
           }
         },
       )
+      model?.invoke()
       target?.invoke()
       Spacer(Modifier.weight(1f))
       if (running) {

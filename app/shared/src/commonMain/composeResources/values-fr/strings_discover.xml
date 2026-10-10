@@ -24,6 +24,8 @@
   <string name="discover_send">Envoyer</string>
   <string name="discover_stop">Arrêter</string>
   <string name="discover_sites_limit">Limiter à des sites web</string>
+  <string name="discover_model_menu_title">Modèle</string>
+  <string name="discover_model_manage">Gérer les fournisseurs</string>
   <plurals name="discover_sites_count">
     <item quantity="one">%1$d site web</item>
     <item quantity="other">%1$d sites web</item>

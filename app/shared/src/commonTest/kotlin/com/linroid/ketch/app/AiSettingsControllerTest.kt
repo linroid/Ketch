@@ -481,4 +481,61 @@ class AiSettingsControllerTest {
 
     assertTrue(controller.available)
   }
+
+  @Test
+  fun addProvider_whileTheOneInUseWorks_keepsUsingIt() {
+    val controller = AiSettingsController(
+      RecordingConfigStore(KetchConfig(ai = usableSettings())),
+      FakeFactory(),
+    )
+    val entry = controller.settings.newEntry(LlmProvider.Anthropic).copy(apiKey = "sk-ant")
+
+    controller.addProvider(entry)
+
+    assertEquals(listOf("openai", "anthropic"), controller.settings.providers.map { it.id })
+    assertEquals("openai", controller.settings.llm.id)
+  }
+
+  @Test
+  fun addProvider_whenNoneWorks_usesTheNewOne() {
+    val controller = AiSettingsController(RecordingConfigStore(), FakeFactory())
+    val entry = controller.settings.newEntry(LlmProvider.Anthropic).copy(apiKey = "sk-ant")
+
+    controller.addProvider(entry)
+
+    assertEquals("anthropic", controller.settings.llm.id)
+    assertTrue(controller.available)
+  }
+
+  @Test
+  fun testConnection_unsavedProvider_testsItWithoutSavingIt() = runTest {
+    val factory = FakeFactory()
+    val controller = AiSettingsController(
+      RecordingConfigStore(KetchConfig(ai = usableSettings())),
+      factory,
+    )
+    val draft = controller.settings.newEntry(LlmProvider.Mistral).copy(apiKey = "k")
+
+    controller.testConnection(draft)
+
+    assertEquals(draft.id, controller.testedId)
+    assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
+    assertTrue((factory.created.last() as FakeAiProvider).closed)
+    assertEquals(listOf("openai"), controller.settings.providers.map { it.id })
+  }
+
+  @Test
+  fun loadModels_unsavedProvider_listsThemUnderItsId() = runTest {
+    val factory = object : AiDiscoveryProviderFactory {
+      override fun create(settings: AiSettings): AiDiscoveryProvider = FakeAiProvider()
+      override suspend fun listModels(llm: LlmSettings): List<String> = listOf(llm.apiKey)
+    }
+    val controller = AiSettingsController(RecordingConfigStore(), factory)
+    val draft = controller.settings.newEntry(LlmProvider.Groq).copy(apiKey = "typed")
+
+    controller.loadModels(draft)
+
+    assertEquals(AiModelList.Loaded(listOf("typed")), controller.modelLists["groq"])
+    assertTrue(controller.settings.providers.isEmpty())
+  }
 }

@@ -40,6 +40,9 @@
   <string name="discover_send">Send</string>
   <string name="discover_stop">Stop</string>
   <string name="discover_sites_limit">Limit to websites</string>
+  <!-- The model chip's menu: its title on phones, and the item that opens Discover's settings. -->
+  <string name="discover_model_menu_title">Model</string>
+  <string name="discover_model_manage">Manage providers</string>
   <!-- The website chip while two or more websites limit the search. -->
   <plurals name="discover_sites_count">
     <item quantity="one">%1$d website</item>

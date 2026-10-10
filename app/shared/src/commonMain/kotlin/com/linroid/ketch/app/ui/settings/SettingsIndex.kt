@@ -16,9 +16,8 @@ import ketch.app.shared.generated.resources.settings_ai_access_trusted
 import ketch.app.shared.generated.resources.settings_ai_api_key
 import ketch.app.shared.generated.resources.settings_ai_discovery
 import ketch.app.shared.generated.resources.settings_ai_endpoint
-import ketch.app.shared.generated.resources.settings_ai_endpoint_optional
 import ketch.app.shared.generated.resources.settings_ai_model
-import ketch.app.shared.generated.resources.settings_ai_provider
+import ketch.app.shared.generated.resources.settings_ai_providers
 import ketch.app.shared.generated.resources.settings_ai_test
 import ketch.app.shared.generated.resources.settings_ai_web_search
 import ketch.app.shared.generated.resources.settings_categories
@@ -337,7 +336,7 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
-    title = Res.string.settings_ai_provider,
+    title = Res.string.settings_ai_providers,
     description = Res.string.settings_search_provider.text(),
     keywords = Res.string.settings_search_provider_keywords,
   ),
@@ -345,22 +344,25 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_api_key,
     keywords = Res.string.settings_search_api_key_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_model,
     keywords = Res.string.settings_search_model_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_endpoint,
     keywords = Res.string.settings_search_endpoint_keywords,
-    anchors = listOf(Res.string.settings_ai_endpoint, Res.string.settings_ai_endpoint_optional),
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_test,
     keywords = Res.string.settings_search_test_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,

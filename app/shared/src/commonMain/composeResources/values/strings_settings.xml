@@ -276,8 +276,6 @@
   <string name="settings_ai_status_off">Find downloads by describing them.</string>
   <!-- %1$s is the provider, such as Anthropic, %2$s the model, such as claude-sonnet-5. -->
   <string name="settings_ai_status_ready">Ready · %1$s · %2$s</string>
-  <!-- The group of the provider, key, model and endpoint. -->
-  <string name="settings_ai_model_group">Model</string>
   <!-- The buttons that pick a provider. Ollama runs models on the computer itself. -->
   <string name="settings_ai_provider_ollama">Ollama · runs locally, no key</string>
   <string name="settings_ai_provider_compatible">Custom (OpenAI-compatible)</string>
@@ -290,10 +288,6 @@
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM and similar servers.</string>
   <string name="settings_ai_api_key_env">Using the key from the environment. One here overrides it.</string>
   <string name="settings_ai_api_key_plain">Stored as plain text in this device's config file.</string>
-  <string name="settings_ai_model_required">Required. Use a model with tool support.</string>
-  <string name="settings_ai_model_any">Any model with tool support works.</string>
-  <!-- In the empty model field of a provider without a default model. -->
-  <string name="settings_ai_model_placeholder">Model id</string>
   <string name="settings_ai_endpoint_compatible_hint">Any OpenAI-compatible endpoint, with or without /v1.</string>
   <!-- The button that tests the connection, and the same while it runs. -->
   <string name="settings_ai_test_button">Test</string>
@@ -315,6 +309,43 @@
   <string name="settings_ai_engine_failed">Could not start the discovery engine.</string>
   <!-- Why the provider's models could not be listed, when it gave no reason. -->
   <string name="settings_ai_models_failed">Couldn't list the models.</string>
+  <!-- The saved LLM providers, each with its own key, endpoint and models. -->
+  <string name="settings_ai_providers">Providers</string>
+  <string name="settings_ai_providers_footer">Discover uses the checked provider. Switch providers and models from its search box too.</string>
+  <string name="settings_ai_providers_none">No provider yet</string>
+  <string name="settings_ai_providers_none_hint">Add one with its API key to start searching.</string>
+  <string name="settings_ai_provider_add">Add provider</string>
+  <!-- The button that makes Discover use a saved provider, and what shows on the one it uses. -->
+  <string name="settings_ai_provider_use">Use</string>
+  <string name="settings_ai_provider_in_use">In use</string>
+  <string name="settings_ai_provider_edit">Edit</string>
+  <!-- %1$s is the provider's name, such as Anthropic or Work. -->
+  <string name="settings_ai_provider_edit_title">Edit %1$s</string>
+  <string name="settings_ai_provider_save">Save</string>
+  <!-- The second click of Remove, which removes the provider and its key. -->
+  <string name="settings_ai_provider_remove_confirm">Remove for good</string>
+  <!-- On a saved provider that cannot be called yet. -->
+  <string name="settings_ai_provider_incomplete">Needs a key or model</string>
+  <string name="settings_ai_provider_env">Key from the environment</string>
+  <string name="settings_ai_provider_choose">Choose where your models run.</string>
+  <!-- Groups of providers: hosted services, ones based in China, servers on the user's computer and any other. -->
+  <string name="settings_ai_provider_group_hosted">Hosted</string>
+  <string name="settings_ai_provider_group_china">Hosted in China</string>
+  <string name="settings_ai_provider_group_local">On your computer</string>
+  <string name="settings_ai_provider_group_custom">Other</string>
+  <string name="settings_ai_provider_name">Name</string>
+  <string name="settings_ai_provider_name_hint">Tells keys of the same provider apart, such as Work and Personal.</string>
+  <string name="settings_ai_models">Models</string>
+  <string name="settings_ai_models_hint">Discover calls the selected one. Add others to switch to them from the search box. Use models with tool support.</string>
+  <string name="settings_ai_models_add_placeholder">Add a model id</string>
+  <string name="settings_ai_models_fetch">Load models from the provider</string>
+  <string name="settings_ai_models_loading">Loading models…</string>
+  <string name="settings_ai_models_no_match">None of the provider's models match. Add it as typed.</string>
+  <!-- Over the models the provider listed that are not added yet; typing in the field above narrows them. -->
+  <plurals name="settings_ai_models_available">
+    <item quantity="one">%1$d model from the provider. Type to filter.</item>
+    <item quantity="other">%1$d models from the provider. Type to filter.</item>
+  </plurals>
   <string name="settings_ai_search_footer">Without a search provider, Discover only reads the pages you give it.</string>
   <string name="settings_ai_search_provider">Search provider</string>
   <!-- The search provider that is no provider: Discover searches nothing. -->
