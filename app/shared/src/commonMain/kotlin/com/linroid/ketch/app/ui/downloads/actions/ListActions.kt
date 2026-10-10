@@ -89,10 +89,11 @@ internal class ListActions(
   }
 
   /**
-   * A double-click on [row]: pauses a downloading or starting task and resumes a paused one,
-   * opens a finished file, and shows any other row in the inspector.
+   * A double-click on [row]: pauses a downloading or starting task and resumes a paused one, and
+   * opens a finished file. It never shows the row in the inspector, nor lets the click before it.
    */
   fun doubleClick(row: TaskRow) {
+    selection.doubleClicked()
     val action = when (val state = row.state) {
       is DownloadState.Downloading -> RowAction.Pause
       is DownloadState.Queued -> RowAction.Pause.takeIf { row.isStarting }
@@ -101,7 +102,7 @@ internal class ListActions(
       is DownloadState.Completed -> RowAction.Open
       else -> null
     }?.takeIf { it in runner.menu(row) }
-    if (action != null) runner.run(action, listOf(row)) else runner.inspect(row.key)
+    if (action != null) runner.run(action, listOf(row))
   }
 
   /** A right-click on [row] at [position] in it: opens the menu of the rows it acts on. */
@@ -276,6 +277,7 @@ internal fun TaskRowFrame(
         onDoubleClick = { actions.doubleClick(row) },
         onContextClick = { actions.contextClick(row, it) },
         onLongPress = { actions.longPress(row) },
+        onClickSettled = { actions.selection.settle(row.key) },
       ),
   ) {
     content(state)

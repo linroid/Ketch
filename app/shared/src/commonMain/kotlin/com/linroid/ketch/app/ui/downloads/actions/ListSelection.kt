@@ -27,6 +27,9 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.SelectionState
 import com.linroid.ketch.app.state.TaskKey
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -48,6 +51,13 @@ internal class ListSelection(private val state: AppState) {
   /** Number of selected rows. */
   val count: Int get() = state.selectedKeys.size
 
+  /**
+   * The row a click selected while the inspector was closed, which [settle] shows once no second
+   * click made the click a double-click; `null` otherwise.
+   */
+  var pendingInspect: TaskKey? = null
+    private set
+
   /** The row with the keyboard focus, or `null`. */
   val focusedKey: TaskKey? get() = focused
 
@@ -62,19 +72,40 @@ internal class ListSelection(private val state: AppState) {
   }
 
   /**
-   * A click on [key]. A plain click selects the row and shows it in the inspector. On touch a
-   * tap only shows the row, unless something is selected: then it toggles the row, as in
+   * A click on [key]. A plain click selects the row and shows it in the inspector; when the
+   * inspector is closed and [RowClick.awaitsDoubleClick], only once the click [settle]s. On touch
+   * a tap only shows the row, unless something is selected: then it toggles the row, as in
    * selection mode.
    */
   fun click(key: TaskKey, visible: List<TaskKey>, click: RowClick) {
+    pendingInspect = null
     if (click.touch && count == 0) {
       focused = key
       state.inspect(key)
       return
     }
     val toggle = click.toggle || click.touch
+    val inspectorShown = state.inspectedTask != null || count >= 2
+    if (!toggle && !click.range && click.awaitsDoubleClick && !inspectorShown) {
+      pendingInspect = key
+    }
     update(current.click(key, visible, toggle = toggle, range = click.range))
-    if (!toggle && !click.range) state.inspect(key)
+    if (!toggle && !click.range && pendingInspect == null) state.inspect(key)
+  }
+
+  /**
+   * The click on [key] did not become a double-click: shows the row in the inspector if its click
+   * is still [pendingInspect] and it is the only row selected.
+   */
+  fun settle(key: TaskKey) {
+    if (pendingInspect != key) return
+    pendingInspect = null
+    if (state.selectedKeys == setOf(key)) state.inspect(key)
+  }
+
+  /** A double-click: the click before it shows nothing in the inspector. */
+  fun doubleClicked() {
+    pendingInspect = null
   }
 
   /** A long-press on touch: enters selection mode with [key] selected, or toggles it. */
@@ -114,40 +145,48 @@ internal fun rememberListSelection(state: AppState = LocalAppState.current): Lis
  * @property toggle whether ⌘ (Apple keyboards) or Ctrl (elsewhere) was held.
  * @property range whether ⇧ was held.
  * @property touch whether a finger tapped, rather than a mouse or pen clicking.
+ * @property awaitsDoubleClick whether a second click may still make this a double-click, so a
+ *   closed inspector waits for [ListSelection.settle] before showing the row.
  */
 internal data class RowClick(
   val toggle: Boolean = false,
   val range: Boolean = false,
   val touch: Boolean = false,
+  val awaitsDoubleClick: Boolean = false,
 )
 
 /**
- * Pointer input of a task row: [onClick] with the modifiers held, [onDoubleClick] for a second
- * click in quick succession, [onContextClick] for a right-click (or ⌃-click on Apple keyboards)
- * at its position in the row, and [onLongPress] for a finger held down. Presses that a child,
- * such as a hover action, handles never reach these, so they never change the selection.
+ * Pointer input of a task row: [onClick] with the modifiers held, [onClickSettled] once a mouse
+ * click had no second click in quick succession, [onDoubleClick] for one that did,
+ * [onContextClick] for a right-click (or ⌃-click on Apple keyboards) at its position in the row,
+ * and [onLongPress] for a finger held down. Presses that a child, such as a hover action,
+ * handles never reach these, so they never change the selection.
  */
 internal fun Modifier.taskRowPointer(
   onClick: (RowClick) -> Unit,
   onDoubleClick: () -> Unit,
   onContextClick: (Offset) -> Unit,
   onLongPress: () -> Unit = {},
-): Modifier = this then RowPointerElement(onClick, onDoubleClick, onContextClick, onLongPress)
+  onClickSettled: () -> Unit = {},
+): Modifier =
+  this then RowPointerElement(onClick, onDoubleClick, onContextClick, onLongPress, onClickSettled)
 
 private data class RowPointerElement(
   val onClick: (RowClick) -> Unit,
   val onDoubleClick: () -> Unit,
   val onContextClick: (Offset) -> Unit,
   val onLongPress: () -> Unit,
+  val onClickSettled: () -> Unit,
 ) : ModifierNodeElement<RowPointerNode>() {
   override fun create(): RowPointerNode =
-    RowPointerNode(onClick, onDoubleClick, onContextClick, onLongPress)
+    RowPointerNode(onClick, onDoubleClick, onContextClick, onLongPress, onClickSettled)
 
   override fun update(node: RowPointerNode) {
     node.onClick = onClick
     node.onDoubleClick = onDoubleClick
     node.onContextClick = onContextClick
     node.onLongPress = onLongPress
+    node.onClickSettled = onClickSettled
   }
 
   override fun InspectorInfo.inspectableProperties() {
@@ -160,9 +199,11 @@ private class RowPointerNode(
   var onDoubleClick: () -> Unit,
   var onContextClick: (Offset) -> Unit,
   var onLongPress: () -> Unit,
+  var onClickSettled: () -> Unit,
 ) : DelegatingNode() {
   private var lastClickAt = 0L
   private var lastClickPosition = Offset.Zero
+  private var settling: Job? = null
 
   init {
     delegate(SuspendingPointerInputModifierNode { detect() })
@@ -205,9 +246,17 @@ private class RowPointerNode(
         onClick(RowClick(touch = true))
         return@awaitEachGesture
       }
-      val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+      // A second press may make the last click a double-click; it settles if this one does not.
+      val unsettled = settling?.isActive == true
+      settling?.cancel()
+      val up = waitForUpOrCancellation()
+      if (up == null) {
+        if (unsettled) onClickSettled()
+        return@awaitEachGesture
+      }
       up.consume()
-      val quick = up.uptimeMillis - lastClickAt <= viewConfiguration.doubleTapTimeoutMillis
+      val timeout = viewConfiguration.doubleTapTimeoutMillis
+      val quick = up.uptimeMillis - lastClickAt <= timeout
       val near = (up.position - lastClickPosition).getDistance() <= viewConfiguration.touchSlop
       if (quick && near) {
         lastClickAt = 0L
@@ -216,7 +265,11 @@ private class RowPointerNode(
         lastClickAt = up.uptimeMillis
         lastClickPosition = up.position
         val primary = if (apple) keys.isMetaPressed else keys.isCtrlPressed
-        onClick(RowClick(toggle = primary, range = keys.isShiftPressed))
+        onClick(RowClick(toggle = primary, range = keys.isShiftPressed, awaitsDoubleClick = true))
+        settling = coroutineScope.launch {
+          delay(timeout)
+          onClickSettled()
+        }
       }
     }
   }
