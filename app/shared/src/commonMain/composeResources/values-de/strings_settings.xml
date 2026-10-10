@@ -429,6 +429,25 @@
   <string name="settings_network_none_found">Keine Netzwerke gefunden. Verbinde dich mit WLAN oder Ethernet und aktualisiere dann.</string>
   <string name="settings_network_http_only">Nur HTTP. FTP und Torrents nutzen den Systemstandard.</string>
   <string name="settings_network_gone">%1$s · nicht verbunden</string>
+  <string name="settings_proxy">Proxy</string>
+  <string name="settings_proxy_mode">Verbinden über</string>
+  <string name="settings_proxy_system">System-Proxy</string>
+  <string name="settings_proxy_direct">Kein Proxy</string>
+  <string name="settings_proxy_manual">Eigener Proxy</string>
+  <string name="settings_proxy_system_hint">Folgt den Proxy-Einstellungen von %1$s.</string>
+  <string name="settings_proxy_address">Adresse</string>
+  <string name="settings_proxy_address_hint">Ein HTTP- oder SOCKS5-Proxy.</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <string name="settings_proxy_address_invalid">Verwende http://host:port oder socks5://host:port</string>
+  <string name="settings_proxy_username">Benutzername</string>
+  <string name="settings_proxy_password">Passwort</string>
+  <string name="settings_proxy_optional">Optional</string>
+  <string name="settings_proxy_bypass">Direkt verbinden mit</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">Hosts, IP-Adressen oder Bereiche, durch Kommas getrennt. Subdomains sind eingeschlossen.</string>
+  <string name="settings_proxy_bypass_invalid">%1$s ist kein Host, keine Adresse und kein Bereich</string>
+  <string name="settings_proxy_footer">Für HTTP-Downloads, sobald sie starten oder fortgesetzt werden. FTP und Torrents verbinden sich direkt.</string>
+  <string name="settings_proxy_unsupported">%1$s kann keinen Proxy verwenden. Aktualisiere Ketch dort, um einen zu wählen.</string>
 
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>
@@ -608,6 +627,8 @@
   <string name="settings_search_connections_keywords">Segmente, Threads, parallel, aufteilen</string>
   <string name="settings_search_networks">Die Netzwerke, die Downloads nutzen</string>
   <string name="settings_search_networks_keywords">WLAN, WiFi, Wi-Fi, Ethernet, LAN, Schnittstelle, VPN, mehrere Netzwerke</string>
+  <string name="settings_search_proxy">Wie Downloads Server erreichen</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http-proxy, ausnahmen, firewall</string>
   <string name="settings_search_trackers">Tracker, die öffentlichen Torrents hinzugefügt werden</string>
   <string name="settings_search_trackers_keywords">Announce, UDP, Magnet, Tracker hinzufügen</string>
   <string name="settings_search_pair">Dieses Gerät von einem Telefon oder Browser aus steuern</string>

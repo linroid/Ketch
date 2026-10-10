@@ -32,7 +32,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The networks [device] spreads its HTTP requests over, as chips: the system's default
  * connection, or any set of its interfaces. The choice applies at once and lasts until the
- * device restarts.
+ * device restarts. Below them, the proxy those requests go through ([ProxySettings]).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -106,6 +106,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
       }
     }
   }
+  ProxySettings(state, device)
 }
 
 /**

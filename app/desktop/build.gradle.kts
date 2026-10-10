@@ -263,6 +263,9 @@ compose.desktop {
     // warning there breaks the reply, so they go to stderr. These come after JAVA_TOOL_OPTIONS, so
     // diagnostic logging asked for there only reaches a file (`-Xlog:cds:file=cds.log`).
     jvmArgs += listOf("-Xlog:all=off:stdout", "-Xlog:all=warning:stderr")
+    // Downloads following the system's proxy (ProxyMode.SYSTEM) ask the JVM's default
+    // ProxySelector, which only reads the operating system's proxies with this set at startup.
+    jvmArgs += "-Djava.net.useSystemProxies=true"
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {

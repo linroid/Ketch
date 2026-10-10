@@ -96,7 +96,7 @@ class ForegroundPolicyTest {
     runCurrent()
     assertFalse(emitted.last().isRequired)
 
-    val task = fakeTask(DownloadState.Queued)
+    val task = fakeTask(DownloadState.Queued, position = 1)
     tasks.value = listOf(task)
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
@@ -106,6 +106,34 @@ class ForegroundPolicyTest {
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
     assertEquals(ForegroundStatus(downloading = 1), emitted.last())
+  }
+
+  @Test
+  fun observe_queuedTaskLeavesTheQueue_reportsItStarting() = runTest {
+    val task = fakeTask(DownloadState.Queued, position = 1)
+    val emitted = observe(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertEquals(ForegroundStatus(queued = 1), emitted.last())
+
+    task.queuePosition.value = null
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertEquals(ForegroundStatus(starting = 1), emitted.last())
+    assertTrue(emitted.last().isRequired)
+  }
+
+  @Test
+  fun observe_queuedOnADeviceWithoutPositions_staysQueued() = runTest {
+    val emitted = mutableListOf<ForegroundStatus>()
+    backgroundScope.launch {
+      val tasks = MutableStateFlow(listOf(fakeTask(DownloadState.Queued)))
+      ForegroundPolicy.observe(tasks, MutableStateFlow(stopped), features = emptySet())
+        .collect { emitted += it }
+    }
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertEquals(ForegroundStatus(queued = 1), emitted.last())
   }
 
   @Test
@@ -168,7 +196,7 @@ class ForegroundPolicyTest {
 
   @Test
   fun observe_rapidStateChanges_emitsAtMostOncePerPeriod() = runTest {
-    val task = fakeTask(DownloadState.Queued)
+    val task = fakeTask(DownloadState.Queued, position = 1)
     val emitted = observe(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))
     repeat(30) { step ->
       task.state.value = if (step % 2 == 0) downloading else DownloadState.Queued
@@ -190,10 +218,12 @@ class ForegroundPolicyTest {
     return emitted
   }
 
-  private fun fakeTask(state: DownloadState) = ListTestTask(
+  // A queued task without a position holds a slot and is starting.
+  private fun fakeTask(state: DownloadState, position: Int? = null) = ListTestTask(
     "task",
     state,
     DownloadRequest(url = "https://example.com/file.iso"),
-    Instant.fromEpochMilliseconds(0)
+    Instant.fromEpochMilliseconds(0),
+    queuePosition = MutableStateFlow(position),
   )
 }

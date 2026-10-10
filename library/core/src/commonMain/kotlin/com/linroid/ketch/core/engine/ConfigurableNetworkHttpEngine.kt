@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.sync.Mutex
@@ -15,7 +16,8 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * Pass this engine to Ketch to expose interface controls through KetchApi. Updates validate and
  * construct the entire replacement before switching. Old transports are closed only after their
  * in-flight requests finish. Closing the engine prevents new requests and likewise drains existing
- * requests; Ketch cancels its downloads before closing the engine.
+ * requests; Ketch cancels its downloads before closing the engine. [withProxy] follows the
+ * selection too: each request goes through the networks selected when it starts.
  *
  * @param provider platform discovery and factories; every factory call must return a new engine
  */
@@ -91,6 +93,12 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
     withEngine { it.download(url, range, headers, onData) }
   }
 
+  /** Whether the engine of the current selection supports proxies. */
+  override val supportsProxies: Boolean
+    get() = current.load()?.engine?.supportsProxies == true
+
+  override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
+
   private suspend fun <T> withEngine(block: suspend (HttpEngine) -> T): T {
     while (true) {
       val generation = checkNotNull(current.load()) { "Network engine is closed" }
@@ -106,6 +114,38 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
 
   override fun close() {
     current.exchange(null)?.release()
+  }
+
+  /** The selected networks, reaching servers as [proxy] says; closing it does nothing. */
+  private inner class Proxied(private val proxy: ProxyConfig) : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      withEngine { it.withProxy(proxy).head(url, headers) }
+
+    override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
+      withEngine { it.withProxy(proxy).probe(url, headers) }
+
+    override suspend fun downloadResource(
+      url: String,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ): String = withEngine { it.withProxy(proxy).downloadResource(url, headers, onData) }
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) {
+      withEngine { it.withProxy(proxy).download(url, range, headers, onData) }
+    }
+
+    override val supportsProxies: Boolean
+      get() = this@ConfigurableNetworkHttpEngine.supportsProxies
+
+    override fun withProxy(proxy: ProxyConfig): HttpEngine =
+      this@ConfigurableNetworkHttpEngine.withProxy(proxy)
+
+    override fun close() {}
   }
 
   private class Generation(val engine: HttpEngine, val config: NetworkInterfaceConfig) {

@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.MultiNetworkHttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -104,6 +106,33 @@ class MultiNetworkHttpEngineTest {
   }
 
   @Test
+  fun withProxy_takesTurnsWithEngineAndAppliesProxyOnEachNetwork() = runTest {
+    val first = RecordingEngine()
+    val second = RecordingEngine()
+    val engine = MultiNetworkHttpEngine(listOf(first, second))
+    val proxy = ProxyConfig.manual("socks5://proxy.test:1080")
+
+    engine.withProxy(proxy).head("https://example.com/file")
+    engine.download("https://example.com/file", null) {}
+    engine.withProxy(proxy).download("https://example.com/file", 0L..9L) {}
+    engine.withProxy(proxy).close()
+
+    assertEquals(listOf(proxy, proxy), first.proxies)
+    assertEquals(1, first.heads.size)
+    assertEquals(listOf(0L..9L), first.gets.map { it.range })
+    assertTrue(second.proxies.isEmpty())
+    assertEquals(1, second.gets.size)
+    assertEquals(0, first.closeCount)
+  }
+
+  @Test
+  fun supportsProxies_onlyWhenEveryNetworkDoes() {
+    val capable = RecordingEngine(supportsProxies = true)
+    assertTrue(MultiNetworkHttpEngine(listOf(capable, capable)).supportsProxies)
+    assertFalse(MultiNetworkHttpEngine(listOf(capable, RecordingEngine())).supportsProxies)
+  }
+
+  @Test
   fun emptyDelegates_areRejected() {
     assertFailsWith<IllegalArgumentException> { MultiNetworkHttpEngine(emptyList()) }
   }
@@ -115,6 +144,7 @@ class MultiNetworkHttpEngineTest {
   )
 
   private class RecordingEngine(
+    override val supportsProxies: Boolean = false,
     val closeFailure: Exception? = null,
     val beforeData: suspend () -> Unit = {},
     val afterData: suspend () -> Unit = {},
@@ -122,6 +152,7 @@ class MultiNetworkHttpEngineTest {
     val info = ServerInfo(100, true, "etag", null)
     val heads = mutableListOf<Request>()
     val gets = mutableListOf<Request>()
+    val proxies = mutableListOf<ProxyConfig>()
     var closeCount = 0
 
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
@@ -139,6 +170,11 @@ class MultiNetworkHttpEngineTest {
       beforeData()
       onData(byteArrayOf(1, 2))
       afterData()
+    }
+
+    override fun withProxy(proxy: ProxyConfig): HttpEngine {
+      proxies.add(proxy)
+      return this
     }
 
     override fun close() {

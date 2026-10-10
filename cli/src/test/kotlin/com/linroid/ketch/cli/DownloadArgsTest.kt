@@ -3,6 +3,7 @@ package com.linroid.ketch.cli
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import java.io.File
 import kotlin.test.Test
@@ -151,5 +152,45 @@ class DownloadArgsTest {
     assertEquals(Destination("./a.zip"), request.destination)
     assertEquals(SpeedLimit.parse("1m"), request.speedLimit)
     assertEquals(DownloadPriority.HIGH, request.priority)
+  }
+
+  @Test
+  fun `proxy option sets the request proxy with its credentials and bypass list`() {
+    val args = parseDownloadArgs(
+      listOf("--proxy", "socks5://me:secret@127.0.0.1:1080", "--proxy-bypass", "*.lan, 10.0.0.0/8",
+        "https://example.com/a.zip"),
+    )
+    val download = assertIs<DownloadArgs.Download>(args)
+    val expected = ProxyConfig.manual(
+      "socks5://me:secret@127.0.0.1:1080",
+      bypass = listOf("*.lan", "10.0.0.0/8"),
+    )
+    assertEquals(expected, download.proxy)
+    assertEquals(expected, download.toRequest(Destination("./")).proxy)
+  }
+
+  @Test
+  fun `no proxy option connects directly`() {
+    val args = parseDownloadArgs(listOf("--no-proxy", "https://example.com/a.zip"))
+    assertEquals(ProxyConfig.Direct, assertIs<DownloadArgs.Download>(args).proxy)
+  }
+
+  @Test
+  fun `without proxy options the configured proxy applies`() {
+    val args = parseDownloadArgs(listOf("https://example.com/a.zip"))
+    assertEquals(null, assertIs<DownloadArgs.Download>(args).proxy)
+  }
+
+  @Test
+  fun `invalid or conflicting proxy options are rejected`() {
+    for (options in listOf(
+      listOf("--proxy", "https://proxy.example"),
+      listOf("--proxy", "http://p:8080", "--no-proxy"),
+      listOf("--proxy-bypass", "*.lan"),
+      listOf("--proxy", "http://p:8080", "--proxy-bypass", "a b"),
+    )) {
+      val args = parseDownloadArgs(options + "https://example.com/a")
+      assertIs<DownloadArgs.Invalid>(args, "$options")
+    }
   }
 }

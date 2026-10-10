@@ -14,8 +14,9 @@ import kotlin.test.assertTrue
 class KeepAwakeTest {
 
   @Test
-  fun keepsAwake_downloadingOrQueued_isTrue() {
+  fun keepsAwake_downloadingStartingOrQueued_isTrue() {
     assertTrue(ForegroundStatus(downloading = 1).keepsAwake)
+    assertTrue(ForegroundStatus(starting = 1).keepsAwake)
     assertTrue(ForegroundStatus(queued = 2).keepsAwake)
   }
 

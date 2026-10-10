@@ -29,6 +29,7 @@ import kotlin.time.TimeSource
  * support use a single connection, and a retry or resume restarts it
  * from byte zero. Content whose size the server does not report, such as
  * an archive generated on request, is streamed to its end the same way.
+ * Requests go through [DownloadConfig.proxy] ([HttpEngine.withProxy]).
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
@@ -52,7 +53,7 @@ internal class HttpDownloadSource(
     properties: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
-    val detector = RangeSupportDetector(httpEngine)
+    val detector = RangeSupportDetector(httpEngine.through(config.proxy))
     val serverInfo = detector.detect(url, properties)
     val fileName = serverInfo.contentDisposition?.let {
       DefaultFileNameResolver.fromContentDisposition(it)
@@ -160,7 +161,7 @@ internal class HttpDownloadSource(
       return
     }
 
-    val detector = RangeSupportDetector(httpEngine)
+    val detector = RangeSupportDetector(httpEngine.through(context.config.proxy))
     val serverInfo = detector.detect(context.url, context.headers)
 
     if (state.etag != null && serverInfo.etag != state.etag) {
@@ -285,6 +286,7 @@ internal class HttpDownloadSource(
       progressIntervalMs = context.config.progressIntervalMs,
       tag = "HttpSource",
     )
+    val engine = httpEngine.through(context.config.proxy)
     segmentHelper.downloadAll(
       context, segments, totalBytes, supportsRanges, requestedConnections,
     ) { segment, onProgress ->
@@ -294,7 +296,7 @@ internal class HttpDownloadSource(
         }
       }
       val downloader = SegmentDownloader(
-        httpEngine, context.fileAccessor,
+        engine, context.fileAccessor,
         throttleLimiter, SpeedLimiter.Unlimited, context.taskId
       )
       downloader.download(
@@ -322,7 +324,8 @@ internal class HttpDownloadSource(
     var lastProgress = TimeSource.Monotonic.markNow()
     var downloaded = 0L
     context.onProgress(0, 0)
-    httpEngine.download(context.url, null, context.headers) { data ->
+    val engine = httpEngine.through(context.config.proxy)
+    engine.download(context.url, null, context.headers) { data ->
       currentCoroutineContext().ensureActive()
       context.throttle(data.size)
       try {

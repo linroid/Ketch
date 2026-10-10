@@ -210,6 +210,8 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
   because paths and queries carry private tracker passkeys
 - Cookie and authorization header values are masked in HTTP debug logs, and request headers
   are never logged
+- Proxies are logged by their address (`Sending GET for ... through socks5://127.0.0.1:1080`),
+  without credentials, and `ProxyConfig` prints its password as `***`, as in `Config updated`
 
 Logs still name the files you downloaded, the hosts and paths they came from and what you asked
 Discover for, so review them before posting them publicly. The app log files stay on the device
