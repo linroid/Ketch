@@ -31,6 +31,15 @@ class TrayIconPainterTest {
   }
 
   @Test
+  fun template_leavesOutTheSpaceLeftOfTheSail() {
+    val image = render(TrayIconLook(), TrayIconStyle.Template)
+
+    // The icon moves left by the 2 of 20 units before the hull, leaving its right edge empty.
+    assertEquals(255, image.alpha(17, 10))
+    assertEquals(0, image.alpha(18, 10))
+  }
+
+  @Test
   fun failed_dotsTheTopRightCornerWithAGap() {
     val image = render(TrayIconLook(failed = true), TrayIconStyle.AppColors)
 
