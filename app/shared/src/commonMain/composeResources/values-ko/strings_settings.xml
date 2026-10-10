@@ -20,7 +20,7 @@
   <string name="settings_category_network">네트워크</string>
   <string name="settings_category_network_description">다운로드에 사용할 네트워크</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">공개 토렌트용 추가 트래커</string>
+  <string name="settings_category_bittorrent_description">업로드 및 추가 트래커</string>
   <string name="settings_category_sharing">공유</string>
   <string name="settings_category_sharing_description">휴대폰이나 브라우저를 페어링해 이 기기 제어</string>
 
@@ -519,9 +519,20 @@
   <string name="settings_proxy_footer">HTTP 다운로드가 시작되거나 재개될 때 적용됩니다. FTP와 토렌트는 직접 연결합니다.</string>
   <string name="settings_proxy_unsupported">%1$s에서는 프록시를 사용할 수 없습니다. 프록시를 선택하려면 해당 기기의 Ketch를 업데이트하세요.</string>
 
+  <string name="settings_torrent_upload">업로드</string>
+  <string name="settings_torrent_upload_mode">피어와 공유</string>
+  <string name="settings_torrent_upload_off">끔</string>
+  <string name="settings_torrent_upload_while_downloading">다운로드 중</string>
+  <string name="settings_torrent_upload_seed">계속 시딩</string>
+  <string name="settings_torrent_upload_off_hint">피어가 이 기기에서 아무것도 다운로드할 수 없습니다.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">토렌트를 다운로드하는 동안 피어가 이미 받은 조각을 다운로드할 수 있습니다.</string>
+  <string name="settings_torrent_upload_seed_hint">Ketch가 실행 중인 동안 완료된 토렌트는 제거하거나 이 설정을 끌 때까지 계속 업로드합니다. 다운로드를 기다리는 토렌트가 우선합니다.</string>
+  <string name="settings_torrent_upload_limit">업로드 속도 제한</string>
+  <string name="settings_torrent_upload_limit_hint">모든 토렌트가 함께 사용합니다.</string>
+  <string name="settings_torrent_upload_footer">업로드받는 피어는 이 기기의 IP 주소를 볼 수 있습니다. 비공개 토렌트는 해당 트래커의 피어와만 공유합니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
-  <string name="settings_torrent_remote">추가 트래커는 %1$s 기기에서 직접 또는 해당 기기의 config.toml에서 변경하세요.</string>
+  <string name="settings_torrent_remote">BitTorrent 설정은 %1$s 기기에서 직접 또는 해당 기기의 config.toml에서 변경하세요.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">트래커 %1$d개를 제거했습니다.</item>
   </plurals>
@@ -696,6 +707,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 프록시, 프록시, 예외, 방화벽</string>
   <string name="settings_search_trackers">공개 토렌트에 추가할 트래커</string>
   <string name="settings_search_trackers_keywords">announce, udp, 마그넷, 트래커 추가</string>
+  <string name="settings_search_upload">피어와 조각을 공유하고 완료된 토렌트를 시딩</string>
+  <string name="settings_search_upload_keywords">업로드, 시드, 시딩, 공유, 비율, 피어, seed</string>
   <string name="settings_search_pair">휴대폰이나 브라우저에서 이 기기 제어</string>
   <string name="settings_search_pair_keywords">qr 코드, 휴대폰, 페어링, 원격, 웹 앱, 연결</string>
   <string name="settings_search_reachable_keywords">lan, 랜, 네트워크, 원격 액세스</string>

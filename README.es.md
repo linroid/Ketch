@@ -116,8 +116,8 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **HTTP y HTTPS**, con las cookies y el referente de la página cuando la extensión del navegador
   envía la descarga.
 - **FTP y FTPS**, con conexiones paralelas y reanudación.
-- **BitTorrent y enlaces magnet** — Torrents v1, v2 e híbridos, con selección de archivos y un
-  motor escrito íntegramente en Kotlin ([detalles](docs/torrent.md)).
+- **BitTorrent y enlaces magnet** — Torrents v1, v2 e híbridos, con selección de archivos,
+  sembrado opcional y un motor escrito íntegramente en Kotlin ([detalles](docs/torrent.md)).
 - **HLS (`.m3u8`) y DASH (`.mpd`)** — Guarda flujos de duración finita y sin cifrar como un único
   archivo multimedia. Las listas maestras HLS usan la variante de mayor ancho de banda
   ([compatibilidad y límites](docs/media.md)).

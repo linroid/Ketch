@@ -3,6 +3,7 @@ package com.linroid.ketch.config
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.SpeedLimit
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -62,6 +63,8 @@ class DefaultConfigTest {
       assertEquals(1, config.torrent.trackers.size)
       assertEquals(listOf("https://lists.example.org/trackers.txt"), config.torrent.trackerListUrls)
       assertEquals(6881, config.torrent.listenPort)
+      assertEquals(TorrentUploadMode.Off, config.torrent.upload)
+      assertEquals(SpeedLimit.Unlimited, config.torrent.uploadLimit)
     } finally {
       dir.deleteRecursively()
     }

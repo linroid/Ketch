@@ -16,7 +16,8 @@ import kotlin.time.Duration.Companion.seconds
  *   `DownloadRequest.connections` or `DownloadTask.setConnections` value replaces it, clamped to
  *   1..512 for v1 and 1..500 for v2. `DownloadConfig.maxConnectionsPerDownload` counts HTTP
  *   segments and does not apply to torrents; [maxConnections] bounds all torrents together.
- * @property enableUpload whether to seed after download completes
+ * @property enableUpload whether to seed after download completes, for v1, v2 and hybrid
+ *   torrents; [uploadPolicy] replaces it when set
  * @property listenPort port for incoming peer connections, over TCP, which DHT also uses over
  *   UDP when it can; 0 lets the system pick a free port for each, at every start
  */
@@ -36,7 +37,10 @@ data class TorrentConfig(
     "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881",
     "dht.libtorrent.org:25401"
   ),
-  /** Explicit policy; null preserves the legacy [enableUpload] setting. */
+  /**
+   * Whether v1, v2 and hybrid torrents upload verified pieces to peers, and whether they keep
+   * seeding once complete; null preserves the legacy [enableUpload] setting.
+   */
   val uploadPolicy: TorrentUploadPolicy? = null,
   /** Maximum metainfo bytes accepted from HTTP or peers. */
   val maxMetadataBytes: Int = 4 * 1024 * 1024,
@@ -78,6 +82,11 @@ data class TorrentConfig(
    * like [additionalTrackers], after them. Other URLs are ignored; empty subscribes to none.
    */
   val trackerListUrls: List<String> = emptyList(),
+  /**
+   * Upload cap shared by every torrent, in bytes per second; zero means unlimited. A piece read
+   * back from disk to prove its block hashes (BEP 52) counts against it like uploading it.
+   */
+  val uploadRateLimit: Long = 0,
 ) {
   init {
     require(maxActiveTorrents in 1..64) { "maxActiveTorrents must be in 1..64" }
@@ -92,6 +101,7 @@ data class TorrentConfig(
     require(maxOpenPayloadFiles in 1..128)
     require(maxFilesPerTorrent in 1..100_000)
     require(maxPiecesPerTorrent in 1..1_000_000)
+    require(uploadRateLimit >= 0) { "uploadRateLimit must be non-negative" }
     require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes +
       maxSessionStateBytes <=
       maxExchangeBytes.toLong()) {

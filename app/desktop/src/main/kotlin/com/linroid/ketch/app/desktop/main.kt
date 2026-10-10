@@ -94,6 +94,7 @@ import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -107,6 +108,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
@@ -635,6 +637,8 @@ private fun createInstanceManager(
       stateDirectory = File(configDir, "torrent-state").path,
       additionalTrackers = config.torrent.trackers,
       trackerListUrls = config.torrent.subscribedTrackerLists,
+      uploadPolicy = config.torrent.upload.toUploadPolicy(),
+      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
     ),
   )
   return InstanceManager(
@@ -687,6 +691,8 @@ private fun createInstanceManager(
       applyTorrentSettings = {
         torrentSource.setAdditionalTrackers(it.trackers)
         torrentSource.setTrackerLists(it.subscribedTrackerLists)
+        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
+        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
       },
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
@@ -1144,3 +1150,10 @@ private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds
 private val QUIT_COMMIT_TIMEOUT = 5.seconds
 private val WINDOW_ERROR_QUIET = 5.seconds
+
+/** The engine's upload policy for this `[torrent] upload` setting. */
+private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}

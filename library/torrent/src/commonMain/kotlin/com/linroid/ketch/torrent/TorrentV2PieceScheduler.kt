@@ -28,6 +28,17 @@ internal class TorrentV2PieceScheduler private constructor(
     return verified[index]
   }
 
+  /** Verified pieces as a wire bitfield, spare bits zero. */
+  fun verifiedBits(): ByteArray {
+    check(!closed)
+    return pieceBitfield(verified)
+  }
+
+  fun anyVerified(): Boolean {
+    check(!closed)
+    return verified.any { it }
+  }
+
   fun canBegin(index: Int): Boolean {
     check(!closed)
     return index in verified.indices && wanted[index] && !verified[index] &&

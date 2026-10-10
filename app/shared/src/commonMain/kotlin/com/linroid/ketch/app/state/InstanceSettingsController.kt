@@ -175,9 +175,9 @@ class InstanceSettingsController(
   }
 
   /**
-   * Saves [settings] and applies them to the embedded instance, where
-   * torrents pick them up as they start or resume. Does nothing for a
-   * remote instance.
+   * Saves [settings] and applies them to the embedded instance: the upload mode and limit reach
+   * running torrents at once, extra trackers and tracker lists reach torrents as they start or
+   * resume. Does nothing for a remote instance.
    */
   fun updateTorrent(settings: TorrentSettings) {
     val app = local ?: return

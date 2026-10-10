@@ -80,7 +80,7 @@ class TorrentPexTransferTest {
           peers.send(first.local)
           peers.close()
           try {
-            TorrentSwarm(store, network, budget, allowLocalDiscovery = true).run(peers)
+            TorrentSwarm(store, network, budget, allowLocalPeers = true).run(peers)
             assertContentEquals(bytes, torrentFileSystem.read(root / "data") { readByteArray() })
             assertEquals(0, budget.allocated)
           } finally {

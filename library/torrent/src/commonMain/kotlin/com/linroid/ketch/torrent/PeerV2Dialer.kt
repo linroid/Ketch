@@ -4,47 +4,79 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Bounded handshakes; endpoint authorization, deduplication and retry policy are upstream. */
-internal class PeerV2Dialer private constructor(
+/**
+ * Bounded handshakes for dialed targets [E] and, optionally, peers that dialed us. Target
+ * authorization, deduplication and retry policy are upstream.
+ */
+internal class PeerV2Dialer<E : Any> private constructor(
   val connections: ReceiveChannel<PeerV2Connector.Connected>,
-  val lastFailure: StateFlow<Failure?>,
+  val lastFailure: StateFlow<Failure<E>?>,
 ) {
-  data class Failure(val endpoint: PeerEndpoint, val cause: Throwable)
+  data class Failure<E>(val endpoint: E, val cause: Throwable)
+
+  /** A connection a peer opened to us, with its handshake unread, admitted in [generation]. */
+  class Incoming(val connection: TorrentConnection, val generation: Long) {
+    fun close() = connection.close()
+  }
 
   companion object {
+    /** Hands [failure] on; once the consumer closed its queue, nobody counts it any more. */
+    private suspend fun <E> SendChannel<Failure<E>>.report(failure: Failure<E>) {
+      try {
+        send(failure)
+      } catch (_: ClosedSendChannelException) {
+        // Closed by its consumer.
+      } catch (error: CancellationException) {
+        // A cancelled queue throws its cause; only the worker's own cancellation propagates.
+        currentCoroutineContext().ensureActive()
+      }
+    }
+
     /**
      * Connect returns an owned handle, or null before opening a socket when admission is exhausted.
-     * Ordinary connection failures are recorded and isolated; a failed endpoint stream is fatal.
-     * Caller owns the endpoint producer. This scope joins dial workers and closes queued handles.
+     * Ordinary connection failures are recorded, sent to [failures] when given (waiting for room,
+     * so a consumer that counts its targets never loses one), and isolated; a failed target
+     * stream is fatal. [respond] answers each [incoming] connection once, on
+     * [respondParallelism] workers sharing the output; a null or failed answer closes it.
+     * Caller owns both producers. This scope joins every worker and closes queued handles.
      */
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-    suspend fun <T> run(
-      endpoints: ReceiveChannel<PeerEndpoint>,
+    suspend fun <E : Any, T> run(
+      endpoints: ReceiveChannel<E>,
       state: TorrentBufferBudget,
       parallelism: Int = 4,
       capacity: Int = 1,
-      connect: suspend (PeerEndpoint) -> PeerV2Connector.Connected?,
-      body: suspend (PeerV2Dialer) -> T,
+      connect: suspend (E) -> PeerV2Connector.Connected?,
+      incoming: ReceiveChannel<Incoming>? = null,
+      respondParallelism: Int = 4,
+      respond: (suspend (Incoming) -> PeerV2Connector.Connected?)? = null,
+      failures: SendChannel<Failure<E>>? = null,
+      body: suspend (PeerV2Dialer<E>) -> T,
     ): T = coroutineScope {
-      require(parallelism in 1..32 && capacity in 1..32)
-      val lease = checkNotNull(state.reserve((parallelism + capacity) * 2048 + 1024)) {
+      require(parallelism in 1..32 && capacity in 1..32 && respondParallelism in 1..32)
+      require((incoming == null) == (respond == null)) { "Incoming peers need a responder" }
+      val responders = if (incoming != null) respondParallelism else 0
+      val lease = checkNotNull(state.reserve((parallelism + responders + capacity) * 2048 + 1024)) {
         "Dial worker state budget exhausted"
       }
       val output = Channel<PeerV2Connector.Connected>(
         capacity = capacity,
         onUndeliveredElement = { it.close() },
       )
-      val failure = MutableStateFlow<Failure?>(null)
+      val failure = MutableStateFlow<Failure<E>?>(null)
       val workers = launch {
         try {
           coroutineScope {
@@ -59,7 +91,10 @@ internal class PeerV2Dialer private constructor(
                       if (error is CancellationException && !currentCoroutineContext().isActive) {
                         throw error
                       }
-                      failure.value = Failure(endpoint, error)
+                      Failure(endpoint, error).let {
+                        failure.value = it
+                        failures?.report(it)
+                      }
                       break
                     }
                     if (connected == null) {
@@ -72,6 +107,23 @@ internal class PeerV2Dialer private constructor(
                     }
                   }
                   if (connected != null) output.send(connected)
+                }
+              }
+            }
+            if (incoming != null && respond != null) repeat(respondParallelism) {
+              launch {
+                for (peer in incoming) {
+                  val connected = try {
+                    respond(peer)
+                  } catch (error: Exception) {
+                    if (error is CancellationException && !currentCoroutineContext().isActive) {
+                      peer.close()
+                      throw error
+                    }
+                    null
+                  }
+                  // Responders never retry: the peer that dialed us can dial again.
+                  if (connected == null) peer.close() else output.send(connected)
                 }
               }
             }

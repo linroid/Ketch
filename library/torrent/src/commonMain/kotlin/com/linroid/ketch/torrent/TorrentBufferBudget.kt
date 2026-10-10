@@ -45,6 +45,13 @@ internal class TorrentBufferBudget(
 internal class TorrentExchangeBudgets(config: TorrentConfig) {
   private val root = TorrentBufferBudget(config.maxExchangeBytes)
   val transfer = TorrentBufferBudget(config.maxBufferedBytes, root)
+
+  /**
+   * Pieces read back to upload or to prove, and the proofs waiting to be sent, across every
+   * session, v1 and v2: half of [transfer] at most, so what peers ask of us can never take the
+   * frames and pieces downloads need.
+   */
+  val uploads = TorrentBufferBudget(maxOf(1, config.maxBufferedBytes / 2), transfer)
   val metadata = TorrentBufferBudget(config.metadataExchangeBytes, root)
   val cache = TorrentBufferBudget(config.maxCachedMetadataBytes, root)
   val sessions = TorrentBufferBudget(config.maxSessionStateBytes, root)

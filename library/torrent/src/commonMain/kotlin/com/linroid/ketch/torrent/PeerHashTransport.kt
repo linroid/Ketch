@@ -9,6 +9,9 @@ import okio.Buffer
  * Framed exchange on an already negotiated v2 connection. The actor serializes all writes,
  * accept, expire and close; one separate reader may call read. Close unblocks the reader; the
  * runtime must then join that reader before releasing its connection admission.
+ *
+ * Without [hashMessages] (a hybrid's v1 route), BEP 52 hash frames mean nothing: [accept] leaves
+ * them to the ordinary handlers as unknown messages, and this side never sends one.
  */
 internal class PeerHashTransport(
   private val connection: TorrentConnection,
@@ -18,6 +21,7 @@ internal class PeerHashTransport(
   private val pieceCount: Int? = null,
   private val keepAliveMs: Long = 60_000,
   private val clock: () -> Long = monotonicClock(),
+  private val hashMessages: Boolean = true,
 ) {
   class Frame internal constructor(
     val message: PeerMessage,
@@ -50,6 +54,7 @@ internal class PeerHashTransport(
 
   suspend fun request(selector: PeerHashSelector): PeerHashExchange.Ticket? {
     check(!closed)
+    check(hashMessages) { "Hash messages are not exchanged on this route" }
     val ticket = exchange.request(selector) ?: return null
     var lease: TorrentBufferBudget.Lease? = null
     try {
@@ -93,7 +98,13 @@ internal class PeerHashTransport(
 
   /** Hash serving owns proof generation and its buffer; this method admits serialization first. */
   suspend fun respond(message: PeerHashMessage) {
+    check(tryRespond(message)) { "Peer write frame budget exhausted" }
+  }
+
+  /** Like [respond]; false, with no bytes emitted, when the frame budget is unavailable. */
+  suspend fun tryRespond(message: PeerHashMessage): Boolean {
     check(!closed)
+    check(hashMessages) { "Hash messages are not exchanged on this route" }
     val payloadSize = when (message) {
       is PeerHashMessage.Request -> error("Use request to register hash response ownership")
       is PeerHashMessage.Reject -> 48
@@ -102,9 +113,7 @@ internal class PeerHashTransport(
         48 + message.hashes.size
       }
     }
-    check(write(payloadSize + 5) { PeerWire.encode(PeerHashWire.encode(message)) }) {
-      "Peer write frame budget exhausted"
-    }
+    return write(payloadSize + 5) { PeerWire.encode(PeerHashWire.encode(message)) }
   }
 
   private suspend fun write(size: Int, encode: () -> ByteArray): Boolean {
@@ -151,6 +160,7 @@ internal class PeerHashTransport(
   /** Called by the actor. Null leaves ordinary peer messages for its other protocol handlers. */
   fun accept(frame: Frame): Event? {
     check(!closed)
+    if (!hashMessages) return null
     val message = frame.message as? PeerMessage.Unknown ?: return null
     return when (val hash = PeerHashWire.decode(message)) {
       null -> null

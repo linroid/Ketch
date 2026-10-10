@@ -106,8 +106,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **HTTP and HTTPS**, with the cookies and referrer of the page when the browser extension sends
   the download.
 - **FTP and FTPS**, with parallel connections and resume.
-- **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files, in an
-  engine written in pure Kotlin ([details](docs/torrent.md)).
+- **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files and
+  optional seeding, in an engine written in pure Kotlin ([details](docs/torrent.md)).
 - **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
   HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or

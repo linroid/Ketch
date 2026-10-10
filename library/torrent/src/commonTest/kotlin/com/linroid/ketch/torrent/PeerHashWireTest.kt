@@ -47,6 +47,23 @@ class PeerHashWireTest {
   }
 
   @Test
+  fun peersMayAskForAWholeLargePieceButWeNeverAcceptSuchAnswers() {
+    // libtorrent asks for a failed piece's block hashes at once: 1024 for a 16 MiB piece.
+    val large = PeerHashSelector(root, 0, 1024, 1024, 10)
+    for (message in listOf(PeerHashMessage.Request(large), PeerHashMessage.Reject(large))) {
+      assertEquals(message, PeerHashWire.decode(PeerHashWire.encode(message)))
+    }
+    assertEquals(PeerHashSelector.MAX_REQUESTED_HASHES,
+      PeerHashSelector(root, 0, 0, 8192, 0).length)
+    // We ask for at most 512, so an answer of more is none of ours.
+    val answer = PeerHashWire.encode(PeerHashMessage.Hashes(large,
+      ByteArray(large.hashCount * 32).toByteString()))
+    assertFailsWith<IllegalArgumentException> { PeerHashWire.decode(answer) }
+    val exchange = PeerHashExchange(TorrentBufferBudget(1 shl 20), { 1L shl 40 })
+    assertFailsWith<IllegalArgumentException> { exchange.request(large) }
+  }
+
+  @Test
   fun singleHashRequestsSurviveDecodingAndCountTheirUncoveredProofLayer() {
     // BEP 52 allows length == 1; a lone base hash covers nothing, so every proof layer follows.
     val selector = PeerHashSelector(root, 0, 0, 1, 0)
@@ -64,7 +81,7 @@ class PeerHashWireTest {
         .writeInt(length).writeInt(proof).readByteArray())
     for (invalid in listOf(request(base = -1), request(base = 64), request(proof = 64),
       request(base = 63, proof = 1), request(index = 1), request(length = 0),
-      request(length = 3), request(length = 1024), request(length = Int.MIN_VALUE))) {
+      request(length = 3), request(length = 16_384), request(length = Int.MIN_VALUE))) {
       assertFailsWith<IllegalArgumentException> { PeerHashWire.decode(invalid) }
     }
     val valid = request()

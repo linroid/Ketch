@@ -6,13 +6,16 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.TimeSource
 
-/** Serialized per-session tracker lifecycle; callers supply whole-torrent verified state. */
+/**
+ * Serialized per-session tracker lifecycle; callers supply whole-torrent verified state. [port]
+ * is read for every announce, so a changed advertised port reaches the next one.
+ */
 internal class TrackerDiscovery private constructor(
-  private val topic: TrackerTopic,
+  val topic: TrackerTopic,
   private val privateTorrent: Boolean,
   private val remaining: (BooleanArray) -> Long,
   private val peerId: ByteArray,
-  private val port: Int,
+  private val port: () -> Int,
   private val trackers: TrackerTiers,
   onPrivateTrackerChanged: suspend () -> Unit = {},
   private val nowMs: () -> Long = monotonicClock(),
@@ -21,7 +24,7 @@ internal class TrackerDiscovery private constructor(
   constructor(
     metadata: TorrentMetadata,
     peerId: ByteArray,
-    port: Int,
+    port: () -> Int,
     trackers: TrackerTiers,
     onPrivateTrackerChanged: suspend () -> Unit = {},
     nowMs: () -> Long = monotonicClock(),
@@ -34,19 +37,28 @@ internal class TrackerDiscovery private constructor(
     }
   }, peerId, port, trackers, onPrivateTrackerChanged, nowMs, announceCompletion)
 
+  /**
+   * A v2 or hybrid owner's announces for [topic]: its v2 hash, or a hybrid's v1 hash, whose
+   * trackers need their own [trackers] tiers. Both report the same `left`, which excludes padding.
+   */
   constructor(
     document: TorrentV2Document,
     layout: TorrentContentLayout,
     peerId: ByteArray,
-    port: Int,
+    port: () -> Int,
     trackers: TrackerTiers,
     onPrivateTrackerChanged: suspend () -> Unit = {},
     nowMs: () -> Long = monotonicClock(),
     announceCompletion: Boolean = true,
-  ) : this(TrackerTopic.V2(document.info.hash), document.info.privateTorrent,
+    topic: TrackerTopic = TrackerTopic.V2(document.info.hash),
+  ) : this(topic, document.info.privateTorrent,
     layout::unverifiedPayloadBytes, peerId, port, trackers, onPrivateTrackerChanged,
     nowMs, announceCompletion) {
     require(layout.infoHash == document.info.hash) { "Tracker layout belongs to another torrent" }
+    require(topic == TrackerTopic.V2(document.info.hash) ||
+      document.identity.v1?.let { topic == TrackerTopic.V1(it) } == true) {
+      "Tracker topic belongs to another torrent"
+    }
   }
 
   init { if (privateTorrent) trackers.preferCurrentTracker(onPrivateTrackerChanged) }
@@ -118,7 +130,7 @@ internal class TrackerDiscovery private constructor(
       if (nowMs() < deadline) return null
     }
     val result = try {
-      trackers.announce(TrackerAnnounce(topic, peerId, port, downloaded,
+      trackers.announce(TrackerAnnounce(topic, peerId, port(), downloaded,
         left, uploaded, event, key))
     } catch (error: CancellationException) {
       throw error

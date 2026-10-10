@@ -1,6 +1,5 @@
 package com.linroid.ketch.torrent
 
-import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
@@ -17,8 +16,12 @@ import okio.FileSystem
 import okio.IOException
 import okio.Path
 import okio.use
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.coroutines.CoroutineContext
 
 /** Owned v2/hybrid storage; existing roots require a bound checkpoint and OS identity checks. */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2PieceStore(
   private val document: TorrentV2Document,
   private val output: Path,
@@ -40,8 +43,9 @@ internal class TorrentV2PieceStore(
   private val owned = linkedMapOf<Path, Ownership>()
   private var layoutGeneration = 0L
   private var selectionGeneration = 0L
-  private var receivedCounter = 0L
-  private var uploadedCounter = 0L
+  // Counted per block without the store lock; checkpoints and restore read and write them.
+  private val receivedCounter = AtomicLong(0)
+  private val uploadedCounter = AtomicLong(0)
   private var root: Path? = null
   private var creationLog: TorrentV2CreationLog? = null
   private var initialized = false
@@ -175,14 +179,45 @@ internal class TorrentV2PieceStore(
     fun close() = lease.close()
   }
 
+  /** What [tryRead] found: the piece's verified bytes, or why there are none. */
+  sealed interface ReadOutcome {
+    /** The caller closes [buffer]. */
+    class Read(val buffer: ReadBuffer) : ReadOutcome
+
+    /** The piece is not committed, so there is nothing to read. */
+    data object NotCommitted : ReadOutcome
+
+    /** No transfer budget for the piece now; the piece stays committed. */
+    data object NoBudget : ReadOutcome
+
+    /** The committed piece no longer reads back or verifies, and is no longer committed. */
+    class Revoked(val cause: Exception) : ReadOutcome
+  }
+
   /** Only committed pieces are readable; returned bytes are authenticated again from disk. */
-  suspend fun read(index: Int): ReadBuffer = mutex.withLock {
+  suspend fun read(index: Int): ReadBuffer = when (val outcome = tryRead(index)) {
+    is ReadOutcome.Read -> outcome.buffer
+    ReadOutcome.NotCommitted -> throw IllegalStateException("Piece is not committed")
+    ReadOutcome.NoBudget -> throw IllegalStateException("Read budget exhausted")
+    is ReadOutcome.Revoked -> throw outcome.cause
+  }
+
+  /**
+   * Reads a committed piece and authenticates it again from disk, holding its bytes against
+   * [budget] (the store's transfer budget unless a caller has a partition of it). A piece that
+   * changed or can no longer be read is revoked: it stops counting as verified progress and must
+   * be fetched again.
+   */
+  suspend fun tryRead(
+    index: Int,
+    budget: TorrentBufferBudget = buffers,
+  ): ReadOutcome = mutex.withLock {
     check(initialized && !closed)
     require(index in verified.indices)
-    check(verified[index]) { "Piece is not committed" }
+    if (!verified[index]) return@withLock ReadOutcome.NotCommitted
     val extent = verifier.layout.v2Piece(index.toLong())
     val file = filesById.getValue(checkNotNull(extent.fileId))
-    val lease = checkNotNull(buffers.reserve(extent.length.toInt())) { "Read budget exhausted" }
+    val lease = budget.reserve(extent.length.toInt()) ?: return@withLock ReadOutcome.NoBudget
     try {
       val bytes = ByteArray(extent.length.toInt())
       try {
@@ -199,13 +234,13 @@ internal class TorrentV2PieceStore(
         verification.update(bytes)
         if (!verification.verify()) throw IOException("Committed torrent payload changed")
       } catch (error: Exception) {
-        if (error is IOException || error is IllegalArgumentException) {
-          verified[index] = false
-          progress[file.v2Index] -= extent.length
-        }
-        throw error
+        if (error !is IOException && error !is IllegalArgumentException) throw error
+        verified[index] = false
+        progress[file.v2Index] -= extent.length
+        lease.close()
+        return@withLock ReadOutcome.Revoked(error)
       }
-      ReadBuffer(bytes, lease)
+      ReadOutcome.Read(ReadBuffer(bytes, lease))
     } catch (error: Throwable) {
       lease.close()
       throw error
@@ -313,9 +348,11 @@ internal class TorrentV2PieceStore(
   }
 
   private fun snapshot(receivedBytes: Long?, uploadedBytes: Long?): TorrentV2Checkpoint {
-    val received = receivedBytes ?: receivedCounter
-    val uploaded = uploadedBytes ?: uploadedCounter
-    require(received >= receivedCounter && uploaded >= uploadedCounter)
+    // Explicit totals may only raise the counters; blocks keep counting while this runs.
+    require(receivedBytes == null || receivedBytes >= receivedCounter.load())
+    require(uploadedBytes == null || uploadedBytes >= uploadedCounter.load())
+    val received = receivedBytes ?: receivedCounter.load()
+    val uploaded = uploadedBytes ?: uploadedCounter.load()
     val destination = checkNotNull(root)
     val records = owned.map { (path, claim) ->
       val components = if (path == destination) emptyList() else
@@ -325,8 +362,8 @@ internal class TorrentV2PieceStore(
     val checkpoint = TorrentV2Checkpoint.create(document, taskId, destination.toString(), selected,
       records, pieceBitfield(verified).toByteString(), layoutGeneration, selectionGeneration,
       received, uploaded)
-    receivedCounter = received
-    uploadedCounter = uploaded
+    raise(receivedCounter, received)
+    raise(uploadedCounter, uploaded)
     return checkpoint
   }
 
@@ -348,8 +385,8 @@ internal class TorrentV2PieceStore(
     owned.putAll(recovered.second)
     layoutGeneration = checkpoint.layoutGeneration
     selectionGeneration = checkpoint.selectionGeneration
-    receivedCounter = checkpoint.receivedBytes
-    uploadedCounter = checkpoint.uploadedBytes
+    receivedCounter.store(checkpoint.receivedBytes)
+    uploadedCounter.store(checkpoint.uploadedBytes)
     // Never adopt verifiedHint: current payloads must pass commit or recheck before publication.
     verified.fill(false)
     progress.fill(0)
@@ -363,12 +400,32 @@ internal class TorrentV2PieceStore(
     initialized && !closed && progress.sum() == totalSelected
   }
 
-  suspend fun recordReceived(bytes: Int) = mutex.withLock {
-    require(bytes >= 0 && receivedCounter <= Long.MAX_VALUE - bytes)
-    receivedCounter += bytes
+  /** Counts payload received from peers, verified or not; never takes the store lock. */
+  fun recordReceived(bytes: Int) = add(receivedCounter, bytes)
+
+  /** Counts payload written to peers; never takes the store lock. */
+  fun recordUploaded(bytes: Int) = add(uploadedCounter, bytes)
+
+  private fun add(counter: AtomicLong, bytes: Int) {
+    require(bytes >= 0)
+    while (true) {
+      val current = counter.load()
+      require(current <= Long.MAX_VALUE - bytes)
+      if (counter.compareAndSet(current, current + bytes)) return
+    }
   }
 
-  suspend fun receivedBytes(): Long = mutex.withLock { receivedCounter }
+  fun receivedBytes(): Long = receivedCounter.load()
+
+  fun uploadedBytes(): Long = uploadedCounter.load()
+
+  /** Raises [counter] to at least [value]; a concurrent increment is never lost. */
+  private fun raise(counter: AtomicLong, value: Long) {
+    while (true) {
+      val current = counter.load()
+      if (current >= value || counter.compareAndSet(current, value)) return
+    }
+  }
 
   suspend fun verifiedPieces(): BooleanArray = mutex.withLock { verified.copyOf() }
 

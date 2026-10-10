@@ -15,6 +15,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class TorrentMetadataExchangeTest {
   @Test
@@ -68,6 +69,55 @@ class TorrentMetadataExchangeTest {
           }
         }
         assertEquals(0, budgets.allocated)
+      }
+    }
+  }
+
+  @Test
+  fun fetchAcceptsHybridInfoForMagnetResolution() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          val hybrid = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5, "c" to 20_000),
+            hybrid = true)
+          val view = TorrentMetadata.fromBencode(hybrid.metainfo, allowHybrid = true)
+          // Torrent files and sessions still refuse a hybrid's v1 view.
+          assertFailsWith<IllegalArgumentException> { TorrentMetadata.fromBencode(hybrid.metainfo) }
+          val network = createTorrentNetwork()
+          val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val budgets = TorrentExchangeBudgets(TorrentConfig())
+          val server = async {
+            val connection = listener.accept()
+            try {
+              val wire = PeerWire(connection)
+              wire.handshake(PeerHandshake(view.infoHash, torrentRandomBytes(20), true, false))
+              assertEquals(0, (wire.read() as PeerMessage.Extended).id)
+              wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+                "m" to mapOf("ut_metadata" to 7L),
+                "metadata_size" to view.infoBytes.size.toLong()))))
+              val request = wire.read() as PeerMessage.Extended
+              val piece = Bencode.parse(request.payload)["piece"]!!.integer!!.toInt()
+              wire.send(TorrentMetadataExchange.response(1, piece, view))
+            } finally { connection.close() }
+          }
+          try {
+            // A btih magnet names only the v1 hash; the info it fetches is the hybrid's.
+            val metadata = TorrentMetadataExchange(network, budget = budgets.metadata)
+              .fetch(view.infoHash, listener.local)
+            assertTrue(metadata.isHybrid)
+            assertContentEquals(hybrid.document.info.rawInfo.toByteArray(), metadata.infoBytes)
+            assertEquals(hybrid.document.info.hash,
+              V2InfoHash.fromBytes(sha256Digest(metadata.infoBytes)))
+            // Its v1 view counts the padding the v1 swarm hashes, which no session writes.
+            assertEquals(listOf(40_000L, 25_536L, 5L, 32_763L, 20_000L),
+              metadata.files.map { it.size })
+            server.await()
+          } finally {
+            server.cancelAndJoin()
+            network.close()
+          }
+          assertEquals(0, budgets.allocated)
+        }
       }
     }
   }

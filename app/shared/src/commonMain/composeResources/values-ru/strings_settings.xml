@@ -20,7 +20,7 @@
   <string name="settings_category_network">Сеть</string>
   <string name="settings_category_network_description">Сети для загрузок</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">Дополнительные трекеры для публичных торрентов</string>
+  <string name="settings_category_bittorrent_description">Отдача и дополнительные трекеры</string>
   <string name="settings_category_sharing">Общий доступ</string>
   <string name="settings_category_sharing_description">Сопряжение с телефоном или браузером для управления этим устройством</string>
 
@@ -555,9 +555,20 @@
   <string name="settings_proxy_footer">Для HTTP-загрузок при запуске или возобновлении. FTP и торренты подключаются напрямую.</string>
   <string name="settings_proxy_unsupported">%1$s не может использовать прокси. Обновите там Ketch, чтобы выбрать его.</string>
 
+  <string name="settings_torrent_upload">Отдача</string>
+  <string name="settings_torrent_upload_mode">Делиться с пирами</string>
+  <string name="settings_torrent_upload_off">Выкл.</string>
+  <string name="settings_torrent_upload_while_downloading">Во время загрузки</string>
+  <string name="settings_torrent_upload_seed">Продолжать раздачу</string>
+  <string name="settings_torrent_upload_off_hint">Пиры не могут ничего скачать с этого устройства.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">Пока торренты загружаются, пиры могут скачивать уже полученные вами части.</string>
+  <string name="settings_torrent_upload_seed_hint">Пока Ketch работает, готовые торренты продолжают отдачу — до их удаления или отключения этого параметра. Торренты, ожидающие загрузки, имеют приоритет.</string>
+  <string name="settings_torrent_upload_limit">Ограничение отдачи</string>
+  <string name="settings_torrent_upload_limit_hint">Общее для всех торрентов.</string>
+  <string name="settings_torrent_upload_footer">Пиры, которым вы отдаёте данные, видят IP-адрес этого устройства. Приватные торренты делятся только с пирами своего трекера.</string>
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>
-  <string name="settings_torrent_remote">Измените дополнительные трекеры на самом устройстве «%1$s» или в его config.toml.</string>
+  <string name="settings_torrent_remote">Измените настройки BitTorrent на самом устройстве «%1$s» или в его config.toml.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">Удалён %1$d трекер.</item>
     <item quantity="few">Удалены %1$d трекера.</item>
@@ -753,6 +764,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http-прокси, прокси, исключения, брандмауэр</string>
   <string name="settings_search_trackers">Трекеры, добавляемые к публичным торрентам</string>
   <string name="settings_search_trackers_keywords">анонс, announce, udp, magnet, добавить трекеры</string>
+  <string name="settings_search_upload">Делиться частями с пирами и раздавать готовые торренты</string>
+  <string name="settings_search_upload_keywords">отдача, раздача, сид, seed, ratio, рейтинг, пиры</string>
   <string name="settings_search_pair">Управлять этим устройством с телефона или из браузера</string>
   <string name="settings_search_pair_keywords">qr-код, qr, телефон, сопряжение, удалённо, веб-приложение, подключить</string>
   <string name="settings_search_reachable_keywords">локальная сеть, lan, сеть, удалённый доступ</string>

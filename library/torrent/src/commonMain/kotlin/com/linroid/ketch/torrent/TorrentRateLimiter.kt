@@ -53,6 +53,43 @@ internal class TorrentRateLimiter(
     }
   }
 
+  /**
+   * Whether upload work larger than a block, such as a piece read back from disk to prove its
+   * block hashes, may start now: every limited bucket holds at least a block. Charges nothing;
+   * the work pays with [charge] once it is done, so work that never happens costs nothing. Lock
+   * order and [task] as in [requestDelay].
+   */
+  suspend fun canCharge(task: TorrentRateLimiter): Boolean {
+    require(task !== this)
+    return mutex.withLock {
+      task.mutex.withLock {
+        val globalRate = rate.load()
+        val taskRate = task.rate.load()
+        refill(globalRate)
+        task.refill(taskRate)
+        (globalRate == 0L || tokens >= MAX_BLOCK) && (taskRate == 0L || task.tokens >= MAX_BLOCK)
+      }
+    }
+  }
+
+  /**
+   * Charges [bytes] of work [canCharge] admitted to each limited bucket: the debt holds later
+   * requests back until refill repays it. Lock order and [task] as in [requestDelay].
+   */
+  suspend fun charge(bytes: Long, task: TorrentRateLimiter) {
+    require(bytes >= 0 && task !== this)
+    mutex.withLock {
+      task.mutex.withLock {
+        val globalRate = rate.load()
+        val taskRate = task.rate.load()
+        refill(globalRate)
+        task.refill(taskRate)
+        if (globalRate != 0L) tokens -= bytes
+        if (taskRate != 0L) task.tokens -= bytes
+      }
+    }
+  }
+
   private fun refill(currentRate: Long) {
     val now = nowMs()
     tokens = minOf(capacity(currentRate),

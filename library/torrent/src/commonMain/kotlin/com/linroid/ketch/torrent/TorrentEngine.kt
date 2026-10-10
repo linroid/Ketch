@@ -60,9 +60,10 @@ internal interface TorrentEngine {
   }
 
   /**
-   * Removes a torrent from the engine.
+   * Removes a torrent from the engine. Unknown hashes are ignored.
    *
-   * @param infoHash hex info hash of the torrent to remove
+   * @param infoHash hex info hash of the torrent to remove: a v1 hash, a v2 hash, or a hybrid's
+   *   v1 hash
    * @param deleteFiles whether to also delete downloaded files
    */
   suspend fun removeTorrent(
@@ -83,6 +84,9 @@ internal interface TorrentEngine {
    * @param bytesPerSecond rate limit in bytes/sec, or 0 for unlimited
    */
   fun setUploadRateLimit(bytesPerSecond: Long)
+
+  /** Replaces the upload policy for running and later torrents, as far as each supports it. */
+  suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {}
 }
 
 internal data class TorrentTaskSpec(

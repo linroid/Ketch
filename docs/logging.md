@@ -73,7 +73,9 @@ val ketch = Ketch(
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
-  newly discovered and failed peers, corrupt pieces
+  newly discovered and failed peers, corrupt pieces, upload slots, interested peers and
+  uploaded bytes; v2 and hybrid swarms also count incoming peers, a hybrid's v1 peers, hash
+  requests served and rejected, and candidates being dialed
 
 ### Verbose Level (For Detailed Diagnostics)
 - Speed limiter waits
@@ -120,7 +122,15 @@ A magnet download (dates omitted, task IDs shortened):
 [INFO] [TorrentEngine] Fetched metadata for magnet 0123456789ab in 4.2s
 [INFO] [TorrentSource] Resolved torrent from magnet: 0123456789ab "ubuntu.iso", v1, files=1, totalBytes=6114656256
 [INFO] [TorrentSession] Downloading taskId=9c1e (0123456789ab) with up to 100 peer(s), upload=DISABLED, privacy=PUBLIC
-[DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, failed=31, corrupt=0, discovery=open
+[DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, failed=31, corrupt=0, uploadSlots=0/4 interestedPeers=3 uploaded=0, discovery=open
+```
+
+A hybrid torrent seeding to two peers, one of them from its v1 swarm (`in` counts peers that
+dialed in, `v1` peers on the v1 protocol, which get no hashes):
+
+```
+[INFO] [TorrentSession] Seeding taskId=51d0 (v2 3991fc2074c5): upload=SEED_AFTER_COMPLETION
+[DEBUG] [TorrentSwarm] V2 swarm taskId=51d0 (3991fc2074c5): pieces 524/524, peers=2 (in=1, v1=1) uploadSlots=2/4 interestedPeers=2 uploaded=7340032 hashServed=3 hashRejected=0 candidates=4 dialing=0 unchoked=0, pendingCommits=0
 ```
 
 ## Troubleshooting

@@ -66,7 +66,7 @@ class SessionTrackerEditTest {
     val discoveries = MutableStateFlow<List<List<List<String>>>>(emptyList())
     var cleanup: suspend () -> Unit = {}
     val session = KotlinTorrentSession(store, network, TorrentBufferBudget(1024 * 1024), parent,
-      uploadPolicy = uploadPolicy,
+      uploadPolicy = { uploadPolicy },
       trackerConfigurationBudget = state,
       discover = { _, owner ->
         discoveries.value += listOf(owner.trackerTiers())

@@ -281,9 +281,9 @@ class InstanceManager(
   }
 
   /**
-   * Applies saved torrent [settings] to the embedded instance; torrents
-   * pick them up as they start or resume. Does nothing when the embedded
-   * instance has no torrent support, or there is none.
+   * Applies saved torrent [settings] to the embedded instance: the upload mode and limit reach
+   * running torrents at once, extra trackers and tracker lists reach torrents as they start or
+   * resume. Does nothing when the embedded instance has no torrent support, or there is none.
    */
   suspend fun applyTorrentSettings(settings: TorrentSettings) {
     factory.applyTorrentSettings?.invoke(settings)

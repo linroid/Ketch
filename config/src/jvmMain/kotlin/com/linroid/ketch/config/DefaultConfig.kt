@@ -85,6 +85,12 @@ maxConnectionsPerHost = 16
 # Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), for port
 # forwarding; 0 picks a free one at every launch. The apps always pick one.
 # listenPort = 6881
+# Share verified pieces with peers: "off" (default), "while-downloading", or
+# "seed" to keep sharing finished torrents while Ketch runs. Peers you upload
+# to see this device's IP address. The apps edit this under Settings >
+# BitTorrent.
+# upload = "off"
+# uploadLimit = "unlimited"  # "unlimited", "1m" (MB/s), "500k" (KB/s)
 
 # Pre-configured remote servers. The apps show `name` (or the name the server
 # announces) and stay connected to a device while another is shown unless

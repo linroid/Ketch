@@ -73,7 +73,9 @@ including a development run, hands its files to the running app instead of openi
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
+  support peer exchange for v1, v2 and hybrid torrents; Ketch advertises its listen port (BEP 10
+  `p`) and never dials an incoming peer's source port, only the listen port it announced.
+  Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
 - Magnet metadata is asked of up to four peers at once, as they are found, within
@@ -121,18 +123,39 @@ including a development run, hands its files to the running app instead of openi
   listenPort`, `KETCH_TORRENT_PORT` or `--torrent-port`, and the [Docker image](docker.md) sets
   16881; the apps and the CLI's other commands always let the system pick. A port in use fails
   the torrents that start with `KetchError.Network`, retried like other transient failures.
-- Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
-  and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
-  are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
-  send a completed announce.
-- V1 upload defaults to `DISABLED`, preserving the previous `enableUpload = false` behavior.
-  `WHILE_DOWNLOADING` exchanges verified pieces during transfer; `SEED_AFTER_COMPLETION` keeps
-  the session alive after completion until removed or the source is closed. `enableUpload = true`
-  maps to the latter when no explicit policy is supplied.
+- Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
+  working tracker until failover, and disconnects its old peers before switching. Public-mode
+  magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
+  metainfo. Partial selections do not send a completed announce.
+- Upload is opt-in, with the same `TorrentConfig.uploadPolicy` for v1, v2 and hybrid torrents.
+  It defaults to `DISABLED`, the previous `enableUpload = false` behavior; `enableUpload = true`
+  maps to `SEED_AFTER_COMPLETION` when no policy is supplied.
+  - `DISABLED` never unchokes a peer, does not offer `ut_metadata` (so magnet peers cannot fetch
+    the info dictionary from this device) and rejects every BEP 52 hash request.
+  - `WHILE_DOWNLOADING` uploads verified pieces while the task downloads and stops at completion.
+  - `SEED_AFTER_COMPLETION` keeps uploading after completion, also for a v2 task that starts
+    complete, until the task is removed, the policy leaves seeding, a waiting download takes its
+    engine slot, or the source is closed.
+
+  The apps and the CLI map `[torrent] upload` (`off`, `while-downloading` or `seed`) to these
+  policies and `[torrent] uploadLimit` to `uploadRateLimit`, the upload cap all torrents share;
+  the apps edit both under Settings → BitTorrent → Uploading and apply them at once.
+  `TorrentDownloadSource.setUploadPolicy` and `setUploadRateLimit` never start the engine: peers
+  are choked within a rechoke (about 10 seconds), seeding sessions finish once the policy leaves
+  seeding, and torrents started later use the new values. `ketch server` and
+  `ketch mcp --standalone` seed while they run; a `ketch <url>` download exits once its downloads
+  finish.
+- Each torrent has four upload slots: three regular ones, reassigned every 10 seconds to the
+  peers that sent the most while it downloads, or took the most while it seeds, and one
+  optimistic slot that rotates every 30 seconds. Peers are served verified pieces only, through
+  a bounded read cache; a verified piece that changed on disk stops the task. A hybrid's v1 peers
+  get canonical v1 blocks, with zeros for the padding.
 - Task and global download limits share Ketch's limiter with HTTP/FTP. Live connection limits
   close excess peers (see [Ketch download settings](#ketch-download-settings)).
-  `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source control upload
-  independently; zero means unlimited.
+  `setUploadRateLimit` on the torrent source caps the upload of all torrents and
+  `setTaskUploadRateLimit` one task's, v1, v2 or hybrid, also while it seeds; zero means
+  unlimited. A block either limit holds back waits in its peer's queue while the connection
+  keeps downloading, so a low upload limit never stalls downloads from the same peers.
 
 ## Ketch download settings
 
@@ -214,7 +237,8 @@ See [release licensing and provenance](development/licensing.md) for dependency 
 the scope of the torrent source provenance review.
 
 The public v2/hybrid download workflow supports metainfo imports, full-identity `btmh` magnets
-(including magnets with both exact topics), authenticated piece-layer exchange, trackers/DHT,
+(including magnets with both exact topics), `btih` magnets of hybrid torrents, which resolve
+their v2 identity from the metadata, authenticated piece-layer exchange, trackers/DHT,
 selection, progress, shared download limits, live connection limits, pause/resume, safe removal,
 and task-store restart. Hybrid payloads must pass both SHA-1 and SHA-256 verification. Hybrid
 padding files are omitted from selection, so file IDs may have gaps. The source persists metainfo
@@ -222,13 +246,30 @@ and full SHA-256 identity with ownership checkpoints; `.ketch-v2-<task-id>.creat
 output root also recovers owned files created before the first checkpoint. Keep this journal with
 the task until removal. Configure a durable `TaskStore` to retain task records across processes.
 
-V2/hybrid currently downloads through outgoing v2 TCP connections. V2 incoming routing, uploads,
-seeding, peer exchange, and hybrid participation in v1-only peer swarms remain separate roadmap
-work; upload policy options apply to v1 sessions. This version does not implement uTP,
-protocol encryption, web seeds, NAT mapping, local service discovery, torrent creation, or a ratio
-management UI. No automatic incoming-port mapping is performed. Bounds include 4 MiB metainfo,
-10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers
-or large pieces increases process memory beyond the piece-buffer budget.
+V2 and hybrid torrents accept incoming peers: the engine routes each connection by the 20-byte
+wire tag in its handshake, both of a hybrid's tags to its one task. They upload, seed, serve
+BEP 52 proofs from the piece layer and, for verified pieces, the block layer, exchange peers, and
+take part in v1 swarms: a hybrid talks to v1-only peers, announces its v1 hash to trackers with
+tier state of its own and looks it up in DHT too. A private hybrid announces both hashes to one
+tracker at a time and moves both to the next one together (BEP 27). Pieces read back for peers
+and proofs waiting to be sent take at most half of `maxBufferedBytes` across all torrents, v1
+and v2, so uploading never starves downloads. The default 32 MiB holds the largest pieces; with
+less, pieces larger than half of it are never uploaded. A piece read back to prove its block
+hashes is paid for from both upload limits once it was read, like uploading it, and the block
+hashes of the last few pieces proved are kept, so repeated requests read nothing. The Fast
+extension (BEP 6) is not negotiated.
+Seeding ends when the task is removed, when the upload policy leaves seeding, when a download
+waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's, or when Ketch
+quits; a torrent that finishes while a download waits for a slot does not seed at all. Seeding
+shows as Completed and is not resumed after a restart. On Android a seeding-only app is not kept
+in the foreground, so Android may stop it, and its seeding, in the background; on iOS seeding
+stops while the app is suspended.
+
+This version does not implement uTP, protocol encryption, web seeds, NAT mapping, local service
+discovery, torrent creation, or ratio management. No automatic incoming-port mapping is
+performed. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
+connection/buffer/task budgets. Configuring many peers or large pieces increases process memory
+beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the
 [current implementation progress](plans/pure-kotlin-torrent-v2-progress.md).

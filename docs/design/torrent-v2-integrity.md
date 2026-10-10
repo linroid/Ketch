@@ -283,11 +283,15 @@ copying hash bytes. The response count omits the first `log2(length)-1` proof la
 the requested proof-layer count in the selector, as specified by
 [BEP 52](https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052.rst).
 
-This adapter limits requests to 512 hashes, following BEP 52's recommended maximum, and bounds
-layer fields to 63. Authenticated file-tree bounds, supported base-layer policy, outstanding-request
-correlation, buffer admission, response proof authentication and hash serving remain required
-connection-handler work. The codec alone does not authorize any hashes or payload progress.
-It is separate from the v1 runtime: later v2 negotiation must explicitly route these frames to it.
+Our requests, and the answers we accept, stay within 512 hashes, BEP 52's recommended maximum.
+Requests from peers decode with up to 8192 base hashes, as libtorrent accepts them (it asks for all
+1024 block hashes of a failed 16 MiB piece at once); serving answers them only when the reply fits
+one frame and asks no more than 512 hashes above the piece layer, and rejects the rest. Layer
+fields are bounded to 63. The codec alone does not authorize any hashes or payload progress:
+`PeerHashExchange` correlates our requests and authenticates the answers (below), and
+`TorrentV2HashServer` checks each peer request against the authenticated file tree before proving
+it from the piece layers or a verified piece. Only V2-mode connections decode these frames; the v1
+runtime and a hybrid's V1-mode connections never interpret or answer them.
 
 ### Authenticating peer hash responses
 
@@ -396,6 +400,14 @@ https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052
 The v2 actor must select this mode, transmit cancellation/rejection frames as required, and enforce
 request deadlines/connection teardown. This state slice does not yet implement that actor or the
 remaining optional Fast Extension messages.
+
+Ketch does not negotiate the Fast Extension (BEP 6), so v2 and hybrid connections keep the legacy
+choke-drop semantics until it is: a choke discards what either side asked for, Ketch never sends a
+reject (ID 16), and a peer we choke asks again once unchoked. The explicit mode stays unselected.
+A hybrid's V1-mode connections, to peers of its v1 swarm, request canonical v1 blocks, which run
+through a file's zero padding to the end of the v1 piece: the padding must arrive as zeros and is
+stripped before the piece is verified against both hashes and committed, and uploads to those
+peers fill it with zeros. Requests reach at most the v1 piece's length, never hash messages.
 
 ### Admitted outbound peer frames
 
@@ -1146,3 +1158,36 @@ with fresh storage ownership. They cover completion without discovery, payload m
 paused, invalid task binding and admission cleanup. Decoding/catalog I/O are still caller-owned;
 this entry point does not yet bound their transient allocations or schedule automatic checkpoints.
 TaskStore/source wiring and durable checkpoint publication remain part of the pending integration.
+
+## V2 swarm membership
+
+The `torrent-v2-swarm` stack completes the follow-up work the sections above leave pending for
+incoming routing, engine registration, upload and its limits, seeding and hash serving. User-facing
+behavior is in [BitTorrent support](../torrent.md); evidence is in
+[verification](../development/torrent-verification.md#v2-swarm-completeness-torrent-v2-swarm).
+
+- **Routing.** One engine table (`TorrentRouteTable`) maps 20-byte wire tags to owners: a v1 hash,
+  a truncated v2 hash, or both of a hybrid's, registered atomically across the two tag spaces.
+  `dispatchIncoming` reads the 68-byte handshake within 10 s and hands the connection, with that
+  handshake still to read (`PrefixedConnection`), to the owner's non-suspending sink under the
+  engine mutex. V2 and hybrid owners are held by the engine like v1 sessions (`addV2Task`), so
+  removal by either hash, shutdown and slot counting share one registry; `withV2Download` remains
+  a scoped wrapper.
+- **Admission.** An owner takes incoming peers only while it transfers; private and tracker-only
+  owners only from hosts their trackers returned, and a tracker reset revokes those hosts before it
+  drops the peers in place. One pool, dialer, responders, commit worker, serve worker and loop live
+  for a whole transfer: connection limits, resets and upload policy changes reach the loop as
+  controls instead of restarting it.
+- **Upload.** Only verified pieces are served, read back through `TorrentV2PieceStore.tryRead`,
+  which verifies them again; a verified piece that changed on disk stops the owner. A request may
+  reach the end of its protocol piece (the v1 piece of a hybrid, the full piece of a pure v2
+  torrent), and bytes past the v2 extent are sent as zeros. `TorrentChoker` gives four slots, and
+  pieces read back for peers stay within an upload partition of half the transfer budget.
+- **Hash serving.** `TorrentV2HashServer` proves the piece layer and above from authenticated
+  layers, with folded upper levels cached per file (at most 1 MiB per owner, charged to session
+  state), and block layers only for verified pieces of peers we unchoke. Requests are rejected
+  under `DISABLED`, on V1-mode connections, out of the file tree's bounds, or past 16 pending per
+  peer.
+
+Still open: the Fast Extension (see above), attributing corrupt pieces to peers, seeding existing
+payload without a checkpoint, and seeding that survives a restart.

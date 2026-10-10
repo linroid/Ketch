@@ -247,16 +247,23 @@ internal class TorrentTracker(
         minimumIntervalSeconds = minimum)
     }
 
-    fun compactPeers(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint> {
+    fun compactPeers(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint> =
+      compactEntries(bytes, ipv6).filterNotNull().distinct()
+
+    /**
+     * Every compact entry of [bytes] in order, null where the port is 0, so that values sent
+     * beside the entries (such as PEX flags) still line up with them.
+     */
+    fun compactEntries(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint?> {
       val stride = if (ipv6) 18 else 6
       require(bytes.size % stride == 0 && bytes.size / stride <= 4096)
-      return bytes.indices.step(stride).mapNotNull { offset ->
+      return bytes.indices.step(stride).map { offset ->
         val port = ((bytes[offset + stride - 2].toInt() and 255) shl 8) or
           (bytes[offset + stride - 1].toInt() and 255)
         if (port == 0) null else PeerEndpoint(
           numericHost(bytes.copyOfRange(offset, offset + stride - 2)), port
         )
-      }.distinct()
+      }
     }
 
     private fun checkedInterval(value: Long): Long {

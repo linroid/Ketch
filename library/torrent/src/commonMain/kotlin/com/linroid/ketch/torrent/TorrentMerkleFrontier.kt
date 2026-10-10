@@ -48,11 +48,7 @@ internal class TorrentMerkleFrontier(private val baseLayer: Int = 0) {
     return checkNotNull(right).copyOf()
   }
 
-  private fun zeroHash(level: Int): ByteArray {
-    var hash = ByteArray(32)
-    repeat(level) { hash = parent(hash, hash) }
-    return hash
-  }
+  private fun zeroHash(level: Int): ByteArray = merkleZeroHash(level)
 
   private fun parent(left: ByteArray, right: ByteArray): ByteArray =
     Sha256().update(left).update(right).digest()

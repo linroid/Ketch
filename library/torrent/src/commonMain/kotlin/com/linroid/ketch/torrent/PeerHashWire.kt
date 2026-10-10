@@ -10,7 +10,12 @@ internal sealed interface PeerHashMessage {
   data class Reject(val selector: PeerHashSelector) : PeerHashMessage
 }
 
-/** File-root identity and coordinates; file-specific tree bounds require authenticated metadata. */
+/**
+ * File-root identity and coordinates; file-specific tree bounds require authenticated metadata.
+ * [length] may be up to [MAX_REQUESTED_HASHES] so that peers' requests decode, as libtorrent asks
+ * for a whole piece's block hashes at once; what we ask for and accept as hashes stays within
+ * [MAX_HASHES].
+ */
 internal data class PeerHashSelector(
   val root: ByteString,
   val baseLayer: Int,
@@ -21,14 +26,23 @@ internal data class PeerHashSelector(
   init {
     require(root.size == 32)
     require(baseLayer in 0..63 && proofLayers in 0..63 && baseLayer + proofLayers <= 63)
-    // BEP 52 allows any positive power of two up to 512, including a single remaining hash.
-    require(length in 1..512 && length and (length - 1) == 0)
+    // A positive power of two, including a single remaining hash. BEP 52 says length SHOULD NOT
+    // exceed 512, and libtorrent accepts requests of up to 8192.
+    require(length in 1..MAX_REQUESTED_HASHES && length and (length - 1) == 0)
     require(index in 0..0xffff_ffffL && index % length == 0L)
     require(index + length <= 0x1_0000_0000L)
   }
 
   // The first log2(length)-1 proof layers are counted but omitted from the response.
   val hashCount: Int get() = length + maxOf(0, proofLayers - length.countTrailingZeroBits() + 1)
+
+  companion object {
+    /** Base hashes we ask for, or accept in an answer, at once (BEP 52). */
+    const val MAX_HASHES = 512
+
+    /** Base hashes a peer may ask us for at once; we answer what fits one frame. */
+    const val MAX_REQUESTED_HASHES = 8192
+  }
 }
 
 /** Adapts bounded PeerWire unknown frames without enabling v2 semantics in the v1 runtime. */
@@ -55,6 +69,8 @@ internal object PeerHashWire {
           PeerHashMessage.Reject(selector)
       }
       else -> {
+        // We never ask for more, so a larger answer is no answer of ours.
+        require(selector.length <= PeerHashSelector.MAX_HASHES) { "Hash response too long" }
         require(input.size == selector.hashCount * 32L) { "Wrong hash response size" }
         PeerHashMessage.Hashes(selector, input.readByteString())
       }

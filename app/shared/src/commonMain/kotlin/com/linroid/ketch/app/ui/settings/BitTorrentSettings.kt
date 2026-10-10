@@ -1,7 +1,9 @@
 package com.linroid.ketch.app.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,6 +19,9 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.components.SpeedLimitPicker
+import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
@@ -30,12 +35,14 @@ import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
 import com.linroid.ketch.app.state.RejectedTracker
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
+import com.linroid.ketch.app.state.speedChoices
 import com.linroid.ketch.app.state.trackerHost
 import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_add
 import ketch.app.shared.generated.resources.action_show
@@ -68,6 +75,18 @@ import ketch.app.shared.generated.resources.settings_torrent_remove_all
 import ketch.app.shared.generated.resources.settings_torrent_removed
 import ketch.app.shared.generated.resources.settings_torrent_trackers
 import ketch.app.shared.generated.resources.settings_torrent_unused
+import ketch.app.shared.generated.resources.settings_torrent_upload
+import ketch.app.shared.generated.resources.settings_torrent_upload_footer
+import ketch.app.shared.generated.resources.settings_torrent_upload_limit
+import ketch.app.shared.generated.resources.settings_torrent_upload_limit_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_mode
+import ketch.app.shared.generated.resources.settings_torrent_upload_off
+import ketch.app.shared.generated.resources.settings_torrent_upload_off_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_seed
+import ketch.app.shared.generated.resources.settings_torrent_upload_seed_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading
+import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading_hint
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -75,8 +94,9 @@ import org.jetbrains.compose.resources.stringResource
 private const val MAX_LISTED_REJECTIONS = 3
 
 /**
- * Extra trackers and the tracker list of [device], applied to torrents as they start or resume.
- * Only the embedded device's trackers can be changed here; a remote device gets a note instead.
+ * What [device] uploads to peers, its extra trackers and its tracker list. Uploading applies at
+ * once, trackers to torrents as they start or resume. Only the embedded device's settings can be
+ * changed here; a remote device gets a note instead.
  */
 @Composable
 fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
@@ -96,6 +116,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   controller.torrentError?.let {
     SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
   }
+  UploadGroup(settings = torrent, onChange = controller::updateTorrent)
   if (removed.isNotEmpty()) {
     SettingsNotice(
       text = pluralStringResource(
@@ -186,6 +207,59 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     onRefresh = controller::refreshTrackerList,
   )
 }
+
+/**
+ * Whether peers may download from this device, with a hint for the choice, and the upload cap
+ * all torrents share, which only matters while something is uploaded.
+ */
+@Composable
+private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_upload),
+    footer = stringResource(Res.string.settings_torrent_upload_footer),
+  ) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_upload_mode),
+      description = stringResource(settings.upload.hint),
+    ) {
+      KetchSegmented(
+        options = TorrentUploadMode.entries,
+        selected = settings.upload,
+        onSelect = { onChange(settings.copy(upload = it)) },
+        label = { stringResource(it.label) },
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        revealInitialSelection = true,
+      )
+    }
+    val limit = settings.uploadLimit
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_upload_limit),
+      description = stringResource(Res.string.settings_torrent_upload_limit_hint),
+      enabled = settings.upload != TorrentUploadMode.Off,
+    ) {
+      SpeedLimitPicker(
+        value = limit,
+        onCommit = { onChange(settings.copy(uploadLimit = it)) },
+        presets = speedChoices(SpeedLimitPickerPresets, limit),
+        enabled = settings.upload != TorrentUploadMode.Off,
+      )
+    }
+  }
+}
+
+private val TorrentUploadMode.label: StringResource
+  get() = when (this) {
+    TorrentUploadMode.Off -> Res.string.settings_torrent_upload_off
+    TorrentUploadMode.WhileDownloading -> Res.string.settings_torrent_upload_while_downloading
+    TorrentUploadMode.Seed -> Res.string.settings_torrent_upload_seed
+  }
+
+private val TorrentUploadMode.hint: StringResource
+  get() = when (this) {
+    TorrentUploadMode.Off -> Res.string.settings_torrent_upload_off_hint
+    TorrentUploadMode.WhileDownloading -> Res.string.settings_torrent_upload_while_downloading_hint
+    TorrentUploadMode.Seed -> Res.string.settings_torrent_upload_seed_hint
+  }
 
 /**
  * The tracker list subscription: a switch, the lists' addresses, which start as

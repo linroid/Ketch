@@ -12,6 +12,7 @@ import okio.ByteString.Companion.toByteString
 import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -58,6 +59,18 @@ class PeerV2DialerTest {
     }
   }
 
+  /** A peer that dialed us: its handshake waits to be read. */
+  private inner class Dialing(port: Int) : TorrentConnection {
+    override val remote = PeerEndpoint("127.0.0.1", port)
+    var closed = false
+    private val handshake = PeerWire.encodeHandshake(PeerHandshake(
+      InfoHash.fromBytes(document.info.hash.wireBytes()), ByteArray(20) { 3 }, false, false))
+    override suspend fun readExactly(size: Int): ByteArray =
+      if (size == 68) handshake.copyOf() else awaitCancellation()
+    override suspend fun write(bytes: ByteArray) = Unit
+    override fun close() { closed = true }
+  }
+
   private fun endpoints(count: Int): Channel<PeerEndpoint> = Channel<PeerEndpoint>(count).also {
     repeat(count) { index -> check(it.trySend(PeerEndpoint("127.0.0.1", index + 1)).isSuccess) }
     it.close()
@@ -81,6 +94,23 @@ class PeerV2DialerTest {
     assertEquals(0, active)
     assertEquals(0, state.allocated)
     input.cancel()
+  }
+
+  @Test
+  fun everyFailureReachesItsConsumerThroughAFullQueue() = runTest {
+    val state = TorrentBufferBudget(100_000)
+    // Room for one: the session counts every dial it queued, so none may be dropped.
+    val failures = Channel<PeerV2Dialer.Failure<PeerEndpoint>>(1)
+    PeerV2Dialer.run(endpoints(5), state, parallelism = 2,
+      connect = { throw IOException("Network is unreachable") }, failures = failures) {
+      val ports = List(5) {
+        runCurrent()
+        assertNotNull(failures.tryReceive().getOrNull()).endpoint.port
+      }
+      assertEquals((1..5).toSet(), ports.toSet())
+    }
+    assertEquals(0, state.allocated)
+    failures.cancel()
   }
 
   @Test
@@ -157,6 +187,47 @@ class PeerV2DialerTest {
       assertEquals("Discovery failed during admission", result.exceptionOrNull()?.message)
       assertEquals(1, attempts)
     }
+    f.released()
+  }
+
+  @Test
+  fun respondWorkersShareOutputAndCloseRefusedConnections() = runTest {
+    val f = Fixture()
+    val answered = Dialing(50_000)
+    val refused = Dialing(50_001)
+    val failing = Dialing(50_002)
+    val incoming = Channel<PeerV2Dialer.Incoming>(4)
+    incoming.send(PeerV2Dialer.Incoming(refused, 0))
+    incoming.send(PeerV2Dialer.Incoming(failing, 0))
+    incoming.send(PeerV2Dialer.Incoming(answered, 3))
+    val failures = Channel<PeerV2Dialer.Failure<PeerEndpoint>>(4)
+    PeerV2Dialer.run(endpoints(1), f.state, parallelism = 1, connect = { f.connect(it) },
+      incoming = incoming, respondParallelism = 2, failures = failures,
+      respond = { peer ->
+        when (peer.connection) {
+          refused -> null
+          failing -> throw IOException("Handshake failed")
+          else -> PeerV2Connector.respond(peer.connection, document, layout,
+            ByteArray(20) { 1 }.toByteString(), f.buffers, f.state, generation = peer.generation)
+        }
+      },
+    ) { dialer ->
+      // Dialed and answered peers arrive on the same output.
+      val connected = List(2) { dialer.connections.receive() }
+      val answer = connected.single { it.info.origin is PeerV2Origin.Incoming }
+      assertEquals(PeerV2Origin.Incoming(answered.remote), answer.info.origin)
+      assertEquals(3L, answer.generation)
+      assertIs<PeerV2Origin.Outgoing>(connected.single { it !== answer }.info.origin)
+      runCurrent()
+      assertTrue(refused.closed)
+      assertTrue(failing.closed)
+      assertFalse(answered.closed)
+      connected.forEach { it.close() }
+      assertTrue(answered.closed)
+      // Responders never retry or report: the peer that dialed us can dial again.
+      assertTrue(failures.tryReceive().isFailure)
+    }
+    incoming.cancel()
     f.released()
   }
 

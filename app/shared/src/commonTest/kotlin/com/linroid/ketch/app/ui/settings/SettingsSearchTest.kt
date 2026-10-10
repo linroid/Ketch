@@ -23,6 +23,17 @@ class SettingsSearchTest {
   }
 
   @Test
+  fun searchSettings_seed_findsTheBitTorrentUpload() = runTest {
+    val hits = searchSettings("seed", every, allFeatures, loadSettingsSearchIndex())
+
+    val first = hits.first().entry
+    assertEquals(SettingsCategory.BitTorrent, first.category)
+    assertEquals("Share with peers", first.title)
+    assertEquals("Share pieces with peers and seed finished torrents", first.description)
+    assertEquals("BitTorrent", first.page)
+  }
+
+  @Test
   fun searchSettings_titleStartingWithTheQuery_ranksAboveOtherMatches() = runTest {
     val titles = searchSettings("speed", every, allFeatures, loadSettingsSearchIndex())
       .map { it.entry.title }

@@ -75,15 +75,96 @@ corrupt proofs, and source shutdown during metadata resolution. The tests execut
 host and iOS.
 
 `PublicV2IndependentSeederTest` resolves pure v2 and hybrid magnets, fetches their external hash
-layers, and downloads exact payload through Ketch from the pinned test-only libtorrent peer.
-These are download interoperability checks, not evidence for v2 upload, inbound routing, hybrid
-v1-only swarms, a second independent v2 implementation, or the remaining production release gates.
+layers, and downloads exact payload through Ketch from the pinned test-only libtorrent peer. The
+upload direction, inbound routing and hybrid v1-only swarms are covered by the
+[v2 swarm completeness evidence](#v2-swarm-completeness-torrent-v2-swarm) below; none of it is
+evidence for a second independent v2 implementation or the remaining production release gates.
 
 The full [roadmap #162](https://github.com/linroid/Ketch/issues/162) still requires bidirectional
 two-engine format interoperability, shaped-network/NAT/proxy fixtures, production resource and
 performance acceptance, physical mobile devices, migration/package qualification and a 72-hour
 soak. Passing the download/restart suites does not complete these gates. The older v1 performance
 and package measurements below remain historical evidence only.
+
+### V2 swarm completeness (`torrent-v2-swarm`)
+
+The `torrent-v2-swarm` stack makes v2 and hybrid owners full swarm members: incoming routing by
+wire tag, upload and seeding with a shared 4-slot choker, BEP 52 proof serving, BEP 10
+`ut_metadata`/`ut_pex`/`p` on v2 connections, and hybrid participation in v1 swarms. Recorded at
+`c81ce826d` on 2026-10-10 on macOS (Apple silicon) with the Homebrew build of Transmission 4.1.3,
+whose `--version` matches the pin. That revision includes the review fixes that changed the
+duplicate-connection rule, decode hash requests of up to 8192 hashes and count a peer exchange
+message as sent only once it was written; every suite and scenario below ran again there:
+
+```sh
+TRANSMISSION_DAEMON=/opt/homebrew/bin/transmission-daemon \
+  ./gradlew allJvmTests :library:torrent:verifyNoNativeTorrentRuntime \
+  -PtorrentConformance=true -PprebuiltWebDir=/nonexistent
+python3 -m unittest discover -s tools/torrent -p 'test_*.py'
+python3 tools/torrent/verify_conformance.py --reports library/torrent/build/test-results/jvmTest \
+  --revision "$(git rev-parse HEAD)" --output library/torrent/build/reports/conformance/executed.json
+./gradlew :library:torrent:testAndroidHostTest
+./gradlew :library:torrent:iosSimulatorArm64Test -PenableIosSimulatorTests=true
+```
+
+| Torrent suite | Before (`8c933c143`) | After (`c81ce826d`) | Failures |
+| --- | ---: | ---: | ---: |
+| JVM, with Transmission | 699 | 889 | 0 |
+| Android host | 675 | 859 | 0 |
+| Executed iOS simulator | 676 | 860 | 0 |
+
+On the iOS simulator the suite's tests took 83.8 s, of which 32.2 s went to the 185 tests added
+since `8c933c143`: about 62% more than the earlier tests' 51.6 s. Most of it is the loopback
+two- and three-engine tests, which iOS still polls every 5 ms, and proof tests that hash whole
+pieces, up to 16 MiB. The Gradle task took 86 s.
+
+One of four full Android host runs at that revision failed
+`TorrentV2MetadataServingTest.disabledUploadAdvertisesNoUtMetadata`: the engine reset the raw
+client's connection before answering its handshake. The same reset failed
+`TorrentV2IncomingTest.duplicatePeerIdKeepsTheSameConnectionOnBothEnds` once at `ec4aac19c`.
+Neither reproduces on its own or in later full runs, and its cause is still open. A final pass at
+`6298ed40b`, which changes only documentation and KDoc after `c81ce826d`, repeated every command
+above with the same counts and all nine scenarios; the reset did not recur there, nor in five more
+full runs (three Android host, two JVM), two runs of both suites at once, or ten repeats of the v2
+incoming, metadata serving, peer exchange and swarm tests.
+
+The verifier then required all nine scenarios of `test-fixtures/torrent/scenarios.json`. The
+seven new ones are:
+
+| Scenario | Test | What it shows |
+| --- | --- | --- |
+| `v2.libtorrent.btmh-magnet-download` | `PublicV2IndependentSeederTest.pureV2MagnetDownloadsFromLibtorrent` | Ketch downloads a pure v2 magnet from libtorrent |
+| `hybrid.libtorrent.dual-magnet-download` | `PublicV2IndependentSeederTest.hybridMagnetDownloadsFromLibtorrent` | The same for a dual-topic hybrid magnet |
+| `v2.libtorrent.btmh-magnet-upload` | `PublicV2IndependentLeecherTest.libtorrentDownloadsPureV2FromKetchSeeder` | libtorrent fetches a pure v2 torrent's info dictionary, piece layers and payload from a seeding Ketch engine |
+| `hybrid.libtorrent.dual-magnet-upload` | `PublicV2IndependentLeecherTest.libtorrentDownloadsHybridFromKetchSeeder` | The same for a hybrid, over the upgraded v2 route |
+| `hybrid.libtorrent.v1-topic-upload` | `PublicV2IndependentLeecherTest.libtorrentJoinsHybridThroughTheV1Topic` | A `btih`-only magnet of a hybrid: libtorrent dials the v1 tag without the upgrade bit and downloads over the v1 route |
+| `hybrid.transmission.v1-peer-upload` | `HybridTransmissionInteropTest.transmissionDownloadsHybridFromKetchSeeder` | Transmission, which knows only v1, downloads a hybrid from Ketch: canonical v1 blocks, padding as zeros |
+| `hybrid.transmission.v1-peer-download` | `HybridTransmissionInteropTest.hybridTaskDownloadsFromTransmissionV1Seeder` | A Ketch hybrid task downloads from Transmission seeding it as v1, stripping the padding and checking both hashes |
+
+The libtorrent fixture's first file has 521 pieces of 32 KiB, so its piece layer takes two hash
+requests and the proofs carry uncles from the cached upper tree; its other files end mid-piece.
+Findings while recording it:
+
+- libtorrent leechers run with `out_enc_policy = pe_disabled` and without uTP, so the first
+  attempt is plaintext TCP until Ketch has protocol encryption and uTP. They use libtorrent's
+  POSIX disk back end: the memory-mapped one installs SIGSEGV and SIGBUS handlers around its
+  writes that turn the JVM's implicit null checks into a crash of the test process.
+- libtorrent reads a magnet's `x.pe` without percent-decoding it, so the tests append the peer
+  as written rather than through `MagnetUri`, which encodes the colon.
+- libtorrent pads the last file of a pure v2 torrent to a whole piece, like every other file, and
+  asks for whole blocks of that last piece however few bytes it holds. Ketch used to ban a peer
+  asking past the last file; a pure v2 piece's requests may now reach its full length, answered
+  with zeros past the file (`TorrentContentLayout.protocolPieceLength`). Hybrids keep their v1
+  geometry, whose last piece is short.
+- Over a `btih`-only magnet, libtorrent fetches the hybrid info dictionary over `ut_metadata` and
+  downloads on the v1 route, verifying SHA-1 pieces without asking for hashes, so the v1-topic
+  scenario needed no fallback.
+- Transmission 4.1.3 loads hybrid metainfo through `torrent-add` as a v1 torrent with BEP 47
+  padding files; it runs with `--no-utp`, so a build with uTP behaves the same. For it to seed,
+  the padding files are on disk as zeros.
+
+These are interoperability results for the formats and directions above. A second independent
+v2 implementation, the complete Fast Extension and the production release gates remain open.
 
 ## Review regression evidence (2026-09-08)
 

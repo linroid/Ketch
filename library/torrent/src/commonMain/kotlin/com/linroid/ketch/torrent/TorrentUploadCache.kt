@@ -3,7 +3,11 @@ package com.linroid.ketch.torrent
 import okio.IOException
 import kotlin.time.TimeSource
 
-/** One verified upload piece per peer, charged to the engine budget and evicted when idle. */
+/**
+ * One verified upload piece per peer, evicted when idle. It is charged to [budget], the engine's
+ * upload partition, so a piece larger than that partition is never read for a peer: [read]
+ * returns null and the peer's upload slot goes to another.
+ */
 internal class TorrentUploadCache(
   private val store: TorrentPieceStore,
   private val budget: TorrentBufferBudget,

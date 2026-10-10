@@ -20,7 +20,7 @@
   <string name="settings_category_network">Red</string>
   <string name="settings_category_network_description">Redes que usan las descargas</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">Trackers adicionales para torrents públicos</string>
+  <string name="settings_category_bittorrent_description">Subida y trackers adicionales</string>
   <string name="settings_category_sharing">Compartir</string>
   <string name="settings_category_sharing_description">Vincula un teléfono o un navegador para controlar este dispositivo</string>
 
@@ -531,9 +531,20 @@
   <string name="settings_proxy_footer">Para descargas HTTP al empezar o reanudarse. FTP y los torrents se conectan directamente.</string>
   <string name="settings_proxy_unsupported">%1$s no puede usar un proxy. Actualiza Ketch allí para elegir uno.</string>
 
+  <string name="settings_torrent_upload">Subida</string>
+  <string name="settings_torrent_upload_mode">Compartir con pares</string>
+  <string name="settings_torrent_upload_off">Desactivado</string>
+  <string name="settings_torrent_upload_while_downloading">Al descargar</string>
+  <string name="settings_torrent_upload_seed">Seguir sembrando</string>
+  <string name="settings_torrent_upload_off_hint">Los pares no pueden descargar nada de este dispositivo.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">Mientras se descargan tus torrents, los pares pueden descargar las piezas que ya tienes.</string>
+  <string name="settings_torrent_upload_seed_hint">Los torrents completados siguen subiendo mientras Ketch esté en marcha, hasta que los quites o desactives esto. Los torrents que esperan para descargarse van primero.</string>
+  <string name="settings_torrent_upload_limit">Límite de subida</string>
+  <string name="settings_torrent_upload_limit_hint">Compartido por todos los torrents.</string>
+  <string name="settings_torrent_upload_footer">Los pares a los que subes datos ven la dirección IP de este dispositivo. Los torrents privados solo comparten con los pares de su tracker.</string>
   <string name="settings_torrent_trackers">Trackers adicionales</string>
   <string name="settings_torrent_no_trackers">Sin trackers adicionales</string>
-  <string name="settings_torrent_remote">Cambia los trackers adicionales directamente en %1$s o en su config.toml.</string>
+  <string name="settings_torrent_remote">Cambia los ajustes de BitTorrent directamente en %1$s o en su config.toml.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">Se quitó %1$d tracker.</item>
     <item quantity="other">Se quitaron %1$d trackers.</item>
@@ -715,6 +726,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, proxy http, excepciones, cortafuegos</string>
   <string name="settings_search_trackers">Trackers añadidos a los torrents públicos</string>
   <string name="settings_search_trackers_keywords">anuncio, announce, udp, magnet, añadir trackers, rastreadores</string>
+  <string name="settings_search_upload">Compartir piezas con pares y sembrar torrents completados</string>
+  <string name="settings_search_upload_keywords">subida, sembrar, seed, seeding, compartir, ratio, pares</string>
   <string name="settings_search_pair">Controla este dispositivo desde un teléfono o un navegador</string>
   <string name="settings_search_pair_keywords">código qr, teléfono, móvil, celular, vincular, emparejar, remoto, app web, conectar</string>
   <string name="settings_search_reachable_keywords">lan, red, acceso remoto</string>

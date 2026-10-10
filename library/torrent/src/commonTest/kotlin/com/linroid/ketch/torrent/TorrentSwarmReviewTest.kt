@@ -127,7 +127,7 @@ class TorrentSwarmReviewTest {
           val budget = TorrentBufferBudget(2 * 1024 * 1024)
           val swarm = async {
             TorrentSwarm(store, network, budget,
-              uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION).run(peers)
+              uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION }).run(peers)
           }
           try {
             val first = List(4) { unchoked.receive() }

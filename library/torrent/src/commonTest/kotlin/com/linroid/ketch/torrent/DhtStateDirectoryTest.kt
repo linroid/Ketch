@@ -59,7 +59,7 @@ class DhtStateDirectoryTest {
   private fun engine(state: okio.Path, bootstrap: List<String>) = KotlinTorrentEngine(
     TorrentConfig(stateDirectory = state.toString(), dhtBootstrap = bootstrap,
       metadataTimeoutSeconds = 1),
-    allowLocalDiscovery = true,
+    allowLocalPeers = true,
     discoveryIntervalMs = 100,
   )
 

@@ -31,6 +31,8 @@ internal class FakeTorrentEngine : TorrentEngine {
     private set
   var uploadRateLimit = 0L
     private set
+  var uploadPolicy: TorrentUploadPolicy? = null
+    private set
 
   override suspend fun start() {
     started = true
@@ -78,6 +80,10 @@ internal class FakeTorrentEngine : TorrentEngine {
   override fun setUploadRateLimit(bytesPerSecond: Long) {
     uploadRateLimit = bytesPerSecond
   }
+
+  override suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
+    uploadPolicy = policy
+  }
 }
 
 /**
@@ -105,6 +111,8 @@ internal class FakeTorrentSession(
     private set
   var sessionDownloadRateLimit = 0L
     private set
+  var sessionUploadRateLimit = 0L
+    private set
   var savedResumeData: ByteArray? = null
 
   override suspend fun pause() {
@@ -125,6 +133,10 @@ internal class FakeTorrentSession(
     sessionDownloadRateLimit = bytesPerSecond
   }
 
+  override fun setUploadRateLimit(bytesPerSecond: Long) {
+    sessionUploadRateLimit = bytesPerSecond
+  }
+
   override suspend fun saveResumeData(): ByteArray? {
     return savedResumeData
   }
@@ -137,6 +149,10 @@ internal class FakeTorrentSession(
 
   fun finish() {
     _state.value = TorrentSessionState.FINISHED
+  }
+
+  fun seed() {
+    _state.value = TorrentSessionState.SEEDING
   }
 
   fun stopUnexpectedly() {

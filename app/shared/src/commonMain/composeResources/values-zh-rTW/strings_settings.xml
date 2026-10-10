@@ -20,7 +20,7 @@
   <string name="settings_category_network">網路</string>
   <string name="settings_category_network_description">下載使用的網路</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">公開種子的額外 Tracker</string>
+  <string name="settings_category_bittorrent_description">上傳和額外的 Tracker</string>
   <string name="settings_category_sharing">共享</string>
   <string name="settings_category_sharing_description">配對手機或瀏覽器來控制此裝置</string>
 
@@ -519,9 +519,20 @@
   <string name="settings_proxy_footer">適用於開始或繼續時的 HTTP 下載。FTP 和種子一律直接連線。</string>
   <string name="settings_proxy_unsupported">%1$s 無法使用代理伺服器。請先在該裝置上更新 Ketch。</string>
 
+  <string name="settings_torrent_upload">上傳</string>
+  <string name="settings_torrent_upload_mode">與對等端分享</string>
+  <string name="settings_torrent_upload_off">關閉</string>
+  <string name="settings_torrent_upload_while_downloading">下載時</string>
+  <string name="settings_torrent_upload_seed">持續做種</string>
+  <string name="settings_torrent_upload_off_hint">對等端無法從此裝置下載任何內容。</string>
+  <string name="settings_torrent_upload_while_downloading_hint">種子下載期間，對等端可以下載已有的區塊。</string>
+  <string name="settings_torrent_upload_seed_hint">Ketch 執行期間，已完成的種子會持續上傳，直到將其移除或關閉此選項。等待下載的種子優先。</string>
+  <string name="settings_torrent_upload_limit">上傳速度限制</string>
+  <string name="settings_torrent_upload_limit_hint">所有種子共用。</string>
+  <string name="settings_torrent_upload_footer">接收上傳的對等端可以看到此裝置的 IP 位址。私人種子只與其 Tracker 提供的對等端分享。</string>
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>
-  <string name="settings_torrent_remote">請在 %1$s 上開啟 Ketch，或編輯該裝置的 config.toml，變更額外的 Tracker。</string>
+  <string name="settings_torrent_remote">請在 %1$s 上開啟 Ketch，或編輯該裝置的 config.toml，變更 BitTorrent 設定。</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">已移除 %1$d 個 Tracker。</item>
   </plurals>
@@ -696,6 +707,8 @@
   <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 代理, 代理伺服器, 例外, 防火牆</string>
   <string name="settings_search_trackers">新增到公開種子的 Tracker</string>
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, 新增 tracker, 追蹤器</string>
+  <string name="settings_search_upload">與對等端分享區塊，並為已完成的種子做種</string>
+  <string name="settings_search_upload_keywords">上傳, 做種, seed, 分享, 分享率, 對等端</string>
   <string name="settings_search_pair">從手機或瀏覽器控制此裝置</string>
   <string name="settings_search_pair_keywords">qr code, QR 碼, 手機, 配對, 遠端, 網頁版, 連線</string>
   <string name="settings_search_reachable_keywords">區域網路, lan, 網路, 遠端存取</string>

@@ -110,8 +110,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 
 - **HTTP 和 HTTPS**，浏览器扩展发送下载任务时会附带页面的 Cookie 和来源信息。
 - **FTP 和 FTPS**，支持并行连接与断点续传。
-- **BitTorrent 和磁力链接** — 纯 Kotlin 引擎支持 v1、v2 和混合种子，可选择要下载的文件
-  （[详情](docs/torrent.md)）。
+- **BitTorrent 和磁力链接** — 纯 Kotlin 引擎支持 v1、v2 和混合种子，可选择要下载的文件，
+  也可选择做种（[详情](docs/torrent.md)）。
 - **HLS（`.m3u8`）和 DASH（`.mpd`）** — 将有限时长、未加密的流保存为一个媒体文件。
   HLS 主播放列表会选择带宽最高的版本（[支持范围与限制](docs/media.md)）。
 - Ketch 可注册为系统中磁力链接和 `.torrent` 文件的打开方式，

@@ -24,6 +24,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
 import com.linroid.ketch.config.defaultDbPath
@@ -40,6 +41,7 @@ import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -1184,9 +1186,10 @@ private fun printMcpUsage() {
 }
 
 /**
- * Torrent source that persists DHT state and adds the configured extra trackers and tracker list.
- * Only `ketch server` passes a [listenPort], [TorrentSettings.listenPort]: the other commands
- * may run beside it, so they let the system pick a free port.
+ * Torrent source that persists DHT state, adds the configured extra trackers and tracker list,
+ * and uploads as `[torrent] upload` and `uploadLimit` say. Only `ketch server` passes a
+ * [listenPort], [TorrentSettings.listenPort]: the other commands may run beside it, so they let
+ * the system pick a free port.
  */
 private fun torrentSource(settings: TorrentSettings, listenPort: Int = 0) = TorrentDownloadSource(
   TorrentConfig(
@@ -1194,8 +1197,17 @@ private fun torrentSource(settings: TorrentSettings, listenPort: Int = 0) = Torr
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
     trackerListUrls = settings.subscribedTrackerLists,
+    uploadPolicy = torrentUploadPolicy(settings.upload),
+    uploadRateLimit = settings.uploadLimit.bytesPerSecond,
   ),
 )
+
+/** The engine's upload policy for the `[torrent] upload` setting [mode]. */
+internal fun torrentUploadPolicy(mode: TorrentUploadMode): TorrentUploadPolicy = when (mode) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
 
 /**
  * The default config file's settings, or the defaults when there is none or it cannot be read,

@@ -25,6 +25,35 @@ class TorrentRateLimiterTest {
   }
 
   @Test
+  fun chargeLeavesDebtThatHoldsLaterRequestsUntilRepaid() = runTest {
+    val global = TorrentRateLimiter(16_384) { testScheduler.currentTime }
+    val task = TorrentRateLimiter() { testScheduler.currentTime }
+    // Asking is free: a full bucket admits work as often as it is asked.
+    assertTrue(global.canCharge(task))
+    assertTrue(global.canCharge(task))
+    // It admits a whole piece at once, which owes the rest once it is charged.
+    global.charge(65_536, task)
+    assertTrue(global.requestDelay(16_384, task) { false } > 0)
+    assertFalse(global.canCharge(task))
+    // Three seconds repay the debt; the fourth refills the block both need.
+    testScheduler.advanceTimeBy(3_000)
+    assertFalse(global.canCharge(task))
+    testScheduler.advanceTimeBy(1_000)
+    assertEquals(0L, global.requestDelay(16_384, task) { false })
+    assertTrue(global.canCharge(task))
+    // The task's own bucket holds it back just the same, and unlimited buckets never do.
+    val limited = TorrentRateLimiter(1) { testScheduler.currentTime }
+    val unlimited = TorrentRateLimiter() { testScheduler.currentTime }
+    assertTrue(unlimited.canCharge(limited))
+    unlimited.charge(1L shl 24, limited)
+    assertFalse(unlimited.canCharge(limited))
+    val free = TorrentRateLimiter()
+    val freeTask = TorrentRateLimiter()
+    free.charge(1L shl 24, freeTask)
+    assertTrue(free.canCharge(freeTask))
+  }
+
+  @Test
   fun requestRetryDelayTracksRateWithoutAnArtificialPollingThroughputCeiling() = runTest {
     val global = TorrentRateLimiter(1024 * 1024) { testScheduler.currentTime }
     val task = TorrentRateLimiter() { testScheduler.currentTime }

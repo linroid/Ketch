@@ -11,6 +11,7 @@ import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -118,6 +119,29 @@ class InstanceSettingsControllerTest {
     assertEquals(edited, store.load().torrent)
     assertEquals(edited, controller.torrent)
     assertEquals(listOf(edited), applied)
+  }
+
+  @Test
+  fun updateTorrent_uploadModeAndLimit_areSavedAndApplied() = runTest {
+    val store = RecordingConfigStore()
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      applyTorrent = { applied += it },
+    )
+    val seeding = TorrentSettings(upload = TorrentUploadMode.Seed)
+    val capped = seeding.copy(uploadLimit = SpeedLimit.kbps(512))
+
+    controller.updateTorrent(seeding)
+    advanceUntilIdle()
+    controller.updateTorrent(capped)
+    advanceUntilIdle()
+
+    assertEquals(capped, store.load().torrent)
+    assertEquals(capped, controller.torrent)
+    assertEquals(listOf(seeding, capped), applied)
   }
 
   @Test
