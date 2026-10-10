@@ -102,6 +102,27 @@ class DownloadStateTest {
   }
 
   @Test
+  fun pauseReason_awaitingFileSelection_usesWireType() {
+    val json = Json.encodeToString(PauseReason.serializer(), PauseReason.AwaitingFileSelection)
+
+    assertEquals("""{"type":"awaiting_file_selection"}""", json)
+    assertEquals(
+      PauseReason.AwaitingFileSelection,
+      Json.decodeFromString(PauseReason.serializer(), json)
+    )
+  }
+
+  @Test
+  fun completed_jsonWithoutSeeding_decodesNotSeeding() {
+    val json = """{"type":"completed","outputPath":"/a","totalBytes":1}"""
+
+    val state = Json.decodeFromString(DownloadState.serializer(), json)
+
+    assertEquals(DownloadState.Completed("/a", 1), state)
+    assertFalse((state as DownloadState.Completed).seeding)
+  }
+
+  @Test
   fun pauseReason_unknownType_decodesAsUser() {
     // A newer server may send a reason this version does not know.
     val json = """

@@ -6,6 +6,9 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Bundles everything a [DownloadSource] needs to execute a download.
@@ -49,6 +52,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   after a retryable [com.linroid.ketch.api.KetchError]; sources should
  *   keep the progress recorded in [segments] on such a retry. Sources
  *   that have no use for a setting may ignore it.
+ * @property selection the task's file selection while it runs. Its first value is the selection
+ *   the run starts with; [com.linroid.ketch.api.DownloadTask.selectFiles] sends a new revision
+ *   while it runs. Sources that implement [DownloadSource.planSelection] apply each revision live
+ *   and confirm it with [acknowledgeSelection].
  */
 class DownloadContext(
   val taskId: String,
@@ -68,7 +75,24 @@ class DownloadContext(
   /** Optional payload speed for sources whose verified progress advances in whole pieces. */
   val reportedSpeed: MutableStateFlow<Long?> = MutableStateFlow(null),
   val config: DownloadConfig = DownloadConfig.Default,
+  val selection: StateFlow<SelectionUpdate> =
+    MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
 ) {
+  private val acknowledged = MutableStateFlow(0)
+
+  /** The latest [selection] revision the source confirmed with [acknowledgeSelection]. */
+  val acknowledgedSelection: StateFlow<Int> = acknowledged.asStateFlow()
+
+  /**
+   * Confirms that this run delivers the files of [selection] revision [revision] before
+   * [DownloadSource.download] or [DownloadSource.resume] returns. Never acknowledge a revision
+   * the run can no longer act on, such as one that arrives after the transfer finished: Ketch
+   * then runs the download again, through [DownloadSource.resume], with the saved selection.
+   */
+  fun acknowledgeSelection(revision: Int) {
+    acknowledged.update { maxOf(it, revision) }
+  }
+
   /**
    * Number of connections a segmented source should use now: [maxConnections] when positive,
    * otherwise (Auto) [DownloadConfig.maxConnectionsPerDownload] from [config]. Sources must

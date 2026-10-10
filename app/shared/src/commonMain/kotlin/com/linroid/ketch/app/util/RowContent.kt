@@ -32,6 +32,7 @@ import ketch.app.shared.generated.resources.queue_position_ahead
 import ketch.app.shared.generated.resources.queue_position_next
 import ketch.app.shared.generated.resources.queue_starting
 import ketch.app.shared.generated.resources.row_canceled
+import ketch.app.shared.generated.resources.row_choose_files
 import ketch.app.shared.generated.resources.row_completed
 import ketch.app.shared.generated.resources.row_connections
 import ketch.app.shared.generated.resources.row_files
@@ -225,6 +226,7 @@ fun rowContent(
           is PauseReason.Preempted -> Res.string.row_paused_preempted.text()
           PauseReason.Shutdown -> Res.string.row_paused_shutdown.text()
           PauseReason.WaitingForCondition -> Res.string.row_waiting_for_conditions.text()
+          PauseReason.AwaitingFileSelection -> Res.string.row_choose_files.text()
           PauseReason.User -> listOfNotNull(Res.string.row_paused.text(), percent).joinText()
         },
         size = runningSize(state),

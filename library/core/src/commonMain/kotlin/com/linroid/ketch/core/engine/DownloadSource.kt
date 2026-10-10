@@ -116,6 +116,28 @@ interface DownloadSource {
   }
 
   /**
+   * Validates [request] against this source's own metadata and sizes it, with no side effects
+   * beyond checking which files exist. Sources that implement it must follow
+   * [DownloadContext.selection] while a download runs and confirm each revision they apply with
+   * [DownloadContext.acknowledgeSelection]. The default refuses: the source has no files to
+   * choose.
+   *
+   * @throws IllegalArgumentException for unknown file IDs or an empty selection
+   * @throws IllegalStateException when the file list is not known yet, or a file the task does
+   *   not own is where a newly chosen file would be saved
+   */
+  suspend fun planSelection(request: SelectionRequest): SelectionPlan =
+    throw UnsupportedOperationException("This download has no files to choose")
+
+  /**
+   * The [ResolvedSource] a task saved in [resumeState], rebuilt without network access, or
+   * `null` when the state holds none. Ketch starts a task that already resolved, such as one
+   * that waited for a file selection, from it instead of resolving again. The default returns
+   * `null`.
+   */
+  suspend fun resolveStored(resumeState: SourceResumeState): ResolvedSource? = null
+
+  /**
    * Executes a fresh download. The source is responsible for writing
    * data via [DownloadContext.fileAccessor], reporting progress via
    * [DownloadContext.onProgress], and updating segments via

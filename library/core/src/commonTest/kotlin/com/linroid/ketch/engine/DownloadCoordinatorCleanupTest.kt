@@ -17,6 +17,7 @@ import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -105,6 +106,7 @@ class DownloadCoordinatorCleanupTest {
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(record) {}
     }
   }

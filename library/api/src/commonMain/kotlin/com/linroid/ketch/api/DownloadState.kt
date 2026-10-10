@@ -19,7 +19,9 @@ import kotlin.time.Instant
  *                           Failed
  * ```
  *
- * A task paused for [PauseReason.Preempted] still waits in the queue.
+ * A task paused for [PauseReason.Preempted] still waits in the queue. One that asked to wait for
+ * a file selection goes from Queued to Paused([PauseReason.AwaitingFileSelection]) once its files
+ * are known, and a completed task whose selection gains files goes back to Queued.
  *
  * @see DownloadTask.state
  */
@@ -60,9 +62,12 @@ sealed class DownloadState {
    * @property downloadTime time spent downloading, summed over every run of the task and
    *   excluding time it was scheduled, queued or paused; `null` if unknown, such as for a
    *   task started by a version of Ketch that did not track it
-   * @property completedAt when the download finished, set once when it completes; `null` if
-   *   unknown, such as for a task that finished in a version of Ketch that did not record it,
-   *   or one reported by an older server
+   * @property completedAt when the download finished, stamped each time it completes (a
+   *   selection that adds files clears it until then); `null` if unknown, such as for a task
+   *   that finished in a version of Ketch that did not record it, or one reported by an older
+   *   server
+   * @property seeding `true` while its source shares the finished content with other peers (a
+   *   seeding torrent). Not persisted; `false` from servers that do not report it.
    */
   @Serializable
   @SerialName("completed")
@@ -71,6 +76,7 @@ sealed class DownloadState {
     val totalBytes: Long? = null,
     val downloadTime: Duration? = null,
     val completedAt: Instant? = null,
+    val seeding: Boolean = false,
   ) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */

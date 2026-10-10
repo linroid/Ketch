@@ -36,6 +36,31 @@ class KetchSubmissionTest {
   }
 
   @Test
+  fun download_sameRequestIdAfterSelectionChange_returnsTheTask() = runTest {
+    val source = SelectableSource()
+    val ketch = Ketch(httpEngine = FakeHttpEngine(), additionalSources = listOf(source))
+    try {
+      val submitted = DownloadRequest(
+        url = "pick:files",
+        selectedFileIds = setOf("0"),
+        schedule = DownloadSchedule.AfterDelay(60.seconds),
+        resolvedSource = source.resolved("pick:files", "client"),
+        requestId = "12345678-1234-1234-1234-123456789abd",
+      )
+      val task = ketch.download(submitted)
+      task.selectFiles(setOf("0", "2"))
+      assertEquals(setOf("0", "2"), task.request.selectedFileIds)
+
+      assertEquals(task.taskId, ketch.download(submitted).taskId)
+      assertEquals(task.taskId, ketch.download(submitted.copy(awaitFileSelection = true)).taskId)
+      assertEquals(setOf("0", "2"), task.request.selectedFileIds)
+      assertEquals(1, ketch.tasks.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun download_afterStoreRestart_returnsRetainedTask() = runTest {
     val store = InMemoryTaskStore()
     val first = Ketch(httpEngine = FakeHttpEngine(), taskStore = store)
