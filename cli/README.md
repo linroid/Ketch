@@ -178,7 +178,8 @@ id=$(ketch add https://example.com/file.zip)
 ketch watch "$id"
 ```
 
-Without a destination, it goes to Ketch's download folder. A destination works as for
+Without a destination, it goes to Ketch's download folder, or to the
+[category folder](#downloadcategories) there that matches it. A destination works as for
 [`ketch <url>`](#download-a-file): an existing directory, or a path ending in a separator, keeps
 the file name from the source, and a relative path is taken from the current directory when Ketch
 runs on this machine. Another device's paths are passed as they are; that server may keep
