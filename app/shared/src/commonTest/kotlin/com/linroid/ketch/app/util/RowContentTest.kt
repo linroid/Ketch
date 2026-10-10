@@ -5,10 +5,13 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
@@ -221,6 +224,29 @@ class RowContentTest {
       listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles),
       actions.menu.take(2)
     )
+    assertFalse(RowAction.Resume in actions.menu)
+  }
+
+  @Test
+  fun taskActions_awaitingSingleChoice_offersOnlyTheChoice() {
+    val state = DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+    val variants = request.copy(
+      resolvedSource = ResolvedSource(
+        url = request.url,
+        sourceType = "hls",
+        totalBytes = 3000,
+        supportsResume = false,
+        suggestedFileName = null,
+        maxSegments = 1,
+        files = listOf(SourceFile("hi", "1080p", 2000), SourceFile("lo", "480p", 1000)),
+        selectionMode = FileSelectionMode.SINGLE,
+      ),
+    )
+
+    val actions = taskActions(variants, state, local)
+
+    assertEquals(RowAction.ChooseFiles, actions.primary)
+    assertFalse(RowAction.DownloadAllFiles in actions.menu)
     assertFalse(RowAction.Resume in actions.menu)
   }
 

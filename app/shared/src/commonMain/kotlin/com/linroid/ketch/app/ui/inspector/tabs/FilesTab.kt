@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.isSpecified
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -49,6 +51,7 @@ import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchRadio
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.LanePhase
@@ -70,8 +73,9 @@ import com.linroid.ketch.app.state.FileSort
 import com.linroid.ketch.app.state.FileSortKey
 import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.TorrentFilesModel
+import com.linroid.ketch.app.state.FileSelectionModel
 import com.linroid.ketch.app.state.awaitsFileSelection
+import com.linroid.ketch.app.state.selectionMode
 import com.linroid.ketch.app.state.sortedByFiles
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
@@ -102,17 +106,19 @@ import ketch.app.shared.generated.resources.inspector_percent_spoken
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The Files tab of the inspector for a torrent: its files, with their size and progress, under a
- * map with one block per file sized by its bytes.
+ * The Files tab of the inspector for a task with several files or variants, such as a torrent:
+ * its files, with their size and progress, under a map with one block per file sized by its
+ * bytes.
  *
- * Names come from the torrent's resolved file list, by id; a device listing
+ * Names come from the task's resolved file list, by id; for a torrent, a device listing
  * [KetchFeatures.TORRENT_CONTROL] is asked for them when the task has none
- * ([TorrentFilesModel.load]), and only a file neither names is "File 12". On a device listing
- * [KetchFeatures.TORRENT_FILE_SELECTION] every file of a task that is not canceled is listed with
- * a checkbox: changes wait in a bar with Apply and Reset (Download for a task that waits for its
- * files), and a failure is posted and undone.
+ * ([FileSelectionModel.load]), and only a file neither names is "File 12". On a device listing
+ * [KetchFeatures.FILE_SELECTION] every file of a task that is not canceled is listed with a
+ * checkbox, or with a radio button when its source offers a single choice
+ * ([com.linroid.ketch.api.FileSelectionMode.SINGLE]): changes wait in a bar with Apply and Reset
+ * (Download for a task that waits for its files), and a failure is posted and undone.
  *
- * The list is virtualized and the whole tab is at most [maxHeight] tall, so a torrent of
+ * The list is virtualized and the whole tab is at most [maxHeight] tall, so a download of
  * thousands of files stays cheap; the summary, the sort and the map stay above it as it scrolls.
  * Its order is remembered ([FileSortSurface.Inspector]), and a filter field appears once there
  * are more than 20 files.
@@ -131,13 +137,17 @@ fun FilesTab(
   val presence by state.instanceManager.presence.collectAsState()
   val deviceId = row.key.deviceId
   val features = remember(presence, deviceId) { state.featuresOf(deviceId) }
-  val controller = remember(presence, deviceId) { state.torrentControllerOf(deviceId) }
+  // Only a torrent's files can be paged from its device's torrent controls.
+  val torrent = row.isTorrent
+  val controller = remember(presence, deviceId, torrent) {
+    if (torrent) state.torrentControllerOf(deviceId) else null
+  }
   val selectable = filesSelectable(row, features)
   val current by rememberUpdatedState(row)
-  // The checks, the filter and the list's state never carry over from another torrent.
+  // The checks, the filter and the list's state never carry over from another task.
   key(row.key) {
     val model = remember(controller) {
-      TorrentFilesModel(row.task, controller, state::launchCommand) { e ->
+      FileSelectionModel(row.task, controller, state::launchCommand) { e ->
         val shown = current
         state.messages.post(
           level = MessageLevel.Error,
@@ -168,7 +178,8 @@ fun FilesTab(
 
 /**
  * [FilesTab]'s content for [row]: the files of [list] (else of the row's resolved file list) in
- * [sort], each with a checkbox when [model] edits the choice.
+ * [sort], each with a checkbox, or a radio button for a single choice, when [model] edits the
+ * choice.
  */
 @Composable
 internal fun FilesTabContent(
@@ -176,7 +187,7 @@ internal fun FilesTabContent(
   modifier: Modifier = Modifier,
   maxHeight: Dp = Dp.Unspecified,
   list: List<SourceFile>? = null,
-  model: TorrentFilesModel? = null,
+  model: FileSelectionModel? = null,
   sort: FileSort = FileSortSurface.Inspector.default,
   onSort: (FileSort) -> Unit = {},
 ) {
@@ -186,14 +197,13 @@ internal fun FilesTabContent(
   val density = KetchTheme.density
   val metrics = remember(spacing, density) { FileMetrics(spacing, density) }
   val selectable = model != null
+  val single = row.request.selectionMode == FileSelectionMode.SINGLE
   val files = remember(row.segments, row.request, row.state, list, selectable) {
-    torrentFiles(row, list, selectable)
+    taskFiles(row, list, selectable)
   }
   val waiting = row.state.awaitsFileSelection
-  val all = remember(files) { files.map { it.id } }
-  val applied = remember(files, waiting) {
-    if (waiting) all.toSet() else files.filter { it.selected }.mapTo(HashSet()) { it.id }
-  }
+  // A task that waits starts from its source's default, which the files mark as selected.
+  val applied = remember(files) { files.filter { it.selected }.mapTo(HashSet()) { it.id } }
   if (model != null) LaunchedEffect(model, applied) { model.sync(applied) }
   val checked = model?.checked(applied) ?: applied
   val chosen = remember(files) { files.filter { it.selected } }
@@ -292,6 +302,7 @@ internal fun FilesTabContent(
         checked = checked,
         applied = applied,
         waiting = waiting,
+        single = single,
       )
     }
     if (shown.isEmpty()) {
@@ -315,7 +326,9 @@ internal fun FilesTabContent(
               // Nothing downloads before the files are chosen.
               progress = !waiting,
               check = model?.let { m ->
-                FileCheck(checked = file.id in checked) { m.toggle(listOf(file.id), applied) }
+                FileCheck(checked = file.id in checked, single = single) {
+                  if (single) m.choose(file.id, applied) else m.toggle(listOf(file.id), applied)
+                }
               },
             )
           }
@@ -328,15 +341,16 @@ internal fun FilesTabContent(
 /**
  * Under the map while the checks differ from the files that download, or always for a task that
  * waits for its files: how many files are checked and their size, with Reset and Apply
- * (Download); then why a click changed nothing, or what Apply does.
+ * (Download); then why a click changed nothing, or what Apply does to checked files.
  */
 @Composable
 private fun ChoiceBar(
-  model: TorrentFilesModel,
-  files: List<TorrentFile>,
+  model: FileSelectionModel,
+  files: List<TaskFile>,
   checked: Set<String>,
   applied: Set<String>,
   waiting: Boolean,
+  single: Boolean,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -385,7 +399,8 @@ private fun ChoiceBar(
   }
   val note = when {
     model.keepOne -> Res.string.inspector_files_keep_one
-    dirty && !waiting -> Res.string.inspector_files_hint
+    // About checked files, which a single choice has none of.
+    dirty && !waiting && !single -> Res.string.inspector_files_hint
     else -> null
   }
   if (note != null) {
@@ -414,12 +429,15 @@ private fun SortChip(sort: FileSort, orders: List<FileOrder>, onSort: (FileSort)
   }
 }
 
-/** A file's checkbox: whether it is [checked], and what clicking it does. */
-private class FileCheck(val checked: Boolean, val onToggle: () -> Unit)
+/**
+ * A file's checkbox, or its radio button when it is one variant of a [single] choice: whether it
+ * is [checked], and what clicking it does.
+ */
+private class FileCheck(val checked: Boolean, val single: Boolean, val onToggle: () -> Unit)
 
 @Composable
 private fun FileRow(
-  file: TorrentFile,
+  file: TaskFile,
   phase: LanePhase,
   metrics: FileMetrics,
   chip: Boolean,
@@ -439,16 +457,22 @@ private fun FileRow(
   } else {
     Res.string.inspector_file_description_no_share.text(name, size)
   }.resolve()
-  val toggle = if (check != null) {
-    Modifier
+  val toggle = when {
+    check == null -> Modifier
+    check.single -> Modifier
+      .clip(KetchTheme.shapes.sm)
+      .selectable(
+        selected = check.checked,
+        role = Role.RadioButton,
+        onClick = check.onToggle,
+      )
+    else -> Modifier
       .clip(KetchTheme.shapes.sm)
       .toggleable(
         value = check.checked,
         role = Role.Checkbox,
         onValueChange = { check.onToggle() },
       )
-  } else {
-    Modifier
   }
   KetchTooltip(text = file.pathText.resolve()) {
     Row(
@@ -460,7 +484,9 @@ private fun FileRow(
         .then(toggle)
         .clearAndSetSemantics { contentDescription = description },
     ) {
-      if (check != null) {
+      if (check?.single == true) {
+        KetchRadio(selected = check.checked, onClick = null, modifier = Modifier.size(spacing.s5))
+      } else if (check != null) {
         KetchCheckbox(
           checked = check.checked,
           onCheckedChange = null,
@@ -549,18 +575,18 @@ private class FileMetrics(spacing: KetchSpacing, density: KetchDensity) {
 }
 
 /**
- * One file of a torrent.
+ * One file or variant of a task, such as a file of a torrent.
  *
- * @property id the file's id in the torrent's resolved file list.
- * @property path its path in the torrent, folders included; `null` when the list names it not.
- * @property start where it begins in the torrent's bytes.
+ * @property id the file's id in the task's resolved file list.
+ * @property path its path in the download, folders included; `null` when the list names it not.
+ * @property start where it begins in the download's bytes.
  * @property size its size in bytes, `-1` when unknown.
  * @property downloaded bytes downloaded so far.
- * @property number its place in the torrent, counting from 1, which names an unnamed file.
+ * @property number its place in the list, counting from 1, which names an unnamed file.
  * @property selected whether the task downloads it.
  */
 @Immutable
-internal data class TorrentFile(
+internal data class TaskFile(
   val id: String,
   val path: String?,
   val start: Long,
@@ -595,41 +621,55 @@ internal data class TorrentFile(
 }
 
 /**
- * Whether the Files tab of [row] lets the user choose its files: its device, which reports
- * [features], changes a torrent's files and the task is not canceled.
+ * Whether [row]'s source offers files or variants to choose: its resolved file list names some,
+ * or it is a torrent, whose names its device's torrent controls can list.
+ */
+internal fun hasFileChoice(row: TaskRow): Boolean =
+  row.request.resolvedSource?.files.orEmpty().isNotEmpty() || row.isTorrent
+
+/**
+ * Whether the Files tab of [row] lets the user choose its files: its source offers a choice
+ * ([hasFileChoice]), its device, which reports [features], changes them
+ * ([KetchFeatures.FILE_SELECTION]), and the task is not canceled.
  */
 internal fun filesSelectable(row: TaskRow, features: Set<String>): Boolean =
-  row.isTorrent && KetchFeatures.TORRENT_FILE_SELECTION in features &&
+  hasFileChoice(row) && KetchFeatures.FILE_SELECTION in features &&
     row.state !is DownloadState.Canceled
 
 /**
- * The files [row]'s torrent downloads, in torrent order: from its segments, one per selected
- * file, once it runs, or else from its resolved file list and selection. Names come from [list],
- * else the resolved list, by id. When [selectable], every file of the list is listed, those it
- * does not download too, with the progress of its segment.
+ * The files [row] downloads, in the source's order. A torrent's come from its segments, one per
+ * selected file, once it runs; otherwise they come from the resolved file list and the selection,
+ * whose default is every file, or the first variant of a single choice. Names come from [list],
+ * else the resolved list, by id. When [selectable], every file of the list is listed, those the
+ * task does not download too, with the progress of its torrent segment, or of the whole task for
+ * the one variant of a single choice.
  */
-internal fun torrentFiles(
+internal fun taskFiles(
   row: TaskRow,
   list: List<SourceFile>? = null,
   selectable: Boolean = false,
-): List<TorrentFile> {
+): List<TaskFile> {
   val source = list ?: row.request.resolvedSource?.files.orEmpty()
   val completed = row.state is DownloadState.Completed
+  val chosenIds = chosenFiles(row, source)
   if (selectable && source.isNotEmpty()) {
-    val bySegment = row.segments.associateBy { it.index.toString() }
-    val selected = row.request.selectedFileIds
-    val waiting = row.state.awaitsFileSelection
+    // Only a torrent's segments are its files.
+    val bySegment = if (row.isTorrent) row.segments.associateBy { it.index.toString() } else null
+    val single = row.request.selectionMode == FileSelectionMode.SINGLE
     var offset = 0L
     return source.mapIndexed { index, file ->
-      val chosen = waiting || selected.isEmpty() || file.id in selected
-      val segment = bySegment[file.id]
+      val chosen = chosenIds == null || file.id in chosenIds
+      val segment = bySegment?.get(file.id)
       val size = segment?.totalBytes ?: file.size
       val downloaded = when {
         !chosen -> 0
         completed && size >= 0 -> size
-        else -> segment?.downloadedBytes?.coerceIn(0, size.coerceAtLeast(0)) ?: 0
+        segment != null -> segment.downloadedBytes.coerceIn(0, size.coerceAtLeast(0))
+        single && !row.state.awaitsFileSelection ->
+          row.downloadedBytes.coerceIn(0, size.coerceAtLeast(0))
+        else -> 0
       }
-      TorrentFile(
+      TaskFile(
         id = file.id,
         path = file.name,
         start = segment?.start ?: offset,
@@ -641,11 +681,11 @@ internal fun torrentFiles(
     }
   }
   val names = source.associate { it.id to it.name }
-  if (row.segments.isNotEmpty()) {
+  if (row.isTorrent && row.segments.isNotEmpty()) {
     return row.segments.sortedBy { it.start }.map { segment ->
       val id = segment.index.toString()
       val size = segment.totalBytes
-      TorrentFile(
+      TaskFile(
         id = id,
         path = names[id],
         start = segment.start,
@@ -655,11 +695,10 @@ internal fun torrentFiles(
       )
     }
   }
-  val selected = row.request.selectedFileIds
   var offset = 0L
-  return source.withIndex().filter { (_, file) -> selected.isEmpty() || file.id in selected }
+  return source.withIndex().filter { (_, file) -> chosenIds == null || file.id in chosenIds }
     .map { (index, file) ->
-      TorrentFile(
+      TaskFile(
         id = file.id,
         path = file.name,
         start = offset,
@@ -671,22 +710,44 @@ internal fun torrentFiles(
 }
 
 /**
- * How many files [torrentFiles] lists for [row], without building them: every file of its
+ * The files of [source] that [row] downloads, or starts from while it waits for a choice: its
+ * selection, else the first variant of a single choice; `null` for every file.
+ */
+private fun chosenFiles(row: TaskRow, source: List<SourceFile>): Set<String>? {
+  val selected = row.request.selectedFileIds
+  return when {
+    !row.state.awaitsFileSelection && selected.isNotEmpty() -> selected
+    row.request.selectionMode == FileSelectionMode.SINGLE ->
+      source.take(1).mapTo(HashSet()) { it.id }
+    else -> null
+  }
+}
+
+/** Bytes [this] task has downloaded, as its state reports them. */
+private val TaskRow.downloadedBytes: Long
+  get() = when (val state = state) {
+    is DownloadState.Downloading -> state.progress.downloadedBytes
+    is DownloadState.Paused -> state.progress.downloadedBytes
+    else -> 0
+  }
+
+/**
+ * How many files [taskFiles] lists for [row], without building them: every file of its
  * resolved list when [selectable].
  */
-internal fun torrentFileCount(row: TaskRow, selectable: Boolean = false): Int {
+internal fun taskFileCount(row: TaskRow, selectable: Boolean = false): Int {
   val files = row.request.resolvedSource?.files.orEmpty()
   if (selectable && files.isNotEmpty()) return files.size
-  if (row.segments.isNotEmpty()) return row.segments.size
-  val selected = row.request.selectedFileIds
-  return if (selected.isEmpty()) files.size else files.count { it.id in selected }
+  if (row.isTorrent && row.segments.isNotEmpty()) return row.segments.size
+  val chosen = chosenFiles(row, files) ?: return files.size
+  return files.count { it.id in chosen }
 }
 
 /**
  * The two lines over the file list: how many files are done, such as "9 of 14 files done", and
- * their bytes, such as "3.2 of 7.9 GB", with the files the torrent [listed] but does not download.
+ * their bytes, such as "3.2 of 7.9 GB", with the files the task [listed] but does not download.
  */
-internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<UiText, UiText> {
+internal fun filesSummary(files: List<TaskFile>, listed: Int): Pair<UiText, UiText> {
   val done = files.count { it.isDone }
   val count = files.size
   val title = when {
@@ -708,7 +769,7 @@ internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<UiText, U
 }
 
 /** What the file map says to a screen reader: "300 files, 100 done, 33 percent". */
-private fun filesMapDescription(files: List<TorrentFile>): UiText {
+private fun filesMapDescription(files: List<TaskFile>): UiText {
   val known = files.filter { it.size > 0 }
   val total = known.sumOf { it.size }
   val downloaded = known.sumOf { it.downloaded.coerceIn(0, it.size) }
@@ -718,7 +779,7 @@ private fun filesMapDescription(files: List<TorrentFile>): UiText {
 }
 
 /** These files in [sort] order; Selected first follows the files the task downloads. */
-internal fun List<TorrentFile>.sortedFor(sort: FileSort): List<TorrentFile> =
+internal fun List<TaskFile>.sortedFor(sort: FileSort): List<TaskFile> =
   sortedByFiles(sort) { file ->
     FileSortKey(
       path = file.path,
@@ -730,16 +791,16 @@ internal fun List<TorrentFile>.sortedFor(sort: FileSort): List<TorrentFile> =
   }
 
 /** The files whose path contains [query], ignoring case; all of them for a blank query. */
-internal fun List<TorrentFile>.matching(query: String): List<TorrentFile> {
+internal fun List<TaskFile>.matching(query: String): List<TaskFile> {
   val text = query.trim()
   return if (text.isEmpty()) this else filter { it.path?.contains(text, ignoreCase = true) == true }
 }
 
 /**
- * One block per file of known, non-zero size, at its place in the torrent; neighbouring files
+ * One block per file of known, non-zero size, at its place in the download; neighbouring files
  * that are done share one block, which the map draws as one run anyway.
  */
-internal fun List<TorrentFile>.blocks(): List<Segment> {
+internal fun List<TaskFile>.blocks(): List<Segment> {
   val blocks = ArrayList<Segment>()
   for (file in sortedBy { it.start }) {
     if (file.size <= 0) continue
@@ -755,7 +816,7 @@ internal fun List<TorrentFile>.blocks(): List<Segment> {
   return blocks
 }
 
-/** Torrents with more files than this get a filter field. */
+/** Tasks with more files than this get a filter field. */
 internal const val FILTER_THRESHOLD: Int = 20
 
 /** What a size or share reads while it is unknown. */

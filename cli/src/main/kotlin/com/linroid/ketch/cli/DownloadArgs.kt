@@ -31,7 +31,10 @@ internal sealed interface DownloadArgs {
     val headers: Map<String, String> = emptyMap(),
     /** `--proxy` or `--no-proxy`, in place of the configured proxy; `null` for that one. */
     val proxy: ProxyConfig? = null,
-    /** `--files`: the IDs of the files of a torrent to download; empty for every file. */
+    /**
+     * `--files`: the IDs of the files to download of a download with several, such as a torrent,
+     * one for a choice of variants; empty for the source's default (every file).
+     */
     val fileIds: Set<String> = emptySet(),
     /** `--list-files`: list the files of the URL instead of downloading it. */
     val listFiles: Boolean = false,

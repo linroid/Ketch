@@ -45,8 +45,9 @@ sealed class PauseReason {
 
   /**
    * Waiting for [DownloadTask.selectFiles], as [DownloadRequest.awaitFileSelection] asked once
-   * the file list was known. Holds no download slot and has no queue position;
-   * [DownloadTask.resume] downloads every file. Older clients decode it as [User].
+   * its files or variants were known. Holds no download slot and has no queue position;
+   * [DownloadTask.resume] downloads the source's [default][ResolvedSource.defaultSelection].
+   * Older clients decode it as [User].
    */
   data object AwaitingFileSelection : PauseReason()
 }

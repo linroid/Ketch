@@ -98,7 +98,8 @@ data class TaskCommandRecord(
 
 /**
  * Whether this record is a task that waits for a file selection: it asked to
- * ([DownloadRequest.awaitFileSelection]), chose no files, and stopped once its source was known,
+ * ([DownloadRequest.awaitFileSelection]), chose no files or variant, and stopped once its source
+ * listed several, whatever its [com.linroid.ketch.api.FileSelectionMode],
  * before it reserved an output path or saved any progress. A user pause while the file list is
  * still being looked up leaves no source type, so it stays a plain pause.
  */

@@ -41,7 +41,7 @@ class RemoteKetchTest {
     val remote = RemoteKetch("remote.example", 8642, null, false, MockEngine { request ->
       paths += request.url.encodedPath
       respond(
-        Json.encodeToString(status(features = setOf(KetchFeatures.TORRENT_FILE_SELECTION))),
+        Json.encodeToString(status(features = setOf(KetchFeatures.FILE_SELECTION))),
         HttpStatusCode.OK,
         headersOf(HttpHeaders.ContentType, "application/json"),
       )
