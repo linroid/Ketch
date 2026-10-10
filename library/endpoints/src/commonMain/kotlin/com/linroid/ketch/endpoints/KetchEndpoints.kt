@@ -30,6 +30,15 @@ import kotlinx.serialization.Serializable
  * - `PUT    /api/tasks/{id}/speed-limit`  — set task speed limit
  * - `PUT    /api/tasks/{id}/priority`     — set task priority
  * - `PUT    /api/tasks/{id}/connections`  — set task connections
+ * - `PUT    /api/tasks/{id}/files`        — choose the files of a torrent task
+ *
+ * ### Torrents
+ * - `GET /api/torrents/capabilities`  — what the torrent controller can do
+ * - `GET /api/torrents/{id}`          — a torrent task's snapshot
+ * - `GET /api/torrents/{id}/files`    — a page of its files (`?limit&cursor&sort&desc`)
+ * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
+ * - `PUT /api/torrents/{id}/seeding`  — start or stop seeding it, guarded by a revision
+ * - `GET /api/torrents/{id}/events`   — SSE stream of its snapshots
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -111,6 +120,58 @@ class Api {
       @Serializable
       @Resource("connections")
       data class Connections(val parent: ById)
+
+      /** The files a torrent task downloads; takes a `FileSelectionRequest`. */
+      @Serializable
+      @Resource("files")
+      data class Files(val parent: ById)
+    }
+  }
+
+  /** Typed torrent controls, which servers listing `torrent.control` serve. */
+  @Serializable
+  @Resource("torrents")
+  data class Torrents(val parent: Api = Api()) {
+
+    @Serializable
+    @Resource("capabilities")
+    data class Capabilities(val parent: Torrents = Torrents())
+
+    @Serializable
+    @Resource("{id}")
+    data class ById(
+      val parent: Torrents = Torrents(),
+      val id: String,
+    ) {
+
+      /**
+       * One page of the task's files, sorted by [sort] (a `TorrentFileOrder` wire name, metainfo
+       * order by default), reversed when [desc] is true.
+       */
+      @Serializable
+      @Resource("files")
+      data class Files(
+        val parent: ById,
+        val limit: Int? = null,
+        val cursor: String? = null,
+        val sort: String? = null,
+        val desc: Boolean? = null,
+      )
+
+      /** Chooses the task's files; takes a `TorrentSelectionRequest`. */
+      @Serializable
+      @Resource("selection")
+      data class Selection(val parent: ById)
+
+      /** Starts or stops seeding the task; takes a `TorrentSeedingRequest`. */
+      @Serializable
+      @Resource("seeding")
+      data class Seeding(val parent: ById)
+
+      /** SSE stream: `snapshot` events, then `removed` or `error` before it closes. */
+      @Serializable
+      @Resource("events")
+      data class Events(val parent: ById)
     }
   }
 
