@@ -150,26 +150,29 @@ jobs:
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Read Xcode build version
-        id: xcode
+      - name: Read toolchain versions
+        id: toolchain
         run: |
-          echo "build=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+          echo "xcode=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+          kotlin=$(sed -n 's/^kotlin = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          echo "kotlin=$kotlin" >> "$GITHUB_OUTPUT"
 
-      # setup-gradle caches ~/.gradle, but the native toolchain and compiler caches live here.
-      # Refresh the cache per commit, restoring only from a compatible toolchain.
+      # setup-gradle caches ~/.gradle, but the native toolchain and the compiler caches of
+      # third-party libraries live here. They only change with the dependencies, so the cache is
+      # saved once per dependency set (about 450 MB) rather than per commit. A dependency update
+      # restores the previous set for the same Kotlin and Xcode and only builds the changed
+      # libraries' caches; a Kotlin update starts afresh, leaving the old distribution behind.
       - name: Cache Kotlin/Native
         uses: actions/cache@v4
         with:
           path: ~/.konan
           key: >-
             ${{ format('konan-{0}-{1}-{2}-{3}-{4}', runner.os, runner.arch,
-                steps.xcode.outputs.build,
-                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties'),
-                github.sha) }}
+                steps.toolchain.outputs.xcode, steps.toolchain.outputs.kotlin,
+                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
           restore-keys: >-
             ${{ format('konan-{0}-{1}-{2}-{3}-', runner.os, runner.arch,
-                steps.xcode.outputs.build,
-                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
+                steps.toolchain.outputs.xcode, steps.toolchain.outputs.kotlin) }}
 
       - name: Run iOS simulator tests
         run: ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
