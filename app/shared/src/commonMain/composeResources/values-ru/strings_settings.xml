@@ -474,6 +474,25 @@
   <string name="settings_network_none_found">Сети не найдены. Подключитесь к Wi-Fi или Ethernet и обновите список.</string>
   <string name="settings_network_http_only">Только HTTP. FTP и торренты используют системную сеть по умолчанию.</string>
   <string name="settings_network_gone">%1$s · не подключена</string>
+  <string name="settings_proxy">Прокси</string>
+  <string name="settings_proxy_mode">Подключение</string>
+  <string name="settings_proxy_system">Системный прокси</string>
+  <string name="settings_proxy_direct">Без прокси</string>
+  <string name="settings_proxy_manual">Свой прокси</string>
+  <string name="settings_proxy_system_hint">Использует настройки прокси устройства %1$s.</string>
+  <string name="settings_proxy_address">Адрес</string>
+  <string name="settings_proxy_address_hint">HTTP- или SOCKS5-прокси.</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <string name="settings_proxy_address_invalid">Укажите http://host:port или socks5://host:port</string>
+  <string name="settings_proxy_username">Имя пользователя</string>
+  <string name="settings_proxy_password">Пароль</string>
+  <string name="settings_proxy_optional">Необязательно</string>
+  <string name="settings_proxy_bypass">Подключаться напрямую к</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">Хосты, IP-адреса или диапазоны через запятую. Поддомены тоже учитываются.</string>
+  <string name="settings_proxy_bypass_invalid">%1$s — не хост, не адрес и не диапазон</string>
+  <string name="settings_proxy_footer">Для HTTP-загрузок при запуске или возобновлении. FTP и торренты подключаются напрямую.</string>
+  <string name="settings_proxy_unsupported">%1$s не может использовать прокси. Обновите там Ketch, чтобы выбрать его.</string>
 
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>
@@ -669,6 +688,8 @@
   <string name="settings_search_connections_keywords">сегменты, потоки, параллельно, части</string>
   <string name="settings_search_networks">Сети, через которые идут загрузки</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, вайфай, ethernet, интерфейс, vpn, несколько сетей</string>
+  <string name="settings_search_proxy">Как загрузки подключаются к серверам</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http-прокси, прокси, исключения, брандмауэр</string>
   <string name="settings_search_trackers">Трекеры, добавляемые к публичным торрентам</string>
   <string name="settings_search_trackers_keywords">анонс, announce, udp, magnet, добавить трекеры</string>
   <string name="settings_search_pair">Управлять этим устройством с телефона или из браузера</string>

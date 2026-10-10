@@ -4,8 +4,11 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
@@ -145,6 +148,7 @@ class RemoteKetch internal constructor(
     request: DownloadRequest,
   ): DownloadTask {
     log.i { "Download: url=${redactUrl(request.url)}" }
+    requireProxySupport(request.proxy)
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -205,6 +209,7 @@ class RemoteKetch internal constructor(
 
   override suspend fun updateConfig(config: DownloadConfig) {
     log.d { "Updating config: speedLimit=${config.speedLimit}" }
+    requireProxySupport(config.proxy)
     val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
       setBody(config)
@@ -215,6 +220,17 @@ class RemoteKetch internal constructor(
       throw IllegalArgumentException(message ?: "Invalid download settings")
     }
     checkSuccess(response)
+  }
+
+  /**
+   * Refuses [proxy] unless the server lists [KetchFeatures.PROXY]: an older server would ignore
+   * it and connect without the proxy.
+   */
+  private suspend fun requireProxySupport(proxy: ProxyConfig?) {
+    if (proxy == null || proxy.mode == ProxyMode.SYSTEM) return
+    if (KetchFeatures.PROXY !in status().features) {
+      throw UnsupportedOperationException("This device cannot use a proxy")
+    }
   }
 
   override suspend fun networkInterfaces(): NetworkInterfaces {

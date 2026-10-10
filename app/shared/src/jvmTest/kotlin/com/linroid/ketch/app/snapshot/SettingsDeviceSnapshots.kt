@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -87,6 +88,21 @@ class SettingsDeviceSnapshots {
       sizes = listOf(Pane),
       themes = listOf(SnapshotTheme.Light),
       setup = DeviceSetup(networksFail = true),
+    )
+  }
+
+  @Test
+  fun network_manualProxy_showsAddressCredentialsAndBypass() {
+    pageSnapshots(
+      name = "settings-network-proxy",
+      category = SettingsCategory.Network,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(
+        proxy = ProxyConfig.manual(
+          "socks5://alex:secret@10.0.0.2:1080",
+          bypass = listOf("*.lan", "10.0.0.0/8"),
+        ),
+      ),
     )
   }
 
@@ -246,6 +262,7 @@ private fun PageFrame(
  * @property pendingPort a port saved after sharing started, which asks for a restart.
  * @property remote whether the pages show the NAS, a remote device, instead of this one.
  * @property networksFail whether asking the device for its networks fails.
+ * @property proxy how the device's downloads reach servers.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -272,6 +289,7 @@ private data class DeviceSetup(
   val pendingPort: Int? = null,
   val remote: Boolean = false,
   val networksFail: Boolean = false,
+  val proxy: ProxyConfig = ProxyConfig.System,
 )
 
 /**
@@ -285,7 +303,10 @@ private class DeviceEnvironment(
   density: DensityMode,
 ) : SnapshotEnvironment {
   override val data = SampleData.downloads(
-    SampleData.DOWNLOAD_CONFIG.copy(defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR),
+    SampleData.DOWNLOAD_CONFIG.copy(
+      defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR,
+      proxy = setup.proxy,
+    ),
   ).let { sample ->
     SampleData(
       tasks = sample.tasks,

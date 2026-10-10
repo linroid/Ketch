@@ -105,6 +105,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   Downloads kannst du Verbindungen hinzufügen oder entfernen.
 - **Mehrere Netzwerke gleichzeitig** — Verteile einen Download auf WLAN, Ethernet und unter
   Android auch Mobilfunk ([so funktioniert es](docs/multiple-networks.md)).
+- **Proxy** — Über den System-Proxy, einen HTTP- oder SOCKS5-Proxy mit Benutzername und Passwort
+  oder ohne Proxy herunterladen, mit direkter Verbindung zu den Hosts deiner Wahl; auch für einen
+  einzelnen Download ([Details](docs/proxy.md)).
 - **Pausieren und fortsetzen, auch nach einem Neustart** — Ketch prüft vor dem Fortsetzen, ob sich
   die Datei auf dem Server geändert hat, und versucht fehlgeschlagene Verbindungen automatisch
   erneut.
@@ -241,7 +244,6 @@ Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
 - **Medienextraktion** — Medien von Webseiten speichern
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
 - **Prüfsummen** — Downloads gegen einen angegebenen oder vom Server veröffentlichten Hash prüfen
-- **Proxy** — Über einen HTTP-, SOCKS5- oder Systemproxy herunterladen, mit Ausnahmeliste
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer
   Verbindungen, damit der Download nicht auf die langsamste warten muss
 - **Stillstand erkennen und Wiederholungen einstellen** — Neu verbinden, wenn keine Daten mehr

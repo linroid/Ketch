@@ -450,6 +450,25 @@
   <string name="settings_network_none_found">네트워크를 찾지 못했습니다. Wi-Fi나 이더넷에 연결한 다음 새로 고치세요.</string>
   <string name="settings_network_http_only">HTTP에만 적용됩니다. FTP와 토렌트는 시스템 기본값을 사용합니다.</string>
   <string name="settings_network_gone">%1$s · 연결되지 않음</string>
+  <string name="settings_proxy">프록시</string>
+  <string name="settings_proxy_mode">연결 방식</string>
+  <string name="settings_proxy_system">시스템 프록시</string>
+  <string name="settings_proxy_direct">프록시 사용 안 함</string>
+  <string name="settings_proxy_manual">수동 프록시</string>
+  <string name="settings_proxy_system_hint">%1$s의 프록시 설정을 따릅니다.</string>
+  <string name="settings_proxy_address">주소</string>
+  <string name="settings_proxy_address_hint">HTTP 또는 SOCKS5 프록시입니다.</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <string name="settings_proxy_address_invalid">http://host:port 또는 socks5://host:port 형식을 사용하세요</string>
+  <string name="settings_proxy_username">사용자 이름</string>
+  <string name="settings_proxy_password">비밀번호</string>
+  <string name="settings_proxy_optional">선택 사항</string>
+  <string name="settings_proxy_bypass">직접 연결할 대상</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">호스트, IP 주소 또는 범위를 쉼표로 구분해 입력하세요. 하위 도메인도 포함됩니다.</string>
+  <string name="settings_proxy_bypass_invalid">%1$s은(는) 호스트, 주소 또는 범위가 아닙니다</string>
+  <string name="settings_proxy_footer">HTTP 다운로드가 시작되거나 재개될 때 적용됩니다. FTP와 토렌트는 직접 연결합니다.</string>
+  <string name="settings_proxy_unsupported">%1$s에서는 프록시를 사용할 수 없습니다. 프록시를 선택하려면 해당 기기의 Ketch를 업데이트하세요.</string>
 
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
@@ -624,6 +643,8 @@
   <string name="settings_search_connections_keywords">세그먼트, 스레드, 병렬, 분할, 연결</string>
   <string name="settings_search_networks">다운로드에 사용할 네트워크</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, 와이파이, 이더넷, 유선, 인터페이스, vpn, 다중 네트워크</string>
+  <string name="settings_search_proxy">다운로드가 서버에 연결하는 방식</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http 프록시, 프록시, 예외, 방화벽</string>
   <string name="settings_search_trackers">공개 토렌트에 추가할 트래커</string>
   <string name="settings_search_trackers_keywords">announce, udp, 마그넷, 트래커 추가</string>
   <string name="settings_search_pair">휴대폰이나 브라우저에서 이 기기 제어</string>

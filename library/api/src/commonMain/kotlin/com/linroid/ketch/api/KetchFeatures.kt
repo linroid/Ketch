@@ -10,6 +10,9 @@ object KetchFeatures {
   /** [DownloadTask.queuePosition] reports positions. */
   const val QUEUE_POSITION: String = "task.queuePosition"
 
+  /** [DownloadConfig.proxy] and [DownloadRequest.proxy] are applied to HTTP(S) downloads. */
+  const val PROXY: String = "http.proxy"
+
   /** Finite, clear single-stream HLS and DASH downloads, with restart rather than byte resume. */
   const val FINITE_MEDIA: String = "media.finite"
 
@@ -24,7 +27,7 @@ object KetchFeatures {
 
   /** Every feature this version of Ketch supports, including optional sources. */
   val ALL: Set<String> = setOf(
-    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
+    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS
   )
 }

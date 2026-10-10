@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import io.ktor.client.HttpClient
@@ -12,6 +13,7 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -319,6 +321,66 @@ class KtorHttpEngineTest {
         sent,
       )
       assertTrue(requests.drop(1).all { it.headers[HttpHeaders.Cookie] == null })
+    }
+  }
+
+  @Test
+  fun withProxy_ownClient_refusesProxiesOtherThanTheSystems() = runTest {
+    withResponse(HttpStatusCode.OK, "", "Content-Length" to "0") { engine ->
+      assertFalse(engine.supportsProxies)
+      assertTrue(engine.withProxy(ProxyConfig.System) === engine)
+      assertFailsWith<KetchError.Unsupported> { engine.withProxy(ProxyConfig.Direct) }
+    }
+  }
+
+  @Test
+  fun download_throughAnotherProxy_followsItsOwnRedirects() = runTest {
+    val requests = mutableListOf<String>()
+    val transports = object : HttpTransports {
+      private val clients = mutableMapOf<String, HttpClient>()
+
+      override fun supports(proxy: ProxyConfig): Boolean = true
+
+      override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient {
+        // Each proxy is sent to a mirror of its own.
+        val name = proxy.address?.host ?: "direct"
+        val client = clients.getOrPut(name) {
+          HttpClient(MockEngine { request ->
+            requests += "$name ${request.method.value} ${request.url.host}"
+            if (request.url.host == "origin.example") {
+              val mirror = "https://mirror-$name.example/file"
+              respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, mirror))
+            } else {
+              respond("abcdefgh", HttpStatusCode.OK, headersOf(HttpHeaders.ContentLength, "8"))
+            }
+          }) { followRedirects = false }
+        }
+        return RoutedClient(client, ProxyRoute.Direct)
+      }
+
+      override fun close() {
+        clients.values.forEach { it.close() }
+      }
+    }
+    val engine = KtorHttpEngine(transports, logRequests = false, userAgent = null)
+    try {
+      val first = engine.withProxy(ProxyConfig.manual("http://first:3128"))
+      val second = engine.withProxy(ProxyConfig.manual("http://second:3128"))
+      first.head(URL)
+      second.head(URL)
+      first.download(URL, null) {}
+      second.download(URL, null) {}
+
+      assertEquals(
+        listOf(
+          "first HEAD origin.example", "first HEAD mirror-first.example",
+          "second HEAD origin.example", "second HEAD mirror-second.example",
+          "first GET mirror-first.example", "second GET mirror-second.example",
+        ),
+        requests,
+      )
+    } finally {
+      engine.close()
     }
   }
 

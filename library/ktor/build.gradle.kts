@@ -31,7 +31,18 @@ kotlin {
 
   jvm()
 
+  // OkHttp transports shared between the JVM and Android
+  applyDefaultHierarchyTemplate()
   sourceSets {
+    val jvmAndAndroidMain by creating {
+      dependsOn(commonMain.get())
+      dependencies {
+        implementation(libs.ktor.client.okhttp)
+      }
+    }
+    androidMain.get().dependsOn(jvmAndAndroidMain)
+    jvmMain.get().dependsOn(jvmAndAndroidMain)
+
     commonMain.dependencies {
       api(projects.library.core)
       implementation(libs.ktor.client.core)

@@ -46,6 +46,20 @@ maxConnectionsPerHost = 16
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# How HTTP(S) downloads reach servers; FTP and BitTorrent always connect
+# directly. "system" (the default) follows the https_proxy, http_proxy,
+# all_proxy and no_proxy environment variables, then the system's settings;
+# "direct" uses no proxy; "manual" uses url, an http:// or socks5:// proxy.
+# Hosts in bypass (names, which match their subdomains too, IP addresses or
+# CIDR ranges) and this machine are always reached directly. The apps edit
+# this under Settings > Network.
+# [download.proxy]
+# mode = "manual"
+# url = "socks5://127.0.0.1:1080"
+# username = "me"
+# password = "secret"
+# bypass = ["*.lan", "10.0.0.0/8"]
+
 # Category folders: a download that does not choose a folder is saved in the
 # folder of the first category it matches, inside defaultDirectory. A download
 # matches by file extension or media type (either is enough) and, when hosts

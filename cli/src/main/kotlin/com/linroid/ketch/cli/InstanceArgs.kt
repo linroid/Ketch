@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import java.util.UUID
 
@@ -28,6 +29,8 @@ internal sealed interface InstanceCommand {
     val headers: Map<String, String> = emptyMap(),
     val requestId: String? = null,
     val json: Boolean = false,
+    /** `--proxy` or `--no-proxy`, in place of the instance's proxy; `null` for that one. */
+    val proxy: ProxyConfig? = null,
   ) : InstanceCommand
 
   /** `ketch list`: prints the tasks. */
@@ -65,8 +68,8 @@ internal sealed interface InstanceArgs {
 private val targetOptions = setOf("--server", "--token")
 
 private val addValueOptions =
-  targetOptions + HEADER_OPTIONS + setOf("--speed-limit", "--priority", "--connections") +
-    "--idempotency-key"
+  targetOptions + HEADER_OPTIONS + PROXY_OPTIONS +
+    setOf("--speed-limit", "--priority", "--connections", "--idempotency-key")
 
 /**
  * Parses the arguments of [command], one of [INSTANCE_COMMANDS], given after its name and
@@ -82,11 +85,13 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   var connections = 0
   var requestId: String? = null
   val headers = HeaderOptions()
+  val proxy = ProxyOptions()
   val positional = mutableListOf<String>()
 
   val valueOptions = if (command == "add") addValueOptions else targetOptions
   val flags = when (command) {
-    "add", "list" -> setOf("--json")
+    "add" -> setOf("--json", NO_PROXY_OPTION)
+    "list" -> setOf("--json")
     "pause", "resume" -> setOf("--all")
     else -> emptySet()
   }
@@ -115,12 +120,14 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
             ?: return InstanceArgs.Invalid("--connections must be 0 (automatic) or more")
           "--idempotency-key" -> requestId = value.takeIf { it.isNotBlank() }?.let(::requestIdFor)
             ?: return InstanceArgs.Invalid("--idempotency-key must not be empty")
+          in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
           else -> headers.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
         }
       }
       arg in flags -> when (arg) {
         "--json" -> json = true
         "--all" -> all = true
+        NO_PROXY_OPTION -> proxy.noProxy()
       }
       arg.length > 1 && arg.startsWith("-") -> return InstanceArgs.Invalid("unknown option '$arg'")
       else -> positional += arg
@@ -147,6 +154,9 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
         },
         requestId = requestId,
         json = json,
+        proxy = proxy.build().getOrElse {
+          return InstanceArgs.Invalid(it.message ?: "invalid proxy")
+        },
       )
     }
     "list" -> {

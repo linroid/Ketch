@@ -95,6 +95,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   connections while the download runs.
 - **Several networks at once** — Spread one download over Wi-Fi, Ethernet and, on Android,
   cellular data ([how it works](docs/multiple-networks.md)).
+- **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and
+  password, or none, skipping the hosts you list; for one download too ([details](docs/proxy.md)).
 - **Pause and resume, even after a restart** — Ketch checks that the file on the server has not
   changed before it continues, and retries failed connections on its own.
 
@@ -216,7 +218,6 @@ the [CLI documentation](cli/README.md) lists every command.
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Checksums** — Check a download against a hash you provide, or one the server publishes
-- **Proxy** — Download through an HTTP or SOCKS5 proxy or the system proxy, with a bypass list
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
 - **Stall detection and retry settings** — Reconnect when a connection stops sending data, and

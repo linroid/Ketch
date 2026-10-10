@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.ProxyConfig
 import io.ktor.http.Url
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -12,7 +13,8 @@ import kotlin.time.TimeSource
  * Where the redirects of a request led last time, so that the segments of a download go
  * straight to the server that answered the probe instead of following the redirects again, which
  * a mirror selector could answer with another mirror. Each [Target] keeps the headers its hop
- * was allowed, so a target on another origin never receives the original credentials.
+ * was allowed, so a target on another origin never receives the original credentials. Targets
+ * are kept per proxy, since servers can redirect requests from each proxy elsewhere.
  *
  * Holds at most [capacity] targets, the least recently used dropped first, each for [ttl].
  */
@@ -21,8 +23,12 @@ internal class RedirectCache(
   private val ttl: Duration = 30.minutes,
   private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
-  /** A request as the caller made it: its URL and the headers sent to that URL. */
-  data class Key(val url: String, val headers: Map<String, String>)
+  /** A request as the caller made it: its URL, the headers sent to that URL and its proxy. */
+  data class Key(
+    val url: String,
+    val headers: Map<String, String>,
+    val proxy: ProxyConfig = ProxyConfig.System,
+  )
 
   /** The final hop of a request: its URL and the headers it was sent with. */
   class Target(val url: Url, val headers: Map<String, String>)

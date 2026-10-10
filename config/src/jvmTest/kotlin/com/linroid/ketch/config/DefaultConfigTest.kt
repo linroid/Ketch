@@ -2,6 +2,7 @@ package com.linroid.ketch.config
 
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.ProxyConfig
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -40,8 +41,16 @@ class DefaultConfigTest {
         ),
         DownloadCategory(folder = "Software/GitHub", hosts = listOf("github.com")),
       )
+      val proxy = ProxyConfig.manual(
+        "socks5://me:secret@127.0.0.1:1080",
+        bypass = listOf("*.lan", "10.0.0.0/8"),
+      )
       assertEquals(
-        DownloadConfig.Default.copy(defaultDirectory = "$home/Downloads", categories = categories),
+        DownloadConfig.Default.copy(
+          defaultDirectory = "$home/Downloads",
+          proxy = proxy,
+          categories = categories,
+        ),
         config.download,
       )
       // Ktor's CORS allowHost rejects a scheme in the host, failing server startup

@@ -43,6 +43,9 @@ import kotlinx.serialization.Serializable
  *   network host, such as HTTP(S) and FTP(S). Magnet links, `torrent:` identifiers and local
  *   files are not counted; a torrent added from an HTTP(S) `.torrent` URL counts against that
  *   URL's host. `0` means unlimited. Runtime changes behave like [maxConcurrentDownloads].
+ * @property proxy How HTTP(S) downloads reach their servers, by default following the system's
+ *   proxy settings. [DownloadRequest.proxy] replaces it for one download. Resolving a URL with
+ *   [KetchApi.resolve] uses it too.
  * @property categories folders under [defaultDirectory] that downloads not choosing a folder
  *   are sorted into, by file extension, media type or site; the first category a download
  *   matches wins, and one that matches none stays in [defaultDirectory]. Empty by default, so
@@ -60,6 +63,7 @@ data class DownloadConfig(
   val maxConcurrentDownloads: Int = 4,
   val maxConnectionsPerDownload: Int = 4,
   val maxConnectionsPerHost: Int = 16,
+  val proxy: ProxyConfig = ProxyConfig.System,
   val categories: List<DownloadCategory> = emptyList(),
 ) {
   init {

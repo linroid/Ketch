@@ -606,6 +606,34 @@
   <string name="settings_network_http_only">HTTP only. FTP and torrents use the system default.</string>
   <!-- A network picked before that the device no longer has. %1$s is its name, such as en5. -->
   <string name="settings_network_gone">%1$s · not connected</string>
+  <string name="settings_proxy">Proxy</string>
+  <string name="settings_proxy_mode">Connect through</string>
+  <!-- How downloads reach servers: the system's proxy settings, no proxy, or one typed here. -->
+  <string name="settings_proxy_system">System proxy</string>
+  <string name="settings_proxy_direct">No proxy</string>
+  <string name="settings_proxy_manual">Manual proxy</string>
+  <!-- %1$s is the device's name. -->
+  <string name="settings_proxy_system_hint">Follows the proxy settings of %1$s.</string>
+  <string name="settings_proxy_address">Address</string>
+  <string name="settings_proxy_address_hint">An HTTP or SOCKS5 proxy.</string>
+  <!-- An example address in the empty field. Keep the URL as it is. -->
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <!-- Keep http://host:port and socks5://host:port as they are. -->
+  <string name="settings_proxy_address_invalid">Use http://host:port or socks5://host:port</string>
+  <string name="settings_proxy_username">Username</string>
+  <string name="settings_proxy_password">Password</string>
+  <!-- Placeholder of a field that can stay empty. -->
+  <string name="settings_proxy_optional">Optional</string>
+  <!-- Hosts that skip the proxy. -->
+  <string name="settings_proxy_bypass">Connect directly to</string>
+  <!-- Example entries in the empty field. Keep them, and the ASCII comma between them, as they are. -->
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">Hosts, IP addresses or ranges, separated by commas. Subdomains are included.</string>
+  <!-- %1$s is what was typed, such as "a/b". -->
+  <string name="settings_proxy_bypass_invalid">%1$s isn't a host, address or range</string>
+  <string name="settings_proxy_footer">For HTTP downloads as they start or resume. FTP and torrents connect directly.</string>
+  <!-- %1$s is the device's name. -->
+  <string name="settings_proxy_unsupported">%1$s can't use a proxy. Update Ketch there to choose one.</string>
 
   <!-- BitTorrent. -->
   <string name="settings_torrent_trackers">Extra trackers</string>
@@ -835,6 +863,8 @@
   <string name="settings_search_connections_keywords">segments, threads, parallel, split</string>
   <string name="settings_search_networks">The networks downloads use</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, ethernet, interface, vpn, multiple networks</string>
+  <string name="settings_search_proxy">How downloads reach servers</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http proxy, bypass, firewall</string>
   <string name="settings_search_trackers">Trackers added to public torrents</string>
   <string name="settings_search_trackers_keywords">announce, udp, magnet, add trackers</string>
   <string name="settings_search_pair">Control this device from a phone or browser</string>
