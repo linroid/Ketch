@@ -41,6 +41,8 @@ import com.linroid.ketch.app.feedback.MessageTap
 import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
@@ -52,6 +54,7 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -71,6 +74,11 @@ class MainActivity : ComponentActivity() {
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
+  private val requestLocalNetworkPermission = registerForActivityResult(
+    ActivityResultContracts.RequestPermission(),
+  ) { }
+  private var localNetworkOffer: Job? = null
+  private var localNetworkAsked = false
   private val requestExternalStoragePermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
@@ -91,7 +99,9 @@ class MainActivity : ComponentActivity() {
       // A recreated activity finds the service already bound.
       snapshotFlow { model.service }.collect { connected ->
         notificationOffer?.cancel()
+        localNetworkOffer?.cancel()
         if (connected == null) return@collect
+        offerLocalNetwork(connected.instanceManager)
         connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
         // The controller is set before the service.
         offerNotifications(connected.instanceManager, model.controller?.state?.aiDiscover)
@@ -208,6 +218,30 @@ class MainActivity : ComponentActivity() {
         permissionPrefs.edit { putBoolean(KEY_NOTIFICATIONS_DUE, true) }
       }
       withStarted { showNotificationRationale() }
+    }
+  }
+
+  /**
+   * Asks for the local network from Android 17, which blocks it until granted, once this device
+   * has a remote device to reach or is shared: those would otherwise just time out. Searching
+   * the network and adding a device ask for themselves. Asked once per activity; the system
+   * stops showing it after two denials.
+   */
+  private fun offerLocalNetwork(manager: InstanceManager) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return
+    val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
+    if (localNetworkAsked || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+      return
+    }
+    val remote = manager.instances.map { list -> list.any { it is RemoteInstance } }
+    val shared = manager.serverState.map { it is ServerState.Running }
+    localNetworkOffer = lifecycleScope.launch {
+      combine(remote, shared) { hasRemote, isShared -> hasRemote || isShared }.first { it }
+      withStarted {
+        if (localNetworkAsked) return@withStarted
+        localNetworkAsked = true
+        requestLocalNetworkPermission.launch(permission)
+      }
     }
   }
 
