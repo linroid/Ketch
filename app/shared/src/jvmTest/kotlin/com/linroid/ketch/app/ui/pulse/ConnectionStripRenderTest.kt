@@ -56,8 +56,9 @@ class ConnectionStripRenderTest {
         frames(FRAMES)
 
         val grid = ConnectionSamples.grid(ConnectionSamples.mixed(), limit = STRIP_LIMIT)
-        val expected = "${grid.total} connections, ${grid.downloading} downloading, " +
-          "${grid.uploading} uploading"
+        // The strip's cells by direction, then the connections it has no cells for.
+        val expected = "${grid.cells.size} connections, ${grid.downloading} downloading, " +
+          "${grid.uploading} uploading · ${grid.overflow} more"
         assertEquals(listOf(expected), connectionNodes())
       }
     }

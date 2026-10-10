@@ -80,6 +80,27 @@ class ConnectionStripTest {
   }
 
   @Test
+  fun gridDescription_overflow_countsTheCellsThenTheRest() = runTest {
+    val grid = ConnectionGridState(
+      devices = listOf(
+        DeviceConnections(
+          deviceId = "mac",
+          name = verbatim("mac"),
+          tasks = listOf(
+            TaskConnections(TaskKey("mac", "t1"), "a.iso", listOf(cell(down = 1), cell(down = 1))),
+          ),
+        ),
+      ),
+      total = 100,
+    )
+
+    assertEquals(
+      "2 connections, 2 downloading, 0 uploading · 98 more",
+      grid.gridDescription().load(),
+    )
+  }
+
+  @Test
   fun summaryText_grid_countsEveryConnectionWithItsRates() = runTest {
     val grid = ConnectionGridState(
       devices = listOf(

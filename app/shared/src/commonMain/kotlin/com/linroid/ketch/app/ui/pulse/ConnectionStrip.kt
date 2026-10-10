@@ -51,6 +51,7 @@ import ketch.app.shared.generated.resources.pulse_connections_legend_download
 import ketch.app.shared.generated.resources.pulse_connections_legend_idle
 import ketch.app.shared.generated.resources.pulse_connections_legend_upload
 import ketch.app.shared.generated.resources.pulse_connections_more
+import ketch.app.shared.generated.resources.pulse_connections_more_long
 import ketch.app.shared.generated.resources.pulse_connections_rates
 import ketch.app.shared.generated.resources.pulse_connections_summary
 import ketch.app.shared.generated.resources.pulse_connections_tooltip
@@ -210,9 +211,17 @@ internal fun gridDescription(cells: List<ConnectionCell>): UiText {
   return Res.plurals.pulse_connections_grid_description.text(cells.size, cells.size, down, up)
 }
 
-/** [gridDescription] of every connection of the grid, those past its cells included. */
-internal fun ConnectionGridState.gridDescription(): UiText =
-  Res.plurals.pulse_connections_grid_description.text(total, total, downloading, uploading)
+/**
+ * [gridDescription] of the grid's cells, then how many more connections it has no cells for,
+ * whose directions are not known.
+ */
+internal fun ConnectionGridState.gridDescription(): UiText {
+  val shown = Res.plurals.pulse_connections_grid_description
+    .text(cells.size, cells.size, downloading, uploading)
+  if (overflow == 0) return shown
+  return listOf(shown, Res.plurals.pulse_connections_more_long.text(overflow, overflow))
+    .joinText()
+}
 
 /** "42 connections · ↓ 3.2 MB/s · ↑ 120 KB/s". */
 internal fun ConnectionGridState.summaryText(): UiText = listOf(

@@ -621,9 +621,10 @@ internal class TorrentSwarm(
         }
         uploads.removeFirst()
         onUploaded(request.length)
-        traffic?.sent(request.length)
         wire.send(PeerMessage.Piece(request.index, request.begin,
           bytes.copyOfRange(request.begin, request.begin + request.length)))
+        // Counted once sent, as v2 does: a blocked or failed write moved nothing yet.
+        traffic?.sent(request.length)
         uploaded.fetchAndAdd(request.length.toLong())
         chokerMutex.withLock { choker.uploaded(id, request.length.toLong()) }
       }

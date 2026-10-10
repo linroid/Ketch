@@ -111,6 +111,15 @@ fun KetchCellGrid(
       hover(null)
     }
   }
+  // A live list can shrink under the cursor: keep it on a cell so the keys still work.
+  LaunchedEffect(cells.size) {
+    val current = cursor ?: return@LaunchedEffect
+    val kept = keepCursor(current, cells.size)
+    if (kept != current) {
+      cursor = kept
+      hover(kept)
+    }
+  }
   val focusable = onSelect != null
   val density = LocalDensity.current
   var width by remember { mutableIntStateOf(0) }
@@ -359,6 +368,13 @@ internal fun cellIndexAt(
   if (column >= layout.columns || row >= layout.rows) return null
   val index = if (layout.columnMajor) column * layout.rows + row else row * layout.columns + column
   return index.takeIf { it < count }
+}
+
+/** The cursor at [index] once the grid has [count] cells: the last cell, or none, past the end. */
+internal fun keepCursor(index: Int, count: Int): Int? = when {
+  index < count -> index
+  count > 0 -> count - 1
+  else -> null
 }
 
 /** The cell [move] reaches from [index]; [index] itself at an edge. */

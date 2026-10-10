@@ -102,4 +102,11 @@ class KetchCellGridTest {
     const val CELL = 12f
     const val GAP = 3f
   }
+
+  @Test
+  fun keepCursor_listShrinksPastIt_movesToTheLastCell() {
+    assertEquals(2, keepCursor(2, 5))
+    assertEquals(2, keepCursor(4, 3))
+    assertEquals(null, keepCursor(0, 0))
+  }
 }
