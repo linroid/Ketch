@@ -64,7 +64,7 @@ Pure v2 and hybrid magnet downloads passed against the pinned test-only libtorre
 `torrent-v2-swarm`, libtorrent also downloads pure v2 and hybrid torrents from a seeding Ketch
 engine (`btmh`, dual-topic and `btih`-only magnets, the last over the v1 route), and Transmission,
 which knows only v1, downloads a hybrid from Ketch and seeds one to it. These runs were recorded
-at `c81ce826d`; see
+at `f6940ba0a`; see
 [verification](../development/torrent-verification.md#v2-swarm-completeness-torrent-v2-swarm).
 A second independent v2 implementation remains outstanding, so the two-independent-engine format
 gate is still open. No production qualification or release is claimed.

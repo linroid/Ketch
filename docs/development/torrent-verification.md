@@ -91,10 +91,11 @@ and package measurements below remain historical evidence only.
 The `torrent-v2-swarm` stack makes v2 and hybrid owners full swarm members: incoming routing by
 wire tag, upload and seeding with a shared 4-slot choker, BEP 52 proof serving, BEP 10
 `ut_metadata`/`ut_pex`/`p` on v2 connections, and hybrid participation in v1 swarms. Recorded at
-`c81ce826d` on 2026-10-10 on macOS (Apple silicon) with the Homebrew build of Transmission 4.1.3,
-whose `--version` matches the pin. That revision includes the review fixes that changed the
-duplicate-connection rule, decode hash requests of up to 8192 hashes and count a peer exchange
-message as sent only once it was written; every suite and scenario below ran again there:
+`f6940ba0a` on 2026-10-10 on macOS (Apple silicon) with the Homebrew build of Transmission 4.1.3,
+whose `--version` matches the pin. That revision is the branch rebased on `main` at `1957d4a56`
+with every review fix, including the last round's proof-read pacing, dropping peers queued before
+a tracker reset, taking over a finished task's seeder and refusing peers at the limit; every suite
+and scenario below ran there:
 
 ```sh
 TRANSMISSION_DAEMON=/opt/homebrew/bin/transmission-daemon \
@@ -107,26 +108,24 @@ python3 tools/torrent/verify_conformance.py --reports library/torrent/build/test
 ./gradlew :library:torrent:iosSimulatorArm64Test -PenableIosSimulatorTests=true
 ```
 
-| Torrent suite | Before (`8c933c143`) | After (`c81ce826d`) | Failures |
+| Torrent suite | Before (`8c933c143`) | After (`f6940ba0a`) | Failures |
 | --- | ---: | ---: | ---: |
-| JVM, with Transmission | 699 | 889 | 0 |
-| Android host | 675 | 859 | 0 |
-| Executed iOS simulator | 676 | 860 | 0 |
+| JVM, with Transmission | 699 | 896 | 0 |
+| Android host | 675 | 866 | 0 |
+| Executed iOS simulator | 676 | 867 | 0 |
 
-On the iOS simulator the suite's tests took 83.8 s, of which 32.2 s went to the 185 tests added
-since `8c933c143`: about 62% more than the earlier tests' 51.6 s. Most of it is the loopback
+On the iOS simulator the suite's tests took 87.1 s, of which 35.2 s went to the 192 tests added
+since `8c933c143`: about 68% more than the earlier tests' 51.8 s. Most of it is the loopback
 two- and three-engine tests, which iOS still polls every 5 ms, and proof tests that hash whole
-pieces, up to 16 MiB. The Gradle task took 86 s.
+pieces, up to 16 MiB.
 
-One of four full Android host runs at that revision failed
-`TorrentV2MetadataServingTest.disabledUploadAdvertisesNoUtMetadata`: the engine reset the raw
-client's connection before answering its handshake. The same reset failed
-`TorrentV2IncomingTest.duplicatePeerIdKeepsTheSameConnectionOnBothEnds` once at `ec4aac19c`.
-Neither reproduces on its own or in later full runs, and its cause is still open. A final pass at
-`6298ed40b`, which changes only documentation and KDoc after `c81ce826d`, repeated every command
-above with the same counts and all nine scenarios; the reset did not recur there, nor in five more
-full runs (three Android host, two JVM), two runs of both suites at once, or ten repeats of the v2
-incoming, metadata serving, peer exchange and swarm tests.
+Earlier runs failed `TorrentV2MetadataServingTest.disabledUploadAdvertisesNoUtMetadata` and
+`TorrentV2IncomingTest.duplicatePeerIdKeepsTheSameConnectionOnBothEnds` now and then: the engine
+seemed to reset the raw client's connection before answering its handshake. The engines listened
+on the wildcard address, and on macOS another socket bound to `127.0.0.1` on the same port takes
+the loopback connections, so the client reached someone else. Tests that dial loopback now bind
+their engine to `127.0.0.1`. At `f6940ba0a`, ten JVM runs and three Android host runs of the v2
+incoming, metadata serving, peer exchange and swarm tests (18 tests each) all passed.
 
 The verifier then required all nine scenarios of `test-fixtures/torrent/scenarios.json`. The
 seven new ones are:
