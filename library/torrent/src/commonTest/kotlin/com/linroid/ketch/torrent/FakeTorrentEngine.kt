@@ -91,7 +91,7 @@ internal class FakeTorrentEngine : TorrentEngine {
  */
 internal class FakeTorrentSession(
   override val infoHash: String,
-  override val totalBytes: Long = 0,
+  override var totalBytes: Long = 0,
 ) : TorrentSession {
 
   private val _downloadedBytes = MutableStateFlow(0L)
@@ -107,8 +107,15 @@ internal class FakeTorrentSession(
     private set
   var resumed = false
     private set
-  var filePriorities = emptyMap<Int, Int>()
-    private set
+  override var selectedFileIds: Set<String> = emptySet()
+
+  /** Every [changeSelection] call, in order. */
+  val selectionChanges = mutableListOf<Set<String>>()
+
+  /** What [changeSelection] returns: whether the change was taken live. */
+  var changeSelectionResult = true
+  var changeSelectionError: Exception? = null
+  var counters = TorrentPayloadCounters(received = 0, uploaded = 0, uploadSpeed = null)
   var sessionDownloadRateLimit = 0L
     private set
   var sessionUploadRateLimit = 0L
@@ -125,9 +132,14 @@ internal class FakeTorrentSession(
     _state.value = TorrentSessionState.DOWNLOADING
   }
 
-  override fun setFilePriorities(priorities: Map<Int, Int>) {
-    filePriorities = priorities
+  override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    selectionChanges += fileIds
+    changeSelectionError?.let { throw it }
+    selectedFileIds = fileIds
+    return changeSelectionResult
   }
+
+  override suspend fun payloadCounters(): TorrentPayloadCounters = counters
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) {
     sessionDownloadRateLimit = bytesPerSecond

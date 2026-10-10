@@ -19,7 +19,7 @@ internal class TrackerDiscovery private constructor(
   private val trackers: TrackerTiers,
   onPrivateTrackerChanged: suspend () -> Unit = {},
   private val nowMs: () -> Long = monotonicClock(),
-  private val announceCompletion: Boolean = true,
+  private val announceCompletion: () -> Boolean = { true },
 ) {
   constructor(
     metadata: TorrentMetadata,
@@ -28,7 +28,8 @@ internal class TrackerDiscovery private constructor(
     trackers: TrackerTiers,
     onPrivateTrackerChanged: suspend () -> Unit = {},
     nowMs: () -> Long = monotonicClock(),
-    announceCompletion: Boolean = true,
+    /** Read at every announce: `completed` only once the selection is the whole torrent. */
+    announceCompletion: () -> Boolean = { true },
   ) : this(TrackerTopic.V1(metadata.infoHash), metadata.isPrivate, { verified ->
     require(verified.size == metadata.pieceHashes.size / 20)
     verified.indices.sumOf { index ->
@@ -49,7 +50,8 @@ internal class TrackerDiscovery private constructor(
     trackers: TrackerTiers,
     onPrivateTrackerChanged: suspend () -> Unit = {},
     nowMs: () -> Long = monotonicClock(),
-    announceCompletion: Boolean = true,
+    /** Read at every announce: `completed` only once the selection is the whole torrent. */
+    announceCompletion: () -> Boolean = { true },
     topic: TrackerTopic = TrackerTopic.V2(document.info.hash),
   ) : this(topic, document.info.privateTorrent,
     layout::unverifiedPayloadBytes, peerId, port, trackers, onPrivateTrackerChanged,
@@ -122,7 +124,7 @@ internal class TrackerDiscovery private constructor(
       stopped && started -> TrackerEvent.STOPPED
       stopped -> return null
       !started -> TrackerEvent.STARTED
-      left == 0L && !completed && announceCompletion -> TrackerEvent.COMPLETED
+      left == 0L && !completed && announceCompletion() -> TrackerEvent.COMPLETED
       else -> TrackerEvent.NONE
     }
     if (event == TrackerEvent.NONE) {

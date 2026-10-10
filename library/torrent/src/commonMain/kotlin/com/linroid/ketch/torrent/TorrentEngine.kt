@@ -98,4 +98,9 @@ internal data class TorrentTaskSpec(
   val resumeData: ByteArray? = null,
   val throttle: suspend (Int) -> Unit = {},
   val privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+  /**
+   * Only seed: a recheck that finds the selection incomplete stops the session with
+   * [IncompleteSeedException] instead of downloading, before any discovery.
+   */
+  val seedOnly: Boolean = false,
 )
