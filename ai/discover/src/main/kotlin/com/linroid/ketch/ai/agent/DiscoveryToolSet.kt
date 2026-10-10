@@ -177,7 +177,10 @@ internal class DiscoveryToolSet(
         "Use to report what you're doing.",
       parameters = listOf(
         stringParameter("title", "Short step title"),
-        stringParameter("details", "Step details or explanation"),
+        stringParameter(
+          "details",
+          "Step details or explanation; start each item of a list on a new line",
+        ),
       ),
     ) { emitStep(string("title"), string("details")) },
   )
