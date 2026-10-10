@@ -193,8 +193,8 @@ class TorrentDownloadSourceTest {
 
   @Test
   fun features_listSelectionFeatures() {
-    assertEquals(setOf(KetchFeatures.TORRENT_FILE_SELECTION,
-      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL), source.features)
+    assertEquals(setOf(KetchFeatures.FILE_SELECTION,
+      KetchFeatures.AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL), source.features)
     assertEquals(setOf("file-selection", "v1", "v2", "hybrid"), source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)
@@ -208,8 +208,8 @@ class TorrentDownloadSourceTest {
       additionalSources = listOf(TorrentDownloadSource()))
     try {
       val features = ketch.status().features
-      assertTrue(KetchFeatures.TORRENT_FILE_SELECTION in features)
-      assertTrue(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION in features)
+      assertTrue(KetchFeatures.FILE_SELECTION in features)
+      assertTrue(KetchFeatures.AWAIT_FILE_SELECTION in features)
       assertTrue(KetchFeatures.TORRENT_CONTROL in features)
       assertNotNull(ketch.torrents)
     } finally {

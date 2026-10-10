@@ -251,9 +251,8 @@ internal class DownloadExecution(
     fromStored: Boolean,
   ): Prepared? {
     val req = handle.record.value.request
-    if (req.awaitFileSelection && req.selectedFileIds.isEmpty() &&
-      resolvedUrl.selectionMode == FileSelectionMode.MULTIPLE && resolvedUrl.files.size > 1
-    ) {
+    // Several files or variants, whether any subset or one of them is chosen.
+    if (req.awaitFileSelection && req.selectedFileIds.isEmpty() && resolvedUrl.files.size > 1) {
       park(source, resolvedUrl, fromStored)
       return null
     }
@@ -326,17 +325,20 @@ internal class DownloadExecution(
   }
 
   /**
-   * The size of a fresh download: the chosen files of a source with several, sized from the
-   * source's own metadata ([DownloadSource.planSelection]) rather than the client's, or the whole
-   * content.
+   * The size of a fresh download: the chosen files or variant of a source with several, sized
+   * from the source's own metadata ([DownloadSource.planSelection]) rather than the client's, or
+   * the whole content.
+   *
+   * @throws IllegalArgumentException when a source offering a single choice is given several
    */
   private suspend fun freshTotal(
     source: DownloadSource,
     resolved: ResolvedSource,
     selected: Set<String>,
   ): Long {
-    if (resolved.selectionMode != FileSelectionMode.MULTIPLE || selected.isEmpty()) {
-      return resolved.totalBytes
+    if (selected.isEmpty()) return resolved.totalBytes
+    require(resolved.selectionMode != FileSelectionMode.SINGLE || selected.size == 1) {
+      SINGLE_CHOICE_MESSAGE
     }
     return try {
       source.planSelection(

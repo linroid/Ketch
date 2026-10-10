@@ -89,13 +89,16 @@ version is available as `KetchApi.VERSION` and `KetchApi.REVISION`.
 
 `resolve(url)` probes a URL (for HTTP, a HEAD request, or a `GET` for its first byte when the
 server refuses HEAD) and returns its size, resume support,
-suggested file name and, for multi-file sources such as torrents, the selectable `files`.
+suggested file name and, for sources with several files or variants such as torrents, the
+selectable `files` and their `selectionMode`: `MULTIPLE` for any subset, `SINGLE` for exactly
+one variant (reserved for HLS quality; no built-in source offers it yet).
 `resolveContent(bytes, fileName)` does the same for file content the caller already holds, such
 as a picked `.torrent` file. Pass the result as `DownloadRequest.resolvedSource` (with its `url`
-as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files` (empty
-downloads every file). With `awaitFileSelection = true` and no `selectedFileIds`, a torrent waits
-once its file list is known, as `Paused(AwaitingFileSelection)` holding no download slot, until
-`selectFiles` chooses its files; `resume()` downloads every file instead.
+as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files`, or one of
+them for a `SINGLE` choice (empty downloads the source's `defaultSelection()`: every file, or the
+first variant). With `awaitFileSelection = true` and no `selectedFileIds`, a download with several
+files or variants waits once they are known, as `Paused(AwaitingFileSelection)` holding no
+download slot, until `selectFiles` chooses; `resume()` downloads the default instead.
 
 `KetchApi.download(...)` returns a `DownloadTask` for controlling an
 individual download. Tasks expose reactive state and per-task actions:
@@ -116,7 +119,7 @@ interface DownloadTask {
   suspend fun setSpeedLimit(limit: SpeedLimit)
   suspend fun setPriority(priority: DownloadPriority)
   suspend fun setConnections(connections: Int)  // 0 = Auto, the configured default
-  suspend fun selectFiles(fileIds: Set<String>)  // torrents: change the files at any time
+  suspend fun selectFiles(fileIds: Set<String>)  // several files or variants: change them
   suspend fun reschedule(
     schedule: DownloadSchedule,
     conditions: List<DownloadCondition> = emptyList(),
@@ -138,18 +141,20 @@ interface DownloadTask {
 }
 ```
 
-`selectFiles(ids)` changes which files of a torrent the task downloads, in every state but
-canceled: a running torrent follows the change without reconnecting, newly chosen files are
-downloaded and unchosen ones stop downloading but stay on disk, and a completed task that gains
-files downloads them and completes again. It throws `IllegalArgumentException` for an empty set
-or an ID the torrent does not have, `IllegalStateException` while the file list is not known or
-after `cancel()`, and `UnsupportedOperationException` for tasks without files or backends that
-cannot change them (see [torrents](torrent.md#choosing-files)).
+`selectFiles(ids)` changes which files or variant of a download with several the task
+downloads, in every state but canceled: any subset for `MULTIPLE`, exactly one ID for `SINGLE`.
+A running source that applies the change live, as a torrent does without reconnecting, keeps
+going; one that does not confirm it runs again through resume. Newly chosen files are downloaded
+and unchosen ones stop downloading but stay on disk, and a completed task that gains files
+downloads them and completes again. It throws `IllegalArgumentException` for an empty set, several
+IDs for a `SINGLE` choice or an ID the download does not have, `IllegalStateException` while the
+file list is not known or after `cancel()`, and `UnsupportedOperationException` for tasks without
+files or backends that cannot change them (see [torrents](torrent.md#choosing-files)).
 
 `DownloadState.Paused.reason` is a `PauseReason`: `User` for `pause()` (and tasks restored
 paused), `Preempted(byTaskId)` for a task that gave its slot to an URGENT one and still waits in
 the queue, `Shutdown` for a task that was downloading when its `Ketch` closed (its partial file
-is kept and it resumes on the next `start()`), `AwaitingFileSelection` for a torrent that waits
+is kept and it resumes on the next `start()`), `AwaitingFileSelection` for a download that waits
 for `selectFiles`, and `WaitingForCondition`. A reason the client does not know decodes as
 `User`. `DownloadState.Completed.completedAt` is when the task last finished, in whole
 milliseconds; it is `null` for tasks that finished before Ketch recorded it.
@@ -160,9 +165,11 @@ in the order the queue starts them, priority first, then age.
 
 `KetchStatus.features` lists the optional behaviors an instance supports, from
 `KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`), `QUEUE_POSITION`, `REQUEST_ID`,
-`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, the media sources' `FINITE_HLS` and `FINITE_DASH`, and the torrent
-source's `TORRENT_FILE_SELECTION` (`selectFiles`), `TORRENT_AWAIT_FILE_SELECTION`
-(`awaitFileSelection`) and `TORRENT_CONTROL` (`KetchApi.torrents`). Older servers send fewer, so
+`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, the media sources' `FINITE_HLS` and
+`FINITE_DASH`, `FILE_SELECTION` (`download.fileSelection`, `selectFiles`) and
+`AWAIT_FILE_SELECTION` (`download.awaitFileSelection`, `awaitFileSelection`), listed by the
+sources that choose files (the torrent source today), and the torrent source's `TORRENT_CONTROL`
+(`KetchApi.torrents`). Older servers send fewer, so
 their tasks report no position and `setConnections(0)` on them throws
 `UnsupportedOperationException`.
 

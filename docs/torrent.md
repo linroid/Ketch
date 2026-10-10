@@ -50,8 +50,9 @@ each running swarm logs a summary every 30 seconds; see
 ## Choosing files
 
 `DownloadTask.selectFiles(ids)` changes which files a torrent task downloads at any time but
-after it is canceled, for v1, v2 and hybrid torrents alike (`KetchFeatures.TORRENT_FILE_SELECTION`,
-`torrent.fileSelection`). IDs are those of `ResolvedSource.files`, 1 to 100,000 of them. Ketch
+after it is canceled, for v1, v2 and hybrid torrents alike (`KetchFeatures.FILE_SELECTION`,
+`download.fileSelection`, which the torrent source lists; the same API serves any source with
+several files or variants). IDs are those of `ResolvedSource.files`, 1 to 100,000 of them. Ketch
 checks them against the metainfo it saved for the task, never against sizes a client sent, saves
 the selection and its size as the task's total, and then applies it:
 
@@ -70,7 +71,7 @@ the selection and its size as the task's total, and then applies it:
   nothing yet, wait for a choice instead.
 
 A torrent added with `DownloadRequest.awaitFileSelection = true` and no selection
-(`torrent.awaitFileSelection`), typically a magnet whose files are not known yet, waits for one:
+(`download.awaitFileSelection`), typically a magnet whose files are not known yet, waits for one:
 once its metadata arrives it stops as `DownloadState.Paused(PauseReason.AwaitingFileSelection)`,
 holding no queue slot, output folder or segments, and keeps waiting across restarts. A torrent of
 one file does not wait. `selectFiles` starts it with the chosen files, without

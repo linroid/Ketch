@@ -6,11 +6,13 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.defaultSelection
 import com.linroid.ketch.api.torrent.TorrentCommandError
 import com.linroid.ketch.api.torrent.TorrentCommandException
 import com.linroid.ketch.api.torrent.TorrentFileOrder
@@ -108,8 +110,10 @@ class KetchToolSet(
         ),
         stringParameter(
           "fileIds",
-          "For a torrent or magnet: the IDs of the files to download, comma-separated, as " +
-            "resolveUrl lists them in 'files'. Omit to download every file.",
+          "For a download with several files or variants, such as a torrent or magnet: the " +
+            "IDs of the files to download, comma-separated, as resolveUrl lists them in " +
+            "'files'; exactly one when its selectionMode is SINGLE. Omit to download every " +
+            "file, or the first variant of a SINGLE choice.",
           required = false,
         ),
       ),
@@ -154,9 +158,10 @@ class KetchToolSet(
     ) { resolveUrl(string("url")) },
     TextTool(
       name = "listDownloadFiles",
-      description = "List the files of a torrent download, a page at a time, with each " +
-        "file's ID, path, size and whether it is selected for download. Returns JSON with " +
-        "'files' and, when more remain, 'nextCursor' for the next call.",
+      description = "List the files or variants of a download, such as a torrent's files, a " +
+        "page at a time, with each file's ID, path, size and whether it is selected for " +
+        "download. Returns JSON with 'selectionMode' (MULTIPLE: choose any of them; SINGLE: " +
+        "choose exactly one), 'files' and, when more remain, 'nextCursor' for the next call.",
       parameters = listOf(
         stringParameter("taskId", "The unique task ID"),
         stringParameter(
@@ -172,7 +177,7 @@ class KetchToolSet(
         ),
         stringParameter(
           "sort",
-          "Order of the files: torrent (the torrent's own order, default), name (natural " +
+          "Order of the files: torrent (the download's own order, default), name (natural " +
             "order of the path, so 2 comes before 10), size (smallest first), extension " +
             "(by file extension, then name) or selected (selected files first, then name).",
           required = false,
@@ -194,16 +199,17 @@ class KetchToolSet(
     },
     TextTool(
       name = "selectDownloadFiles",
-      description = "Choose which files of a torrent download are downloaded, at any time: " +
-        "newly chosen files download, unchosen ones stop downloading and stay on disk. A " +
-        "torrent waiting for its files starts with the chosen ones; to download every file " +
-        "of a waiting torrent, call resumeDownload instead. Returns the task snapshot.",
+      description = "Choose which files or variant of a download with several (see " +
+        "listDownloadFiles) are downloaded, at any time: newly chosen files download, " +
+        "unchosen ones stop downloading and stay on disk. A download waiting for its files " +
+        "starts with the chosen ones; to download its default instead (every file, or the " +
+        "first variant of a SINGLE choice), call resumeDownload. Returns the task snapshot.",
       parameters = listOf(
         stringParameter("taskId", "The unique task ID"),
         stringParameter(
           "fileIds",
           "The IDs of the files to download, comma-separated, from listDownloadFiles. At " +
-            "least one.",
+            "least one, and exactly one when its selectionMode is SINGLE.",
         ),
       ),
     ) { selectDownloadFiles(string("taskId"), string("fileIds")) },
@@ -356,7 +362,7 @@ class KetchToolSet(
   }
 
   /**
-   * A page of the files of torrent task [taskId], sorted by [sort] (a [TorrentFileOrder] wire
+   * A page of the files or variants of task [taskId], sorted by [sort] (a [TorrentFileOrder] wire
    * name) and reversed when [descending], from the instance's
    * [com.linroid.ketch.api.torrent.TorrentController]. An instance without one, or one that
    * cannot list them, pages the task's [DownloadRequest.resolvedSource] files instead.
@@ -390,18 +396,26 @@ class KetchToolSet(
         if (e.error != TorrentCommandError.UNSUPPORTED) throw e
         null
       }
-      if (page != null) return json.encodeToString(pageToJson(page))
+      if (page != null) return json.encodeToString(pageToJson(page, task.selectionMode()))
     }
     return localFiles(task, cursor, limit, order, descending)
   }
 
-  /** Has task [taskId] download the files of [fileIds], comma-separated IDs. */
+  /**
+   * Has task [taskId] download the files of [fileIds], comma-separated IDs: exactly one when its
+   * source offers a single choice.
+   */
   suspend fun selectDownloadFiles(
     taskId: String,
     fileIds: String,
   ): String {
     val ids = parseFileIds(fileIds)
     val task = findTask(taskId) ?: return notFound(taskId)
+    if (task.selectionMode() == FileSelectionMode.SINGLE && ids.size != 1) {
+      throw ToolException.ValidationFailure(
+        "This download downloads one variant: fileIds must name exactly one file ID",
+      )
+    }
     task.selectFiles(ids)
     return json.encodeToString(taskToJson(task))
   }
@@ -496,8 +510,10 @@ class KetchToolSet(
     }
     val waiting = (task.state.value as? DownloadState.Paused)?.reason ==
       PauseReason.AwaitingFileSelection
-    val chosen = request.selectedFileIds
-    fun isSelected(file: SourceFile) = !waiting && (chosen.isEmpty() || file.id in chosen)
+    // With nothing chosen, the source's default downloads: every file, or the first variant.
+    val chosen = request.selectedFileIds.ifEmpty { request.resolvedSource?.defaultSelection() }
+      .orEmpty()
+    fun isSelected(file: SourceFile) = !waiting && file.id in chosen
     val sorted = files.sortedByFileOrder(
       order = order,
       descending = descending,
@@ -509,6 +525,7 @@ class KetchToolSet(
     return json.encodeToString(
       buildJsonObject {
         put("taskId", task.taskId)
+        put("selectionMode", task.selectionMode().name)
         put("totalFiles", files.size)
         put(
           "files",
@@ -523,18 +540,20 @@ class KetchToolSet(
     )
   }
 
-  private fun pageToJson(page: TorrentFilePage): JsonObject = buildJsonObject {
-    put("taskId", page.taskId)
-    put("totalFiles", page.totalFiles)
-    put("selectionGeneration", page.selectionGeneration)
-    put(
-      "files",
-      buildJsonArray {
-        page.files.forEach { add(fileJson(it.id, it.path, it.size, it.selected)) }
-      },
-    )
-    page.nextCursor?.let { put("nextCursor", it) }
-  }
+  private fun pageToJson(page: TorrentFilePage, mode: FileSelectionMode): JsonObject =
+    buildJsonObject {
+      put("taskId", page.taskId)
+      put("selectionMode", mode.name)
+      put("totalFiles", page.totalFiles)
+      put("selectionGeneration", page.selectionGeneration)
+      put(
+        "files",
+        buildJsonArray {
+          page.files.forEach { add(fileJson(it.id, it.path, it.size, it.selected)) }
+        },
+      )
+      page.nextCursor?.let { put("nextCursor", it) }
+    }
 
   private fun fileJson(id: String, path: String, size: Long, selected: Boolean) =
     buildJsonObject {
@@ -543,6 +562,10 @@ class KetchToolSet(
       put("size", size)
       put("selected", selected)
     }
+
+  /** How [this] task's files are chosen; any subset unless its source says otherwise. */
+  private fun com.linroid.ketch.api.DownloadTask.selectionMode(): FileSelectionMode =
+    request.resolvedSource?.selectionMode ?: FileSelectionMode.MULTIPLE
 
   /** The file's path inside its torrent, as torrent sources record it. */
   private fun SourceFile.path(): String = metadata["path"] ?: name

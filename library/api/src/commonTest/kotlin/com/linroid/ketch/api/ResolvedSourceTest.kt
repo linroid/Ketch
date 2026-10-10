@@ -174,4 +174,24 @@ class ResolvedSourceTest {
     val plain = source.copy(metadata = mapOf("name" to "Pack"))
     assertTrue(plain.withoutBulkMetadata() === plain)
   }
+
+  @Test
+  fun defaultSelection_followsTheSelectionMode() {
+    val source = ResolvedSource(
+      url = "https://example.com/stream.m3u8",
+      sourceType = "hls",
+      totalBytes = 30,
+      supportsResume = false,
+      suggestedFileName = null,
+      maxSegments = 1,
+      files = listOf(SourceFile("hi", "1080p", 20), SourceFile("lo", "480p", 10)),
+    )
+
+    assertEquals(setOf("hi", "lo"), source.defaultSelection())
+    assertEquals(
+      setOf("hi"),
+      source.copy(selectionMode = FileSelectionMode.SINGLE).defaultSelection()
+    )
+    assertTrue(source.copy(files = emptyList()).defaultSelection().isEmpty())
+  }
 }

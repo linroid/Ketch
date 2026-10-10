@@ -125,8 +125,8 @@ class TorrentDownloadSource(
   private val log = KetchLogger("TorrentSource")
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
-  override val features: Set<String> = setOf(KetchFeatures.TORRENT_FILE_SELECTION,
-    KetchFeatures.TORRENT_AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
+  override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
+    KetchFeatures.AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
 
   override val torrentCapabilities: Set<String>
     get() = buildSet {

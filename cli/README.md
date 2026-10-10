@@ -103,9 +103,9 @@ instead, use [`ketch add`](#add-a-download).
 | `--proxy <url>` | Download HTTP(S) through this proxy: `http://[user:pass@]host:port` or `socks5://[user:pass@]host:port` |
 | `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated (`*.lan,10.0.0.0/8`) |
 | `--no-proxy` | Connect directly, whatever the configured or system proxy |
-| `--files <ids>` | Download only these files of a torrent or magnet, comma-separated IDs from `--list-files` |
-| `--list-files` | List the files of a torrent or magnet, with their IDs and sizes, instead of downloading it |
-| `--sort <order>` | Order of `--list-files`: `name` (natural order, so 2 comes before 10), `size` or `type` (by file extension); default: the torrent's own order |
+| `--files <ids>` | Download only these files of a download with several, such as a torrent or magnet, comma-separated IDs from `--list-files`; exactly one when they are variants |
+| `--list-files` | List the files or variants of a URL, such as a torrent or magnet, with their IDs and sizes, instead of downloading it |
+| `--sort <order>` | Order of `--list-files`: `name` (natural order, so 2 comes before 10), `size` or `type` (by file extension); default: the download's own order |
 | `--reverse` | Reverse the order of `--list-files` |
 | `--help`, `-h` | Show help message |
 
@@ -115,7 +115,9 @@ cookies, `Authorization` and other headers stay with the site they were given fo
 
 `--list-files` resolves the URL, which for a magnet means finding its metadata, and prints one
 `ID  SIZE  PATH` row per file to stdout; it exits 1 when the URL cannot be resolved or has no
-files to choose. `--files` cannot be combined with it. Invalid options exit with status 2.
+files to choose. When the source offers variants, of which one downloads, it says so on stderr,
+and `--files` then takes one ID. `--files` cannot be combined with it. Invalid options exit with
+status 2.
 
 Without `--proxy` or `--no-proxy`, HTTP(S) downloads use `[download.proxy]` of the
 [config file](#downloadproxy), which by default follows the `https_proxy`, `http_proxy`,
@@ -507,7 +509,7 @@ keep a token there. The Ketch apps' server follows the same rules.
 
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
 agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, list and choose
-the files of torrents, and change speed limits, priorities and the download config.
+the files of torrents and other downloads with several, and change speed limits, priorities and the download config.
 
 ```bash
 ketch mcp [options]
@@ -543,18 +545,20 @@ adding another. An older Ketch without request IDs refuses it.
 The 14 tools are `listDownloads`, `getDownload`, `startDownload`, `pauseDownload`,
 `resumeDownload`, `cancelDownload`, `removeDownload`, `resolveUrl`, `listDownloadFiles`,
 `selectDownloadFiles`, `getStatus`, `setSpeedLimit`, `setPriority` and `updateConfig`. For
-torrents:
+downloads with several files or variants, such as torrents:
 
-- `resolveUrl` lists a torrent's `files`, each with its `id`, without the torrent's metainfo.
+- `resolveUrl` lists their `files`, each with its `id`, and the `selectionMode`: `MULTIPLE` for
+  any subset, `SINGLE` for exactly one variant. It leaves out a torrent's metainfo.
 - `startDownload` takes `fileIds`, comma-separated, to download only those files.
 - `listDownloadFiles` lists a task's files with their `id`, `path`, `size` and whether they are
-  `selected`, up to `limit` (1 to 1000, default 100) at a time; pass the `nextCursor` it returns
+  `selected`, and its `selectionMode`, up to `limit` (1 to 1000, default 100) at a time; pass the `nextCursor` it returns
   as `cursor` for the next page. `sort` orders them `torrent` (default), `name` (natural order),
   `size`, `extension` or `selected` (selected first), and `descending` reverses that. It reads
-  them from the instance's torrent controller, or from the task's resolved files on an older
-  instance.
-- `selectDownloadFiles` changes a task's files at any time, from comma-separated IDs; a torrent
-  waiting for its files starts with them, while `resumeDownload` downloads every file of it.
+  a torrent's from the instance's torrent controller, other tasks' (and a torrent's on an older
+  instance) from the task's resolved files.
+- `selectDownloadFiles` changes a task's files at any time, from comma-separated IDs, one for a
+  `SINGLE` choice; a task waiting for its files starts with them, while `resumeDownload`
+  downloads its default: every file, or the first variant.
 - A task's JSON counts its `selectedFiles` and `totalFiles`, and says whether a completed torrent
   is `seeding`.
 

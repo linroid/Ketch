@@ -20,7 +20,7 @@ class InspectorTabsTest {
   fun inspectorTabs_waitingTorrent_showsFiles() {
     val listed = row("t", waiting, request = magnet(files = FILES))
     val unlisted = row("u", waiting, request = magnet(files = null))
-    val control = setOf(KetchFeatures.TORRENT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
+    val control = setOf(KetchFeatures.FILE_SELECTION, KetchFeatures.TORRENT_CONTROL)
 
     assertEquals(
       listOf(InspectorTab.Overview, InspectorTab.Files),
@@ -40,7 +40,7 @@ class InspectorTabsTest {
   fun inspectorTabs_selectableTorrent_countsEveryFile() {
     val selection = magnet(files = FILES).copy(selectedFileIds = setOf("0"))
     val queued = row("t", DownloadState.Queued, request = selection)
-    val features = setOf(KetchFeatures.TORRENT_FILE_SELECTION)
+    val features = setOf(KetchFeatures.FILE_SELECTION)
 
     assertEquals(3, InspectorTab.Files.count(queued, features))
     assertEquals(1, InspectorTab.Files.count(queued))

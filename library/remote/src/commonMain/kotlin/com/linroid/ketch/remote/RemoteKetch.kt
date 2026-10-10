@@ -170,7 +170,7 @@ class RemoteKetch internal constructor(
     requireProxySupport(request.proxy)
     // An older server would ignore the flag and download every file at once.
     if (request.awaitFileSelection &&
-      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION !in features()
+      KetchFeatures.AWAIT_FILE_SELECTION !in features()
     ) {
       throw UnsupportedOperationException("This device cannot wait for a choice of files")
     }

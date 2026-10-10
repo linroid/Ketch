@@ -25,11 +25,18 @@ object KetchFeatures {
   /** [DownloadConfig.categories] sort downloads into folders. */
   const val CATEGORY_FOLDERS: String = "download.categories"
 
-  /** [DownloadTask.selectFiles] works for torrent tasks in every state but canceled. */
-  const val TORRENT_FILE_SELECTION: String = "torrent.fileSelection"
+  /**
+   * [DownloadTask.selectFiles] works in every state but canceled for downloads whose
+   * [ResolvedSource.files] list several files or variants, following their
+   * [ResolvedSource.selectionMode]. Listed by the sources that implement it.
+   */
+  const val FILE_SELECTION: String = "download.fileSelection"
 
-  /** [DownloadRequest.awaitFileSelection] is honored. */
-  const val TORRENT_AWAIT_FILE_SELECTION: String = "torrent.awaitFileSelection"
+  /**
+   * [DownloadRequest.awaitFileSelection] is honored: a download with several files or variants
+   * waits for a choice once they are known. Listed by the sources that implement it.
+   */
+  const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
 
   /** [KetchApi.torrents] executes commands: REST `/api/torrents` and its event stream. */
   const val TORRENT_CONTROL: String = "torrent.control"
@@ -40,7 +47,6 @@ object KetchFeatures {
   /** Every feature this version of Ketch supports, including optional sources. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
-    CATEGORY_FOLDERS, TORRENT_FILE_SELECTION, TORRENT_AWAIT_FILE_SELECTION, TORRENT_CONTROL,
-    ACTIVE_CONNECTIONS
+    CATEGORY_FOLDERS, FILE_SELECTION, AWAIT_FILE_SELECTION, TORRENT_CONTROL, ACTIVE_CONNECTIONS
   )
 }

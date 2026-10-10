@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
@@ -27,7 +28,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-class TorrentFilesModelTest {
+class FileSelectionModelTest {
   private val files = listOf(
     SourceFile("0", "Show/S01E01.mkv", 1_000),
     SourceFile("1", "Show/S01E02.mkv", 1_000),
@@ -96,6 +97,45 @@ class TorrentFilesModelTest {
   }
 
   @Test
+  fun apply_waitingSingleChoice_startsFromTheFirstVariantAndSendsTheChosenOne() = runTest {
+    val waiting = DownloadState.Paused(DownloadProgress(0, 0), PauseReason.AwaitingFileSelection)
+    val variants = source().copy(selectionMode = FileSelectionMode.SINGLE)
+    val task = RecordingKetchApi().add(waiting, DownloadRequest(STREAM, resolvedSource = variants))
+    val model = model(task)
+    val applied = appliedSelection(task.request, task.state.value, files)
+
+    assertEquals(setOf("0"), applied)
+    model.choose("2", applied)
+    assertEquals(setOf("2"), model.checked(applied))
+    model.choose("0", applied)
+    assertNull(model.pending)
+    model.choose("1", applied)
+    model.apply(applied)
+    runCurrent()
+
+    assertEquals(listOf("select 1"), task.calls)
+  }
+
+  @Test
+  fun appliedSelection_singleChoice_isTheSelectionElseTheFirstVariant() {
+    val variants = source().copy(selectionMode = FileSelectionMode.SINGLE)
+    val running = DownloadState.Downloading(RecordingTask.PROGRESS)
+
+    assertEquals(
+      setOf("0"),
+      appliedSelection(DownloadRequest(STREAM, resolvedSource = variants), running, files)
+    )
+    assertEquals(
+      setOf("2"),
+      appliedSelection(
+        DownloadRequest(STREAM, selectedFileIds = setOf("2"), resolvedSource = variants),
+        running,
+        files
+      )
+    )
+  }
+
+  @Test
   fun apply_failure_revertsAndReportsFailure() = runTest {
     val task = RecordingKetchApi().add(downloading(), DownloadRequest(MAGNET))
     task.failure = IllegalStateException("A file is in the way")
@@ -128,7 +168,7 @@ class TorrentFilesModelTest {
     task: RecordingTask,
     controller: TorrentController? = null,
     onFailure: (Throwable) -> Unit = {},
-  ) = TorrentFilesModel(
+  ) = FileSelectionModel(
     task = task,
     controller = controller,
     launch = { block -> backgroundScope.launch(block = block) },
@@ -149,6 +189,7 @@ class TorrentFilesModelTest {
 
   private companion object {
     const val MAGNET = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    const val STREAM = "https://example.com/show/master.m3u8"
   }
 }
 
