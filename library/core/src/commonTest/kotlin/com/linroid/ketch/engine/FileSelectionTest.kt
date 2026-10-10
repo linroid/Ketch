@@ -127,6 +127,28 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_runningTaskWithoutProgress_publishesTheNewTotal() = runTest {
+    // A transfer with no peers reports no progress, so the change must show at once.
+    val source = SelectableSource().apply { reportsOnChange = false }
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      assertEquals(300, assertIs<DownloadState.Downloading>(task.state.value).progress.totalBytes)
+
+      task.selectFiles(setOf("1"))
+      runCurrent()
+
+      val downloading = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(source.totalOf(setOf("1")), downloading.progress.totalBytes)
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_unacknowledgedAtFinish_reruns() = runTest {
     val source = SelectableSource().apply { collects = false }
     val ketch = ketch(source)

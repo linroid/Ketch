@@ -722,7 +722,23 @@ class Ketch(
       SelectionDelivery.NOT_RUNNING
     }
     when {
-      delivery == SelectionDelivery.DELIVERED -> {}
+      delivery == SelectionDelivery.DELIVERED -> {
+        // Show the new size now: a transfer that moves no bytes reports no progress to carry it.
+        val current = handle.mutableState.value
+        if (current is DownloadState.Downloading) {
+          val downloaded = plan.segments?.sumOf { it.downloadedBytes }
+            ?: current.progress.downloadedBytes.coerceAtMost(plan.totalBytes)
+          handle.mutableState.compareAndSet(
+            current,
+            current.copy(
+              progress = current.progress.copy(
+                downloadedBytes = downloaded,
+                totalBytes = plan.totalBytes,
+              ),
+            ),
+          )
+        }
+      }
       // Cannot happen while the lock is held, as an execution only starts finishing under it.
       delivery == SelectionDelivery.FINISHING -> return null
       reopen || awaiting -> {
