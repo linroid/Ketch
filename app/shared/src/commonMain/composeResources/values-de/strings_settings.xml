@@ -89,10 +89,10 @@
   <string name="settings_theme_light">Hell</string>
   <string name="settings_theme_dark">Dunkel</string>
   <string name="settings_general_accent">Akzentfarbe</string>
-  <string name="settings_accent_signal">Signal</string>
-  <string name="settings_accent_harbor">Hafen</string>
-  <string name="settings_accent_fathom">Tiefsee</string>
-  <string name="settings_accent_beacon">Leuchtfeuer</string>
+  <string name="settings_accent_indigo">Indigo</string>
+  <string name="settings_accent_teal">Petrol</string>
+  <string name="settings_accent_green">Grün</string>
+  <string name="settings_accent_orange">Orange</string>
   <string name="settings_general_density">Dichte</string>
   <string name="settings_general_density_hint">Automatisch: kompakt mit Maus, großzügiger bei Touch-Bedienung.</string>
   <string name="settings_density_auto">Automatisch</string>

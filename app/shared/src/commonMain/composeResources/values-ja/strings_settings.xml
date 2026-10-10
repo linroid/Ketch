@@ -85,10 +85,10 @@
   <string name="settings_theme_light">ライト</string>
   <string name="settings_theme_dark">ダーク</string>
   <string name="settings_general_accent">アクセントカラー</string>
-  <string name="settings_accent_signal">シグナル</string>
-  <string name="settings_accent_harbor">ハーバー</string>
-  <string name="settings_accent_fathom">ファゾム</string>
-  <string name="settings_accent_beacon">ビーコン</string>
+  <string name="settings_accent_indigo">インディゴ</string>
+  <string name="settings_accent_teal">ティール</string>
+  <string name="settings_accent_green">グリーン</string>
+  <string name="settings_accent_orange">オレンジ</string>
   <string name="settings_general_density">表示密度</string>
   <string name="settings_general_density_hint">自動：マウスではコンパクトに、タッチではゆったり表示します。</string>
   <string name="settings_density_auto">自動</string>

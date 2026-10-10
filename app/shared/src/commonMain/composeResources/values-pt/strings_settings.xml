@@ -89,10 +89,10 @@
   <string name="settings_theme_light">Claro</string>
   <string name="settings_theme_dark">Escuro</string>
   <string name="settings_general_accent">Cor de destaque</string>
-  <string name="settings_accent_signal">Sinal</string>
-  <string name="settings_accent_harbor">Porto</string>
-  <string name="settings_accent_fathom">Profundo</string>
-  <string name="settings_accent_beacon">Farol</string>
+  <string name="settings_accent_indigo">Índigo</string>
+  <string name="settings_accent_teal">Verde-azulado</string>
+  <string name="settings_accent_green">Verde</string>
+  <string name="settings_accent_orange">Laranja</string>
   <string name="settings_general_density">Densidade</string>
   <string name="settings_general_density_hint">Automática: compacta com mouse, mais espaçosa com toque.</string>
   <string name="settings_density_auto">Automática</string>

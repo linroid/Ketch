@@ -7,10 +7,10 @@ import androidx.compose.ui.graphics.luminance
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.settings_accent_beacon
-import ketch.app.shared.generated.resources.settings_accent_fathom
-import ketch.app.shared.generated.resources.settings_accent_harbor
-import ketch.app.shared.generated.resources.settings_accent_signal
+import ketch.app.shared.generated.resources.settings_accent_green
+import ketch.app.shared.generated.resources.settings_accent_indigo
+import ketch.app.shared.generated.resources.settings_accent_orange
+import ketch.app.shared.generated.resources.settings_accent_teal
 import org.jetbrains.compose.resources.StringResource
 
 /**
@@ -143,12 +143,12 @@ data class KetchStatusColors(
   val seeding: KetchStatusColor,
 )
 
-/** Accent palettes, chosen in Settings → General → Accent. */
+/** Accent palettes, each named after its color, chosen in Settings → General → Accent. */
 enum class KetchAccent(private val nameResource: StringResource) {
-  Signal(Res.string.settings_accent_signal),
-  Harbor(Res.string.settings_accent_harbor),
-  Fathom(Res.string.settings_accent_fathom),
-  Beacon(Res.string.settings_accent_beacon);
+  Indigo(Res.string.settings_accent_indigo),
+  Teal(Res.string.settings_accent_teal),
+  Green(Res.string.settings_accent_green),
+  Orange(Res.string.settings_accent_orange);
 
   /** The palette's name, as Settings shows it under its swatch. */
   val displayName: UiText get() = nameResource.text()
@@ -171,22 +171,22 @@ internal object KetchPalette {
   class AccentTone(val fill: Color, val text: Color, val soft: Color)
 
   fun accentTone(accent: KetchAccent, dark: Boolean): AccentTone = when (accent) {
-    KetchAccent.Signal -> if (dark) {
+    KetchAccent.Indigo -> if (dark) {
       AccentTone(Color(0xFF5563F0), Color(0xFF8E9BFF), Color(0xFF1D2140))
     } else {
       AccentTone(Color(0xFF4F5DE4), Color(0xFF3C47B7), Color(0xFFECEEFE))
     }
-    KetchAccent.Harbor -> if (dark) {
+    KetchAccent.Teal -> if (dark) {
       AccentTone(Color(0xFF00818D), Color(0xFF4FD1DB), Color(0xFF0D2E33))
     } else {
       AccentTone(Color(0xFF00818D), Color(0xFF006A74), Color(0xFFDDF5F7))
     }
-    KetchAccent.Fathom -> if (dark) {
+    KetchAccent.Green -> if (dark) {
       AccentTone(Color(0xFF007F35), Color(0xFF5FD08A), Color(0xFF0E2C1A))
     } else {
       AccentTone(Color(0xFF007F35), Color(0xFF00692C), Color(0xFFDCF3E3))
     }
-    KetchAccent.Beacon -> if (dark) {
+    KetchAccent.Orange -> if (dark) {
       AccentTone(Color(0xFFC9431C), Color(0xFFFF9A6B), Color(0xFF34160D))
     } else {
       AccentTone(Color(0xFFC9431C), Color(0xFFA8370F), Color(0xFFFFE9E0))
@@ -223,11 +223,11 @@ enum class FileTypeHue(val light: Color, val dark: Color) {
 }
 
 /** Light theme colors with [accent]. */
-fun lightKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
+fun lightKetchColors(accent: KetchAccent = KetchAccent.Indigo): KetchColors =
   ketchColors(accent, isDark = false)
 
 /** Dark theme colors with [accent]. */
-fun darkKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
+fun darkKetchColors(accent: KetchAccent = KetchAccent.Indigo): KetchColors =
   ketchColors(accent, isDark = true)
 
 /** The colors of [accent]; each neutral is written as `pick(light, dark)`. */

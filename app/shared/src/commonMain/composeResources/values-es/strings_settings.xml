@@ -89,10 +89,10 @@
   <string name="settings_theme_light">Claro</string>
   <string name="settings_theme_dark">Oscuro</string>
   <string name="settings_general_accent">Color de acento</string>
-  <string name="settings_accent_signal">Señal</string>
-  <string name="settings_accent_harbor">Puerto</string>
-  <string name="settings_accent_fathom">Braza</string>
-  <string name="settings_accent_beacon">Faro</string>
+  <string name="settings_accent_indigo">Índigo</string>
+  <string name="settings_accent_teal">Verde azulado</string>
+  <string name="settings_accent_green">Verde</string>
+  <string name="settings_accent_orange">Naranja</string>
   <string name="settings_general_density">Densidad</string>
   <string name="settings_general_density_hint">Automática: compacta con puntero, más amplia con pantalla táctil.</string>
   <string name="settings_density_auto">Automática</string>

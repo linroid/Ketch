@@ -760,7 +760,7 @@ internal val SettingsCategory.hue: FileTypeHue
   }
 
 /**
- * The live one-line state of each page, as the list of pages shows it, such as "Light · Signal"
+ * The live one-line state of each page, as the list of pages shows it, such as "Light · Indigo"
  * for General or "~/Downloads · 3 at a time" for Downloads. Pages whose state is still loading
  * have none.
  *
@@ -808,7 +808,7 @@ internal fun rememberSettingsSummaries(
   }
 }
 
-/** "Light · Signal": the theme and the accent. */
+/** "Light · Indigo": the theme and the accent. */
 internal fun generalSummary(theme: ThemeMode, accent: KetchAccent): UiText =
   listOf(theme.label, accent.displayName).joinText()
 

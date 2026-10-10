@@ -85,10 +85,10 @@
   <string name="settings_theme_light">淺色</string>
   <string name="settings_theme_dark">深色</string>
   <string name="settings_general_accent">強調色</string>
-  <string name="settings_accent_signal">訊號</string>
-  <string name="settings_accent_harbor">港灣</string>
-  <string name="settings_accent_fathom">深海</string>
-  <string name="settings_accent_beacon">燈塔</string>
+  <string name="settings_accent_indigo">靛藍</string>
+  <string name="settings_accent_teal">青綠</string>
+  <string name="settings_accent_green">綠色</string>
+  <string name="settings_accent_orange">橙色</string>
   <string name="settings_general_density">密度</string>
   <string name="settings_general_density_hint">自動：使用滑鼠時較緊湊，使用觸控時較寬鬆。</string>
   <string name="settings_density_auto">自動</string>

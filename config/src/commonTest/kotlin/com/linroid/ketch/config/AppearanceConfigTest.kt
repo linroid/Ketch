@@ -9,18 +9,52 @@ class AppearanceConfigTest {
   @Test
   fun `accent round trips through toml under its own section`() {
     val config = KetchConfig(
-      appearance = AppearanceConfig(accent = AccentColor.Fathom),
+      appearance = AppearanceConfig(accent = AccentColor.Green),
     )
     val encoded = ConfigStore.toml
       .encodeToString(KetchConfig.serializer(), config)
     assertTrue(
       encoded.contains("[appearance]") &&
-        encoded.contains("accent = \"fathom\""),
+        encoded.contains("accent = \"green\""),
       "expected a hand-editable appearance section, got:\n$encoded",
     )
     val decoded = ConfigStore.toml
       .decodeFromString(KetchConfig.serializer(), encoded)
-    assertEquals(AccentColor.Fathom, decoded.appearance.accent)
+    assertEquals(AccentColor.Green, decoded.appearance.accent)
+  }
+
+  @Test
+  fun `accents saved under their former names load as their colors`() {
+    val former = mapOf(
+      "signal" to AccentColor.Indigo,
+      "harbor" to AccentColor.Teal,
+      "fathom" to AccentColor.Green,
+      "beacon" to AccentColor.Orange,
+    )
+    for ((name, accent) in former) {
+      val decoded = ConfigStore.toml.decodeFromString(
+        KetchConfig.serializer(),
+        """
+        |[appearance]
+        |accent = "$name"
+        """.trimMargin(),
+      )
+      assertEquals(accent, decoded.appearance.accent, name)
+    }
+  }
+
+  @Test
+  fun `an accent this version does not know loads as the default`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[appearance]
+      |accent = "chartreuse"
+      |theme = "dark"
+      """.trimMargin(),
+    )
+    assertEquals(AccentColor.Indigo, decoded.appearance.accent)
+    assertEquals(ThemeMode.Dark, decoded.appearance.theme)
   }
 
   @Test
@@ -50,11 +84,11 @@ class AppearanceConfigTest {
       KetchConfig.serializer(),
       """
       |[appearance]
-      |accent = "harbor"
+      |accent = "teal"
       """.trimMargin(),
     )
     assertEquals(ThemeMode.System, legacy.appearance.theme)
-    assertEquals(AccentColor.Harbor, legacy.appearance.accent)
+    assertEquals(AccentColor.Teal, legacy.appearance.accent)
   }
 
   @Test

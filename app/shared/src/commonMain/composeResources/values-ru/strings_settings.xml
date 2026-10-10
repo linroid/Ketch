@@ -97,10 +97,10 @@
   <string name="settings_theme_light">Светлая</string>
   <string name="settings_theme_dark">Тёмная</string>
   <string name="settings_general_accent">Акцентный цвет</string>
-  <string name="settings_accent_signal">Сигнал</string>
-  <string name="settings_accent_harbor">Гавань</string>
-  <string name="settings_accent_fathom">Глубина</string>
-  <string name="settings_accent_beacon">Маяк</string>
+  <string name="settings_accent_indigo">Индиго</string>
+  <string name="settings_accent_teal">Сине-зелёный</string>
+  <string name="settings_accent_green">Зелёный</string>
+  <string name="settings_accent_orange">Оранжевый</string>
   <string name="settings_general_density">Плотность</string>
   <string name="settings_general_density_hint">Авто: компактно при работе с мышью, просторнее при касаниях.</string>
   <string name="settings_density_auto">Авто</string>

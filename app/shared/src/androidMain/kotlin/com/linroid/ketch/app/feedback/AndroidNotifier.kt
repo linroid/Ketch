@@ -91,7 +91,7 @@ class AndroidNotifier(
 
   /** Accent the notifications are tinted with, as chosen under Appearance. */
   @Volatile
-  var accent: KetchAccent = KetchAccent.Signal
+  var accent: KetchAccent = KetchAccent.Indigo
 
   // The buttons of the notifications [notify] posts, read once by [setUpChannels] or on first use.
   @Volatile

@@ -120,11 +120,11 @@
   <string name="settings_theme_light">Light</string>
   <string name="settings_theme_dark">Dark</string>
   <string name="settings_general_accent">Accent color</string>
-  <!-- The names of the accent palettes, under their swatches. -->
-  <string name="settings_accent_signal">Signal</string>
-  <string name="settings_accent_harbor">Harbor</string>
-  <string name="settings_accent_fathom">Fathom</string>
-  <string name="settings_accent_beacon">Beacon</string>
+  <!-- The names of the accent palettes, under their swatches. Each is the name of its color. -->
+  <string name="settings_accent_indigo">Indigo</string>
+  <string name="settings_accent_teal">Teal</string>
+  <string name="settings_accent_green">Green</string>
+  <string name="settings_accent_orange">Orange</string>
   <string name="settings_general_density">Density</string>
   <string name="settings_general_density_hint">Auto: compact with a mouse, roomier with touch.</string>
   <string name="settings_density_auto">Auto</string>
@@ -745,7 +745,7 @@
   <string name="settings_search_device_name_keywords">hostname, computer, rename</string>
   <string name="settings_search_theme">System, light or dark</string>
   <string name="settings_search_theme_keywords">dark mode, light mode, appearance</string>
-  <!-- %1$s to %4$s are the accents' names: Signal, Harbor, Fathom and Beacon. -->
+  <!-- %1$s to %4$s are the accents' names: Indigo, Teal, Green and Orange. -->
   <string name="settings_search_accent">%1$s, %2$s, %3$s or %4$s</string>
   <string name="settings_search_accent_keywords">colour, appearance</string>
   <string name="settings_search_density">Auto, compact or comfortable</string>

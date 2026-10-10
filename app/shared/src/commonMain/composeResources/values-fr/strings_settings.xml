@@ -89,10 +89,10 @@
   <string name="settings_theme_light">Clair</string>
   <string name="settings_theme_dark">Sombre</string>
   <string name="settings_general_accent">Couleur d'accentuation</string>
-  <string name="settings_accent_signal">Signal</string>
-  <string name="settings_accent_harbor">Port</string>
-  <string name="settings_accent_fathom">Abysse</string>
-  <string name="settings_accent_beacon">Phare</string>
+  <string name="settings_accent_indigo">Indigo</string>
+  <string name="settings_accent_teal">Bleu canard</string>
+  <string name="settings_accent_green">Vert</string>
+  <string name="settings_accent_orange">Orange</string>
   <string name="settings_general_density">Densité</string>
   <string name="settings_general_density_hint">Auto : compacte avec une souris, plus aérée en tactile.</string>
   <string name="settings_density_auto">Auto</string>

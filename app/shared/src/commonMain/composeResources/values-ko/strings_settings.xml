@@ -85,10 +85,10 @@
   <string name="settings_theme_light">밝게</string>
   <string name="settings_theme_dark">어둡게</string>
   <string name="settings_general_accent">강조 색상</string>
-  <string name="settings_accent_signal">신호</string>
-  <string name="settings_accent_harbor">항구</string>
-  <string name="settings_accent_fathom">심해</string>
-  <string name="settings_accent_beacon">등대</string>
+  <string name="settings_accent_indigo">인디고</string>
+  <string name="settings_accent_teal">청록</string>
+  <string name="settings_accent_green">초록</string>
+  <string name="settings_accent_orange">주황</string>
   <string name="settings_general_density">밀도</string>
   <string name="settings_general_density_hint">자동: 마우스를 쓰면 촘촘하게, 터치에서는 여유 있게 표시합니다.</string>
   <string name="settings_density_auto">자동</string>
