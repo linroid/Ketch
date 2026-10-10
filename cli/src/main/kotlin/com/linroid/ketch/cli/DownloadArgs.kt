@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.core.engine.RequestHeaders
@@ -24,11 +25,14 @@ internal sealed interface DownloadArgs {
     val priority: DownloadPriority = DownloadPriority.NORMAL,
     val maxConcurrent: Int = DownloadConfig.Default.maxConcurrentDownloads,
     val headers: Map<String, String> = emptyMap(),
+    /** `--proxy` or `--no-proxy`, in place of the configured proxy; `null` for that one. */
+    val proxy: ProxyConfig? = null,
   ) : DownloadArgs
 }
 
 private val valueOptions = setOf(
   "--speed-limit", "--priority", "--max-concurrent", "-H", "--header", "--user-agent", "--referer",
+  "--proxy", "--proxy-bypass",
 )
 
 /**
@@ -48,6 +52,9 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var priority = DownloadPriority.NORMAL
   var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
   val headers = LinkedHashMap<String, String>()
+  var proxyUrl: String? = null
+  var bypass: List<String>? = null
+  var direct = false
   // Header names ignore case, so a later option replaces an earlier one however it is spelled.
   fun setHeader(name: String, value: String) {
     headers.keys.removeAll { it.equals(name, ignoreCase = true) }
@@ -59,6 +66,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     val arg = args[i]
     when {
       arg == "--help" || arg == "-h" -> return DownloadArgs.Help
+      arg == "--no-proxy" -> direct = true
       arg in valueOptions -> {
         val value = args.getOrNull(i + 1)
           ?: return DownloadArgs.Invalid("$arg requires a value")
@@ -83,6 +91,13 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
           }
           "--user-agent" -> setHeader("User-Agent", value)
           "--referer" -> setHeader("Referer", value)
+          "--proxy" -> proxyUrl = value
+          "--proxy-bypass" -> {
+            bypass = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            bypass.firstOrNull { !ProxyConfig.isValidBypass(it) }?.let {
+              return DownloadArgs.Invalid("invalid host '$it' in --proxy-bypass")
+            }
+          }
         }
         i++
       }
@@ -100,6 +115,23 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   } catch (e: IllegalArgumentException) {
     return DownloadArgs.Invalid(e.message ?: "invalid header")
   }
+  if (direct && proxyUrl != null) {
+    return DownloadArgs.Invalid("--proxy and --no-proxy cannot be used together")
+  }
+  if (bypass != null && proxyUrl == null) {
+    return DownloadArgs.Invalid("--proxy-bypass requires --proxy")
+  }
+  val proxy = when {
+    direct -> ProxyConfig.Direct
+    proxyUrl != null -> try {
+      ProxyConfig.manual(proxyUrl, bypass.orEmpty())
+    } catch (_: IllegalArgumentException) {
+      return DownloadArgs.Invalid(
+        "invalid proxy '$proxyUrl' (expected http://host:port or socks5://host:port)",
+      )
+    }
+    else -> null
+  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
@@ -107,6 +139,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     priority = priority,
     maxConcurrent = maxConcurrent,
     headers = headers,
+    proxy = proxy,
   )
 }
 
@@ -119,6 +152,7 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     priority = priority,
     headers = headers,
     properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
+    proxy = proxy,
   )
 
 /**

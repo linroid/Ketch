@@ -55,6 +55,10 @@ import kotlinx.serialization.Serializable
  *   [KetchApi.resolve]. When present, the download engine skips
  *   its own probe and uses this information directly. Not persisted
  *   across restarts.
+ * @property proxy how this download reaches its servers, in place of
+ *   [DownloadConfig.proxy]; `null` (the default) follows the global setting
+ *   as it is when the download starts or resumes. Saved with the task, its
+ *   password included.
  * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
  *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
  *   is retained, including after restart. Reusing an ID with different source, destination,
@@ -76,6 +80,7 @@ data class DownloadRequest(
   val conditions: List<DownloadCondition> = emptyList(),
   val resolvedSource: ResolvedSource? = null,
   val requestId: String? = null,
+  val proxy: ProxyConfig? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

@@ -419,6 +419,23 @@
   <string name="settings_network_none_found">ネットワークが見つかりません。Wi-Fiまたはイーサネットに接続してから更新してください。</string>
   <string name="settings_network_http_only">HTTPのみが対象です。FTPとトレントはシステムのデフォルトを使います。</string>
   <string name="settings_network_gone">%1$s · 未接続</string>
+  <string name="settings_proxy">プロキシ</string>
+  <string name="settings_proxy_mode">接続方法</string>
+  <string name="settings_proxy_system">システムのプロキシ</string>
+  <string name="settings_proxy_direct">プロキシなし</string>
+  <string name="settings_proxy_manual">手動プロキシ</string>
+  <string name="settings_proxy_system_hint">%1$sのプロキシ設定に従います。</string>
+  <string name="settings_proxy_address">アドレス</string>
+  <string name="settings_proxy_address_hint">HTTPまたはSOCKS5プロキシ。</string>
+  <string name="settings_proxy_address_invalid">http://host:port または socks5://host:port の形式で入力してください</string>
+  <string name="settings_proxy_username">ユーザー名</string>
+  <string name="settings_proxy_password">パスワード</string>
+  <string name="settings_proxy_optional">任意</string>
+  <string name="settings_proxy_bypass">直接接続する宛先</string>
+  <string name="settings_proxy_bypass_hint">ホスト、IPアドレス、または範囲をカンマ区切りで入力します。サブドメインも含まれます。</string>
+  <string name="settings_proxy_bypass_invalid">%1$s はホスト、アドレス、範囲のいずれでもありません</string>
+  <string name="settings_proxy_footer">HTTPダウンロードの開始時と再開時に適用されます。FTPとトレントは直接接続します。</string>
+  <string name="settings_proxy_unsupported">%1$sではプロキシを使えません。プロキシを選ぶには、そのデバイスのKetchをアップデートしてください。</string>
 
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>
@@ -590,6 +607,8 @@
   <string name="settings_search_connections_keywords">セグメント, スレッド, 並列, 分割</string>
   <string name="settings_search_networks">ダウンロードに使うネットワーク</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, イーサネット, 有線LAN, インターフェース, vpn, 複数のネットワーク</string>
+  <string name="settings_search_proxy">ダウンロードがサーバーに接続する方法</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, httpプロキシ, プロキシ, 除外, ファイアウォール</string>
   <string name="settings_search_trackers">公開トレントに追加するトラッカー</string>
   <string name="settings_search_trackers_keywords">アナウンス, udp, マグネット, トラッカーを追加</string>
   <string name="settings_search_pair">スマートフォンやブラウザからこのデバイスを操作</string>

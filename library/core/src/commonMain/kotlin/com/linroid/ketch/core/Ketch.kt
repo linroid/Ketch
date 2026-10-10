@@ -113,6 +113,7 @@ class Ketch(
     add(KetchFeatures.AUTO_CONNECTIONS)
     add(KetchFeatures.QUEUE_POSITION)
     add(KetchFeatures.REQUEST_ID)
+    add(KetchFeatures.PROXY)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)

@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.ProxyConfig
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -12,6 +13,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * HEAD requests also participate in dispatch. Failed requests are not replayed here, since their
  * callbacks may already have written data; Ketch's existing retry/resume logic handles retries.
  * All networks must reach the same resource with the same content and credentials.
+ * [withProxy] applies a proxy on every network, taking turns with the requests of this engine.
  *
  * This engine owns its delegates and closes each distinct instance once. Closing prevents new
  * requests and closes any requests in flight according to the delegate's own close semantics.
@@ -50,6 +52,8 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
     nextEngine().download(url, range, headers, onData)
   }
 
+  override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
+
   private fun nextEngine(): HttpEngine {
     while (true) {
       val index = nextIndex.load()
@@ -73,5 +77,34 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
       }
     }
     failure?.let { throw it }
+  }
+
+  /** These networks, each reaching servers as [proxy] says; closing it does nothing. */
+  private inner class Proxied(private val proxy: ProxyConfig) : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      nextEngine().withProxy(proxy).head(url, headers)
+
+    override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
+      nextEngine().withProxy(proxy).probe(url, headers)
+
+    override suspend fun downloadResource(
+      url: String,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ): String = nextEngine().withProxy(proxy).downloadResource(url, headers, onData)
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) {
+      nextEngine().withProxy(proxy).download(url, range, headers, onData)
+    }
+
+    override fun withProxy(proxy: ProxyConfig): HttpEngine =
+      this@MultiNetworkHttpEngine.withProxy(proxy)
+
+    override fun close() {}
   }
 }

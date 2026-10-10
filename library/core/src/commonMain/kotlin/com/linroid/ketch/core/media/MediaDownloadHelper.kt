@@ -1,9 +1,11 @@
 package com.linroid.ketch.core.media
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.through
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.sanitizeFileName
 import kotlinx.coroutines.CancellationException
@@ -11,7 +13,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import okio.Buffer
 
-/** Shared bounded manifest fetching and sequential transfer for finite media sources. */
+/**
+ * Shared bounded manifest fetching and sequential transfer for finite media sources. Requests go
+ * through the proxy the task downloads with ([DownloadContext.config]).
+ */
 class MediaDownloadHelper(private val http: HttpEngine, private val type: String) {
   /** Builds metadata for an already validated plan. */
   fun resolve(url: String, plan: MediaPlan): ResolvedSource {
@@ -35,6 +40,7 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     val expected = context.preResolved?.metadata?.get("media.extension")
     mediaRequire(expected == null || expected == plan.extension,
       "Media format changed; add it again")
+    val engine = http.through(context.config.proxy)
     context.segments.value = emptyList()
     disk { context.fileAccessor.preallocate(0) }
     var written = 0L
@@ -44,7 +50,7 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
       var received = 0L
       val expectedBytes = part.range?.let { it.last - it.first + 1 }
       val headers = mediaHeaders(context.url, part.url, context.headers)
-      http.download(part.url, part.range, headers) { data ->
+      engine.download(part.url, part.range, headers) { data ->
         currentCoroutineContext().ensureActive()
         mediaRequire(expectedBytes == null || data.size <= expectedBytes - received,
           "Media server returned a different byte range")
@@ -64,11 +70,18 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
   /** Media transfers restart from zero; no byte offset can identify a refreshed manifest part. */
   fun buildResumeState(): SourceResumeState = SourceResumeState(type, "{}")
 
-  /** Fetches at most 1 MiB and retains the final URL and headers safe for that origin. */
-  suspend fun fetchManifest(url: String, headers: Map<String, String>): MediaManifest {
+  /**
+   * Fetches at most 1 MiB through [proxy] and retains the final URL and headers safe for that
+   * origin.
+   */
+  suspend fun fetchManifest(
+    url: String,
+    headers: Map<String, String>,
+    proxy: ProxyConfig = ProxyConfig.System,
+  ): MediaManifest {
     val checked = mediaUrl(type, url, url)
     val buffer = Buffer()
-    val effective = http.downloadResource(checked, headers) { bytes ->
+    val effective = http.through(proxy).downloadResource(checked, headers) { bytes ->
       mediaRequire(buffer.size + bytes.size <= 1024 * 1024, "Media manifest exceeds 1 MiB")
       buffer.write(bytes)
     }

@@ -7,6 +7,7 @@ import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
@@ -113,10 +114,19 @@ private fun runDownload(args: DownloadArgs.Download) {
   println("Max concurrent: ${args.maxConcurrent}")
   // Names only: values such as cookies are credentials.
   if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
+  val fileConfig = readDefaultConfig()
+  val proxy = args.proxy ?: fileConfig.download.proxy
+  when (proxy.mode) {
+    ProxyMode.SYSTEM -> Unit
+    ProxyMode.DIRECT -> println("Proxy: none")
+    // The URL holds no credentials; they are kept apart.
+    ProxyMode.MANUAL -> println("Proxy: ${proxy.url}")
+  }
   println()
 
   val config = DownloadConfig(
     maxConcurrentDownloads = args.maxConcurrent,
+    proxy = fileConfig.download.proxy,
   )
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
@@ -125,7 +135,7 @@ private fun runDownload(args: DownloadArgs.Download) {
     config = config,
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
-      FtpDownloadSource(), torrentSource(readDefaultConfig().torrent),
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
     ),
   )
@@ -916,6 +926,15 @@ private fun printUsage() {
   println("  --user-agent <value>     Send this User-Agent instead of")
   println("                           Ketch/<version>")
   println("  --referer <url>          Send this Referer")
+  println("  --proxy <url>            Download HTTP(S) through this proxy:")
+  println("                           http://[user:pass@]host:port or")
+  println("                           socks5://[user:pass@]host:port")
+  println("  --proxy-bypass <hosts>   Hosts to reach directly with --proxy,")
+  println("                           comma-separated, e.g. '*.lan,10.0.0.0/8'")
+  println("  --no-proxy               Connect directly, without a proxy")
+  println("                           Default: [download.proxy] in the config")
+  println("                           file, else https_proxy, http_proxy,")
+  println("                           all_proxy and no_proxy")
   println()
   println("Server:")
   println("  server [options]         Start Ketch daemon server")

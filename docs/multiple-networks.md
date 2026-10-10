@@ -103,9 +103,12 @@ Use `java.net.NetworkInterface.getNetworkInterfaces()` and each interface's `ine
 to discover addresses. Choose a concrete IPv4 or IPv6 address; wildcard, multicast, and
 unassigned addresses are rejected. The address family must match an address of the destination.
 
-The factory uses Ktor's OkHttp transport with a separate connection pool per engine and binds
-TCP sockets before connecting, including HTTPS sockets. DNS uses the system resolver and
-filters results to the chosen source address family. System proxies are disabled. Source-address
+The factory uses Ktor's OkHttp transport with separate connection pools per engine and binds
+TCP sockets before connecting, including HTTPS sockets and those to a proxy. DNS uses the
+system resolver and filters results to the chosen source address family. A [proxy](proxy.md)
+set for the downloads is reached from the address, and the system's proxy is that of the
+environment variables and the JVM's `ProxySelector`, so it must be reachable from every
+selected address. Source-address
 binding still depends on OS routing; it does not guarantee a physical egress interface on every
 OS or VPN configuration. Configure routes as needed. A removed address produces a failure;
 the factory never falls back to an unbound socket. Recreate engines after address changes.
@@ -130,8 +133,10 @@ val httpEngine = MultiNetworkHttpEngine(
 ```
 
 The factory binds both sockets and DNS to the supplied network without changing the process's
-default network. Each engine has its own connection pool and connects directly without a system
-proxy. Acquire and retain networks with `ConnectivityManager` and the permissions required by
+default network. Each engine has its own connection pools. A [proxy](proxy.md) set for the
+downloads is reached over the network too; the system's proxy is the network's own HTTP proxy,
+which `forNetwork` reads when given a `connectivityManager` (`withNetworkInterfaces` passes its
+own), and requests connect directly without one. Acquire and retain networks with `ConnectivityManager` and the permissions required by
 the network APIs your app uses. The caller owns network callbacks and unregisters them when done.
 Selecting cellular explicitly can consume mobile data. Network loss fails affected requests;
 it does not silently switch those requests to the system default network.

@@ -195,7 +195,7 @@ Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 |---|---|
 | Android | OkHttp |
 | iOS | Darwin |
-| Desktop | CIO |
+| Desktop | CIO; OkHttp through a proxy |
 
 On JavaScript and WasmWasi, pass your own `HttpEngine` to `Ketch`.
 
@@ -208,6 +208,12 @@ any other header, which may hold a credential, stay with the origin they were gi
 engine remembers where a request's redirects led, so a download's segments go to the server that
 answered its probe; when that server fails, for example because a signed link expired, the next
 request follows the redirects again.
+
+`KtorHttpEngine` applies `DownloadConfig.proxy` and `DownloadRequest.proxy` (see
+[proxies](proxy.md)): every request, and every hop of a redirect, goes directly or through an
+HTTP or SOCKS5 proxy as the setting says for its URL. An engine built around an `HttpClient` of
+your own only follows the system's proxy settings, in the client's own way, and fails downloads
+given any other proxy with `KetchError.Unsupported`.
 
 For downloading across multiple interfaces, wrap network-bound engines in
 `MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;
@@ -237,6 +243,7 @@ DownloadConfig(
   speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
   maxConcurrentDownloads = 4,     // max simultaneous downloads (0 = unlimited)
   maxConnectionsPerHost = 16,     // max simultaneous downloads per host (0 = unlimited)
+  proxy = ProxyConfig.System,     // HTTP(S) proxy: System, Direct or ProxyConfig.manual(url)
 )
 ```
 
@@ -301,6 +308,15 @@ ketch.download(
 // Speed limiting
 task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
 ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // global
+
+// Proxies: one for every download, and one for a single download
+ketch.updateConfig(config.copy(proxy = ProxyConfig.manual("http://proxy.lan:3128")))
+ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    proxy = ProxyConfig.manual("socks5://user:secret@127.0.0.1:1080", bypass = listOf("*.lan")),
+  )
+)
 ```
 
 A per-task limit applies in addition to the global one, so a task never exceeds the lower of

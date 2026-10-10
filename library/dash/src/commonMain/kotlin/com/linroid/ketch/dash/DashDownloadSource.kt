@@ -1,6 +1,8 @@
 package com.linroid.ketch.dash
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
@@ -24,10 +26,16 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource {
     Regex("https?://[^?#]+\\.mpd(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(url)
 
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    helper.resolve(url, plan(url, properties))
+    helper.resolve(url, plan(url, properties, ProxyConfig.System))
+
+  override suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = helper.resolve(url, plan(url, properties, config.proxy))
 
   override suspend fun download(context: DownloadContext) {
-    helper.download(context, plan(context.url, context.headers))
+    helper.download(context, plan(context.url, context.headers, context.config.proxy))
   }
 
   override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
@@ -37,8 +45,12 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource {
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
     helper.buildResumeState()
 
-  private suspend fun plan(original: String, headers: Map<String, String>): MediaPlan {
-    val manifest = helper.fetchManifest(original, headers)
+  private suspend fun plan(
+    original: String,
+    headers: Map<String, String>,
+    proxy: ProxyConfig,
+  ): MediaPlan {
+    val manifest = helper.fetchManifest(original, headers, proxy)
     return parseDash(manifest.text, manifest.url)
   }
 }

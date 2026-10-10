@@ -104,6 +104,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   conexiones durante la descarga.
 - **Varias redes a la vez** — Reparte una descarga entre Wi-Fi, Ethernet y, en Android, datos
   móviles ([cómo funciona](docs/multiple-networks.md)).
+- **Proxy** — Descarga a través del proxy del sistema, un proxy HTTP o SOCKS5 con usuario y
+  contraseña, o sin proxy, con conexión directa a los hosts que indiques; también para una sola
+  descarga ([detalles](docs/proxy.md)).
 - **Pausa y reanudación, incluso tras reiniciar** — Ketch comprueba que el archivo del servidor
   no haya cambiado antes de continuar y reintenta automáticamente las conexiones fallidas.
 
@@ -226,7 +229,6 @@ la [documentación de la CLI](cli/README.md) enumera todos los comandos.
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
 - **Sumas de comprobación** — Verificar una descarga con un hash que proporciones o publique el
   servidor
-- **Proxy** — Descargar mediante un proxy HTTP, SOCKS5 o del sistema, con una lista de excepciones
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
 - **Detección de bloqueos y ajustes de reintento** — Reconectar si una conexión deja de enviar datos

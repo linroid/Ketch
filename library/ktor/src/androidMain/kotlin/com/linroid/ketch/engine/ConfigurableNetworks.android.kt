@@ -14,7 +14,8 @@ import com.linroid.ketch.core.engine.NetworkInterfaceProvider
  * the app owns ConnectivityManager callbacks when keeping a non-default network alive is needed.
  * Network IDs are scoped to the current network lifetime and must be rediscovered after reconnects.
  * Networks are named by their transport, "Wi-Fi" or "Mobile data", not by kernel interface.
- * Starts with system-default routing; selected networks use [forNetwork] for sockets and DNS.
+ * Starts with system-default routing; selected networks use [forNetwork] for sockets, DNS and
+ * their own proxy.
  */
 fun KtorHttpEngine.Companion.withNetworkInterfaces(
   connectivityManager: ConnectivityManager,
@@ -55,7 +56,7 @@ internal class AndroidNetworkInterfaceProvider(
     val network = requireNotNull(manager.allNetworks.find {
       it.networkHandle.toString() == networkInterface.id && isAvailable(it)
     }) { "Unknown or unavailable network: ${networkInterface.id}" }
-    return KtorHttpEngine.forNetwork(network, logRequests, userAgent)
+    return KtorHttpEngine.forNetwork(network, logRequests, userAgent, manager)
   }
 
   private fun isAvailable(network: Network): Boolean =

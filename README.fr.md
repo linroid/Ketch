@@ -105,6 +105,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   retirer des connexions pendant le téléchargement.
 - **Plusieurs réseaux à la fois** — Répartissez un téléchargement entre Wi-Fi, Ethernet et, sur
   Android, données mobiles ([fonctionnement](docs/multiple-networks.md)).
+- **Proxy** — Téléchargez via le proxy du système, un proxy HTTP ou SOCKS5 avec nom d'utilisateur
+  et mot de passe, ou sans proxy, en joignant directement les hôtes de votre choix ; aussi pour un
+  seul téléchargement ([détails](docs/proxy.md)).
 - **Pause et reprise, même après un redémarrage** — Avant de reprendre, Ketch vérifie que le fichier
   sur le serveur n'a pas changé et relance automatiquement les connexions en échec.
 
@@ -233,7 +236,6 @@ La [documentation CLI](cli/README.md) présente toutes les commandes.
 - **Détection de ressources** — Trouver les fichiers téléchargeables d'une page web
 - **Sommes de contrôle** — Vérifier un téléchargement avec une empreinte fournie par vous ou
   publiée par le serveur
-- **Proxy** — Télécharger via un proxy HTTP, SOCKS5 ou système, avec une liste d'exceptions
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
   aux plus lentes pour ne plus attendre la connexion la plus lente
 - **Détection des blocages et réglages de reprise** — Reconnecter lorsqu'une connexion n'envoie

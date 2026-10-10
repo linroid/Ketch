@@ -65,7 +65,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
-  `ResolvedSource`, `SourceFile`, `FileSelectionMode`
+  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
   `redactUrl()`, `describeCauses()`
 - `com.linroid.ketch.api.torrent` -- `TorrentController` (optional `KetchApi.torrents`; no backend
@@ -90,7 +90,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `library:ktor`, `library:kermit`, `library:sqlite`
 - `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM),
-  `RedirectCache`
+  `RedirectCache`; internal proxy transports: `ProxyRoute`, `HttpTransports`, `JvmTransports`
+  (with `EnvironmentProxies`), `AndroidTransports`, `DarwinTransports`, `Socks5Socket`
 - `com.linroid.ketch.log` -- `KermitLogger`
 - `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual),
   `UnreadableDatabase`
@@ -231,6 +232,25 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - HTTP requests can be spread round-robin over selected network interfaces
   (`KetchApi.updateNetworkInterfaces`, `MultiNetworkHttpEngine`); see
   [multiple networks](docs/multiple-networks.md)
+- Proxies for HTTP(S), HLS and DASH downloads (not FTP or BitTorrent; Discover never proxies):
+  `DownloadConfig.proxy` (`[download.proxy]`), replaced per task by `DownloadRequest.proxy`, which
+  `DownloadCoordinator` folds into the run's `DownloadContext.config` (`forRequest`); `resolve`
+  uses the global one. `ProxyConfig` is `SYSTEM` (default), `DIRECT` or `MANUAL` with an
+  `http://` or `socks5://` URL (`ProxyAddress.parse`), username/password and a bypass list
+  (domains with subdomains, IPs, CIDR, `<local>`, `*`); loopback hosts always go directly and
+  `toString` masks the password. Sources call `HttpEngine.withProxy` (internal `through()`) only
+  for non-SYSTEM modes; its default refuses them with `KetchError.Unsupported`, so a proxy is
+  never skipped. `Multi`/`ConfigurableNetworkHttpEngine` return views sharing their selection and
+  round robin. `KtorHttpEngine` resolves a `ProxyRoute` per request and redirect hop and keeps one
+  client per route (`HttpTransports`): JVM uses CIO for direct requests the JVM `ProxySelector`
+  would not proxy and OkHttp (HTTP/1.1) otherwise, SYSTEM reading `https_proxy`/`http_proxy`/
+  `all_proxy`/`no_proxy` (`EnvironmentProxies`) then the JVM selector, which reads the OS settings
+  with `-Djava.net.useSystemProxies=true` (the desktop launcher sets it); Android leaves SYSTEM to
+  OkHttp; iOS sets `NSURLSession` proxy dictionaries. HTTP proxy credentials only go in `CONNECT`
+  and proxied plain-HTTP requests; SOCKS5 is Ketch's own `Socks5Socket` (RFC 1928/1929, names
+  resolved by the proxy). The interface-bound engines reach proxies through their address or
+  network; a custom `HttpClient` only follows SYSTEM. `KetchFeatures.PROXY` (`http.proxy`), and
+  `RemoteKetch` refuses a proxy for servers without it. See [proxies](docs/proxy.md)
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
@@ -442,7 +462,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `InstanceSettingsController` (`AppState.settingsFor`): pushed live via
   `KetchApi.updateConfig` / `updateNetworkInterfaces`. Downloads settings are saved to
   `config.toml` only for the embedded instance; the network selection is runtime-only and
-  never saved
+  never saved. The Network page also edits the device's proxy (`ProxySettings`), shown for
+  devices listing `KetchFeatures.PROXY`
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, `allowedDirectories`, mDNS,
   `autoStart` (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
@@ -627,6 +648,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   GitHub publishes per asset (files without one are refused). Pass it the process's logger:
   every `Ketch` installs its logger globally
 - `ReleaseVersion` orders `rc9` before `rc15` and pre-releases before their release
+- `ketch <url>` downloads through `[download.proxy]` of the config file; `--proxy <url>`,
+  `--proxy-bypass <hosts>` and `--no-proxy` set `DownloadRequest.proxy` instead
 - `ketch update [--check] [--version <v>]` replaces the native binary (`CliInstallation`): renamed
   over the old one on macOS/Linux, the old one set aside as `ketch.exe.old` on Windows; refuses
   on a JVM. See [updates](docs/updates.md)
@@ -835,49 +858,45 @@ Planned features not yet implemented:
    mismatch fails the task with a typed error. Pure Kotlin on every target, settable from the
    apps, the CLI (`--checksum`), REST and MCP. Today only `library:torrent` and `updater` hash
    content; Metalink and mirrors build on this
-7. **Proxy** - HTTP(S) and SOCKS5 proxies with credentials and a bypass list, or the system
-   proxy, set in `DownloadConfig` / `[download]` with a per-download override and applied by
-   `KtorHttpEngine`, including the per-interface engines, which force `NO_PROXY` today. Today
-   CIO on the JVM honors only JVM proxy properties; the OS proxy and `HTTPS_PROXY` are ignored
-8. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
+7. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-9. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
+8. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
    speed, unlimited retries and a capped, jittered backoff that resets once bytes are saved; a
    watchdog around HTTP segments and FTP transfers raises a retryable `KetchError.Network`.
    Today socket and request timeouts are `Long.MAX_VALUE`, so a stalled connection hangs until
    the task is paused, and the backoff (`retryDelayMs * (1 shl n)`) has no cap
-10. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
-    renamed to the final, deduplicated name after the last flush, never replacing a file that
-    appeared meanwhile. Today they write to the final name, preallocated to full size, so an
-    unfinished file looks complete
-11. **Category folders** - Rules (by extension, MIME type or host) choose the folder under the
+9. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
+   renamed to the final, deduplicated name after the last flush, never replacing a file that
+   appeared meanwhile. Today they write to the final name, preallocated to full size, so an
+   unfinished file looks complete
+10. **Category folders** - Rules (by extension, MIME type or host) choose the folder under the
     default directory for downloads without an explicit destination, applied in the engine so
     every client, the server and the browser extension get them
-12. **Torrent file selection after adding** - A magnet added without a selection can wait, with
+11. **Torrent file selection after adding** - A magnet added without a selection can wait, with
     its metadata, until files are chosen, and a running torrent's selection can change, through
     `KetchApi`, the REST API and MCP. Today a selection can only be given up front
     (`DownloadRequest.selectedFileIds`, after a resolve), and a magnet added without one, as the
     extension, CLI and MCP always do, downloads every file
-13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
+12. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
     on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
     `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
     quit, sleep or shut down once the queue is empty
-14. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+13. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-15. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
+14. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
     and `ketch mcp` attach through `RemoteKetch` to the running desktop app or a server instead
     of opening `ketch.db` with a second engine, and an idempotency key keeps retried submissions
     from creating duplicates. Today `ketch mcp` and `ketch server` can open the desktop app's
     `ketch.db` while it runs, and both engines resume the same tasks
-16. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
+15. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
     workflow, with an unauthenticated readiness endpoint that answers once saved tasks are
     restored, configuration through environment variables, and a fixed, configurable BitTorrent
     listen port (today the OS picks one on every launch)
-17. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+16. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-18. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+17. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
-    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 8
+    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 7
