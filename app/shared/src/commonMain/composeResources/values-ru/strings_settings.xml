@@ -136,6 +136,9 @@
   <string name="settings_general_badge_active">Активные загрузки</string>
   <string name="settings_general_badge_failures">Только ошибки</string>
   <string name="settings_general_badge_off">Ничего</string>
+  <string name="settings_general_power">Питание</string>
+  <string name="settings_general_keep_awake">Не засыпать во время загрузок</string>
+  <string name="settings_general_keep_awake_hint">%1$s не будет сам переходить в режим сна, пока идут загрузки. Экран при этом может выключаться.</string>
 
   <string name="settings_notifications_downloads">Загрузки</string>
   <string name="settings_notifications_footer">«Уведомлять» использует системные уведомления. «Только в приложении» — сообщения внутри Ketch.</string>
@@ -576,6 +579,7 @@
   <string name="settings_search_start_hidden_keywords">автозапуск, фон, свернуть, строка меню, трей</string>
   <string name="settings_search_badge">Что показывает значок в Dock или на панели задач</string>
   <string name="settings_search_badge_keywords">счётчик, наклейка, dock, панель задач</string>
+  <string name="settings_search_keep_awake_keywords">сон, спящий режим, питание, батарея, не засыпать, wake lock</string>
   <string name="settings_search_shortcuts">Все сочетания клавиш</string>
   <string name="settings_search_shortcuts_keywords">клавиши, горячие клавиши, быстрые клавиши</string>
   <string name="settings_search_finished_keywords">завершено, готово, оповещение</string>

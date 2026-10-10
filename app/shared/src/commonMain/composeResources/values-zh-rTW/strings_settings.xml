@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">進行中的下載</string>
   <string name="settings_general_badge_failures">僅限失敗項目</string>
   <string name="settings_general_badge_off">不顯示</string>
+  <string name="settings_general_power">電源</string>
+  <string name="settings_general_keep_awake">下載時保持喚醒</string>
+  <string name="settings_general_keep_awake_hint">下載進行時，%1$s不會自動進入睡眠。螢幕仍可關閉。</string>
 
   <string name="settings_notifications_downloads">下載</string>
   <string name="settings_notifications_footer">「通知」使用系統通知；「僅在應用程式內」只會在 Ketch 中顯示。</string>
@@ -531,6 +534,7 @@
   <string name="settings_search_start_hidden_keywords">啟動, 背景, 選單列, 系統匣, 隱藏</string>
   <string name="settings_search_badge">Dock 或工作列圖示顯示的內容</string>
   <string name="settings_search_badge_keywords">數字, 標記, 徽章, dock, 工作列</string>
+  <string name="settings_search_keep_awake_keywords">睡眠, 休眠, 電源, 電池, 防止睡眠, 喚醒鎖</string>
   <string name="settings_search_shortcuts">所有快速鍵</string>
   <string name="settings_search_shortcuts_keywords">按鍵, 快速鍵, 熱鍵, 鍵盤</string>
   <string name="settings_search_finished_keywords">完成, 下載完成, 提醒</string>

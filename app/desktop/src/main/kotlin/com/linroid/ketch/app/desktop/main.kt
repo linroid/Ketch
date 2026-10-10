@@ -70,7 +70,9 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.FileDiscoverHistoryStore
+import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
@@ -106,6 +108,7 @@ import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.keep_awake_reason
 import ketch.app.desktop.generated.resources.message_window_error
 import ketch.app.desktop.generated.resources.notify_added
 import ketch.app.desktop.generated.resources.notify_names_more
@@ -183,14 +186,18 @@ fun main(args: Array<String>) {
     file = File(configDir, "browser-extension.properties"),
     browsers = registration::browsers,
   )
-  val extensionServer = BrowserExtensionServer(
+  val localApiServer = LocalApiServer(
     onConnect = { integration.extensionConnected(connectingBrowser()) },
   )
   val singleInstance = SingleInstance.acquire(
     configDir,
     launched.toArguments() + listOfNotNull(BACKGROUND_FLAG.takeIf { background }),
     onRequest = { request ->
-      if (request == NativeMessagingHost.CONNECT_REQUEST) extensionServer.connect() else null
+      when (request) {
+        NativeMessagingHost.CONNECT_REQUEST -> localApiServer.connect()
+        CLI_CONNECT_REQUEST -> localApiServer.connect(fromExtension = false)
+        else -> null
+      }
     },
   ) { forwarded ->
     open(fileArguments(forwarded), LinkSource.Arguments)
@@ -252,7 +259,7 @@ fun main(args: Array<String>) {
     windowRequests = windowRequests.receiveAsFlow(),
     background = background,
     singleInstance = singleInstance,
-    extensionServer = extensionServer,
+    localApiServer = localApiServer,
     integration = integration,
     logger = logger,
     fileLogger = fileLogger,
@@ -288,7 +295,7 @@ private class LaunchContext(
   val windowRequests: Flow<Unit>,
   val background: Boolean,
   val singleInstance: SingleInstance,
-  val extensionServer: BrowserExtensionServer,
+  val localApiServer: LocalApiServer,
   val integration: DesktopIntegrationStatus,
   val logger: Logger,
   val fileLogger: FileLogger,
@@ -466,6 +473,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   // Pairing requests ask in the main window; from the tray while it is not in front.
   remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
+  remember { keepAwake(controller) }
   LaunchedEffect(controller, notifier) {
     // Such as Discover waiting for an OK, which would wait unseen while the window is away.
     MessageNotifications.follow(
@@ -602,7 +610,7 @@ private fun createInstanceManager(
             FtpDownloadSource(), torrentSource,
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
           ),
-        ).also(launch.extensionServer::attach)
+        ).also(launch.localApiServer::attach)
       },
       localServerFactory = { ketchApi, pairingRequests ->
         // Reloaded here so a restart from Settings picks up the
@@ -691,7 +699,7 @@ private class AppResources(
     closed = true
     controller.close()
     localSpeed.close()
-    launch.extensionServer.close()
+    launch.localApiServer.close()
     controller.instanceManager.close()
     launch.singleInstance.close()
   }
@@ -865,6 +873,21 @@ private fun notifyPairingRequests(
     controller.instanceManager.pairingRequests.watch(
       onArrived = { ask -> if (!inFront()) notifier.post(pairingNotificationCopy(ask)) },
       onLeft = {},
+    )
+  }
+}
+
+/**
+ * Keeps this computer from sleeping while idle as long as its downloads run or wait in the queue,
+ * as `[power] keepAwake` allows; the controller's scope ending lets it sleep again.
+ */
+private fun keepAwake(controller: AppController) {
+  val embedded = controller.instanceManager.embedded ?: return
+  controller.scope.launch(Dispatchers.IO) {
+    KeepAwake.follow(
+      inhibitor = systemSleepInhibitor(Res.string.keep_awake_reason.text().load()),
+      statuses = ForegroundPolicy.observe(embedded.tasks, controller.instanceManager.serverState),
+      enabled = snapshotFlow { controller.appSettings.config.power.keepAwake },
     )
   }
 }

@@ -118,4 +118,6 @@
   </plurals>
 
   <string name="settings_window_title">설정</string>
+
+  <string name="keep_awake_reason">다운로드 진행 중</string>
 </resources>

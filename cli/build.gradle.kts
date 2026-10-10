@@ -31,6 +31,10 @@ graalvmNative {
       )
       buildArgs.addAll(
         "--no-fallback",
+        // Runs the shutdown hooks on SIGINT and SIGTERM, as the JVM does: `ketch server` then
+        // pauses its downloads and stops announcing itself. Without them, PID 1 of a container,
+        // as in the Docker image, would even ignore `docker stop`'s SIGTERM.
+        "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         "--initialize-at-build-time=ch.qos.logback",
@@ -43,9 +47,6 @@ graalvmNative {
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
-        // SIGTERM and SIGINT run the shutdown hooks, which pause downloads and save them. Without
-        // handlers, PID 1 of a container, as in the Docker image, ignores `docker stop`'s SIGTERM.
-        "--install-exit-handlers",
       )
       // Optimizing for size needs GraalVM for JDK 23 or later. Older ones build with -Ob, which
       // optimizes less than the default -O2 and so makes a smaller binary.
@@ -135,14 +136,18 @@ tasks.named("nativeCompile") {
 
 // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the CLI does not
 // use (reflective tool sets and schemas, loading server modules by name). The stdlib looks it up
-// by name, so native-image would compile much of it in.
-configurations.runtimeClasspath {
-  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
-}
+// by name, so native-image would compile much of it in, without the metadata it reads: Ktor's
+// StatusPages then failed every error response with "Built-in class kotlin.Any is not found"
+// while printing its handler. The native image resolves a classpath of its own.
+configurations.matching { it.name == "runtimeClasspath" || it.name == "nativeImageClasspath" }
+  .configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+  }
 
 dependencies {
   implementation(projects.config)
   implementation(projects.library.server)
+  implementation(projects.library.remote)
   implementation(projects.library.mcp)
   implementation(projects.ai.discover)
   implementation(projects.library.core)

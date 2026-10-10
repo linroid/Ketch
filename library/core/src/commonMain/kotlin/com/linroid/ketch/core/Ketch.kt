@@ -410,7 +410,10 @@ class Ketch(
         }
       }
 
-      _tasks.value = loaded
+      // Downloads added while the records loaded, such as through a server that already
+      // listens, are saved after the snapshot and stay in the list.
+      val recordIds = records.map { it.taskId }.toSet()
+      _tasks.value = loaded + currentTasks.filter { it.taskId !in recordIds }
     }
   }
 

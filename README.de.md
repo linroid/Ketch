@@ -138,6 +138,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Ohne Oberfläche auf NAS oder Server** — `ketch server`, auch als
   [Docker-Image](docs/docker.md), startet dieselbe Engine mit REST-API und integrierter Web-App.
   Die Apps finden den Server in deinem Netzwerk.
+- **Aus dem Terminal** — `ketch add`, `list`, `pause`, `resume` und `watch` steuern die Downloads
+  der Ketch-App oder eines Servers aus dem Terminal oder einem Skript; `watch` gibt JSON-Zeilen aus
+  ([CLI](cli/README.md#work-on-a-running-ketch)).
 
 ### Deine Bandbreite im Griff
 
@@ -161,6 +164,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   heraus, direkt aus der Liste.
 - **Auf jeder Plattform zu Hause** — Menüleiste oder Infobereich, Benachrichtigungen und Fortschritt
   im Dock und in der Taskleiste auf dem Desktop; Hintergrunddownloads unter Android und iOS 26.
+- **Wach während Downloads** — Die Desktop- und Android-Apps halten das System vom selbstständigen
+  Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
+  (**Einstellungen → Allgemein**).
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit vier Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
   ([Übersetzungen](docs/development/localization.md)).
@@ -176,8 +182,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   Modelldienst: OpenAI, Anthropic, Gemini, Ollama oder einen OpenAI-kompatiblen Dienst. Verfügbar in
   den Desktop- und Android-Apps sowie mit `ketch ai-discover`
   ([Einrichtung](docs/ai-discovery.md)).
-- **MCP-Server** — Mit `ketch mcp` können KI-Assistenten deine Downloads über das
-  [Model Context Protocol](cli/README.md#mcp-server) starten, verfolgen und verwalten.
+- **MCP-Server** — Mit `ketch mcp` können KI-Assistenten die Downloads der Ketch-App oder eines
+  Servers über das [Model Context Protocol](cli/README.md#mcp-server) starten, verfolgen und
+  verwalten.
 
 <a id="getting-started"></a>
 
@@ -254,11 +261,9 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   Ordnern speichern
 - **Torrent-Dateien jederzeit wählen** — Nach Eingang der Magnet-Metadaten Dateien auswählen und
   die Auswahl während des Downloads ändern
-- **Wach halten** — Den Computer während Downloads am Einschlafen hindern und danach optional
-  in den Ruhezustand versetzen oder herunterfahren
+- **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
+  herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen
-- **Kommandozeile für laufende Geräte** — `ketch` und KI-Agenten ergänzen, listen, pausieren und
-  verfolgen Downloads der Ketch-App oder eines Servers, ohne eine zweite Engine zu starten
 - **Übertragung zwischen Geräten** — Senden an und Verschieben nach übertragen bereits geladene
   Daten, damit das andere Gerät fortsetzen kann, statt von vorn zu beginnen
   ([Plan](docs/plans/task-transfer.md))

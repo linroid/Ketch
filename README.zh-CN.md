@@ -126,6 +126,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   或将下载任务发送或移动到另一台设备，无需切换当前设备。
 - **在 NAS 或服务器上无界面运行** — `ketch server`（也提供 [Docker 镜像](docs/docker.zh-CN.md)）
   运行同一个引擎，内置 REST API 和网页应用，其他 Ketch 应用可在局域网中发现它。
+- **在终端中操作** — `ketch add`、`list`、`pause`、`resume` 和 `watch` 可在终端或脚本中管理 Ketch
+  应用或服务器的下载任务；`watch` 输出 JSON 行（[CLI](cli/README.md#work-on-a-running-ketch)）。
 
 ### 掌控带宽
 
@@ -146,6 +148,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 - **下载完成即可打开** — 直接从列表打开文件、在文件夹中显示，或将文件拖出。
 - **融入各个平台** — 桌面端支持菜单栏或托盘、通知、Dock 和任务栏进度；
   Android 和 iOS 26 上可在后台继续下载。
+- **下载时保持唤醒** — 桌面版和 Android 版在下载进行时防止系统自动进入睡眠，屏幕仍可关闭
+  （**设置 → 通用**）。
 - **外观与语言随心选择** — 浅色与深色主题、四种强调色，支持 English、简体中文、繁體中文、
   日本語、한국어、Español、Português (Brasil)、Deutsch 和 Français
   （[参与翻译](docs/development/localization.md)）。
@@ -159,7 +163,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   Gemini、Ollama 或任意兼容 OpenAI 的服务。桌面端、Android 应用和 `ketch ai-discover`
   均可使用（[配置方法](docs/ai-discovery.md)）。
 - **MCP 服务器** — `ketch mcp` 让 AI 助手通过
-  [Model Context Protocol](cli/README.md#mcp-server) 启动、查看和管理下载任务。
+  [Model Context Protocol](cli/README.md#mcp-server) 启动、查看和管理 Ketch 应用或服务器中的下载任务。
 
 <a id="getting-started"></a>
 
@@ -224,10 +228,8 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **让未完成文件一目了然** — 下载时使用临时文件名，完成后再改为正式名称
 - **分类文件夹** — 按自定义规则，将视频、音乐、文档和压缩包保存到各自的文件夹
 - **随时选择种子文件** — 磁力链接的详情获取后再选择文件，下载中也可调整选择
-- **保持唤醒** — 下载时防止电脑休眠，可选在完成后休眠或关机
+- **下载完成后** — 队列清空后可选择退出 Ketch、让电脑睡眠或关机
 - **自动化钩子** — 下载完成或失败时执行命令或调用 webhook
-- **控制运行中设备的命令行** — `ketch` 和 AI 智能体可添加、列出、暂停和查看 Ketch 应用
-  或服务器中的下载任务，无需启动第二个引擎
 - **设备间传输** — 「发送到」和「移动到」携带已下载的数据，让另一台设备继续下载，
   无需从头开始（[计划](docs/plans/task-transfer.md)）
 - **辅助设备** — 让其他设备使用各自的网络连接下载同一文件的部分内容，运行中可随时加入或退出

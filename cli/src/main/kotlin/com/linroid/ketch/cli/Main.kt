@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverDevice
@@ -58,7 +59,7 @@ fun main(args: Array<String>) {
   val remaining = applyGlobalFlags(args.toMutableList())
 
   // The MCP server owns stdout, and ai-discover keeps it for its results, so each prints the
-  // banner to stderr itself; health prints none
+  // banner to stderr itself; health and the commands that work on a running instance print none
   when (remaining.firstOrNull()) {
     "mcp" -> {
       runMcp(remaining.drop(1))
@@ -69,6 +70,7 @@ fun main(args: Array<String>) {
       if (status != AiDiscoverExit.OK) exitProcess(status)
       return
     }
+    in INSTANCE_COMMANDS -> exitProcess(runInstance(remaining.first(), remaining.drop(1)))
     // Health checks run it every few seconds: one line, no banner.
     "health" -> exitProcess(runHealth(remaining.drop(1)))
   }
@@ -451,6 +453,7 @@ private fun runServer(args: Array<String>): Int {
   File(downloadConfig.defaultDirectory).mkdirs()
 
   val dbPath = defaultDbPath()
+  val instance = claimDownloads(SERVER_COMMAND)
   val taskStore = openTaskStore(dbPath)
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
@@ -484,6 +487,7 @@ private fun runServer(args: Array<String>): Int {
     println("Shutting down Ketch server...")
     server.stop()
     ketch.close()
+    instance.close()
   })
 
   println("Ketch Server v${KetchApi.VERSION}")
@@ -541,17 +545,130 @@ private fun runServer(args: Array<String>): Int {
     )
   }
 
-  serveDaemon(server, ketch)
+  serveDaemon(server, ketch) {
+    // Other `ketch` commands on this machine attach to it through this.
+    val port = runBlocking { server.port() }
+    instance.publish(
+      CliInstance.Info(
+        command = SERVER_COMMAND,
+        pid = ProcessHandle.current().pid(),
+        url = loopbackUrl(serverConfig.host, port),
+        token = serverConfig.apiToken,
+      )
+    )
+  }
   return 0
 }
+
+/** How [CliInstance.Info] names `ketch server`. */
+private const val SERVER_COMMAND = "ketch server"
+
+/** How [CliInstance.Info] names `ketch mcp --standalone`. */
+private const val STANDALONE_MCP_COMMAND = "ketch mcp --standalone"
+
+/**
+ * Makes this process, which runs [command], the one that runs the downloads of the config
+ * directory, before it opens their database. When the desktop app or another `ketch` process
+ * already runs them, it says so and exits with status 1 instead: two engines on one database
+ * would resume the same downloads into the same files.
+ */
+private fun claimDownloads(command: String): CliInstance {
+  val configDir = File(defaultConfigDir())
+  if (DesktopApp.isRunning(configDir)) {
+    System.err.println(
+      """
+      |Error: the Ketch app is running, and it runs the downloads in ${defaultDbPath()}.
+      |Quit it before running `$command`. To reach the app's downloads, use `ketch add`,
+      |`ketch list` and `ketch mcp`, or turn on Settings > Sharing in the app for other devices.
+      """.trimMargin()
+    )
+    exitProcess(1)
+  }
+  val instance = try {
+    CliInstance.acquire(configDir)
+  } catch (e: IOException) {
+    val lockFile = File(configDir, CliInstance.LOCK_FILE)
+    System.err.println("Error: couldn't lock $lockFile: ${e.message}")
+    exitProcess(1)
+  }
+  if (instance == null) {
+    val holder = CliInstance.read(configDir)
+    val who = holder?.let { "`${it.command}` (process ${it.pid})" } ?: "another `ketch` process"
+    System.err.println(
+      """
+      |Error: $who already runs the downloads in ${defaultDbPath()}.
+      |Stop it before running `$command`, or use `ketch add`, `ketch list` and `ketch mcp`,
+      |which work through it.
+      """.trimMargin()
+    )
+    exitProcess(1)
+  }
+  return instance
+}
+
+/**
+ * The address this machine reaches a server listening on [host] and [port] at: the loopback
+ * address when it listens on every interface.
+ */
+internal fun loopbackUrl(host: String, port: Int): String {
+  val name = host.trim().removePrefix("[").removeSuffix("]")
+  val address = when {
+    name.isEmpty() || name == "0.0.0.0" || name == "::" -> "127.0.0.1"
+    ':' in name -> "[$name]"
+    else -> name
+  }
+  return "http://$address:$port"
+}
+
+/**
+ * Runs the attaching command [name], one of [INSTANCE_COMMANDS], with [args], the arguments
+ * after its name, and returns its exit status, one of [InstanceExit]. Only the results, or the
+ * usage asked for, go to [results]; errors and logs go to stderr.
+ */
+internal fun runInstance(name: String, args: List<String>, results: PrintStream = System.out): Int {
+  // Logback's console appender and the console logger write to System.out; see runMcp.
+  val stdout = System.out
+  System.setOut(System.err)
+  try {
+    val command = when (val parsed = parseInstanceArgs(name, args)) {
+      InstanceArgs.Help -> {
+        printInstanceUsage(name, results)
+        return InstanceExit.OK
+      }
+      is InstanceArgs.Invalid -> {
+        System.err.println("Error: ${parsed.message}")
+        System.err.println("Run `ketch $name --help` for usage.")
+        return InstanceExit.USAGE
+      }
+      is InstanceArgs.Run -> parsed.command
+    }
+    // Only warnings unless -v or --debug asks for more, so the results stay readable.
+    val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
+    KetchLogger.setLogger(Logger.console(level))
+    val locator = instanceLocator(command.target)
+    return runBlocking { runInstanceCommand(command, locator::locate, results, System.err) }
+  } finally {
+    System.setOut(stdout)
+  }
+}
+
+/** Finds the instance [target] names, or the one running on this machine. */
+private fun instanceLocator(target: Target) = InstanceLocator(
+  configDir = File(defaultConfigDir()),
+  server = target.server ?: System.getenv(SERVER_ENV),
+  token = target.token ?: System.getenv(TOKEN_ENV),
+)
 
 /**
  * Serves [ketch] through [server] until the server stops. It listens before restoring the
  * tasks saved by earlier runs, so a daemon that cannot start, e.g. because another one uses
  * the port, never resumes downloads into the same files; health checks report it ready once
  * they are restored. A failure to restore them stops the server.
+ *
+ * @param onReady called once the server listens and the tasks are restored, so a client it lets
+ *   find the server sees every task
  */
-internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
+internal fun serveDaemon(server: KetchServer, ketch: KetchApi, onReady: () -> Unit = {}) {
   server.start(wait = false)
   try {
     runBlocking { ketch.start() }
@@ -560,6 +677,7 @@ internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
     throw e
   }
   server.markReady()
+  onReady()
   server.awaitStop()
 }
 
@@ -799,34 +917,45 @@ private fun printAiDiscoverUsage(out: PrintStream) {
 private fun runMcp(args: List<String>) {
   var configPath: String? = null
   var cliDownloadDir: String? = null
+  var server: String? = null
+  var token: String? = null
+  var standalone = false
 
   var i = 0
   while (i < args.size) {
-    when (args[i]) {
+    when (val arg = args[i]) {
       "--help", "-h" -> {
         printMcpUsage()
         return
       }
-      "--config" -> {
+      "--standalone" -> standalone = true
+      "--config", "--dir", "--server", "--token" -> {
         if (i + 1 >= args.size) {
-          printMcpError("--config requires a value")
-          return
+          printMcpError("$arg requires a value")
+          exitProcess(InstanceExit.USAGE)
         }
-        configPath = args[++i]
-      }
-      "--dir" -> {
-        if (i + 1 >= args.size) {
-          printMcpError("--dir requires a value")
-          return
+        val value = args[++i]
+        when (arg) {
+          "--config" -> configPath = value
+          "--dir" -> cliDownloadDir = value
+          "--server" -> server = value
+          "--token" -> token = value
         }
-        cliDownloadDir = args[++i]
       }
       else -> {
-        printMcpError("unknown option '${args[i]}'")
-        return
+        printMcpError("unknown option '$arg'")
+        exitProcess(InstanceExit.USAGE)
       }
     }
     i++
+  }
+  if (standalone && (server != null || token != null)) {
+    printMcpError("--server and --token attach to an instance, which --standalone does not")
+    exitProcess(InstanceExit.USAGE)
+  }
+  if (!standalone && (configPath != null || cliDownloadDir != null)) {
+    printMcpError("--config and --dir set up the engine of --standalone")
+    exitProcess(InstanceExit.USAGE)
   }
 
   // stdout carries the JSON-RPC stream, so keep it for the transport and send everything
@@ -837,6 +966,41 @@ private fun runMcp(args: List<String>) {
   System.setOut(System.err)
   printBanner()
 
+  if (standalone) {
+    runStandaloneMcp(configPath, cliDownloadDir, protocolOut)
+  } else {
+    runAttachedMcp(Target(server, token), protocolOut)
+  }
+  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
+  // library thread being a daemon; the shutdown hooks close what is still open.
+  exitProcess(0)
+}
+
+/**
+ * Serves MCP on [protocolOut] for the instance the attaching commands find: the desktop app, a
+ * server, or the `ketch` process running this machine's downloads. It looks for one when a tool
+ * first needs it and again once it is lost, so the client may start before the app does.
+ */
+private fun runAttachedMcp(target: Target, protocolOut: PrintStream) {
+  KetchLogger.setLogger(Logger.console(ketchLogLevel))
+  val locator = instanceLocator(target)
+  val connection = InstanceConnection.remote(locator::locate) { endpoint ->
+    System.err.println("Working on the downloads of ${endpoint.label}")
+  }
+  Runtime.getRuntime().addShutdownHook(Thread { connection.close() })
+  runBlocking { KetchMcpServer(connection::get).startStdio(output = protocolOut) }
+}
+
+/**
+ * Serves MCP on [protocolOut] for an engine of its own on this machine's task database, as long
+ * as nothing else runs those downloads. Its API listens on loopback, with a token made for this
+ * run, so the attaching commands work through it meanwhile.
+ */
+private fun runStandaloneMcp(
+  configPath: String?,
+  cliDownloadDir: String?,
+  protocolOut: PrintStream,
+) {
   val fileConfig = if (configPath != null) {
     try {
       FileConfigStore(configPath).load()
@@ -859,6 +1023,7 @@ private fun runMcp(args: List<String>) {
 
   File(downloadConfig.defaultDirectory!!).mkdirs()
 
+  val instance = claimDownloads(STANDALONE_MCP_COMMAND)
   val taskStore = openTaskStore(defaultDbPath())
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
@@ -872,20 +1037,35 @@ private fun runMcp(args: List<String>) {
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
     ),
   )
+  val apiToken = newToken()
+  val apiServer = KetchServer(
+    ketch,
+    host = "127.0.0.1",
+    port = 0,
+    apiToken = apiToken,
+    mdnsEnabled = false,
+  )
 
   Runtime.getRuntime().addShutdownHook(Thread {
+    apiServer.stop()
     ketch.close()
+    instance.close()
   })
 
-  val mcpServer = KetchMcpServer(ketch)
-
+  apiServer.start(wait = false)
   runBlocking {
     ketch.start()
-    mcpServer.startStdio(output = protocolOut)
+    // Once the tasks are restored, so the attaching commands see every one.
+    instance.publish(
+      CliInstance.Info(
+        command = STANDALONE_MCP_COMMAND,
+        pid = ProcessHandle.current().pid(),
+        url = loopbackUrl("127.0.0.1", apiServer.port()),
+        token = apiToken,
+      )
+    )
+    KetchMcpServer(ketch).startStdio(output = protocolOut)
   }
-  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
-  // library thread being a daemon; the shutdown hook above closes Ketch.
-  exitProcess(0)
 }
 
 /**
@@ -955,10 +1135,20 @@ private fun printMcpUsage() {
   println("using stdio transport. AI agents like Claude Desktop")
   println("can manage downloads through MCP tools.")
   println()
+  println("It works on the downloads of the Ketch app, or of the")
+  println("`ketch server` running on this machine, found when a tool")
+  println("first needs them, so start either before or after it.")
+  println()
   println("Options:")
-  println("  --config <path>   Path to TOML config file")
-  println("  --dir <path>      Download directory")
-  println("                    (default: ~/Downloads)")
+  println("  --server <url>    Use the Ketch server at this address;")
+  println("                    also read from $SERVER_ENV")
+  println("  --token <token>   Its access token; also read from")
+  println("                    $TOKEN_ENV")
+  println("  --standalone      Run downloads itself, as nothing else")
+  println("                    on this machine does")
+  println("  --config <path>   Path to TOML config file (--standalone)")
+  println("  --dir <path>      Download directory (--standalone;")
+  println("                    default: ~/Downloads)")
   println("  --help, -h        Show this help message")
   println()
   println("MCP client configuration (e.g. claude_desktop_config.json):")
@@ -1025,6 +1215,8 @@ private fun openTaskStore(dbPath: String): SqliteTaskStore {
 
 private fun printUsage() {
   println("Usage: ketch [options] <url> [destination]")
+  println("       ketch add [options] <url> [destination]")
+  println("       ketch list | pause | resume | watch [options]")
   println("       ketch server [options]")
   println("       ketch mcp [options]")
   println("       ketch ai-discover <query> [options]")
@@ -1048,6 +1240,15 @@ private fun printUsage() {
   println("  --user-agent <value>     Send this User-Agent instead of")
   println("                           Ketch/<version>")
   println("  --referer <url>          Send this Referer")
+  println()
+  println("Running Ketch (the app, or `ketch server`):")
+  println("  add <url> [destination]  Add a download; prints its task ID")
+  println("  list                     List the downloads")
+  println("  pause <id>... | --all    Pause downloads")
+  println("  resume <id>... | --all   Resume downloads")
+  println("  watch [<id>...]          Print changes as JSON lines")
+  println("                           Run `ketch <command> --help` for")
+  println("                           their options")
   println()
   println("Server:")
   println("  server [options]         Start Ketch daemon server")
@@ -1093,10 +1294,81 @@ private fun printUsage() {
   println("Examples:")
   println("  ketch https://example.com/file.zip")
   println("  ketch -v https://example.com/file.zip")
+  println("  ketch add https://example.com/file.zip ~/Downloads/")
+  println("  ketch watch $(ketch add https://example.com/file.zip)")
   println("  ketch --priority high https://example.com/file.zip")
   println("  ketch server --port 9000 --dir /tmp/downloads")
   println("  ketch ai-discover \"latest Ubuntu ISO\"")
   println("  ketch ai-discover \"ffmpeg\" --sites ffmpeg.org")
+}
+
+/** Prints the usage of the attaching command [name] to [out]. */
+private fun printInstanceUsage(name: String, out: PrintStream) {
+  when (name) {
+    "add" -> {
+      out.println("Usage: ketch add [options] <url> [destination]")
+      out.println()
+      out.println("Add a download to the running Ketch and print its task ID.")
+      out.println("Without a destination it goes to Ketch's download folder; a")
+      out.println("relative path is taken from the current directory.")
+    }
+    "list" -> {
+      out.println("Usage: ketch list [options]")
+      out.println()
+      out.println("List the downloads of the running Ketch.")
+    }
+    "pause", "resume" -> {
+      out.println("Usage: ketch $name [options] <task-id>...")
+      out.println("       ketch $name [options] --all")
+      out.println()
+      if (name == "pause") {
+        out.println("Pause downloads of the running Ketch: those named, or every")
+        out.println("waiting and running one. Any unique start of an ID will do.")
+      } else {
+        out.println("Resume downloads of the running Ketch: those named, or every")
+        out.println("paused one. Any unique start of an ID will do.")
+      }
+    }
+    "watch" -> {
+      out.println("Usage: ketch watch [options] [<task-id>...]")
+      out.println()
+      out.println("Print the downloads of the running Ketch as JSON lines while")
+      out.println("they change. Each line has an \"event\": snapshot (each task")
+      out.println("when watch starts), added, state, progress or removed.")
+      out.println("With task IDs it follows those only and exits once each has")
+      out.println("finished: 0 when all completed, 1 otherwise.")
+    }
+  }
+  out.println()
+  out.println("It works on the Ketch app, or the `ketch server` running on")
+  out.println("this machine, unless --server names another device.")
+  out.println()
+  out.println("Options:")
+  if (name == "add") {
+    out.println("  --speed-limit <value>    Limit its speed (e.g. 500k, 10m)")
+    out.println("  --priority <level>       low, normal, high or urgent")
+    out.println("  --connections <n>        Connections to use; 0 (default)")
+    out.println("                           uses Ketch's setting")
+    out.println("  -H, --header <header>    Send a request header, e.g.")
+    out.println("                           -H 'Cookie: sid=1'; repeatable")
+    out.println("  --user-agent <value>     Send this User-Agent")
+    out.println("  --referer <url>          Send this Referer")
+    out.println("  --idempotency-key <key>  Running the command again with the")
+    out.println("                           same key adds the download once")
+  }
+  if (name == "add" || name == "list") {
+    out.println("  --json                   Print JSON instead")
+  }
+  if (name == "pause" || name == "resume") {
+    out.println("  --all                    Every download it applies to")
+  }
+  out.println("  --server <url>           Use the Ketch server at this address;")
+  out.println("                           also read from $SERVER_ENV")
+  out.println("  --token <token>          Its access token; also read from")
+  out.println("                           $TOKEN_ENV")
+  out.println("  -h, --help               Show this help message")
+  out.println()
+  out.println("Exit status: 0 on success, 1 on failure, 2 for invalid arguments.")
 }
 
 private fun printServerUsage() {
