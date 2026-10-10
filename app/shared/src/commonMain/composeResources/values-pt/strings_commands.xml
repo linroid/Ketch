@@ -36,7 +36,7 @@
   <string name="command_list_toggle">Pausar ou retomar</string>
   <string name="command_list_open">Abrir</string>
   <string name="command_list_reveal">Mostrar na pasta</string>
-  <string name="command_list_remove">Remover da lista</string>
+  <string name="command_list_remove">Remover</string>
   <string name="command_list_remove_and_trash">Remover e mover arquivos para a lixeira…</string>
   <string name="command_list_copy_link">Copiar link</string>
   <string name="command_list_copy_path">Copiar caminho do arquivo</string>

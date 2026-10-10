@@ -131,6 +131,7 @@
   <string name="settings_general_badge_active">Aktive Downloads</string>
   <string name="settings_general_badge_failures">Nur Fehler</string>
   <string name="settings_general_badge_off">Nichts</string>
+  <string name="settings_general_menu_bar_speed">Geschwindigkeit in der Menüleiste anzeigen</string>
   <string name="settings_general_power">Energie</string>
   <string name="settings_general_keep_awake">Während Downloads wach bleiben</string>
   <string name="settings_general_keep_awake_hint">%1$s wechselt nicht von selbst in den Ruhezustand, solange Downloads laufen. Der Bildschirm kann sich trotzdem ausschalten.</string>

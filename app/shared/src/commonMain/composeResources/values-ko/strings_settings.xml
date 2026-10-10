@@ -127,6 +127,7 @@
   <string name="settings_general_badge_active">진행 중인 다운로드</string>
   <string name="settings_general_badge_failures">실패만</string>
   <string name="settings_general_badge_off">표시 안 함</string>
+  <string name="settings_general_menu_bar_speed">메뉴 막대에 속도 표시</string>
   <string name="settings_general_power">전원</string>
   <string name="settings_general_keep_awake">다운로드 중 잠자기 방지</string>
   <string name="settings_general_keep_awake_hint">다운로드하는 동안 %1$s의 자동 잠자기를 막습니다. 화면은 꺼질 수 있습니다.</string>

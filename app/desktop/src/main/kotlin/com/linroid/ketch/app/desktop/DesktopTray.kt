@@ -11,19 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.window.ApplicationScope
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.TrayState
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
@@ -32,11 +20,11 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.speedText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -59,7 +47,6 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
-import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.SpeedLimitMode
@@ -83,6 +70,7 @@ import ketch.app.desktop.generated.resources.tray_retry_now
 import ketch.app.desktop.generated.resources.tray_show
 import ketch.app.desktop.generated.resources.tray_show_ketch
 import ketch.app.desktop.generated.resources.tray_speed
+import ketch.app.desktop.generated.resources.tray_speed_now
 import ketch.app.desktop.generated.resources.tray_stay_connected
 import ketch.app.desktop.generated.resources.tray_tooltip_downloading
 import ketch.app.desktop.generated.resources.tray_waiting
@@ -100,7 +88,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
-import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -246,15 +233,16 @@ private fun DevicePresence.toPulse(): DevicePulse = DevicePulse(
 )
 
 /**
- * The tray icon (the menu bar extra on macOS) and its menu: the status sentence, adding
- * downloads, pausing and resuming everything, the speed mode, each device with what it is doing
- * and its own actions, the last finished downloads, and the window, Settings and Quit. Clicking
+ * The tray icon (the menu bar extra on macOS) and its menu: the window, the status sentence with
+ * the speed, adding downloads, pausing and resuming everything, the speed mode, each device with
+ * what it is doing and its own actions, the last finished downloads, Settings and Quit. Clicking
  * the icon on Windows and Linux shows the window.
  *
  * The icon, its tooltip and the status sentence sum up every device the app keeps connected:
- * the sail with a ring for the overall progress and a dot for failures not seen yet, dimmed
- * while everything is paused. On macOS it is a template image, which the menu bar tints.
- * Nothing shows where the system has no tray.
+ * the sail, filled from its foot as far as the downloads have come, with a dot for failures not
+ * seen yet, dimmed while everything is paused. On macOS it is a template image, which the menu
+ * bar tints, followed by the speed while downloads run unless `[desktop] menuBarSpeed` is off; on
+ * Windows the sail takes the app icon's gradient. Nothing shows where the system has no tray.
  *
  * @param status the Pulse, devices and unseen failures to show.
  * @param actions shows the window and quits the app.
@@ -291,8 +279,13 @@ fun ApplicationScope.KetchTray(
   val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices))
   // Text resolves as it composes, so the menu composes again in a new language.
   val language = controller.appSettings.language
-  Tray(
-    icon = rememberTrayIcon(fleet, status.unseenFailures),
+  val showSpeed = controller.appSettings.config.desktop.menuBarSpeed
+  val icon = rememberTrayIcon(
+    look = trayIconLook(fleet, status.unseenFailures),
+    speed = if (showSpeed) trayIconSpeed(fleet) else null,
+  )
+  SystemTrayIcon(
+    image = icon,
     state = state,
     tooltip = trayTooltip(fleet, now).resolve(),
     onAction = actions.showWindow,
@@ -375,7 +368,11 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
 
   val counts = context.pulse.onlineCounts
   val targets = context.pulse.devices.filter { it.health.isOnline }.map { it.deviceId }
+  add(MenuEntry.Item(MenuAction.ShowWindow, Res.string.tray_show_ketch.text()))
+  add(MenuEntry.Separator)
   add(MenuEntry.Header(context.pulse.sentence(now = context.now)))
+  traySpeedLine(context.pulse)?.let { add(MenuEntry.Header(it)) }
+  add(MenuEntry.Separator)
   add(command(KetchCommands.Add))
   add(command(KetchCommands.AddClipboardLink))
   add(command(KetchCommands.OpenTorrent))
@@ -395,9 +392,19 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
     ),
   )
   add(MenuEntry.Separator)
-  add(MenuEntry.Item(MenuAction.ShowWindow, Res.string.tray_show_ketch.text()))
   add(command(KetchCommands.Settings))
   add(command(KetchCommands.Quit))
+}
+
+/**
+ * The line under the tray's status sentence while the online devices of [pulse] download: their
+ * speed and, when their sizes are known, how much has come in: "↓ 4.2 MB/s · 42%".
+ */
+internal fun traySpeedLine(pulse: PulseState): UiText? {
+  if (pulse.onlineCounts.downloading == 0) return null
+  val speed = Res.string.tray_speed_now.text(speedText(pulse.onlineSpeed))
+  val percent = pulse.progress?.let { percentText((it.coerceIn(0f, 1f) * 100).toInt()) }
+  return listOfNotNull(speed, percent).joinText()
 }
 
 /**
@@ -407,6 +414,10 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
 internal val PulseState.onlineCounts: PulseCounts
   get() = devices.filter { it.health.isOnline }
     .fold(PulseCounts()) { sum, device -> sum + device.counts }
+
+/** Download speed of the online devices in this Pulse, in bytes per second. */
+internal val PulseState.onlineSpeed: Long
+  get() = devices.filter { it.health.isOnline }.sumOf { it.speed }
 
 /**
  * What [device] is doing, after its name in the Devices menu: "6.4 MB/s · 2 active",
@@ -554,7 +565,7 @@ internal fun trayTooltip(pulse: PulseState, now: Instant): UiText {
     Res.plurals.tray_tooltip_downloading.text(
       downloading,
       downloading,
-      speedText(pulse.totalSpeed),
+      speedText(pulse.onlineSpeed),
     )
   } else {
     pulse.sentence(now = now)
@@ -596,86 +607,6 @@ private fun recentDownloads(controller: AppController): Flow<List<RecentDownload
   }
 }
 
-@Composable
-private fun rememberTrayIcon(pulse: PulseState, unseenFailures: Int): Painter {
-  val sail = rememberVectorPainter(KetchIcon.Sail.imageVector)
-  val counts = pulse.onlineCounts
-  val active = counts.downloading > 0
-  // Steps keep the icon from being redrawn for changes too small to see.
-  val progress = pulse.progress?.takeIf { active }
-    ?.let { (it * PROGRESS_STEPS).roundToInt() / PROGRESS_STEPS.toFloat() }
-  val failed = unseenFailures > 0
-  val dimmed = !active && counts.waiting == 0 && counts.paused > 0
-  return remember(sail, active, progress, failed, dimmed) {
-    TrayIconPainter(sail, active, progress, failed, dimmed, trayIconColors)
-  }
-}
-
-private class TrayIconColors(val glyph: Color, val ring: Color, val failure: Color)
-
-// A template image only keeps the alpha, which macOS tints for the menu bar; elsewhere the icon
-// sits on the dark taskbars and panels most systems use.
-private val trayIconColors: TrayIconColors = if (DesktopOs.current == DesktopOs.MAC) {
-  TrayIconColors(Color.Black, Color.Black, Color.Black)
-} else {
-  val colors = darkKetchColors()
-  TrayIconColors(colors.textPrimary, colors.accent, colors.status.failed.color)
-}
-
-private class TrayIconPainter(
-  private val sail: Painter,
-  private val active: Boolean,
-  private val progress: Float?,
-  private val failed: Boolean,
-  private val dimmed: Boolean,
-  private val colors: TrayIconColors,
-) : Painter() {
-  override val intrinsicSize: Size get() = Size.Unspecified
-
-  override fun DrawScope.onDraw() {
-    val alpha = if (dimmed) DIMMED_ALPHA else 1f
-    val extent = size.minDimension
-    val glyph = if (active) extent * RING_GLYPH_SCALE else extent
-    translate((size.width - glyph) / 2, (size.height - glyph) / 2) {
-      with(sail) { draw(Size(glyph, glyph), alpha, ColorFilter.tint(colors.glyph)) }
-    }
-    if (active) {
-      val stroke = extent * RING_STROKE_SCALE
-      val topLeft = Offset(stroke / 2, stroke / 2)
-      val arc = Size(size.width - stroke, size.height - stroke)
-      drawArc(
-        color = colors.glyph,
-        startAngle = 0f,
-        sweepAngle = FULL_CIRCLE,
-        useCenter = false,
-        topLeft = topLeft,
-        size = arc,
-        alpha = alpha * RING_TRACK_ALPHA,
-        style = Stroke(stroke),
-      )
-      if (progress != null && progress > 0f) {
-        drawArc(
-          color = colors.ring,
-          startAngle = RING_START_ANGLE,
-          sweepAngle = FULL_CIRCLE * progress,
-          useCenter = false,
-          topLeft = topLeft,
-          size = arc,
-          alpha = alpha,
-          style = Stroke(stroke, cap = StrokeCap.Round),
-        )
-      }
-    }
-    if (failed) {
-      val radius = extent * DOT_SCALE / 2
-      val center = Offset(size.width - radius, radius)
-      // A gap around the dot keeps it apart from the sail and the ring.
-      drawCircle(Color.Transparent, radius * DOT_GAP_SCALE, center, blendMode = BlendMode.Clear)
-      drawCircle(colors.failure, radius, center)
-    }
-  }
-}
-
 // Emits the first value at once, then the latest value at most once per period.
 private fun <T> Flow<T>.throttleLatest(period: Duration): Flow<T> = conflate().transform {
   emit(it)
@@ -684,12 +615,3 @@ private fun <T> Flow<T>.throttleLatest(period: Duration): Flow<T> = conflate().t
 
 private val STATUS_INTERVAL = 1.seconds
 private const val RECENT_LIMIT = 5
-private const val PROGRESS_STEPS = 32
-private const val FULL_CIRCLE = 360f
-private const val RING_START_ANGLE = -90f
-private const val RING_GLYPH_SCALE = 0.62f
-private const val RING_STROKE_SCALE = 0.11f
-private const val RING_TRACK_ALPHA = 0.3f
-private const val DOT_SCALE = 0.25f
-private const val DOT_GAP_SCALE = 1.5f
-private const val DIMMED_ALPHA = 0.45f

@@ -164,10 +164,8 @@
   <string name="action_row_open_source_page">Open source page</string>
   <string name="action_row_copy_error">Copy error</string>
   <string name="action_row_copy_details">Copy details</string>
-  <string name="action_row_stop_and_discard">Stop and discard progress…</string>
-  <string name="action_row_remove">Remove from list</string>
-  <string name="action_row_remove_and_trash">Remove and trash file…</string>
-  <string name="action_row_remove_and_delete">Remove and delete files…</string>
+  <string name="action_row_stop_and_discard">Cancel download…</string>
+  <string name="action_row_remove">Remove…</string>
   <!-- Menu labels of actions on several selected downloads. %1$d is how many. -->
   <plurals name="batch_pause">
     <item quantity="one">Pause %1$d download</item>
@@ -204,23 +202,19 @@
     <item quantity="other">Download %1$d files again</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Discard progress of %1$d download…</item>
-    <item quantity="other">Discard progress of %1$d downloads…</item>
+    <item quantity="one">Cancel %1$d download…</item>
+    <item quantity="other">Cancel %1$d downloads…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Remove %1$d download from list</item>
-    <item quantity="other">Remove %1$d downloads from list</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Remove %1$d download and its file…</item>
-    <item quantity="other">Remove %1$d downloads and their files…</item>
+    <item quantity="one">Remove %1$d download…</item>
+    <item quantity="other">Remove %1$d downloads…</item>
   </plurals>
   <!-- Buttons of the bar shown while downloads are selected. -->
   <string name="bar_speed">Speed</string>
   <string name="bar_copy_links">Copy links</string>
   <string name="bar_remove">Remove…</string>
   <string name="bar_copy_paths">Copy file paths</string>
-  <string name="bar_discard">Discard progress…</string>
+  <string name="bar_discard">Cancel downloads…</string>
   <!-- A bar action in a menu with how many selected downloads it applies to: "Pause (3)". -->
   <string name="bar_label_count">%1$s (%2$d)</string>
   <!-- The same on a phone's bar button: "Pause 3". -->

@@ -129,10 +129,8 @@
   <string name="action_row_open_source_page">開啟來源網頁</string>
   <string name="action_row_copy_error">複製錯誤訊息</string>
   <string name="action_row_copy_details">複製詳細資料</string>
-  <string name="action_row_stop_and_discard">停止並捨棄進度…</string>
-  <string name="action_row_remove">從清單中移除</string>
-  <string name="action_row_remove_and_trash">移除並將檔案移到垃圾桶…</string>
-  <string name="action_row_remove_and_delete">移除並刪除檔案…</string>
+  <string name="action_row_stop_and_discard">取消下載…</string>
+  <string name="action_row_remove">移除…</string>
   <plurals name="batch_pause">
     <item quantity="other">暫停 %1$d 個下載項目</item>
   </plurals>
@@ -159,19 +157,16 @@
     <item quantity="other">重新下載 %1$d 個檔案</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="other">捨棄 %1$d 個下載項目的進度…</item>
+    <item quantity="other">取消 %1$d 個下載項目…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="other">從清單中移除 %1$d 個下載項目</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="other">移除 %1$d 個下載項目及其檔案…</item>
+    <item quantity="other">移除 %1$d 個下載項目…</item>
   </plurals>
   <string name="bar_speed">速度</string>
   <string name="bar_copy_links">複製連結</string>
   <string name="bar_remove">移除…</string>
   <string name="bar_copy_paths">複製檔案路徑</string>
-  <string name="bar_discard">捨棄進度…</string>
+  <string name="bar_discard">取消下載…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s所選下載中的 %2$d 個（共 %3$d 個）</string>

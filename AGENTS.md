@@ -488,7 +488,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
   Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
-  open at login, Dock badge, daily update checks; `NotificationSettings`,
+  open at login, Dock badge, the speed in the macOS menu bar (`menuBarSpeed`), daily update
+  checks; `NotificationSettings`,
   `IntegrationSettings` (magnet and `.torrent` handlers) and `PowerSettings` (`[power]`:
   `keepAwake`, on by default)
 - `[[download.categories]]` tables hold `DownloadConfig.categories` (`folder`, `extensions`,
@@ -606,7 +607,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   positions. The tray lists every device with its own actions, and the
   macOS menu bar, the tray and the Dock menu are generated from `KetchCommands`
   (`DesktopMenuBar`, `DesktopTray`, `TaskbarFeedback` for the Dock and taskbar badge and
-  progress)
+  progress). The tray icon (`TrayIcon.kt`) is an AWT `TrayIcon` of its own rather than
+  Compose's `Tray`, which squeezes every image into a square: its sail fills from the foot as
+  downloads progress, the macOS menu bar shows the speed after it (`[desktop] menuBarSpeed`)
+  and Windows paints it in the app icon's gradient
 - Release notes (desktop, direct Android): What's new on the update toasts, and Settings → About,
   opens `ReleaseNotesDialog` (`ui/settings`; `AppState.releaseNotesRequest` for the toasts),
   which reads `AppUpdates.releaseNotes(version, since)`: the GitHub releases after `since`

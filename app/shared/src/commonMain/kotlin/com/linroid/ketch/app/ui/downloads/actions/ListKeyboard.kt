@@ -122,7 +122,7 @@ internal fun keyAction(command: KetchCommand, row: TaskRow, menu: List<RowAction
     KetchCommands.Open -> offered(RowAction.Open) ?: RowAction.Details
     KetchCommands.Reveal -> offered(RowAction.ShowInFolder)
     KetchCommands.Remove -> offered(RowAction.Remove)
-    KetchCommands.RemoveAndTrash -> RowAction.RemoveAndDelete
+    KetchCommands.RemoveAndTrash -> offered(RowAction.Remove)
     KetchCommands.CopyLink -> offered(RowAction.CopyLink)
     KetchCommands.CopyPath -> offered(RowAction.CopyPath)
     KetchCommands.Retry -> when (row.state) {
@@ -257,6 +257,9 @@ internal class ListKeyboard(
     if (actions.values.all { it == null }) return false
     when {
       command == KetchCommands.RemoveAndTrash -> runner.requestRemove(targets, withFiles = true)
+      // Menus ask first; ⌫ removes at once, with Undo.
+      command == KetchCommands.Remove ->
+        runner.remove(targets.filter { actions[it] != null }, withFiles = false)
       // Space pauses the whole selection while any of it runs, as the menu bar does.
       RowAction.Pause in actions.values -> runner.run(RowAction.Pause, targets)
       command == KetchCommands.Open && RowAction.Open !in actions.values -> {

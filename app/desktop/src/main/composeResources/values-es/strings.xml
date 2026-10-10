@@ -19,6 +19,7 @@
   <string name="tray_recent">Recientes</string>
   <string name="tray_show_ketch">Mostrar Ketch</string>
   <string name="tray_speed">Velocidad</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Mostrar</string>
   <string name="tray_enter_token">Introducir token…</string>
   <string name="tray_retry_now">Reintentar ahora</string>

@@ -225,8 +225,10 @@ and write its shortcuts with that platform's keys (`KeyboardPlatform.override`).
   This keeps the generated API revision stable between commits, so unchanged modules reuse
   their compilations and test results from the Gradle build cache. The override is only for
   test builds: omit it when packaging or publishing so `KetchApi.REVISION` identifies the real
-  Git revision. The iOS job also preserves `~/.konan` across compatible Kotlin and Xcode
-  toolchains, and with a `GRADLE_ENCRYPTION_KEY` secret every job keeps its configuration
+  Git revision. Simulator test results are cacheable too (the root build script turns it on), so
+  only modules whose test binary changed run on the simulator again. The iOS job also preserves
+  `~/.konan`, saved once per dependency set rather than per commit, and with a
+  `GRADLE_ENCRYPTION_KEY` secret every job keeps its configuration
   cache between runs. Build scripts must not read values that change on every run, such as
   `GITHUB_RUN_NUMBER`, while configuring: the release workflow passes the Android
   `versionCode` as `-PversionCode` instead.

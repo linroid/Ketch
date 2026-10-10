@@ -36,7 +36,7 @@
   <string name="command_list_toggle">暂停或继续</string>
   <string name="command_list_open">打开</string>
   <string name="command_list_reveal">在文件夹中显示</string>
-  <string name="command_list_remove">从列表中移除</string>
+  <string name="command_list_remove">移除</string>
   <string name="command_list_remove_and_trash">移除并将文件移到回收站…</string>
   <string name="command_list_copy_link">复制链接</string>
   <string name="command_list_copy_path">复制文件路径</string>

@@ -92,16 +92,98 @@ class DesktopTrayModelTest {
   }
 
   @Test
+  fun trayMenu_anyContext_startsWithShowKetchThenTheStatus() = runTest {
+    val menu = trayMenu(tray(pulse(PulseCounts(done = 4))))
+
+    assertEquals(MenuAction.ShowWindow, (menu[0] as MenuEntry.Item).action)
+    assertEquals("Show Ketch", (menu[0] as MenuEntry.Item).label.load())
+    assertEquals(MenuEntry.Separator, menu[1])
+    assertTrue(menu[2] is MenuEntry.Header)
+    assertEquals(MenuEntry.Separator, menu[3])
+    assertTrue(menu.last().runs(KetchCommands.Quit))
+  }
+
+  @Test
   fun trayMenu_idleOrFailing_headerIsTheStatusSentence() = runTest {
     val idle = pulse(PulseCounts(done = 4))
     val failing = pulse(PulseCounts(failed = 1), failures = 1)
 
-    val idleHeader = trayMenu(tray(idle)).first() as MenuEntry.Header
-    val failingHeader = trayMenu(tray(failing)).first() as MenuEntry.Header
+    val idleHeaders = trayMenu(tray(idle)).filterIsInstance<MenuEntry.Header>()
+    val failingHeaders = trayMenu(tray(failing)).filterIsInstance<MenuEntry.Header>()
 
-    assertEquals("Idle", idleHeader.text.load())
-    assertEquals("1 download needs attention", failingHeader.text.load())
-    assertEquals(MenuEntry.Header(failing.sentence(now = now)), failingHeader)
+    assertEquals(listOf("Idle"), idleHeaders.map { it.text.load() })
+    assertEquals(listOf("1 download needs attention"), failingHeaders.map { it.text.load() })
+    assertEquals(MenuEntry.Header(failing.sentence(now = now)), failingHeaders.single())
+  }
+
+  @Test
+  fun trayMenu_downloading_showsTheSpeedAndProgressUnderTheSentence() = runTest {
+    val pulse = pulse(
+      PulseCounts(downloading = 1),
+      speed = 4_404_019,
+      downloaded = 42,
+      size = 100,
+    )
+
+    val headers = trayMenu(tray(pulse)).filterIsInstance<MenuEntry.Header>()
+
+    assertEquals(
+      listOf(pulse.sentence(now = now).load(), "↓ 4.2 MB/s · 42%"),
+      headers.map { it.text.load() },
+    )
+  }
+
+  @Test
+  fun traySpeedLine_sizesUnknown_showsTheSpeedAlone() = runTest {
+    val pulse = pulse(PulseCounts(downloading = 2), speed = 1_048_576)
+
+    assertEquals("↓ 1.0 MB/s", traySpeedLine(pulse)?.load())
+  }
+
+  @Test
+  fun traySpeedLine_offlineDevices_leavesThemOut() = runTest {
+    val pulse = PulseState(
+      devices = listOf(
+        device(PulseCounts(downloading = 1), 0, speed = 1_048_576),
+        device(
+          PulseCounts(downloading = 1),
+          0,
+          DeviceHealth.Offline(),
+          deviceId = NAS,
+          speed = 9_000_000,
+        ),
+      ),
+    )
+
+    assertEquals("↓ 1.0 MB/s", traySpeedLine(pulse)?.load())
+    assertNull(traySpeedLine(pulse(PulseCounts(waiting = 1, paused = 1))))
+  }
+
+  @Test
+  fun trayIconLook_downloading_fillsInStepsOfAThirtySecond() {
+    val pulse = pulse(PulseCounts(downloading = 1), downloaded = 999, size = 1_000)
+
+    assertEquals(TrayIconLook(progress = 31 / 32f), trayIconLook(pulse, unseenFailures = 0))
+  }
+
+  @Test
+  fun trayIconLook_notDownloading_showsTheWholeSail() {
+    val queued = pulse(PulseCounts(waiting = 1), downloaded = 5, size = 10)
+    val paused = pulse(PulseCounts(paused = 2))
+
+    assertEquals(TrayIconLook(), trayIconLook(queued, unseenFailures = 0))
+    assertEquals(TrayIconLook(failed = true, dimmed = true), trayIconLook(paused, 1))
+  }
+
+  @Test
+  fun trayIconSpeed_onlyWhileDownloading() {
+    val downloading = pulse(PulseCounts(downloading = 1), speed = 2_000)
+    val stalled = pulse(PulseCounts(downloading = 1))
+    val queued = pulse(PulseCounts(waiting = 1), speed = 2_000)
+
+    assertEquals(2_000, trayIconSpeed(downloading))
+    assertEquals(0, trayIconSpeed(stalled))
+    assertNull(trayIconSpeed(queued))
   }
 
   @Test

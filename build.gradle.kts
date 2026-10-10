@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -72,5 +73,14 @@ subprojects {
       val metadata = tasks.named { it == "compileCommonMainKotlinMetadata" }
       compilePublishedMetadata.configure { dependsOn(metadata) }
     }
+  }
+}
+
+// Simulator tests declare their inputs (the test binary, arguments and device) but the Kotlin
+// plugin does not cache them. Caching them, as Gradle does JVM tests, lets a module whose test
+// binary did not change reuse its results instead of running the suite on the simulator again.
+subprojects {
+  tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    outputs.cacheIf { true }
   }
 }

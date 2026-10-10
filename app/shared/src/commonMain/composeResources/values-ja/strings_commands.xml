@@ -36,7 +36,7 @@
   <string name="command_list_toggle">一時停止/再開</string>
   <string name="command_list_open">開く</string>
   <string name="command_list_reveal">フォルダに表示</string>
-  <string name="command_list_remove">リストから削除</string>
+  <string name="command_list_remove">削除</string>
   <string name="command_list_remove_and_trash">リストから削除してファイルをゴミ箱へ…</string>
   <string name="command_list_copy_link">リンクをコピー</string>
   <string name="command_list_copy_path">ファイルパスをコピー</string>
