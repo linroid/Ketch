@@ -115,4 +115,40 @@
   <string name="pulse_timeline_limit">制限 → %1$s</string>
   <string name="pulse_timeline_limit_removed">制限を解除</string>
   <string name="pulse_timeline_priority">優先度 → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">接続</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="other">%1$d件の接続</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="other">ほか%1$d件</item>
+  </plurals>
+  <string name="pulse_connections_none">アクティブな接続はありません</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="other">%1$d台のデバイスは接続を報告しません</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">ダウンロード中</string>
+  <string name="pulse_connections_legend_upload">アップロード中</string>
+  <string name="pulse_connections_legend_both">両方</string>
+  <string name="pulse_connections_legend_idle">アイドル</string>
+  <string name="pulse_connection_outgoing">発信</string>
+  <string name="pulse_connection_incoming">着信</string>
+  <string name="pulse_connection_direct">直接</string>
+  <string name="pulse_connection_via_http_proxy">HTTPプロキシ経由</string>
+  <string name="pulse_connection_via_socks_proxy">SOCKS5プロキシ経由</string>
+  <string name="pulse_connection_secure">暗号化</string>
+  <string name="pulse_connection_received">受信 %1$s</string>
+  <string name="pulse_connection_sent">送信 %1$s</string>
+  <string name="pulse_connection_open_for">接続時間 %1$s</string>
+  <string name="pulse_connection_peer_choking">ピアは送信を停止中</string>
+  <string name="pulse_connection_upload_slot">このピアにアップロード中</string>
+  <string name="pulse_connection_show_task">ダウンロードを表示</string>
+  <string name="pulse_connections_tooltip">アクティブな接続</string>
+  <string name="pulse_connection_description">%1$s、%2$s、%3$s、受信 %4$s、送信 %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="other">%1$d件の接続、ダウンロード中 %2$d件、アップロード中 %3$d件</item>
+  </plurals>
 </resources>

@@ -152,9 +152,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
-  `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`, `KeepAwake`,
-  `SleepInhibitor`, `TorrentFilesModel`, `FileOrder`, `AiDiscoverController`, `DiscoverSession`,
-  `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
+  `ConnectionGridModel`, `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`,
+  `KeepAwake`, `SleepInhibitor`, `TorrentFilesModel`, `FileOrder`, `AiDiscoverController`,
+  `DiscoverSession`, `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
   (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
   `CommandScope`, `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`,
@@ -694,6 +694,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   download" (Choose files…, Download all files) and a seeding one "Seeding" (Stop seeding; Seed
   is in the inspector only). Auto connections and queue positions only show for devices whose
   `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all)
+- Live connections grid: on the Downloads page the Pulse bar shows, left of the device's
+  connection from 540 dp, three rows of up to twelve squares, one per live connection of the
+  shown devices listing `net.activeConnections` (oldest top left, then "+N"); hovering one names
+  it, a click opens `ConnectionsPopover` (count and speeds, a legend, cells grouped by task in
+  list order and under All devices by device, the hovered, focused or picked cell's details with
+  Show task, which opens the inspector on its Connections tab for HTTP and FTP, and "N devices
+  don't report connections"). Phones show a 3×8 mini strip after the summary line and the
+  popover's content in the Pulse sheet. `ConnectionGridModel` asks each online device for its own
+  stream (`AppState.connectionGrid.state(36)` and `state(512)`, the limit split between
+  devices) only while one is on screen, stopping 5 s after, and asks again with backoff (1 s
+  doubling to 30 s) when one fails or ends; a device refusing it as unsupported is listed, not
+  asked again. Cells draw on one canvas (`components/KetchCellGrid`, hit-testing, arrow keys and
+  Enter, a live-region description of the picked cell) in `KetchColors.traffic`: download is the
+  accent, upload the seeding teal (Purple's fill for the Teal, Green and Blue accents,
+  `TrafficColorsTest` keeps them ΔE ≥ 20 apart), in four levels by fixed rates (under 16 KB/s,
+  256 KB/s, 2 MB/s, and more); download solid, upload a ring, both split along the diagonal,
+  idle a hairline outline
 - Torrent files: the inspector's Files tab checks and unchecks files with an Apply bar
   (`TorrentFilesModel`, at least one file stays checked) on devices listing
   `torrent.fileSelection`, and starts a waiting torrent; the add sheet and the Files tab sort

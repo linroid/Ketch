@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.pulse
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
@@ -61,9 +63,17 @@ import org.jetbrains.compose.resources.stringResource
  * "↓ 4.2 MB/s · 2 active · Full speed ▾"; tapping it opens the [PulseSheet]. When the page's
  * buttons leave it too little room it drops its middle parts, then the speed mode, rather than
  * end in an ellipsis; screen readers always hear all of it.
+ *
+ * @param showConnections whether a small grid of the live connections follows it while it has
+ *   room, as on the Downloads page; the devices are asked for them only while it does.
  */
 @Composable
-fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun PulseSubtitle(
+  state: AppState,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  showConnections: Boolean = false,
+) {
   val pulse by state.pulse.state.collectAsState()
   val view = rememberSpeedModeView(state)
   val colors = KetchTheme.colors
@@ -99,6 +109,14 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
       )
     }
     KetchIconImage(icon = KetchIcon.ChevronDown, size = ChevronSize, tint = colors.textTertiary)
+    if (showConnections) {
+      BoxWithConstraints {
+        if (maxWidth >= MiniStripMinRoom) {
+          val grid by state.connectionGrid.state(STRIP_LIMIT).collectAsStateWithLifecycle()
+          ConnectionMiniStrip(grid, Modifier.padding(start = KetchTheme.spacing.s1))
+        }
+      }
+    }
   }
 }
 
@@ -134,11 +152,12 @@ private fun pulseParts(pulse: PulseState): List<UiText> {
 /**
  * The phone's Pulse sheet: the active device's speed in large numerals, its last minute as a
  * chart with the speed limit, the speed mode and limit, the counts (each opens its tab) and the
- * free space.
+ * free space; with [showConnections], also the live connections of the shown devices that
+ * report them, as the Pulse bar's popover lists them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PulseSheet(state: AppState, onDismissRequest: () -> Unit) {
+fun PulseSheet(state: AppState, onDismissRequest: () -> Unit, showConnections: Boolean = false) {
   KetchBottomSheet(onDismissRequest = onDismissRequest) {
     val pulse by state.pulse.state.collectAsState()
     Column(
@@ -164,6 +183,10 @@ fun PulseSheet(state: AppState, onDismissRequest: () -> Unit) {
         onOpenSettings = onDismissRequest,
         fillModes = true,
       )
+      if (showConnections) {
+        Spacer(Modifier.height(KetchTheme.spacing.s6))
+        ConnectionsSection(state, onShown = onDismissRequest)
+      }
     }
   }
 }
@@ -281,3 +304,5 @@ private val ChartHeight = 96.dp
 private val DiskBarHeight = 4.dp
 private val TileHeight = 56.dp
 private val ChevronSize = 12.dp
+// The room the line must leave the mini strip after its chevron.
+private val MiniStripMinRoom = 48.dp

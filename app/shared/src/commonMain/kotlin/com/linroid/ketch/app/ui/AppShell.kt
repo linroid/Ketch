@@ -280,7 +280,11 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     ShortcutSheet(groups, onDismissRequest = { shell.shortcutsOpen = false })
   }
   if (shell.pulseSheetOpen) {
-    PulseSheet(appState, onDismissRequest = { shell.pulseSheetOpen = false })
+    PulseSheet(
+      state = appState,
+      onDismissRequest = { shell.pulseSheetOpen = false },
+      showConnections = shell.destination == AppDestination.Downloads,
+    )
   }
 
   val switcherAsked = appState.showInstanceSelector
@@ -387,7 +391,13 @@ private fun WideShell(
       }
     },
     top = { BannerHost(appState) },
-    bottom = { PulseBar(appState, barState = shell.pulseBar) },
+    bottom = {
+      PulseBar(
+        state = appState,
+        barState = shell.pulseBar,
+        showConnections = shell.destination == AppDestination.Downloads && !shell.settingsOpen,
+      )
+    },
     overlay = {
       // Above the controls a page keeps at the bottom, such as Discover's composer.
       val clearance = LocalBottomChrome.current?.height ?: 0.dp

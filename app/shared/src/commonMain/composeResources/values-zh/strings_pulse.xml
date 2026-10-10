@@ -115,4 +115,40 @@
   <string name="pulse_timeline_limit">限速 → %1$s</string>
   <string name="pulse_timeline_limit_removed">已取消限速</string>
   <string name="pulse_timeline_priority">优先级 → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">连接</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="other">还有 %1$d 个</item>
+  </plurals>
+  <string name="pulse_connections_none">没有活动连接</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="other">%1$d 台设备不报告连接</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">下载中</string>
+  <string name="pulse_connections_legend_upload">上传中</string>
+  <string name="pulse_connections_legend_both">上传和下载</string>
+  <string name="pulse_connections_legend_idle">空闲</string>
+  <string name="pulse_connection_outgoing">传出</string>
+  <string name="pulse_connection_incoming">传入</string>
+  <string name="pulse_connection_direct">直连</string>
+  <string name="pulse_connection_via_http_proxy">通过 HTTP 代理</string>
+  <string name="pulse_connection_via_socks_proxy">通过 SOCKS5 代理</string>
+  <string name="pulse_connection_secure">已加密</string>
+  <string name="pulse_connection_received">已接收 %1$s</string>
+  <string name="pulse_connection_sent">已发送 %1$s</string>
+  <string name="pulse_connection_open_for">已连接 %1$s</string>
+  <string name="pulse_connection_peer_choking">节点暂不发送数据</string>
+  <string name="pulse_connection_upload_slot">正在向此节点上传</string>
+  <string name="pulse_connection_show_task">显示下载</string>
+  <string name="pulse_connections_tooltip">活动连接</string>
+  <string name="pulse_connection_description">%1$s，%2$s，%3$s，下行 %4$s，上行 %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="other">%1$d 个连接，%2$d 个下载中，%3$d 个上传中</item>
+  </plurals>
 </resources>

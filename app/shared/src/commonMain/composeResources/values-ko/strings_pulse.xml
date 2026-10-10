@@ -115,4 +115,40 @@
   <string name="pulse_timeline_limit">제한 → %1$s</string>
   <string name="pulse_timeline_limit_removed">제한 해제됨</string>
   <string name="pulse_timeline_priority">우선순위 → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">연결</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="other">연결 %1$d개</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="other">%1$d개 더</item>
+  </plurals>
+  <string name="pulse_connections_none">활성 연결 없음</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="other">기기 %1$d대가 연결을 보고하지 않음</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">다운로드 중</string>
+  <string name="pulse_connections_legend_upload">업로드 중</string>
+  <string name="pulse_connections_legend_both">둘 다</string>
+  <string name="pulse_connections_legend_idle">유휴</string>
+  <string name="pulse_connection_outgoing">발신</string>
+  <string name="pulse_connection_incoming">수신</string>
+  <string name="pulse_connection_direct">직접</string>
+  <string name="pulse_connection_via_http_proxy">HTTP 프록시 경유</string>
+  <string name="pulse_connection_via_socks_proxy">SOCKS5 프록시 경유</string>
+  <string name="pulse_connection_secure">암호화됨</string>
+  <string name="pulse_connection_received">받음 %1$s</string>
+  <string name="pulse_connection_sent">보냄 %1$s</string>
+  <string name="pulse_connection_open_for">연결 시간 %1$s</string>
+  <string name="pulse_connection_peer_choking">피어가 전송을 멈춤</string>
+  <string name="pulse_connection_upload_slot">이 피어에 업로드 중</string>
+  <string name="pulse_connection_show_task">다운로드 보기</string>
+  <string name="pulse_connections_tooltip">활성 연결</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, 받기 %4$s, 보내기 %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="other">연결 %1$d개, 다운로드 중 %2$d개, 업로드 중 %3$d개</item>
+  </plurals>
 </resources>
