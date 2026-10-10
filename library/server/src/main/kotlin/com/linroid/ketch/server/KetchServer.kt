@@ -8,6 +8,7 @@ import com.linroid.ketch.server.api.PayloadTooLargeException
 import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
+import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
@@ -103,11 +104,19 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET    /api/pairing/{id}` — whether the owner answered, with the token once allowed
  * - `DELETE /api/pairing/{id}` — withdraw the request
  *
+ * ### Health
+ * - `GET /api/health` — `200` once [ketch] serves its saved tasks, `503` before ([markReady])
+ *
+ * Until [markReady], every other API endpoint but pairing answers `503 Service Unavailable` with
+ * a `starting` `ErrorResponse` and `Retry-After: 1`, so no download is added while the saved
+ * tasks load.
+ *
  * ## Access token
  *
- * With an [apiToken], every API request must carry it as `Authorization: Bearer <token>`. An
- * address that sends ten wrong tokens within a minute gets `429 Too Many Requests` for any
- * token until that minute ends. Without one, anyone who can reach [host] and [port] can use the
+ * With an [apiToken], every API request but the pairing and health endpoints must carry it as
+ * `Authorization: Bearer <token>`. An address that sends ten wrong tokens within a minute gets
+ * `429 Too Many Requests` for any token until that minute ends. Without one, anyone who can
+ * reach [host] and [port] can use the
  * API, so the server binds to loopback by default and logs a warning when it listens on another
  * address without a token.
  *
@@ -197,6 +206,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *   an Android implementation, since the default registrar is compiled for the JVM
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
+ * @param ready whether [ketch] already serves its saved tasks, as `GET /api/health` reports.
+ *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then;
+ *   until then the other API endpoints answer `503`.
  */
 class KetchServer(
   private val ketch: KetchApi,
@@ -210,8 +222,11 @@ class KetchServer(
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
   pairingApprover: PairingApprover? = null,
+  ready: Boolean = true,
 ) {
   private val log = KetchLogger("KetchServer")
+  @Volatile
+  private var ready = ready
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private val pairing = if (apiToken.isNullOrBlank() || pairingApprover == null) {
     null
@@ -251,6 +266,15 @@ class KetchServer(
     engine.start(wait = false)
     startMdnsRegistration()
     if (wait) awaitStop()
+  }
+
+  /**
+   * Tells health checks that [ketch] serves its saved tasks, so `GET /api/health` answers `200`
+   * from now on; only needed when the server was created with `ready = false`.
+   */
+  fun markReady() {
+    if (!ready) log.i { "Ready: saved tasks are restored" }
+    ready = true
   }
 
   /** Blocks the calling thread until [stop] is called. */
@@ -349,6 +373,9 @@ class KetchServer(
       }
     }
 
+    // Before authentication too: the API is closed to everyone while the tasks are restored.
+    install(startupGate { ready })
+
     if (apiToken != null) {
       // Before authentication, so an address guessing tokens is turned away unchecked.
       install(authThrottling(throttle))
@@ -432,6 +459,7 @@ class KetchServer(
         apiRoutes(ketch, destinations)
       }
       pairing?.let { pairingRoutes(it) }
+      healthRoutes { ready }
       webResources()
     }
   }

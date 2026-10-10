@@ -86,6 +86,7 @@ La bibliothèque Kotlin Multiplatform est disponible sur Maven Central.
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), pour contrôler Ketch sur un autre appareil |
 | Extension de navigateur | Chrome, Edge, Brave, Firefox et autres : `.zip` de la [dernière version][release] ([installation](app/browser-extension/README.md#installing)) |
 | Ligne de commande et serveur | macOS, Linux et Windows : [script d'installation](#run-ketch-on-a-server) ou [dernière version][release] |
+| Docker | NAS et serveurs domestiques x64 et ARM64 : `ghcr.io/linroid/ketch` ([guide](docs/docker.md), avec TrueNAS et fnOS) |
 
 Les applications de bureau incluent leur environnement d'exécution et la ligne de commande est un
 unique binaire natif : aucune n'a besoin de Java. Toutes deux se mettent à jour depuis les versions
@@ -136,8 +137,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Envoyez les téléchargements au bon appareil** — Ajoutez un lien à n'importe quel appareil,
   déposez-le sur un appareil dans la barre latérale, ou envoyez ou déplacez un téléchargement vers
   un autre appareil sans changer de vue.
-- **Sans interface graphique sur NAS ou serveur** — `ketch server` exécute le même moteur avec
-  une API REST et l'application web intégrées. Les applications le trouvent sur votre réseau.
+- **Sans interface graphique sur NAS ou serveur** — `ketch server`, aussi en
+  [image Docker](docs/docker.md), exécute le même moteur avec une API REST et l'application web
+  intégrées. Les applications le trouvent sur votre réseau.
 - **Depuis le terminal** — `ketch add`, `list`, `pause`, `resume` et `watch` pilotent les
   téléchargements de l'application Ketch ou d'un serveur depuis un terminal ou un script ; `watch`
   produit des lignes JSON ([CLI](cli/README.md#work-on-a-running-ketch)).
@@ -232,6 +234,15 @@ Définissez le code d'accès, le port et les autres options dans un
 [fichier de configuration](cli/README.md#configuration-file).
 La [documentation CLI](cli/README.md) présente toutes les commandes.
 
+Sur un NAS, ou partout où Docker fonctionne, lancez plutôt l'image. Le
+[guide Docker](docs/docker.md) décrit ses réglages et les étapes pour TrueNAS et fnOS :
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
+
 ## Feuille de route
 
 - **Distribution avant v1.0.0** — Versions Windows signées, versions macOS signées et notariées,
@@ -258,8 +269,6 @@ La [documentation CLI](cli/README.md) présente toutes les commandes.
   au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un
   téléchargement
-- **Image Docker** — Une image officielle pour NAS et serveurs domestiques x64 et ARM, avec
-  contrôle d'état et port torrent fixe
 - **Transferts entre appareils** — Envoyer vers et Déplacer vers transmettent les données déjà
   téléchargées pour que l'autre appareil reprenne au lieu de recommencer
   ([plan](docs/plans/task-transfer.md))

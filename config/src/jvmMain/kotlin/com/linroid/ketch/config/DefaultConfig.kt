@@ -82,6 +82,9 @@ maxConnectionsPerHost = 16
 # used after the trackers above: ngosang's and XIU2's best lists by default.
 # trackerList = true
 # trackerListUrls = ["https://lists.example.org/trackers.txt"]
+# Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), for port
+# forwarding; 0 picks a free one at every launch. The apps always pick one.
+# listenPort = 6881
 
 # Pre-configured remote servers. The apps show `name` (or the name the server
 # announces) and stay connected to a device while another is shown unless

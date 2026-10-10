@@ -55,7 +55,8 @@ app/
   web/        # Wasm browser app
   ios/        # Native iOS app (Xcode project, consumes shared module)
   browser-extension/  # Chromium/Firefox/Safari extension that sends downloads to Ketch (plain JS)
-cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; GraalVM native releases)
+cli/          # CLI: downloads, `server`, `mcp`, `health` and `ai-discover` (JVM; GraalVM native)
+docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose files for NAS)
 ```
 
 ## Package Structure
@@ -118,7 +119,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
   `PriorityRequest`, `ConnectionsRequest`, `PairingRequest`, `PairingTicket`, `PairingStatus`,
-  `PairingState`
+  `PairingState`, `HealthResponse`, `HealthStatus`
 
 ### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -349,6 +350,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   give up after one `metadataTimeout`. The apps show it as Starting, "Finding peers"
 - Verified selected-file storage, ownership journal, restart rehash, live limits and explicit
   seeding
+- `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
+  can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
+  start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
+  `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
   app) and resolve them through `KetchApi.resolveContent`, like dropped files
 - Native torrent engine dependencies exist only in interoperability tests
@@ -472,7 +477,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   and page access (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
   Settings (app-only; CLI and server ignore it)
-- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`) and
+- `TorrentSettings`: `listenPort` (read by `ketch server` only), extra trackers for public
+  torrents (`TorrentConfig.additionalTrackers`) and
   tracker list subscriptions, on by default (`trackerList`, `trackerListUrls`, default ngosang's
   and XIU2's best lists; `TorrentConfig.trackerListUrls`; a 0.3.0 `trackerListUrl` is still
   read), edited on the embedded instance's
@@ -505,6 +511,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `autoStart` (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
   reported, which picks its `DeviceType` glyph in the apps' pennants
+- `defaultConfigDir()` (JVM: desktop app and CLI) is `KETCH_CONFIG_DIR` when set (`/config` in
+  the Docker image), else the platform's directory
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)
@@ -676,7 +684,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   apps show the server's message, except for `path_rejected`, which their own text explains
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
-  cannot bind never resumes them; `Ketch.start` keeps downloads added meanwhile in the list
+  cannot bind never resumes them; `Ketch.start` keeps downloads added meanwhile in the list,
+  and a failed restore stops the server
 - Only one engine runs the downloads of a config directory, holding its `instance.lock` while it
   has `ketch.db` open. `ketch server` and `ketch mcp --standalone` (`claimDownloads`,
   `CliInstance`) refuse to start while another process holds it, naming the command
@@ -692,6 +701,16 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   first, shown at launch and never saved), `LocalApiServer` serves a client of it (and refuses
   clients when there is none), and banners name the command and pid and, once it exits, say to
   reopen the app to run the downloads there
+- Health: `GET /api/health` (`Api.Health`, no token) answers `200 {"status":"ready"}` once the
+  tasks are restored and `503 {"status":"starting"}` before. `KetchServer(ready = false)` plus
+  `markReady()`, which `serveDaemon` calls after `KetchApi.start()`; other embedders are ready
+  from the start. Until then `startupGate` answers every other API route but pairing with `503`
+  `starting` and `Retry-After: 1`, so no download races the restore. `ketch health` asks it (0
+  ready, 1 not, 2 usage) at the URL the server published in `instance.json`, which follows its
+  options, else where the config file and environment variables say (`healthCheckUrl`)
+- `ketch server` configuration layers: flags over `KETCH_*` environment variables
+  (`ServerEnv`, `applyServerEnvironment`; blank counts as unset, an unusable value exits 2 naming
+  it) over `config.toml`. It exits 1 when it cannot start and 2 for invalid options
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -728,6 +747,28 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   content-polymorphic types; build with
   `./gradlew :cli:nativeCompile` and exercise `ketch mcp` and `ketch ai-discover` with each LLM
   provider to verify changes
+
+### Docker image (`docker/`)
+- `docker/Dockerfile` puts the native Linux `ketch` of each architecture
+  (`docker/build/linux-<amd64|arm64>/`) on `debian:trixie-slim`; `ENV` sets `KETCH_DOCKER=1`
+  (`ketch update` refuses and points to the image), `KETCH_CONFIG_DIR=/config`,
+  `KETCH_DOWNLOAD_DIR=/downloads`, `KETCH_TORRENT_PORT=16881`, `PUID`/`PGID` 1000 and `UMASK`;
+  `HEALTHCHECK` runs `ketch health`
+- `docker/entrypoint.sh` (POSIX sh): options alone go to `ketch server`, other programs run as
+  they are. As root it applies `UMASK`, adds passwd/group entries for `PUID`:`PGID` (home
+  `/config`), gives every file in `/config` to them, takes over `/downloads` only when it is empty
+  and root-owned (else warns), then `setpriv`s; started as another user (`user:`) it changes
+  nothing. `docker/test-entrypoint.sh` tests it around a stub binary (CI `docker-tests`, with
+  shellcheck), `docker/smoke-test.sh` a built image
+- The native binary is built with `--install-exit-handlers`: as PID 1 it would otherwise ignore
+  `docker stop`'s SIGTERM and skip the shutdown hooks
+- The release workflow's `publish-docker` job unpacks the Linux CLI archives (`upx -d`: a UPX
+  binary is unpacked into memory at every start), smoke-tests both architectures (arm64 under
+  QEMU) and pushes `linux/amd64,linux/arm64` to `ghcr.io/<owner>/ketch`, and to Docker Hub
+  (`DOCKERHUB_IMAGE`, default `linroid/ketch`) when the `DOCKERHUB_*` secrets are set. Tags:
+  `X.Y.Z` always, `X.Y` and `latest` for stable releases
+- `docker/compose.yaml`, `truenas.yaml` and `fnos.yaml` are the templates
+  [Docker](docs/docker.md) ([中文](docs/docker.zh-CN.md)) walks through
 
 ### Self-update (`updater`)
 - Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest (or a tagged)
@@ -980,13 +1021,9 @@ Planned features not yet implemented:
     the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
 12. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-13. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
-    workflow, with an unauthenticated readiness endpoint that answers once saved tasks are
-    restored, configuration through environment variables, and a fixed, configurable BitTorrent
-    listen port (today the OS picks one on every launch)
-14. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+13. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-15. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+14. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
     [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 7

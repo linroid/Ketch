@@ -248,11 +248,11 @@ resources in `library:endpoints` (`Api`) and shared with the client:
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events
 - **Auth**: Bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
-  `config.toml`) required on every API route except pairing, compared in constant time; ten
-  wrong tokens from an address within a minute get `429` until the minute ends. `KetchServer`
-  binds to loopback by default; `ketch server` beyond loopback always has a token (`--token`,
-  `KETCH_API_TOKEN`, `apiToken`, or one it creates in the owner-only `api-token` file) unless
-  started with `--no-token`
+  `config.toml`) required on every API route except pairing and health, compared in constant
+  time; ten wrong tokens from an address within a minute get `429` until the minute ends.
+  `KetchServer` binds to loopback by default; `ketch server` beyond loopback always has a token
+  (`--token`, `KETCH_API_TOKEN`, `apiToken`, or one it creates in the owner-only `api-token`
+  file) unless started with `--no-token`
 - **Folders**: Without a token, and with one when `allowedDirectories` is set, callers are kept
   to the download directory and `allowedDirectories` (`DestinationGuard` over core's
   `DestinationPathPolicy`) for new tasks' destinations, resume destinations, the
@@ -270,6 +270,12 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   (`CrossOriginGuard`); with one, `corsAllowedHosts` lists the origins that get CORS
 - **Discovery**: Advertised on the LAN over mDNS as `_ketch._tcp` unless disabled, with TXT
   `token=none|required` and `pairing=1` when it takes pairing requests
+- **Health**: `GET /api/health`, without the token, answers `200` once the tasks are served
+  and `503` before: `ketch server` listens first, so a daemon that cannot bind never resumes
+  downloads, and calls `markReady()` once `KetchApi.start()` restored them (`KetchServer(ready =
+  false)`); other embedders are ready from the start. Until then the other API routes but
+  pairing answer `503 starting` (`startupGate`), so no download races the restore. `ketch
+  health` and the Docker image's `HEALTHCHECK` ask it
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
 
 `RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`
