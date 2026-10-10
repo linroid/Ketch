@@ -123,6 +123,74 @@ class MacWindowChromeTest {
     }
   }
 
+  @Test
+  fun onStillClick_clickInPlace_runsTheAction() {
+    assertEquals(1, stillClicks(listOf(Offset(500f, 300f), Offset(500f, 300f))))
+  }
+
+  @Test
+  fun onStillClick_pressThatDragsTheWindow_isNoClick() {
+    // The window follows the pointer, so only its place on the screen changes.
+    assertEquals(0, stillClicks(listOf(Offset(500f, 300f), Offset(560f, 340f))))
+  }
+
+  @Test
+  fun onStillClick_dragBackToTheStart_isNoClick() {
+    val path = listOf(Offset(500f, 300f), Offset(560f, 340f), Offset(500f, 300f))
+    assertEquals(0, stillClicks(path))
+  }
+
+  @Test
+  fun onStillClick_dragOfOnePixel_isNoClick() {
+    assertEquals(0, stillClicks(listOf(Offset(500f, 300f), Offset(501f, 300f))))
+  }
+
+  /**
+   * Presses at the first of [screen] places, drags through the others and releases at the last,
+   * all at the same place in a window that follows the pointer.
+   */
+  private fun stillClicks(screen: List<Offset>): Int {
+    var clicks = 0
+    val scene = ImageComposeScene(width = 100, height = 100, density = Density(1f)) {
+      Box(Modifier.fillMaxSize().onStillClick { clicks++ })
+    }
+    try {
+      scene.render()
+      val position = Offset(10f, 10f)
+      val source = Canvas()
+      fun mouse(id: Int, at: Offset) = MouseEvent(
+        source, id, 0L, InputEvent.BUTTON1_DOWN_MASK, position.x.toInt(), position.y.toInt(),
+        at.x.toInt(), at.y.toInt(), 1, false, MouseEvent.BUTTON1,
+      )
+      scene.sendPointerEvent(PointerEventType.Move, position)
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Press,
+        position = position,
+        buttons = PointerButtons(isPrimaryPressed = true),
+        button = PointerButton.Primary,
+        nativeEvent = mouse(MouseEvent.MOUSE_PRESSED, screen.first()),
+      )
+      for (at in screen.drop(1)) {
+        scene.sendPointerEvent(
+          eventType = PointerEventType.Move,
+          position = position,
+          buttons = PointerButtons(isPrimaryPressed = true),
+          nativeEvent = mouse(MouseEvent.MOUSE_DRAGGED, at),
+        )
+      }
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Release,
+        position = position,
+        buttons = PointerButtons(),
+        button = PointerButton.Primary,
+        nativeEvent = mouse(MouseEvent.MOUSE_RELEASED, screen.last()),
+      )
+    } finally {
+      scene.close()
+    }
+    return clicks
+  }
+
   /** A [TitleBarLayout] 60 px tall over content with a 40 px button at the top left. */
   private class TitleBarScene {
     var titleBarPresses = 0
