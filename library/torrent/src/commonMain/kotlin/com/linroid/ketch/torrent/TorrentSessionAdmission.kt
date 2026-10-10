@@ -34,7 +34,8 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
     pieces * 128 + metadata.files.sumOf { 512 + it.path.length * 4L } +
     TorrentPieceStore.CHECK_CHUNK_BYTES + (spec.resumeData?.size ?: 0) * 8L +
     spec.outputPath.length * 4L + (spec.magnetUri?.length ?: 0) * 4L +
-    spec.selected.size * 64L + 128 * 1024 + trackerControlStateWeight()
+    // Every file, not only the selected ones: the selection may grow while the session runs.
+    metadata.files.size * 64L + 128 * 1024 + trackerControlStateWeight()
 }
 
 /**

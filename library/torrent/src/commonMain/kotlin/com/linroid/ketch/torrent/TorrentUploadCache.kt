@@ -6,7 +6,8 @@ import kotlin.time.TimeSource
 /**
  * One verified upload piece per peer, evicted when idle. It is charged to [budget], the engine's
  * upload partition, so a piece larger than that partition is never read for a peer: [read]
- * returns null and the peer's upload slot goes to another.
+ * returns null and the peer's upload slot goes to another. A piece the store revoked while reading
+ * it throws [PieceRevokedException].
  */
 internal class TorrentUploadCache(
   private val store: TorrentPieceStore,
@@ -25,6 +26,8 @@ internal class TorrentUploadCache(
         val data = store.read(piece)
         if (!sha1Digest(data).contentEquals(store.metadata.pieceHashes.copyOfRange(
             piece * 20, piece * 20 + 20))) {
+          // A file outside the selection may change; the piece is dropped instead of failing.
+          if (store.revoke(piece)) throw PieceRevokedException(piece)
           throw IOException("Verified torrent output changed")
         }
         bytes = data

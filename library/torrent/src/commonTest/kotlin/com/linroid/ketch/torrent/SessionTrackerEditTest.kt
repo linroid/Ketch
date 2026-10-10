@@ -293,6 +293,66 @@ class SessionTrackerEditTest {
   }
 
   @Test
+  fun trackerEdit_afterSelectionChange_keepsSelection() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          val second = byteArrayOf(5, 6, 7, 8)
+          val pack = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+            "announce" to "https://old/announce", "info" to mapOf("name" to "pack",
+              "piece length" to 4L, "pieces" to sha1Digest(bytes) + sha1Digest(second),
+              "private" to 1L, "files" to listOf(
+                mapOf("length" to 4L, "path" to listOf("a")),
+                mapOf("length" to 4L, "path" to listOf("b"))))
+          )))
+          val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+            "ketch-edit-selection-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+          torrentFileSystem.createDirectories(root / "pack")
+          torrentFileSystem.write(root / "pack/a") { write(bytes) }
+          torrentFileSystem.write(root / "pack/b") { write(second) }
+          val state = TorrentBufferBudget(256 * 1024)
+          val budget = TorrentBufferBudget(1024 * 1024)
+          val network = createTorrentNetwork()
+          val discoveries = MutableStateFlow(0)
+          val session = KotlinTorrentSession(
+            TorrentPieceStore(pack, root / "pack", emptySet(), "edited"), network, budget, this,
+            uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
+            trackerConfigurationBudget = state,
+            discover = { _, _ ->
+              discoveries.value++
+              awaitCancellation()
+            },
+          )
+          try {
+            session.resume()
+            discoveries.first { it == 1 }
+            assertTrue(session.changeSelection(setOf("0")))
+            assertTrue(session.replaceTrackers(next))
+            discoveries.first { it == 2 }
+            assertEquals(TorrentSessionState.SEEDING, session.state.first {
+              it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+            }, session.failure.value?.stackTraceToString())
+            assertEquals(setOf("0"), session.selectedFileIds)
+            assertEquals(4L, session.totalBytes)
+            session.pause()
+            val saved = assertNotNull(TorrentCheckpoint.decode(
+              assertNotNull(session.saveResumeData())))
+            assertEquals(setOf(0), saved.selected)
+            assertEquals(next, assertNotNull(saved.trackerConfiguration).tiers)
+            assertTrue(torrentFileSystem.exists(root / "pack/b"))
+          } finally {
+            session.close()
+            network.close()
+            torrentFileSystem.deleteRecursively(root, mustExist = false)
+          }
+          assertEquals(0, state.allocated)
+          assertEquals(0, budget.allocated)
+        }
+      }
+    }
+  }
+
+  @Test
   fun engineEditsRestartTrackersAndPreserveEmptyOverrideAcrossResume() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {

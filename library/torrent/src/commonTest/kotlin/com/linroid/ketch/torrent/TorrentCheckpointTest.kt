@@ -93,8 +93,9 @@ class TorrentCheckpointTest {
       val restarted = store(root)
       restarted.restore(snapshot)
       restarted.initialize()
-      assertContentEquals(booleanArrayOf(true, false, false), restarted.recheck())
-      assertContentEquals(longArrayOf(3, 0, 0), restarted.progress())
+      // Piece 1's boundary byte heals from its sidecar; piece 2 lies wholly in the changed file.
+      assertContentEquals(booleanArrayOf(true, true, false), restarted.recheck())
+      assertContentEquals(longArrayOf(3, 0, 1), restarted.progress())
       assertFalse(restarted.completed())
       for (piece in 1..2) restarted.commit(piece,
         bytes.copyOfRange(piece * 4, minOf(piece * 4 + 4, 10)))

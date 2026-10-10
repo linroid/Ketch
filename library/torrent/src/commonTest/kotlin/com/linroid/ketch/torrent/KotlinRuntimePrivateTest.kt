@@ -117,4 +117,91 @@ class KotlinRuntimePrivateTest {
       }
     }
   }
+
+  @Test
+  fun selectionChange_privateTorrent_bindsNoUdp() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          val payloads = listOf(byteArrayOf(1, 2, 3, 4), byteArrayOf(5, 6, 7, 8))
+          val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+            "announce" to "http://a/announce",
+            "info" to mapOf("name" to "private", "private" to 1L, "piece length" to 4L,
+              "pieces" to sha1Digest(payloads[0]) + sha1Digest(payloads[1]),
+              "files" to listOf(
+                mapOf("length" to 4L, "path" to listOf("first")),
+                mapOf("length" to 4L, "path" to listOf("second"))))
+          )))
+          val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+            "ketch-private-selection-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+          val udpSockets = AtomicInt(0)
+          val connects = AtomicInt(0)
+          val transport = createTorrentNetwork()
+          val seeder = transport.listen(PeerEndpoint("127.0.0.1", 0))
+          val network = object : TorrentNetwork by transport {
+            override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
+              udpSockets.fetchAndAdd(1)
+              return transport.bindUdp(local)
+            }
+            override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+              connects.fetchAndAdd(1)
+              return transport.connect(remote)
+            }
+          }
+          val http = object : HttpEngine {
+            override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+              error("unused")
+            override suspend fun download(url: String, range: LongRange?,
+              headers: Map<String, String>, onData: suspend (ByteArray) -> Unit) {
+              onData(Bencode.encode(mapOf("interval" to 30L, "peers" to listOf(
+                mapOf("ip" to seeder.local.host, "port" to seeder.local.port.toLong())
+              ))))
+            }
+            override fun close() = Unit
+          }
+          val server = launch {
+            val connection = seeder.accept()
+            try {
+              val wire = PeerWire(connection, metadata)
+              wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), false, false))
+              wire.send(PeerMessage.Bitfield(byteArrayOf(0xC0.toByte())))
+              wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+              while (true) {
+                val message = wire.read()
+                if (message is PeerMessage.Request) {
+                  wire.send(PeerMessage.Piece(message.index, 0, payloads[message.index]))
+                }
+              }
+            } catch (_: IOException) {
+              // The engine stopped.
+            } finally { connection.close() }
+          }
+          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = true,
+            uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), network, TorrentHttp(http))
+          try {
+            engine.start()
+            val session = engine.addTask(TorrentTaskSpec("private-selection", metadata,
+              (root / "private").toString(), setOf(0)))
+            session.resume()
+            assertEquals(TorrentSessionState.SEEDING, session.state.first {
+              it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+            }, session.failure.value?.stackTraceToString())
+            assertTrue(session.changeSelection(setOf("0", "1")))
+            session.downloadedBytes.first { it == 8L }
+            assertEquals(TorrentSessionState.SEEDING, session.state.first {
+              it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+            }, session.failure.value?.stackTraceToString())
+            assertEquals(0, udpSockets.load())
+            assertEquals(1, connects.load())
+          } finally {
+            engine.stop()
+            server.cancelAndJoin()
+            network.close()
+            torrentFileSystem.deleteRecursively(root, mustExist = false)
+          }
+          assertEquals(0, engine.allocatedExchangeBytes)
+        }
+      }
+    }
+  }
 }
