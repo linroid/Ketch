@@ -217,10 +217,12 @@ private fun runDownload(args: DownloadArgs.Download) {
 private fun runListFiles(args: DownloadArgs.Download): Int {
   val fileConfig = readDefaultConfig()
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  // Only warnings unless -v or --debug asks for more, so the rows are not lost among log lines.
+  val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
   val ketch = Ketch(
     httpEngine = httpEngine,
     config = DownloadConfig(proxy = args.proxy ?: fileConfig.download.proxy),
-    logger = Logger.console(ketchLogLevel),
+    logger = Logger.console(level),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
