@@ -69,6 +69,13 @@ internal class RemoteDownloadTask(
    */
   private var appliedEvents = 0L
 
+  /**
+   * How many updates [updateState] has applied, guarded by [updateLock]. A snapshot fetched
+   * while this changed may be older than what the task now holds.
+   */
+  internal var updates = 0L
+    private set
+
   /** Applies an SSE event; the caller holds [updateLock]. */
   internal fun applyEvent(
     newState: DownloadState,
@@ -91,6 +98,7 @@ internal class RemoteDownloadTask(
     segments: List<Segment>?,
     queuePosition: Int?,
   ) {
+    updates++
     request?.let { mutableRequest.value = it }
     segments?.let { _segments.value = it }
     _queuePosition.value = queuePosition
