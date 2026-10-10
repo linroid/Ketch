@@ -91,6 +91,7 @@ import ketch.app.shared.generated.resources.settings_general_language_system
 import ketch.app.shared.generated.resources.settings_general_login_add_failed
 import ketch.app.shared.generated.resources.settings_general_login_remove_failed
 import ketch.app.shared.generated.resources.settings_general_login_update_failed
+import ketch.app.shared.generated.resources.settings_general_menu_bar_speed
 import ketch.app.shared.generated.resources.settings_general_open_at_login
 import ketch.app.shared.generated.resources.settings_general_power
 import ketch.app.shared.generated.resources.settings_general_reduce_motion
@@ -215,7 +216,10 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
   }
 }
 
-/** Closing the window, opening at login and the app icon badge, on desktop. */
+/**
+ * Closing the window, opening at login, the app icon badge and, on macOS, the speed in the menu
+ * bar, on desktop.
+ */
 @Composable
 private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   val hooks = LocalDesktopHooks.current
@@ -327,6 +331,13 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
         hooks.setDockBadgeMode(mode)
       },
     )
+    if (menuBar) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_general_menu_bar_speed),
+        checked = desktop.menuBarSpeed,
+        onCheckedChange = { on -> appSettings.saveDesktop { it.copy(menuBarSpeed = on) } },
+      )
+    }
   }
 }
 

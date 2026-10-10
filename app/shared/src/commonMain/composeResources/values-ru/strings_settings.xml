@@ -136,6 +136,7 @@
   <string name="settings_general_badge_active">Активные загрузки</string>
   <string name="settings_general_badge_failures">Только ошибки</string>
   <string name="settings_general_badge_off">Ничего</string>
+  <string name="settings_general_menu_bar_speed">Показывать скорость в строке меню</string>
   <string name="settings_general_power">Питание</string>
   <string name="settings_general_keep_awake">Не засыпать во время загрузок</string>
   <string name="settings_general_keep_awake_hint">%1$s не будет сам переходить в режим сна, пока идут загрузки. Экран при этом может выключаться.</string>

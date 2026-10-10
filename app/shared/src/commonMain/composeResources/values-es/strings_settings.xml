@@ -128,6 +128,7 @@
   <string name="settings_general_badge_active">Descargas activas</string>
   <string name="settings_general_badge_failures">Solo errores</string>
   <string name="settings_general_badge_off">Nada</string>
+  <string name="settings_general_menu_bar_speed">Mostrar la velocidad en la barra de menús</string>
   <string name="settings_general_power">Energía</string>
   <string name="settings_general_keep_awake">Mantener activo durante las descargas</string>
   <string name="settings_general_keep_awake_hint">%1$s no entrará en reposo automáticamente mientras haya descargas en curso. La pantalla puede apagarse igualmente.</string>

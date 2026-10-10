@@ -35,6 +35,8 @@
   <string name="tray_recent">Recent</string>
   <string name="tray_show_ketch">Show Ketch</string>
   <string name="tray_speed">Speed</string>
+  <!-- Under the tray menu's status sentence while downloading. %1$s is the speed: "↓ 4.2 MB/s". -->
+  <string name="tray_speed_now">↓ %1$s</string>
   <!-- First item of a device's submenu: shows the window on that device. -->
   <string name="tray_show">Show</string>
   <!-- Asks for a new access token for a device that rejected its token. -->

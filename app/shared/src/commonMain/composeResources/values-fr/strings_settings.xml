@@ -128,6 +128,7 @@
   <string name="settings_general_badge_active">Téléchargements en cours</string>
   <string name="settings_general_badge_failures">Échecs uniquement</string>
   <string name="settings_general_badge_off">Rien</string>
+  <string name="settings_general_menu_bar_speed">Afficher la vitesse dans la barre des menus</string>
   <string name="settings_general_power">Énergie</string>
   <string name="settings_general_keep_awake">Rester éveillé pendant les téléchargements</string>
   <string name="settings_general_keep_awake_hint">%1$s ne se met pas en veille automatiquement pendant les téléchargements. L'écran peut tout de même s'éteindre.</string>

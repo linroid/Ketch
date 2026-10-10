@@ -167,6 +167,8 @@
   <string name="settings_general_badge_active">Active downloads</string>
   <string name="settings_general_badge_failures">Failures only</string>
   <string name="settings_general_badge_off">Nothing</string>
+  <!-- macOS: the download speed after the Ketch icon in the menu bar while downloads run. -->
+  <string name="settings_general_menu_bar_speed">Show speed in the menu bar</string>
   <!-- The group of settings about the power of the device the app runs on. -->
   <string name="settings_general_power">Power</string>
   <string name="settings_general_keep_awake">Keep awake while downloading</string>

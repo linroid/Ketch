@@ -2530,7 +2530,11 @@ PermissionDenied, Dns, Refused, Timeout, Tls) are W5.
 - **Tray / menu bar extra** (`DesktopTray.kt`):
 
   ```
-   ↓ 4.2 MB/s · 3 active · 2 waiting            (disabled header = status sentence)
+   Show Ketch
+   ─────────────────────────────────────────
+   Downloading 3 files · all done ≈ 14:32       (disabled header = status sentence)
+   ↓ 4.2 MB/s · 42%                             (disabled, while downloading)
+   ─────────────────────────────────────────
    New Download…                         ⌘N
    Download Link from Clipboard         ⇧⌘V
    Open Torrent File…                    ⌘O
@@ -2544,12 +2548,14 @@ PermissionDenied, Dns, Refused, Timeout, Tls) are W5.
               Den-PC — offline                    ▸ Retry now
    Recent ▸  (last 5 finished; click opens the file)
    ─────────────────────────────────────────
-   Show Ketch     Settings… ⌘,     Quit Ketch ⌘Q
+   Settings… ⌘,     Quit Ketch ⌘Q
   ```
 
-  - Icon: a 16 dp **template** `Sail` glyph with an aggregate progress ring, a 4 dp red dot for
-    unseen failures, dimmed when everything is paused. Recomposed at most once per second.
-    `-Dapple.awt.enableTemplateImages=true` (verify on Temurin 21).
+  - Icon: a **template** `Sail` glyph (the app icon's gradient on Windows) whose sails fill from
+    the foot with the aggregate progress, a red dot for unseen failures, dimmed (gray on Windows)
+    when everything is paused. On macOS the download speed follows it while downloads run
+    ("Show speed in the menu bar", `[desktop] menuBarSpeed`). Recomposed at most once per
+    second. `-Dapple.awt.enableTemplateImages=true` (verify on Temurin 21).
   - Tooltip: "Ketch — ↓ 4.2 MB/s · 3 active".
 - **macOS extras:**
   - `AppReopenedListener` shows the window on a Dock click.
@@ -3748,8 +3754,6 @@ the banner countdown matches `nextRetryAt`; stats tiles appear only when `stats(
   events.
 - **Push notifications** while the phone app is closed (needs a push relay).
 - **Remote Trash semantics.** Remote deletes stay permanent, and the copy says so.
-- **Menu-bar speed text** on macOS (AWT `TrayIcon` has no title text). The tray tooltip and the
-  progress ring cover it. The "Show speed in the menu bar" setting is **not** built.
 - **User-editable device hues** and per-category glossy icons beyond `KetchHueTile`.
 - **PWA `window-controls-overlay`.** It needs title-bar insets from
   `navigator.windowControlsOverlay` fed into `LocalWindowChrome`; the web app stays `standalone`.

@@ -124,6 +124,7 @@
   <string name="settings_general_badge_active">進行中的下載</string>
   <string name="settings_general_badge_failures">僅限失敗項目</string>
   <string name="settings_general_badge_off">不顯示</string>
+  <string name="settings_general_menu_bar_speed">在選單列中顯示速度</string>
   <string name="settings_general_power">電源</string>
   <string name="settings_general_keep_awake">下載時保持喚醒</string>
   <string name="settings_general_keep_awake_hint">下載進行時，%1$s不會自動進入睡眠。螢幕仍可關閉。</string>

@@ -19,6 +19,7 @@
   <string name="tray_recent">最近のダウンロード</string>
   <string name="tray_show_ketch">Ketchを表示</string>
   <string name="tray_speed">速度</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">表示</string>
   <string name="tray_enter_token">トークンを入力…</string>
   <string name="tray_retry_now">今すぐ再試行</string>

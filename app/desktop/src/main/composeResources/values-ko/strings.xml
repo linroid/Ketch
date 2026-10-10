@@ -19,6 +19,7 @@
   <string name="tray_recent">최근 다운로드</string>
   <string name="tray_show_ketch">Ketch 보기</string>
   <string name="tray_speed">속도</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">보기</string>
   <string name="tray_enter_token">토큰 입력…</string>
   <string name="tray_retry_now">지금 재시도</string>

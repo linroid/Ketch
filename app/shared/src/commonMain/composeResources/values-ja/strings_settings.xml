@@ -124,6 +124,7 @@
   <string name="settings_general_badge_active">実行中のダウンロード</string>
   <string name="settings_general_badge_failures">失敗のみ</string>
   <string name="settings_general_badge_off">表示しない</string>
+  <string name="settings_general_menu_bar_speed">メニューバーに速度を表示</string>
   <string name="settings_general_power">電源</string>
   <string name="settings_general_keep_awake">ダウンロード中はスリープしない</string>
   <string name="settings_general_keep_awake_hint">ダウンロード中は%1$sが自動でスリープしません。画面はオフになる場合があります。</string>
