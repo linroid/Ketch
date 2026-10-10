@@ -6,8 +6,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
@@ -256,6 +258,14 @@ class TrackerListTest {
   }
 
   @Test
+  fun lists_keepTheShippedTrackersWhileSubscribing() = realTime {
+    body = null
+    val lists = lists()
+    lists.subscribe(listOf(BUNDLED_LIST, LIST))
+    assertEquals(listOf(listOf(BUNDLED)), lock.withLock { published.distinct() })
+  }
+
+  @Test
   fun bestTrackers_areAllUsable() {
     val text = TorrentConfig.BEST_TRACKERS.joinToString("\n")
     assertEquals(TorrentConfig.BEST_TRACKERS, parseTrackerList(text))
@@ -271,8 +281,14 @@ class TrackerListTest {
     assertEquals(emptyList(), published.last())
   }
 
+  // Stops the lists before the test ends, so cleanUp never deletes the directory while a
+  // download is still saving its copy there.
   private fun realTime(block: suspend () -> Unit) = runTest {
-    withContext(Dispatchers.Default) { withTimeout(10_000) { block() } }
+    try {
+      withContext(Dispatchers.Default) { withTimeout(10_000) { block() } }
+    } finally {
+      scope.coroutineContext.job.cancelAndJoin()
+    }
   }
 
   private fun lists() = TrackerLists(
@@ -280,7 +296,7 @@ class TrackerListTest {
     stateDirectory = directory,
     scope = scope,
     onTrackers = { synchronizedAdd(published, it) },
-    bundled = { emptyList() },
+    bundled = { if (it == BUNDLED_LIST) listOf(BUNDLED) else emptyList() },
     clock = clock,
   )
 

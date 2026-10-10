@@ -160,6 +160,14 @@ class RowActionTest {
   }
 
   @Test
+  fun taskActions_starting_pausesWithoutStartNow() {
+    val actions = taskActions(request, DownloadState.Queued, remote, starting = true)
+
+    assertEquals(RowAction.Pause, actions.primary)
+    assertTrue(RowAction.StartNow !in actions.menu)
+  }
+
+  @Test
   fun taskActions_preempted_primaryIsStartNow() {
     val preempted = DownloadState.Paused(progress, PauseReason.Preempted("urgent"))
 

@@ -56,13 +56,12 @@ def download_notes(artifacts, server_url, repository, tag, docker_image):
     ("Linux", "ARM64", cli("linux", "arm64")),
   ])
   extensions = table([
-    ("Your browser", "Download"),
+    ("Your browser", "Install"),
     ("---", "---"),
     ("Chrome, Edge, Brave and other Chromium browsers",
-     download("Extension ZIP", "extension-{version}-chrome.zip")),
-    ("Firefox", download("Unsigned extension ZIP", "extension-{version}-firefox.zip")),
-    ("Safari (requires Xcode packaging and signing)",
-     download("Extension source ZIP", "extension-{version}-safari.zip")),
+     "[Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)"),
+    ("Firefox and Safari",
+     f"[Extension releases]({server_url}/{repository}/releases?q=extension-v&expanded=true)"),
   ])
   web = download("Download the web bundle", "web-{version}.zip")
   docker = f"`docker pull {docker_image}:{version}`"

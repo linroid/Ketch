@@ -18,7 +18,7 @@ import ai.koog.prompt.executor.ollama.client.OllamaModels
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
-import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.LlmApi
 import com.linroid.ketch.config.LlmSettings
 import io.ktor.http.Url
 
@@ -48,22 +48,22 @@ internal object LlmClientFactory {
     if (!settings.isComplete) return null
     val modelId = settings.effectiveModel
     val baseUrl = settings.effectiveBaseUrl
-    val (client, model) = when (settings.provider) {
+    val (client, model) = when (settings.provider.api) {
       // OpenAI's current models (gpt-6-astra, gpt-5.6-*) are served by
       // the Responses API, while third-party compatible servers
       // implement chat completions — so the fallback endpoint differs.
-      LlmProvider.OpenAi -> openAi(
+      LlmApi.OpenAiResponses -> openAi(
         settings.apiKey, baseUrl, modelId,
         LLMCapability.OpenAIEndpoint.Responses,
       )
-      LlmProvider.OpenAiCompatible -> openAi(
+      LlmApi.OpenAiChat -> openAi(
         settings.apiKey, baseUrl, modelId,
         LLMCapability.OpenAIEndpoint.Completions,
       )
-      LlmProvider.Anthropic ->
+      LlmApi.Anthropic ->
         anthropic(settings.apiKey, baseUrl, modelId)
-      LlmProvider.Google -> google(settings.apiKey, baseUrl, modelId)
-      LlmProvider.Ollama -> ollama(baseUrl, modelId)
+      LlmApi.Google -> google(settings.apiKey, baseUrl, modelId)
+      LlmApi.Ollama -> ollama(baseUrl, modelId)
     }
     return ResolvedLlm(MultiLLMPromptExecutor(client), model)
   }
@@ -169,23 +169,36 @@ internal object LlmClientFactory {
    *   `v1/chat/completions` follows.
    */
   internal fun openAiClientSettings(endpoint: String): OpenAIClientSettings {
-    val trimmed = trimTrailingSlash(endpoint)
-    val base = trimmed.removeSuffix("/$CHAT_COMPLETIONS_PATH")
-    // A full request URL or a versioned path already ends where the request paths start.
-    val isApiBase = base != trimmed || Url(base).segments.any { it.matches(API_VERSION_SEGMENT) }
-    val prefix = if (isApiBase) "" else "v1/"
+    val (base, prefix) = openAiBase(endpoint)
     return OpenAIClientSettings(
       baseUrl = base,
       chatCompletionsPath = prefix + CHAT_COMPLETIONS_PATH,
       responsesAPIPath = prefix + RESPONSES_PATH,
+      modelsPath = prefix + MODELS_PATH,
     )
   }
 
-  private fun trimTrailingSlash(raw: String): String =
+  /** The URL that lists the models of an OpenAI-compatible [endpoint], read as above. */
+  internal fun openAiModelsUrl(endpoint: String): String {
+    val (base, prefix) = openAiBase(endpoint)
+    return "$base/$prefix$MODELS_PATH"
+  }
+
+  /** [endpoint] split into the base URL and the prefix the request paths follow it with. */
+  private fun openAiBase(endpoint: String): Pair<String, String> {
+    val trimmed = trimTrailingSlash(endpoint)
+    val base = trimmed.removeSuffix("/$CHAT_COMPLETIONS_PATH")
+    // A full request URL or a versioned path already ends where the request paths start.
+    val isApiBase = base != trimmed || Url(base).segments.any { it.matches(API_VERSION_SEGMENT) }
+    return base to if (isApiBase) "" else "v1/"
+  }
+
+  internal fun trimTrailingSlash(raw: String): String =
     raw.trim().trimEnd('/')
 
   private const val CHAT_COMPLETIONS_PATH = "chat/completions"
   private const val RESPONSES_PATH = "responses"
+  private const val MODELS_PATH = "models"
 
   /** A path segment naming an API version: `v1`, `v4`, `v1beta`. */
   private val API_VERSION_SEGMENT = Regex("v\\d+[a-z0-9.]*", RegexOption.IGNORE_CASE)

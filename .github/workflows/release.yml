@@ -331,35 +331,6 @@ jobs:
           name: ketch-web
           path: /tmp/ketch-web-*.zip
 
-  build-extension:
-    name: Browser extension
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: app/browser-extension
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Run unit tests
-        run: node --test
-
-      # Manifests only take numeric versions: the run number keeps each release newer than the
-      # last one, and Chromium displays the tag's version.
-      # Includes chrome-store.zip without the development key for store submissions.
-      - name: Build browser extension packages
-        run: node build.mjs --version "${KETCH_VERSION#v}" --build "${{ github.run_number }}"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ketch-extension
-          path: app/browser-extension/build/ketch-extension-*.zip
-          if-no-files-found: error
-
   # The ketch server image for linux/amd64 and linux/arm64, from the Linux CLI builds. It goes to
   # GHCR, and to Docker Hub too once the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets are set
   # (repository variable DOCKERHUB_IMAGE names the repository, linroid/ketch by default).
@@ -477,7 +448,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-cli, build-android, build-desktop, build-web, build-extension, publish-docker, publish-maven-central]
+    needs: [build-cli, build-android, build-desktop, build-web, publish-docker, publish-maven-central]
     steps:
       - uses: actions/checkout@v6
         with:

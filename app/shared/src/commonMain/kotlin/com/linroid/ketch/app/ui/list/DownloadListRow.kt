@@ -266,7 +266,7 @@ internal fun secondLineParts(row: TaskRow, touch: Boolean): List<LinePart> {
       val detail = content.detail
       // A queue reason is a sentence and may wrap; the other details are short facts.
       when {
-        state.waitsInQueue -> add(LinePart(detail, unbroken = false))
+        state.waitsInQueue && !row.isStarting -> add(LinePart(detail, unbroken = false))
         detail is UiText.Joined && detail.separator == SEPARATOR ->
           detail.parts.forEach { add(LinePart(it)) }
         else -> add(LinePart(detail))

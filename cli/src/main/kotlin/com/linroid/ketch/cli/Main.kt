@@ -611,11 +611,27 @@ private fun discover(args: List<String>, results: PrintStream): Int {
     is AiDiscoverArgs.Discover -> parsed
   }
 
-  val settings = resolveAiSettingsFromEnv(readDefaultConfig().ai)
+  val base = when (val choice = chooseLlm(readDefaultConfig().ai, options.provider)) {
+    is CliLlmChoice.Chosen -> choice.settings
+    is CliLlmChoice.Unknown -> {
+      System.err.println("Error: ${choice.message}")
+      return AiDiscoverExit.USAGE
+    }
+  }
+  val resolved = resolveAiSettingsFromEnv(base)
+  // After the environment, which may add the provider the model is for.
+  val settings = options.model?.let { resolved.withActive(resolved.llm.id, it) } ?: resolved
   if (!settings.isUsable) {
-    System.err.println("AI discovery is not configured.")
-    System.err.println("Set a provider and API token on the app's Settings page,")
-    System.err.println("or export a provider API key for this shell.")
+    val llm = settings.llm
+    val envKey = llm.provider.envKeys.firstOrNull()
+    if (options.provider != null && !llm.isComplete && envKey != null) {
+      System.err.println("${llm.displayName} has no API key.")
+      System.err.println("Set it on the app's Settings page, or export $envKey for this shell.")
+    } else {
+      System.err.println("AI discovery is not configured.")
+      System.err.println("Set a provider and API token on the app's Settings page,")
+      System.err.println("or export a provider API key for this shell.")
+    }
     return AiDiscoverExit.FAILED
   }
 
@@ -642,7 +658,7 @@ private fun discover(args: List<String>, results: PrintStream): Int {
   val aiModule = AiModule.create(AiConfig(settings = settings))
 
   System.err.println(
-    "Using ${settings.llm.provider.label}" +
+    "Using ${settings.llm.displayName}" +
       " · ${settings.llm.effectiveModel}"
   )
   System.err.println("Discovering resources for: \"${options.query}\"")
@@ -753,6 +769,11 @@ private fun printAiDiscoverUsage(out: PrintStream) {
   out.println("  --no-filter          Show results the content filter hides:")
   out.println("                       shortened links, download aggregators,")
   out.println("                       look-alike sites, installers over HTTP")
+  out.println("  --provider <name>    Search with this saved provider, by its id")
+  out.println("                       or name, or with a provider such as")
+  out.println("                       deepseek whose API key is in the")
+  out.println("                       environment")
+  out.println("  --model <id>         Call this model")
   out.println("  -h, --help           Show this help message")
   out.println()
   out.println("Discover asks before it opens a website unless [ai.access] in")
@@ -768,10 +789,11 @@ private fun printAiDiscoverUsage(out: PrintStream) {
   out.println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
   out.println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
   out.println("  ketch ai-discover --yes \"blender 4.2 macOS\" > results.txt")
+  out.println("  ketch ai-discover --provider deepseek \"krita 5 windows\"")
   out.println()
-  out.println("Configure a provider and token on the app's Settings")
-  out.println("page, or export OPENAI_API_KEY / ANTHROPIC_API_KEY /")
-  out.println("GEMINI_API_KEY for the same effect.")
+  out.println("Configure providers and keys on the app's Settings page,")
+  out.println("or export a provider's API key, such as OPENAI_API_KEY,")
+  out.println("ANTHROPIC_API_KEY, GEMINI_API_KEY or DEEPSEEK_API_KEY.")
 }
 
 private fun runMcp(args: List<String>) {

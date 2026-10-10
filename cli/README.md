@@ -380,14 +380,16 @@ ketch ai-discover <query> [options]
 | `--max-results <n>` | Max candidates to return (default: 5) |
 | `-y`, `--yes` | Open websites without asking |
 | `--no-filter` | Show results the [content filter](../docs/ai-discovery.md#the-content-filter) hides |
+| `--provider <name>` | Search with a saved provider, by its id or name, or with a preset such as `deepseek` whose key is in the environment |
+| `--model <id>` | Call this model |
 | `-h`, `--help` | Show the command's usage |
 
 Unknown options are an error rather than part of the query.
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
-the apps edit under Settings → Discover. Blank API keys are filled from `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`; without an `[ai]` section, exporting one of them is
-enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
+the apps edit under Settings → Discover. Blank API keys are filled from each provider's
+variable, such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `DEEPSEEK_API_KEY`;
+without an `[ai]` section, exporting one of them is enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
 settings and environment variables combine.
 
 #### Page access

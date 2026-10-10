@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.load
@@ -118,6 +119,19 @@ class DeviceWorkTest {
     assertEquals("preempted", nextWaiting(tasks, mapOf("high" to 2, "preempted" to 1))?.taskId)
     assertEquals("high", nextWaiting(tasks)?.taskId)
     assertEquals("preempted", nextWaiting(tasks.drop(1))?.taskId)
+  }
+
+  @Test
+  fun nextWaiting_startingTask_isNotNext() {
+    val tasks = listOf(
+      task("starting", DownloadState.Queued, minutesAgo = 9, priority = DownloadPriority.HIGH),
+      task("queued", DownloadState.Queued, minutesAgo = 2)
+    )
+
+    assertEquals("queued", nextWaiting(tasks, mapOf("queued" to 1), KetchFeatures.ALL)?.taskId)
+    assertNull(nextWaiting(tasks.take(1), features = KetchFeatures.ALL))
+    // Without positions, a queued task may still wait.
+    assertEquals("starting", nextWaiting(tasks.take(1))?.taskId)
   }
 
   @Test

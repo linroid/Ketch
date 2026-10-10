@@ -207,9 +207,7 @@
   <string name="settings_ai_provider_ollama">Ollama · ローカルで実行、キー不要</string>
   <string name="settings_ai_provider_compatible">カスタム（OpenAI互換）</string>
   <string name="settings_ai_provider_compatible_name">OpenAI互換</string>
-  <string name="settings_ai_hint_openai">キーはplatform.openai.comで取得できます。</string>
-  <string name="settings_ai_hint_anthropic">キーはconsole.anthropic.comで取得できます。</string>
-  <string name="settings_ai_hint_gemini">キーはaistudio.google.com/apikeyで取得できます。</string>
+  <string name="settings_ai_hint_key">キーは%1$sで取得できます。</string>
   <string name="settings_ai_hint_ollama">先にモデルを取得してください：ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter、DeepSeek、LM Studio、vLLMなどのサーバー。</string>
   <string name="settings_ai_api_key_env">環境変数のキーを使用中です。ここに入力したキーが優先されます。</string>
@@ -230,6 +228,7 @@
   <string name="settings_ai_test_unsupported">このプラットフォームではAIディスカバーを利用できません。</string>
   <string name="settings_ai_test_connection_failed">接続に失敗しました。</string>
   <string name="settings_ai_engine_failed">ディスカバーのエンジンを起動できませんでした。</string>
+  <string name="settings_ai_models_failed">モデルの一覧を取得できませんでした。</string>
   <string name="settings_ai_search_footer">検索プロバイダがない場合、ディスカバーは指定したページだけを読み込みます。</string>
   <string name="settings_ai_search_provider">検索プロバイダ</string>
   <string name="settings_ai_search_none">なし</string>
