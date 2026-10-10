@@ -15,6 +15,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.torrent.TorrentController
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
@@ -144,11 +145,31 @@ class RemoteKetch internal constructor(
   private val sseMutex = Mutex()
   private var sseJob: Job? = null
 
+  /** Counts the event stream's connections; every reconnect makes earlier answers stale. */
+  private val connectionGeneration = MutableStateFlow(0L)
+
+  private val featuresMutex = Mutex()
+  private var cachedFeatures: Pair<Long, Set<String>>? = null
+
+  /**
+   * Torrent controls of the server, over its `/api/torrents` routes. A server without them, an
+   * older one or one without a torrent source, fails every command with
+   * [com.linroid.ketch.api.torrent.TorrentCommandError.UNSUPPORTED] before sending it.
+   */
+  override val torrents: TorrentController =
+    RemoteTorrentController(httpClient, connectionGeneration.asStateFlow(), json)
+
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
     log.i { "Download: url=${redactUrl(request.url)}" }
     requireProxySupport(request.proxy)
+    // An older server would ignore the flag and download every file at once.
+    if (request.awaitFileSelection &&
+      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION !in features()
+    ) {
+      throw UnsupportedOperationException("This device cannot wait for a choice of files")
+    }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -205,6 +226,17 @@ class RemoteKetch internal constructor(
     val response = httpClient.get(Api.Status())
     checkSuccess(response)
     return response.body()
+  }
+
+  /** The server's [KetchStatus.features], asked once per connection. */
+  private suspend fun features(): Set<String> {
+    val connection = connectionGeneration.value
+    featuresMutex.withLock {
+      cachedFeatures?.takeIf { it.first == connection }?.let { return it.second }
+    }
+    val features = status().features
+    featuresMutex.withLock { cachedFeatures = connection to features }
+    return features
   }
 
   override suspend fun updateConfig(config: DownloadConfig) {
@@ -279,6 +311,7 @@ class RemoteKetch internal constructor(
         httpClient.sse(
           urlString = "/api/events",
         ) {
+          connectionGeneration.update { it + 1 }
           log.i { "Connected to $baseUrl/api/events" }
           incoming.collect { sseEvent ->
             val data = sseEvent.data ?: return@collect

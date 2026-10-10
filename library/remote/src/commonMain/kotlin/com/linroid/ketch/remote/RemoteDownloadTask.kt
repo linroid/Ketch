@@ -12,6 +12,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
+import com.linroid.ketch.endpoints.model.FileSelectionRequest
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TaskSnapshot
@@ -198,6 +199,40 @@ internal class RemoteDownloadTask(
       fail(error)
     }
     checkSuccess(response)
+    update(response.body(), events)
+  }
+
+  override suspend fun selectFiles(fileIds: Set<String>) {
+    require(
+      fileIds.isNotEmpty() && fileIds.size <= DownloadTask.MAX_SELECTED_FILES &&
+        fileIds.all { it.length in 1..DownloadTask.MAX_FILE_ID_LENGTH }
+    ) {
+      "Choose between 1 and ${DownloadTask.MAX_SELECTED_FILES} files, each with an ID of 1 to " +
+        "${DownloadTask.MAX_FILE_ID_LENGTH} characters"
+    }
+    log.d { "Select ${fileIds.size} file(s) of taskId=$taskId" }
+    val events = appliedEvents()
+    val response = httpClient.put(Api.Tasks.ById.Files(parent = byId)) {
+      contentType(ContentType.Application.Json)
+      setBody(FileSelectionRequest(fileIds))
+    }
+    if (!response.status.isSuccess()) {
+      val error = response.toRemoteApiException()
+      when {
+        // Servers without the route answer with no error code: the web files catch GETs only.
+        error.errorCode == null && (response.status == HttpStatusCode.NotFound ||
+          response.status == HttpStatusCode.MethodNotAllowed) ->
+          throw UnsupportedOperationException(
+            "This server cannot change the files of a download", error,
+          )
+        error.errorCode == "invalid_selection" ->
+          throw IllegalArgumentException(error.message, error)
+        error.errorCode == "unsupported" || response.status == HttpStatusCode.NotImplemented ->
+          throw UnsupportedOperationException(error.message, error)
+        // 409 selection_unavailable: RemoteApiException is an IllegalStateException.
+        else -> fail(error)
+      }
+    }
     update(response.body(), events)
   }
 

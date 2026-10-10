@@ -60,7 +60,9 @@ sealed class TaskEvent {
 
   /**
    * Download progress, settings, or segment update for an active download.
-   * Null request or segments indicate an older server that omitted those fields.
+   * A null request means it did not change since the last event of this stream (or an older
+   * server omitted it); null segments indicate an older server. Either way, keep the current
+   * value.
    */
   @Serializable
   @SerialName("progress")

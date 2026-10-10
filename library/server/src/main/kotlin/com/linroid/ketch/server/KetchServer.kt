@@ -2,6 +2,7 @@ package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.torrent.TorrentCommandException
 import com.linroid.ketch.core.file.PathRejectedException
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.server.api.PayloadTooLargeException
@@ -11,6 +12,9 @@ import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
+import com.linroid.ketch.server.api.toErrorResponse
+import com.linroid.ketch.server.api.torrentErrorStatus
+import com.linroid.ketch.server.api.torrentRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
 import io.ktor.http.ContentType
@@ -94,6 +98,24 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
  * - `PUT    /api/tasks/{id}/priority`    — set task priority
  * - `PUT    /api/tasks/{id}/connections` — set task connections
+ * - `PUT    /api/tasks/{id}/files`       — choose the files of a torrent task: `400`
+ *   `invalid_selection`, `409` `selection_unavailable` (no file list yet, or canceled), `501`
+ *   `unsupported` (not a task with files)
+ *
+ * ### Torrents
+ *
+ * Served from [KetchApi.torrents]; servers listing `torrent.control` have one. Failures answer
+ * with the `TorrentCommandError` wire name: `400` `invalid_input`; `409` `invalid_state`,
+ * `metadata_unavailable`, `revision_conflict` (with the current `revision`),
+ * `idempotency_key_reused` and `stale_cursor`; `403` `policy_denied`; `429`
+ * `resource_exhausted`; `404` `not_found`; `500` `storage_failure`; `501` `unsupported`.
+ * - `GET /api/torrents/capabilities`   — the controller's capabilities (none without one)
+ * - `GET /api/torrents/{id}`           — a torrent task's snapshot
+ * - `GET /api/torrents/{id}/files`     — a page of its files
+ *   (`?limit=1..1000&cursor=&sort=torrent|name|size|extension|selected&desc=true`)
+ * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
+ * - `PUT /api/torrents/{id}/seeding`   — start or stop seeding it, guarded by a revision
+ * - `GET /api/torrents/{id}/events`    — SSE: `snapshot` events, then `removed` or `error`
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -404,6 +426,9 @@ class KetchServer(
           ),
         )
       }
+      exception<TorrentCommandException> { call, cause ->
+        call.respond(torrentErrorStatus(cause.error), cause.toErrorResponse())
+      }
       exception<IllegalArgumentException> { call, cause ->
         call.respond(
           HttpStatusCode.BadRequest,
@@ -488,6 +513,7 @@ private fun CORSConfig.allowCorsEntry(entry: String) {
 private fun Route.apiRoutes(ketch: KetchApi, destinations: DestinationGuard) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
+  torrentRoutes(ketch)
   eventRoutes(ketch)
 }
 
