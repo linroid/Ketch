@@ -216,10 +216,22 @@
   <string name="inspector_files_filter">Фильтр файлов</string>
   <string name="inspector_files_no_match">Нет файлов по запросу «%1$s»</string>
   <string name="inspector_files_sort">Сортировка файлов</string>
-  <string name="inspector_sort_incomplete">Сначала незавершённые</string>
-  <string name="inspector_sort_name">Имя</string>
-  <string name="inspector_sort_size">Размер</string>
   <string name="inspector_file_unnamed">Файл %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d файл · %2$s</item>
+    <item quantity="few">%1$d файла · %2$s</item>
+    <item quantity="many">%1$d файлов · %2$s</item>
+    <item quantity="other">%1$d файла · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Применить</string>
+  <string name="inspector_files_reset">Сбросить</string>
+  <string name="inspector_files_start">Скачать</string>
+  <string name="inspector_files_choose">Выберите файлы для скачивания</string>
+  <string name="inspector_files_keep_one">Оставьте хотя бы один файл</string>
+  <string name="inspector_files_hint">Отмеченные файлы скачиваются, а неотмеченные остаются на месте.</string>
+  <string name="inspector_seeding_status">Раздача · ↑ %1$s · отдано %2$s</string>
+  <string name="inspector_seeding_stop">Остановить раздачу</string>
+  <string name="inspector_seeding_start">Раздавать</string>
 </resources>

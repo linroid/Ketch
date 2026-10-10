@@ -193,6 +193,7 @@
   <string name="feedback_send_sign_in">サインイン情報が%1$sに送信されます。</string>
 
   <string name="feedback_added">%1$sを追加しました</string>
+  <string name="feedback_choose_files">「%1$s」でダウンロードするファイルを選択してください</string>
   <plurals name="feedback_recovered">
     <item quantity="other">前回のセッションから%1$d件のダウンロードを再開しています</item>
   </plurals>

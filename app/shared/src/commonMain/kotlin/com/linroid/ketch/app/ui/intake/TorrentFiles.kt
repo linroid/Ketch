@@ -2,7 +2,13 @@ package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.ui.state.ToggleableState
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.state.FileSort
+import com.linroid.ketch.app.state.FileSortKey
+import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.isTorrentExtra
+import com.linroid.ketch.app.state.sortedByFiles
+import com.linroid.ketch.app.state.toggle
+import com.linroid.ketch.app.state.toggleState
 import com.linroid.ketch.app.util.FileKind
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.file_type_audio
@@ -10,8 +16,6 @@ import ketch.app.shared.generated.resources.file_type_image
 import ketch.app.shared.generated.resources.file_type_other
 import ketch.app.shared.generated.resources.file_type_video
 import ketch.app.shared.generated.resources.intake_kind_subtitles
-import ketch.app.shared.generated.resources.sort_name
-import ketch.app.shared.generated.resources.sort_size
 import org.jetbrains.compose.resources.StringResource
 
 /** Kinds of torrent files the picker selects with one chip. */
@@ -32,12 +36,6 @@ internal enum class TorrentFileKind(val label: StringResource) {
       else -> Other
     }
   }
-}
-
-/** How the picker orders the files of a folder. */
-internal enum class TorrentSort(val label: StringResource) {
-  Name(Res.string.sort_name),
-  Size(Res.string.sort_size),
 }
 
 /** One row of the torrent picker's tree. */
@@ -66,6 +64,14 @@ internal sealed interface TorrentNode {
   ) : TorrentNode {
     override val size: Long = children.sumOf { it.size }
     override val fileIds: List<String> = children.flatMap { it.fileIds }
+
+    /** Place of its first file in the torrent. */
+    val index: Int = children.minOfOrNull {
+      when (it) {
+        is Folder -> it.index
+        is File -> it.index
+      }
+    } ?: 0
   }
 
   /** A file. */
@@ -73,6 +79,7 @@ internal sealed interface TorrentNode {
     val file: SourceFile,
     override val name: String,
     override val depth: Int,
+    val index: Int = 0,
   ) : TorrentNode {
     override val path: String get() = file.name
     override val size: Long get() = file.size.coerceAtLeast(0)
@@ -84,11 +91,24 @@ internal sealed interface TorrentNode {
 /**
  * The files of a torrent as a folder tree, from the `/`-separated paths in their names.
  *
- * @param sort order of the rows within each folder; folders come first.
+ * @param sort order of the rows within each folder; folders come first, ordered the same way
+ *   (by total size, and by name for Kind).
+ * @param selection the chosen files, which the Selected order puts first; a folder counts as
+ *   chosen when any of its files is.
  */
-internal class TorrentTree(val files: List<SourceFile>, sort: TorrentSort = TorrentSort.Name) {
+internal class TorrentTree(
+  val files: List<SourceFile>,
+  sort: FileSort = FileSortSurface.Intake.default,
+  selection: Set<String> = emptySet(),
+) {
   /** Top-level rows. */
-  val roots: List<TorrentNode> = build(files.map { it to it.name.split('/') }, "", 0, sort)
+  val roots: List<TorrentNode> = build(
+    entries = files.mapIndexed { index, file -> Entry(file, index, file.name.split('/')) },
+    prefix = "",
+    depth = 0,
+    sort = sort,
+    selection = selection,
+  )
 
   /** Every file's kind, by file id. */
   val kinds: Map<String, TorrentFileKind> =
@@ -139,48 +159,61 @@ internal class TorrentTree(val files: List<SourceFile>, sort: TorrentSort = Torr
   fun idsOf(kind: TorrentFileKind): Set<String> =
     kinds.filterValues { it == kind }.keys
 
+  /** A file with its place in the torrent and the parts of its path left to place. */
+  private class Entry(val file: SourceFile, val index: Int, val parts: List<String>)
+
   private fun build(
-    entries: List<Pair<SourceFile, List<String>>>,
+    entries: List<Entry>,
     prefix: String,
     depth: Int,
-    sort: TorrentSort,
+    sort: FileSort,
+    selection: Set<String>,
   ): List<TorrentNode> {
-    val (leaves, nested) = entries.partition { it.second.size == 1 }
-    val folders = nested.groupBy { it.second.first() }.map { (name, children) ->
+    val (leaves, nested) = entries.partition { it.parts.size == 1 }
+    val folders = nested.groupBy { it.parts.first() }.map { (name, children) ->
       val path = prefix + name
       TorrentNode.Folder(
         path = path,
         name = name,
         depth = depth,
-        children = build(children.map { it.first to it.second.drop(1) }, "$path/", depth + 1, sort),
+        children = build(
+          entries = children.map { Entry(it.file, it.index, it.parts.drop(1)) },
+          prefix = "$path/",
+          depth = depth + 1,
+          sort = sort,
+          selection = selection,
+        ),
       )
     }
-    val fileNodes = leaves.map { (file, parts) -> TorrentNode.File(file, parts.single(), depth) }
-    val comparator: Comparator<TorrentNode> = when (sort) {
-      TorrentSort.Name -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-      TorrentSort.Size -> compareByDescending { it.size }
+    val fileNodes = leaves.map { TorrentNode.File(it.file, it.parts.single(), depth, it.index) }
+    val sortedFolders = folders.sortedByFiles(sort) { folder ->
+      FileSortKey(
+        path = folder.name,
+        size = folder.size,
+        index = folder.index,
+        selected = folder.fileIds.any { it in selection },
+        folder = true,
+      )
     }
-    return folders.sortedWith(comparator) + fileNodes.sortedWith(comparator)
+    val sortedFiles = fileNodes.sortedByFiles(sort) { node ->
+      FileSortKey(
+        path = node.name,
+        size = node.size,
+        index = node.index,
+        selected = node.file.id in selection,
+      )
+    }
+    return sortedFolders + sortedFiles
   }
 }
 
 /** Whether every, some or none of [node]'s files are in [selection]. */
-internal fun toggleState(node: TorrentNode, selection: Set<String>): ToggleableState {
-  val selected = node.fileIds.count { it in selection }
-  return when (selected) {
-    0 -> ToggleableState.Off
-    node.fileIds.size -> ToggleableState.On
-    else -> ToggleableState.Indeterminate
-  }
-}
+internal fun toggleState(node: TorrentNode, selection: Set<String>): ToggleableState =
+  toggleState(node.fileIds, selection)
 
 /** [selection] after clicking [node]: a fully selected row clears, any other selects all. */
 internal fun toggle(node: TorrentNode, selection: Set<String>): Set<String> =
-  if (toggleState(node, selection) == ToggleableState.On) {
-    selection - node.fileIds.toSet()
-  } else {
-    selection + node.fileIds
-  }
+  toggle(node.fileIds, selection)
 
 /**
  * [selection] after a ⇧-click on [to] in [rows], the visible rows, whose last click was on

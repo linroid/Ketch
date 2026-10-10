@@ -188,10 +188,20 @@
   <string name="inspector_files_filter">Filtrer les fichiers</string>
   <string name="inspector_files_no_match">Aucun fichier ne correspond à « %1$s »</string>
   <string name="inspector_files_sort">Trier les fichiers</string>
-  <string name="inspector_sort_incomplete">Incomplets d'abord</string>
-  <string name="inspector_sort_name">Nom</string>
-  <string name="inspector_sort_size">Taille</string>
   <string name="inspector_file_unnamed">Fichier %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d fichier · %2$s</item>
+    <item quantity="other">%1$d fichiers · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Appliquer</string>
+  <string name="inspector_files_reset">Réinitialiser</string>
+  <string name="inspector_files_start">Télécharger</string>
+  <string name="inspector_files_choose">Choisissez les fichiers à télécharger</string>
+  <string name="inspector_files_keep_one">Gardez au moins un fichier</string>
+  <string name="inspector_files_hint">Les fichiers cochés sont téléchargés ; les fichiers décochés restent où ils sont.</string>
+  <string name="inspector_seeding_status">En partage · ↑ %1$s · %2$s envoyés</string>
+  <string name="inspector_seeding_stop">Arrêter le partage</string>
+  <string name="inspector_seeding_start">Partager</string>
 </resources>

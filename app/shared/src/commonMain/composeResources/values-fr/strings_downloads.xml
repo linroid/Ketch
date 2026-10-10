@@ -239,6 +239,8 @@
   <string name="downloads_failed_priority">Impossible de définir la priorité de %1$s sur %2$s</string>
   <string name="downloads_failed_connections">Impossible de définir les connexions de %1$s sur %2$s</string>
   <string name="downloads_failed_reschedule">Impossible de replanifier %1$s sur %2$s</string>
+  <string name="downloads_failed_files">Impossible de modifier les fichiers de %1$s sur %2$s</string>
+  <string name="downloads_failed_seeding">Impossible de modifier le partage de %1$s sur %2$s</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">%1$d téléchargement mis en pause</item>

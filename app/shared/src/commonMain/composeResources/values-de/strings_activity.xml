@@ -226,6 +226,7 @@
   <string name="feedback_send_sign_in">Anmeldedaten werden an %1$s gesendet.</string>
 
   <string name="feedback_added">%1$s hinzugefügt</string>
+  <string name="feedback_choose_files">Wähle aus, welche Dateien von „%1$s“ heruntergeladen werden</string>
   <plurals name="feedback_recovered">
     <item quantity="one">%1$d Download aus deiner letzten Sitzung wird fortgesetzt</item>
     <item quantity="other">%1$d Downloads aus deiner letzten Sitzung werden fortgesetzt</item>

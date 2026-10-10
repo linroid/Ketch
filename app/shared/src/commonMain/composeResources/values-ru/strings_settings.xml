@@ -562,7 +562,7 @@
   <string name="settings_torrent_upload_seed">Продолжать раздачу</string>
   <string name="settings_torrent_upload_off_hint">Пиры не могут ничего скачать с этого устройства.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Пока торренты загружаются, пиры могут скачивать уже полученные вами части.</string>
-  <string name="settings_torrent_upload_seed_hint">Пока Ketch работает, готовые торренты продолжают отдачу — до их удаления или отключения этого параметра. Торренты, ожидающие загрузки, имеют приоритет.</string>
+  <string name="settings_torrent_upload_seed_hint">Готовые торренты продолжают отдачу, пока вы их не остановите или не отключите этот параметр, в том числе после перезапуска Ketch.</string>
   <string name="settings_torrent_upload_limit">Ограничение отдачи</string>
   <string name="settings_torrent_upload_limit_hint">Общее для всех торрентов.</string>
   <string name="settings_torrent_upload_footer">Пиры, которым вы отдаёте данные, видят IP-адрес этого устройства. Приватные торренты делятся только с пирами своего трекера.</string>

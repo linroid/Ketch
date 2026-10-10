@@ -538,7 +538,7 @@
   <string name="settings_torrent_upload_seed">Partage continu</string>
   <string name="settings_torrent_upload_off_hint">Les pairs ne peuvent rien télécharger depuis cet appareil.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Pendant le téléchargement de vos torrents, les pairs peuvent télécharger les morceaux que vous avez déjà.</string>
-  <string name="settings_torrent_upload_seed_hint">Les torrents terminés continuent l'envoi tant que Ketch est lancé, jusqu'à ce que vous les retiriez ou désactiviez cette option. Les torrents en attente de téléchargement passent en priorité.</string>
+  <string name="settings_torrent_upload_seed_hint">Les torrents terminés continuent l'envoi jusqu'à ce que vous les arrêtiez ou désactiviez cette option, même après un redémarrage de Ketch.</string>
   <string name="settings_torrent_upload_limit">Limite d'envoi</string>
   <string name="settings_torrent_upload_limit_hint">Partagée par tous les torrents.</string>
   <string name="settings_torrent_upload_footer">Les pairs auxquels vous envoyez des données voient l'adresse IP de cet appareil. Les torrents privés ne partagent qu'avec les pairs de leur tracker.</string>

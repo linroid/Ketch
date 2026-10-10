@@ -305,6 +305,8 @@
   <string name="downloads_failed_priority">Couldn't set the priority of %1$s on %2$s</string>
   <string name="downloads_failed_connections">Couldn't set the connections of %1$s on %2$s</string>
   <string name="downloads_failed_reschedule">Couldn't reschedule %1$s on %2$s</string>
+  <string name="downloads_failed_files">Couldn't change the files of %1$s on %2$s</string>
+  <string name="downloads_failed_seeding">Couldn't change seeding of %1$s on %2$s</string>
 
   <!-- What a command did to several downloads, parts joined by " · ". %1$d is how many. -->
   <plurals name="downloads_batch_paused">

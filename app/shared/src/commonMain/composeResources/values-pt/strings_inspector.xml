@@ -188,10 +188,20 @@
   <string name="inspector_files_filter">Filtrar arquivos</string>
   <string name="inspector_files_no_match">Nenhum arquivo corresponde a “%1$s”</string>
   <string name="inspector_files_sort">Ordenar arquivos</string>
-  <string name="inspector_sort_incomplete">Incompletos primeiro</string>
-  <string name="inspector_sort_name">Nome</string>
-  <string name="inspector_sort_size">Tamanho</string>
   <string name="inspector_file_unnamed">Arquivo %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d arquivo · %2$s</item>
+    <item quantity="other">%1$d arquivos · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Aplicar</string>
+  <string name="inspector_files_reset">Redefinir</string>
+  <string name="inspector_files_start">Baixar</string>
+  <string name="inspector_files_choose">Escolha os arquivos para baixar</string>
+  <string name="inspector_files_keep_one">Mantenha pelo menos um arquivo</string>
+  <string name="inspector_files_hint">Os arquivos marcados são baixados; os desmarcados ficam onde estão.</string>
+  <string name="inspector_seeding_status">Semeando · ↑ %1$s · %2$s enviados</string>
+  <string name="inspector_seeding_stop">Parar de semear</string>
+  <string name="inspector_seeding_start">Semear</string>
 </resources>
