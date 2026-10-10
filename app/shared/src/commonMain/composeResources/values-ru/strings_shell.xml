@@ -50,7 +50,6 @@
   <string name="shell_devices_online">%1$d из %2$d в сети</string>
 
   <string name="sidebar_all_devices_tooltip">Загрузки всех устройств</string>
-  <string name="sidebar_add_device">Добавить устройство</string>
   <string name="sidebar_device_menu">Меню устройства</string>
   <string name="sidebar_menu_pause_all">Приостановить все здесь</string>
   <string name="sidebar_menu_resume_all">Возобновить все здесь</string>

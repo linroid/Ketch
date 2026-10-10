@@ -38,7 +38,6 @@
   <string name="shell_devices_online">%2$d 台中有 %1$d 台在線上</string>
 
   <string name="sidebar_all_devices_tooltip">所有裝置的下載</string>
-  <string name="sidebar_add_device">新增裝置</string>
   <string name="sidebar_device_menu">裝置選單</string>
   <string name="sidebar_menu_pause_all">全部暫停</string>
   <string name="sidebar_menu_resume_all">全部繼續</string>

@@ -95,9 +95,9 @@ import org.jetbrains.compose.resources.stringResource
  * [AppearanceToggle], the destinations with Downloads' downloading count, the device stack, and
  * Settings at the bottom. On macOS it starts below the traffic lights.
  *
- * From two devices on, the stack starts with All devices, ringed by the progress of everything
- * downloading. Each device's pennant switches to it, opens its menu on a right click or a long
- * press, and takes links, files and rows dragged onto it.
+ * The stack shows from two devices on, starting with All devices, ringed by the progress of
+ * everything downloading. Each device's pennant switches to it, opens its menu on a right click or
+ * a long press, and takes links, files and rows dragged onto it.
  *
  * The destination [shell] shows, or Settings while it shows, is selected.
  *
@@ -165,31 +165,34 @@ internal fun NavRail(
         )
       }
     }
-    Spacer(
-      Modifier
-        .padding(vertical = spacing.s3)
-        .width(spacing.s8)
-        .height(DividerWidth)
-        .background(KetchTheme.colors.hairline),
-    )
-    // The devices take the room left, so Settings stays at the bottom.
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(spacing.s1),
-      modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-    ) {
-      val all = scope == DeviceScope.All
-      if (devices.size >= DeviceScope.MIN_DEVICES) {
+    if (devices.size < DeviceScope.MIN_DEVICES) {
+      // A lone device needs no list.
+      Spacer(Modifier.weight(1f))
+    } else {
+      Spacer(
+        Modifier
+          .padding(vertical = spacing.s3)
+          .width(spacing.s8)
+          .height(DividerWidth)
+          .background(KetchTheme.colors.hairline),
+      )
+      // The devices take the room left, so Settings stays at the bottom.
+      Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.s1),
+        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+      ) {
+        val all = scope == DeviceScope.All
         AllDevicesCell(state, devices, selected = all, onClick = { state.showAllDevices() })
-      }
-      devices.forEachIndexed { index, device ->
-        key(device.deviceId) {
-          RailDeviceCell(
-            state = state,
-            device = device,
-            number = index + 1,
-            selected = !all && device.deviceId == active?.deviceId,
-          )
+        devices.forEachIndexed { index, device ->
+          key(device.deviceId) {
+            RailDeviceCell(
+              state = state,
+              device = device,
+              number = index + 1,
+              selected = !all && device.deviceId == active?.deviceId,
+            )
+          }
         }
       }
     }

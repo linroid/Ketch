@@ -38,7 +38,6 @@
   <string name="shell_devices_online">%2$d대 중 %1$d대 온라인</string>
 
   <string name="sidebar_all_devices_tooltip">모든 기기의 다운로드</string>
-  <string name="sidebar_add_device">기기 추가</string>
   <string name="sidebar_device_menu">기기 메뉴</string>
   <string name="sidebar_menu_pause_all">이 기기에서 모두 일시정지</string>
   <string name="sidebar_menu_resume_all">이 기기에서 모두 재개</string>

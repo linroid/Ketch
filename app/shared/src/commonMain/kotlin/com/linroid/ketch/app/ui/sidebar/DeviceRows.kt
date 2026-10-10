@@ -82,7 +82,6 @@ import ketch.app.shared.generated.resources.shell_device_needs_token
 import ketch.app.shared.generated.resources.shell_device_off
 import ketch.app.shared.generated.resources.shell_device_offline
 import ketch.app.shared.generated.resources.shell_device_waiting
-import ketch.app.shared.generated.resources.sidebar_add_device
 import ketch.app.shared.generated.resources.sidebar_all_devices_tooltip
 import ketch.app.shared.generated.resources.sidebar_device_menu
 import org.jetbrains.compose.resources.stringResource
@@ -346,32 +345,6 @@ internal fun PennantCluster(
           .border(ClusterRing, ring, KetchTheme.shapes.full),
       )
     }
-  }
-}
-
-/** The "Add device" row under the devices, which asks for a device to connect to. */
-@Composable
-internal fun AddDeviceRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
-  val colors = KetchTheme.colors
-  SidebarRow(
-    selected = false,
-    onClick = onClick,
-    modifier = modifier,
-    leading = {
-      KetchIconImage(
-        icon = KetchIcon.Plus,
-        size = KetchTheme.density.controlGlyph,
-        tint = colors.textSecondary,
-      )
-    },
-  ) {
-    Text(
-      text = stringResource(Res.string.sidebar_add_device),
-      style = KetchTheme.typography.label,
-      color = colors.textSecondary,
-      maxLines = 1,
-      modifier = Modifier.weight(1f),
-    )
   }
 }
 

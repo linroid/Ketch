@@ -62,7 +62,6 @@
 
   <!-- The sidebar's device rows. -->
   <string name="sidebar_all_devices_tooltip">Every device's downloads</string>
-  <string name="sidebar_add_device">Add device</string>
   <!-- What a long press on a device opens, for screen readers. -->
   <string name="sidebar_device_menu">Device menu</string>
   <!-- The menu of a device in the sidebar and the rail. -->
