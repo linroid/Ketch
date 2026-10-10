@@ -102,6 +102,9 @@ internal class TorrentActiveSlots(private val capacity: Int) {
    */
   suspend fun reclaim(taskId: String): Boolean = mutex.withLock { seeders.remove(taskId) }
 
+  /** Slots owned or lent to seeders; for leak checks. */
+  suspend fun inUse(): Int = mutex.withLock { used }
+
   /** Returns an owned slot, handing it straight to the first waiter. */
   suspend fun release() = mutex.withLock { releaseLocked() }
 

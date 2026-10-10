@@ -38,7 +38,9 @@ The manifest covers **v1 download** through libtorrent DHT/metadata and a Transm
 with an explicit peer; **v2 and hybrid download and upload** with libtorrent, which fetches
 metadata, piece layers and payload from a seeding Ketch engine through `btmh`, dual-topic and
 `btih`-only magnets (the last over the v1 route, without hashes); and **hybrid v1-peer upload and
-download** with Transmission, which knows only v1 and its padding. It does not certify public
+download** with Transmission, which knows only v1 and its padding; and **live file selection**: a
+running task gains files while it downloads from a libtorrent seeder (v1 and pure v2) and from a
+Transmission seeder (v1), byte-exact, without dialing the peer again. It does not certify public
 trackerless discovery, a second independent v2 implementation, uTP or protocol encryption.
 Extend the manifest with each implemented capability and preserve independent expected payloads.
 Never add an unimplemented scenario as passing, or satisfy two capability rows with one no-op test.
