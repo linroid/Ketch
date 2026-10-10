@@ -24,6 +24,19 @@ class AppearanceConfigTest {
   }
 
   @Test
+  fun `every accent round trips under its color name`() {
+    for (accent in AccentColor.entries) {
+      val encoded = ConfigStore.toml.encodeToString(
+        KetchConfig.serializer(),
+        KetchConfig(appearance = AppearanceConfig(accent = accent)),
+      )
+      assertTrue(encoded.contains("accent = \"${accent.name.lowercase()}\""), encoded)
+      val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
+      assertEquals(accent, decoded.appearance.accent)
+    }
+  }
+
+  @Test
   fun `accents saved under their former names load as their colors`() {
     val former = mapOf(
       "signal" to AccentColor.Indigo,

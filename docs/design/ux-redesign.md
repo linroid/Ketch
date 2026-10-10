@@ -155,7 +155,8 @@ Why this combination:
    - The ketch motif lives in visuals: the segmented-sail logo, lane illustrations, device
      pennants.
    - It reaches copy in exactly one place: "Slow lane". Accents are named after their color
-     (Indigo, Teal, Green and Orange), so the name says what the swatch shows.
+     (Indigo, Purple, Pink, Orange, Green, Teal and Blue), so the name says what the swatch
+     shows.
    - Status, error and button copy stays literal.
 10. **Tokens or nothing.** Colors, radii, spacing, type and durations all come from `KetchTheme`.
     A `jvmTest` fails the build on new literals.
@@ -337,12 +338,19 @@ otherwise `#141A26`), so `KetchButton` never hard-codes `Color.White` again
 (`KetchButton.kt:72,75`). Hover adds an 8% black overlay on the fill in light, and an 8% white
 overlay in dark.
 
+The swatches follow the color wheel from the default and wrap onto more lines where the row is
+narrow. There is no red, yellow or gray accent: the accent colors downloading rows, lanes and
+progress, which would then read as failed, paused or queued.
+
 | Accent | Fill light | Fill dark | `accentText` light / dark | `accentSoft` light / dark | White on fill |
 |---|---|---|---|---|---|
 | **Indigo** (default) | `#4F5DE4` | `#5563F0` | `#3C47B7` / `#8E9BFF` | `#ECEEFE` / `#1D2140` | 5.2 / 4.7 |
-| Teal | `#00818D` | `#00818D` | `#006A74` / `#4FD1DB` | `#DDF5F7` / `#0D2E33` | 4.6 / 4.6 |
-| Green | `#007F35` | `#007F35` | `#00692C` / `#5FD08A` | `#DCF3E3` / `#0E2C1A` | 5.1 / 5.1 |
+| Purple | `#8A3FD1` | `#8A3FD1` | `#7232B0` / `#C79BFF` | `#F2E9FC` / `#271A3B` | 5.7 / 5.7 |
+| Pink | `#C8317A` | `#C8317A` | `#A82664` / `#FF8EC2` | `#FCE6F0` / `#361526` | 5.0 / 5.0 |
 | Orange | `#C9431C` | `#C9431C` | `#A8370F` / `#FF9A6B` | `#FFE9E0` / `#34160D` | 4.9 / 4.9 |
+| Green | `#007F35` | `#007F35` | `#00692C` / `#5FD08A` | `#DCF3E3` / `#0E2C1A` | 5.1 / 5.1 |
+| Teal | `#00818D` | `#00818D` | `#006A74` / `#4FD1DB` | `#DDF5F7` / `#0D2E33` | 4.6 / 4.6 |
+| Blue | `#1A6FDB` | `#1A6FDB` | `#155BB5` / `#7EB6FF` | `#E3EEFD` / `#11243D` | 4.8 / 4.8 |
 
 Indigo's dark fill changes from azure `#319CFC` to `#5563F0`. Indigo is therefore one hue
 family in both themes, and white text on it passes AA.

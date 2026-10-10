@@ -16,14 +16,17 @@ import kotlinx.serialization.encoding.Encoder
  * does not know loads as [Indigo] rather than failing the whole config file.
  *
  * @property id value stored in `config.toml`.
- * @property previousId the name older versions saved this palette under.
+ * @property previousId the name older versions saved this palette under, if it had another.
  */
 @Serializable(with = AccentColorSerializer::class)
-enum class AccentColor(val id: String, internal val previousId: String) {
+enum class AccentColor(val id: String, internal val previousId: String? = null) {
   Indigo(id = "indigo", previousId = "signal"),
-  Teal(id = "teal", previousId = "harbor"),
-  Green(id = "green", previousId = "fathom"),
+  Purple(id = "purple"),
+  Pink(id = "pink"),
   Orange(id = "orange", previousId = "beacon"),
+  Green(id = "green", previousId = "fathom"),
+  Teal(id = "teal", previousId = "harbor"),
+  Blue(id = "blue"),
 }
 
 internal object AccentColorSerializer : KSerializer<AccentColor> {

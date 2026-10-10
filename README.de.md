@@ -168,7 +168,7 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Wach während Downloads** — Die Desktop- und Android-Apps halten das System vom selbstständigen
   Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
   (**Einstellungen → Allgemein**).
-- **Dein Stil, deine Sprache** — Helles und dunkles Design mit vier Akzentfarben, in English,
+- **Dein Stil, deine Sprache** — Helles und dunkles Design mit sieben Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
   ([Übersetzungen](docs/development/localization.md)).
 

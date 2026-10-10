@@ -180,10 +180,7 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.General,
     title = Res.string.settings_general_accent,
     description = Res.string.settings_search_accent.text(
-      KetchAccent.Indigo.displayName,
-      KetchAccent.Teal.displayName,
-      KetchAccent.Green.displayName,
-      KetchAccent.Orange.displayName,
+      *KetchAccent.entries.map { it.displayName }.toTypedArray(),
     ),
     keywords = Res.string.settings_search_accent_keywords,
   ),

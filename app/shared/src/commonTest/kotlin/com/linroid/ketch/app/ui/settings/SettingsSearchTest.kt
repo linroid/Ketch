@@ -43,7 +43,7 @@ class SettingsSearchTest {
     val hits = searchSettings("teal", every, allFeatures, loadSettingsSearchIndex())
 
     assertEquals("Accent color", hits.first().entry.title)
-    assertEquals("Indigo, Teal, Green or Orange", hits.first().entry.description)
+    assertEquals("Indigo, Purple, Pink, Orange, Green, Teal or Blue", hits.first().entry.description)
   }
 
   @Test

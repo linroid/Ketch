@@ -86,9 +86,12 @@
   <string name="settings_theme_dark">어둡게</string>
   <string name="settings_general_accent">강조 색상</string>
   <string name="settings_accent_indigo">인디고</string>
-  <string name="settings_accent_teal">청록</string>
-  <string name="settings_accent_green">초록</string>
+  <string name="settings_accent_purple">보라</string>
+  <string name="settings_accent_pink">분홍</string>
   <string name="settings_accent_orange">주황</string>
+  <string name="settings_accent_green">초록</string>
+  <string name="settings_accent_teal">청록</string>
+  <string name="settings_accent_blue">파랑</string>
   <string name="settings_general_density">밀도</string>
   <string name="settings_general_density_hint">자동: 마우스를 쓰면 촘촘하게, 터치에서는 여유 있게 표시합니다.</string>
   <string name="settings_density_auto">자동</string>
@@ -540,7 +543,7 @@
   <string name="settings_search_device_name_keywords">호스트 이름, 컴퓨터 이름, 기기 이름, 이름 변경, hostname</string>
   <string name="settings_search_theme">시스템, 밝게 또는 어둡게</string>
   <string name="settings_search_theme_keywords">다크 모드, 라이트 모드, 어두운 모드, 밝은 모드, 테마, 화면 모드</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s 또는 %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s 또는 %7$s</string>
   <string name="settings_search_accent_keywords">색상, 색, 컬러, 테마</string>
   <string name="settings_search_density">자동, 촘촘하게 또는 여유 있게</string>
   <string name="settings_search_density_keywords">크기, 간격, 여백, 터치, 화면</string>

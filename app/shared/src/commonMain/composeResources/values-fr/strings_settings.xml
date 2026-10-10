@@ -90,9 +90,12 @@
   <string name="settings_theme_dark">Sombre</string>
   <string name="settings_general_accent">Couleur d'accentuation</string>
   <string name="settings_accent_indigo">Indigo</string>
-  <string name="settings_accent_teal">Bleu canard</string>
-  <string name="settings_accent_green">Vert</string>
+  <string name="settings_accent_purple">Violet</string>
+  <string name="settings_accent_pink">Rose</string>
   <string name="settings_accent_orange">Orange</string>
+  <string name="settings_accent_green">Vert</string>
+  <string name="settings_accent_teal">Bleu canard</string>
+  <string name="settings_accent_blue">Bleu</string>
   <string name="settings_general_density">Densité</string>
   <string name="settings_general_density_hint">Auto : compacte avec une souris, plus aérée en tactile.</string>
   <string name="settings_density_auto">Auto</string>
@@ -555,7 +558,7 @@
   <string name="settings_search_device_name_keywords">nom d'hôte, hostname, ordinateur, renommer, nom</string>
   <string name="settings_search_theme">Système, clair ou sombre</string>
   <string name="settings_search_theme_keywords">mode sombre, mode clair, apparence, thème</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s ou %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s ou %7$s</string>
   <string name="settings_search_accent_keywords">couleur, apparence, accent</string>
   <string name="settings_search_density">Auto, compacte ou confortable</string>
   <string name="settings_search_density_keywords">taille, espacement, tactile, apparence</string>

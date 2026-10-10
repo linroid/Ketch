@@ -169,7 +169,7 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Éveillé pendant les téléchargements** — Les apps pour ordinateur et Android empêchent la mise
   en veille automatique du système pendant les téléchargements ; l'écran peut tout de même
   s'éteindre (**Réglages → Général**).
-- **Votre style, votre langue** — Thèmes clair et sombre avec quatre couleurs d'accent, en English,
+- **Votre style, votre langue** — Thèmes clair et sombre avec sept couleurs d'accent, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch et Français
   ([traductions](docs/development/localization.md)).
 

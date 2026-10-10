@@ -177,15 +177,21 @@ class AppSettingsController(
 /** Maps the persisted accent onto the theme's palette. */
 fun AccentColor.toKetchAccent(): KetchAccent = when (this) {
   AccentColor.Indigo -> KetchAccent.Indigo
-  AccentColor.Teal -> KetchAccent.Teal
-  AccentColor.Green -> KetchAccent.Green
+  AccentColor.Purple -> KetchAccent.Purple
+  AccentColor.Pink -> KetchAccent.Pink
   AccentColor.Orange -> KetchAccent.Orange
+  AccentColor.Green -> KetchAccent.Green
+  AccentColor.Teal -> KetchAccent.Teal
+  AccentColor.Blue -> KetchAccent.Blue
 }
 
 /** Maps a theme palette back onto its persisted form. */
 fun KetchAccent.toAccentColor(): AccentColor = when (this) {
   KetchAccent.Indigo -> AccentColor.Indigo
-  KetchAccent.Teal -> AccentColor.Teal
-  KetchAccent.Green -> AccentColor.Green
+  KetchAccent.Purple -> AccentColor.Purple
+  KetchAccent.Pink -> AccentColor.Pink
   KetchAccent.Orange -> AccentColor.Orange
+  KetchAccent.Green -> AccentColor.Green
+  KetchAccent.Teal -> AccentColor.Teal
+  KetchAccent.Blue -> AccentColor.Blue
 }

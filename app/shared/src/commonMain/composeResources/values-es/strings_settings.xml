@@ -90,9 +90,12 @@
   <string name="settings_theme_dark">Oscuro</string>
   <string name="settings_general_accent">Color de acento</string>
   <string name="settings_accent_indigo">Índigo</string>
-  <string name="settings_accent_teal">Verde azulado</string>
-  <string name="settings_accent_green">Verde</string>
+  <string name="settings_accent_purple">Morado</string>
+  <string name="settings_accent_pink">Rosa</string>
   <string name="settings_accent_orange">Naranja</string>
+  <string name="settings_accent_green">Verde</string>
+  <string name="settings_accent_teal">Verde azulado</string>
+  <string name="settings_accent_blue">Azul</string>
   <string name="settings_general_density">Densidad</string>
   <string name="settings_general_density_hint">Automática: compacta con puntero, más amplia con pantalla táctil.</string>
   <string name="settings_density_auto">Automática</string>
@@ -555,7 +558,7 @@
   <string name="settings_search_device_name_keywords">nombre de host, hostname, equipo, ordenador, computadora, renombrar, cambiar nombre</string>
   <string name="settings_search_theme">Sistema, claro u oscuro</string>
   <string name="settings_search_theme_keywords">modo oscuro, modo claro, aspecto, apariencia, tema</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s o %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s o %7$s</string>
   <string name="settings_search_accent_keywords">color, aspecto, apariencia</string>
   <string name="settings_search_density">Automática, compacta o cómoda</string>
   <string name="settings_search_density_keywords">tamaño, espaciado, táctil, aspecto</string>

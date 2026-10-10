@@ -151,7 +151,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   Android 和 iOS 26 上可在后台继续下载。
 - **下载时保持唤醒** — 桌面版和 Android 版在下载进行时防止系统自动进入睡眠，屏幕仍可关闭
   （**设置 → 通用**）。
-- **外观与语言随心选择** — 浅色与深色主题、四种强调色，支持 English、简体中文、繁體中文、
+- **外观与语言随心选择** — 浅色与深色主题、七种强调色，支持 English、简体中文、繁體中文、
   日本語、한국어、Español、Português (Brasil)、Deutsch 和 Français
   （[参与翻译](docs/development/localization.md)）。
 

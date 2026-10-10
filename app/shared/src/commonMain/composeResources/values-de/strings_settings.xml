@@ -90,9 +90,12 @@
   <string name="settings_theme_dark">Dunkel</string>
   <string name="settings_general_accent">Akzentfarbe</string>
   <string name="settings_accent_indigo">Indigo</string>
-  <string name="settings_accent_teal">Petrol</string>
-  <string name="settings_accent_green">Grün</string>
+  <string name="settings_accent_purple">Lila</string>
+  <string name="settings_accent_pink">Pink</string>
   <string name="settings_accent_orange">Orange</string>
+  <string name="settings_accent_green">Grün</string>
+  <string name="settings_accent_teal">Petrol</string>
+  <string name="settings_accent_blue">Blau</string>
   <string name="settings_general_density">Dichte</string>
   <string name="settings_general_density_hint">Automatisch: kompakt mit Maus, großzügiger bei Touch-Bedienung.</string>
   <string name="settings_density_auto">Automatisch</string>
@@ -555,7 +558,7 @@
   <string name="settings_search_device_name_keywords">Hostname, Computername, Rechnername, umbenennen</string>
   <string name="settings_search_theme">System, hell oder dunkel</string>
   <string name="settings_search_theme_keywords">Dunkelmodus, dunkler Modus, heller Modus, Darstellung, Theme</string>
-  <string name="settings_search_accent">%1$s, %2$s, %3$s oder %4$s</string>
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s oder %7$s</string>
   <string name="settings_search_accent_keywords">Farbe, Akzent, Darstellung</string>
   <string name="settings_search_density">Automatisch, kompakt oder komfortabel</string>
   <string name="settings_search_density_keywords">Größe, Abstand, Touch, Darstellung</string>

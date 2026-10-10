@@ -7,9 +7,12 @@ import androidx.compose.ui.graphics.luminance
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_accent_blue
 import ketch.app.shared.generated.resources.settings_accent_green
 import ketch.app.shared.generated.resources.settings_accent_indigo
 import ketch.app.shared.generated.resources.settings_accent_orange
+import ketch.app.shared.generated.resources.settings_accent_pink
+import ketch.app.shared.generated.resources.settings_accent_purple
 import ketch.app.shared.generated.resources.settings_accent_teal
 import org.jetbrains.compose.resources.StringResource
 
@@ -143,12 +146,19 @@ data class KetchStatusColors(
   val seeding: KetchStatusColor,
 )
 
-/** Accent palettes, each named after its color, chosen in Settings → General → Accent. */
+/**
+ * Accent palettes, each named after its color, chosen in Settings → General → Accent. They are
+ * listed around the color wheel from the default, [Indigo]. There is no red, yellow or gray: the
+ * accent colors downloads, which would then look failed, paused or queued.
+ */
 enum class KetchAccent(private val nameResource: StringResource) {
   Indigo(Res.string.settings_accent_indigo),
-  Teal(Res.string.settings_accent_teal),
+  Purple(Res.string.settings_accent_purple),
+  Pink(Res.string.settings_accent_pink),
+  Orange(Res.string.settings_accent_orange),
   Green(Res.string.settings_accent_green),
-  Orange(Res.string.settings_accent_orange);
+  Teal(Res.string.settings_accent_teal),
+  Blue(Res.string.settings_accent_blue);
 
   /** The palette's name, as Settings shows it under its swatch. */
   val displayName: UiText get() = nameResource.text()
@@ -176,20 +186,35 @@ internal object KetchPalette {
     } else {
       AccentTone(Color(0xFF4F5DE4), Color(0xFF3C47B7), Color(0xFFECEEFE))
     }
-    KetchAccent.Teal -> if (dark) {
-      AccentTone(Color(0xFF00818D), Color(0xFF4FD1DB), Color(0xFF0D2E33))
+    KetchAccent.Purple -> if (dark) {
+      AccentTone(Color(0xFF8A3FD1), Color(0xFFC79BFF), Color(0xFF271A3B))
     } else {
-      AccentTone(Color(0xFF00818D), Color(0xFF006A74), Color(0xFFDDF5F7))
+      AccentTone(Color(0xFF8A3FD1), Color(0xFF7232B0), Color(0xFFF2E9FC))
+    }
+    KetchAccent.Pink -> if (dark) {
+      AccentTone(Color(0xFFC8317A), Color(0xFFFF8EC2), Color(0xFF361526))
+    } else {
+      AccentTone(Color(0xFFC8317A), Color(0xFFA82664), Color(0xFFFCE6F0))
+    }
+    KetchAccent.Orange -> if (dark) {
+      AccentTone(Color(0xFFC9431C), Color(0xFFFF9A6B), Color(0xFF34160D))
+    } else {
+      AccentTone(Color(0xFFC9431C), Color(0xFFA8370F), Color(0xFFFFE9E0))
     }
     KetchAccent.Green -> if (dark) {
       AccentTone(Color(0xFF007F35), Color(0xFF5FD08A), Color(0xFF0E2C1A))
     } else {
       AccentTone(Color(0xFF007F35), Color(0xFF00692C), Color(0xFFDCF3E3))
     }
-    KetchAccent.Orange -> if (dark) {
-      AccentTone(Color(0xFFC9431C), Color(0xFFFF9A6B), Color(0xFF34160D))
+    KetchAccent.Teal -> if (dark) {
+      AccentTone(Color(0xFF00818D), Color(0xFF4FD1DB), Color(0xFF0D2E33))
     } else {
-      AccentTone(Color(0xFFC9431C), Color(0xFFA8370F), Color(0xFFFFE9E0))
+      AccentTone(Color(0xFF00818D), Color(0xFF006A74), Color(0xFFDDF5F7))
+    }
+    KetchAccent.Blue -> if (dark) {
+      AccentTone(Color(0xFF1A6FDB), Color(0xFF7EB6FF), Color(0xFF11243D))
+    } else {
+      AccentTone(Color(0xFF1A6FDB), Color(0xFF155BB5), Color(0xFFE3EEFD))
     }
   }
 }
