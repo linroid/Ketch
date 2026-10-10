@@ -209,6 +209,7 @@
   <string name="intake_save_to">Guardar en</string>
   <string name="intake_folder_downloads">Descargas</string>
   <string name="intake_default_folder">Carpeta predeterminada</string>
+  <string name="intake_category_folder">Se guarda en %1$s</string>
   <string name="intake_recent">Recientes</string>
   <string name="intake_pinned">Fijadas</string>
   <string name="intake_unpin">Dejar de fijar %1$s</string>

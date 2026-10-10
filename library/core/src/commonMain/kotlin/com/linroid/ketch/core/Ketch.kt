@@ -118,6 +118,7 @@ class Ketch(
     add(KetchFeatures.QUEUE_POSITION)
     add(KetchFeatures.REQUEST_ID)
     if (httpEngine.supportsProxies) add(KetchFeatures.PROXY)
+    add(KetchFeatures.CATEGORY_FOLDERS)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)

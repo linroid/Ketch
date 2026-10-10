@@ -129,6 +129,17 @@
   </plurals>
   <!-- A failure the window could not handle; its error message follows. -->
   <string name="message_window_error">Something went wrong</string>
+  <!--
+    Banners while a `ketch` command, not the app, runs this computer's downloads. %1$s is the
+    command, such as "ketch server", %2$d its process ID.
+  -->
+  <string name="message_downloads_run_by">%1$s (process %2$d) is running this computer's downloads</string>
+  <string name="message_downloads_run_elsewhere">Another Ketch process is running this computer's downloads</string>
+  <!-- The second part of either banner above. -->
+  <string name="message_downloads_run_hint">Stop it, then quit and reopen Ketch to run them here</string>
+  <!-- The command that ran the downloads exited. %1$s is the command, such as "ketch server". -->
+  <string name="message_command_stopped">%1$s stopped</string>
+  <string name="message_command_stopped_hint">Quit and reopen Ketch to run this computer's downloads here</string>
   <!-- Title of the dialog that picks .torrent files to add. -->
   <string name="open_torrent_title">Open torrent file</string>
 

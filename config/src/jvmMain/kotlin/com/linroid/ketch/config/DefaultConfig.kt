@@ -60,6 +60,19 @@ maxConnectionsPerHost = 16
 # password = "secret"
 # bypass = ["*.lan", "10.0.0.0/8"]
 
+# Category folders: a download that does not choose a folder is saved in the
+# folder of the first category it matches, inside defaultDirectory. A download
+# matches by file extension or media type (either is enough) and, when hosts
+# are listed, by site too; example.com covers its subdomains. The apps edit
+# these under Settings > Downloads.
+# [[download.categories]]
+# folder = "Video"
+# extensions = ["mp4", "mkv", "webm"]
+# mimeTypes = ["video/*"]
+# [[download.categories]]
+# folder = "Software/GitHub"
+# hosts = ["github.com"]
+
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.

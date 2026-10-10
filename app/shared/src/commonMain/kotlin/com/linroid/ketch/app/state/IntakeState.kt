@@ -21,6 +21,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.categoryFor
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
@@ -751,6 +752,21 @@ class IntakeSession internal constructor(
 
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
+
+  /**
+   * The category folder of [target] that [single] is saved in, inside [defaultFolder], when no
+   * [folder] is chosen and one of the target's [DownloadConfig.categories] takes it; `null`
+   * otherwise. A guess while the link is checked: the server may still name the file differently.
+   */
+  val categoryFolder: String?
+    get() {
+      if (folder != null) return null
+      val entry = single ?: return null
+      val status = targetStatus ?: return null
+      if (KetchFeatures.CATEGORY_FOLDERS !in status.features) return null
+      val host = entry.url?.let(::urlHost)
+      return status.config.categoryFor(entry.name, entry.resolved?.contentType, host)?.folder
+    }
 
   /** Path separator of [target]. */
   val separator: String get() = targetStatus?.system?.separator ?: "/"

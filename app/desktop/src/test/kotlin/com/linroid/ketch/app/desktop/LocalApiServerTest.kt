@@ -124,6 +124,37 @@ class LocalApiServerTest {
   }
 
   @Test
+  fun connect_whenRefused_repliesAtOnceWithTheReason() {
+    val server = LocalApiServer { _, _ -> error("Must not start without an engine") }
+    server.refuse("Another Ketch process runs the downloads")
+
+    // Long before the 20 seconds a client waits for an app that is starting.
+    assertEquals(
+      """{"error":"unavailable","message":"Another Ketch process runs the downloads"}""",
+      server.connect(20.seconds),
+    )
+  }
+
+  @Test
+  fun close_closesOnlyTheClientMadeForIt() {
+    val closed = mutableListOf<String>()
+    fun client(name: String) = Proxy.newProxyInstance(
+      KetchApi::class.java.classLoader,
+      arrayOf(KetchApi::class.java),
+    ) { _, method, _ -> if (method.name == "close") closed += name else null } as KetchApi
+    val engine = LocalApiServer { _, token -> LocalApiServer.Started(5123, token, stop = { }) }
+    val relay = LocalApiServer { _, token -> LocalApiServer.Started(5124, token, stop = { }) }
+    engine.attach(client("engine"))
+    relay.attach(client("ketch server"), owned = true)
+
+    engine.close()
+    relay.close()
+
+    // The app closes its own engine after the server.
+    assertEquals(listOf("ketch server"), closed)
+  }
+
+  @Test
   fun close_stopsTheServer() {
     var stopped = false
     val server = LocalApiServer { _, token ->

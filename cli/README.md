@@ -191,7 +191,8 @@ id=$(ketch add https://example.com/file.zip)
 ketch watch "$id"
 ```
 
-Without a destination, it goes to Ketch's download folder. A destination works as for
+Without a destination, it goes to Ketch's download folder, or to the
+[category folder](#downloadcategories) there that matches it. A destination works as for
 [`ketch <url>`](#download-a-file): an existing directory, or a path ending in a separator, keeps
 the file name from the source, and a relative path is taken from the current directory when Ketch
 runs on this machine. Another device's paths are passed as they are; that server may keep
@@ -292,7 +293,10 @@ Only one Ketch runs the downloads in the task database at a time, so the same do
 resumed twice into the same files. `ketch server` stops with status 1 when the Ketch app is
 running, or another `ketch server` or `ketch mcp --standalone` already is. Use the
 [commands above](#work-on-a-running-ketch) and `ketch mcp`, which work through the one that
-runs, or turn on **Settings → Sharing** in the app for other devices.
+runs, or turn on **Settings → Sharing** in the app for other devices. The other way round, the
+Ketch app opened while `ketch server` runs leaves the downloads to it: it shows them through the
+server, as a device named `ketch server`, and runs them itself again once you stop the server
+and reopen the app.
 
 ```bash
 ketch server [options]
@@ -505,8 +509,9 @@ client may start before Ketch does. While none runs, tools fail with `Ketch isn'
 
 `--standalone` runs the downloads itself instead, as earlier versions did, for a machine where no
 Ketch app or server runs: it uses the same config file and [task database](#database) as
-`ketch server`, restores saved tasks when it starts, and the commands above work through it
-while it runs. Like `ketch server`, it refuses to start while another Ketch runs those downloads.
+`ketch server`, restores saved tasks when it starts, and the commands above and the Ketch app
+work through it while it runs. Like `ketch server`, it refuses to start while another Ketch runs
+those downloads.
 
 | Option | Description |
 |---|---|
@@ -748,6 +753,16 @@ maxConnectionsPerHost = 16
 # password = "secret"
 # bypass = ["*.lan", "10.0.0.0/8"]
 
+# Category folders: a download that does not choose a folder is saved in the
+# folder of the first category it matches, inside defaultDirectory.
+# [[download.categories]]
+# folder = "Video"
+# extensions = ["mp4", "mkv", "webm"]
+# mimeTypes = ["video/*"]
+# [[download.categories]]
+# folder = "Software/GitHub"
+# hosts = ["github.com"]
+
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.
@@ -821,6 +836,25 @@ be negative.
 Requests to this machine (`localhost`, `127.0.0.0/8`, `::1`) never use a proxy. `ketch server` and
 `ketch mcp` apply the setting to every HTTP(S) download; see [proxies](../docs/proxy.md).
 
+#### `[[download.categories]]`
+
+Category folders sort the downloads that do not choose a folder (the server's clients send no
+destination, or only a file name, as the browser extension does) into folders inside
+`defaultDirectory`. Each `[[download.categories]]` table is one category; a download goes to
+the first one it matches, and stays in `defaultDirectory` when it matches none.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `folder` | string | *(required)* | Folder inside `defaultDirectory`, such as `"Video"`; `/` nests folders. Absolute paths and `..` fail to load |
+| `extensions` | string[] | `[]` | File name extensions, such as `"mp4"` or `"tar.gz"` |
+| `mimeTypes` | string[] | `[]` | Media types the server reports, such as `"application/pdf"`, or `"video/*"` for a whole kind |
+| `hosts` | string[] | `[]` | Sites, such as `"github.com"`, which also covers its subdomains |
+
+A download matches when its extension or media type is listed (either is enough; with neither
+list set, any type matches) and, when `hosts` is set, it comes from one of them. A category
+without any rule matches nothing. The apps also edit them under Settings → Downloads; on a
+server, like the other download settings changed there, they last until it restarts.
+
 #### `[torrent]`
 
 | Key | Type | Default | Description |
@@ -856,8 +890,9 @@ directory, which the Ketch app shares:
 | Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` (default: `~/.config/ketch/ketch.db`) |
 | Windows | `%APPDATA%\ketch\ketch.db` |
 
-BitTorrent DHT state is kept in the `torrent-state` folder of the same directory. While one of
-the two runs, it holds `instance.lock` there, so no other opens the database, and describes
-itself in `instance.json`, readable by your user only as it holds the access token, so the
-[commands above](#work-on-a-running-ketch) can find it. The Ketch app is found through its own
-`app.endpoint` instead.
+BitTorrent DHT state is kept in the `torrent-state` folder of the same directory. Whichever of
+the two or the Ketch app runs the downloads holds `instance.lock` there while it does, so no
+other opens the database. The two also describe themselves in `instance.json`, readable by your
+user only as it holds the access token, so the [commands above](#work-on-a-running-ketch) can
+find them, and so can the Ketch app, which shows their downloads through them instead of
+opening the database. The Ketch app is found through its own `app.endpoint` instead.

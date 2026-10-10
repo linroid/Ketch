@@ -189,6 +189,7 @@
   <string name="intake_save_to">保存先</string>
   <string name="intake_folder_downloads">ダウンロード</string>
   <string name="intake_default_folder">デフォルトのフォルダ</string>
+  <string name="intake_category_folder">%1$s に振り分け</string>
   <string name="intake_recent">最近</string>
   <string name="intake_pinned">ピン留め</string>
   <string name="intake_unpin">%1$sのピン留めを外す</string>

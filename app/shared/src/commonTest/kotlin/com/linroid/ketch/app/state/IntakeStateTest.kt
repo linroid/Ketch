@@ -2,6 +2,7 @@ package com.linroid.ketch.app.state
 
 import androidx.compose.ui.text.input.TextFieldValue
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
@@ -628,6 +629,33 @@ class IntakeStateTest {
   }
 
   @Test
+  fun categoryFolder_singleMatchingLink_namesItsFolderUntilOneIsChosen() = runTest {
+    val video = DownloadCategory(folder = "Media/Video", extensions = listOf("mp4"))
+    val api = IntakeTestApi(
+      features = KetchFeatures.ALL,
+      config = DownloadConfig(categories = listOf(video)),
+    )
+    val seeds = listOf(IntakeSeed("https://example.com/talk.mp4"))
+    val session = session(api, IntakeRequest(seeds = seeds))
+    runCurrent()
+
+    assertEquals("Media/Video", session.categoryFolder)
+    session.folder = "/Volumes/Data"
+    assertNull(session.categoryFolder)
+  }
+
+  @Test
+  fun categoryFolder_deviceWithoutCategoryFolders_isNull() = runTest {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val api = IntakeTestApi(config = DownloadConfig(categories = listOf(video)))
+    val seeds = listOf(IntakeSeed("https://example.com/talk.mp4"))
+    val session = session(api, IntakeRequest(seeds = seeds))
+    runCurrent()
+
+    assertNull(session.categoryFolder)
+  }
+
+  @Test
   fun retry_autoConnectionsOnCapableDevice_setsAuto() = runTest {
     val api = IntakeTestApi(features = KetchFeatures.ALL)
     val failed = api.base.add(
@@ -904,13 +932,14 @@ private class IntakeTestApi(
     ready(url)
   },
   private val features: Set<String> = emptySet(),
+  private val config: DownloadConfig = DownloadConfig(maxConcurrentDownloads = 3),
 ) : KetchApi by base {
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
     check(url, properties)
 
   override suspend fun status(): KetchStatus = testStatus(
     name = "This Mac",
-    config = DownloadConfig(maxConcurrentDownloads = 3),
+    config = config,
     version = "1",
     revision = "r",
     system = testSystem(

@@ -22,8 +22,12 @@ object KetchFeatures {
   /** Finite, unencrypted DASH downloads that restart on resume. */
   const val FINITE_DASH: String = "dash.finite"
 
+  /** [DownloadConfig.categories] sort downloads into folders. */
+  const val CATEGORY_FOLDERS: String = "download.categories"
+
   /** Every feature this version of Ketch supports, including optional sources. */
   val ALL: Set<String> = setOf(
-    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH
+    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
+    CATEGORY_FOLDERS
   )
 }

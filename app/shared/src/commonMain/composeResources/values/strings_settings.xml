@@ -440,6 +440,48 @@
   <!-- %1$s is the folder's name. -->
   <string name="settings_downloads_unpin">Unpin %1$s</string>
   <string name="settings_downloads_pin">Pin</string>
+  <!-- Category folders: rules that sort downloads into folders inside the download folder. -->
+  <string name="settings_categories">Category folders</string>
+  <string name="settings_categories_footer">Downloads that don't choose a folder go to the first category they match, inside the download folder. They match by extension or media type, and by site when sites are listed.</string>
+  <string name="settings_categories_add">Add category</string>
+  <string name="settings_categories_empty">Everything goes to the download folder</string>
+  <string name="settings_categories_empty_hint">Sort videos, music, documents and archives into folders of their own.</string>
+  <string name="settings_categories_suggested">Use suggested</string>
+  <!-- A device whose Ketch is too old for category folders. %1$s is its name. -->
+  <string name="settings_categories_unsupported">Update Ketch on %1$s to sort its downloads into folders.</string>
+  <!-- The summary under a category without rules. -->
+  <string name="settings_categories_no_rules">Add an extension, media type or site</string>
+  <!-- In a category's summary, after its first extensions: how many more it has. -->
+  <string name="settings_categories_more">+%1$d</string>
+  <!-- In a category's summary: the sites it is limited to, such as "github.com, gitlab.com". -->
+  <string name="settings_categories_from_sites">From %1$s</string>
+  <string name="settings_categories_folder">Folder</string>
+  <string name="settings_categories_folder_hint">Inside the download folder. Use / for a folder inside another.</string>
+  <string name="settings_categories_folder_invalid">Use a folder inside the download folder</string>
+  <string name="settings_categories_extensions">Extensions</string>
+  <!-- Example extensions in the empty field. -->
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
+  <string name="settings_categories_types">Media types</string>
+  <string name="settings_categories_types_hint">As servers report them; video/* covers every video.</string>
+  <!-- Example media types in the empty field. -->
+  <string name="settings_categories_types_placeholder">video/*</string>
+  <string name="settings_categories_types_invalid">Write media types as type/subtype, such as video/mp4</string>
+  <string name="settings_categories_sites">Sites</string>
+  <string name="settings_categories_sites_hint">example.com also covers its subdomains.</string>
+  <!-- In the empty Sites field: the category takes downloads from every site. -->
+  <string name="settings_categories_sites_placeholder">Any site</string>
+  <string name="settings_categories_move_up">Move up</string>
+  <string name="settings_categories_move_down">Move down</string>
+  <string name="settings_categories_remove">Remove</string>
+  <!-- The folder of a category just added, until it is renamed. -->
+  <string name="settings_categories_new_folder">New folder</string>
+  <!-- Folder names of the suggested categories, created inside the download folder. -->
+  <string name="settings_category_video">Video</string>
+  <string name="settings_category_music">Music</string>
+  <string name="settings_category_pictures">Pictures</string>
+  <string name="settings_category_documents">Documents</string>
+  <string name="settings_category_archives">Archives</string>
+  <string name="settings_category_programs">Programs</string>
   <string name="settings_downloads_queue">Queue</string>
   <string name="settings_downloads_queue_footer">Lowering a limit lets running downloads finish. Retries apply as downloads start or resume.</string>
   <!-- A count of 0 on a stepper: no limit. -->
@@ -804,6 +846,8 @@
   <string name="settings_search_save_to_keywords">folder, directory, location, path, destination</string>
   <string name="settings_search_folders">Pinned and recent folders</string>
   <string name="settings_search_folders_keywords">favorite, pin, recent</string>
+  <string name="settings_search_categories">Sort downloads into folders by type or site</string>
+  <string name="settings_search_categories_keywords">category, sort, organize, extension, file type, video, music</string>
   <string name="settings_search_run_at_once">Downloads that run together</string>
   <string name="settings_search_run_at_once_keywords">concurrent, parallel, simultaneous, queue, limit</string>
   <string name="settings_search_per_server">Downloads from one website at a time</string>

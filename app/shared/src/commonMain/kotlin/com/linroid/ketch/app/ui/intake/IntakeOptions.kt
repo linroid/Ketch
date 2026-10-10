@@ -103,6 +103,7 @@ import ketch.app.shared.generated.resources.intake_auto_device
 import ketch.app.shared.generated.resources.intake_auto_setting
 import ketch.app.shared.generated.resources.intake_choose_folder
 import ketch.app.shared.generated.resources.intake_connections
+import ketch.app.shared.generated.resources.intake_category_folder
 import ketch.app.shared.generated.resources.intake_default_folder
 import ketch.app.shared.generated.resources.intake_file_name
 import ketch.app.shared.generated.resources.intake_folder_downloads
@@ -512,7 +513,10 @@ private fun SaveToPill(
   val folder = session.folder
   val default = session.defaultFolder
   val free = session.targetStatus?.system?.usableSpace?.takeIf { folder == null && it > 0 }
-  val name = folderLabel(folder ?: default ?: stringResource(Res.string.intake_folder_downloads))
+  val category = session.categoryFolder
+  val name = folderLabel(
+    folder ?: category ?: default ?: stringResource(Res.string.intake_folder_downloads),
+  )
   val saveTo = stringResource(Res.string.intake_save_to)
   val local = session.target is EmbeddedInstance && actions.picker.canPickFolder
   Box(modifier) {
@@ -534,7 +538,8 @@ private fun SaveToPill(
       item(
         label = default?.let { verbatim(folderLabel(it)) }
           ?: Res.string.intake_default_folder.text(),
-        caption = default?.let(::verbatim),
+        caption = category?.let { Res.string.intake_category_folder.text(it) }
+          ?: default?.let(::verbatim),
         icon = KetchIcon.Folder,
         checked = folder == null,
         onClick = { session.folder = null },

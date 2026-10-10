@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.security.SecureRandom
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration
@@ -20,6 +21,10 @@ import kotlin.time.Duration.Companion.seconds
  * system picks, requires a token made for this run, and starts the first time one of them asks
  * for it over [SingleInstance]: the extension through [NativeMessagingHost]
  * ([NativeMessagingHost.CONNECT_REQUEST]), the command line with [CLI_CONNECT_REQUEST].
+ *
+ * It serves the app's engine, or, while a `ketch server` runs this computer's downloads in the
+ * app's place ([DownloadsLock]), a client of that server, so clients reach them through the app
+ * either way and always get a token, which a loopback `ketch server` may not require.
  *
  * @param onConnect called on the requesting thread each time the extension connects, before it
  *   gets the reply, while the native messaging host that asked for it still runs. A failure there
@@ -33,12 +38,29 @@ internal class LocalApiServer(
   private val api = CompletableFuture<KetchApi>()
   private var started: Started? = null
 
+  // Set by attach, which must not wait for connect's lock: connect holds it while it waits.
+  @Volatile private var owned: KetchApi? = null
+
   /** A running server: where it listens and how to stop it. */
   class Started(val port: Int, val token: String, val stop: () -> Unit)
 
-  /** Makes [ketch] available; [connect] waits for it while the app starts. */
-  fun attach(ketch: KetchApi) {
+  /**
+   * Makes [ketch] available; [connect] waits for it while the app starts.
+   *
+   * @param owned whether [ketch] was made for this server, such as a client of the `ketch server`
+   *   that runs the downloads in the app's place, which [close] then closes too.
+   */
+  fun attach(ketch: KetchApi, owned: Boolean = false) {
+    if (owned) this.owned = ketch
     api.complete(ketch)
+  }
+
+  /**
+   * Makes [connect] turn every client away with [message], for when the app has nothing to
+   * serve: another process runs this computer's downloads and the app can't reach it.
+   */
+  fun refuse(message: String) {
+    api.completeExceptionally(Refused(message))
   }
 
   /**
@@ -54,6 +76,8 @@ internal class LocalApiServer(
         api.get(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       } catch (_: TimeoutException) {
         return errorReply(NativeMessagingHost.NOT_READY, "Ketch is still starting")
+      } catch (e: ExecutionException) {
+        return errorReply(UNAVAILABLE, e.cause?.message.orEmpty())
       }
       try {
         startServer(ketch, newToken())
@@ -78,6 +102,15 @@ internal class LocalApiServer(
   override fun close() {
     started?.stop?.invoke()
     started = null
+    owned?.close()
+    owned = null
+  }
+
+  private class Refused(message: String) : Exception(message)
+
+  companion object {
+    /** Error code of a client [refuse]d. */
+    const val UNAVAILABLE = "unavailable"
   }
 }
 

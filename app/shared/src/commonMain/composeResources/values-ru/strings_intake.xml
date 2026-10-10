@@ -249,6 +249,7 @@
   <string name="intake_save_to">Сохранить в</string>
   <string name="intake_folder_downloads">Загрузки</string>
   <string name="intake_default_folder">Папка по умолчанию</string>
+  <string name="intake_category_folder">Попадёт в %1$s</string>
   <string name="intake_recent">Недавние</string>
   <string name="intake_pinned">Закреплённые</string>
   <string name="intake_unpin">Открепить %1$s</string>

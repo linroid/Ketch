@@ -83,6 +83,11 @@
     <item quantity="other">%1$d Links kopiert</item>
   </plurals>
   <string name="message_window_error">Etwas ist schiefgelaufen</string>
+  <string name="message_downloads_run_by">%1$s (Prozess %2$d) führt die Downloads dieses Computers aus</string>
+  <string name="message_downloads_run_elsewhere">Ein anderer Ketch-Prozess führt die Downloads dieses Computers aus</string>
+  <string name="message_downloads_run_hint">Stoppe ihn, dann beende Ketch und öffne es erneut, um sie hier auszuführen</string>
+  <string name="message_command_stopped">%1$s wurde beendet</string>
+  <string name="message_command_stopped_hint">Beende Ketch und öffne es erneut, um die Downloads dieses Computers hier auszuführen</string>
   <string name="open_torrent_title">Torrent-Datei öffnen</string>
 
   <string name="close_keep_running_title">Im Hintergrund weiter herunterladen?</string>

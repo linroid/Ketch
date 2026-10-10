@@ -163,6 +163,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   ou laissez Ketch proposer les liens que vous copiez.
 - **Au clavier sur ordinateur** — `⌘K` (`Ctrl+K` sous Windows et Linux) ouvre la palette de
   commandes, et la liste des raccourcis présente toutes les combinaisons.
+- **Dossiers par catégorie** — Vidéos, musique, documents et archives vont dans leurs propres
+  dossiers au sein du dossier de téléchargement, selon le type de fichier ou le site web :
+  partez des suggestions dans **Réglages → Téléchargements** ou définissez vos règles.
 - **Prêt à ouvrir dès la fin** — Ouvrez le fichier, affichez-le dans son dossier ou faites-le
   glisser hors de la liste, directement depuis celle-ci.
 - **Intégré à chaque plateforme** — Barre de menus ou zone de notification, notifications et
@@ -260,8 +263,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   plus de données et choisir les délais d'attente et le nombre de tentatives, même illimité
 - **Distinguer les fichiers incomplets** — Écrire sous un nom temporaire et attribuer le nom
   définitif une fois le téléchargement terminé
-- **Dossiers par catégorie** — Ranger vidéos, musique, documents et archives dans leurs propres
-  dossiers selon vos règles
 - **Choix des fichiers torrent à tout moment** — Choisir les fichiers d'un lien magnet une fois
   ses détails reçus et modifier la sélection pendant le téléchargement
 - **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,

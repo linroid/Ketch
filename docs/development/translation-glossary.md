@@ -53,6 +53,7 @@ Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidab
 | browser extension | 浏览器扩展 | 瀏覽器擴充功能 | ブラウザ拡張機能 | 브라우저 확장 프로그램 | extensión del navegador | extensão do navegador | Browsererweiterung | extension de navigateur | расширение браузера |
 | Activity (message history) | 动态 | 動態 | アクティビティ | 활동 | Actividad | Atividade | Aktivität | Activité | Активность |
 | command palette | 命令面板 | 命令面板 | コマンドパレット | 명령 팔레트 | paleta de comandos | paleta de comandos | Befehlspalette | palette de commandes | палитра команд |
+| category folders (downloads sorted into folders by type or site) | 分类文件夹 | 分類資料夾 | カテゴリフォルダ | 카테고리 폴더 | carpetas por categoría | pastas por categoria | Kategorieordner | dossiers par catégorie | папки по категориям |
 | add sheet (where links are added) | 添加面板 | 新增面板 | 追加シート | 추가 시트 | panel de añadir | painel de adicionar | Hinzufügen-Fenster | panneau d'ajout | окно добавления |
 | inspector (task details panel) | 详情面板 | 詳細面板 | インスペクタ | 인스펙터 | inspector | inspetor | Informationen | inspecteur | инспектор |
 
