@@ -301,13 +301,12 @@ internal class HttpDownloadSource(
         throttleLimiter, SpeedLimiter.Unlimited, context.taskId
       )
       // One connection per segment request; a complete segment sends none.
-      val handle = if (segment.isComplete) {
-        ConnectionHandle.None
-      } else {
-        context.connections.open(httpConnectionSpec(TYPE, context.url, context.config.proxy))
-      }
+      val spec = httpConnectionSpec(TYPE, context.url, context.config.proxy)
+      val handle = if (segment.isComplete) ConnectionHandle.None else context.connections.open(spec)
       try {
-        downloader.download(context.url, segment, context.headers, handle, onProgress)
+        observeExchanges(handle, spec) {
+          downloader.download(context.url, segment, context.headers, handle, onProgress)
+        }
       } finally {
         handle.close()
       }
@@ -334,25 +333,26 @@ internal class HttpDownloadSource(
     var downloaded = 0L
     context.onProgress(0, 0)
     val engine = httpEngine.through(context.config.proxy)
-    val handle = context.connections.open(
-      httpConnectionSpec(TYPE, context.url, context.config.proxy),
-    )
+    val spec = httpConnectionSpec(TYPE, context.url, context.config.proxy)
+    val handle = context.connections.open(spec)
     try {
-      engine.download(context.url, null, context.headers) { data ->
-        currentCoroutineContext().ensureActive()
-        context.throttle(data.size)
-        try {
-          context.fileAccessor.writeAt(downloaded, data)
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          if (e is KetchError) throw e
-          throw KetchError.Disk(e)
-        }
-        downloaded += data.size
-        handle.received(data.size)
-        if (lastProgress.elapsedNow() >= progressInterval) {
-          context.onProgress(downloaded, 0)
-          lastProgress = TimeSource.Monotonic.markNow()
+      observeExchanges(handle, spec) {
+        engine.download(context.url, null, context.headers) { data ->
+          currentCoroutineContext().ensureActive()
+          context.throttle(data.size)
+          try {
+            context.fileAccessor.writeAt(downloaded, data)
+          } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (e is KetchError) throw e
+            throw KetchError.Disk(e)
+          }
+          downloaded += data.size
+          handle.received(data.size)
+          if (lastProgress.elapsedNow() >= progressInterval) {
+            context.onProgress(downloaded, 0)
+            lastProgress = TimeSource.Monotonic.markNow()
+          }
         }
       }
     } finally {

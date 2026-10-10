@@ -11,6 +11,7 @@ import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.HttpExchange
 import com.linroid.ketch.core.file.platformFileSystem
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -89,6 +90,29 @@ class KetchConnectionsTest {
       val after = ketch.activeConnections()
         .first { snapshot -> snapshot.total > 0 && snapshot.connections.none { it.id in before } }
       assertTrue(after.connections.all { it.downloadedBytes == 100L })
+    }
+  }
+
+  @Test
+  fun download_engineReportsExchange_connectionsShowFinalHop() = runTest {
+    val exchange = HttpExchange(
+      host = "mirror.example.net",
+      port = 443,
+      secure = true,
+      protocol = "HTTP/2",
+      route = ConnectionRoute.DIRECT,
+    )
+    withKetch(FakeHttpEngine(stallAfterBytes = 50, exchange = exchange)) { ketch, folder ->
+      ketch.download(request(folder, connections = 2))
+
+      val open = ketch.activeConnections().first { it.total == 2 }
+
+      for (connection in open.connections) {
+        assertEquals("mirror.example.net", connection.host)
+        assertEquals(443, connection.port)
+        assertEquals("HTTP/2", connection.protocol)
+        assertEquals(ConnectionRoute.DIRECT, connection.route)
+      }
     }
   }
 
