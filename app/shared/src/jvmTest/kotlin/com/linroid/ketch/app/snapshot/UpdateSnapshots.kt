@@ -11,6 +11,7 @@ import com.linroid.ketch.app.platform.ReleaseNotesRequest
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
+import com.linroid.ketch.app.ui.settings.ReleaseHistoryDialog
 import com.linroid.ketch.app.ui.settings.ReleaseNotesDialog
 import com.linroid.ketch.app.ui.settings.SettingsContent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +91,22 @@ class UpdateSnapshots {
     }
   }
 
+  @Test
+  fun releaseHistory_listsEveryReleaseWithTheNewestOpen() {
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Desktop to SnapshotTheme.Dark,
+      SnapshotSize.Phone to SnapshotTheme.Light,
+    )) {
+      val updates = FixedUpdates(AppUpdateState.UpToDate, SampleNotes + quietRelease("0.3.0"))
+      snapshot("release-history", size, theme) {
+        CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
+          ReleaseHistoryDialog(updates, version = "0.3.2", onDismiss = {})
+        }
+      }
+    }
+  }
+
   /** A dialog of notes as [updates] in [state] reads them, from [since]. */
   private class NotesScenario(
     val name: String,
@@ -117,6 +134,11 @@ class UpdateSnapshots {
     override fun setCheckAutomatically(enabled: Boolean) {}
 
     override suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes> {
+      failure?.let { throw it }
+      return notes
+    }
+
+    override suspend fun releaseHistory(version: String, first: String): List<ReleaseNotes> {
       failure?.let { throw it }
       return notes
     }
@@ -158,8 +180,8 @@ class UpdateSnapshots {
       installable = true,
     )
 
-    fun quietRelease() =
-      notes("0.3.2", "2026-09-30T09:12:00Z", firstPull = 460, "ci: cache the Gradle wrapper")
+    fun quietRelease(version: String = "0.3.2") =
+      notes(version, "2026-09-30T09:12:00Z", firstPull = 460, "ci: cache the Gradle wrapper")
 
     /** Notes listing pull requests titled [titles], numbered from [firstPull]. */
     fun notes(

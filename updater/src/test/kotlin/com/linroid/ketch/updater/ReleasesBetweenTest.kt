@@ -62,6 +62,34 @@ class ReleasesBetweenTest {
     assertEquals(emptyList(), feed.pages)
   }
 
+  @Test
+  fun releasesFrom_listsFirstAndEveryReleaseUpToVersion() = runTest {
+    val feed = PagedFeed(listOf("0.4.0", "0.3.1", "0.3.0", "0.2.4", "0.1.0", "0.0.5"))
+
+    val releases = feed.releasesFrom(version("0.2.4"), version("0.3.1"))
+
+    assertEquals(listOf("0.3.1", "0.3.0", "0.2.4"), releases.map { it.version.toString() })
+  }
+
+  @Test
+  fun releasesFrom_stopsAtThePageListingAnOlderRelease() = runTest {
+    val feed = PagedFeed((20 downTo 1).map { "0.$it.0" }, pageSize = 3)
+
+    feed.releasesFrom(version("0.18.0"), version("0.20.0"))
+
+    assertEquals(listOf(1, 2), feed.pages)
+  }
+
+  @Test
+  fun releasesFrom_firstNotOlder_readsOnlyTheVersion() = runTest {
+    val feed = PagedFeed(listOf("0.3.2", "0.3.1"))
+
+    val releases = feed.releasesFrom(version("0.3.2"), version("0.3.2"))
+
+    assertEquals(listOf("0.3.2"), releases.map { it.version.toString() })
+    assertEquals(emptyList(), feed.pages)
+  }
+
   private fun version(text: String) = ReleaseVersion.parse(text)!!
 
   /** Lists [versions] in pages of [pageSize]; records the pages read and releases asked for. */

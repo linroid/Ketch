@@ -340,6 +340,20 @@
   <string name="settings_about_update_auto">Проверять обновления автоматически</string>
   <string name="settings_about_update_auto_hint">Ежедневно проверять наличие новой версии Ketch на GitHub.</string>
   <string name="settings_about_update_notes">Что нового в %1$s</string>
+  <string name="settings_about_history">История выпусков</string>
+  <string name="settings_about_history_hint">Все выпуски начиная с %1$s</string>
+  <plurals name="settings_about_history_count">
+    <item quantity="one">%1$d выпуск начиная с %2$s</item>
+    <item quantity="few">%1$d выпуска начиная с %2$s</item>
+    <item quantity="many">%1$d выпусков начиная с %2$s</item>
+    <item quantity="other">%1$d выпуска начиная с %2$s</item>
+  </plurals>
+  <plurals name="settings_about_history_changes">
+    <item quantity="one">%1$d изменение</item>
+    <item quantity="few">%1$d изменения</item>
+    <item quantity="many">%1$d изменений</item>
+    <item quantity="other">%1$d изменения</item>
+  </plurals>
   <string name="settings_about_update_check">Проверить</string>
   <string name="settings_about_update_install">Обновить</string>
   <string name="settings_about_update_restart">Перезапустить и обновить</string>

@@ -13,6 +13,7 @@ import com.linroid.ketch.updater.ReleaseFeed
 import com.linroid.ketch.updater.ReleaseVersion
 import com.linroid.ketch.updater.UpdateException
 import com.linroid.ketch.updater.releasesBetween
+import com.linroid.ketch.updater.releasesFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -63,17 +64,12 @@ internal class AndroidUpdater(
     return last.takeIf { it < current }?.toString()
   }
 
-  override suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes> {
-    val upTo = ReleaseVersion.parse(version) ?: throw UpdateException("$version is not a release")
-    return feed.releasesBetween(since?.let(ReleaseVersion::parse), upTo).map { release ->
-      ReleaseNotes.parse(
-        release.version.toString(),
-        release.pageUrl,
-        release.publishedAt,
-        release.notes,
-      )
-    }
-  }
+  override suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes> =
+    feed.releasesBetween(since?.let(ReleaseVersion::parse), releaseVersion(version))
+      .map { it.toNotes() }
+
+  override suspend fun releaseHistory(version: String, first: String): List<ReleaseNotes> =
+    feed.releasesFrom(releaseVersion(first), releaseVersion(version)).map { it.toNotes() }
 
   private fun check(automatic: Boolean) {
     if (step?.isActive == true) return
@@ -191,3 +187,9 @@ internal class AndroidUpdater(
 
 internal const val UPDATE_APK = "ketch-update.apk"
 internal const val UPDATES_DIR = "updates"
+
+private fun releaseVersion(text: String): ReleaseVersion =
+  ReleaseVersion.parse(text) ?: throw UpdateException("$text is not a release")
+
+private fun Release.toNotes() =
+  ReleaseNotes.parse(version.toString(), pageUrl, publishedAt, notes)

@@ -325,6 +325,14 @@
   <string name="settings_about_update_auto">自動的にアップデートを確認</string>
   <string name="settings_about_update_auto_hint">1日に1回、GitHubのKetchのリリースを確認します。</string>
   <string name="settings_about_update_notes">%1$sの新機能</string>
+  <string name="settings_about_history">リリース履歴</string>
+  <string name="settings_about_history_hint">%1$s以降のすべてのリリース</string>
+  <plurals name="settings_about_history_count">
+    <item quantity="other">%2$s以降の%1$d件のリリース</item>
+  </plurals>
+  <plurals name="settings_about_history_changes">
+    <item quantity="other">%1$d 件の変更</item>
+  </plurals>
   <string name="settings_about_update_check">今すぐ確認</string>
   <string name="settings_about_update_install">アップデート</string>
   <string name="settings_about_update_restart">再起動してアップデート</string>

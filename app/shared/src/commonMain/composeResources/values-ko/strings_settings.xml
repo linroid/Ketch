@@ -325,6 +325,14 @@
   <string name="settings_about_update_auto">자동으로 업데이트 확인</string>
   <string name="settings_about_update_auto_hint">하루에 한 번 GitHub에서 Ketch의 새 버전을 확인합니다.</string>
   <string name="settings_about_update_notes">%1$s의 새로운 기능</string>
+  <string name="settings_about_history">릴리스 기록</string>
+  <string name="settings_about_history_hint">%1$s 이후의 모든 릴리스</string>
+  <plurals name="settings_about_history_count">
+    <item quantity="other">%2$s 이후 릴리스 %1$d개</item>
+  </plurals>
+  <plurals name="settings_about_history_changes">
+    <item quantity="other">변경 사항 %1$d개</item>
+  </plurals>
   <string name="settings_about_update_check">지금 확인</string>
   <string name="settings_about_update_install">업데이트</string>
   <string name="settings_about_update_restart">재시작하여 업데이트</string>
