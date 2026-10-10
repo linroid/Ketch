@@ -130,11 +130,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
   `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
-  `NotificationSettings`, `IntegrationSettings`
+  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
-  `IntakeState`, `SpeedModeController`, `PendingOps`, `AiDiscoverController`, `DiscoverSession`,
+  `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`, `KeepAwake`,
+  `SleepInhibitor`, `AiDiscoverController`, `DiscoverSession`,
   `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
   (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
@@ -434,7 +435,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### Configuration (`config/`)
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
-  desktop, notifications and integration sections
+  desktop, notifications, integration and power sections
 - `AiSettings`: AI discovery's saved LLM providers (`[[ai.providers]]`, `active`), search keys
   and page access (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
@@ -449,8 +450,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
   Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
-  open at login, Dock badge, daily update checks; `NotificationSettings` and
-  `IntegrationSettings` (magnet and `.torrent` handlers)
+  open at login, Dock badge, daily update checks; `NotificationSettings`,
+  `IntegrationSettings` (magnet and `.torrent` handlers) and `PowerSettings` (`[power]`:
+  `keepAwake`, on by default)
 - Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
   Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
   BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
@@ -473,8 +475,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `config.toml.broken-<UTC time>` and they start with the defaults. They report it, and a
   database moved aside, through `UnreadableFiles`, which the app shows once as a sticky warning.
   The CLI never moves the file it shares with the desktop app: `ketch server` refuses to start
-  (defaults would serve on every interface without the token), `ketch mcp` and `ai-discover`
-  warn on stderr and use the defaults, and an unreadable `--config` file stops `ketch mcp`
+  (defaults would serve on every interface without the token), `ketch mcp --standalone` and
+  `ai-discover` warn on stderr and use the defaults, and an unreadable `--config` file stops
+  `ketch mcp --standalone`
 
 ### Apps (`app/`)
 - One Compose Multiplatform UI (`app:shared`) for Android, desktop, iOS and the web, laid out
@@ -514,6 +517,18 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SuccessFeedbackPlayer` (`DesktopFeedbackPlayer`, `AndroidFeedbackPlayer`, which follows silent
   mode and Do Not Disturb); on Android a finished download posted as a notification leaves the
   alert to its channel. iOS and the web play none
+- Keep awake (`[power] keepAwake`, Settings → General → Power on desktop and Android,
+  `keepAwakeSupported`): `KeepAwake.follow` holds a host's `SleepInhibitor` while the embedded
+  device's tasks download or wait in the queue (`ForegroundStatus.keepsAwake`; the local server
+  and Discover never count), and releases it when they stop, the setting goes off or its scope
+  ends. Each keeps the system from sleeping while idle only, never stopping the user's own sleep,
+  lid close or the display turning off: desktop's `systemSleepInhibitor` takes an IOKit
+  `PreventUserIdleSystemSleep` assertion on macOS, `SetThreadExecutionState` from a thread of its
+  own on Windows and a logind `idle` lock through `systemd-inhibit` on Linux, taken again with
+  backoff when it ends while still wanted (a `sleep` lock would need an administrator for the
+  user's own suspend; GNOME ignores `idle` locks); Android's
+  `WakeLockInhibitor` is a partial `WakeLock`, held only while `KetchService` is in the
+  foreground, which keeps it out of Android vitals' excessive wake lock count
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
@@ -595,8 +610,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   download directory, file names through `sanitizeFileName()`, existing or reserved paths never
   reused), a resume's `destination`, `PUT /api/config`'s `defaultDirectory` and
   `deleteFiles=true` (checked against `DownloadTask.outputPath`); anything else is 403
-  `path_rejected`. With a token and no list, callers may save anywhere, as the apps let owners
-  type any folder on a remote device
+  `path_rejected`. A request sent again with a task's `requestId` keeps that task's destination
+  when it names the same place (`DestinationPathPolicy.confinesTo`), as the task's own file would
+  otherwise give it a new name. With a token and no list, callers may save anywhere, as the apps
+  let owners type any folder on a remote device
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
   `POST /api/tasks`, 16 MiB for uploaded content, 4 KiB for pairing; longer is 413
   `payload_too_large`
@@ -619,15 +636,36 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   apps show the server's message, except for `path_rejected`, which their own text explains
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
-  cannot bind never resumes them
+  cannot bind never resumes them; `Ketch.start` keeps downloads added meanwhile in the list
+- Only one engine runs the downloads of a config directory: `ketch server` and
+  `ketch mcp --standalone` refuse to start while the desktop app runs (`DesktopApp.isRunning`) or
+  another one holds `instance.lock` (`claimDownloads`, `CliInstance`), and once their tasks are
+  restored describe themselves in the owner-only `instance.json` (command, pid, loopback URL,
+  token) for the attaching commands
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
   `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
-  SDK, `ai:discover` for Koog's clients). The binary has no kotlin-reflect. It is built with
+  SDK, `ai:discover` for Koog's clients). The binary has no kotlin-reflect: it is excluded from
+  `nativeImageClasspath` as well as `runtimeClasspath`, as native-image would otherwise compile it
+  in without its metadata, and Ktor's StatusPages failed every error response printing a lambda.
+  It is built with `--install-exit-handlers`, so SIGINT and SIGTERM run the shutdown hooks, with
   `-Os` on GraalVM for JDK 23 and later and `-Ob` before (smaller than the default `-O2`), and
   bundles the web UI with its wasm and JS gzipped, which `KetchServer` sends compressed to
   browsers that accept gzip
+- `ketch add`, `list`, `pause`, `resume` and `watch` work on a running instance through
+  `RemoteKetch` instead of an engine of their own (`InstanceCommands`). `InstanceLocator` takes
+  `--server` / `KETCH_SERVER` (with `--token` / `KETCH_API_TOKEN`), else the desktop app, asked
+  over its `SingleInstance` endpoint for `LocalApiServer` (`DesktopApp`, request `cli/connect`;
+  an older app's empty reply asks to update it), else the `ketch server` or
+  `ketch mcp --standalone` that `instance.json` names, when its pid runs. Results go to stdout,
+  everything else to stderr; exit 0, 1 on failure, 2 for invalid arguments (`InstanceExit`).
+  Task IDs may be shortened to a unique prefix
+- `ketch add` sends a `requestId` (`--idempotency-key`: a UUID as it is, other text a name-based
+  UUID) and sends it again, up to three times, when the connection fails or the instance answers
+  5xx (`submitDownload`); a destination is made absolute for an instance on this machine.
+  `ketch watch` prints task JSON lines (`snapshot`, `added`, `state`, `progress`, `removed`); with
+  IDs it exits once they finish, and it exits 1 when the connection is lost
 - Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
   serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
   so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
@@ -659,14 +697,20 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   out by hand and called with the arguments by name. They need no kotlin-reflect, unlike Koog's
   `ToolSet`, and pass `String` results on as they are, so tools return their JSON as text. A
   missing or malformed argument is a `ToolException.ValidationFailure`
-- `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
-  `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
-  Logback never corrupt the JSON-RPC stream
+- `KetchToolSet` and `KetchMcpServer` take `connect: suspend () -> KetchApi`, asked on every
+  call (or a `KetchApi`); what it throws fails the call with its message. `startDownload` takes
+  an optional `requestId`, refused by an instance without `KetchFeatures.REQUEST_ID`
+- `ketch mcp` attaches to the instance the CLI's `InstanceLocator` finds (`InstanceConnection`):
+  when a tool first needs it, and again once the `RemoteKetch` is no longer connected, as when
+  the app restarts on another port. `--standalone` runs its own engine on `ketch.db` instead,
+  with a loopback `KetchServer` (per-run token) the attaching commands use. It passes the real
+  stdout to `startStdio` and redirects `System.out` to stderr, so the banner, the console logger
+  and Logback never corrupt the JSON-RPC stream
 - Stdio uses Ketch's own `StdioTransport`: when stdin ends it answers the requests already read,
   then closes, and `startStdio` returns (`Server.onClose` only fires on `Server.close()`, so it
   waits for the transport). The SDK's `StdioServerTransport` drops those replies. `ketch mcp`
-  then calls `exitProcess`, so a non-daemon thread cannot keep it alive; its shutdown hook closes
-  `Ketch`
+  then calls `exitProcess`, so a non-daemon thread cannot keep it alive; its shutdown hooks close
+  the connection, or `Ketch` with `--standalone`
 - Stdio builds its SDK `Server` itself (adding tools with Koog's `addTool`) without
   `tools.listChanged`. With Koog's `configureMcpServer`, which announces it, the SDK sent
   `notifications/tools/list_changed` for the tools it registered to a session starting in the same
@@ -691,12 +735,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   magnets go to the default one
 - The Ketch desktop app is reached through the native messaging host `com.linroid.ketch`, its own
   launcher run with `--native-messaging-host` (`app/desktop`: `NativeMessagingHost`,
-  `NativeHostRegistration`, `BrowserExtensionServer`). The host asks the running app over
+  `NativeHostRegistration`, `LocalApiServer`). The host asks the running app over
   `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
-  per-run token, separate from the Settings server. The app registers the host with installed
-  browsers on every launch; the Chromium extension id is pinned by the manifest `key`. The
-  browser reads the host's stdout as length-prefixed messages, so nothing else may write there:
-  the launcher sends the JVM's own warnings to stderr (`-Xlog` in `app/desktop/build.gradle.kts`)
+  per-run token, separate from the Settings server; the `ketch` CLI asks for the same server
+  (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection. The app
+  registers the host with installed browsers on every launch; the Chromium extension id is pinned
+  by the manifest `key`. The browser reads the host's stdout as length-prefixed messages, so
+  nothing else may write there: the launcher sends the JVM's own warnings to stderr (`-Xlog` in
+  `app/desktop/build.gradle.kts`)
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks
@@ -838,6 +884,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
    the web app report AI discovery as unavailable
 8. AI API tokens are stored in plain text in `config.toml`, like the server
    `apiToken`; use environment variables on shared machines
+9. The desktop app does not check for a `ketch server` or `ketch mcp --standalone` that already
+   runs the downloads of its config directory; only they refuse to start while the app runs
 
 ## Roadmap
 
@@ -882,24 +930,17 @@ Planned features not yet implemented:
     `KetchApi`, the REST API and MCP. Today a selection can only be given up front
     (`DownloadRequest.selectedFileIds`, after a resolve), and a magnet added without one, as the
     extension, CLI and MCP always do, downloads every file
-13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
-    on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
-    `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
-    quit, sleep or shut down once the queue is empty
+13. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
 14. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-15. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
-    and `ketch mcp` attach through `RemoteKetch` to the running desktop app or a server instead
-    of opening `ketch.db` with a second engine, and an idempotency key keeps retried submissions
-    from creating duplicates. Today `ketch mcp` and `ketch server` can open the desktop app's
-    `ketch.db` while it runs, and both engines resume the same tasks
-16. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
+15. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
     workflow, with an unauthenticated readiness endpoint that answers once saved tasks are
     restored, configuration through environment variables, and a fixed, configurable BitTorrent
     listen port (today the OS picks one on every launch)
-17. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+16. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-18. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+17. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
     [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 8

@@ -8,3 +8,5 @@ actual val isMobilePlatform: Boolean = true
 
 internal actual val HorizontalResizePointerIcon: PointerIcon =
   PointerIcon(android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW)
+
+internal actual val keepAwakeSupported: Boolean = true
