@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -121,6 +122,89 @@ class RemoteKetchSnapshotTest {
             assertEquals(completed.state, task.state.value)
           } finally {
             refresh.cancelAndJoin()
+            remote.close()
+            engine.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun handleEvent_taskAddedSnapshotOlderThanSse_keepsNewerState() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(5_000) {
+        coroutineScope {
+          val original = snapshot("task")
+          val completed = DownloadState.Completed("/output")
+          val started = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          val engine = MockEngine { request ->
+            if (request.method == HttpMethod.Get) {
+              started.complete(Unit)
+              release.await()
+            }
+            respond(
+              Json.encodeToString(original),
+              headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+          }
+          val remote = RemoteKetch("localhost", 8642, null, false, engine)
+          // TaskAdded can arrive before the POST that created the task returns.
+          val added = async { remote.handleEvent(TaskEvent.TaskAdded("task", original.state)) }
+          try {
+            started.await()
+            val task = remote.download(original.request)
+            remote.handleEvent(TaskEvent.StateChanged(task.taskId, completed))
+            release.complete(Unit)
+            added.await()
+            assertSame(task, remote.tasks.value.single())
+            assertEquals(completed, task.state.value)
+          } finally {
+            added.cancelAndJoin()
+            remote.close()
+            engine.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun handleEvent_taskAddedForKnownTask_keepsNewerState() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(5_000) {
+        coroutineScope {
+          val original = snapshot("task")
+          val completed = DownloadState.Completed("/output")
+          val started = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          val engine = MockEngine { request ->
+            if (request.method == HttpMethod.Get) {
+              started.complete(Unit)
+              release.await()
+            }
+            respond(
+              Json.encodeToString(original),
+              headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+          }
+          val remote = RemoteKetch("localhost", 8642, null, false, engine)
+          val task = remote.download(original.request)
+          val added = async { remote.handleEvent(TaskEvent.TaskAdded("task", original.state)) }
+          try {
+            // Wait until the snapshot is requested, unless the event needs none.
+            select {
+              started.onAwait {}
+              added.onAwait {}
+            }
+            remote.handleEvent(TaskEvent.StateChanged(task.taskId, completed))
+            release.complete(Unit)
+            added.await()
+            assertSame(task, remote.tasks.value.single())
+            assertEquals(completed, task.state.value)
+          } finally {
+            added.cancelAndJoin()
             remote.close()
             engine.close()
           }

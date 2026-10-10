@@ -346,6 +346,9 @@ class RemoteKetch internal constructor(
     }
     when (event) {
       is TaskEvent.TaskAdded -> {
+        // The server streams the task's current state right after this event, so the snapshot
+        // is only needed to create a task this client does not know yet.
+        if (taskMutex.withLock { event.taskId in taskMap }) return
         try {
           val response = httpClient.get(
             Api.Tasks.ById(id = event.taskId),
@@ -353,7 +356,11 @@ class RemoteKetch internal constructor(
           if (response.status.isSuccess()) {
             val wire: TaskSnapshot = response.body()
             val task = createRemoteTask(wire)
-            taskMutex.withLock { addOrUpdate(task) }
+            taskMutex.withLock {
+              // A POST response, command or SSE event may have reported newer state while the
+              // snapshot was in flight; never write the older snapshot over it.
+              if (task.taskId !in taskMap) addOrUpdate(task)
+            }
           }
         } catch (e: Exception) {
           log.w(e) { "Failed to fetch added task: ${event.taskId}" }
