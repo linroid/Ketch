@@ -50,7 +50,10 @@ interface TorrentControlSource {
    */
   suspend fun startSeeding(task: SeedingTask): SeedingOutcome
 
-  /** Stops the task's session, if any, saving its state first. */
+  /**
+   * Stops the task's seeding session, if any, saving its state first; a download in progress is
+   * left alone.
+   */
   suspend fun stopSeeding(taskId: String)
 }
 

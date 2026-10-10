@@ -34,12 +34,15 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RequestHeaders
+import com.linroid.ketch.core.engine.SeedingOutcome
+import com.linroid.ketch.core.engine.SeedingTask
 import com.linroid.ketch.core.engine.SelectionDelivery
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
+import com.linroid.ketch.core.engine.TorrentControlSource
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
@@ -63,12 +66,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -93,6 +99,7 @@ import kotlin.uuid.Uuid
  *   size: network transfers suspend instead of blocking a thread, so the
  *   pool size does not limit how many connections a download can use.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class Ketch(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
@@ -121,6 +128,15 @@ class Ketch(
   private val sourceResolver = SourceResolver(
     additionalSources + httpSource,
   )
+
+  /** Sources with torrent controls, such as seeding completed tasks. */
+  private val controlSources: List<Pair<DownloadSource, TorrentControlSource>> =
+    additionalSources.mapNotNull { source ->
+      (source as? TorrentControlSource)?.let { source to it }
+    }
+
+  /** Set once [start] began following the control sources' seeding. */
+  private val seedingFollowed = AtomicBoolean(false)
 
   private val features: Set<String> = buildSet {
     add(KetchFeatures.AUTO_CONNECTIONS)
@@ -270,6 +286,121 @@ class Ketch(
   override suspend fun start() {
     log.i { "Start" }
     loadTasks()
+    if (controlSources.isNotEmpty() && seedingFollowed.compareAndSet(false, true)) {
+      scope.launch { followSeeding() }
+      scope.launch { restoreSeeding() }
+    }
+  }
+
+  /** Every task the control sources report seeding now. */
+  private fun seedingTaskIds(): Set<String> =
+    controlSources.flatMapTo(HashSet()) { it.second.seedingTaskIds.value }
+
+  /** Shows on every completed task whether its source seeds it, as the sources report it. */
+  private suspend fun followSeeding() {
+    combine(controlSources.map { it.second.seedingTaskIds }) { sets ->
+      sets.flatMapTo(HashSet()) { it }
+    }.collect { ids ->
+      for (task in _tasks.value) {
+        (task as? RealDownloadTask)?.let { syncSeeding(it, ids) }
+      }
+    }
+  }
+
+  /**
+   * Publishes whether a completed task seeds, as a copy of its [DownloadState.Completed], and
+   * saves the intent to seed it again after a restart once it does. Nothing here clears the
+   * intent: a seeder that a download stopped, or that stopped with Ketch, seeds again later.
+   */
+  private suspend fun syncSeeding(handle: TaskHandle, ids: Set<String>) {
+    val taskId = handle.taskId
+    val seeding = taskId in ids
+    val current = handle.mutableState.value as? DownloadState.Completed ?: return
+    if (current.seeding != seeding) {
+      val updated = current.copy(seeding = seeding)
+      if (handle.mutableState.compareAndSet(current, updated)) {
+        log.i { if (seeding) "Seeding taskId=$taskId" else "Stopped seeding taskId=$taskId" }
+        // The queue skips a completion whose state was replaced meanwhile, and a later copy may
+        // equal the state it skipped, so the copy releases the slot itself. Releasing is
+        // idempotent, and a task that started again since is never touched.
+        queue.onTaskCompleted(taskId, updated)
+      }
+    }
+    if (seeding && handle.record.value.control?.seeding != true) {
+      scope.launch { saveSeedingIntent(handle, true) }
+    }
+  }
+
+  /** Saves whether [handle]'s completed task seeds again after a restart. */
+  private suspend fun saveSeedingIntent(handle: TaskHandle, seeding: Boolean) {
+    handle.controlLock.withLock {
+      val record = handle.record.value
+      if ((record.control?.seeding ?: false) == seeding) return@withLock
+      if (seeding && record.state != TaskState.COMPLETED) return@withLock
+      handle.record.update {
+        it.copy(
+          control = (it.control ?: TaskControl()).copy(seeding = seeding),
+          updatedAt = Clock.System.now(),
+        )
+      }
+      log.d { "Saved seeding intent of taskId=${handle.taskId}: $seeding" }
+    }
+  }
+
+  /**
+   * Seeds the completed tasks that seeded before Ketch last stopped, oldest completion first,
+   * through sources that restore seeding: each checks its files first and only takes a free
+   * slot. The walk stops at the first that finds no slot or seeding switched off.
+   */
+  private suspend fun restoreSeeding() {
+    for ((source, control) in controlSources) {
+      if (!control.restoresSeeding) continue
+      val candidates = _tasks.value.mapNotNull { it as? RealDownloadTask }.filter {
+        val record = it.record.value
+        record.state == TaskState.COMPLETED && record.control?.seeding == true &&
+          record.sourceType == source.type
+      }.sortedBy { it.record.value.completedAt }
+      if (candidates.isEmpty()) continue
+      log.i { "Restoring seeding of ${candidates.size} task(s) from ${source.type}" }
+      for (handle in candidates) {
+        val taskId = handle.taskId
+        val record = handle.record.value
+        // The task may have started again, or stopped seeding for good, since the walk began.
+        if (handle.mutableState.value !is DownloadState.Completed ||
+          record.state != TaskState.COMPLETED || record.control?.seeding != true
+        ) continue
+        val resumeState = record.sourceResumeState
+        val outputPath = record.outputPath
+        if (resumeState == null || outputPath == null) {
+          log.w { "Cannot restore seeding of taskId=$taskId: nothing saved to seed from" }
+          continue
+        }
+        val outcome = try {
+          control.startSeeding(
+            SeedingTask(taskId, record.request.url, resumeState, outputPath,
+              record.request.selectedFileIds)
+          )
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          log.w { "Restoring seeding of taskId=$taskId failed: ${e.describeCauses()}" }
+          SeedingOutcome.FAILED
+        }
+        when (outcome) {
+          SeedingOutcome.SEEDING -> log.i { "Restored seeding of taskId=$taskId" }
+          SeedingOutcome.NO_SLOT, SeedingOutcome.POLICY_OFF -> {
+            log.i { "Stopped restoring seeding at taskId=$taskId: $outcome" }
+            return
+          }
+          SeedingOutcome.CHANGED_ON_DISK -> {
+            saveSeedingIntent(handle, false)
+            log.w { "Files of taskId=$taskId changed on disk since it completed; not seeding it" }
+          }
+          SeedingOutcome.ALREADY_ACTIVE, SeedingOutcome.UNSUPPORTED, SeedingOutcome.FAILED ->
+            log.i { "Did not restore seeding of taskId=$taskId: $outcome" }
+        }
+      }
+    }
   }
 
   override suspend fun status(): KetchStatus {
@@ -606,7 +737,7 @@ class Ketch(
       else -> {} // PAUSED, COMPLETED, FAILED, CANCELED — no action
     }
 
-    monitorTaskState(record.taskId, task.state)
+    monitorTaskState(task)
     return task
   }
 
@@ -640,10 +771,9 @@ class Ketch(
     }
   }
 
-  private suspend fun monitorTaskState(
-    taskId: String,
-    stateFlow: StateFlow<DownloadState>,
-  ) {
+  private suspend fun monitorTaskState(handle: RealDownloadTask) {
+    val taskId = handle.taskId
+    val stateFlow = handle.state
     monitorMutex.withLock {
       taskMonitors.remove(taskId)?.cancel()
       taskMonitors[taskId] = scope.launch {
@@ -656,7 +786,10 @@ class Ketch(
             log.i { "Task state: taskId=$taskId, ${last.logLabel()} -> ${state.logLabel()}" }
           }
           when (state) {
-            is DownloadState.Completed -> queue.onTaskCompleted(taskId, state)
+            is DownloadState.Completed -> {
+              queue.onTaskCompleted(taskId, state)
+              if (controlSources.isNotEmpty()) syncSeeding(handle, seedingTaskIds())
+            }
             is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
             is DownloadState.Canceled -> queue.onTaskCanceled(taskId, state)
             is DownloadState.Paused -> if (state.reason == PauseReason.AwaitingFileSelection) {
