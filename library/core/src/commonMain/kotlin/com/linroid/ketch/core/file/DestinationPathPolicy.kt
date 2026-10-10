@@ -50,28 +50,72 @@ class DestinationPathPolicy(roots: List<String>) {
    * @param baseDirectory the folder downloads go to when they name no folder
    * @throws PathRejectedException if the destination lies outside the roots
    */
-  fun confine(destination: Destination, baseDirectory: String): Destination {
+  fun confine(destination: Destination, baseDirectory: String): Destination =
+    when (val confined = confineWithoutFreeName(destination, baseDirectory)) {
+      is Confined.As -> confined.destination
+      is Confined.File -> {
+        val file = OutputPathReservations.freePath(confined.path.toString())
+        if (!contains(file)) throw PathRejectedException(destination.value)
+        Destination(file)
+      }
+    }
+
+  /**
+   * Whether [confine] made [previous] of [destination] earlier, with the same [baseDirectory]:
+   * it would make the same of it now, but for the free name it picked when the file existed or
+   * was reserved, such as `name (1).ext`. A request sent again keeps the destination it got the
+   * first time this way, although its own download may have created that file since.
+   *
+   * @throws PathRejectedException if [destination] lies outside the roots
+   */
+  fun confinesTo(
+    destination: Destination,
+    baseDirectory: String,
+    previous: Destination,
+  ): Boolean =
+    when (val confined = confineWithoutFreeName(destination, baseDirectory)) {
+      is Confined.As -> confined.destination == previous
+      is Confined.File -> {
+        val path = confined.path
+        val earlier = previous.value.toPath()
+        earlier == path || earlier.parent == path.parent &&
+          FREE_NAME_NUMBER.findAll(earlier.name).any { match ->
+            fitFileName(path.name, " (${match.groupValues[1]})") == earlier.name
+          }
+      }
+    }
+
+  /** What [confine] makes of a destination, before it picks a free name for a file. */
+  private sealed interface Confined {
+    /** The destination as it is saved to. */
+    class As(val destination: Destination) : Confined
+
+    /** A file at [path], which gets a free name if it exists or is reserved. */
+    class File(val path: Path) : Confined
+  }
+
+  private fun confineWithoutFreeName(destination: Destination, baseDirectory: String): Confined {
     val value = destination.value
     requireUsable(value)
     if (isUri(value)) {
       if (!contains(value)) throw PathRejectedException(value)
-      return destination
+      return Confined.As(destination)
     }
     if (destination.isName()) {
       if (!contains(baseDirectory)) throw PathRejectedException(baseDirectory)
-      return Destination(safeName(value))
+      return Confined.As(Destination(safeName(value)))
     }
     if (isUri(baseDirectory) && !value.toPath().isAbsolute) throw PathRejectedException(value)
     val path = resolve(value.toPath(), baseDirectory.toPath())
     if (destination.isDirectory() || isDirectory(path)) {
       if (!contains(path)) throw PathRejectedException(value)
       val folder = path.toString().removeSuffix(Path.DIRECTORY_SEPARATOR)
-      return Destination(folder + Path.DIRECTORY_SEPARATOR)
+      return Confined.As(Destination(folder + Path.DIRECTORY_SEPARATOR))
     }
     val parent = path.parent ?: throw PathRejectedException(value)
-    val file = OutputPathReservations.freePath((parent / safeName(path.name)).toString())
+    val file = parent / safeName(path.name)
     if (!contains(file)) throw PathRejectedException(value)
-    return Destination(file)
+    return Confined.File(file)
   }
 
   /**
@@ -154,6 +198,9 @@ class PathRejectedException(
 ) : IllegalArgumentException("$path $reason")
 
 private fun isUri(value: String): Boolean = "://" in value
+
+/** A number in a free name, as `OutputPathReservations` picks it: the `1` of `name (1).ext`. */
+private val FREE_NAME_NUMBER = Regex("""\((\d+)\)""")
 
 private fun Path.isWithin(root: Path): Boolean =
   this.root == root.root && segments.size >= root.segments.size &&

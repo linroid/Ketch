@@ -253,9 +253,22 @@ class KetchMcpServerTest {
       )
       // Optional parameters are still described
       assertEquals(
-        setOf("url", "destination", "connections", "priority", "speedLimit", "headers"),
+        setOf(
+          "url", "destination", "connections", "priority", "speedLimit", "headers", "requestId",
+        ),
         schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
       )
+    }
+
+  @Test
+  fun `tools call reports why the instance could not be reached as a tool error`() =
+    runTest(timeout = 10.seconds) {
+      val mcp = KetchMcpServer { throw IllegalStateException("Ketch isn't running") }
+      val reply = exchange(mcp, INITIALIZE, INITIALIZED, LIST_DOWNLOADS).last()
+      val result = assertNotNull(reply["result"], "Request failed: $reply").jsonObject
+
+      assertEquals(true, result["isError"]?.jsonPrimitive?.booleanOrNull, "$result")
+      assertTrue("Ketch isn't running" in result.toString(), "$result")
     }
 
   @Test

@@ -1,7 +1,8 @@
 # Ketch CLI
 
-Command-line interface for Ketch. Downloads a single file, runs the Ketch daemon server, serves
-Ketch to AI agents over MCP, and finds downloads with AI discovery.
+Command-line interface for Ketch. Downloads a single file, adds, lists, pauses, resumes and
+watches the downloads of the Ketch app or server that is running, runs the Ketch daemon server,
+serves Ketch to AI agents over MCP, and finds downloads with AI discovery.
 
 ## Install
 
@@ -86,7 +87,8 @@ variant. Live streams and separate audio/video tracks are unsupported; see
 [media support and limits](../docs/media.md).
 
 The download is kept in memory only and is not recorded in the [task database](#database). The
-command exits when the download completes or fails.
+command exits when the download completes or fails. To add a download to the Ketch app or server
+instead, use [`ketch add`](#add-a-download).
 
 | Option | Description |
 |---|---|
@@ -126,6 +128,142 @@ ketch ftp://user:secret@ftp.example.com/pub/file.iso
 ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 ```
 
+### Work on a running Ketch
+
+These commands work on the downloads of a Ketch that is running, rather than starting a download
+engine of their own: the Ketch app, a `ketch server`, or another device's server.
+
+```bash
+ketch add [options] <url> [destination]
+ketch list [options]
+ketch pause [options] <task-id>... | --all
+ketch resume [options] <task-id>... | --all
+ketch watch [options] [<task-id>...]
+```
+
+They use the first of:
+
+1. the server `--server <url>` names, or the `KETCH_SERVER` environment variable, with the token
+   from `--token` or `KETCH_API_TOKEN`. An address without a port uses 8642 for `http` and 443
+   for `https`, as behind a reverse proxy; `nas:8642` means `http://nas:8642`.
+2. the Ketch app running for your user. It opens a connection only this machine can use, with
+   an access code made for that run, so it needs nothing set up; Sharing can stay off. The
+   [portable Windows app](../docs/updates.md#the-portable-windows-app) is not found.
+3. the [`ketch server`](#server) running on this machine, or a
+   [`ketch mcp --standalone`](#mcp-server), with the token it uses.
+
+Without any, they stop with `Ketch isn't running`.
+
+Every one of them takes:
+
+| Option | Description |
+|---|---|
+| `--server <url>` | Use the Ketch server at this address; also read from `KETCH_SERVER` |
+| `--token <token>` | Its access token; also read from `KETCH_API_TOKEN` |
+| `--help`, `-h` | Show the command's usage |
+
+Results go to stdout and errors to stderr. The exit status is 0 on success, 1 on failure (no
+Ketch running, a refusal, a task ID that matches nothing, a watched download that did not
+complete, a lost connection) and 2 for invalid arguments.
+
+A task ID can be shortened to any start only that task has, such as the 8 characters
+`ketch list` shows.
+
+#### Add a download
+
+`ketch add` adds a download and prints its task ID, so scripts can follow it:
+
+```bash
+id=$(ketch add https://example.com/file.zip)
+ketch watch "$id"
+```
+
+Without a destination, it goes to Ketch's download folder. A destination works as for
+[`ketch <url>`](#download-a-file): an existing directory, or a path ending in a separator, keeps
+the file name from the source, and a relative path is taken from the current directory when Ketch
+runs on this machine. Another device's paths are passed as they are; that server may keep
+downloads to [its folders](#save-folders).
+
+| Option | Description |
+|---|---|
+| `--speed-limit <value>` | Limit its speed (e.g., `500k`, `10m`) |
+| `--priority <level>` | `low`, `normal`, `high` or `urgent` |
+| `--connections <n>` | Connections to use; `0`, the default, uses Ketch's setting |
+| `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
+| `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
+| `--referer <url>` | Send this `Referer` |
+| `--idempotency-key <key>` | Running the command again with the same key adds the download once |
+| `--json` | Print the task as JSON (see [Task JSON](#task-json)) instead of its ID |
+
+`ketch add` sends each download with a request ID, so when the connection fails before Ketch
+answers it can send it again without adding it twice; it tries three times. When it still cannot
+tell whether the download was added, it says so and prints the request ID: run the command again
+with `--idempotency-key <that ID>` to finish without a duplicate.
+
+`--idempotency-key` makes retrying safe across runs, such as from a script or a job that may run
+twice: the same key always sends the same request ID, so Ketch answers with the task it added
+the first time while that task is still in its list. A UUID is used as it is, and any other text
+turns into one. Using a key again for another download (another URL, destination, headers or
+file selection) is refused. Older Ketch versions without request IDs refuse the option, and get
+no retries without it.
+
+#### List downloads
+
+```bash
+ketch list
+```
+
+```text
+ID        STATE        DONE  SIZE     SPEED     NAME
+3f2a9c1e  downloading  42%   1.2 GB   5.1 MB/s  ubuntu-24.04.iso
+9c1e3f2a  queued #1    -     -        -         debian-12.iso
+```
+
+`--json` prints a JSON array of [task objects](#task-json) instead.
+
+#### Pause and resume
+
+```bash
+ketch pause 3f2a 9c1e
+ketch resume --all
+```
+
+Each task's new state is printed on a line of its own. `pause --all` pauses every waiting and
+running download; `resume --all` resumes every paused one, but not those waiting for an urgent
+download, which resume on their own.
+
+#### Watch
+
+`ketch watch` prints the downloads as JSON lines while they change, one [task object](#task-json)
+per line with an `event`:
+
+| `event` | When |
+|---|---|
+| `snapshot` | Each download as it is when `watch` starts |
+| `added` | A download was added |
+| `state` | A download's state, or its place in the queue, changed |
+| `progress` | A running download made progress (a few times a second) |
+| `removed` | A download was removed; the line has only `event` and `taskId` |
+
+```bash
+ketch watch | jq -r 'select(.event == "state" and .state == "completed") | .name'
+```
+
+With task IDs it follows those downloads only, and exits once each has finished: with status 0
+when all completed, and 1 when one failed, was canceled or removed. Without, it runs until you
+stop it. Either way it exits with status 1 when the connection to Ketch is lost, as when the app
+quits.
+
+#### Task JSON
+
+`list --json`, `add --json` and `watch` describe a download with the fields `ketch mcp`'s tools
+use: `taskId`, `name`, `url`, `destination`, `state` (`scheduled`, `queued`, `downloading`,
+`paused`, `completed`, `failed` or `canceled`) and `createdAt`, and, as they apply,
+`downloadedBytes`, `totalBytes`, `bytesPerSecond`, `percent` (0 to 1), `pauseReason`,
+`preemptedBy`, `outputPath`, `completedAt`, `downloadTimeMs`, `error`, `queuePosition`,
+`priority`, `speedLimit` (bytes per second) and `requestId`. Request headers are left out, as
+they can hold credentials.
+
 ### Server
 
 Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
@@ -133,6 +271,12 @@ downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
 [task database](#database) and restores them when it starts, and announces itself on the local
 network over mDNS unless `mdnsEnabled` is `false`. It listens on every interface by default and
 then requires an [access token](#access-token).
+
+Only one Ketch runs the downloads in the task database at a time, so the same downloads are never
+resumed twice into the same files. `ketch server` stops with status 1 when the Ketch app is
+running, or another `ketch server` or `ketch mcp --standalone` already is. Use the
+[commands above](#work-on-a-running-ketch) and `ketch mcp`, which work through the one that
+runs, or turn on **Settings → Sharing** in the app for other devices.
 
 ```bash
 ketch server [options]
@@ -283,21 +427,37 @@ keep a token there. The Ketch apps' server follows the same rules.
 
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
 agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, and change speed
-limits, priorities and the download config. It uses the same config file and
-[task database](#database) as `ketch server`, and restores saved tasks when it starts.
+limits, priorities and the download config.
 
 ```bash
 ketch mcp [options]
 ```
 
+It works on the downloads of the Ketch that is running, found like the
+[commands above](#work-on-a-running-ketch) find it: the Ketch app, the `ketch server` running on
+this machine, or the server `--server` names. It looks for it when a tool is first called rather
+than when it starts, and again once the connection is lost, as when the app restarts, so the MCP
+client may start before Ketch does. While none runs, tools fail with `Ketch isn't running`.
+
+`--standalone` runs the downloads itself instead, as earlier versions did, for a machine where no
+Ketch app or server runs: it uses the same config file and [task database](#database) as
+`ketch server`, restores saved tasks when it starts, and the commands above work through it
+while it runs. Like `ketch server`, it refuses to start while another Ketch runs those downloads.
+
 | Option | Description |
 |---|---|
-| `--config <path>` | Path to a TOML config file |
-| `--dir <path>` | Download directory (default: `~/Downloads`) |
+| `--server <url>` | Use the Ketch server at this address; also read from `KETCH_SERVER` |
+| `--token <token>` | Its access token; also read from `KETCH_API_TOKEN` |
+| `--standalone` | Run the downloads itself |
+| `--config <path>` | Path to a TOML config file (with `--standalone`) |
+| `--dir <path>` | Download directory (with `--standalone`; default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
 Each tool returns a JSON document as the text of its result. Parameters that have a default,
 such as everything but `url` in `startDownload`, are optional in the tool's input schema.
+`startDownload` takes a `requestId`, a UUID the agent makes up: calling it again with the same
+`requestId` and arguments, such as after a timeout, returns the download it started instead of
+adding another. An older Ketch without request IDs refuses it.
 
 Stdout carries only the MCP protocol; the banner and all logs go to stderr. The server exits once
 the client closes stdin, after answering the requests it has already read, so it can also be
@@ -332,14 +492,16 @@ ketch ai-discover <query> [options]
 | `--max-results <n>` | Max candidates to return (default: 5) |
 | `-y`, `--yes` | Open websites without asking |
 | `--no-filter` | Show results the [content filter](../docs/ai-discovery.md#the-content-filter) hides |
+| `--provider <name>` | Search with a saved provider, by its id or name, or with a preset such as `deepseek` whose key is in the environment |
+| `--model <id>` | Call this model |
 | `-h`, `--help` | Show the command's usage |
 
 Unknown options are an error rather than part of the query.
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
-the apps edit under Settings → Discover. Blank API keys are filled from `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`; without an `[ai]` section, exporting one of them is
-enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
+the apps edit under Settings → Discover. Blank API keys are filled from each provider's
+variable, such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `DEEPSEEK_API_KEY`;
+without an `[ai]` section, exporting one of them is enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
 settings and environment variables combine.
 
 #### Page access
@@ -414,9 +576,9 @@ ketch update --version 0.0.1-rc15
 
 ## Configuration File
 
-The `server` and `mcp` commands support TOML configuration files. CLI flags always take precedence
-over config file values. The download command reads only `[torrent]`, and `ai-discover` only
-`[ai]`, from the default path.
+The `server` and `mcp --standalone` commands support TOML configuration files. CLI flags always
+take precedence over config file values. The download command reads only `[torrent]`, and
+`ai-discover` only `[ai]`, from the default path.
 
 ### Config file locations
 
@@ -591,7 +753,8 @@ Speed limits accept human-readable suffixes:
 
 ## Database
 
-Tasks of `ketch server` and `ketch mcp` are stored in a SQLite database in the config directory:
+Tasks of `ketch server` and `ketch mcp --standalone` are stored in a SQLite database in the config
+directory, which the Ketch app shares:
 
 | Platform | Default path |
 |---|---|
@@ -599,4 +762,8 @@ Tasks of `ketch server` and `ketch mcp` are stored in a SQLite database in the c
 | Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` (default: `~/.config/ketch/ketch.db`) |
 | Windows | `%APPDATA%\ketch\ketch.db` |
 
-BitTorrent DHT state is kept in the `torrent-state` folder of the same directory.
+BitTorrent DHT state is kept in the `torrent-state` folder of the same directory. While one of
+the two runs, it holds `instance.lock` there, so no other opens the database, and describes
+itself in `instance.json`, readable by your user only as it holds the access token, so the
+[commands above](#work-on-a-running-ketch) can find it. The Ketch app is found through its own
+`app.endpoint` instead.

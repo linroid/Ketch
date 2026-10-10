@@ -10,73 +10,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * LLM providers that can drive AI resource discovery.
- *
- * @property label human-readable provider name.
- * @property defaultModel model used when [LlmSettings.model] is blank.
- *   Blank for providers that have no meaningful default. These track the
- *   providers' current recommended models; any id the provider accepts
- *   can be entered instead.
- * @property defaultBaseUrl endpoint used when [LlmSettings.baseUrl] is
- *   blank. Blank for providers that require an explicit endpoint.
- * @property requiresApiKey whether the provider rejects anonymous calls.
- * @property requiresBaseUrl whether the user must supply an endpoint.
- */
-@Serializable
-enum class LlmProvider(
-  val label: String,
-  val defaultModel: String,
-  val defaultBaseUrl: String,
-  val requiresApiKey: Boolean,
-  val requiresBaseUrl: Boolean,
-) {
-  @SerialName("openai")
-  OpenAi(
-    label = "OpenAI",
-    defaultModel = "gpt-5.6-terra",
-    defaultBaseUrl = "https://api.openai.com",
-    requiresApiKey = true,
-    requiresBaseUrl = false,
-  ),
-
-  @SerialName("anthropic")
-  Anthropic(
-    label = "Anthropic",
-    defaultModel = "claude-opus-5",
-    defaultBaseUrl = "https://api.anthropic.com",
-    requiresApiKey = true,
-    requiresBaseUrl = false,
-  ),
-
-  @SerialName("google")
-  Google(
-    label = "Google Gemini",
-    defaultModel = "gemini-3.8-flash",
-    defaultBaseUrl = "https://generativelanguage.googleapis.com",
-    requiresApiKey = true,
-    requiresBaseUrl = false,
-  ),
-
-  @SerialName("ollama")
-  Ollama(
-    label = "Ollama",
-    defaultModel = "qwen3",
-    defaultBaseUrl = "http://localhost:11434",
-    requiresApiKey = false,
-    requiresBaseUrl = false,
-  ),
-
-  @SerialName("openai-compatible")
-  OpenAiCompatible(
-    label = "OpenAI-compatible",
-    defaultModel = "",
-    defaultBaseUrl = "",
-    requiresApiKey = true,
-    requiresBaseUrl = true,
-  ),
-}
-
-/**
  * Web search providers used by the discovery agent's search tools.
  *
  * Saved as [id]. An id this version does not know, such as `bing`
@@ -115,22 +48,35 @@ internal object SearchProviderSerializer : KSerializer<SearchProvider> {
 }
 
 /**
- * LLM connection settings for AI discovery.
+ * A saved LLM provider for AI discovery: the provider to call, with its key, endpoint and models.
+ * The settings keep several under `[[ai.providers]]`, and discovery calls the one
+ * [AiSettings.active] names.
  *
+ * @property id unique among the saved providers, such as `openai` or `openai-2`; blank for the
+ *   default provider while none is saved.
+ * @property name what the apps call it; blank means [LlmProvider.label].
  * @property provider which LLM provider to call.
  * @property apiKey provider API key. Stored as plain text in the config
  *   file, like [ServerConfig.apiToken].
- * @property model model id; blank means [LlmProvider.defaultModel].
  * @property baseUrl endpoint override; blank means
  *   [LlmProvider.defaultBaseUrl].
+ * @property model the model to call; blank means [LlmProvider.defaultModel].
+ * @property models model ids the user added, which the apps offer next to [LlmProvider.models].
  */
 @Serializable
 data class LlmSettings(
+  val id: String = "",
+  val name: String = "",
   val provider: LlmProvider = LlmProvider.OpenAi,
   val apiKey: String = "",
-  val model: String = "",
   val baseUrl: String = "",
+  val model: String = "",
+  val models: List<String> = emptyList(),
 ) {
+  /** What the apps call it: its [name], or the provider's. */
+  val displayName: String
+    get() = name.ifBlank { provider.label }
+
   /** Model id to call, falling back to the provider default. */
   val effectiveModel: String
     get() = model.ifBlank { provider.defaultModel }
@@ -144,6 +90,31 @@ data class LlmSettings(
     get() = (!provider.requiresApiKey || apiKey.isNotBlank()) &&
       effectiveBaseUrl.isNotBlank() &&
       effectiveModel.isNotBlank()
+
+  /**
+   * The models to choose from, each once: the ones the user added, then the provider's, with
+   * [effectiveModel] first when it is in neither.
+   */
+  val modelChoices: List<String>
+    get() {
+      val listed = (models + provider.models).filter { it.isNotBlank() }.distinct()
+      val current = effectiveModel
+      return if (current.isBlank() || current in listed) listed else listOf(current) + listed
+    }
+
+  /** Calls [model] from now on, adding it to [models] when neither list has it. */
+  fun withModel(model: String): LlmSettings {
+    val id = model.trim()
+    if (id.isEmpty()) return copy(model = "")
+    val known = id in models || id in provider.models
+    return copy(model = id, models = if (known) models else models + id)
+  }
+
+  /** Forgets [model]: it leaves [models], and stops being the one called. */
+  fun withoutModel(model: String): LlmSettings = copy(
+    model = if (this.model == model) "" else this.model,
+    models = models - model,
+  )
 }
 
 /**
@@ -172,31 +143,169 @@ data class SearchSettings(
 /**
  * User-facing AI discovery settings, persisted under `[ai]`.
  *
+ * A config written before several providers could be saved has one provider under `[ai.llm]`:
+ * [ConfigStore] implementations load it as the one saved, active provider, and saving writes it
+ * under `[[ai.providers]]`.
+ *
  * @property enabled master switch for the feature, on by default: discovery runs once [llm] and
  *   [search] are complete, and the apps hide it until then.
- * @property llm LLM connection settings.
+ * @property providers the saved LLM providers, each with a unique [LlmSettings.id], under
+ *   `[[ai.providers]]`; empty until one is saved, when discovery calls a default OpenAI one.
+ * @property active id of the provider discovery calls; the first one when no provider has it.
  * @property search web search settings.
  * @property access when discovery may open websites, under `[ai.access]`.
  * @property contentFilter whether discovery hides results that look unsafe, such as links
  *   through URL shorteners or download aggregators, piracy, look-alike websites and installers
  *   over plain HTTP. Private and local addresses are refused either way.
+ * @property legacyLlm the one provider of a config written before several could be saved, as
+ *   read from `[ai.llm]`; `null` once loaded, and never written.
  */
 @Serializable
 data class AiSettings(
   val enabled: Boolean = true,
-  val llm: LlmSettings = LlmSettings(),
+  val providers: List<LlmSettings> = emptyList(),
+  val active: String = "",
   val search: SearchSettings = SearchSettings(),
   val access: PageAccessSettings = PageAccessSettings(),
   val contentFilter: Boolean = true,
+  @SerialName("llm") val legacyLlm: LlmSettings? = null,
 ) {
+  /**
+   * Settings with [llm] as the one saved provider, active. It keeps its id, or takes its
+   * provider's.
+   */
+  constructor(
+    enabled: Boolean = true,
+    llm: LlmSettings,
+    search: SearchSettings = SearchSettings(),
+    access: PageAccessSettings = PageAccessSettings(),
+    contentFilter: Boolean = true,
+  ) : this(
+    enabled = enabled,
+    providers = listOf(llm.copy(id = llm.id.ifBlank { llm.provider.id })),
+    active = llm.id.ifBlank { llm.provider.id },
+    search = search,
+    access = access,
+    contentFilter = contentFilter,
+  )
+
+  /** The providers to choose from: the saved ones, or the default one while none is saved. */
+  val entries: List<LlmSettings>
+    get() = providers.ifEmpty { listOf(LlmSettings()) }
+
+  /** The provider discovery calls. */
+  val llm: LlmSettings
+    get() = providers.firstOrNull { it.id == active } ?: entries.first()
+
   /** `true` when discovery is switched on and fully configured. */
   val isUsable: Boolean
     get() = enabled && llm.isComplete && search.isComplete
 
   /**
-   * These settings without [access] and [contentFilter], which the discovery engine never reads
-   * (each search is given them): two settings that differ only in those build the same engine.
+   * What the discovery engine runs with: the active provider, without its name and the models
+   * it is not calling, and the search. Two settings with the same engine settings build the same
+   * engine; [access] and [contentFilter] are given to each search instead.
    */
   val engineSettings: AiSettings
-    get() = copy(access = PageAccessSettings(), contentFilter = true)
+    get() {
+      val llm = llm
+      return AiSettings(
+        enabled = enabled,
+        providers = providers.filter { it.id == llm.id }.take(1)
+          .map { it.copy(name = "", models = emptyList()) },
+        active = llm.id,
+        search = search,
+      )
+    }
+
+  /** The saved provider with [id], or the default one for a blank id while none is saved. */
+  fun entry(id: String): LlmSettings? = entries.firstOrNull { it.id == id }
+
+  /**
+   * A new provider of [provider], not saved yet: its id is unused, and it is named after the
+   * provider, with a number when another provider is called that already.
+   */
+  fun newEntry(provider: LlmProvider): LlmSettings {
+    val ids = providers.mapTo(HashSet()) { it.id }
+    val id = generateSequence(1) { it + 1 }
+      .map { if (it == 1) provider.id else "${provider.id}-$it" }
+      .first { it !in ids }
+    val names = providers.mapTo(HashSet()) { it.displayName }
+    val name = generateSequence(1) { it + 1 }
+      .map { if (it == 1) provider.label else "${provider.label} $it" }
+      .first { it !in names }
+    // The first is called by the provider's name, which needs no saving.
+    return LlmSettings(
+      id = id,
+      name = if (name == provider.label) "" else name,
+      provider = provider,
+    )
+  }
+
+  /**
+   * Saves [entry] in place of the saved provider with its id, or adds it. One without an id,
+   * such as the default provider being edited, gets one. While no provider is saved, the one
+   * saved first becomes active.
+   */
+  fun withEntry(entry: LlmSettings): AiSettings {
+    val saved = if (entry.id.isBlank()) {
+      entry.copy(id = newEntry(entry.provider).id)
+    } else {
+      entry
+    }
+    val index = providers.indexOfFirst { it.id == saved.id }
+    if (index >= 0) {
+      return copy(providers = providers.toMutableList().also { it[index] = saved })
+    }
+    return copy(
+      providers = providers + saved,
+      active = if (providers.isEmpty()) saved.id else active,
+    )
+  }
+
+  /**
+   * Removes the saved provider with [id]. Removing the active one makes the first that is left
+   * active; removing the last brings back the default provider.
+   */
+  fun withoutEntry(id: String): AiSettings {
+    val left = providers.filterNot { it.id == id }
+    if (left.size == providers.size) return this
+    val active = if (llm.id == id) left.firstOrNull()?.id.orEmpty() else llm.id
+    return copy(providers = left, active = active)
+  }
+
+  /**
+   * Makes the provider with [id] the one discovery calls, with [model] when it is given. The
+   * default provider, while none is saved, is saved by choosing a model for it.
+   */
+  fun withActive(id: String, model: String? = null): AiSettings {
+    val entry = entry(id) ?: return this
+    val chosen = if (model == null) this else withEntry(entry.withModel(model))
+    val savedId = chosen.providers.firstOrNull { it.id == id }?.id
+      ?: chosen.providers.singleOrNull()?.id
+      ?: return chosen
+    return chosen.copy(active = savedId)
+  }
+
+  /**
+   * These settings as loaded from a file: the provider of a config written before several could
+   * be saved becomes the one saved, active provider, unless it was left untouched, and every saved
+   * provider has an id the others do not, which a hand-edited file may lack.
+   */
+  internal fun migrated(): AiSettings {
+    val legacy = legacyLlm?.takeIf { it != LlmSettings() && providers.isEmpty() }
+    if (legacy != null) {
+      return copy(legacyLlm = null, providers = emptyList(), active = "").withEntry(legacy)
+    }
+    val ids = providers.map { it.id }
+    val unique = ids.none { it.isBlank() } && ids.distinct().size == ids.size
+    if (unique && legacyLlm == null) return this
+    var settings = copy(legacyLlm = null, providers = emptyList())
+    for (entry in providers) {
+      val taken = entry.id.isBlank() || settings.providers.any { it.id == entry.id }
+      settings = settings.withEntry(if (taken) entry.copy(id = "") else entry)
+    }
+    // The active provider keeps its place; one whose id was taken was the first with it.
+    return settings.copy(active = active)
+  }
 }

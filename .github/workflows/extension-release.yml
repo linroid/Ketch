@@ -1,0 +1,67 @@
+name: Extension Release
+
+# Releases the browser extension on its own, when it has changed, so a store review only follows
+# extension changes. Run it from the Actions tab. The extension takes the version of the latest
+# app release plus this workflow's run number (`0.3.1.7`), so every extension release is newer
+# than the last one, and Chromium shows the app version (`0.3.1`).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+    working-directory: app/browser-extension
+
+jobs:
+  release:
+    name: Browser extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Take the version of the latest app release
+        run: |
+          app=$(git describe --tags --abbrev=0 --match 'v*')
+          echo "APP_VERSION=${app#v}" >> "$GITHUB_ENV"
+          echo "EXTENSION_TAG=extension-${app}.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        run: node --test
+
+      # chrome.zip leaves out the development key, so it is the Chrome Web Store upload.
+      - name: Build browser extension packages
+        run: node build.mjs --version "$APP_VERSION" --build "${{ github.run_number }}"
+
+      - name: Write release notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'extension-v*' 2>/dev/null || true)
+          {
+            echo "Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)."
+            echo "The packages below are for store submission and testing; see the"
+            echo "[extension README](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/app/browser-extension/README.md#installing)."
+            echo
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s (%h)' ${previous:+"$previous.."}HEAD -- .
+          } > build/release-notes.md
+
+      # Never the latest release: the desktop and CLI updaters read releases/latest.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.EXTENSION_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Browser extension ${{ env.APP_VERSION }}.${{ github.run_number }}
+          body_path: app/browser-extension/build/release-notes.md
+          make_latest: false
+          files: app/browser-extension/build/ketch-extension-*.zip
+          fail_on_unmatched_files: true

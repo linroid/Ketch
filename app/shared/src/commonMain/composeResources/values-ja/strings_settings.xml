@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">実行中のダウンロード</string>
   <string name="settings_general_badge_failures">失敗のみ</string>
   <string name="settings_general_badge_off">表示しない</string>
+  <string name="settings_general_power">電源</string>
+  <string name="settings_general_keep_awake">ダウンロード中はスリープしない</string>
+  <string name="settings_general_keep_awake_hint">ダウンロード中は%1$sが自動でスリープしません。画面はオフになる場合があります。</string>
 
   <string name="settings_notifications_downloads">ダウンロード</string>
   <string name="settings_notifications_footer">「通知」はシステムの通知を使います。「アプリ内のみ」はKetchの中だけに表示します。</string>
@@ -207,9 +210,7 @@
   <string name="settings_ai_provider_ollama">Ollama · ローカルで実行、キー不要</string>
   <string name="settings_ai_provider_compatible">カスタム（OpenAI互換）</string>
   <string name="settings_ai_provider_compatible_name">OpenAI互換</string>
-  <string name="settings_ai_hint_openai">キーはplatform.openai.comで取得できます。</string>
-  <string name="settings_ai_hint_anthropic">キーはconsole.anthropic.comで取得できます。</string>
-  <string name="settings_ai_hint_gemini">キーはaistudio.google.com/apikeyで取得できます。</string>
+  <string name="settings_ai_hint_key">キーは%1$sで取得できます。</string>
   <string name="settings_ai_hint_ollama">先にモデルを取得してください：ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter、DeepSeek、LM Studio、vLLMなどのサーバー。</string>
   <string name="settings_ai_api_key_env">環境変数のキーを使用中です。ここに入力したキーが優先されます。</string>
@@ -230,6 +231,7 @@
   <string name="settings_ai_test_unsupported">このプラットフォームではAIディスカバーを利用できません。</string>
   <string name="settings_ai_test_connection_failed">接続に失敗しました。</string>
   <string name="settings_ai_engine_failed">ディスカバーのエンジンを起動できませんでした。</string>
+  <string name="settings_ai_models_failed">モデルの一覧を取得できませんでした。</string>
   <string name="settings_ai_search_footer">検索プロバイダがない場合、ディスカバーは指定したページだけを読み込みます。</string>
   <string name="settings_ai_search_provider">検索プロバイダ</string>
   <string name="settings_ai_search_none">なし</string>
@@ -561,6 +563,7 @@
   <string name="settings_search_start_hidden_keywords">起動, バックグラウンド, メニューバー, トレイ, 常駐</string>
   <string name="settings_search_badge">Dockやタスクバーのアイコンに表示する内容</string>
   <string name="settings_search_badge_keywords">件数, Dock, タスクバー, バッジ</string>
+  <string name="settings_search_keep_awake_keywords">スリープ, 電源, バッテリー, スリープ防止, スリープさせない</string>
   <string name="settings_search_shortcuts">すべてのキーボードショートカット</string>
   <string name="settings_search_shortcuts_keywords">キー, ホットキー, キーボード, キー割り当て</string>
   <string name="settings_search_finished_keywords">完了, 終了, アラート, お知らせ</string>

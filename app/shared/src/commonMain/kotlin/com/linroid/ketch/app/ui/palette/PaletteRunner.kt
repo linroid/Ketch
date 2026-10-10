@@ -110,7 +110,7 @@ internal class PaletteRunner(
       return
     }
     // Shows the task on a tab that lists it.
-    val filter = state.statusFilter.takeIf { it.matches(row.state) } ?: StatusFilter.All
+    val filter = state.statusFilter.takeIf { it.matches(row) } ?: StatusFilter.All
     state.showDownloads(filter)
     state.inspect(action.key)
   }

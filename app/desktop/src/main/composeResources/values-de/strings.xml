@@ -132,4 +132,6 @@
   </plurals>
 
   <string name="settings_window_title">Einstellungen</string>
+
+  <string name="keep_awake_reason">Downloads laufen</string>
 </resources>

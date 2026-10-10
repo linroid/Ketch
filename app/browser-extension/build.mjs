@@ -3,7 +3,6 @@
  * Builds the extension for each browser family from `src/`:
  *
  *   build/chrome/    Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers
- *   build/chrome-store/   Chromium store upload without the development key
  *   build/firefox/   Firefox
  *   build/ketch-extension-<version>-<browser>.zip   packages for releases and extension stores
  *
@@ -12,7 +11,9 @@
  * Without options the version comes from package.json. The release workflow passes the tag's
  * version and its run number; see `releaseVersion`.
  *
- * `src/` itself is the Chromium build, so it can be loaded unpacked while developing.
+ * `src/` itself is the Chromium build, so it can be loaded unpacked while developing; its `key`
+ * keeps the development id there. The Chromium build leaves the key out, as the Chrome Web Store
+ * requires of uploads.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync }
   from 'node:fs';
@@ -61,12 +62,12 @@ export function releaseVersion(release, build) {
 /** @returns {Record<string, object>} the manifest for each browser build */
 function targetManifests({ version: manifestVersion, versionName }) {
   const base = { ...manifest, version: manifestVersion };
-  const chrome = versionName === manifestVersion ? base : { ...base, version_name: versionName };
-  // Store uploads must omit the key; local installs need it for native host authorization.
-  const { key: _key, ...chromeStore } = chrome;
+  // Store uploads must omit the key, which only pins the id of unpacked `src/`.
+  const { key: _key, ...chrome } = versionName === manifestVersion
+    ? base
+    : { ...base, version_name: versionName };
   return {
     chrome,
-    'chrome-store': chromeStore,
     firefox: firefoxManifest(base),
     safari: safariManifest(base),
   };

@@ -51,6 +51,39 @@ class DestinationPathPolicyTest {
   }
 
   @Test
+  fun confinesTo_theFreeNameConfineGaveItEarlier_true() {
+    File(root, "file.zip").writeText("existing")
+    val given = Destination("${root.path}/file.zip")
+    val earlier = policy.confine(given, root.path)
+    File(root, "file (1).zip").writeText("downloading")
+
+    assertEquals(Destination(File(root, "file (1).zip").path), earlier)
+    assertTrue(policy.confinesTo(given, root.path, earlier))
+    assertTrue(policy.confinesTo(Destination("file.zip"), root.path, Destination("file.zip")))
+  }
+
+  @Test
+  fun confinesTo_anotherFileOrFolder_false() {
+    val given = Destination("${root.path}/file.zip")
+
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/other (1).zip")))
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/sub/file (1).zip")))
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/file (x).zip")))
+    assertFalse(policy.confinesTo(Destination("${root.path}/a/"), root.path, Destination("b/")))
+  }
+
+  @Test
+  fun confinesTo_outsideTheRoots_rejected() {
+    assertFailsWith<PathRejectedException> {
+      policy.confinesTo(
+        Destination("${outside.path}/file.zip"),
+        root.path,
+        Destination("${outside.path}/file.zip"),
+      )
+    }
+  }
+
+  @Test
   fun confine_folderOutsideTheRoots_rejected() {
     assertFailsWith<PathRejectedException> {
       policy.confine(Destination("${outside.path}/"), root.path)

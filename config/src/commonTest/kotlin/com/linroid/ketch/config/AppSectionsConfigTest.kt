@@ -29,6 +29,7 @@ class AppSectionsConfigTest {
     assertEquals(DesktopSettings(), decoded.desktop)
     assertEquals(NotificationSettings(), decoded.notifications)
     assertEquals(IntegrationSettings(), decoded.integration)
+    assertEquals(PowerSettings(), decoded.power)
   }
 
   @Test
@@ -205,4 +206,5 @@ internal val populatedAppSections = KetchConfig(
     successVibration = false,
   ),
   integration = IntegrationSettings(magnetHandler = true, torrentFileHandler = true),
+  power = PowerSettings(keepAwake = false),
 )

@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">진행 중인 다운로드</string>
   <string name="settings_general_badge_failures">실패만</string>
   <string name="settings_general_badge_off">표시 안 함</string>
+  <string name="settings_general_power">전원</string>
+  <string name="settings_general_keep_awake">다운로드 중 잠자기 방지</string>
+  <string name="settings_general_keep_awake_hint">다운로드하는 동안 %1$s의 자동 잠자기를 막습니다. 화면은 꺼질 수 있습니다.</string>
 
   <string name="settings_notifications_downloads">다운로드</string>
   <string name="settings_notifications_footer">‘알림’은 시스템 알림을 사용하고, ‘앱 내에서만’은 Ketch 안에서만 표시합니다.</string>
@@ -207,9 +210,7 @@
   <string name="settings_ai_provider_ollama">Ollama · 로컬에서 실행, 키 불필요</string>
   <string name="settings_ai_provider_compatible">사용자 지정(OpenAI 호환)</string>
   <string name="settings_ai_provider_compatible_name">OpenAI 호환</string>
-  <string name="settings_ai_hint_openai">platform.openai.com에서 키를 발급받으세요.</string>
-  <string name="settings_ai_hint_anthropic">console.anthropic.com에서 키를 발급받으세요.</string>
-  <string name="settings_ai_hint_gemini">aistudio.google.com/apikey에서 키를 발급받으세요.</string>
+  <string name="settings_ai_hint_key">%1$s에서 키를 발급받으세요.</string>
   <string name="settings_ai_hint_ollama">먼저 모델을 받으세요: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM 및 유사한 서버.</string>
   <string name="settings_ai_api_key_env">환경 변수의 키를 사용 중입니다. 여기에 입력한 키가 우선합니다.</string>
@@ -230,6 +231,7 @@
   <string name="settings_ai_test_unsupported">이 플랫폼에서는 AI 찾기를 사용할 수 없습니다.</string>
   <string name="settings_ai_test_connection_failed">연결에 실패했습니다.</string>
   <string name="settings_ai_engine_failed">찾기 엔진을 시작할 수 없습니다.</string>
+  <string name="settings_ai_models_failed">모델 목록을 가져올 수 없습니다.</string>
   <string name="settings_ai_search_footer">검색 제공업체가 없으면 찾기는 사용자가 제공한 페이지만 읽습니다.</string>
   <string name="settings_ai_search_provider">검색 제공업체</string>
   <string name="settings_ai_search_none">없음</string>
@@ -561,6 +563,7 @@
   <string name="settings_search_start_hidden_keywords">시작 프로그램, 백그라운드, 메뉴 막대, 트레이, 숨김</string>
   <string name="settings_search_badge">Dock 또는 작업 표시줄 아이콘에 표시할 내용</string>
   <string name="settings_search_badge_keywords">개수, 배지, Dock, 독, 작업 표시줄</string>
+  <string name="settings_search_keep_awake_keywords">잠자기, 절전, 전원, 배터리, 잠자기 방지</string>
   <string name="settings_search_shortcuts">모든 키보드 단축키</string>
   <string name="settings_search_shortcuts_keywords">키, 단축키, 핫키, 키 바인딩</string>
   <string name="settings_search_finished_keywords">완료, 끝남, 알림</string>

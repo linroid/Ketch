@@ -128,6 +128,9 @@
   <string name="settings_general_badge_active">Downloads ativos</string>
   <string name="settings_general_badge_failures">Só falhas</string>
   <string name="settings_general_badge_off">Nada</string>
+  <string name="settings_general_power">Energia</string>
+  <string name="settings_general_keep_awake">Manter ativo durante downloads</string>
+  <string name="settings_general_keep_awake_hint">%1$s não entra em repouso automaticamente enquanto houver downloads em andamento. A tela ainda pode desligar.</string>
 
   <string name="settings_notifications_downloads">Downloads</string>
   <string name="settings_notifications_footer">“Notificar” usa as notificações do sistema. “Só no app” mostra os avisos dentro do Ketch.</string>
@@ -211,9 +214,7 @@
   <string name="settings_ai_provider_ollama">Ollama · roda localmente, sem chave</string>
   <string name="settings_ai_provider_compatible">Personalizado (compatível com OpenAI)</string>
   <string name="settings_ai_provider_compatible_name">Compatível com OpenAI</string>
-  <string name="settings_ai_hint_openai">Obtenha uma chave em platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Obtenha uma chave em console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Obtenha uma chave em aistudio.google.com/apikey.</string>
+  <string name="settings_ai_hint_key">Obtenha uma chave em %1$s.</string>
   <string name="settings_ai_hint_ollama">Baixe um modelo primeiro: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM e servidores semelhantes.</string>
   <string name="settings_ai_api_key_env">Usando a chave do ambiente. Uma chave aqui tem prioridade.</string>
@@ -234,6 +235,7 @@
   <string name="settings_ai_test_unsupported">A descoberta por IA não está disponível nesta plataforma.</string>
   <string name="settings_ai_test_connection_failed">Falha na conexão.</string>
   <string name="settings_ai_engine_failed">Não foi possível iniciar o mecanismo de descoberta.</string>
+  <string name="settings_ai_models_failed">Não foi possível obter a lista de modelos.</string>
   <string name="settings_ai_search_footer">Sem um provedor de pesquisa, o Descobrir só lê as páginas que você indicar.</string>
   <string name="settings_ai_search_provider">Provedor de pesquisa</string>
   <string name="settings_ai_search_none">Nenhum</string>
@@ -576,6 +578,7 @@
   <string name="settings_search_start_hidden_keywords">inicialização, segundo plano, barra de menus, bandeja, oculto</string>
   <string name="settings_search_badge">O que o ícone no Dock ou na barra de tarefas mostra</string>
   <string name="settings_search_badge_keywords">contador, indicador, selo, dock, barra de tarefas</string>
+  <string name="settings_search_keep_awake_keywords">repouso, suspensão, energia, bateria, impedir repouso, wake lock</string>
   <string name="settings_search_shortcuts">Todos os atalhos de teclado</string>
   <string name="settings_search_shortcuts_keywords">teclas, atalhos, teclado, combinações de teclas</string>
   <string name="settings_search_finished_keywords">concluído, terminado, pronto, alerta, aviso</string>

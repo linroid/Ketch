@@ -118,4 +118,6 @@
   </plurals>
 
   <string name="settings_window_title">設定</string>
+
+  <string name="keep_awake_reason">ダウンロード中</string>
 </resources>

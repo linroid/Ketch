@@ -25,7 +25,7 @@
 
 <p align="center">
 
-[![最新リリース](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![最新リリース](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web アプリ](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
@@ -129,6 +129,9 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   サイドバーのデバイスにドロップしたり、ダウンロードを別のデバイスへ送信・移動したりできます。
 - **NAS やサーバーでヘッドレス実行** — `ketch server` は REST API と Web アプリを内蔵した
   同じエンジンを実行します。アプリからネットワーク上のサーバーを見つけられます。
+- **ターミナルから操作** — `ketch add`・`list`・`pause`・`resume`・`watch` で、Ketch アプリや
+  サーバーのダウンロードをターミナルやスクリプトから操作できます。`watch` は JSON Lines を出力します
+  （[CLI](cli/README.md#work-on-a-running-ketch)）。
 
 ### 帯域幅をコントロール
 
@@ -154,6 +157,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   ファイルを外へドラッグする、といった操作ができます。
 - **各プラットフォームに自然に統合** — デスクトップのメニューバーやトレイ、通知、Dock と
   タスクバーの進捗表示に対応。Android と iOS 26 ではバックグラウンドでもダウンロードを続けます。
+- **ダウンロード中はスリープしない** — デスクトップ版と Android 版は、ダウンロード中にシステムが
+  自動でスリープしないようにします。画面はオフになることがあります（「設定 → 一般」）。
 - **好みの外観と言語** — ライト・ダークテーマと 4 色のアクセントカラーを用意。
   English、简体中文、繁體中文、日本語、한국어、Español、Português (Brasil)、Deutsch、
   Français に対応します（[翻訳への参加](docs/development/localization.md)）。
@@ -167,7 +172,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   Ollama、OpenAI 互換サービスなど、自分のモデルサービスを利用できます。
   デスクトップ、Android、`ketch ai-discover` で使えます（[設定方法](docs/ai-discovery.md)）。
 - **MCP サーバー** — `ketch mcp` を使うと、AI アシスタントが
-  [Model Context Protocol](cli/README.md#mcp-server) を通じてダウンロードを開始・確認・管理できます。
+  [Model Context Protocol](cli/README.md#mcp-server) を通じて Ketch アプリやサーバーのダウンロードを
+  開始・確認・管理できます。
 
 <a id="getting-started"></a>
 
@@ -226,10 +232,8 @@ ketch https://example.com/file.zip
   無制限の再試行にも対応
 - **未完了ファイルを区別** — 一時的な名前で保存し、完了してから正式なファイル名に変更
 - **トレントのファイルをいつでも選択** — マグネットリンクの詳細取得後に選び、ダウンロード中も変更
-- **スリープを防止** — ダウンロード中は PC を起動状態に保ち、完了後のスリープやシャットダウンも選択可能に
+- **ダウンロード完了後の動作** — キューが空になったら Ketch の終了、スリープ、シャットダウンを選択可能に
 - **自動化フック** — 完了時や失敗時にコマンド実行や webhook 呼び出し
-- **実行中のデバイスをコマンドラインで操作** — `ketch` や AI エージェントから、別のエンジンを起動せずに
-  Ketch アプリやサーバーのダウンロードを追加・一覧表示・一時停止・確認
 - **Docker イメージ** — x64 と ARM の NAS・ホームサーバー向け公式イメージ。
   ヘルスチェックと固定トレントポートに対応
 - **デバイス間転送** — 送信・移動時にダウンロード済みデータも渡し、別のデバイスで最初からやり直さずに再開

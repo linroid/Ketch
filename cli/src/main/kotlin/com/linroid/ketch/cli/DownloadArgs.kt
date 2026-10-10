@@ -27,18 +27,56 @@ internal sealed interface DownloadArgs {
   ) : DownloadArgs
 }
 
-private val valueOptions = setOf(
-  "--speed-limit", "--priority", "--max-concurrent", "-H", "--header", "--user-agent", "--referer",
-)
-
 /**
  * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
  * it; apps group and filter downloads by it.
  */
-private const val ORIGIN_PROPERTY = "ketch.origin"
+internal const val ORIGIN_PROPERTY = "ketch.origin"
 
 /** Value of [ORIGIN_PROPERTY] on downloads started from the command line. */
-private const val CLI_ORIGIN = "cli"
+internal const val CLI_ORIGIN = "cli"
+
+/** Options that set a request header: `-H 'Name: value'`, `--user-agent` and `--referer`. */
+internal val HEADER_OPTIONS = setOf("-H", "--header", "--user-agent", "--referer")
+
+/** The request headers [HEADER_OPTIONS] give, in the order given. */
+internal class HeaderOptions {
+  private val headers = LinkedHashMap<String, String>()
+
+  /**
+   * Applies [option], one of [HEADER_OPTIONS], with its [value], returning why it cannot be used
+   * or `null`. Header names ignore case, so a later option replaces an earlier one however it is
+   * spelled.
+   */
+  fun apply(option: String, value: String): String? {
+    when (option) {
+      "-H", "--header" -> {
+        val separator = value.indexOf(':')
+        if (separator <= 0) return "$option expects 'Name: value'"
+        set(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
+      }
+      "--user-agent" -> set("User-Agent", value)
+      "--referer" -> set("Referer", value)
+      else -> return "unknown option '$option'"
+    }
+    return null
+  }
+
+  /** The headers, or why one of them cannot be sent. */
+  fun build(): Result<Map<String, String>> = try {
+    RequestHeaders.requireValid(headers)
+    Result.success(headers.toMap())
+  } catch (e: IllegalArgumentException) {
+    Result.failure(e)
+  }
+
+  private fun set(name: String, value: String) {
+    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
+    headers[name] = value
+  }
+}
+
+private val valueOptions = setOf("--speed-limit", "--priority", "--max-concurrent") + HEADER_OPTIONS
 
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
@@ -47,12 +85,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var speedLimit = SpeedLimit.Unlimited
   var priority = DownloadPriority.NORMAL
   var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
-  val headers = LinkedHashMap<String, String>()
-  // Header names ignore case, so a later option replaces an earlier one however it is spelled.
-  fun setHeader(name: String, value: String) {
-    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
-    headers[name] = value
-  }
+  val headers = HeaderOptions()
 
   var i = 0
   while (i < args.size) {
@@ -76,13 +109,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
               return DownloadArgs.Invalid("--max-concurrent must be > 0")
             }
           }
-          "-H", "--header" -> {
-            val separator = value.indexOf(':')
-            if (separator <= 0) return DownloadArgs.Invalid("$arg expects 'Name: value'")
-            setHeader(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
-          }
-          "--user-agent" -> setHeader("User-Agent", value)
-          "--referer" -> setHeader("Referer", value)
+          else -> headers.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
         }
         i++
       }
@@ -95,18 +122,15 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   }
 
   if (url == null) return DownloadArgs.Invalid("missing <url>")
-  try {
-    RequestHeaders.requireValid(headers)
-  } catch (e: IllegalArgumentException) {
-    return DownloadArgs.Invalid(e.message ?: "invalid header")
-  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
     speedLimit = speedLimit,
     priority = priority,
     maxConcurrent = maxConcurrent,
-    headers = headers,
+    headers = headers.build().getOrElse {
+      return DownloadArgs.Invalid(it.message ?: "invalid header")
+    },
   )
 }
 

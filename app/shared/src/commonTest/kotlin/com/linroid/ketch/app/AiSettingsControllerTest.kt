@@ -3,9 +3,12 @@ package com.linroid.ketch.app
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AiConnectionTest
+import com.linroid.ketch.app.state.AiDiscoverFailure
 import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.AiModelList
 import com.linroid.ketch.app.state.AiSettingsController
+import com.linroid.ketch.app.state.TurnModel
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
@@ -40,9 +43,11 @@ private class FakeFactory(
     platform(settings)
 }
 
-/** Stands in for an API key exported in the environment. */
-private val envToken: (AiSettings) -> AiSettings = {
-  it.copy(llm = it.llm.copy(apiKey = it.llm.apiKey.ifBlank { "sk-env" }))
+/** Stands in for an API key exported in the environment, which fills every blank key. */
+private val envToken: (AiSettings) -> AiSettings = { settings ->
+  settings.copy(
+    providers = settings.entries.map { it.copy(apiKey = it.apiKey.ifBlank { "sk-env" }) },
+  )
 }
 
 private fun usableSettings(apiKey: String = "sk-test") = AiSettings(
@@ -192,7 +197,8 @@ class AiSettingsControllerTest {
       configStore = RecordingConfigStore(),
       factory = FakeFactory(platform = envToken),
     )
-    controller.testConnection(AiSettings(enabled = true))
+    controller.save(AiSettings(enabled = true))
+    controller.testConnection()
     assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
   }
 
@@ -238,7 +244,8 @@ class AiSettingsControllerTest {
   fun testConnectionWorksWhileDiscoveryIsSwitchedOff() = runTest {
     val factory = FakeFactory(usable = { it.llm.isComplete })
     val controller = AiSettingsController(RecordingConfigStore(), factory)
-    controller.testConnection(usableSettings().copy(enabled = false))
+    controller.save(usableSettings().copy(enabled = false))
+    controller.testConnection()
     assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
     // The check must not switch discovery on behind the user's back.
     assertNull(controller.provider)
@@ -251,7 +258,8 @@ class AiSettingsControllerTest {
       configStore = RecordingConfigStore(),
       factory = FakeFactory(provider = { FakeAiProvider(reply = "OK") }),
     )
-    controller.testConnection(usableSettings())
+    controller.save(usableSettings())
+    controller.testConnection()
     assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
   }
 
@@ -265,7 +273,8 @@ class AiSettingsControllerTest {
         },
       ),
     )
-    controller.testConnection(usableSettings())
+    controller.save(usableSettings())
+    controller.testConnection()
     assertEquals(
       AiConnectionTest.Failure(verbatim("401 no key")), controller.connectionTest,
     )
@@ -277,7 +286,8 @@ class AiSettingsControllerTest {
       configStore = RecordingConfigStore(),
       factory = FakeFactory(),
     )
-    controller.testConnection(AiSettings(enabled = true))
+    controller.save(AiSettings(enabled = true))
+    controller.testConnection()
     val result = controller.connectionTest
     assertTrue(result is AiConnectionTest.Failure)
     assertTrue(result.message.load().contains("Fill in"))
@@ -289,7 +299,8 @@ class AiSettingsControllerTest {
       configStore = RecordingConfigStore(),
       factory = FakeFactory(),
     )
-    controller.testConnection(usableSettings())
+    controller.save(usableSettings())
+    controller.testConnection()
     assertTrue(controller.connectionTest is AiConnectionTest.Success)
     controller.save(usableSettings(apiKey = "sk-other"))
     assertEquals(AiConnectionTest.Idle, controller.connectionTest)
@@ -343,26 +354,26 @@ class AiSettingsControllerTest {
   }
 
   @Test
-  fun chooseProvider_newProvider_switchesDiscoveryOnWithItsDefaults() {
-    val store = RecordingConfigStore(
-      KetchConfig(
-        ai = AiSettings(
-          llm = LlmSettings(
-            provider = LlmProvider.OpenAi,
-            apiKey = "sk-test",
-            model = "gpt-custom",
-            baseUrl = "https://proxy.example.com",
-          ),
-        ),
-      ),
+  fun chooseProvider_newProvider_switchesDiscoveryOnAndKeepsTheOtherOne() {
+    val openAi = LlmSettings(
+      provider = LlmProvider.OpenAi,
+      apiKey = "sk-test",
+      model = "gpt-custom",
+      baseUrl = "https://proxy.example.com",
     )
+    val store = RecordingConfigStore(KetchConfig(ai = AiSettings(enabled = false, llm = openAi)))
     val controller = AiSettingsController(store, FakeFactory())
 
     controller.chooseProvider(LlmProvider.Anthropic)
 
     val saved = store.load().ai
     assertTrue(saved.enabled)
-    assertEquals(LlmSettings(provider = LlmProvider.Anthropic, apiKey = "sk-test"), saved.llm)
+    assertEquals(LlmProvider.Anthropic, saved.llm.provider)
+    assertEquals("", saved.llm.apiKey)
+    // Going back finds the key, model and endpoint as they were.
+    controller.chooseProvider(LlmProvider.OpenAi)
+    assertEquals(openAi.copy(id = "openai"), controller.settings.llm)
+    assertEquals(2, controller.settings.providers.size)
   }
 
   @Test
@@ -376,6 +387,89 @@ class AiSettingsControllerTest {
     controller.chooseProvider(LlmProvider.OpenAi)
 
     assertEquals(AiSettings(enabled = true, llm = llm), controller.settings)
+  }
+
+  @Test
+  fun addProvider_keepsTheOneInUseAndItsSearches() {
+    val controller = AiSettingsController(
+      RecordingConfigStore(KetchConfig(ai = usableSettings())),
+      FakeFactory(),
+    )
+    val running = controller.provider
+
+    val id = controller.addProvider(LlmProvider.OpenAi)
+
+    assertEquals("openai-2", id)
+    assertEquals("openai", controller.settings.llm.id)
+    assertSame(running, controller.provider)
+  }
+
+  @Test
+  fun use_otherProviderAndModel_rebuildsTheProviderForTheNextSearch() {
+    val settings = usableSettings()
+      .withEntry(LlmSettings(id = "work", provider = LlmProvider.Mistral, apiKey = "k"))
+    val factory = FakeFactory()
+    val controller = AiSettingsController(RecordingConfigStore(KetchConfig(ai = settings)), factory)
+    val first = controller.provider as FakeAiProvider
+
+    controller.use("work", "mistral-small-latest")
+
+    assertEquals("work", controller.settings.llm.id)
+    assertEquals("mistral-small-latest", controller.settings.llm.effectiveModel)
+    assertEquals(TurnModel("Mistral", "mistral-small-latest"), controller.activeModel)
+    assertTrue(first.closed)
+    assertEquals(2, factory.created.size)
+  }
+
+  @Test
+  fun removeProvider_inUse_handsOverToTheFirstOneLeft() {
+    val settings = usableSettings()
+      .withEntry(LlmSettings(id = "work", provider = LlmProvider.Mistral, apiKey = "k"))
+      .withActive("work")
+    val store = RecordingConfigStore(KetchConfig(ai = settings))
+    val controller = AiSettingsController(store, FakeFactory())
+
+    controller.removeProvider("work")
+
+    assertEquals("openai", store.load().ai.llm.id)
+    assertTrue(controller.available)
+  }
+
+  @Test
+  fun testConnection_providerNotInUse_testsItOnATemporaryEngine() = runTest {
+    val settings = usableSettings()
+      .withEntry(LlmSettings(id = "work", provider = LlmProvider.Mistral, apiKey = "k"))
+    val factory = FakeFactory()
+    val controller = AiSettingsController(RecordingConfigStore(KetchConfig(ai = settings)), factory)
+    val inUse = controller.provider
+
+    controller.testConnection("work")
+
+    assertEquals("work", controller.testedId)
+    assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
+    assertSame(inUse, controller.provider)
+    assertTrue((factory.created.last() as FakeAiProvider).closed)
+    assertEquals("openai", controller.settings.llm.id)
+  }
+
+  @Test
+  fun loadModels_listsThemPerProvider() = runTest {
+    val factory = object : AiDiscoveryProviderFactory {
+      override fun create(settings: AiSettings): AiDiscoveryProvider = FakeAiProvider()
+      override suspend fun listModels(llm: LlmSettings): List<String> {
+        if (llm.apiKey == "bad") throw AiDiscoverFailure("Rejected (HTTP 401)", "Rejected")
+        return listOf("a", "b")
+      }
+    }
+    val settings = usableSettings()
+      .withEntry(LlmSettings(id = "bad", provider = LlmProvider.Mistral, apiKey = "bad"))
+    val controller = AiSettingsController(RecordingConfigStore(KetchConfig(ai = settings)), factory)
+
+    controller.loadModels("openai")
+    controller.loadModels("bad")
+
+    assertEquals(AiModelList.Loaded(listOf("a", "b")), controller.modelLists["openai"])
+    assertEquals(AiModelList.Failed(verbatim("Rejected (HTTP 401)")), controller.modelLists["bad"])
   }
 
   @Test

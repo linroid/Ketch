@@ -154,9 +154,13 @@ internal class NativeHostRegistration(
   companion object {
     /**
      * Chromium ids of the extension allowed to use the host: the one pinned by the `key` in
-     * the extension's manifest. Add the Chrome Web Store and Edge Add-ons ids once published.
+     * the extension's manifest (unpacked installs) and the Chrome Web Store one. Add the Edge
+     * Add-ons id once published.
      */
-    val CHROMIUM_EXTENSION_IDS = listOf("kddcjkhnjcjhekohejnehplbnjclbdbl")
+    val CHROMIUM_EXTENSION_IDS = listOf(
+      "kddcjkhnjcjhekohejnehplbnjclbdbl",
+      "flnjeochbgpaipiofdjmoijaeooemhka",
+    )
 
     /** The add-on id in the Firefox build of the extension. */
     const val FIREFOX_EXTENSION_ID = "ketch@linroid.github.io"

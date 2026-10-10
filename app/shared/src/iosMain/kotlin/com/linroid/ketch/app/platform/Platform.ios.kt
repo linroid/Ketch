@@ -7,3 +7,5 @@ internal actual val successFeedbackSupport: SuccessFeedbackSupport = SuccessFeed
 actual val isMobilePlatform: Boolean = true
 
 internal actual val HorizontalResizePointerIcon: PointerIcon = PointerIcon.Default
+
+internal actual val keepAwakeSupported: Boolean = false

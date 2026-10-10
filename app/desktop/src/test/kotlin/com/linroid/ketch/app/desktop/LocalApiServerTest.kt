@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-class BrowserExtensionServerTest {
+class LocalApiServerTest {
   /** The server never calls the API itself, so any instance will do. */
   private val api = Proxy.newProxyInstance(
     KetchApi::class.java.classLoader,
@@ -20,9 +20,9 @@ class BrowserExtensionServerTest {
   @Test
   fun connect_startsTheServerOnceAndRepliesWithItsAddressAndToken() {
     val tokens = mutableListOf<String>()
-    val server = BrowserExtensionServer { _, token ->
+    val server = LocalApiServer { _, token ->
       tokens += token
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
 
@@ -37,8 +37,8 @@ class BrowserExtensionServerTest {
 
   @Test
   fun connect_beforeTheAppIsReady_waitsForIt() {
-    val server = BrowserExtensionServer { _, token ->
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+    val server = LocalApiServer { _, token ->
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     val reply = Executors.newSingleThreadExecutor().submit<String> { server.connect(5.seconds) }
     Thread.sleep(50)
@@ -49,7 +49,7 @@ class BrowserExtensionServerTest {
 
   @Test
   fun connect_whenTheAppNeverGetsReady_repliesWithAnError() {
-    val server = BrowserExtensionServer { _, _ -> error("Must not start without the app") }
+    val server = LocalApiServer { _, _ -> error("Must not start without the app") }
     assertEquals(
       """{"error":"not_ready","message":"Ketch is still starting"}""",
       server.connect(10.milliseconds),
@@ -59,9 +59,9 @@ class BrowserExtensionServerTest {
   @Test
   fun connect_afterTheServerFailedToStart_triesAgain() {
     var attempts = 0
-    val server = BrowserExtensionServer { _, token ->
+    val server = LocalApiServer { _, token ->
       if (++attempts == 1) throw IllegalStateException("port in use")
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
 
@@ -75,8 +75,8 @@ class BrowserExtensionServerTest {
   @Test
   fun connect_eachTimeTheExtensionConnects_reportsIt() {
     var connections = 0
-    val server = BrowserExtensionServer(onConnect = { connections++ }) { _, token ->
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+    val server = LocalApiServer(onConnect = { connections++ }) { _, token ->
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
 
@@ -87,9 +87,23 @@ class BrowserExtensionServerTest {
   }
 
   @Test
+  fun connect_fromTheCommandLine_repliesWithoutReportingAnExtension() {
+    var connections = 0
+    val server = LocalApiServer(onConnect = { connections++ }) { _, token ->
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
+    }
+    server.attach(api)
+
+    val reply = server.connect(fromExtension = false)
+
+    assertTrue(reply.contains("5123"))
+    assertEquals(0, connections)
+  }
+
+  @Test
   fun connect_reportingTheConnectionFails_stillReplies() {
-    val server = BrowserExtensionServer(onConnect = { error("no processes") }) { _, token ->
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+    val server = LocalApiServer(onConnect = { error("no processes") }) { _, token ->
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
 
@@ -99,7 +113,7 @@ class BrowserExtensionServerTest {
   @Test
   fun connect_whenTheServerFails_reportsNoConnection() {
     var connections = 0
-    val server = BrowserExtensionServer(onConnect = { connections++ }) { _, _ ->
+    val server = LocalApiServer(onConnect = { connections++ }) { _, _ ->
       throw IllegalStateException("port in use")
     }
     server.attach(api)
@@ -112,8 +126,8 @@ class BrowserExtensionServerTest {
   @Test
   fun close_stopsTheServer() {
     var stopped = false
-    val server = BrowserExtensionServer { _, token ->
-      BrowserExtensionServer.Started(port = 5123, token = token, stop = { stopped = true })
+    val server = LocalApiServer { _, token ->
+      LocalApiServer.Started(port = 5123, token = token, stop = { stopped = true })
     }
     server.attach(api)
     server.connect()

@@ -34,12 +34,18 @@ import java.io.OutputStream
  * val mcp = KetchMcpServer(ketch)
  * mcp.startStdio()  // suspends until the client closes stdin
  * ```
+ *
+ * @param connect returns the instance a tool call works on, asked on every call (see
+ *   [KetchToolSet]); what it throws fails that call with its message.
  */
 class KetchMcpServer(
-  private val ketch: KetchApi,
+  connect: suspend () -> KetchApi,
 ) {
+  /** A server whose tools always work on [ketch]. */
+  constructor(ketch: KetchApi) : this({ ketch })
+
   private val toolRegistry = ToolRegistry {
-    tools(KetchToolSet(ketch).tools())
+    tools(KetchToolSet(connect).tools())
   }
 
   /**

@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">进行中的下载</string>
   <string name="settings_general_badge_failures">仅失败</string>
   <string name="settings_general_badge_off">不显示</string>
+  <string name="settings_general_power">电源</string>
+  <string name="settings_general_keep_awake">下载时保持唤醒</string>
+  <string name="settings_general_keep_awake_hint">下载进行时，%1$s不会自动进入睡眠。屏幕仍可关闭。</string>
 
   <string name="settings_notifications_downloads">下载</string>
   <string name="settings_notifications_footer">“通知”使用系统通知。“仅在应用内”只在 Ketch 中显示。</string>
@@ -207,9 +210,7 @@
   <string name="settings_ai_provider_ollama">Ollama · 本地运行，无需密钥</string>
   <string name="settings_ai_provider_compatible">自定义（OpenAI 兼容）</string>
   <string name="settings_ai_provider_compatible_name">OpenAI 兼容</string>
-  <string name="settings_ai_hint_openai">在 platform.openai.com 获取密钥。</string>
-  <string name="settings_ai_hint_anthropic">在 console.anthropic.com 获取密钥。</string>
-  <string name="settings_ai_hint_gemini">在 aistudio.google.com/apikey 获取密钥。</string>
+  <string name="settings_ai_hint_key">在 %1$s 获取密钥。</string>
   <string name="settings_ai_hint_ollama">请先下载模型：ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter、DeepSeek、LM Studio、vLLM 等类似服务器。</string>
   <string name="settings_ai_api_key_env">正在使用环境变量中的密钥。在此填写的密钥会覆盖它。</string>
@@ -230,6 +231,7 @@
   <string name="settings_ai_test_unsupported">此平台不支持 AI 搜索。</string>
   <string name="settings_ai_test_connection_failed">连接失败。</string>
   <string name="settings_ai_engine_failed">无法启动搜索引擎。</string>
+  <string name="settings_ai_models_failed">无法获取模型列表。</string>
   <string name="settings_ai_search_footer">没有搜索服务时，“搜索”只会读取你提供的网页。</string>
   <string name="settings_ai_search_provider">搜索服务</string>
   <string name="settings_ai_search_none">无</string>
@@ -561,6 +563,7 @@
   <string name="settings_search_start_hidden_keywords">开机启动, 后台, 菜单栏, 托盘, 静默启动</string>
   <string name="settings_search_badge">程序坞或任务栏图标显示的内容</string>
   <string name="settings_search_badge_keywords">数字, 角标, 程序坞, dock, 任务栏</string>
+  <string name="settings_search_keep_awake_keywords">睡眠, 休眠, 电源, 电池, 防止睡眠, 唤醒锁</string>
   <string name="settings_search_shortcuts">所有键盘快捷键</string>
   <string name="settings_search_shortcuts_keywords">按键, 快捷键, 热键, 键位</string>
   <string name="settings_search_finished_keywords">完成, 下载完成, 提醒</string>

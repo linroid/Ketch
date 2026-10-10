@@ -126,6 +126,13 @@ interface SearchTarget {
   /** Current state of the task. */
   val state: DownloadState
 
+  /**
+   * Whether the task is queued but already holds a slot, which [state] alone does not tell; see
+   * [com.linroid.ketch.app.state.isStarting].
+   */
+  val isStarting: Boolean
+    get() = false
+
   /** Queue priority of the task. */
   val priority: DownloadPriority
 
@@ -172,11 +179,11 @@ enum class SearchStatus(val id: String) {
 
   /** Whether [target] has this status. Status words use the [StatusFilter] definitions. */
   fun matches(target: SearchTarget): Boolean = when (this) {
-    Downloading -> StatusFilter.Downloading.matches(target.state)
-    Waiting -> StatusFilter.Waiting.matches(target.state)
-    Paused -> StatusFilter.Paused.matches(target.state)
-    Done -> StatusFilter.Done.matches(target.state)
-    Failed -> StatusFilter.Failed.matches(target.state)
+    Downloading -> StatusFilter.Downloading.matches(target)
+    Waiting -> StatusFilter.Waiting.matches(target)
+    Paused -> StatusFilter.Paused.matches(target)
+    Done -> StatusFilter.Done.matches(target)
+    Failed -> StatusFilter.Failed.matches(target)
     Scheduled -> target.state is DownloadState.Scheduled
     Urgent -> target.priority == DownloadPriority.URGENT
     Stalled -> target.isStalled

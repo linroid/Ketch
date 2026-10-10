@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
@@ -147,6 +148,34 @@ class SortAndGroupTest {
     assertEquals(listOf("Waiting", "Paused"), groups.map { it.title }.load())
     assertEquals(listOf("preempted", "queued"), groups[0].ids())
     assertEquals(listOf("paused"), groups[1].ids())
+  }
+
+  @Test
+  fun smart_startingTask_inDownloadingGroupAfterRunningOnes() = runTest {
+    val rows = listOf(
+      row("starting", DownloadState.Queued, features = KetchFeatures.ALL),
+      row("queued", DownloadState.Queued, queuePosition = 1, features = KetchFeatures.ALL),
+      row("running", downloading(10))
+    )
+
+    val groups = arrangeRows(rows, ListArrangement(), START, utc)
+
+    assertEquals(listOf("Downloading", "Waiting"), groups.map { it.title }.load())
+    assertEquals(listOf("running", "starting"), groups[0].ids())
+    assertEquals(listOf("queued"), groups[1].ids())
+  }
+
+  @Test
+  fun groupByStatus_startingTask_isDownloading() = runTest {
+    val rows = listOf(
+      row("starting", DownloadState.Queued, features = KetchFeatures.ALL),
+      row("queued", DownloadState.Queued, queuePosition = 1, features = KetchFeatures.ALL)
+    )
+
+    val groups = arrangeRows(rows, ListArrangement(group = GroupBy.Status), START, utc)
+
+    assertEquals(listOf("Downloading", "Waiting"), groups.map { it.title }.load())
+    assertEquals(listOf("starting"), groups[0].ids())
   }
 
   @Test

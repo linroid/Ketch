@@ -27,15 +27,16 @@ page's own setup links there too. It holds:
 | Content filter | On by default; see [the content filter](#the-content-filter). |
 | Before opening a website | **Allow automatically**, **Ask for each new site** (the default) or **Ask every time**; see [page access](#page-access). |
 | Always allowed | Sites Discover opens without asking, each with its subdomains. Type one or more, such as `ubuntu.com`, separated by commas or spaces, and press **Add**; a pasted URL is reduced to its domain. Each site shows as a chip whose ✕ removes it, and **Always allow** on a question adds one. |
-| Provider | OpenAI, Anthropic, Google Gemini, Ollama, or any OpenAI-compatible endpoint. |
-| API key | Required for everything except Ollama. |
-| Model | Blank uses the provider default (see below). |
+| Provider | The provider Discover uses: one of the [presets](#providers), or any OpenAI-compatible endpoint. Each provider keeps its own key, model and endpoint, so switching back to one finds them as they were. |
+| API key | Required for everything except Ollama and LM Studio. Under the provider, a hint says where to create one. |
+| Model | Blank uses the provider default (see below). The buttons under it hold the provider's suggestions and the models you entered; a typed id is added to them. |
 | Endpoint | Blank uses the provider default; required for OpenAI-compatible. |
 | Web search | None, Brave, or Google Programmable Search, plus credentials. |
 
 Changes are saved as you make them — there is no Save button. A change
-to the provider, key, model, endpoint or web search rebuilds the
-discovery engine in place, without restarting the app. Page access
+to the provider in use, its key, model or endpoint, or web search rebuilds the
+discovery engine in place, without restarting the app; searches that run
+finish with the provider and model they started with. Page access
 and content filter changes keep the engine: searches that are running
 carry on under the new rules, and questions waiting for an answer that
 the change covers are answered by it; the next search filters by the new
@@ -43,22 +44,58 @@ setting. **Test** sends a one-line prompt to the provider
 with the saved settings, so a wrong key or model shows up immediately
 instead of on the first search.
 
+Several providers can be saved at once, each with its own name, key,
+endpoint and models, and more than one of the same kind, such as a
+personal and a work OpenAI key, or two OpenAI-compatible servers; one of
+them is in use. `config.toml` holds them as `[[ai.providers]]` (see
+[config.toml](#configtoml)), and `ketch ai-discover --provider` picks one
+for a run. A config written by an earlier version, with one provider
+under `[ai.llm]`, loads as one saved provider in use, with nothing to
+enter again.
+
 The token is stored in plain text in the app's config file, the same way
 the server's `apiToken` is. On a shared machine, prefer an environment
 variable (below) over saving the token.
 
 ## Providers
 
-Defaults and the suggestion chips under the model field track each
-provider's current recommended model (checked September 2026):
+Ketch has presets for these providers. The default model is the first
+suggestion; the suggestions track each provider's current models that
+call tools (checked October 2026). Where a provider has sites in several
+regions, the first endpoint is the default and the others can be entered
+under **Endpoint**:
 
-| Provider | Default model | Other suggestions | Default endpoint | Token |
-|----------|---------------|-------------------|------------------|-------|
-| OpenAI | `gpt-5.6-terra` | `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-luna` | `https://api.openai.com` | required |
-| Anthropic | `claude-opus-5` | `claude-sonnet-5`, `claude-haiku-4-5` | `https://api.anthropic.com` | required |
-| Google Gemini | `gemini-3.8-flash` | `gemini-3.7-flash`, `gemini-3.5-flash-lite` | `https://generativelanguage.googleapis.com` | required |
-| Ollama | `qwen3` | `llama3.1:8b`, `gemma4` | `http://localhost:11434` | not used |
-| OpenAI-compatible | — (required) | — | — (required) | required |
+| Provider | `provider` | Models (default first) | Endpoint | Key |
+|----------|------------|------------------------|----------|-----|
+| OpenAI | `openai` | `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-luna` | `https://api.openai.com` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic` | `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1` | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
+| Google Gemini | `google` | `gemini-3.8-flash`, `gemini-3.1-pro-preview`, `gemini-3.6-flash`, `gemini-3.5-flash-lite` | `https://generativelanguage.googleapis.com` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
+| OpenRouter | `openrouter` | `anthropic/claude-sonnet-5.5`, `openai/gpt-6.1-sol`, `google/gemini-3.8-flash`, `moonshotai/kimi-k3` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
+| DeepSeek | `deepseek` | `deepseek-flash`, `deepseek-v4-pro` | `https://api.deepseek.com/chat/completions` | `DEEPSEEK_API_KEY` |
+| xAI | `xai` | `grok-4.7`, `grok-4.6`, `grok-4.3` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| Mistral | `mistral` | `mistral-medium-latest`, `mistral-large-latest`, `mistral-small-latest` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| Groq | `groq` | `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`, `minimaxai/minimax-m2.7`, `openai/gpt-oss-20b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| Together AI | `together` | `moonshotai/Kimi-K3`, `zai-org/GLM-5.3`, `MiniMaxAI/MiniMax-M3`, `zai-org/GLM-5.3-Flash` | `https://api.together.ai/v1` | `TOGETHER_API_KEY` |
+| Fireworks AI | `fireworks` | `accounts/fireworks/models/kimi-k3`, `…/glm-5p3`, `…/deepseek-v4p1-flash`, `…/minimax-m3` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| Zhipu AI | `zhipu` | `glm-5.3`, `glm-5.2`, `glm-4.7`, `glm-4.7-flash` | `https://open.bigmodel.cn/api/paas/v4`, `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY`, `ZHIPUAI_API_KEY` |
+| Moonshot AI | `moonshot` | `kimi-k3`, `kimi-k2.6`, `kimi-k2.7-code` | `https://api.moonshot.cn/v1`, `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| Alibaba Model Studio | `qwen` | — (required) | `https://dashscope.aliyuncs.com/compatible-mode/v1`, `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `DASHSCOPE_API_KEY` |
+| Volcengine Ark | `doubao` | — (required) | `https://ark.cn-beijing.volces.com/api/v3` | `ARK_API_KEY` |
+| SiliconFlow | `siliconflow` | — (required) | `https://api.siliconflow.cn/v1`, `https://api.siliconflow.com/v1` | `SILICONFLOW_API_KEY` |
+| MiniMax | `minimax` | `MiniMax-M3`, `MiniMax-M2.7`, `MiniMax-M2.7-highspeed` | `https://api.minimax.cn/v1`, `https://api.minimax.io/v1` | `MINIMAX_API_KEY` |
+| Ollama | `ollama` | `qwen3`, `qwen3.6`, `gpt-oss`, `gemma4`, `llama3.1:8b` | `http://localhost:11434` | not used |
+| LM Studio | `lmstudio` | — (required) | `http://localhost:1234/v1` | not used |
+| OpenAI-compatible | `openai-compatible` | — (required) | — (required) | `OPENAI_API_KEY` |
+
+A provider id this version does not know, such as one a later version
+added, loads as `openai-compatible` with the rest of its settings.
+
+Every preset but OpenAI's, Anthropic's, Gemini's and Ollama's speaks
+OpenAI's chat completions API. The endpoints and the models above come
+from each provider's documentation; they have not all been tried with a
+real key yet. Alibaba Model Studio, Volcengine Ark, SiliconFlow and LM
+Studio suggest no model: enter the id of one that can call tools, as the
+provider's console lists it.
 
 The model field is free text: any id your provider accepts works, so a
 model released after this table does too. Ids that Koog ships in its
@@ -76,8 +113,8 @@ Two details Ketch handles for you:
   newest) reject a `temperature`, so discovery only sends one to models
   that advertise support for it.
 
-**OpenAI-compatible** covers OpenRouter, DeepSeek, LM Studio, vLLM and
-similar servers, as well as Gemini's OpenAI-compatible endpoint. Enter
+**OpenAI-compatible** covers any other server that speaks OpenAI's API,
+such as vLLM or LiteLLM, as well as Gemini's OpenAI-compatible endpoint. Enter
 the endpoint as the provider documents it, as you would for OpenAI's
 SDKs:
 
@@ -86,8 +123,7 @@ SDKs:
   `https://open.bigmodel.cn/api/paas/v4` or
   `https://generativelanguage.googleapis.com/v1beta/openai`.
 - An endpoint without one is the server's root, which
-  `v1/chat/completions` follows: `https://api.deepseek.com` or
-  `http://localhost:1234`.
+  `v1/chat/completions` follows: `http://localhost:8000`.
 - A full URL ending in `/chat/completions` is used as it is.
 
 ## Web search
@@ -352,25 +388,30 @@ keeps tokens out of the config file and makes CI and CLI use easy:
 | `OPENAI_API_KEY` | OpenAI and OpenAI-compatible providers |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | Google Gemini |
+| The **Key** column of [the presets](#providers) | Every other preset, such as `DEEPSEEK_API_KEY` |
 | `BRAVE_SEARCH_API_KEY` | Brave web search |
 | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Google web search |
 
 Rules:
 
 - A token saved in the settings always wins; the environment only fills
-  blanks.
+  blanks, of every saved provider, each from its own provider's variable.
 - **In the apps, the Enable switch decides.** Discovery is on by
   default, so an exported key for the chosen provider is all it needs;
   once you switch it off, a key never switches it back on. The
-  environment never picks a provider in the apps: an `ANTHROPIC_API_KEY`
-  alone does nothing while the settings name OpenAI.
+  environment never adds a provider in the apps: an `ANTHROPIC_API_KEY`
+  alone does nothing while no Anthropic provider is saved.
 - **Web search follows the same rule.** Once you pick Brave or Google, a
   blank key (and Google's engine id) is filled from that provider's
   variables; saved values are kept and your choice is never switched to
   another provider.
-- **In the CLI**, untouched `[ai]` settings plus any provider key select
-  that provider (LLM and web search) — the "export a key and go" path. Once anything is
-  configured, the environment only fills blank credentials there too.
+- **In the CLI**, untouched `[ai]` settings plus provider keys add a
+  provider for each key, the first in the order of [the presets](#providers)
+  in use, and pick the web search provider — the "export a key and go" path;
+  `--provider` picks another. Once anything is configured, the environment
+  only fills blank credentials there too, and `--provider` with a preset
+  that is not saved, such as `--provider deepseek`, takes its key from the
+  environment.
   Page access does not count: settings that differ only in `[ai.access]`
   are still untouched.
 
@@ -391,13 +432,22 @@ reporting that nothing was found.
 ```toml
 [ai]
 enabled = true
+active = "work"
 contentFilter = true
 
-[ai.llm]
+[[ai.providers]]
+id = "openai"
+provider = "openai"
+apiKey = "sk-..."
+
+[[ai.providers]]
+id = "work"
+name = "Work"
 provider = "openai-compatible"
 apiKey = "sk-..."
+baseUrl = "https://llm.example.com/v1"
 model = "llama-3.3-70b"
-baseUrl = "https://openrouter.ai/api/v1"
+models = ["llama-3.3-70b", "qwen3-32b"]
 
 [ai.search]
 provider = "google"
@@ -409,8 +459,14 @@ mode = "ask-site"
 trustedSites = ["ubuntu.com", "blender.org"]
 ```
 
-Provider values are `openai`, `anthropic`, `google`, `ollama`,
-`openai-compatible`; search providers are `none`, `brave`, `google`;
+Each `[[ai.providers]]` entry has an `id` unique among them, an optional
+`name` (blank uses the provider's), the `provider` (the ids in
+[the presets](#providers)), `apiKey`, `baseUrl` and `model` (blank use the
+provider's), and `models`, the ids you added. `active` names the one in
+use; the first is used when none has that id. Entries without an id, or
+with one another entry has, get one when the file loads. A config with
+`[ai.llm]` instead, written by an earlier version, loads as one entry in
+use. Search providers are `none`, `brave`, `google`;
 page access modes are `allow`, `ask-site` (the default) and `ask`, and
 an unknown mode loads as `ask-site`. `trustedSites` holds bare domains,
 each covering its subdomains; an entry written another way, such as
@@ -622,6 +678,9 @@ you discarded and a note of the sites you allowed or denied. Links in
 the steps are redacted as in the logs (passwords and token-like query
 values masked); result links are kept as they are, so you can still add
 them.
+Each turn also keeps the provider and model it searched with: the ones in
+use when it started, since choosing another applies to the next turn.
+
 A failed turn keeps only the short explanation, such as *The AI provider
 rejected the API token (HTTP 401)*, never the provider's reply, which may
 echo a key. Page access answers themselves are not saved, so a chat
@@ -695,6 +754,12 @@ Allow Discover to open www.blender.org? https://www.blender.org/download/
 It follows `contentFilter` under `[ai]` too; `--no-filter` turns
 [the filter](#the-content-filter) off for the run. When it hid results, a
 note on stderr says how many.
+
+`--provider <name>` searches with a saved provider, by its `id` or its
+name, or with a preset such as `deepseek`: the first saved one of that
+kind, or one whose key comes from the environment. `--model <id>` calls
+that model. Both apply to the run only. An unknown name exits with
+status 2 and lists the saved providers and the presets.
 
 Answers last for the run; the CLI never writes `config.toml`. It asks on
 the controlling terminal (`/dev/tty`), so the questions still reach you
