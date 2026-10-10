@@ -126,6 +126,24 @@ class SettingsSnapshots {
   }
 
   @Test
+  fun downloadsPage_categoryFolders_listsSuggestedAndOpensOne() {
+    for (theme in SnapshotTheme.entries) {
+      windowSnapshot(
+        name = "settings-downloads-categories",
+        size = TallWindowSize,
+        theme = theme,
+        target = SettingsTarget(SettingsTarget.Page.Downloads),
+        interact = {
+          clickOnText("Use suggested")
+          settle()
+          clickOnText("Video")
+          settle()
+        },
+      )
+    }
+  }
+
+  @Test
   fun settingsWindow_genericOpen_reopensTheLastPage() {
     windowSnapshot(
       name = "settings-resume",
@@ -256,6 +274,9 @@ class SettingsSnapshots {
   private companion object {
     /** The Settings window's size until the user resizes it. */
     val WindowSize = SnapshotSize(860.dp, 640.dp, KetchDensity.Compact)
+
+    /** The Settings window stretched to show a whole page. */
+    val TallWindowSize = SnapshotSize(860.dp, 1400.dp, KetchDensity.Compact)
 
     /** The smallest the Settings window gets. */
     val MinWindowSize = SnapshotSize(640.dp, 480.dp, KetchDensity.Compact)

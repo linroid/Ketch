@@ -480,6 +480,16 @@ maxConnectionsPerHost = 16
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# Category folders: a download that does not choose a folder is saved in the
+# folder of the first category it matches, inside defaultDirectory.
+# [[download.categories]]
+# folder = "Video"
+# extensions = ["mp4", "mkv", "webm"]
+# mimeTypes = ["video/*"]
+# [[download.categories]]
+# folder = "Software/GitHub"
+# hosts = ["github.com"]
+
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.
@@ -536,6 +546,25 @@ maxConnectionsPerHost = 16
 A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
 `saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
 be negative.
+
+#### `[[download.categories]]`
+
+Category folders sort the downloads that do not choose a folder (the server's clients send no
+destination, or only a file name, as the browser extension does) into folders inside
+`defaultDirectory`. Each `[[download.categories]]` table is one category; a download goes to
+the first one it matches, and stays in `defaultDirectory` when it matches none.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `folder` | string | *(required)* | Folder inside `defaultDirectory`, such as `"Video"`; `/` nests folders. Absolute paths and `..` fail to load |
+| `extensions` | string[] | `[]` | File name extensions, such as `"mp4"` or `"tar.gz"` |
+| `mimeTypes` | string[] | `[]` | Media types the server reports, such as `"application/pdf"`, or `"video/*"` for a whole kind |
+| `hosts` | string[] | `[]` | Sites, such as `"github.com"`, which also covers its subdomains |
+
+A download matches when its extension or media type is listed (either is enough; with neither
+list set, any type matches) and, when `hosts` is set, it comes from one of them. A category
+without any rule matches nothing. The apps also edit them under Settings → Downloads; on a
+server, like the other download settings changed there, they last until it restarts.
 
 #### `[torrent]`
 

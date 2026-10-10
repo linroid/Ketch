@@ -1,5 +1,7 @@
 package com.linroid.ketch.config
 
+import com.linroid.ketch.api.DownloadCategory
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.SpeedLimit
 import kotlin.test.Test
@@ -68,6 +70,68 @@ class AppSectionsConfigTest {
       ),
       decoded.speed,
     )
+  }
+
+  @Test
+  fun decode_handWrittenCategories_readsRulesInOrder() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[download]
+      |maxConcurrentDownloads = 3
+      |
+      |[[download.categories]]
+      |folder = "Video"
+      |extensions = ["mp4", "mkv"]
+      |mimeTypes = ["video/*"]
+      |
+      |[[download.categories]]
+      |folder = "Software/GitHub"
+      |hosts = ["github.com"]
+      """.trimMargin(),
+    )
+    assertEquals(
+      listOf(
+        DownloadCategory(
+          folder = "Video",
+          extensions = listOf("mp4", "mkv"),
+          mimeTypes = listOf("video/*"),
+        ),
+        DownloadCategory(folder = "Software/GitHub", hosts = listOf("github.com")),
+      ),
+      decoded.download.categories,
+    )
+    assertEquals(3, decoded.download.maxConcurrentDownloads)
+  }
+
+  @Test
+  fun encode_categories_roundTrips() {
+    val config = KetchConfig(
+      download = DownloadConfig(
+        categories = listOf(
+          DownloadCategory(folder = "Music", extensions = listOf("mp3", "flac")),
+          DownloadCategory(folder = "Docs", mimeTypes = listOf("application/pdf")),
+          DownloadCategory(folder = "Mirror", hosts = listOf("mirror.example.org")),
+        ),
+      ),
+    )
+    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), config)
+    val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals(config, decoded, encoded)
+  }
+
+  @Test
+  fun decode_categoryFolderLeavingDownloadFolder_fails() {
+    assertFailsWith<IllegalArgumentException> {
+      ConfigStore.toml.decodeFromString(
+        KetchConfig.serializer(),
+        """
+        |[[download.categories]]
+        |folder = "../Escape"
+        |extensions = ["exe"]
+        """.trimMargin(),
+      )
+    }
   }
 
   @Test

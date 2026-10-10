@@ -237,6 +237,7 @@ DownloadConfig(
   speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
   maxConcurrentDownloads = 4,     // max simultaneous downloads (0 = unlimited)
   maxConnectionsPerHost = 16,     // max simultaneous downloads per host (0 = unlimited)
+  categories = emptyList(),       // folders inside defaultDirectory, by type or site
 )
 ```
 
@@ -264,6 +265,45 @@ single connection is used. BitTorrent treats a per-task connection count as its 
 A count of 0 (Auto) uses the configured default of the run: `maxConnectionsPerDownload`, or a
 torrent's own peer limit; `setConnections(0)` returns a running task to it.
 `bufferSize` sets the FTP read buffer; HTTP buffering is up to the `HttpEngine`.
+
+### Category folders
+
+`categories` sorts the downloads that do not choose a folder into folders inside
+`defaultDirectory`. A request whose `destination` is `null` or a bare file name is saved in the
+`folder` of the first `DownloadCategory` it matches, and in `defaultDirectory` when it matches
+none; a destination naming a folder or a full path is used as it is. Matching happens when a
+download starts, against the name it is saved under, the `Content-Type` the server reported
+(`ResolvedSource.contentType`) and the host of the request URL:
+
+```kotlin
+DownloadConfig(
+  categories = listOf(
+    DownloadCategory(
+      folder = "Video",
+      extensions = listOf("mp4", "mkv"),
+      mimeTypes = listOf("video/*"),
+    ),
+    DownloadCategory(folder = "Software/GitHub", hosts = listOf("github.com")),
+  ),
+)
+```
+
+- A category matches when the file's type matches (its name ends with one of `extensions`, such
+  as `tar.gz`, or its media type is one of `mimeTypes`, where `video/*` covers a whole kind) and,
+  when `hosts` is set, its host is one of them or a subdomain of one. Rules ignore case.
+- A category with no rules matches nothing. Order matters: the first match wins.
+- `folder` is relative to `defaultDirectory`, `/` separating nested folders; an absolute folder,
+  a drive or `..` is rejected with `IllegalArgumentException`. Each folder name is made safe like
+  a server's file name, and folders are created as the download starts, including inside an
+  Android `content://` tree.
+- Magnet links have no host, and a torrent matches by its name, which for a torrent of several
+  files is usually a folder name without an extension.
+- `DownloadConfig.categoryFor(fileName, contentType, host)` tells which category a download
+  would go to, as the apps' add sheet shows it. Instances that support category folders list
+  `KetchFeatures.CATEGORY_FOLDERS` in `status().features`.
+- `RemoteKetch.updateConfig` sends the categories to the server. A `PUT /api/config` body
+  without a `categories` field, as clients older than category folders send it, keeps the
+  server's categories rather than clearing them.
 
 ### Priority & Scheduling
 

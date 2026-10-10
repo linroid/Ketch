@@ -43,6 +43,10 @@ import kotlinx.serialization.Serializable
  *   network host, such as HTTP(S) and FTP(S). Magnet links, `torrent:` identifiers and local
  *   files are not counted; a torrent added from an HTTP(S) `.torrent` URL counts against that
  *   URL's host. `0` means unlimited. Runtime changes behave like [maxConcurrentDownloads].
+ * @property categories folders under [defaultDirectory] that downloads not choosing a folder
+ *   are sorted into, by file extension, media type or site; the first category a download
+ *   matches wins, and one that matches none stays in [defaultDirectory]. Empty by default, so
+ *   every such download is saved in [defaultDirectory]. See [DownloadCategory].
  */
 @Serializable
 data class DownloadConfig(
@@ -56,6 +60,7 @@ data class DownloadConfig(
   val maxConcurrentDownloads: Int = 4,
   val maxConnectionsPerDownload: Int = 4,
   val maxConnectionsPerHost: Int = 16,
+  val categories: List<DownloadCategory> = emptyList(),
 ) {
   init {
     require(retryCount >= 0) { "retryCount must be non-negative" }

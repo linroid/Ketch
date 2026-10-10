@@ -209,6 +209,7 @@
   <string name="intake_save_to">Enregistrer dans</string>
   <string name="intake_folder_downloads">Téléchargements</string>
   <string name="intake_default_folder">Dossier par défaut</string>
+  <string name="intake_category_folder">Rangé dans %1$s</string>
   <string name="intake_recent">Récents</string>
   <string name="intake_pinned">Épinglés</string>
   <string name="intake_unpin">Désépingler %1$s</string>

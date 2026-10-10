@@ -147,7 +147,9 @@ Turn off **Capture browser downloads** in the popup to leave downloads to the br
 Magnet capture has its own switch in settings.
 
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
-the file name in Ketch's download folder; Ketch picks a free name if it is taken.
+the file name in Ketch's download folder, or in the category folder there that the receiving
+device sorts it into by type or site (Settings → Downloads in the app); Ketch picks a free name
+if it is taken.
 
 ## Page resources
 

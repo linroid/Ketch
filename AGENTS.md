@@ -62,7 +62,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `library:api` (public API)
 - `com.linroid.ketch.api` -- `KetchApi` (`VERSION`/`REVISION` constants), `DownloadTask`,
-  `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `Destination`,
+  `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `DownloadCategory`,
+  `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
   `ResolvedSource`, `SourceFile`, `FileSelectionMode`
@@ -202,6 +203,16 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   deduplication also avoids files other downloads have not created yet
 - `DownloadTask.outputPath` reports where a task saves once the download chose it (core tasks;
   `null` from remote ones)
+- Category folders: a request whose destination is `null` or a bare name is saved in the folder,
+  inside the default directory, of the first of `DownloadConfig.categories` it matches
+  (`DownloadCategory`: `extensions` or `mimeTypes`, either enough, and `hosts` with subdomains
+  when set; no rules matches nothing), checked in `DownloadExecution` when a download starts
+  against the saved name, `ResolvedSource.contentType` (HTTP `Content-Type`, from
+  `ServerInfo.contentType`) and the request host. Folder names pass through
+  `sanitizeFileName()`; absolute folders, drives and `..` fail in `DownloadCategory`'s `init`.
+  `resolveChildFolder` finds or creates them in an Android `content://` tree. Listed as
+  `KetchFeatures.CATEGORY_FOLDERS`; `DownloadConfig.categoryFor` is the matcher the apps preview
+  with
 - File integrity check on resume (validates local file size vs. claimed progress)
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
@@ -433,6 +444,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
   open at login, Dock badge, daily update checks; `NotificationSettings` and
   `IntegrationSettings` (magnet and `.torrent` handlers)
+- `[[download.categories]]` tables hold `DownloadConfig.categories` (`folder`, `extensions`,
+  `mimeTypes`, `hosts`), edited in Settings → Downloads (`ui/settings/CategorySettings.kt`, with
+  `SuggestedCategory` presets named in the app's language and the field parsing in
+  `state/CategoryRules.kt`) for any device listing the feature; the add sheet's Save to pill
+  shows the category folder a single link goes to (`IntakeSession.categoryFolder`)
 - Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
   Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
   BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
@@ -579,6 +595,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `deleteFiles=true` (checked against `DownloadTask.outputPath`); anything else is 403
   `path_rejected`. With a token and no list, callers may save anywhere, as the apps let owners
   type any folder on a remote device
+- `PUT /api/config` keeps the server's `categories` when the body has no `categories` field, as
+  clients older than category folders send it
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
   `POST /api/tasks`, 16 MiB for uploaded content, 4 KiB for pairing; longer is 413
   `payload_too_large`
@@ -852,32 +870,29 @@ Planned features not yet implemented:
     renamed to the final, deduplicated name after the last flush, never replacing a file that
     appeared meanwhile. Today they write to the final name, preallocated to full size, so an
     unfinished file looks complete
-11. **Category folders** - Rules (by extension, MIME type or host) choose the folder under the
-    default directory for downloads without an explicit destination, applied in the engine so
-    every client, the server and the browser extension get them
-12. **Torrent file selection after adding** - A magnet added without a selection can wait, with
+11. **Torrent file selection after adding** - A magnet added without a selection can wait, with
     its metadata, until files are chosen, and a running torrent's selection can change, through
     `KetchApi`, the REST API and MCP. Today a selection can only be given up front
     (`DownloadRequest.selectedFileIds`, after a resolve), and a magnet added without one, as the
     extension, CLI and MCP always do, downloads every file
-13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
+12. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
     on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
     `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
     quit, sleep or shut down once the queue is empty
-14. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+13. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-15. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
+14. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
     and `ketch mcp` attach through `RemoteKetch` to the running desktop app or a server instead
     of opening `ketch.db` with a second engine, and an idempotency key keeps retried submissions
     from creating duplicates. Today `ketch mcp` and `ketch server` can open the desktop app's
     `ketch.db` while it runs, and both engines resume the same tasks
-16. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
+15. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
     workflow, with an unauthenticated readiness endpoint that answers once saved tasks are
     restored, configuration through environment variables, and a fixed, configurable BitTorrent
     listen port (today the OS picks one on every launch)
-17. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+16. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-18. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+17. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
     [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 8

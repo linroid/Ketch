@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -193,4 +194,44 @@ class ServerRoutesTest {
       assertTrue(missing in error.message)
       assertEquals(DownloadConfig.Default, ketch.status().config)
     }
+
+  @Test
+  fun `PUT config without categories keeps the categories set`() = testApplication {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // As a client older than category folders sends it.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"maxConcurrentDownloads": 2}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    val config = ketch.status().config
+    assertEquals(2, config.maxConcurrentDownloads)
+    assertEquals(listOf(video), config.categories)
+  }
+
+  @Test
+  fun `PUT config with categories replaces them`() = testApplication {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(DownloadConfig(categories = emptyList()))
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(emptyList(), ketch.status().config.categories)
+  }
 }

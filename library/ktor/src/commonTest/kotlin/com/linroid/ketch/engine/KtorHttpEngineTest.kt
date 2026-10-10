@@ -375,6 +375,17 @@ class KtorHttpEngineTest {
   }
 
   @Test
+  fun head_contentType_reportedForCategoryFolders() = runTest {
+    val headers = headersOf(
+      HttpHeaders.ContentLength to listOf("8"),
+      HttpHeaders.ContentType to listOf("video/mp4; codecs=avc1"),
+    )
+    withServer({ respond("", HttpStatusCode.OK, headers) }) { engine, _ ->
+      assertEquals("video/mp4; codecs=avc1", engine.head(URL, emptyMap()).contentType)
+    }
+  }
+
+  @Test
   fun probe_partialContent_readsTotalLengthFromContentRange() = runTest {
     val headers = headersOf(
       HttpHeaders.ContentRange to listOf("bytes 0-0/1234"),

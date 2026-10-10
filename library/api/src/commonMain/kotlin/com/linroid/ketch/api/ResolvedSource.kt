@@ -27,6 +27,8 @@ import kotlinx.serialization.Serializable
  * @property selectionMode how the user selects from [files]:
  *   [FileSelectionMode.MULTIPLE] for subset selection (torrent),
  *   [FileSelectionMode.SINGLE] for single-variant selection (HLS).
+ * @property contentType media type of the content as the source reports it, such as an HTTP
+ *   `Content-Type` of `video/mp4`, or `null` when unknown. [DownloadCategory.mimeTypes] match it.
  */
 @Serializable
 data class ResolvedSource(
@@ -39,4 +41,5 @@ data class ResolvedSource(
   val metadata: Map<String, String> = emptyMap(),
   val files: List<SourceFile> = emptyList(),
   val selectionMode: FileSelectionMode = FileSelectionMode.MULTIPLE,
+  val contentType: String? = null,
 )
