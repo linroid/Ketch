@@ -411,6 +411,9 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v6
+        env:
+          # Keeps the build record out of the run's artifacts.
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
           platforms: linux/amd64,linux/arm64
@@ -457,6 +460,9 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
+          # Only the release files: the Docker job's build record is not a zip and fails to
+          # extract.
+          pattern: ketch-*
           path: artifacts
           merge-multiple: true
 
