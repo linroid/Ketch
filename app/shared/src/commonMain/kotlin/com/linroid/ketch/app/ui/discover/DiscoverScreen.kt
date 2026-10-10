@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -681,13 +680,12 @@ private fun DiscoverIntro(
   onExample: (String) -> Unit,
   modifier: Modifier,
 ) {
-  val provider = state.aiSettings.settings.llm.provider
   DiscoverHero(
     title = stringResource(Res.string.discover_hero_title),
-    body = stringResource(Res.string.discover_intro_body, provider.shortLabel.resolve()),
+    body = stringResource(Res.string.discover_intro_body),
     modifier = modifier,
   ) {
-    DiscoverExamples(onClick = onExample)
+    DiscoverExamples(state.aiDiscover.examples, onClick = onExample)
   }
 }
 

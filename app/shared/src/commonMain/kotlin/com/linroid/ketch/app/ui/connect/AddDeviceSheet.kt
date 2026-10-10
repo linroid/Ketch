@@ -113,12 +113,17 @@ fun AddDeviceSheet(
   val serverState by state.serverState.collectAsState()
   LaunchedEffect(nearby) {
     // Asking for a permission is up to the user, so phones wait for a tap.
-    if (nearby != null && (searchNow || !isMobilePlatform)) access.request { nearby.search() }
+    if (nearby != null && (searchNow || !isMobilePlatform)) {
+      access.request(search = true) { nearby.search() }
+    }
   }
   val submit = { check: Boolean ->
-    form.connect(scope, connector, check) { connected ->
-      state.reportConnected(connected, tried = check)
-      onDismiss()
+    // Android 17 blocks devices on the local network until the user allows it.
+    access.request(search = false) {
+      form.connect(scope, connector, check) { connected ->
+        state.reportConnected(connected, tried = check)
+        onDismiss()
+      }
     }
   }
   // This device announces itself too when it is shared; it is no device to add.
@@ -149,7 +154,7 @@ fun AddDeviceSheet(
         }
       }
     },
-    onFind = { access.request { nearby?.search() } },
+    onFind = { access.request(search = true) { nearby?.search() } },
     onShare = if (local != null && state.instanceManager.isLocalServerSupported) {
       {
         onDismiss()

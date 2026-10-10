@@ -9,12 +9,34 @@
   <string name="discover_title">Discover</string>
   <string name="discover_settings">Discover settings</string>
   <string name="discover_hero_title">What do you want to download?</string>
-  <!-- %1$s is the model provider, such as Anthropic or Gemini. -->
-  <string name="discover_intro_body">%1$s searches the web and lists the downloads it finds. Nothing downloads until you add it.</string>
-  <!-- Searches to try, which run as they are written. -->
-  <string name="discover_example_blender">Blender for Apple silicon</string>
-  <string name="discover_example_ubuntu">Ubuntu 24.04 server ISO</string>
+  <string name="discover_intro_body">Discover searches the web and lists the downloads it finds. Nothing downloads until you add it.</string>
+  <!-- Searches to try, which run as they are written: a few at a time, picked at random for each new search. Keep them short, as they show on one line. -->
+  <string name="discover_example_bootable_usb">Tools for making a bootable USB drive</string>
+  <string name="discover_example_photo_editor">Free, open-source photo editor</string>
+  <string name="discover_example_video_editor">Free video editor for beginners</string>
+  <string name="discover_example_screen_recorder">Screen recorder for making tutorials</string>
+  <string name="discover_example_podcast">Software for recording a podcast</string>
+  <string name="discover_example_password_manager">Open-source password manager</string>
+  <string name="discover_example_office">Free office suite that works offline</string>
+  <string name="discover_example_planetarium">Planetarium software for stargazing</string>
+  <string name="discover_example_games">Open-source games to play offline</string>
+  <string name="discover_example_old_laptop">Lightweight Linux for an old laptop</string>
+  <string name="discover_example_raspberry_pi">Operating system for a Raspberry Pi</string>
+  <string name="discover_example_local_ai">Local AI models to run on my laptop</string>
   <string name="discover_example_footage">Public-domain 4K nature footage</string>
+  <string name="discover_example_music">Royalty-free music for videos</string>
+  <string name="discover_example_audiobooks">Free audiobooks of classic novels</string>
+  <string name="discover_example_films">Classic films in the public domain</string>
+  <string name="discover_example_fonts">Free fonts for commercial use</string>
+  <string name="discover_example_sound_effects">Creative Commons sound effects</string>
+  <string name="discover_example_textures">Free textures for 3D models</string>
+  <string name="discover_example_paintings">Famous paintings as 4K wallpapers</string>
+  <string name="discover_example_mars">Full-resolution NASA photos of Mars</string>
+  <string name="discover_example_lectures">Free computer science lectures</string>
+  <string name="discover_example_wikipedia">Wikipedia to read offline</string>
+  <string name="discover_example_hdr_test">4K HDR test videos for my TV</string>
+  <string name="discover_example_speed_test">Large files to test my download speed</string>
+  <string name="discover_example_datasets">Public datasets to practice SQL</string>
   <!-- An example search in quotation marks. %1$s is the search. -->
   <string name="discover_example_quoted">“%1$s”</string>
 
