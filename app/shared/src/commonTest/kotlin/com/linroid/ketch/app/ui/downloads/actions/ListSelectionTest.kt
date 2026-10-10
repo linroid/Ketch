@@ -132,7 +132,7 @@ class ListSelectionTest {
   }
 
   @Test
-  fun doubleClick_waitingRows_inspectThem() = actionsTest { f ->
+  fun doubleClick_waitingRows_doNothing() = actionsTest { f ->
     val preempted = DownloadState.Paused(DownloadProgress(10, 100), PauseReason.Preempted("urgent"))
     val tasks = listOf(f.add(preempted), f.add(DownloadState.Queued))
     val rows = tasks.map { rowOf(it) }
@@ -141,9 +141,64 @@ class ListSelectionTest {
     for (row in rows) {
       actions.doubleClick(row)
       runCurrent()
-      assertEquals(row.key, f.state.inspectedTask)
+      assertEquals(null, f.state.inspectedTask)
     }
     assertTrue(tasks.all { it.calls.isEmpty() })
+  }
+
+  @Test
+  fun click_awaitingDoubleClick_inspectsOnceSettled() = actionsTest { f ->
+    val rows = List(2) { rowOf(f.add(downloading)) }
+    val keys = rows.map { it.key }
+    val selection = ListSelection(f.state)
+
+    selection.click(keys[0], keys, RowClick(awaitsDoubleClick = true))
+    assertEquals(setOf(keys[0]), f.state.selectedKeys)
+    assertEquals(null, f.state.inspectedTask)
+
+    selection.settle(keys[0])
+    assertEquals(keys[0], f.state.inspectedTask)
+  }
+
+  @Test
+  fun doubleClick_afterAClick_neverInspects() = actionsTest { f ->
+    val task = f.add(downloading)
+    val row = rowOf(task)
+    val actions = listActions(f, listOf(row))
+
+    actions.click(row, RowClick(awaitsDoubleClick = true))
+    actions.doubleClick(row)
+    actions.selection.settle(row.key)
+    runCurrent()
+
+    assertEquals(null, f.state.inspectedTask)
+    assertEquals(listOf("pause"), task.calls)
+  }
+
+  @Test
+  fun click_awaitingDoubleClick_withTheInspectorOpen_inspectsAtOnce() = actionsTest { f ->
+    val rows = List(2) { rowOf(f.add(downloading)) }
+    val keys = rows.map { it.key }
+    val selection = ListSelection(f.state)
+    selection.click(keys[0], keys, RowClick())
+
+    selection.click(keys[1], keys, RowClick(awaitsDoubleClick = true))
+
+    assertEquals(keys[1], f.state.inspectedTask)
+  }
+
+  @Test
+  fun settle_ofAnEarlierClick_leavesTheLaterOneWaiting() = actionsTest { f ->
+    val rows = List(2) { rowOf(f.add(downloading)) }
+    val keys = rows.map { it.key }
+    val selection = ListSelection(f.state)
+
+    selection.click(keys[0], keys, RowClick(awaitsDoubleClick = true))
+    selection.click(keys[1], keys, RowClick(awaitsDoubleClick = true))
+    selection.settle(keys[0])
+
+    assertEquals(null, f.state.inspectedTask)
+    assertEquals(keys[1], selection.pendingInspect)
   }
 
   @Test

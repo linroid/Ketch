@@ -285,7 +285,8 @@ private fun PageEffects(page: DownloadsPage, view: TaskListView) {
     if (!pointer) return@LaunchedEffect
     // The arrow keys and ⌘-clicks that leave one row selected show it, as a click does.
     snapshotFlow { state.selectedKeys.singleOrNull() }.drop(1).collect { key ->
-      if (key != null) state.inspect(key)
+      // A click waits to see whether it is the first of a double-click.
+      if (key != null && key != actions.selection.pendingInspect) state.inspect(key)
     }
   }
   LaunchedEffect(page) {
