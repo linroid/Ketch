@@ -108,7 +108,7 @@ class SettingsWindowStateTest {
     val small = WindowBounds(x = 100, y = 100, width = 500, height = 300, maximized = false)
     val restored = initialWindowState(small, screens, SettingsWindowSize, MinSettingsWindowSize)
 
-    assertEquals(DpSize(860.dp, 640.dp), fresh.size)
+    assertEquals(DpSize(720.dp, 580.dp), fresh.size)
     assertEquals(DpSize(640.dp, 480.dp), restored.size)
   }
 }
