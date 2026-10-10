@@ -10,17 +10,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -124,6 +128,9 @@ internal fun ConnectionsContent(
   val type = KetchTheme.typography
   var hovered by remember { mutableStateOf<ConnectionCellKey?>(null) }
   var selected by remember { mutableStateOf(initialSelection) }
+  // The cell the details last showed: leaving the grid keeps them, so the popover never
+  // changes under the pointer.
+  var lastShown by remember { mutableStateOf(initialSelection) }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
     Column(verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       Text(
@@ -172,6 +179,9 @@ internal fun ConnectionsContent(
         verticalArrangement = Arrangement.spacedBy(spacing.s2),
         modifier = Modifier
           .fillMaxWidth()
+          // Never shrinks while open: the popover grows upward from the bar, so a smaller
+          // grid would move the cells under the pointer and change what it hovers.
+          .growOnly()
           .heightIn(max = gridHeight)
           .verticalScroll(rememberScrollState()),
       ) {
@@ -206,10 +216,14 @@ internal fun ConnectionsContent(
           )
         }
       }
-      val key = hovered ?: selected
-      val shown = tasks.firstNotNullOfOrNull { task ->
-        task.cells.firstOrNull { it.key == key }?.let { it to task }
-      } ?: tasks.first().let { it.cells.first() to it }
+      fun find(key: ConnectionCellKey?) = key?.let {
+        tasks.firstNotNullOfOrNull { task ->
+          task.cells.firstOrNull { cell -> cell.key == key }?.let { cell -> cell to task }
+        }
+      }
+      val shown = find(hovered) ?: find(selected) ?: find(lastShown)
+        ?: tasks.first().let { it.cells.first() to it }
+      SideEffect { lastShown = shown.first.key }
       ConnectionDetail(shown.first, shown.second.name, onShowTask)
     }
     if (grid.unsupported.isNotEmpty()) {
@@ -219,6 +233,18 @@ internal fun ConnectionsContent(
         color = colors.textTertiary,
       )
     }
+  }
+}
+
+/** Takes the tallest height it has measured so far, so content that shrinks leaves room. */
+@Composable
+private fun Modifier.growOnly(): Modifier {
+  var tallest by remember { mutableIntStateOf(0) }
+  return layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    tallest = maxOf(tallest, placeable.height)
+    val height = tallest.coerceAtMost(constraints.maxHeight)
+    layout(placeable.width, height) { placeable.place(0, 0) }
   }
 }
 
@@ -301,22 +327,36 @@ private fun ConnectionDetail(
         overflow = TextOverflow.Ellipsis,
       )
     }
-    Text(
-      text = details.endpoint,
-      style = type.mono,
-      color = colors.textPrimary,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
-    DetailLine(details.transport.resolve())
-    DetailLine(details.route.resolve())
-    details.peer?.let { DetailLine(it.resolve()) }
-    Text(text = details.rates.resolve(), style = type.numeral, color = colors.textPrimary)
-    Text(
-      text = details.totals.resolve(),
-      style = type.caption,
-      color = colors.textTertiary,
-    )
+    // The endpoint and the rest can be selected and copied.
+    SelectionContainer {
+      Column(verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
+        Text(
+          text = details.endpoint,
+          style = type.mono,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        // Every connection fills the same lines, so the panel keeps its height from cell to cell.
+        DetailLine(details.transport.resolve())
+        DetailLine(details.route.resolve())
+        DetailLine(details.peer?.resolve() ?: "")
+        Text(
+          text = details.rates.resolve(),
+          style = type.numeral,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = details.totals.resolve(),
+          style = type.caption,
+          color = colors.textTertiary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
     Row(Modifier.fillMaxWidth().padding(top = spacing.s1)) {
       KetchEyebrow(
         text = trafficLabel(cell.direction).resolve(),
@@ -338,7 +378,8 @@ private fun DetailLine(text: String) {
     text = text,
     style = KetchTheme.typography.caption,
     color = KetchTheme.colors.textSecondary,
-    maxLines = 2,
+    maxLines = 1,
+    minLines = 1,
     overflow = TextOverflow.Ellipsis,
   )
 }
