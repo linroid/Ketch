@@ -4,7 +4,11 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.torrent.TorrentActivity
 import com.linroid.ketch.api.torrent.TorrentCapability
+import com.linroid.ketch.api.torrent.TorrentCommandContext
+import com.linroid.ketch.api.torrent.TorrentCommandError
+import com.linroid.ketch.api.torrent.TorrentCommandException
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SeedingOutcome
@@ -29,6 +33,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -450,6 +455,90 @@ class TorrentSeedingControlTest {
     assertEquals(true, store.intent("seeder"))
     download.awaitSeeding(true)
     source.stopSeeding(download.taskId)
+    source.assertNoLeaks()
+  }
+
+  private suspend fun Ketch.context(taskId: String, key: String): TorrentCommandContext {
+    val snapshot = assertNotNull(assertNotNull(torrents).snapshot(taskId))
+    return TorrentCommandContext(key, snapshot.revision)
+  }
+
+  @Test
+  fun setSeeding_false_stopsTheSessionAndClearsIntent() = harness {
+    val source = source()
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    eventually("the seeding intent to be saved") { store.intent(task.taskId) == true }
+    val controller = assertNotNull(ketch.torrents)
+    eventually("the snapshot to show seeding") {
+      controller.snapshot(task.taskId)?.activity == TorrentActivity.SEEDING
+    }
+
+    val result = controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
+
+    assertEquals(false, result.seeding)
+    task.awaitSeeding(false)
+    assertNull(source.sessionOf(task.taskId))
+    assertEquals(false, store.intent(task.taskId))
+    val snapshot = assertNotNull(controller.snapshot(task.taskId))
+    assertEquals(TorrentActivity.STOPPED, snapshot.activity)
+    assertTrue(snapshot.selectionComplete)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setSeeding_true_seedsAfterRecheck() = harness {
+    val source = source()
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 2))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    val controller = assertNotNull(ketch.torrents)
+    val stopped = controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
+    task.awaitSeeding(false)
+    val connects = networks.single().connects.load()
+
+    val started = controller.setSeeding(task.taskId, true,
+      TorrentCommandContext("seed", stopped.revision))
+
+    assertEquals(true, started.seeding)
+    assertTrue(started.revision.sequence > stopped.revision.sequence)
+    task.awaitSeeding(true)
+    assertEquals(TorrentSessionState.SEEDING, source.sessionOf(task.taskId)?.state?.value)
+    assertEquals(true, store.intent(task.taskId))
+    // An exact retry starts nothing more.
+    assertEquals(started, controller.setSeeding(task.taskId, true,
+      TorrentCommandContext("seed", stopped.revision)))
+    assertTrue(networks.single().connects.load() >= connects)
+    controller.setSeeding(task.taskId, false, TorrentCommandContext("again", started.revision))
+    task.awaitSeeding(false)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setSeeding_policyOff_isDenied() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(1))
+    assertFalse(task.awaitCompleted().seeding)
+    val controller = assertNotNull(ketch.torrents)
+    assertFalse(controller.capabilities().supports(TorrentCapability.SEEDING))
+
+    val error = assertFailsWith<TorrentCommandException> {
+      controller.setSeeding(task.taskId, true, ketch.context(task.taskId, "seed"))
+    }
+
+    assertEquals(TorrentCommandError.POLICY_DENIED, error.error)
+    assertNull(source.sessionOf(task.taskId))
+    assertNull(store.intent(task.taskId))
     source.assertNoLeaks()
   }
 }
