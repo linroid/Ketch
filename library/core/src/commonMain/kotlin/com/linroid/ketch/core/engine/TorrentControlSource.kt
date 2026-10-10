@@ -55,6 +55,13 @@ interface TorrentControlSource {
    * left alone.
    */
   suspend fun stopSeeding(taskId: String)
+
+  /**
+   * Applies [fileIds], a completed task's new selection that adds no files, to the task's
+   * seeding session, if any, so it shares and announces that selection and a removed file it can
+   * no longer read does not stop it. Returns whether a session took the change.
+   */
+  suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean = false
 }
 
 /**
