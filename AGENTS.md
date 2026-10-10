@@ -129,11 +129,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `AiSettings`, `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
   `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
-  `NotificationSettings`, `IntegrationSettings`
+  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
-  `IntakeState`, `SpeedModeController`, `PendingOps`, `AiDiscoverController`, `DiscoverSession`,
+  `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`, `KeepAwake`,
+  `SleepInhibitor`, `AiDiscoverController`, `DiscoverSession`,
   `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
   (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
@@ -416,7 +417,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### Configuration (`config/`)
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
-  desktop, notifications and integration sections
+  desktop, notifications, integration and power sections
 - `AiSettings`: AI discovery provider, token, model, endpoint, search keys and page access
   (`access`, `[ai.access]`)
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
@@ -431,8 +432,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
   Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
-  open at login, Dock badge, daily update checks; `NotificationSettings` and
-  `IntegrationSettings` (magnet and `.torrent` handlers)
+  open at login, Dock badge, daily update checks; `NotificationSettings`,
+  `IntegrationSettings` (magnet and `.torrent` handlers) and `PowerSettings` (`[power]`:
+  `keepAwake`, on by default)
 - Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
   Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
   BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
@@ -496,6 +498,17 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SuccessFeedbackPlayer` (`DesktopFeedbackPlayer`, `AndroidFeedbackPlayer`, which follows silent
   mode and Do Not Disturb); on Android a finished download posted as a notification leaves the
   alert to its channel. iOS and the web play none
+- Keep awake (`[power] keepAwake`, Settings → General → Power on desktop and Android,
+  `keepAwakeSupported`): `KeepAwake.follow` holds a host's `SleepInhibitor` while the embedded
+  device's tasks download or wait in the queue (`ForegroundStatus.keepsAwake`; the local server
+  and Discover never count), and releases it when they stop, the setting goes off or its scope
+  ends. Each keeps the system from sleeping while idle only, never stopping the user's own sleep,
+  lid close or the display turning off: desktop's `systemSleepInhibitor` takes an IOKit
+  `PreventUserIdleSystemSleep` assertion on macOS, `SetThreadExecutionState` from a thread of its
+  own on Windows and a logind `idle` lock through `systemd-inhibit` on Linux (a `sleep` lock would
+  need an administrator for the user's own suspend; GNOME ignores `idle` locks); Android's
+  `WakeLockInhibitor` is a partial `WakeLock`, held only while `KetchService` is in the
+  foreground, which keeps it out of Android vitals' excessive wake lock count
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
@@ -860,10 +873,8 @@ Planned features not yet implemented:
     `KetchApi`, the REST API and MCP. Today a selection can only be given up front
     (`DownloadRequest.selectedFileIds`, after a resolve), and a magnet added without one, as the
     extension, CLI and MCP always do, downloads every file
-13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
-    on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
-    `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
-    quit, sleep or shut down once the queue is empty
+13. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
 14. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
 15. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)

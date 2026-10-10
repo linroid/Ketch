@@ -128,6 +128,9 @@
   <string name="settings_general_badge_active">Téléchargements en cours</string>
   <string name="settings_general_badge_failures">Échecs uniquement</string>
   <string name="settings_general_badge_off">Rien</string>
+  <string name="settings_general_power">Énergie</string>
+  <string name="settings_general_keep_awake">Rester éveillé pendant les téléchargements</string>
+  <string name="settings_general_keep_awake_hint">%1$s ne se met pas en veille automatiquement pendant les téléchargements. L'écran peut tout de même s'éteindre.</string>
 
   <string name="settings_notifications_downloads">Téléchargements</string>
   <string name="settings_notifications_footer">« Notifier » utilise les notifications du système. « Dans l'app uniquement » affiche les alertes dans Ketch.</string>
@@ -547,6 +550,7 @@
   <string name="settings_search_start_hidden_keywords">démarrage, arrière-plan, barre des menus, zone de notification</string>
   <string name="settings_search_badge">Ce qu'affiche l'icône du Dock ou de la barre des tâches</string>
   <string name="settings_search_badge_keywords">compteur, pastille, dock, barre des tâches</string>
+  <string name="settings_search_keep_awake_keywords">veille, énergie, batterie, empêcher la veille, wake lock</string>
   <string name="settings_search_shortcuts">Tous les raccourcis clavier</string>
   <string name="settings_search_shortcuts_keywords">touches, raccourcis clavier, combinaisons de touches</string>
   <string name="settings_search_finished_keywords">terminé, fini, alerte</string>

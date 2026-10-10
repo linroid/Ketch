@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">実行中のダウンロード</string>
   <string name="settings_general_badge_failures">失敗のみ</string>
   <string name="settings_general_badge_off">表示しない</string>
+  <string name="settings_general_power">電源</string>
+  <string name="settings_general_keep_awake">ダウンロード中はスリープしない</string>
+  <string name="settings_general_keep_awake_hint">ダウンロード中は%1$sが自動でスリープしません。画面はオフになる場合があります。</string>
 
   <string name="settings_notifications_downloads">ダウンロード</string>
   <string name="settings_notifications_footer">「通知」はシステムの通知を使います。「アプリ内のみ」はKetchの中だけに表示します。</string>
@@ -532,6 +535,7 @@
   <string name="settings_search_start_hidden_keywords">起動, バックグラウンド, メニューバー, トレイ, 常駐</string>
   <string name="settings_search_badge">Dockやタスクバーのアイコンに表示する内容</string>
   <string name="settings_search_badge_keywords">件数, Dock, タスクバー, バッジ</string>
+  <string name="settings_search_keep_awake_keywords">スリープ, 電源, バッテリー, スリープ防止, スリープさせない</string>
   <string name="settings_search_shortcuts">すべてのキーボードショートカット</string>
   <string name="settings_search_shortcuts_keywords">キー, ホットキー, キーボード, キー割り当て</string>
   <string name="settings_search_finished_keywords">完了, 終了, アラート, お知らせ</string>

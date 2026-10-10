@@ -70,7 +70,9 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.FileDiscoverHistoryStore
+import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
@@ -106,6 +108,7 @@ import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.keep_awake_reason
 import ketch.app.desktop.generated.resources.message_window_error
 import ketch.app.desktop.generated.resources.notify_added
 import ketch.app.desktop.generated.resources.notify_names_more
@@ -466,6 +469,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   // Pairing requests ask in the main window; from the tray while it is not in front.
   remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
+  remember { keepAwake(controller) }
   LaunchedEffect(controller, notifier) {
     // Such as Discover waiting for an OK, which would wait unseen while the window is away.
     MessageNotifications.follow(
@@ -865,6 +869,21 @@ private fun notifyPairingRequests(
     controller.instanceManager.pairingRequests.watch(
       onArrived = { ask -> if (!inFront()) notifier.post(pairingNotificationCopy(ask)) },
       onLeft = {},
+    )
+  }
+}
+
+/**
+ * Keeps this computer from sleeping while idle as long as its downloads run or wait in the queue,
+ * as `[power] keepAwake` allows; the controller's scope ending lets it sleep again.
+ */
+private fun keepAwake(controller: AppController) {
+  val embedded = controller.instanceManager.embedded ?: return
+  controller.scope.launch(Dispatchers.IO) {
+    KeepAwake.follow(
+      inhibitor = systemSleepInhibitor(Res.string.keep_awake_reason.text().load()),
+      statuses = ForegroundPolicy.observe(embedded.tasks, controller.instanceManager.serverState),
+      enabled = snapshotFlow { controller.appSettings.config.power.keepAwake },
     )
   }
 }

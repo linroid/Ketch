@@ -56,6 +56,9 @@ internal enum class SettingsFeature {
 
   /** The app keeps log files to open or share. */
   Logs,
+
+  /** The app keeps the system awake while downloading: desktop and Android. */
+  KeepAwake,
 }
 
 /**

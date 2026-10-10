@@ -159,6 +159,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   heraus, direkt aus der Liste.
 - **Auf jeder Plattform zu Hause** — Menüleiste oder Infobereich, Benachrichtigungen und Fortschritt
   im Dock und in der Taskleiste auf dem Desktop; Hintergrunddownloads unter Android und iOS 26.
+- **Wach während Downloads** — Die Desktop- und Android-Apps halten das System vom selbstständigen
+  Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
+  (**Einstellungen → Allgemein**).
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit vier Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
   ([Übersetzungen](docs/development/localization.md)).
@@ -242,8 +245,8 @@ Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
   Ordnern speichern
 - **Torrent-Dateien jederzeit wählen** — Nach Eingang der Magnet-Metadaten Dateien auswählen und
   die Auswahl während des Downloads ändern
-- **Wach halten** — Den Computer während Downloads am Einschlafen hindern und danach optional
-  in den Ruhezustand versetzen oder herunterfahren
+- **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
+  herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen
 - **Kommandozeile für laufende Geräte** — `ketch` und KI-Agenten ergänzen, listen, pausieren und
   verfolgen Downloads der Ketch-App oder eines Servers, ohne eine zweite Engine zu starten

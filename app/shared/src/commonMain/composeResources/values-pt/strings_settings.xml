@@ -128,6 +128,9 @@
   <string name="settings_general_badge_active">Downloads ativos</string>
   <string name="settings_general_badge_failures">Só falhas</string>
   <string name="settings_general_badge_off">Nada</string>
+  <string name="settings_general_power">Energia</string>
+  <string name="settings_general_keep_awake">Manter ativo durante downloads</string>
+  <string name="settings_general_keep_awake_hint">%1$s não entra em repouso automaticamente enquanto houver downloads em andamento. A tela ainda pode desligar.</string>
 
   <string name="settings_notifications_downloads">Downloads</string>
   <string name="settings_notifications_footer">“Notificar” usa as notificações do sistema. “Só no app” mostra os avisos dentro do Ketch.</string>
@@ -547,6 +550,7 @@
   <string name="settings_search_start_hidden_keywords">inicialização, segundo plano, barra de menus, bandeja, oculto</string>
   <string name="settings_search_badge">O que o ícone no Dock ou na barra de tarefas mostra</string>
   <string name="settings_search_badge_keywords">contador, indicador, selo, dock, barra de tarefas</string>
+  <string name="settings_search_keep_awake_keywords">repouso, suspensão, energia, bateria, impedir repouso, wake lock</string>
   <string name="settings_search_shortcuts">Todos os atalhos de teclado</string>
   <string name="settings_search_shortcuts_keywords">teclas, atalhos, teclado, combinações de teclas</string>
   <string name="settings_search_finished_keywords">concluído, terminado, pronto, alerta, aviso</string>

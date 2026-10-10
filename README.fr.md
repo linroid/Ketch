@@ -160,6 +160,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Intégré à chaque plateforme** — Barre de menus ou zone de notification, notifications et
   progression dans le Dock et la barre des tâches sur ordinateur ; téléchargements en arrière-plan
   sur Android et iOS 26.
+- **Éveillé pendant les téléchargements** — Les apps pour ordinateur et Android empêchent la mise
+  en veille automatique du système pendant les téléchargements ; l'écran peut tout de même
+  s'éteindre (**Réglages → Général**).
 - **Votre style, votre langue** — Thèmes clair et sombre avec quatre couleurs d'accent, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch et Français
   ([traductions](docs/development/localization.md)).
@@ -244,8 +247,8 @@ La [documentation CLI](cli/README.md) présente toutes les commandes.
   dossiers selon vos règles
 - **Choix des fichiers torrent à tout moment** — Choisir les fichiers d'un lien magnet une fois
   ses détails reçus et modifier la sélection pendant le téléchargement
-- **Maintien en éveil** — Empêcher la mise en veille pendant les téléchargements, puis permettre
-  la mise en veille ou l'arrêt à la fin
+- **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
+  au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un
   téléchargement
 - **Ligne de commande pour les appareils actifs** — `ketch` et les agents IA ajoutent, listent,

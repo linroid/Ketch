@@ -37,6 +37,7 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.ForegroundStatus
+import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SpeedModeController
@@ -66,6 +67,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -74,6 +76,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -108,9 +111,14 @@ class KetchService : Service() {
   private val toasts = Channel<ActivityEvent>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
   private val speed = MutableStateFlow(0L)
   private val discovering = MutableStateFlow(0)
+
+  // `[power] keepAwake`, as the app's settings last said, and whether the service runs in the
+  // foreground: the wake lock follows both.
+  private val keepAwake = MutableStateFlow(true)
+  private val foreground = MutableStateFlow(false)
   private lateinit var notifier: AndroidNotifier
   private val successFeedback by lazy { SuccessFeedback(AndroidFeedbackPlayer(this)) }
-  private var isForeground = false
+  private var isForeground by foreground::value
   private var isBound = false
   private var isStarted = false
   private val inFront = MutableStateFlow(false)
@@ -149,6 +157,7 @@ class KetchService : Service() {
     val configStore = app.configStore
     val config = configStore.load()
     notifier.accent = config.appearance.accent.toKetchAccent()
+    keepAwake.value = config.power.keepAwake
     val driverFactory = DriverFactory(this) { unreadable ->
       app.unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
     }
@@ -287,8 +296,9 @@ class KetchService : Service() {
    * with `notify`, such as Discover waiting for the user's OK to open a website, while the app is
    * not in front; each notification goes once its message leaves the screen, and tapping it
    * opens [MainActivity], which runs the message's first action. It gives success feedback when a
-   * search finds downloads, and keeps the service in the foreground while Discover searches, so
-   * the search keeps going, and can ask, once the user leaves the app.
+   * search finds downloads, keeps the service in the foreground while Discover searches, so
+   * the search keeps going, and can ask, once the user leaves the app, and follows the keep awake
+   * setting.
    */
   fun follow(controller: AppController) {
     followed = controller
@@ -304,6 +314,11 @@ class KetchService : Service() {
       successFeedback.follow(controller.state.aiDiscover) {
         controller.appSettings.config.notifications
       }
+    }
+    controller.scope.launch {
+      // The setting keeps its last value once the app closes, as the service keeps running.
+      snapshotFlow { controller.appSettings.config.power.keepAwake }
+        .collect { if (followed === controller) keepAwake.value = it }
     }
     controller.scope.launch {
       // A controller that closes after the next one started leaves the count to that one.
@@ -349,12 +364,24 @@ class KetchService : Service() {
   /**
    * Keeps the service in the foreground while the embedded device downloads or shares itself,
    * whichever device the app shows, or while Discover searches, and refreshes the ongoing
-   * notification once a second while it downloads.
+   * notification once a second while it downloads. While it downloads in the foreground, a wake
+   * lock keeps the CPU running with the screen off, as the keep awake setting allows.
    */
   private fun startForegroundMonitor(embedded: KetchApi) {
     val statuses = ForegroundPolicy
       .observe(embedded.tasks, instanceManager.serverState, discovering)
       .flowOn(Dispatchers.Default)
+      .shareIn(scope, SharingStarted.Eagerly, replay = 1)
+    scope.launch {
+      KeepAwake.follow(
+        inhibitor = WakeLockInhibitor(this@KetchService),
+        // Android vitals count a wake lock held without a foreground service as excessive.
+        statuses = combine(statuses, foreground) { status, inForeground ->
+          if (inForeground) status else ForegroundStatus()
+        },
+        enabled = keepAwake,
+      )
+    }
     scope.launch {
       // A new speed mode only relabels the Slow lane button.
       combine(statuses, speedMode.mode) { status, _ -> status }.collectLatest { status ->

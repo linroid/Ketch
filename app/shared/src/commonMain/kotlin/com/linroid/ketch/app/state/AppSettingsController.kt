@@ -13,6 +13,7 @@ import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.IntegrationSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.PowerSettings
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.TorrentSettings
@@ -144,6 +145,11 @@ class AppSettingsController(
   /** Persists a change to which activity the apps report, and how. */
   fun saveNotifications(transform: (NotificationSettings) -> NotificationSettings) {
     update { it.copy(notifications = transform(it.notifications)) }
+  }
+
+  /** Persists a change to how the apps treat the power of the device they run on. */
+  fun savePower(transform: (PowerSettings) -> PowerSettings) {
+    update { it.copy(power = transform(it.power)) }
   }
 
   /** Persists a change to how the desktop app hooks into the operating system. */

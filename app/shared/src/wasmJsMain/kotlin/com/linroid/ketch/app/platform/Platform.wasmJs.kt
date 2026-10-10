@@ -10,3 +10,5 @@ actual val isMobilePlatform: Boolean = false
 
 @OptIn(ExperimentalComposeUiApi::class)
 internal actual val HorizontalResizePointerIcon: PointerIcon = PointerIcon.fromKeyword("ew-resize")
+
+internal actual val keepAwakeSupported: Boolean = false
