@@ -37,6 +37,9 @@ internal class SelectableSource(
   /** Whether runs acknowledge the selections they apply. */
   var live = true
 
+  /** Whether the source reports progress when it applies a selection, as a busy transfer does. */
+  var reportsOnChange = true
+
   /** Holds metadata lookups until completed. */
   var resolveGate: CompletableDeferred<Unit>? = null
 
@@ -129,7 +132,7 @@ internal class SelectableSource(
         context.selection.collect { update ->
           if (update.revision <= initial.revision) return@collect
           run.applied += update
-          publish(context, update.fileIds)
+          if (reportsOnChange) publish(context, update.fileIds)
           if (live) context.acknowledgeSelection(update.revision)
         }
       }
