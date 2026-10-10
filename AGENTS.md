@@ -363,7 +363,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [verification](docs/development/torrent-verification.md)
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
-- LLM agent-driven discovery using Koog framework (v1.2.0)
+- LLM agent-driven discovery using Koog framework (v1.3.0)
 - Providers are `LlmProvider` presets, data: id, `LlmApi` (OpenAI Responses, chat completions,
   Anthropic, Gemini, Ollama), endpoints per region, model suggestions, key variables and key
   page. OpenAI, Anthropic, Gemini, Ollama, LM Studio, hosted chat-completions services
