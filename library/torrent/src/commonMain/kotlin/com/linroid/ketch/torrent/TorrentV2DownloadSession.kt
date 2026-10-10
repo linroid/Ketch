@@ -300,8 +300,12 @@ internal class TorrentV2DownloadSession private constructor(
     } finally { admission.unlock() }
   }
 
-  /** Records the hosts [topic]'s trackers returned; a restricted owner admits only those. */
+  /**
+   * Records the hosts [topic]'s trackers returned; a restricted owner admits only those. A public
+   * owner keeps no list, so a tracker answer never holds [admission] while a peer dials in.
+   */
   suspend fun trackerPeers(topic: TrackerTopic, peers: List<PeerEndpoint>) {
+    if (!restricted) return
     val hosts = peers.map { it.host }.toSet()
     admission.withLock { allowedHosts[topic] = hosts }
   }
