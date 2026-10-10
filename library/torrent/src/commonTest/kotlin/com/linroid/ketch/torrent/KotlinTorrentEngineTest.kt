@@ -269,7 +269,7 @@ class KotlinTorrentEngineTest {
         FileSystem.SYSTEM.createDirectories(root)
         FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val remote = createTorrentNetwork()
         try {
           engine.start()

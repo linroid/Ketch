@@ -79,7 +79,8 @@ class KotlinTorrentEngineRoutingTest {
       withTimeout(15_000) {
         val root = root()
         val metadata = v1()
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          listenHost = "127.0.0.1")
         val remote = createTorrentNetwork()
         try {
           engine.start()
@@ -113,7 +114,8 @@ class KotlinTorrentEngineRoutingTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val root = root()
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          listenHost = "127.0.0.1")
         val remote = createTorrentNetwork()
         try {
           engine.start()

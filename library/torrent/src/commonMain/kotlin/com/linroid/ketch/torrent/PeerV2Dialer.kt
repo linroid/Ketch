@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Bounded handshakes for dialed targets [E] and, optionally, peers that dialed us. Target
@@ -33,6 +34,8 @@ internal class PeerV2Dialer<E : Any> private constructor(
   }
 
   companion object {
+    private const val RESPOND_HANDOFF_MS = 5_000L
+
     /** Hands [failure] on; once the consumer closed its queue, nobody counts it any more. */
     private suspend fun <E> SendChannel<Failure<E>>.report(failure: Failure<E>) {
       try {
@@ -50,7 +53,8 @@ internal class PeerV2Dialer<E : Any> private constructor(
      * Ordinary connection failures are recorded, sent to [failures] when given (waiting for room,
      * so a consumer that counts its targets never loses one), and isolated; a failed target
      * stream is fatal. [respond] answers each [incoming] connection once, on
-     * [respondParallelism] workers sharing the output; a null or failed answer closes it.
+     * [respondParallelism] workers sharing the output; a null or failed answer closes it, and
+     * so does an answer the consumer does not take within [handoffMs].
      * Caller owns both producers. This scope joins every worker and closes queued handles.
      */
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
@@ -64,6 +68,7 @@ internal class PeerV2Dialer<E : Any> private constructor(
       respondParallelism: Int = 4,
       respond: (suspend (Incoming) -> PeerV2Connector.Connected?)? = null,
       failures: SendChannel<Failure<E>>? = null,
+      handoffMs: Long = RESPOND_HANDOFF_MS,
       body: suspend (PeerV2Dialer<E>) -> T,
     ): T = coroutineScope {
       require(parallelism in 1..32 && capacity in 1..32 && respondParallelism in 1..32)
@@ -122,8 +127,13 @@ internal class PeerV2Dialer<E : Any> private constructor(
                     }
                     null
                   }
-                  // Responders never retry: the peer that dialed us can dial again.
-                  if (connected == null) peer.close() else output.send(connected)
+                  // Responders never retry: the peer that dialed us can dial again. An answered
+                  // peer the consumer does not take in time is closed: it holds a connection
+                  // slot and saw our handshake, so it must not wait in silence.
+                  if (connected == null) peer.close()
+                  else if (withTimeoutOrNull(handoffMs) { output.send(connected) } == null) {
+                    connected.close()
+                  }
                 }
               }
             }

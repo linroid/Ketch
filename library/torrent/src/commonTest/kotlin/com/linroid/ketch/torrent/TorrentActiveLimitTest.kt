@@ -77,7 +77,7 @@ class TorrentActiveLimitTest {
           "ketch-active-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
         torrentFileSystem.createDirectories(root)
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           maxActiveTorrents = 1))
         // Unlimited simultaneous downloads: Ketch admits every torrent at once.

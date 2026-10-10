@@ -1,6 +1,9 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -58,7 +61,7 @@ internal class TransmissionDaemon private constructor(
     error("Transmission RPC session negotiation failed")
   }
 
-  /** Waits until the daemon answers RPC calls. */
+  /** Waits until the daemon answers RPC calls; [start] already did. */
   suspend fun awaitReady() {
     while (true) {
       check(process.isAlive) { log.readText() }
@@ -114,20 +117,46 @@ internal class TransmissionDaemon private constructor(
       return binary
     }
 
-    /** Starts [binary] with its configuration and log under [root], saving to [downloadDir]. */
-    fun start(binary: String, root: File, downloadDir: File): TransmissionDaemon {
-      fun port(): Int = ServerSocket(0).use { it.localPort }
-      val rpcPort = port()
-      val peerPort = port()
-      val log = root.resolve("transmission.log")
-      val process = ProcessBuilder(binary, "--foreground", "--config-dir",
-        root.resolve("config").absolutePath, "--download-dir", downloadDir.absolutePath,
-        "--port", rpcPort.toString(), "--peerport", peerPort.toString(),
-        "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", "127.0.0.1",
-        "--no-auth", "--no-dht", "--no-lpd", "--no-portmap", "--no-utp",
-        "--encryption-tolerated", "--no-global-seedratio")
-        .redirectErrorStream(true).redirectOutput(log).start()
-      return TransmissionDaemon(process, log, rpcPort, peerPort)
+    /**
+     * Starts [binary] with its configuration and log under [root], saving to [downloadDir], and
+     * waits until it answers RPC calls. Its ports are free when chosen but may be taken before it
+     * binds them; it then starts again on fresh ones.
+     */
+    suspend fun start(binary: String, root: File, downloadDir: File): TransmissionDaemon {
+      var failure: Throwable? = null
+      repeat(TRANSMISSION_START_ATTEMPTS) { attempt ->
+        val rpcPort = freePort()
+        val peerPort = freePort()
+        val log = root.resolve("transmission-$attempt.log")
+        val process = ProcessBuilder(binary, "--foreground", "--config-dir",
+          root.resolve("config").absolutePath, "--download-dir", downloadDir.absolutePath,
+          "--port", rpcPort.toString(), "--peerport", peerPort.toString(),
+          "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", "127.0.0.1",
+          "--no-auth", "--no-dht", "--no-lpd", "--no-portmap", "--no-utp",
+          "--encryption-tolerated", "--no-global-seedratio")
+          .redirectErrorStream(true).redirectOutput(log).start()
+        val daemon = TransmissionDaemon(process, log, rpcPort, peerPort)
+        try {
+          withTimeout(30_000) { daemon.awaitReady() }
+          if (!transmissionBindFailed(log)) return daemon
+          failure = IllegalStateException(log.readText())
+        } catch (error: Throwable) {
+          currentCoroutineContext().ensureActive()
+          failure = error
+        }
+        daemon.close()
+      }
+      throw AssertionError("Transmission did not start on free ports", failure)
     }
   }
 }
+
+/** Starts of a Transmission fixture before a port taken meanwhile fails the test. */
+internal const val TRANSMISSION_START_ATTEMPTS = 3
+
+/** A port free now; whoever binds it later may find it taken and must try another. */
+internal fun freePort(): Int = ServerSocket(0).use { it.localPort }
+
+/** Transmission logs a port it could not bind and carries on without it. */
+internal fun transmissionBindFailed(log: File): Boolean =
+  log.readLines().any { " ERR " in it && "bind" in it.lowercase() }

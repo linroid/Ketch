@@ -167,13 +167,14 @@ class TorrentV2SessionLoopTest {
   private inner class Swarm(
     f: Fixture,
     limit: Int,
-    generation: Long = 0,
+    var generation: Long = 0,
     dialCapacity: Int = 4,
     val failures: Channel<PeerV2Dialer.Failure<TorrentV2DialTarget>> = Channel(4),
+    discoveredCapacity: Int = Channel.RENDEZVOUS,
   ) {
     val connections = Channel<PeerV2Connector.Connected>(Channel.UNLIMITED,
       onUndeliveredElement = { it.close() })
-    val discovered = Channel<TorrentV2Discovered>()
+    val discovered = Channel<TorrentV2Discovered>(discoveredCapacity)
     val dial = Channel<TorrentV2DialTarget>(dialCapacity)
     val controls = Channel<TorrentV2SessionLoop.Control>(8)
     private val network = object : TorrentNetwork {
@@ -185,7 +186,7 @@ class TorrentV2SessionLoopTest {
     val swarm = TorrentV2Swarm(document, TorrentV2Runtime(network,
       ByteArray(20) { 9 }.toByteString(), f.buffers, f.state), restricted = false,
       waitForPeers = false, discovered = discovered, dial = dial, dialFailures = failures,
-      controls = controls, connectionLimit = { limit }, generation = { generation })
+      controls = controls, connectionLimit = { limit }, generation = { this.generation })
 
     fun send(connected: PeerV2Connector.Connected) {
       check(connections.trySend(connected).isSuccess)
@@ -304,6 +305,41 @@ class TorrentV2SessionLoopTest {
         runCurrent()
         val second = generateSequence { s.dial.tryReceive().getOrNull() }.toList()
         assertEquals(endpoints.toSet(), second.map { it.endpoint }.toSet())
+        assertFalse(download.isCompleted)
+      } finally { download.cancelAndJoin() }
+      f.checkReleased()
+    } finally {
+      s.close()
+      f.store.cleanup()
+    }
+  }
+
+  @Test
+  fun endpointsQueuedBeforeAResetAreNeverDialed() = runTest {
+    val f = Fixture(setOf("0"))
+    val s = Swarm(f, limit = 8, dialCapacity = 8, discoveredCapacity = 8)
+    try {
+      f.store.initialize()
+      // The old tracker's peers wait in the queue while the session moves to another tracker.
+      val old = List(3) { PeerEndpoint("10.0.0.${it + 1}", 6881) }
+      for (endpoint in old) {
+        s.discovered.send(TorrentV2Discovered(endpoint, PeerTopic.V2, PeerOrigin.TRACKER,
+          generation = 0))
+      }
+      s.generation = 1
+      val done = CompletableDeferred<Unit>()
+      s.controls.send(TorrentV2SessionLoop.Control.Reset(done, 1))
+      // The new tracker's peer, found after the reset.
+      val fresh = PeerEndpoint("10.0.1.1", 6881)
+      s.discovered.send(TorrentV2Discovered(fresh, PeerTopic.V2, PeerOrigin.TRACKER,
+        generation = 1))
+      val download = swarmDownload(f, s, maxPeers = 8)
+      try {
+        runCurrent()
+        assertTrue(done.isCompleted)
+        val dialed = generateSequence { s.dial.tryReceive().getOrNull() }.toList()
+        assertEquals(listOf(fresh), dialed.map { it.endpoint })
+        assertEquals(1L, dialed.single().generation)
         assertFalse(download.isCompleted)
       } finally { download.cancelAndJoin() }
       f.checkReleased()

@@ -36,7 +36,7 @@ class TorrentV2MetadataServingTest {
           "ketch-v2-metadata-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}")
           .also { torrentFileSystem.createDirectories(it) }
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = policy))
+          uploadPolicy = policy), listenHost = "127.0.0.1")
         try {
           engine.start()
           val owner = engine.addV2Task(TorrentV2TaskSpec("serving", fixture.document,

@@ -32,6 +32,11 @@ internal class TorrentSessionRegistry {
     entries[taskId]?.session
   }
 
+  /** The task that owns [infoHash]'s swarm, if any. */
+  suspend fun ownerOf(infoHash: String): String? = mutex.withLock {
+    entries.entries.firstOrNull { it.value.infoHash == infoHash }?.key
+  }
+
   suspend fun isReserved(taskId: String): Boolean = mutex.withLock { taskId in entries }
 
   suspend fun release(taskId: String) = mutex.withLock {

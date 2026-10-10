@@ -41,7 +41,7 @@ class MixedDownloadLimitsTest {
         torrentFileSystem.createDirectories(root)
         torrentFileSystem.write(root / "seed") { write(bytes) }
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
         val http = object : HttpEngine {
           override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
@@ -120,7 +120,7 @@ class MixedDownloadLimitsTest {
         torrentFileSystem.createDirectories(root)
         torrentFileSystem.write(root / "seed") { write(bytes) }
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
         val ketch = Ketch(UnusedHttp, additionalSources = listOf(source))
         try {

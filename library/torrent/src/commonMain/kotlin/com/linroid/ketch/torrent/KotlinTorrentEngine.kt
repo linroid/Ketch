@@ -72,6 +72,12 @@ internal class KotlinTorrentEngine(
   private val allowLocalPeers: Boolean = false,
   private val discoveryIntervalMs: Long = 30_000,
   private val nowMs: () -> Long = monotonicClock(),
+  /**
+   * Test hook: the address peers reach us on, every interface by default. Tests that dial us on
+   * loopback listen there, as on macOS another socket bound to 127.0.0.1 on the same port takes
+   * loopback connections from a wildcard listener and resets them when it closes.
+   */
+  private val listenHost: String = WILDCARD_IPV4,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -157,12 +163,12 @@ internal class KotlinTorrentEngine(
   override suspend fun start() = mutex.withLock {
     check(!closed && shutdown.load() == null) { "Torrent runtime is closed" }
     if (running.load()) return@withLock
-    val listener = network.listen(PeerEndpoint("0.0.0.0", config.listenPort))
+    val listener = network.listen(PeerEndpoint(listenHost, config.listenPort))
     advertisedPort.setListen(listener.local.port)
     running.store(true)
     acceptIncoming(listener)
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
-    val ipv6 = try {
+    val ipv6 = listenHost == WILDCARD_IPV4 && try {
       acceptIncoming(network.listen(PeerEndpoint("::", listenPort)))
       true
     } catch (_: Exception) {
@@ -1200,6 +1206,8 @@ internal class KotlinTorrentEngine(
     }
   }
 }
+
+private const val WILDCARD_IPV4 = "0.0.0.0"
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128

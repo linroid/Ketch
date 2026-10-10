@@ -246,24 +246,26 @@ and full SHA-256 identity with ownership checkpoints; `.ketch-v2-<task-id>.creat
 output root also recovers owned files created before the first checkpoint. Keep this journal with
 the task until removal. Configure a durable `TaskStore` to retain task records across processes.
 
-V2 and hybrid torrents accept incoming peers: the engine routes each connection by the 20-byte
-wire tag in its handshake, both of a hybrid's tags to its one task. They upload, seed, serve
-BEP 52 proofs from the piece layer and, for verified pieces, the block layer, exchange peers, and
-take part in v1 swarms: a hybrid talks to v1-only peers, announces its v1 hash to trackers with
-tier state of its own and looks it up in DHT too. A private hybrid announces both hashes to one
-tracker at a time and moves both to the next one together (BEP 27). Pieces read back for peers
-and proofs waiting to be sent take at most half of `maxBufferedBytes` across all torrents, v1
-and v2, so uploading never starves downloads. The default 32 MiB holds the largest pieces; with
-less, pieces larger than half of it are never uploaded. A piece read back to prove its block
-hashes is paid for from both upload limits once it was read, like uploading it, and the block
-hashes of the last few pieces proved are kept, so repeated requests read nothing. The Fast
-extension (BEP 6) is not negotiated.
+V2 and hybrid torrents accept incoming peers: the engine routes each connection by the 20-byte wire
+tag in its handshake, both of a hybrid's tags to its one task. They upload, seed, serve BEP 52
+proofs from the piece layer and, for verified pieces, the block layer, exchange peers, and take part
+in v1 swarms: a hybrid talks to v1-only peers, announces its v1 hash to trackers with tier state of
+its own and looks it up in DHT too. A private hybrid announces both hashes to one tracker at a time
+and moves both to the next one together (BEP 27). Pieces read back for peers and proofs waiting to
+be sent take at most half of `maxBufferedBytes` across all torrents, v1 and v2, so uploading never
+starves downloads. The default 32 MiB holds the largest pieces; with less, pieces larger than half
+of it are never uploaded. A piece read back to prove its block hashes is paid for from both upload
+limits once it was read, like uploading it: a limit owes at most a tenth of a second (or one block)
+of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
+starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
+so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
+answering their handshake, v2 and hybrid like v1. The Fast extension (BEP 6) is not negotiated.
 Seeding ends when the task is removed, when the upload policy leaves seeding, when a download
-waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's, or when Ketch
-quits; a torrent that finishes while a download waits for a slot does not seed at all. Seeding
-shows as Completed and is not resumed after a restart. On Android a seeding-only app is not kept
-in the foreground, so Android may stop it, and its seeding, in the background; on iOS seeding
-stops while the app is suspended.
+waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's, when the same
+torrent is added as another task, which takes the seeder's slot, or when Ketch quits; a torrent that
+finishes while a download waits for a slot does not seed at all. Seeding shows as Completed and is
+not resumed after a restart. On Android a seeding-only app is not kept in the foreground, so Android
+may stop it, and its seeding, in the background; on iOS seeding stops while the app is suspended.
 
 This version does not implement uTP, protocol encryption, web seeds, NAT mapping, local service
 discovery, torrent creation, or ratio management. No automatic incoming-port mapping is

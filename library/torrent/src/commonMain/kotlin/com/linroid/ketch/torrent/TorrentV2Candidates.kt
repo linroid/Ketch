@@ -5,12 +5,16 @@ import okio.ByteString
 /** The swarm a discovered endpoint belongs to: the v1 hash's or the v2 hash's. */
 internal enum class PeerTopic { V1, V2 }
 
-/** One endpoint discovery found, with the [flags] a peer advertised for it (PEX only). */
+/**
+ * One endpoint discovery found, with the [flags] a peer advertised for it (PEX only), in the
+ * session [generation] it was found in: a tracker reset makes it stale even while it is queued.
+ */
 internal data class TorrentV2Discovered(
   val endpoint: PeerEndpoint,
   val topic: PeerTopic,
   val origin: PeerOrigin,
   val flags: Int = 0,
+  val generation: Long = 0,
 )
 
 /** What a dial worker needs to reach one candidate; workers never read the candidate book. */

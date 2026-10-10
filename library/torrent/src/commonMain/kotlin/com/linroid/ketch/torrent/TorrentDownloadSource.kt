@@ -479,7 +479,7 @@ class TorrentDownloadSource(
         "files=${selected.size}/${metadata.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
-    withActiveSlot(context, total) {
+    withActiveSlot(context, total, hash) {
       tasks.reserve(context.taskId, hash)
       var session: TorrentSession? = null
       var keepSeeding = false
@@ -616,7 +616,7 @@ class TorrentDownloadSource(
         "files=${selected.size}/${resolved.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
-    withActiveSlot(context, total) {
+    withActiveSlot(context, total, hash) {
       tasks.reserve(context.taskId, hash)
       var engine: KotlinTorrentEngine? = null
       var session: TorrentV2DownloadSession? = null
@@ -720,15 +720,22 @@ class TorrentDownloadSource(
   /**
    * Runs [block] holding one of the engine's [TorrentConfig.maxActiveTorrents] slots. When every
    * slot is taken the task waits, cancellably, by priority and then arrival instead of failing;
-   * the oldest seeder yields its slot first. [block] returns true when it lent the slot to a
-   * seeding session, which gives it back on eviction or [release].
+   * the oldest seeder yields its slot first. A seeder of the same torrent [hash], such as a
+   * finished task's, gives way to the new task and hands it its slot, since one swarm has one
+   * owner. [block] returns true when it lent the slot to a seeding session, which gives it back
+   * on eviction or [release].
    */
   private suspend fun withActiveSlot(
     context: DownloadContext,
     total: Long,
+    hash: String,
     block: suspend () -> Boolean,
   ) {
-    val evicted = slots.acquire(context.request.priority) {
+    // Only a lent seeder can be reclaimed; an active download of the same torrent still refuses
+    // this task when it reserves the hash.
+    val sameTorrent = tasks.ownerOf(hash)
+      ?.takeIf { it != context.taskId && slots.reclaim(it) }
+    val evicted = sameTorrent ?: slots.acquire(context.request.priority) {
       log.i {
         "Torrent taskId=${context.taskId} waits for one of ${config.maxActiveTorrents} " +
           "active torrent slots"

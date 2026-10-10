@@ -72,7 +72,7 @@ class TorrentV2IncomingTest {
   ) {
     val root = root()
     val output = root / "payload"
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false), listenHost = "127.0.0.1")
     try {
       engine.start()
       val session = engine.addV2Task(spec(document, output, discover))
@@ -255,6 +255,7 @@ class TorrentV2IncomingTest {
   private suspend fun restricted(
     document: TorrentV2Document,
     privacy: TorrentDiscoveryPrivacy,
+    maxPeers: Int = 4,
     body: suspend (TorrentV2DownloadSession, TorrentV2DiscoverySink, TorrentNetwork,
       () -> Int) -> Unit,
   ) = coroutineScope {
@@ -271,7 +272,7 @@ class TorrentV2IncomingTest {
     val session = TorrentV2DownloadSession.open(this, document,
       TorrentContentLayout.from(document.info), emptySet(), store,
       TorrentV2Runtime(network, peerId(9), buffers, state),
-      TorrentV2SessionOptions(maxPeers = 4, privacy = privacy, waitForPeers = true,
+      TorrentV2SessionOptions(maxPeers = maxPeers, privacy = privacy, waitForPeers = true,
         discovery = { sink ->
           starts++
           sink.trackerPeers(topic, listOf(PeerEndpoint("127.0.0.2", 6881)))
@@ -333,6 +334,47 @@ class TorrentV2IncomingTest {
             } finally { known.close() }
           } finally { listener.close() }
         }
+      }
+    }
+  }
+
+  @Test
+  fun fullOwnerClosesPeersThatDialItUnanswered() = runTest {
+    loopback {
+      val document = document()
+      restricted(document, TorrentDiscoveryPrivacy.PUBLIC, maxPeers = 1) { session, _, network, _ ->
+        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+        try {
+          val first = arrive(network, listener)
+          try {
+            assertTrue(session.accept(first.server))
+            PeerIdentityHandshake(document.identity).initiate(first.client,
+              PeerIdentityHandshake.Mode.V2, peerId(1), handshakes)
+            val wire = PeerWire(first.client, pieceCount = 1)
+            wire.send(PeerMessage.Bitfield(byteArrayOf(128.toByte())))
+            wire.readUntil { it == PeerMessage.Control(PeerMessage.Signal.INTERESTED) }
+            // The only place is taken. More peers dial in than the responders and the handoff
+            // hold, and none of them hears our handshake: each is closed instead of left waiting.
+            repeat(8) { index ->
+              val extra = arrive(network, listener)
+              try {
+                // Refused, the engine closes it, as the route does.
+                if (!session.accept(extra.server)) extra.server.close()
+                val answer = runCatching {
+                  withTimeout(5_000) {
+                    PeerIdentityHandshake(document.identity).initiate(extra.client,
+                      PeerIdentityHandshake.Mode.V2, peerId(index + 2), handshakes)
+                  }
+                }
+                val failure = assertNotNull(answer.exceptionOrNull(), "Peer $index was answered")
+                assertFalse(failure is TimeoutCancellationException, "Peer $index was kept open")
+              } finally { extra.close() }
+            }
+            // The peer in the pool carries on.
+            serve(wire, announce = false)
+            session.state.first { it == TorrentSessionState.FINISHED }
+          } finally { first.close() }
+        } finally { listener.close() }
       }
     }
   }

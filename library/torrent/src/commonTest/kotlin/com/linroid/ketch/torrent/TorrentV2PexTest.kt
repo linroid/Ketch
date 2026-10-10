@@ -32,7 +32,7 @@ class TorrentV2PexTest {
 
   private fun engine(policy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED) =
     KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, uploadPolicy = policy),
-      allowLocalPeers = true)
+      allowLocalPeers = true, listenHost = "127.0.0.1")
 
   private fun local(port: Int) = PeerEndpoint("127.0.0.1", port)
 

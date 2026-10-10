@@ -77,7 +77,8 @@ class KotlinTorrentV2SeedTest {
       withTimeout(30_000) {
         val root = root()
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = policy, uploadRateLimit = uploadRateLimit), http = TorrentHttp(http))
+          uploadPolicy = policy, uploadRateLimit = uploadRateLimit), http = TorrentHttp(http),
+          listenHost = "127.0.0.1")
         try {
           engine.start()
           body(engine, root)

@@ -140,6 +140,44 @@ class TorrentSourceSeedingTest {
     }
   }
 
+  @Test
+  fun sameV1TorrentTakesOverItsSeeder() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        // A free slot: nothing has to be evicted for the second task to start.
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          maxActiveTorrents = 2)).also { it.engineFactory = { engine } }
+        try {
+          val resolved = source.resolveMetainfo(v1Metainfo("again"))
+          val hash = resolved.metadata.getValue("infoHash")
+          val seeder = FakeTorrentSession(hash)
+          engine.addTorrentResult = seeder
+          val seeds = launch {
+            eventually { seeder.resumed }
+            seeder.seed()
+          }
+          source.download(context("first", resolved, "unused-first"))
+          seeds.join()
+          assertTrue(engine.removedTorrents.isEmpty())
+          // The same torrent again, as another task: the seeder gives way instead of failing it.
+          val again = FakeTorrentSession(hash)
+          engine.addTorrentResult = again
+          val finishes = launch {
+            eventually { again.resumed }
+            again.finish()
+          }
+          source.download(context("second", resolved, "unused-second"))
+          finishes.join()
+          assertEquals(listOf(hash to false, hash to false), engine.removedTorrents)
+          // The first task finds nothing left to stop.
+          source.release("first", null)
+          assertEquals(2, engine.removedTorrents.size)
+        } finally { source.close() }
+      }
+    }
+  }
+
   // Pieces of 32 KiB: a spans pieces 0 and 1, b is piece 2, c is piece 3.
   private val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5, "c" to 20_000))
 
@@ -160,9 +198,11 @@ class TorrentSourceSeedingTest {
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           maxActiveTorrents = maxActiveTorrents,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION)).also {
-          it.engineFactory = { config -> KotlinTorrentEngine(config).also { created ->
-            engine = created
-          } }
+          it.engineFactory = { config ->
+            KotlinTorrentEngine(config, listenHost = "127.0.0.1").also { created ->
+              engine = created
+            }
+          }
         }
         try {
           body(source, { checkNotNull(engine) }, root)
@@ -234,6 +274,27 @@ class TorrentSourceSeedingTest {
       // The new task seeds on the slot until it is removed too.
       source.release("other", null)
       assertTrue(engine().hasFreeSlot())
+      assertEquals(emptySet(), engine().incomingTags())
+      assertEquals(0, engine().admittedSessionBytes)
+    }
+
+  @Test
+  fun sameV2TorrentTakesOverItsSeeder() =
+    v2Seeding(maxActiveTorrents = 2) { source, engine, root ->
+      source.resumeSeeded("seeder", fixture, root / "seeding")
+      assertTrue(engine().hasFreeSlot())
+      // The same torrent again, into another folder: the seeder leaves the swarm to it.
+      source.resumeSeeded("again", fixture, root / "again")
+      assertEquals(TorrentRouteTable.tagsOf(fixture.document.identity).toSet(),
+        engine().incomingTags())
+      assertContentEquals(fixture.payloads[0],
+        torrentFileSystem.read(root / "again" / "a") { readByteArray() })
+      // The first task's seeder is gone, and the slot it held went to the new task.
+      source.release("seeder", null)
+      assertTrue(engine().hasFreeSlot())
+      source.setTaskUploadRateLimit("again", 0)
+      assertFailsWith<IllegalStateException> { source.setTaskUploadRateLimit("seeder", 0) }
+      source.release("again", null)
       assertEquals(emptySet(), engine().incomingTags())
       assertEquals(0, engine().admittedSessionBytes)
     }

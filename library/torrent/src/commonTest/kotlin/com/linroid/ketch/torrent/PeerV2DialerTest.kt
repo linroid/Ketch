@@ -232,6 +232,39 @@ class PeerV2DialerTest {
   }
 
   @Test
+  fun answeredPeerTheConsumerDoesNotTakeIsClosedAfterTheHandoff() = runTest {
+    val f = Fixture()
+    val peers = List(2) { Dialing(50_000 + it) }
+    val incoming = Channel<PeerV2Dialer.Incoming>(2)
+    peers.forEach { incoming.send(PeerV2Dialer.Incoming(it, 0)) }
+    PeerV2Dialer.run(endpoints(0), f.state, parallelism = 1, connect = { f.connect(it) },
+      incoming = incoming, respondParallelism = 2, handoffMs = 1_000,
+      respond = { peer ->
+        PeerV2Connector.respond(peer.connection, document, layout,
+          ByteArray(20) { 1 }.toByteString(), f.buffers, f.state, generation = peer.generation)
+      },
+    ) { dialer ->
+      // Both are answered; one waits in the output while the other waits to be handed over.
+      runCurrent()
+      assertTrue(peers.none { it.closed })
+      advanceTimeBy(999)
+      runCurrent()
+      assertTrue(peers.none { it.closed })
+      // The consumer, such as a full pool, took neither in time: the waiting one is closed.
+      advanceTimeBy(2)
+      runCurrent()
+      assertEquals(1, peers.count { it.closed })
+      val taken = dialer.connections.receive()
+      val open = peers.single { !it.closed }
+      assertEquals(PeerV2Origin.Incoming(open.remote), taken.info.origin)
+      taken.close()
+      assertTrue(open.closed)
+    }
+    incoming.cancel()
+    f.released()
+  }
+
+  @Test
   fun endpointStreamFailureFollowsAlreadyQueuedConnections() = runTest {
     val f = Fixture()
     val input = Channel<PeerEndpoint>(1)

@@ -66,7 +66,7 @@ class PublicV2IndependentLeecherTest {
       val root = Files.createTempDirectory("ketch-public-v2-leecher").toFile()
       val leech = root.resolve("leech").apply { mkdirs() }
       val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-        uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+        uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
       val manager = SessionManager()
       try {
         engine.start()

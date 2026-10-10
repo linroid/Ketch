@@ -41,7 +41,8 @@ class TorrentV2HybridV1PeerTest {
         val network = createTorrentNetwork()
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val requests = mutableListOf<PeerMessage.Request>()
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          listenHost = "127.0.0.1")
         val seeder = async(start = CoroutineStart.LAZY) {
           val connection = if (incoming) {
             network.connect(PeerEndpoint("127.0.0.1", engine.listenPort)).also {

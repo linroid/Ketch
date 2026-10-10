@@ -245,7 +245,8 @@ class TorrentUploadTest {
         torrentFileSystem.write(root / "data") { write(bytes) }
         // The engine's shared cap, a byte a second: its bucket holds one block to start with.
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION, uploadRateLimit = 1))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION, uploadRateLimit = 1),
+          listenHost = "127.0.0.1")
         val network = createTorrentNetwork()
         try {
           engine.start()

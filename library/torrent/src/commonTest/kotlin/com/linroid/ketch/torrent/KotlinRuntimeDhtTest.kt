@@ -34,7 +34,7 @@ class KotlinRuntimeDhtTest {
           torrentFileSystem.createDirectories(root)
           torrentFileSystem.write(root / "seed") { write(bytes) }
           val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-            uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+            uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
           val network = createTorrentNetwork()
           fun node(socket: TorrentDatagramSocket) = DhtNode(socket, this,
             allowLocalAddresses = true).also { it.start() }

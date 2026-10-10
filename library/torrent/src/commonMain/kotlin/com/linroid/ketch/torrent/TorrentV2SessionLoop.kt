@@ -48,6 +48,11 @@ internal class TorrentV2Swarm(
   val onCompleted: suspend () -> Boolean = { false },
   /** Counts payload bytes a peer on a v1 route confirmed, as a hybrid's v1 swarm's share. */
   val uploadedOverV1: (Int) -> Unit = {},
+  /**
+   * Told whether the pool has room for another peer, whenever the loop is about to wait; while
+   * it has none, peers that dial us are closed unanswered, as a v1 swarm does.
+   */
+  val onRoom: (Boolean) -> Unit = {},
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -437,6 +442,8 @@ internal object TorrentV2SessionLoop {
           stop(existing)
         }
         val peer = connected.attach(pool) ?: return refuse("no capacity left")
+        // Before the peer hears from us: peers that dial us next see a full pool at once.
+        swarm.onRoom(pool.size < limit && pool.remainingCapacity > 0)
         val member = Member(info.peerId, host, attached++)
         member.listen = dialed ?: learned
         member.listenDialed = member.listen != null
@@ -554,6 +561,8 @@ internal object TorrentV2SessionLoop {
             discoveryOpen || swarm.waitForPeers)) {
           "All torrent peers disconnected before completion"
         }
+        val room = acceptingConnections && pool.size < limit && pool.remainingCapacity > 0
+        swarm?.onRoom?.invoke(room)
         val event = select<Event> {
           repeat(branches) { offset ->
             when ((preference + offset) % branches) {
@@ -565,7 +574,7 @@ internal object TorrentV2SessionLoop {
                 result.getOrNull()?.let { Event.Peer(it) }
                   ?: Event.Stopped(result.exceptionOrNull())
               }
-              2 -> if (acceptingConnections && pool.size < limit && pool.remainingCapacity > 0) {
+              2 -> if (room) {
                 checkNotNull(connections).onReceiveCatching { Event.Connection(it) }
               }
               3 -> if (discoveryOpen) {
@@ -612,6 +621,9 @@ internal object TorrentV2SessionLoop {
               discoveryOpen = false
               // A failed discovery fails the session, which a later resume retries.
               event.value.exceptionOrNull()?.let { throw it }
+            } else if (found.generation < checkNotNull(swarm).generation()) {
+              // Found before a tracker reset, it belongs to the old trackers' swarm (BEP 27).
+              log.v { "V2 swarm $label: dropped a peer found before a reset" }
             } else checkNotNull(book).offer(found.endpoint, found.topic, found.origin, found.flags)
           }
           is Event.DialFailed -> {

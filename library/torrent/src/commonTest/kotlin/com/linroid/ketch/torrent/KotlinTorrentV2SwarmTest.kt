@@ -59,7 +59,7 @@ class KotlinTorrentV2SwarmTest {
       withTimeout(30_000) {
         val root = root()
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         try {
           seeder.start()
           val output = root / "seed"

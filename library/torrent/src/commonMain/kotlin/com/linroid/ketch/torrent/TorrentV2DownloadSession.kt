@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.ByteString
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -193,6 +194,8 @@ internal class TorrentV2DownloadSession private constructor(
   private val allowedHosts = mutableMapOf<TrackerTopic, Set<String>>()
   /** Raised by every reset; connections and dial targets of older ones are closed. */
   private val generation = AtomicLong(0)
+  // Whether the running transfer's pool has room for a peer that dials us; see [accept].
+  private val room = AtomicBoolean(true)
   /** The running transfer's control queue, for [resetPeers]. */
   private val controls = AtomicReference<SendChannel<TorrentV2SessionLoop.Control>?>(null)
 
@@ -290,7 +293,8 @@ internal class TorrentV2DownloadSession private constructor(
   fun accept(connection: TorrentConnection): Boolean {
     if (!admission.tryLock()) return false
     try {
-      if (!accepting) return false
+      // A full pool refuses at once, before any handshake, as a v1 swarm does.
+      if (!accepting || !room.load()) return false
       if (restricted && allowedHosts.values.none { connection.remote.host in it }) return false
       return incoming.trySend(PeerV2Dialer.Incoming(connection, generation.load())).isSuccess
     } finally { admission.unlock() }
@@ -366,9 +370,11 @@ internal class TorrentV2DownloadSession private constructor(
     private val controls: SendChannel<TorrentV2SessionLoop.Control>,
   ) : TorrentV2DiscoverySink {
     override suspend fun offer(endpoint: PeerEndpoint, topic: PeerTopic, origin: PeerOrigin) {
-      // Once its transfer has ended, the sink drops what it is offered.
+      // Once its transfer has ended, the sink drops what it is offered. Stamped before it waits
+      // for room, an endpoint queued across a reset is dropped rather than dialed (BEP 27).
       try {
-        discovered.send(TorrentV2Discovered(endpoint, topic, origin))
+        discovered.send(TorrentV2Discovered(endpoint, topic, origin,
+          generation = generation.load()))
       } catch (_: ClosedSendChannelException) {
         // Closed with the transfer.
       } catch (_: CancellationException) {
@@ -378,7 +384,8 @@ internal class TorrentV2DownloadSession private constructor(
     }
 
     override fun tryOffer(endpoint: PeerEndpoint, topic: PeerTopic, origin: PeerOrigin): Boolean =
-      discovered.trySend(TorrentV2Discovered(endpoint, topic, origin)).isSuccess
+      discovered.trySend(TorrentV2Discovered(endpoint, topic, origin,
+        generation = generation.load())).isSuccess
 
     override suspend fun trackerPeers(topic: TrackerTopic, peers: List<PeerEndpoint>) =
       this@TorrentV2DownloadSession.trackerPeers(topic, peers)
@@ -412,6 +419,7 @@ internal class TorrentV2DownloadSession private constructor(
     val dial = Channel<TorrentV2DialTarget>(DIAL_QUEUE)
     val failures = dialFailures(maxPeers)
     controls.store(loopControls)
+    room.store(true)
     val discovery = launch {
       try { discover(Sink(discovered, loopControls)) } catch (error: Throwable) {
         discovered.close(error)
@@ -434,8 +442,11 @@ internal class TorrentV2DownloadSession private constructor(
           incoming = incoming,
           respondParallelism = RESPOND_WORKERS,
           respond = { peer ->
-            PeerV2Connector.respond(peer.connection, document, layout, peerId, buffers, memory,
-              extensions = true, generation = peer.generation)
+            // The pool filled while the peer waited: it is closed unanswered.
+            if (!room.load()) null else {
+              PeerV2Connector.respond(peer.connection, document, layout, peerId, buffers, memory,
+                extensions = true, generation = peer.generation)
+            }
           },
           failures = failures,
         ) { dialer ->
@@ -458,7 +469,8 @@ internal class TorrentV2DownloadSession private constructor(
                 swarm = TorrentV2Swarm(document, runtime, restricted, waitForPeers, discovered,
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
-                  uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) }))
+                  uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
+                  onRoom = room::store))
             }
           }
         }
