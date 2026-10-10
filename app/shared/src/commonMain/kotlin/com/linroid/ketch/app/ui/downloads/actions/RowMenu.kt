@@ -68,7 +68,6 @@ import ketch.app.shared.generated.resources.batch_download_again
 import ketch.app.shared.generated.resources.batch_open
 import ketch.app.shared.generated.resources.batch_pause
 import ketch.app.shared.generated.resources.batch_remove
-import ketch.app.shared.generated.resources.batch_remove_files
 import ketch.app.shared.generated.resources.batch_resume
 import ketch.app.shared.generated.resources.batch_retry
 import ketch.app.shared.generated.resources.batch_show_in_folder
@@ -586,8 +585,6 @@ internal fun batchLabel(action: RowAction, count: Int, revealLabel: UiText?): Ui
     RowAction.DownloadAgain -> Res.plurals.batch_download_again.text(count)
     RowAction.StopAndDiscard -> Res.plurals.batch_discard.text(count)
     RowAction.Remove -> Res.plurals.batch_remove.text(count)
-    RowAction.RemoveAndTrash, RowAction.RemoveAndDelete ->
-      Res.plurals.batch_remove_files.text(count)
     else -> action.label
   }
 
@@ -602,7 +599,6 @@ internal val RowAction.command: KetchCommand?
     RowAction.Retry -> KetchCommands.Retry
     RowAction.Details -> KetchCommands.ShowDetails
     RowAction.Remove -> KetchCommands.Remove
-    RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> KetchCommands.RemoveAndTrash
     else -> null
   }
 
@@ -628,5 +624,5 @@ internal val RowAction.icon: KetchIcon
     RowAction.RetryWithOptions, RowAction.EnterCredentials -> KetchIcon.Settings
     RowAction.FindAnotherSource -> KetchIcon.Discover
     RowAction.StopAndDiscard -> KetchIcon.Stop
-    RowAction.Remove, RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> KetchIcon.Trash
+    RowAction.Remove -> KetchIcon.Trash
   }

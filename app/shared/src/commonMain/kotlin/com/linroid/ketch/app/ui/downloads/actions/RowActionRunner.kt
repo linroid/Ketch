@@ -191,9 +191,8 @@ internal class RowActionRunner(
     files?.canTrash == true && !row.device.capabilities.isRemote
 
   /** The actions [row] offers here, in menu order, its primary one included. */
-  fun menu(row: TaskRow): List<RowAction> = actionsOf(row).menu
-    .map { if (it == RowAction.RemoveAndDelete && canTrash(row)) RowAction.RemoveAndTrash else it }
-    .filter { commands.canRun(it, row) }
+  fun menu(row: TaskRow): List<RowAction> =
+    actionsOf(row).menu.filter { commands.canRun(it, row) }
 
   /** The hover buttons of [row] that can run here, before "⋯". */
   fun hover(row: TaskRow): List<RowAction> =
@@ -233,7 +232,7 @@ internal class RowActionRunner(
     when (action) {
       RowAction.Details -> inspect(row.key)
       RowAction.StopAndDiscard -> dialog = RowDialog.Discard(rows)
-      RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> dialog = RowDialog.Remove(rows, true)
+      RowAction.Remove -> dialog = RowDialog.Remove(rows, withFiles = false)
       else -> commands.run(action, row)
     }
   }
@@ -374,10 +373,7 @@ internal class RowActionRunner(
       RowAction.StartNow -> state.startNow(applies.map { it.task })
       RowAction.DownloadAgain -> state.redownload(applies.map { it.task })
       RowAction.StopAndDiscard -> dialog = RowDialog.Discard(applies)
-      RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> {
-        dialog = RowDialog.Remove(applies, withFiles = true)
-      }
-      RowAction.Remove -> state.remove(applies.map { it.task })
+      RowAction.Remove -> dialog = RowDialog.Remove(applies, withFiles = false)
       RowAction.CopyLink -> commands.copy(CopiedText.Link) { applies.map { it.request.url } }
       RowAction.CopyPath -> commands.copy(CopiedText.Path) { applies.mapNotNull { it.outputFile } }
       else -> applies.forEach { commands.run(action, it) }
@@ -556,8 +552,6 @@ internal class RowActionRunner(
       RowAction.DownloadAgain,
       RowAction.StopAndDiscard,
       RowAction.Remove,
-      RowAction.RemoveAndTrash,
-      RowAction.RemoveAndDelete,
     )
   }
 }

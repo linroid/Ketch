@@ -132,10 +132,8 @@
   <string name="action_row_open_source_page">Quellseite öffnen</string>
   <string name="action_row_copy_error">Fehler kopieren</string>
   <string name="action_row_copy_details">Details kopieren</string>
-  <string name="action_row_stop_and_discard">Stoppen und Fortschritt verwerfen…</string>
-  <string name="action_row_remove">Aus der Liste entfernen</string>
-  <string name="action_row_remove_and_trash">Entfernen und Datei in den Papierkorb legen…</string>
-  <string name="action_row_remove_and_delete">Entfernen und Dateien löschen…</string>
+  <string name="action_row_stop_and_discard">Download abbrechen…</string>
+  <string name="action_row_remove">Entfernen…</string>
   <plurals name="batch_pause">
     <item quantity="one">%1$d Download pausieren</item>
     <item quantity="other">%1$d Downloads pausieren</item>
@@ -170,22 +168,18 @@
     <item quantity="other">%1$d Dateien erneut herunterladen</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Fortschritt von %1$d Download verwerfen…</item>
-    <item quantity="other">Fortschritt von %1$d Downloads verwerfen…</item>
+    <item quantity="one">%1$d Download abbrechen…</item>
+    <item quantity="other">%1$d Downloads abbrechen…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">%1$d Download aus der Liste entfernen</item>
-    <item quantity="other">%1$d Downloads aus der Liste entfernen</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">%1$d Download und seine Datei entfernen…</item>
-    <item quantity="other">%1$d Downloads und ihre Dateien entfernen…</item>
+    <item quantity="one">%1$d Download entfernen…</item>
+    <item quantity="other">%1$d Downloads entfernen…</item>
   </plurals>
   <string name="bar_speed">Geschwindigkeit</string>
   <string name="bar_copy_links">Links kopieren</string>
   <string name="bar_remove">Entfernen…</string>
   <string name="bar_copy_paths">Dateipfade kopieren</string>
-  <string name="bar_discard">Fortschritt verwerfen…</string>
+  <string name="bar_discard">Downloads abbrechen…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s: %2$d von %3$d ausgewählten</string>

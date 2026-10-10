@@ -129,10 +129,8 @@
   <string name="action_row_open_source_page">소스 페이지 열기</string>
   <string name="action_row_copy_error">오류 복사</string>
   <string name="action_row_copy_details">세부 정보 복사</string>
-  <string name="action_row_stop_and_discard">중지하고 진행 상황 삭제…</string>
-  <string name="action_row_remove">목록에서 제거</string>
-  <string name="action_row_remove_and_trash">제거하고 파일을 휴지통으로 이동…</string>
-  <string name="action_row_remove_and_delete">제거하고 파일 삭제…</string>
+  <string name="action_row_stop_and_discard">다운로드 취소…</string>
+  <string name="action_row_remove">제거…</string>
   <plurals name="batch_pause">
     <item quantity="other">다운로드 %1$d개 일시정지</item>
   </plurals>
@@ -159,19 +157,16 @@
     <item quantity="other">파일 %1$d개 다시 다운로드</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="other">다운로드 %1$d개의 진행 상황 삭제…</item>
+    <item quantity="other">다운로드 %1$d개 취소…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="other">목록에서 다운로드 %1$d개 제거</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="other">다운로드 %1$d개와 파일 제거…</item>
+    <item quantity="other">다운로드 %1$d개 제거…</item>
   </plurals>
   <string name="bar_speed">속도</string>
   <string name="bar_copy_links">링크 복사</string>
   <string name="bar_remove">제거…</string>
   <string name="bar_copy_paths">파일 경로 복사</string>
-  <string name="bar_discard">진행 상황 삭제…</string>
+  <string name="bar_discard">다운로드 취소…</string>
   <string name="bar_label_count">%1$s(%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">선택한 %3$d개 중 %2$d개 %1$s</string>

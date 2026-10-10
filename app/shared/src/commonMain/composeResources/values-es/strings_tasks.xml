@@ -132,10 +132,8 @@
   <string name="action_row_open_source_page">Abrir la página de origen</string>
   <string name="action_row_copy_error">Copiar error</string>
   <string name="action_row_copy_details">Copiar detalles</string>
-  <string name="action_row_stop_and_discard">Detener y descartar el progreso…</string>
-  <string name="action_row_remove">Quitar de la lista</string>
-  <string name="action_row_remove_and_trash">Quitar y mover el archivo a la papelera…</string>
-  <string name="action_row_remove_and_delete">Quitar y eliminar los archivos…</string>
+  <string name="action_row_stop_and_discard">Cancelar descarga…</string>
+  <string name="action_row_remove">Quitar…</string>
   <plurals name="batch_pause">
     <item quantity="one">Pausar %1$d descarga</item>
     <item quantity="other">Pausar %1$d descargas</item>
@@ -170,22 +168,18 @@
     <item quantity="other">Volver a descargar %1$d archivos</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Descartar el progreso de %1$d descarga…</item>
-    <item quantity="other">Descartar el progreso de %1$d descargas…</item>
+    <item quantity="one">Cancelar %1$d descarga…</item>
+    <item quantity="other">Cancelar %1$d descargas…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Quitar %1$d descarga de la lista</item>
-    <item quantity="other">Quitar %1$d descargas de la lista</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Quitar %1$d descarga y su archivo…</item>
-    <item quantity="other">Quitar %1$d descargas y sus archivos…</item>
+    <item quantity="one">Quitar %1$d descarga…</item>
+    <item quantity="other">Quitar %1$d descargas…</item>
   </plurals>
   <string name="bar_speed">Velocidad</string>
   <string name="bar_copy_links">Copiar enlaces</string>
   <string name="bar_remove">Quitar…</string>
   <string name="bar_copy_paths">Copiar rutas de archivo</string>
-  <string name="bar_discard">Descartar el progreso…</string>
+  <string name="bar_discard">Cancelar descargas…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s %2$d de %3$d seleccionadas</string>

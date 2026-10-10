@@ -36,7 +36,7 @@
   <string name="command_list_toggle">Приостановить или возобновить</string>
   <string name="command_list_open">Открыть</string>
   <string name="command_list_reveal">Показать в папке</string>
-  <string name="command_list_remove">Удалить из списка</string>
+  <string name="command_list_remove">Удалить</string>
   <string name="command_list_remove_and_trash">Удалить и переместить файлы в корзину…</string>
   <string name="command_list_copy_link">Копировать ссылку</string>
   <string name="command_list_copy_path">Копировать путь к файлу</string>

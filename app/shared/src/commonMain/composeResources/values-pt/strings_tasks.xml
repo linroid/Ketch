@@ -132,10 +132,8 @@
   <string name="action_row_open_source_page">Abrir página de origem</string>
   <string name="action_row_copy_error">Copiar erro</string>
   <string name="action_row_copy_details">Copiar detalhes</string>
-  <string name="action_row_stop_and_discard">Parar e descartar o progresso…</string>
-  <string name="action_row_remove">Remover da lista</string>
-  <string name="action_row_remove_and_trash">Remover e mover o arquivo para a lixeira…</string>
-  <string name="action_row_remove_and_delete">Remover e apagar os arquivos…</string>
+  <string name="action_row_stop_and_discard">Cancelar download…</string>
+  <string name="action_row_remove">Remover…</string>
   <plurals name="batch_pause">
     <item quantity="one">Pausar %1$d download</item>
     <item quantity="other">Pausar %1$d downloads</item>
@@ -170,22 +168,18 @@
     <item quantity="other">Baixar %1$d arquivos novamente</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Descartar o progresso de %1$d download…</item>
-    <item quantity="other">Descartar o progresso de %1$d downloads…</item>
+    <item quantity="one">Cancelar %1$d download…</item>
+    <item quantity="other">Cancelar %1$d downloads…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Remover %1$d download da lista</item>
-    <item quantity="other">Remover %1$d downloads da lista</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Remover %1$d download e o arquivo dele…</item>
-    <item quantity="other">Remover %1$d downloads e os arquivos deles…</item>
+    <item quantity="one">Remover %1$d download…</item>
+    <item quantity="other">Remover %1$d downloads…</item>
   </plurals>
   <string name="bar_speed">Velocidade</string>
   <string name="bar_copy_links">Copiar links</string>
   <string name="bar_remove">Remover…</string>
   <string name="bar_copy_paths">Copiar caminhos</string>
-  <string name="bar_discard">Descartar progresso…</string>
+  <string name="bar_discard">Cancelar downloads…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s %2$d de %3$d selecionados</string>

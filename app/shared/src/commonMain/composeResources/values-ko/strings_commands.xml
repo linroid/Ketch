@@ -36,7 +36,7 @@
   <string name="command_list_toggle">일시정지 또는 재개</string>
   <string name="command_list_open">열기</string>
   <string name="command_list_reveal">폴더에서 보기</string>
-  <string name="command_list_remove">목록에서 제거</string>
+  <string name="command_list_remove">제거</string>
   <string name="command_list_remove_and_trash">제거하고 파일을 휴지통으로 이동…</string>
   <string name="command_list_copy_link">링크 복사</string>
   <string name="command_list_copy_path">파일 경로 복사</string>
