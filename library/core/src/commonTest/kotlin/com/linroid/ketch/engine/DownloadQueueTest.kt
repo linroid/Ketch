@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
@@ -19,6 +20,7 @@ import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,6 +82,7 @@ class DownloadQueueTest {
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(record) {}
     }
   }
@@ -891,6 +894,38 @@ class DownloadQueueTest {
 
       assertNull(b.mutableQueuePosition.value)
       assertEquals(1, c.mutableQueuePosition.value)
+      assertEquals(httpRequest("b").url, engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun onTaskParked_releasesSlotAndPromotesNext() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val (a, b) = listOf("a", "b").map { createHandle(it, httpRequest(it)) }
+      listOf(a, b).forEach { queue.enqueue(it) }
+      runCurrent()
+      assertEquals(1, b.mutableQueuePosition.value)
+      val parked = DownloadState.Paused(
+        DownloadProgress(0, 10),
+        PauseReason.AwaitingFileSelection
+      )
+
+      // A stale state does not release the slot.
+      queue.onTaskParked("a", DownloadState.Paused(DownloadProgress(0, 10)))
+      runCurrent()
+      assertEquals(1, b.mutableQueuePosition.value)
+
+      a.mutableState.value = parked
+      queue.onTaskParked("a", parked)
+      runCurrent()
+
+      assertNull(a.mutableQueuePosition.value)
+      assertNull(b.mutableQueuePosition.value)
       assertEquals(httpRequest("b").url, engine.probed.last())
     } finally {
       coordinator.close()

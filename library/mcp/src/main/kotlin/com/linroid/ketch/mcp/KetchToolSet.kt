@@ -407,6 +407,7 @@ class KetchToolSet(
     is PauseReason.Preempted -> "preempted"
     PauseReason.WaitingForCondition -> "waiting_for_condition"
     PauseReason.Shutdown -> "shutdown"
+    PauseReason.AwaitingFileSelection -> "awaiting_file_selection"
   }
 
   private fun parsePriority(value: String): DownloadPriority =

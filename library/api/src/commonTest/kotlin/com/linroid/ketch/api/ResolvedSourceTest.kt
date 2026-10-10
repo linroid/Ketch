@@ -146,4 +146,32 @@ class ResolvedSourceTest {
       deserialized.selectionMode,
     )
   }
+
+  @Test
+  fun withoutBulkMetadata_dropsMetainfoKeepsFiles() {
+    val files = listOf(SourceFile("0", "a.mkv", 10), SourceFile("1", "b.srt", 2))
+    val source = ResolvedSource(
+      url = "magnet:?xt=urn:btih:abc",
+      sourceType = "torrent",
+      totalBytes = 12,
+      supportsResume = true,
+      suggestedFileName = "Pack",
+      maxSegments = 2,
+      metadata = mapOf(
+        ResolvedSource.METAINFO_KEY to "short",
+        "comment" to "x".repeat(ResolvedSource.MAX_VIEW_METADATA_CHARS + 1),
+        "name" to "Pack",
+        "edge" to "y".repeat(ResolvedSource.MAX_VIEW_METADATA_CHARS)
+      ),
+      files = files,
+    )
+
+    val view = source.withoutBulkMetadata()
+
+    assertEquals(setOf("name", "edge"), view.metadata.keys)
+    assertEquals(files, view.files)
+    assertEquals(source.copy(metadata = view.metadata), view)
+    val plain = source.copy(metadata = mapOf("name" to "Pack"))
+    assertTrue(plain.withoutBulkMetadata() === plain)
+  }
 }

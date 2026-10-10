@@ -180,6 +180,29 @@ internal class DownloadQueue(
     }
   }
 
+  /**
+   * Frees the slot of a task that stopped to wait for a file selection
+   * ([PauseReason.AwaitingFileSelection]) and starts the next one. Like [onTaskCompleted], it
+   * does nothing when [expectedState] is no longer the task's state.
+   */
+  suspend fun onTaskParked(taskId: String, expectedState: DownloadState? = null) {
+    mutex.withLock {
+      try {
+        if (expectedState != null &&
+          activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+        ) return
+        removeActive(taskId)
+        log.d {
+          "Task waits for a file selection: taskId=$taskId, " +
+            "active=${activeEntries.size}/$maxConcurrent"
+        }
+        promoteNext()
+      } finally {
+        publishPositions()
+      }
+    }
+  }
+
   suspend fun onTaskFailed(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
       try {

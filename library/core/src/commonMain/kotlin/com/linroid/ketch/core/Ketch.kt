@@ -2,7 +2,9 @@ package com.linroid.ketch.core
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
@@ -17,8 +19,8 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
@@ -32,30 +34,37 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RequestHeaders
+import com.linroid.ketch.core.engine.SelectionDelivery
+import com.linroid.ketch.core.engine.SelectionPlan
+import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
+import com.linroid.ketch.core.task.ControlOutcome
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
+import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskController
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -187,12 +196,15 @@ class Ketch(
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
       if (existing != null) {
-        // Live task controls are mutable; metadata and conditions are not persisted.
+        // Live task controls, the file selection included, are mutable; metadata and conditions
+        // are not persisted.
         require(existing.request.copy(
           connections = request.connections,
           speedLimit = request.speedLimit,
           priority = request.priority,
           schedule = request.schedule,
+          selectedFileIds = request.selectedFileIds,
+          awaitFileSelection = request.awaitFileSelection,
           resolvedSource = null,
           conditions = emptyList(),
         ) == request.copy(resolvedSource = null, conditions = emptyList())) {
@@ -302,7 +314,16 @@ class Ketch(
       handle: TaskHandle,
       destination: Destination?,
     ) {
-      if (handle.mutableState.value is DownloadState.Failed) {
+      val state = handle.mutableState.value
+      if (state is DownloadState.Paused && state.reason == PauseReason.AwaitingFileSelection) {
+        if (destination != null) {
+          log.d { "Ignoring the destination of taskId=${handle.taskId}, which waits for files" }
+        }
+        log.i { "Resuming taskId=${handle.taskId} with every file" }
+        selectFiles(handle, fileIds = null)
+        return
+      }
+      if (state is DownloadState.Failed) {
         coordinator.awaitCompletion(handle.taskId)
       }
       queue.enqueue(handle, preferResume = true, destination = destination)
@@ -359,6 +380,29 @@ class Ketch(
       queue.setPriority(taskId, priority)
     }
 
+    override suspend fun selectFiles(handle: TaskHandle, fileIds: Set<String>?): ControlOutcome {
+      val taskId = handle.taskId
+      while (true) {
+        val state = handle.mutableState.value
+        if (state is DownloadState.Canceled) {
+          throw IllegalStateException("Canceled downloads cannot change their files")
+        }
+        // Joins happen before the control lock is taken: a finishing or stopping execution
+        // must be able to end, and an execution that already stopped must be gone before the
+        // task starts again.
+        when {
+          state is DownloadState.Completed || state is DownloadState.Failed ||
+            state.isAwaitingFiles() -> coordinator.awaitCompletion(taskId)
+          state is DownloadState.Paused -> coordinator.awaitStopping(taskId)
+          else -> {}
+        }
+        if (coordinator.isFinishing(taskId)) coordinator.awaitCompletion(taskId)
+        val outcome = handle.controlLock.withLock { applySelection(handle, fileIds) }
+        // Null when the execution was finishing: join it, then plan again.
+        if (outcome != null) return outcome
+      }
+    }
+
     override suspend fun reschedule(
       handle: TaskHandle,
       schedule: DownloadSchedule,
@@ -378,6 +422,120 @@ class Ketch(
     }
   }
 
+  /**
+   * Validates, saves and applies a file selection; the caller holds the task's control lock.
+   * Saves the selection, its size, the new segment layout and the next generation in one record
+   * write, then hands it to the running execution, starts a task that waited for it or that
+   * gains files after it completed, or updates the state a stopped task shows. Returns `null`
+   * when the execution is finishing and the caller must join it and try again.
+   */
+  private suspend fun applySelection(handle: TaskHandle, fileIds: Set<String>?): ControlOutcome? {
+    val taskId = handle.taskId
+    if (coordinator.isFinishing(taskId)) return null
+    val record = handle.record.value
+    val state = handle.mutableState.value
+    if (state is DownloadState.Canceled) {
+      throw IllegalStateException("Canceled downloads cannot change their files")
+    }
+    val control = record.control ?: TaskControl()
+    val source = selectionSource(record)
+    val plan = source.planSelection(
+      SelectionRequest(
+        taskId = taskId,
+        fileIds = fileIds,
+        current = record.request.selectedFileIds,
+        resumeState = record.sourceResumeState,
+        resolved = record.request.resolvedSource,
+        segments = record.segments,
+        outputPath = record.outputPath,
+        completed = state is DownloadState.Completed,
+      )
+    )
+    val awaiting = record.awaitsFileSelection()
+    if (!plan.changed && !awaiting) {
+      log.d { "Selection of taskId=$taskId is unchanged" }
+      return ControlOutcome(control.selectionGeneration, control.seeding, null, replayed = false)
+    }
+    val running = coordinator.isActive(taskId)
+    val reopen = !running && state is DownloadState.Completed && plan.expands
+    val generation = control.selectionGeneration + if (plan.changed) 1 else 0
+    val now = Clock.System.now()
+    handle.record.update { r ->
+      r.copy(
+        request = r.request.copy(selectedFileIds = plan.fileIds),
+        totalBytes = plan.totalBytes,
+        segments = when {
+          reopen -> plan.segments ?: emptyList()
+          // A task that never started (or waits for files) starts fresh: segments would make it
+          // resume without an output path.
+          r.outputPath == null -> r.segments
+          else -> plan.segments ?: r.segments
+        },
+        state = if (reopen || awaiting) TaskState.QUEUED else r.state,
+        completedAt = if (reopen) null else r.completedAt,
+        control = (r.control ?: TaskControl()).copy(selectionGeneration = generation),
+        updatedAt = now,
+      )
+    }
+    val delivery = if (running) {
+      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
+    } else {
+      SelectionDelivery.NOT_RUNNING
+    }
+    when {
+      delivery == SelectionDelivery.DELIVERED -> {}
+      // Cannot happen while the lock is held, as an execution only starts finishing under it.
+      delivery == SelectionDelivery.FINISHING -> return null
+      reopen || awaiting -> {
+        queue.dequeue(taskId)
+        handle.mutableState.value = DownloadState.Queued
+        queue.enqueue(handle, preferResume = true)
+      }
+      else -> showStopped(handle, plan, handle.record.value.segments)
+    }
+    log.i {
+      "Selected files for taskId=$taskId: files=${plan.fileIds.size}, " +
+        "totalBytes=${plan.totalBytes}, generation=$generation" +
+        if (reopen) ", reopened" else ""
+    }
+    return ControlOutcome(generation, control.seeding, null, replayed = false)
+  }
+
+  /** The source that plans [record]'s selection: its own, else its request's, else its URL's. */
+  private fun selectionSource(record: TaskRecord): DownloadSource {
+    val url = record.request.url
+    record.sourceType?.let { return sourceResolver.resolveByType(it, url) }
+    record.request.resolvedSource?.let {
+      return sourceResolver.resolveByType(it.sourceType, it.url)
+    }
+    return sourceResolver.resolve(url)
+  }
+
+  /**
+   * Shows a saved selection on a task that is not running: a completed task's new size, or a
+   * paused one's saved [segments] and progress. Other states read the record when they start.
+   */
+  private fun showStopped(handle: TaskHandle, plan: SelectionPlan, segments: List<Segment>?) {
+    handle.mutableState.update { current ->
+      when (current) {
+        is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
+        is DownloadState.Paused -> current.copy(
+          progress = DownloadProgress(
+            segments?.sumOf { it.downloadedBytes } ?: 0L,
+            plan.totalBytes
+          ),
+        )
+        else -> current
+      }
+    }
+    if (segments != null && handle.mutableState.value is DownloadState.Paused) {
+      handle.mutableSegments.value = segments
+    }
+  }
+
+  private fun DownloadState.isAwaitingFiles(): Boolean =
+    this is DownloadState.Paused && reason == PauseReason.AwaitingFileSelection
+
   // -- Internal task lifecycle --
 
   /**
@@ -390,7 +548,8 @@ class Ketch(
    *   default to met after deserialization)
    * - `QUEUED` / `DOWNLOADING` -> enqueued for immediate download; this includes tasks
    *   that were paused for [PauseReason.Preempted] or [PauseReason.Shutdown]
-   * - `PAUSED` -> stays [DownloadState.Paused] for [PauseReason.User]
+   * - `PAUSED` -> stays [DownloadState.Paused] for [PauseReason.User], or for
+   *   [PauseReason.AwaitingFileSelection] when the record waits for a file selection
    * - `COMPLETED` -> [DownloadState.Completed], with the saved finish time
    * - `FAILED` -> [DownloadState.Failed]
    * - `CANCELED` -> [DownloadState.Canceled]
@@ -460,13 +619,17 @@ class Ketch(
       TaskState.QUEUED,
       TaskState.DOWNLOADING -> DownloadState.Queued
 
-      TaskState.PAUSED -> DownloadState.Paused(record.savedProgress())
+      TaskState.PAUSED -> DownloadState.Paused(
+        record.savedProgress(),
+        if (record.awaitsFileSelection()) PauseReason.AwaitingFileSelection else PauseReason.User
+      )
 
       TaskState.COMPLETED -> DownloadState.Completed(
         outputPath = record.outputPath ?: "",
         totalBytes = record.totalBytes.takeIf { it >= 0 },
         downloadTime = record.downloadTime,
         completedAt = record.completedAt,
+        seeding = false,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -496,6 +659,9 @@ class Ketch(
             is DownloadState.Completed -> queue.onTaskCompleted(taskId, state)
             is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
             is DownloadState.Canceled -> queue.onTaskCanceled(taskId, state)
+            is DownloadState.Paused -> if (state.reason == PauseReason.AwaitingFileSelection) {
+              queue.onTaskParked(taskId, state)
+            }
             else -> {}
           }
         }
@@ -516,6 +682,7 @@ class Ketch(
     is PauseReason.Preempted -> "preempted by taskId=$byTaskId"
     PauseReason.WaitingForCondition -> "waiting for conditions"
     PauseReason.Shutdown -> "shutdown"
+    PauseReason.AwaitingFileSelection -> "awaiting file selection"
   }
 
   /**
