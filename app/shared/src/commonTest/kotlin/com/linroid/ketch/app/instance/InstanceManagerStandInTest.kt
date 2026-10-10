@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.app.FakeInstanceFactory
+import com.linroid.ketch.app.FakeRemote
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.deviceId
@@ -72,17 +73,23 @@ class InstanceManagerStandInTest {
   }
 
   @Test
-  fun standIn_atASavedDevicesAddress_isThatDeviceAndStaysSaved() = runTest {
+  fun standIn_atASavedDevicesAddress_isThatDeviceWithTheTokenItUsesNow() = runTest {
     val own = server.copy(name = "My server", apiToken = "old")
     val store = RecordingConfigStore(KetchConfig(remotes = listOf(nas, own)))
     val manager = manager(store)
+    // Saved at once, so a later launch without the server still has the token it accepts.
+    assertEquals("secret", store.config.remotes[1].apiToken)
 
     manager.addRemote(RemoteConfig("den-pc"))
 
     val labels = manager.instances.value.map { it.label }
     assertEquals(listOf("NAS", "My server", "den-pc:8642"), labels)
-    assertEquals("My server", manager.activeInstance.value?.label)
+    val active = manager.activeInstance.value as RemoteInstance
+    assertEquals("My server", active.label)
+    // The client connects with the server's current token, not the one saved before.
+    assertEquals("secret", (active.instance as FakeRemote).config.apiToken)
     assertEquals(listOf("nas.local", "127.0.0.1", "den-pc"), store.config.remotes.map { it.host })
+    assertEquals("secret", store.config.remotes[1].apiToken)
     manager.close()
   }
 

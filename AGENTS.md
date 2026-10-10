@@ -1398,12 +1398,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   URL, token) for the attaching commands and the app
 - The desktop app takes the lock before it opens `ketch.db` and keeps it until its process exits,
   removing an `instance.json` a stopped command left (`DownloadsLock`). Opened while a command
-  holds it, it waits up to 3 s for the command to say where it listens, then starts without an
-  engine (`DownloadsClaim.Taken`): the command's API, only at an `http` address of this machine
-  (`CliEngine.device`), is a device named after the command (`InstanceManager.standIn`, listed
-  first, shown at launch and never saved), `LocalApiServer` serves a client of it (and refuses
-  clients when there is none), and banners name the command and pid and, once it exits, say to
-  reopen the app to run the downloads there
+  holds it, it waits up to 3 s for the command to say where it listens, taking the lock if it
+  frees meanwhile, then starts without an engine (`DownloadsClaim.Taken`): the command's API,
+  only at an `http` address of this machine (`CliEngine.device`), is a device named after the
+  command (`InstanceManager.standIn`, listed first, shown at launch and never saved; a saved
+  device at its address stands in instead, with its token and scheme), `LocalApiServer` serves a
+  client of it (and refuses clients when there is none), and banners name the command and pid
+  and, once it exits, say to reopen the app to run the downloads there
 - Health: `GET /api/health` (`Api.Health`, no token) answers `200 {"status":"ready"}` once the
   tasks are restored and `503 {"status":"starting"}` before. `KetchServer(ready = false)` plus
   `markReady()`, which `serveDaemon` calls after `KetchApi.start()`; other embedders are ready

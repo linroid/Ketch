@@ -77,7 +77,8 @@ import kotlin.time.Duration
  *   without an embedded device, such as the `ketch server` the desktop app finds running them
  *   when it starts. Like an embedded device, it is listed first and shown at launch unless
  *   another device was shown last, and it is never saved with the remote devices; one of those
- *   at the same address stands in instead and stays saved.
+ *   at the same address stands in instead and stays saved, with the stand-in's token and
+ *   scheme, as the server there uses them now.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InstanceManager(
@@ -442,11 +443,21 @@ class InstanceManager(
   }
 
   // Lists the stand-in first, where the embedded device would be, unless a saved device has its
-  // address already.
+  // address already: that one is the same server, and takes the token and scheme it uses now.
   private fun addStandIn(config: RemoteConfig): RemoteInstance {
     require(embeddedInstance == null)
     val existing = entryOf("${config.host}:${config.port}")
-    if (existing is RemoteInstance) return existing
+    if (existing is RemoteInstance) {
+      val saved = existing.remoteConfig
+      if (saved.apiToken == config.apiToken && saved.secure == config.secure) return existing
+      // Not started yet, as devices connect once the manager is built.
+      existing.instance.close()
+      val current = saved.copy(apiToken = config.apiToken, secure = config.secure)
+      val live = factory.createRemote(current)
+      _instances.update { list -> list.map { if (it.deviceId == live.deviceId) live else it } }
+      persistRemotes()
+      return live
+    }
     val entry = factory.createRemote(config.copy(name = deviceNameOrNull(config.name)))
     unsavedId = entry.deviceId
     _instances.update { listOf(entry) + it }

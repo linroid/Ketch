@@ -43,7 +43,8 @@ internal object DownloadsLock {
    * another one does.
    *
    * A command that has just taken the lock describes itself once its API listens, so while the
-   * holder has not said where, this waits up to [describeTimeout] for it.
+   * holder has not said where, this waits up to [describeTimeout] for it, trying the lock again
+   * meanwhile: a command started with the app takes it, then quits on finding the app running.
    *
    * @param isAlive whether a process with this ID runs; an info file left by one that stopped
    *   describes no one.
@@ -54,34 +55,19 @@ internal object DownloadsLock {
     describeTimeout: Duration = 3.seconds,
     retryInterval: Duration = 200.milliseconds,
   ): DownloadsClaim {
-    val channel = try {
-      dir.mkdirs()
-      FileChannel.open(
-        File(dir, LOCK_FILE).toPath(),
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-      )
-    } catch (e: IOException) {
-      return unlocked(e)
-    }
-    val lock = try {
-      channel.tryLock()
-    } catch (_: OverlappingFileLockException) {
-      // Held by this JVM already, which only happens in tests.
-      null
-    } catch (e: IOException) {
-      channel.close()
-      return unlocked(e)
-    }
-    if (lock != null) {
-      // Only the holder writes the info file, so one found now was left by a process that
-      // stopped, and would send `ketch` commands to it.
-      File(dir, INFO_FILE).delete()
-      return DownloadsClaim.Held(channel)
-    }
-    channel.close()
     val start = TimeSource.Monotonic.markNow()
     while (true) {
+      val held = try {
+        tryLock(dir)
+      } catch (e: IOException) {
+        return unlocked(e)
+      }
+      if (held != null) {
+        // Only the holder writes the info file, so one found now was left by a process that
+        // stopped, and would send `ketch` commands to it.
+        File(dir, INFO_FILE).delete()
+        return held
+      }
       val engine = read(dir)?.takeIf { isAlive(it.pid) }
       if (engine?.url != null || start.elapsedNow() >= describeTimeout) {
         log.i { "${engine?.describe() ?: "Another process"} runs the downloads in $dir" }
@@ -89,6 +75,30 @@ internal object DownloadsLock {
       }
       Thread.sleep(retryInterval.inWholeMilliseconds)
     }
+  }
+
+  // The lock, or null while another process holds it.
+  private fun tryLock(dir: File): DownloadsClaim.Held? {
+    dir.mkdirs()
+    val channel = FileChannel.open(
+      File(dir, LOCK_FILE).toPath(),
+      StandardOpenOption.CREATE,
+      StandardOpenOption.WRITE,
+    )
+    val lock = try {
+      channel.tryLock()
+    } catch (_: OverlappingFileLockException) {
+      // Held by this JVM already, which only happens in tests.
+      null
+    } catch (e: IOException) {
+      channel.close()
+      throw e
+    }
+    if (lock == null) {
+      channel.close()
+      return null
+    }
+    return DownloadsClaim.Held(channel)
   }
 
   /**

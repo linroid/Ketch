@@ -92,6 +92,26 @@ class DownloadsLockTest {
   }
 
   @Test
+  fun claim_whileACommandQuitsWithoutDescribingItself_takesTheLock() {
+    // A command started with the app takes the lock, then quits on finding the app running.
+    val command = holdLikeTheCommandLine()
+    val quit = thread {
+      Thread.sleep(50)
+      command.close()
+    }
+
+    val claim = DownloadsLock.claim(
+      dir,
+      isAlive = { true },
+      describeTimeout = 5.seconds,
+      retryInterval = 10.milliseconds,
+    )
+
+    quit.join()
+    assertIs<DownloadsClaim.Held>(claim).close()
+  }
+
+  @Test
   fun claim_withTheInfoOfAStoppedProcess_returnsAnUnknownHolder() {
     holdLikeTheCommandLine().use {
       // Left by a command that stopped, while a second app copy or a new command holds the lock.
