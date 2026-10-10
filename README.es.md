@@ -118,6 +118,10 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **FTP y FTPS**, con conexiones paralelas y reanudación.
 - **BitTorrent y enlaces magnet** — Torrents v1, v2 e híbridos, con selección de archivos,
   sembrado opcional y un motor escrito íntegramente en Kotlin ([detalles](docs/torrent.md)).
+- **Elegir archivos de un torrent en cualquier momento** — Elige los archivos de un torrent antes
+  o durante la descarga y cámbialos sin empezar de nuevo; un enlace magnet añadido antes de
+  recibir sus detalles espera a que elijas. Detén o reanuda el sembrado de un torrent terminado;
+  los que sigues compartiendo vuelven a sembrar cuando Ketch se reinicia.
 - **HLS (`.m3u8`) y DASH (`.mpd`)** — Guarda flujos de duración finita y sin cifrar como un único
   archivo multimedia. Las listas maestras HLS usan la variante de mayor ancho de banda
   ([compatibilidad y límites](docs/media.md)).
@@ -256,8 +260,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   y elegir tiempos de espera y número de reintentos, incluidos reintentos ilimitados
 - **Archivos incompletos reconocibles** — Usar un nombre temporal durante la descarga y asignar el
   definitivo al terminar
-- **Elegir archivos de un torrent en cualquier momento** — Seleccionarlos cuando lleguen los
-  detalles de un enlace magnet y cambiar la selección durante la descarga
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
   la cola quede vacía
 - **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle

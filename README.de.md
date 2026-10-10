@@ -121,6 +121,10 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **BitTorrent und Magnet-Links** — v1-, v2- und Hybrid-Torrents mit Dateiauswahl und
   optionalem Seeden, in einer vollständig in Kotlin geschriebenen Engine
   ([Details](docs/torrent.md)).
+- **Torrent-Dateien jederzeit wählen** — Wähle die Dateien eines Torrents vor oder während des
+  Downloads und ändere sie, ohne neu zu beginnen; ein Magnet-Link, der vor seinen Details
+  hinzugefügt wurde, wartet auf deine Wahl. Das Seeden fertiger Torrents lässt sich beenden und
+  wieder starten; Torrents, die du weiter teilst, seeden auch nach einem Neustart von Ketch weiter.
 - **HLS (`.m3u8`) und DASH (`.mpd`)** — Speichere zeitlich begrenzte, unverschlüsselte Streams als
   eine Mediendatei. Bei HLS-Master-Playlists wird die Variante mit der höchsten Bandbreite verwendet
   ([Unterstützung und Grenzen](docs/media.md)).
@@ -262,8 +266,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   ankommen; Zeitlimits und Wiederholungszahlen wählen, auch unbegrenzt
 - **Unfertige Dateien erkennbar machen** — Unter einem temporären Namen speichern und erst nach
   Abschluss den endgültigen Namen vergeben
-- **Torrent-Dateien jederzeit wählen** — Nach Eingang der Magnet-Metadaten Dateien auswählen und
-  die Auswahl während des Downloads ändern
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
   herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen

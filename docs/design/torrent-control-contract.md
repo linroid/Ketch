@@ -90,6 +90,47 @@ unsupported capability, invalid input, conflict, policy denial, resource exhaust
 integrity failure, not found, and cancellation. They must not expose tracker credentials or raw
 untrusted paths. Unsupported requests fail before any side effect or network access.
 
+## Version 1 runtime
+
+`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.torrents` adapts the first
+registered source that is a `TorrentControlSource` (`KetchTorrentController`);
+`RemoteKetch.torrents` calls a server's `/api/torrents` routes and their `events` stream
+(`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
+serve them. What the runtime does, where it narrows the contract above:
+
+- **Capabilities.** `inspect`, `file-selection`, `v1`, `v2` and `hybrid`, plus `seeding` only while
+  the live upload policy is `SEED_AFTER_COMPLETION`. Every other name is never advertised.
+  `maxPageSize` is 1000, `maxSubscriptions` 16, and `backgroundTransfers` is false: seeding runs
+  only while the process runs. The remote adapter fails closed: it checks the server's capabilities,
+  read once per connection, before every command and refuses with `UNSUPPORTED` before sending
+  anything when a capability is missing, as with older servers, and a response, or a capabilities
+  answer, that arrives after the connection changed fails with `CONNECTION_CHANGED`.
+- **Preconditions.** `expectedRevision` is selection-scoped: it must be at least the revision of the
+  task's last control change (a selection or seeding change) in the same epoch, so progress-only
+  revisions never make a command conflict. A stale one fails with `CONFLICT` and the current
+  revision.
+- **Retry ledger.** Each task keeps its last 32 commands for 15 minutes in its record, saved in the
+  same write as the change, so an exact retry returns its first outcome across restarts. A 33rd
+  command inside the window fails with `RESOURCE_EXHAUSTED` rather than evicting an entry. The
+  ledger goes with the task: a command for a removed task fails with `NOT_FOUND`, not its recorded
+  outcome. Keys are scoped to the task; a server has one principal, its API token.
+- **Selection.** `select` takes 1 to 100,000 stable file IDs and applies them at once, live in a
+  running session; there are no priorities, sequential mode or deadlines, and no operation ID.
+  Completion shows as `selectionComplete` of the selection's generation. Expanding a completed
+  selection needs no explicit restart: the task reopens and downloads the new files. Empty
+  selections cannot be represented yet; `DownloadRequest.awaitFileSelection` expresses waiting for a
+  choice instead.
+- **Seeding.** `setSeeding` starts (after a recheck, on a free engine slot only, else
+  `RESOURCE_EXHAUSTED`) or stops sharing a completed task, and records the intent that restores
+  seeding after a restart; `POLICY_DENIED` while uploads do not seed, `INVALID_STATE` for a task
+  that is not completed. There are no ratio or duration goals and no separate seed queue: seeders
+  use free engine slots and yield them to waiting downloads, keeping their intent.
+- **Counters.** Received and uploaded payload and upload speed come from a live session; without
+  one, as for a completed task that does not seed, they are `null`.
+- **File pages.** `files` sorts by `TorrentFileOrder` (torrent, natural name, size, extension,
+  selected first), optionally descending. Cursors bind the task, the epoch, the selection generation
+  and the order; one used after any of them changed fails with `STALE_CURSOR`.
+
 ## Migration gates
 
 Existing `KetchApi` implementations compile with the default null controller. New clients connected

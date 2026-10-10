@@ -103,11 +103,19 @@ instead, use [`ketch add`](#add-a-download).
 | `--proxy <url>` | Download HTTP(S) through this proxy: `http://[user:pass@]host:port` or `socks5://[user:pass@]host:port` |
 | `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated (`*.lan,10.0.0.0/8`) |
 | `--no-proxy` | Connect directly, whatever the configured or system proxy |
+| `--files <ids>` | Download only these files of a torrent or magnet, comma-separated IDs from `--list-files` |
+| `--list-files` | List the files of a torrent or magnet, with their IDs and sizes, instead of downloading it |
+| `--sort <order>` | Order of `--list-files`: `name` (natural order, so 2 comes before 10), `size` or `type` (by file extension); default: the torrent's own order |
+| `--reverse` | Reverse the order of `--list-files` |
 | `--help`, `-h` | Show help message |
 
 Headers go with every request of the download. A redirect to another scheme, host or port keeps
 only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and the origin of `Referer`;
 cookies, `Authorization` and other headers stay with the site they were given for.
+
+`--list-files` resolves the URL, which for a magnet means finding its metadata, and prints one
+`ID  SIZE  PATH` row per file to stdout; it exits 1 when the URL cannot be resolved or has no
+files to choose. `--files` cannot be combined with it. Invalid options exit with status 2.
 
 Without `--proxy` or `--no-proxy`, HTTP(S) downloads use `[download.proxy]` of the
 [config file](#downloadproxy), which by default follows the `https_proxy`, `http_proxy`,
@@ -139,6 +147,10 @@ ketch --proxy socks5://127.0.0.1:1080 --proxy-bypass '*.lan' https://example.com
 # FTP with credentials, and a magnet link into a directory, with debug logs
 ketch ftp://user:secret@ftp.example.com/pub/file.iso
 ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
+
+# The files of a torrent, largest first, then only two of them
+ketch --list-files --sort size --reverse ./pack.torrent
+ketch --files 0,3 ./pack.torrent ~/Downloads/
 ```
 
 ### Work on a running Ketch
@@ -494,8 +506,8 @@ keep a token there. The Ketch apps' server follows the same rules.
 ### MCP server
 
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
-agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, and change speed
-limits, priorities and the download config.
+agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, list and choose
+the files of torrents, and change speed limits, priorities and the download config.
 
 ```bash
 ketch mcp [options]
@@ -527,6 +539,28 @@ such as everything but `url` in `startDownload`, are optional in the tool's inpu
 `startDownload` takes a `requestId`, a UUID the agent makes up: calling it again with the same
 `requestId` and arguments, such as after a timeout, returns the download it started instead of
 adding another. An older Ketch without request IDs refuses it.
+
+The 14 tools are `listDownloads`, `getDownload`, `startDownload`, `pauseDownload`,
+`resumeDownload`, `cancelDownload`, `removeDownload`, `resolveUrl`, `listDownloadFiles`,
+`selectDownloadFiles`, `getStatus`, `setSpeedLimit`, `setPriority` and `updateConfig`. For
+torrents:
+
+- `resolveUrl` lists a torrent's `files`, each with its `id`, without the torrent's metainfo.
+- `startDownload` takes `fileIds`, comma-separated, to download only those files.
+- `listDownloadFiles` lists a task's files with their `id`, `path`, `size` and whether they are
+  `selected`, up to `limit` (1 to 1000, default 100) at a time; pass the `nextCursor` it returns
+  as `cursor` for the next page. `sort` orders them `torrent` (default), `name` (natural order),
+  `size`, `extension` or `selected` (selected first), and `descending` reverses that. It reads
+  them from the instance's torrent controller, or from the task's resolved files on an older
+  instance.
+- `selectDownloadFiles` changes a task's files at any time, from comma-separated IDs; a torrent
+  waiting for its files starts with them, while `resumeDownload` downloads every file of it.
+- A task's JSON counts its `selectedFiles` and `totalFiles`, and says whether a completed torrent
+  is `seeding`.
+
+There is no tool to start or stop seeding. `ketch mcp --standalone` seeds the torrents that finish
+while it runs, as `[torrent] upload = "seed"` says, but does not seed again after a restart the
+torrents that seeded before; `ketch server` and the apps do.
 
 Stdout carries only the MCP protocol; the banner and all logs go to stderr. The server exits once
 the client closes stdin, after answering the requests it has already read, so it can also be
@@ -869,7 +903,7 @@ server, like the other download settings changed there, they last until it resta
 | `trackerList` | bool | `true` | Subscribe to the tracker lists at `trackerListUrls`, downloaded daily; their trackers are used after `trackers` |
 | `trackerListUrls` | string[] | ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's [`best.txt`](https://github.com/XIU2/TrackersListCollection) | `http` or `https` URLs of plain-text lists, one announce URL per line |
 | `listenPort` | int | `0` | Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), 0-65535; `0` picks a free one at every start. The apps and the other commands always pick one, so they never contend for it |
-| `upload` | string | `"off"` | What torrents upload to peers: `off`, `while-downloading` (verified pieces, until each torrent finishes) or `seed` (finished torrents too). `ketch server` and `ketch mcp --standalone` seed while they run; the download command exits when its downloads finish. Unknown values, and values that are not strings, load as `off` |
+| `upload` | string | `"off"` | What torrents upload to peers: `off`, `while-downloading` (verified pieces, until each torrent finishes) or `seed` (finished torrents too, also after `ketch server` restarts). `ketch server` and `ketch mcp --standalone` seed while they run; the download command exits when its downloads finish. Unknown values, and values that are not strings, load as `off` |
 | `uploadLimit` | string | `"unlimited"` | Upload cap shared by all torrents, in the [speed limit format](#speed-limit-format); a bare number is bytes per second, and a value that can't be read loads as unlimited |
 
 The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps

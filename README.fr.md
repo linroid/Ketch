@@ -119,6 +119,10 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **FTP et FTPS**, avec connexions parallèles et reprise.
 - **BitTorrent et liens magnet** — Torrents v1, v2 et hybrides, avec sélection des fichiers et
   partage facultatif, dans un moteur entièrement écrit en Kotlin ([détails](docs/torrent.md)).
+- **Choix des fichiers torrent à tout moment** — Choisissez les fichiers d'un torrent avant ou
+  pendant le téléchargement et modifiez-les sans tout reprendre ; un lien magnet ajouté avant
+  l'arrivée de ses détails attend votre choix. Arrêtez ou relancez le partage d'un torrent
+  terminé ; ceux que vous continuez à partager reprennent le partage après un redémarrage de Ketch.
 - **HLS (`.m3u8`) et DASH (`.mpd`)** — Enregistrez les flux de durée finie non chiffrés dans un
   seul fichier multimédia. Les listes maîtresses HLS utilisent la variante au débit le plus élevé
   ([prise en charge et limites](docs/media.md)).
@@ -263,8 +267,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   plus de données et choisir les délais d'attente et le nombre de tentatives, même illimité
 - **Distinguer les fichiers incomplets** — Écrire sous un nom temporaire et attribuer le nom
   définitif une fois le téléchargement terminé
-- **Choix des fichiers torrent à tout moment** — Choisir les fichiers d'un lien magnet une fois
-  ses détails reçus et modifier la sélection pendant le téléchargement
 - **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
   au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un

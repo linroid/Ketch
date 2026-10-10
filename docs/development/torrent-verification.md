@@ -165,6 +165,46 @@ Findings while recording it:
 These are interoperability results for the formats and directions above. A second independent
 v2 implementation, the complete Fast Extension and the production release gates remain open.
 
+### Live file selection (`torrent-v2-selection`)
+
+The `torrent-v2-selection` stack lets a task change its files at any time, lets a magnet wait for
+a choice, and adds the torrent controller and seeding control (see
+[choosing files](../torrent.md#choosing-files)). Its interoperability evidence is a running Ketch
+task that gains a file while it downloads from an independent seeder, keeps that seeder's one
+connection (the test counts the dials), and finishes byte-exact without the file it never chose.
+The verifier requires these three scenarios on top of the nine above:
+
+| Scenario | Test | What it shows |
+| --- | --- | --- |
+| `v1.libtorrent.live-selection-expand` | `IndependentSeederTest.liveSelectionExpand_keepsTheIndependentSeederConnection` | A v1 task downloading one of three files, whose boundaries fall inside pieces, from libtorrent gains a second file live: one connection, both files byte-exact, the third never created |
+| `v2.libtorrent.live-selection-expand` | `PublicV2IndependentSeederTest.liveSelectionExpand_pureV2FromIndependentSeeder` | The same for a pure v2 magnet from libtorrent, through the v2 loop's selection control |
+| `v1.transmission.live-selection-expand` | `TransmissionInteropTest.publicSource_expandsSelectionWhileDownloadingFromTransmission` | The same through `TorrentDownloadSource` and Ketch from a Transmission seeder |
+
+Recorded at `75f5a38d5` on 2026-10-10 on macOS (Apple silicon), with the Homebrew build of
+Transmission 4.1.3, whose `--version` matches the pin:
+
+```sh
+TRANSMISSION_DAEMON=/opt/homebrew/bin/transmission-daemon \
+  ./gradlew :library:torrent:jvmTest :library:torrent:verifyNoNativeTorrentRuntime \
+  -PtorrentConformance=true -PprebuiltWebDir=/nonexistent
+python3 tools/torrent/verify_conformance.py --reports library/torrent/build/test-results/jvmTest \
+  --revision "$(git rev-parse HEAD)" --output library/torrent/build/reports/conformance/executed.json
+./gradlew allJvmTests :library:torrent:testAndroidHostTest -PprebuiltWebDir=/nonexistent
+```
+
+The verifier found all 12 scenarios executed. The torrent JVM suite with Transmission ran 1014
+tests and `allJvmTests` 5249 (235 skipped, all in `app:shared`), with no failures, and the
+torrent Android host suite ran 976 with none. The live-selection scenarios took 2.0 s (v1,
+libtorrent), 1.7 s (v2, libtorrent) and 10.9 s (v1, Transmission).
+
+Besides these, the stack's own tests cover, on loopback between Ketch engines: v1 and hybrid
+selection changes that never dial a peer again, a waiting magnet that fetches its metadata over
+`ut_metadata` and starts with the chosen files, completed tasks that reopen and adopt their
+seeding session, seeding restored after a restart for v1 and v2 (no socket bound when uploads
+are off, and no UDP when a private torrent changes its files), crash points during the v1 sidecar copy and the
+v2 creation-log rebinding in child JVMs, and an end-to-end selection through `KetchServer` and
+`RemoteKetch` whose task views and events carry no metainfo.
+
 ## Review regression evidence (2026-09-08)
 
 The first review pass added coverage for Unicode path aliases and encoded filename limits,
