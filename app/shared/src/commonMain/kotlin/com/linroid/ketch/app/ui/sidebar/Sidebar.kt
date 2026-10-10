@@ -63,8 +63,8 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
  * sidebar toggle and the [AppearanceToggle] (beside the traffic lights on macOS, after the Ketch
- * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with
- * its health and live line, its menu and its drops, shown from two devices on), and Settings at the bottom.
+ * mark on the web), the destinations, the DEVICES from two devices on (All devices, then each
+ * device with its health and live line, its menu and its drops), and Settings at the bottom.
  *
  * The destination [shell] shows sits on the selected pill, or Settings while it shows; the toggle
  * collapses the sidebar to the rail.

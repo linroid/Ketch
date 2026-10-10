@@ -96,8 +96,8 @@ import org.jetbrains.compose.resources.stringResource
  * Settings at the bottom. On macOS it starts below the traffic lights.
  *
  * The stack shows from two devices on, starting with All devices, ringed by the progress of
- * everything downloading. Each device's pennant switches to it, opens its menu on a right click or a long
- * press, and takes links, files and rows dragged onto it.
+ * everything downloading. Each device's pennant switches to it, opens its menu on a right click or
+ * a long press, and takes links, files and rows dragged onto it.
  *
  * The destination [shell] shows, or Settings while it shows, is selected.
  *
