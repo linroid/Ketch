@@ -330,6 +330,16 @@
   <string name="settings_about_update_auto">Verificar atualizações automaticamente</string>
   <string name="settings_about_update_auto_hint">Verifica diariamente se há uma nova versão do Ketch disponível no GitHub.</string>
   <string name="settings_about_update_notes">Novidades da %1$s</string>
+  <string name="settings_about_history">Histórico de versões</string>
+  <string name="settings_about_history_hint">Todas as versões desde a %1$s</string>
+  <plurals name="settings_about_history_count">
+    <item quantity="one">%1$d versão desde a %2$s</item>
+    <item quantity="other">%1$d versões desde a %2$s</item>
+  </plurals>
+  <plurals name="settings_about_history_changes">
+    <item quantity="one">%1$d alteração</item>
+    <item quantity="other">%1$d alterações</item>
+  </plurals>
   <string name="settings_about_update_check">Verificar agora</string>
   <string name="settings_about_update_install">Atualizar</string>
   <string name="settings_about_update_restart">Reiniciar para atualizar</string>

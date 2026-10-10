@@ -1,10 +1,13 @@
 package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,9 +22,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -37,6 +42,7 @@ import com.linroid.ketch.app.i18n.SEPARATOR
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.shortDateText
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.AppUpdateState
 import com.linroid.ketch.app.platform.AppUpdates
 import com.linroid.ketch.app.platform.LocalAppUpdates
@@ -52,6 +58,9 @@ import com.linroid.ketch.app.ui.common.AdaptiveModal
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_close
 import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.settings_about_history
+import ketch.app.shared.generated.resources.settings_about_history_changes
+import ketch.app.shared.generated.resources.settings_about_history_count
 import ketch.app.shared.generated.resources.settings_about_notes_failed
 import ketch.app.shared.generated.resources.settings_about_notes_fixed
 import ketch.app.shared.generated.resources.settings_about_notes_improved
@@ -138,23 +147,169 @@ fun ReleaseNotesDialog(updates: AppUpdates, request: ReleaseNotesRequest, onDism
   ) {
     val pageUrl = "$RELEASES_URL/tag/v${request.version}"
     when (val current = load) {
-      NotesLoad.Loading -> Row(
-        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        KetchSpinner()
-        Text(
-          text = stringResource(Res.string.settings_about_notes_loading),
-          style = KetchTheme.typography.bodyS,
-          color = KetchTheme.colors.textSecondary,
-        )
-      }
+      NotesLoad.Loading -> NotesLoading()
       is NotesLoad.Failed -> NotesFailure(current.reason, pageUrl, onRetry = { attempt++ })
       is NotesLoad.Loaded -> {
         NotesList(current.notes, request.since)
         ReleasePageButton(current.notes.firstOrNull()?.pageUrl ?: pageUrl)
       }
     }
+  }
+}
+
+/** The first release [ReleaseHistoryDialog] lists. */
+internal const val FIRST_LISTED_RELEASE = "0.1.0"
+
+/**
+ * Every release from [FIRST_LISTED_RELEASE] up to [version], newest first, as [updates] reads
+ * them: a line per release with its date and how many changes its notes list, which opens to
+ * those changes under New, Fixed and Improved. The newest starts open.
+ */
+@Composable
+fun ReleaseHistoryDialog(updates: AppUpdates, version: String, onDismiss: () -> Unit) {
+  var attempt by remember { mutableIntStateOf(0) }
+  var load by remember(version) { mutableStateOf<NotesLoad>(NotesLoad.Loading) }
+  LaunchedEffect(updates, version, attempt) {
+    load = NotesLoad.Loading
+    load = try {
+      // Each release keeps its notes as published, repeats included, so none drops out.
+      NotesLoad.Loaded(updates.releaseHistory(version, FIRST_LISTED_RELEASE))
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Couldn't read the releases up to Ketch $version: ${e.describeCauses()}" }
+      NotesLoad.Failed(e.message ?: e.describeCauses())
+    }
+  }
+  AdaptiveModal(
+    onDismissRequest = onDismiss,
+    title = { Text(stringResource(Res.string.settings_about_history)) },
+    confirmButton = {
+      KetchButton(
+        text = stringResource(Res.string.action_close),
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Secondary,
+      )
+    },
+  ) {
+    when (val current = load) {
+      NotesLoad.Loading -> NotesLoading()
+      is NotesLoad.Failed -> NotesFailure(current.reason, RELEASES_URL, onRetry = { attempt++ })
+      is NotesLoad.Loaded -> HistoryList(current.notes)
+    }
+  }
+}
+
+/** [releases], newest first, each a line that opens to its changes; the first starts open. */
+@Composable
+private fun HistoryList(releases: List<ReleaseNotes>) {
+  val zone = remember { TimeZone.currentSystemDefault() }
+  val today = LocalClock.current.now().toLocalDateTime(zone).date
+  var open by remember(releases) { mutableStateOf(setOfNotNull(releases.firstOrNull()?.version)) }
+  Text(
+    text = pluralStringResource(
+      Res.plurals.settings_about_history_count,
+      releases.size,
+      releases.size,
+      FIRST_LISTED_RELEASE,
+    ),
+    style = KetchTheme.typography.bodyS,
+    color = KetchTheme.colors.textSecondary,
+  )
+  Column {
+    for ((index, release) in releases.withIndex()) {
+      if (index > 0) {
+        Box(Modifier.fillMaxWidth().height(HairlineWidth).background(KetchTheme.colors.divider))
+      }
+      val expanded = release.version in open
+      HistoryEntry(release, expanded, today, zone, onToggle = {
+        open = if (expanded) open - release.version else open + release.version
+      })
+    }
+  }
+}
+
+/** The line of [release], which [onToggle] opens to its changes and its page, or closes. */
+@Composable
+private fun HistoryEntry(
+  release: ReleaseNotes,
+  expanded: Boolean,
+  today: LocalDate,
+  zone: TimeZone,
+  onToggle: () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
+    Row(
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+        .fillMaxWidth()
+        .clip(KetchTheme.shapes.sm)
+        .clickable(role = Role.Button, onClick = onToggle)
+        .padding(vertical = spacing.s2),
+    ) {
+      Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+        verticalAlignment = Alignment.Bottom,
+        modifier = Modifier.weight(1f),
+      ) {
+        Text(
+          text = release.version,
+          style = KetchTheme.typography.bodyStrong,
+          color = colors.textPrimary,
+        )
+        release.publishedAt?.let { published ->
+          Text(
+            text = shortDateText(published.toLocalDateTime(zone).date, today).resolve(),
+            style = KetchTheme.typography.caption,
+            color = colors.textTertiary,
+          )
+        }
+      }
+      if (release.changes.isNotEmpty()) {
+        Text(
+          text = pluralStringResource(
+            Res.plurals.settings_about_history_changes,
+            release.changes.size,
+            release.changes.size,
+          ),
+          style = KetchTheme.typography.caption,
+          color = colors.textSecondary,
+        )
+      }
+      KetchIconImage(
+        icon = if (expanded) KetchIcon.ChevronUp else KetchIcon.ChevronDown,
+        size = KetchTheme.density.controlGlyph,
+        tint = colors.textTertiary,
+      )
+    }
+    if (expanded) {
+      Column(
+        verticalArrangement = Arrangement.spacedBy(spacing.s3),
+        modifier = Modifier.padding(bottom = spacing.s2),
+      ) {
+        ReleaseChanges(release.changes)
+        ReleasePageButton(release.pageUrl)
+      }
+    }
+  }
+}
+
+/** A spinner beside the line saying the notes are loading. */
+@Composable
+private fun NotesLoading() {
+  Row(
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    KetchSpinner()
+    Text(
+      text = stringResource(Res.string.settings_about_notes_loading),
+      style = KetchTheme.typography.bodyS,
+      color = KetchTheme.colors.textSecondary,
+    )
   }
 }
 

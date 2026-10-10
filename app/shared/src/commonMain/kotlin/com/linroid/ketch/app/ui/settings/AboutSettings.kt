@@ -65,6 +65,8 @@ import ketch.app.shared.generated.resources.settings_about_checklist_done
 import ketch.app.shared.generated.resources.settings_about_checklist_hint
 import ketch.app.shared.generated.resources.settings_about_discover_elsewhere
 import ketch.app.shared.generated.resources.settings_about_getting_started
+import ketch.app.shared.generated.resources.settings_about_history
+import ketch.app.shared.generated.resources.settings_about_history_hint
 import ketch.app.shared.generated.resources.settings_about_licenses
 import ketch.app.shared.generated.resources.settings_about_licenses_failed
 import ketch.app.shared.generated.resources.settings_about_licenses_loading
@@ -216,6 +218,7 @@ fun AboutSettings(state: AppState) {
 private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController) {
   val state by updates.state.collectAsState()
   var notes by remember { mutableStateOf<ReleaseNotesRequest?>(null) }
+  var historyShown by remember { mutableStateOf(false) }
   SettingsGroup(title = stringResource(Res.string.settings_about_updates)) {
     UpdateStatusRow(state, updates)
     val current = updates.currentVersion
@@ -226,6 +229,14 @@ private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController
       SettingsRow(
         title = stringResource(Res.string.settings_about_update_notes, request.version),
         modifier = Modifier.clickable(role = Role.Button) { notes = request },
+        trailing = { Chevron() },
+      )
+    }
+    if (request != null) {
+      SettingsRow(
+        title = stringResource(Res.string.settings_about_history),
+        description = stringResource(Res.string.settings_about_history_hint, FIRST_LISTED_RELEASE),
+        modifier = Modifier.clickable(role = Role.Button) { historyShown = true },
         trailing = { Chevron() },
       )
     }
@@ -241,6 +252,11 @@ private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController
   }
   notes?.let { request ->
     ReleaseNotesDialog(updates, request, onDismiss = { notes = null })
+  }
+  // Up to the newer release once one is found, so its changes are listed too.
+  val newest = state.releaseVersion() ?: updates.currentVersion
+  if (historyShown && newest != null) {
+    ReleaseHistoryDialog(updates, newest, onDismiss = { historyShown = false })
   }
 }
 

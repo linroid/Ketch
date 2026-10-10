@@ -432,6 +432,20 @@
   <string name="settings_about_update_auto_hint">Once a day, from Ketch's releases on GitHub.</string>
   <!-- Opens the release notes. %1$s is the version. -->
   <string name="settings_about_update_notes">What's new in %1$s</string>
+  <!-- Opens every release with its changes. -->
+  <string name="settings_about_history">Release history</string>
+  <!-- %1$s is the first release listed, such as 0.1.0. -->
+  <string name="settings_about_history_hint">Every release since %1$s</string>
+  <!-- Over the release history: %1$d releases, from the version %2$s on. -->
+  <plurals name="settings_about_history_count">
+    <item quantity="one">%1$d release since %2$s</item>
+    <item quantity="other">%1$d releases since %2$s</item>
+  </plurals>
+  <!-- How many changes a release in the history lists. -->
+  <plurals name="settings_about_history_changes">
+    <item quantity="one">%1$d change</item>
+    <item quantity="other">%1$d changes</item>
+  </plurals>
   <string name="settings_about_update_check">Check now</string>
   <!-- Button: downloads the update. -->
   <string name="settings_about_update_install">Update</string>
