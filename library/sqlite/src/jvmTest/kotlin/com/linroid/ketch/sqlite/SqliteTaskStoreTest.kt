@@ -13,7 +13,9 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class SqliteTaskStoreTest {
@@ -137,6 +139,32 @@ class SqliteTaskStoreTest {
 
       store.save(record.copy(control = null))
       assertNull(store.load("a")?.control)
+    } finally {
+      driver.close()
+    }
+  }
+
+  @Test
+  fun load_controlSavedAsSeeding_keepsTheSharingIntent() = runTest {
+    val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    try {
+      KetchDatabase.Schema.create(driver)
+      val store = SqliteTaskStore(driver)
+      store.save(record("a").copy(control = TaskControl()))
+      // How builds before the rename to sharing saved the intent and a command's outcome.
+      driver.execute(
+        null,
+        "UPDATE task_records SET control_json = '{\"selectionGeneration\":2,\"seeding\":true," +
+          "\"commands\":[{\"key\":\"k\",\"digest\":\"${"0".repeat(64)}\"," +
+          "\"epoch\":\"e\",\"sequence\":1,\"selectionGeneration\":2,\"seeding\":true," +
+          "\"recordedAtMs\":1}]}'",
+        0
+      )
+
+      val control = assertNotNull(store.load("a")?.control)
+
+      assertTrue(control.sharing)
+      assertEquals(true, control.commands.single().sharing)
     } finally {
       driver.close()
     }

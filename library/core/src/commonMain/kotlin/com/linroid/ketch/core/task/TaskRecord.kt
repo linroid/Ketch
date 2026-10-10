@@ -5,7 +5,9 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.SourceResumeState
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -54,6 +56,9 @@ data class TaskRecord(
 @Serializable
 data class TaskControl(
   val selectionGeneration: Long = 0,
+  // Builds before the rename saved it as "seeding".
+  @OptIn(ExperimentalSerializationApi::class)
+  @JsonNames("seeding")
   val sharing: Boolean = false,
   val commands: List<TaskCommandRecord> = emptyList(),
 ) {
@@ -86,6 +91,8 @@ data class TaskCommandRecord(
   val epoch: String,
   val sequence: Long,
   val selectionGeneration: Long,
+  @OptIn(ExperimentalSerializationApi::class)
+  @JsonNames("seeding")
   val sharing: Boolean? = null,
   val recordedAtMs: Long,
 ) {
