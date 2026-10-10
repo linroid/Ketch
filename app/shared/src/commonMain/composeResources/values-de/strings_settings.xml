@@ -309,6 +309,19 @@
   <string name="settings_about_update_restart">Neu starten und aktualisieren</string>
   <string name="settings_about_update_open_installer">Installationsprogramm öffnen</string>
   <string name="settings_about_update_release_page">Release-Seite</string>
+  <string name="settings_about_update_installed">Auf Ketch %1$s aktualisiert</string>
+  <string name="settings_about_update_whats_new">Neuerungen</string>
+  <string name="settings_about_notes_loading">Versionshinweise werden geladen…</string>
+  <string name="settings_about_notes_failed">Die Versionshinweise konnten nicht geladen werden</string>
+  <string name="settings_about_notes_released">Veröffentlicht am %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d Version seit %2$s</item>
+    <item quantity="other">%1$d Versionen seit %2$s</item>
+  </plurals>
+  <string name="settings_about_notes_new">Neu</string>
+  <string name="settings_about_notes_fixed">Behoben</string>
+  <string name="settings_about_notes_improved">Verbessert</string>
+  <string name="settings_about_notes_quiet">Wartung und Verbesserungen im Hintergrund.</string>
   <string name="settings_logs_open">Protokollordner öffnen</string>
   <string name="settings_logs_open_failed">Der Protokollordner konnte nicht geöffnet werden: %1$s</string>
   <string name="settings_logs_share">Protokolle teilen</string>

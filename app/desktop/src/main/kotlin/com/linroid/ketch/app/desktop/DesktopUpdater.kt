@@ -6,7 +6,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.platform.AppUpdateState
 import com.linroid.ketch.app.platform.AppUpdateStep
 import com.linroid.ketch.app.platform.AppUpdates
-import com.linroid.ketch.updater.KETCH_REPOSITORY
+import com.linroid.ketch.app.platform.ReleaseNotes
 import com.linroid.ketch.updater.Release
 import com.linroid.ketch.updater.ReleaseAsset
 import com.linroid.ketch.updater.ReleaseFeed
@@ -14,6 +14,7 @@ import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseProduct
 import com.linroid.ketch.updater.ReleaseVersion
 import com.linroid.ketch.updater.UpdateException
+import com.linroid.ketch.updater.releasesBetween
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -39,8 +40,11 @@ internal sealed interface UpdateEvent {
   /** [update] is downloaded and can be installed. */
   data class Ready(val update: AppUpdateState.Ready) : UpdateEvent
 
-  /** The app now runs [version], which the run before installed. */
-  data class Installed(val version: String, val notesUrl: String) : UpdateEvent
+  /**
+   * The app now runs [version], newer than the run before, which ran [since]; `null` when that
+   * run was of a release that did not record its version.
+   */
+  data class Installed(val version: String, val since: String?) : UpdateEvent
 
   /** The run before set out to install [version], and the app does not run it. */
   data class InstallFailed(val version: String) : UpdateEvent
@@ -54,7 +58,8 @@ internal sealed interface UpdateEvent {
  *
  * Every step runs in [scope], on the main thread, one at a time. Files live in [workDir]: the
  * download, what [installer] unpacks from it, and the record of an install in progress, which
- * the next run reads in [start] to report how it went.
+ * the next run reads in [start] to report how it went. [start] also reports an update installed
+ * any other way, by the version that ran last.
  *
  * @param current the running version; `null` when it is not a release version.
  * @param platform the system the installers are for; `null` where Ketch is not released.
@@ -81,6 +86,7 @@ internal class DesktopUpdater(
   private val log = KetchLogger("Updater")
   private val mutableState = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
   override val state: StateFlow<AppUpdateState> = mutableState.asStateFlow()
+  override val currentVersion: String? = current?.toString()
 
   /** The newer release found, which [download] fetches. */
   private var release: Release? = null
@@ -91,11 +97,12 @@ internal class DesktopUpdater(
   private var automatic: Job? = null
 
   /**
-   * Reports the update the run before installed, clears the files it left and starts the
-   * automatic checks when [checkAutomatically]. Call once, at launch.
+   * Reports the update since the run before, which ran [lastVersion], or its install that did
+   * not take, clears the files it left and starts the automatic checks when
+   * [checkAutomatically]. Call once, at launch.
    */
-  fun start(checkAutomatically: Boolean) {
-    scope.launch { reportPreviousInstall() }
+  fun start(checkAutomatically: Boolean, lastVersion: String?) {
+    scope.launch { reportPreviousRun(lastVersion?.let(ReleaseVersion::parse)) }
     setCheckAutomatically(checkAutomatically)
   }
 
@@ -163,6 +170,18 @@ internal class DesktopUpdater(
     }
   }
 
+  override suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes> {
+    val upTo = ReleaseVersion.parse(version) ?: throw UpdateException("$version is not a release")
+    return feed.releasesBetween(since?.let(ReleaseVersion::parse), upTo).map { release ->
+      ReleaseNotes.parse(
+        release.version.toString(),
+        release.pageUrl,
+        release.publishedAt,
+        release.notes,
+      )
+    }
+  }
+
   override fun setCheckAutomatically(enabled: Boolean) {
     automatic?.cancel()
     automatic = null
@@ -225,21 +244,36 @@ internal class DesktopUpdater(
   private fun asset(release: Release): ReleaseAsset? =
     platform?.let { release.asset(installer?.product ?: ReleaseProduct.Desktop, it) }
 
-  private suspend fun reportPreviousInstall() {
+  /**
+   * Reports an install the run before set out to make that did not take, or an update since
+   * [lastVersion] ran, made by this updater or any other way.
+   */
+  private suspend fun reportPreviousRun(lastVersion: ReleaseVersion?) {
     val record = File(workDir, PENDING_INSTALL)
-    val installed = withContext(io) {
+    val pending = withContext(io) {
       val text = record.takeIf { it.isFile }?.readText()?.trim()
       // The download, the unpacked app and the scripts have served their purpose.
       workDir.deleteRecursively()
       text?.let(ReleaseVersion::parse)
-    } ?: return
-    if (installed == current) {
-      log.i { "Updated to Ketch $installed" }
-      onEvent(UpdateEvent.Installed(installed.toString(), releasePage(installed)))
-    } else {
-      log.w { "The update to Ketch $installed did not install; this is $current" }
-      onEvent(UpdateEvent.InstallFailed(installed.toString()))
     }
+    val event = when {
+      pending != null && pending != current -> {
+        log.w { "The update to Ketch $pending did not install; this is $current" }
+        UpdateEvent.InstallFailed(pending.toString())
+      }
+      current == null -> return
+      lastVersion != null && lastVersion < current -> {
+        log.i { "Updated to Ketch $current from $lastVersion" }
+        UpdateEvent.Installed(current.toString(), since = lastVersion.toString())
+      }
+      // Installed by a release that did not record its version.
+      pending != null -> {
+        log.i { "Updated to Ketch $current" }
+        UpdateEvent.Installed(current.toString(), since = null)
+      }
+      else -> return
+    }
+    onEvent(event)
   }
 
   private fun reason(e: Exception): String = when (e) {
@@ -250,8 +284,5 @@ internal class DesktopUpdater(
   private companion object {
     /** Holds the version an installer that restarts the app set out to install. */
     const val PENDING_INSTALL = "pending-install"
-
-    fun releasePage(version: ReleaseVersion): String =
-      "https://github.com/$KETCH_REPOSITORY/releases/tag/v$version"
   }
 }

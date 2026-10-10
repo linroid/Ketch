@@ -48,6 +48,7 @@ import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.ReleaseNotesRequest
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.TaskOrigin
@@ -395,6 +396,12 @@ class AppState(
   /** A Send to waiting for the user to accept that cookies go along; see [sendTo]. */
   var sendConfirmation by mutableStateOf<SendConfirmation?>(null)
     private set
+
+  /**
+   * Release notes the user asked to read from a toast about an update, which the shell shows in
+   * a dialog until it is closed and this is set back to `null`.
+   */
+  var releaseNotesRequest by mutableStateOf<ReleaseNotesRequest?>(null)
 
   private val focusSearch = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 

@@ -46,13 +46,16 @@ See the [CLI README](../cli/README.md#update) for the options.
   the switch `[desktop] checkForUpdates` (on by default). The macOS Help menu has
   "Check for Updates…".
 - While the switch is on, the packaged app checks 30 seconds after it starts and once a day. A
-  check that finds a release shows a toast with Update and What's new; once the download is
-  checked, another toast offers Restart. An app run from Gradle or an IDE only checks when asked
-  and links to the release page.
+  check that finds a release shows a toast with Update and What's new, which opens its
+  [release notes](#release-notes); once the download is checked, another toast offers Restart.
+  An app run from Gradle or an IDE only checks when asked and links to the release page.
 - Downloads and unpacked files go to `updates/` in the config folder. Before quitting to install,
-  the app writes the version to `updates/pending-install`; the next launch reports
-  "Updated to Ketch …" or, when it still runs the old version, that the update failed, and
-  empties `updates/`.
+  the app writes the version to `updates/pending-install`; the next launch reports that the
+  update failed when it still runs the old version, and empties `updates/`.
+- Each launch records its version as `[ui] lastVersion`. A launch of a newer release, however
+  it was installed, shows "Updated to Ketch …" with What's new, the notes of every release
+  since the one that ran last. Copies updated from a release that did not record it only say so
+  after an update the app installed itself.
 - The installer runs in a process of its own once the app has quit, writes to `logs/update.log`,
   and opens the app again, updated or not:
 
@@ -76,8 +79,9 @@ Android has two `distribution` flavors with the same application ID:
   activity, update file provider or `REQUEST_INSTALL_PACKAGES` permission, even if sideloaded.
 
 The direct release build checks 30 seconds after the main screen opens and then daily while
-that screen's model lives. It shows a toast for a newer release and another when its download
-is ready. Debug builds check only when asked. The About-page automatic-check switch reuses
+that screen's model lives. It shows a toast for a newer release, with Update and What's new, and
+another when its download is ready. Like the desktop app, it records its version as
+`[ui] lastVersion` and, once updated, shows "Updated to Ketch …" with What's new. Debug builds check only when asked. The About-page automatic-check switch reuses
 `[desktop] checkForUpdates` for compatibility with the existing shared UI and config schema.
 Checks never download or install without the user choosing to do so.
 
@@ -93,6 +97,28 @@ Build the GitHub APK with `:app:android:assembleDirectRelease`, and the Play bun
 asset name. Keep the existing application ID, signing key and increasing `-PversionCode` so
 already-installed APKs can upgrade. A debug-signed build cannot install the release-signed APK
 as an update. See [Google Play signing](app-store-listing.md#google-play) for channel changes.
+
+## Release notes
+
+The desktop app and the direct Android build show what a release changes in a dialog, opened from
+What's new on the toasts above and from Settings → About → Updates, whose row names the release
+found or, before one is, the running version. When an update is available, its button offers
+the next step, Update or Restart.
+
+- The notes come from the same GitHub releases (`AppUpdates.releaseNotes`). For an update, the
+  dialog lists every release after the running or last-run version, newest first:
+  `releasesBetween` reads `/releases` ten at a time, up to five pages, until it reaches that
+  version, and asks for the target release on its own when the pages miss it.
+- Each release's body is the download list followed by the changes GitHub generates, a line per
+  pull request (`* <title> by @<author> in <link>`). `releaseChanges` in `app/shared` reads only
+  those lines and groups them by their Conventional Commits type: `feat` under New, `fix` under
+  Fixed, the rest under Improved, and titles without a type by their first word. `build`,
+  `chore`, `ci`, `docs`, `refactor`, `style`, `test` and `deps` changes are left out; a release
+  with nothing else says it only has maintenance. The scope shows after the summary.
+- A pull request listed by several releases, as when a release repeats its release candidates,
+  shows only under the newest (`withoutRepeats`).
+- Reading them is one request without a range and one per page with one, so the dialog can fail
+  on GitHub's hourly limit; it then offers Try again and the release page.
 
 ## The portable Windows app
 

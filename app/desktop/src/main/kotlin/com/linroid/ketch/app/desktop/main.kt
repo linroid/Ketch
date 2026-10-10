@@ -439,7 +439,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
   val updater = remember { createUpdater(launch, controller, behavior, scope) }
-  LaunchedEffect(updater) { updater.start(desktopSettings.checkForUpdates) }
+  LaunchedEffect(updater) {
+    val appSettings = controller.appSettings
+    val lastVersion = appSettings.ui.lastVersion
+    updater.start(desktopSettings.checkForUpdates, lastVersion)
+    // The next launch tells from it whether the app was updated in between.
+    if (lastVersion != KetchApi.VERSION) {
+      appSettings.saveUi { it.copy(lastVersion = KetchApi.VERSION) }
+    }
+  }
   // The Settings window closes and minimizes itself, from its own menu bar or keys.
   val actions = remember {
     DesktopActions(
@@ -746,7 +754,7 @@ private fun announceDownloadsElsewhere(controller: AppController, claim: Downloa
 /**
  * The app's [DesktopUpdater], which keeps its files in the `updates` folder, logs its
  * installers to `logs/update.log`, quits through [behavior] to install and tells the user what
- * it finds in toasts.
+ * it finds in toasts, whose What's new shows the release notes in the main window.
  */
 private fun createUpdater(
   launch: LaunchContext,
@@ -766,7 +774,11 @@ private fun createUpdater(
     workDir = workDir,
     download = ReleaseDownloader({ KtorHttpEngine() }, launch.logger)::download,
     quit = behavior::quitWithoutAsking,
-    onEvent = { event -> postUpdateNotice(event, controller.messages, updater) },
+    onEvent = { event ->
+      postUpdateNotice(event, controller.messages, updater) { request ->
+        controller.state.releaseNotesRequest = request
+      }
+    },
   )
   return updater
 }

@@ -305,6 +305,18 @@
   <string name="settings_about_update_restart">重新啟動以更新</string>
   <string name="settings_about_update_open_installer">開啟安裝程式</string>
   <string name="settings_about_update_release_page">發行頁面</string>
+  <string name="settings_about_update_installed">已更新到 Ketch %1$s</string>
+  <string name="settings_about_update_whats_new">新功能</string>
+  <string name="settings_about_notes_loading">正在載入發行說明…</string>
+  <string name="settings_about_notes_failed">無法載入發行說明</string>
+  <string name="settings_about_notes_released">發行於 %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="other">%2$s 之後的 %1$d 個版本</item>
+  </plurals>
+  <string name="settings_about_notes_new">新功能</string>
+  <string name="settings_about_notes_fixed">修正</string>
+  <string name="settings_about_notes_improved">改進</string>
+  <string name="settings_about_notes_quiet">維護與幕後改進。</string>
   <string name="settings_logs_open">開啟記錄檔資料夾</string>
   <string name="settings_logs_open_failed">無法開啟記錄檔資料夾：%1$s</string>
   <string name="settings_logs_share">分享記錄檔</string>

@@ -6,10 +6,13 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.platform.AppUpdateState
 import com.linroid.ketch.app.platform.AppUpdateStep
 import com.linroid.ketch.app.platform.AppUpdates
+import com.linroid.ketch.app.platform.ReleaseNotes
 import com.linroid.ketch.updater.Release
 import com.linroid.ketch.updater.ReleaseAsset
 import com.linroid.ketch.updater.ReleaseFeed
 import com.linroid.ketch.updater.ReleaseVersion
+import com.linroid.ketch.updater.UpdateException
+import com.linroid.ketch.updater.releasesBetween
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -41,12 +44,36 @@ internal class AndroidUpdater(
   private val log = KetchLogger("AndroidUpdater")
   private val mutableState = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
   override val state: StateFlow<AppUpdateState> = mutableState.asStateFlow()
+  override val currentVersion: String? = current?.toString()
   private var release: Release? = null
   private var prepared: File? = null
   private var step: Job? = null
   private var automatic: Job? = null
 
   override fun check() = check(automatic = false)
+
+  /**
+   * The release that ran before this one when the app was updated since: [lastVersion], the
+   * version that ran last, when it is a release older than this one. `null` on a first run,
+   * after a downgrade and when either is not a release.
+   */
+  fun updatedFrom(lastVersion: String?): String? {
+    val current = current ?: return null
+    val last = lastVersion?.let(ReleaseVersion::parse) ?: return null
+    return last.takeIf { it < current }?.toString()
+  }
+
+  override suspend fun releaseNotes(version: String, since: String?): List<ReleaseNotes> {
+    val upTo = ReleaseVersion.parse(version) ?: throw UpdateException("$version is not a release")
+    return feed.releasesBetween(since?.let(ReleaseVersion::parse), upTo).map { release ->
+      ReleaseNotes.parse(
+        release.version.toString(),
+        release.pageUrl,
+        release.publishedAt,
+        release.notes,
+      )
+    }
+  }
 
   private fun check(automatic: Boolean) {
     if (step?.isActive == true) return

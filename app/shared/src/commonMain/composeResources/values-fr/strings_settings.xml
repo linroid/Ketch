@@ -309,6 +309,19 @@
   <string name="settings_about_update_restart">Redémarrer pour mettre à jour</string>
   <string name="settings_about_update_open_installer">Ouvrir le programme d'installation</string>
   <string name="settings_about_update_release_page">Page de la version</string>
+  <string name="settings_about_update_installed">Ketch a été mis à jour vers la version %1$s</string>
+  <string name="settings_about_update_whats_new">Nouveautés</string>
+  <string name="settings_about_notes_loading">Chargement des notes de version…</string>
+  <string name="settings_about_notes_failed">Impossible de charger les notes de version</string>
+  <string name="settings_about_notes_released">Publiée le %1$s</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d version depuis la %2$s</item>
+    <item quantity="other">%1$d versions depuis la %2$s</item>
+  </plurals>
+  <string name="settings_about_notes_new">Nouveau</string>
+  <string name="settings_about_notes_fixed">Corrigé</string>
+  <string name="settings_about_notes_improved">Amélioré</string>
+  <string name="settings_about_notes_quiet">Maintenance et améliorations internes.</string>
   <string name="settings_logs_open">Ouvrir le dossier des journaux</string>
   <string name="settings_logs_open_failed">Impossible d'ouvrir le dossier des journaux : %1$s</string>
   <string name="settings_logs_share">Partager les journaux</string>

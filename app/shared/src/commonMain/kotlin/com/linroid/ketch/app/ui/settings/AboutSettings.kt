@@ -50,6 +50,7 @@ import com.linroid.ketch.app.platform.AppUpdateState
 import com.linroid.ketch.app.platform.AppUpdateStep
 import com.linroid.ketch.app.platform.AppUpdates
 import com.linroid.ketch.app.platform.LocalAppUpdates
+import com.linroid.ketch.app.platform.ReleaseNotesRequest
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
@@ -208,21 +209,24 @@ fun AboutSettings(state: AppState) {
 }
 
 /**
- * Where the app's update to the latest release stands, with the button for the next step, and
- * whether the app looks for one by itself.
+ * Where the app's update to the latest release stands, with the button for the next step, what
+ * is new in the release found or else in this one, and whether the app looks for one by itself.
  */
 @Composable
 private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController) {
   val state by updates.state.collectAsState()
+  var notes by remember { mutableStateOf<ReleaseNotesRequest?>(null) }
   SettingsGroup(title = stringResource(Res.string.settings_about_updates)) {
     UpdateStatusRow(state, updates)
-    val release = state.release()
-    if (release != null) {
-      val (version, notesUrl) = release
-      LinkRow(
-        title = stringResource(Res.string.settings_about_update_notes, version),
-        description = notesUrl.substringAfter("://"),
-        url = notesUrl,
+    val current = updates.currentVersion
+    // A newer release's notes start after this one's; otherwise this release's own.
+    val request = state.releaseVersion()?.let { ReleaseNotesRequest(it, since = current) }
+      ?: current?.let { ReleaseNotesRequest(it) }
+    if (request != null) {
+      SettingsRow(
+        title = stringResource(Res.string.settings_about_update_notes, request.version),
+        modifier = Modifier.clickable(role = Role.Button) { notes = request },
+        trailing = { Chevron() },
       )
     }
     SettingsSwitchRow(
@@ -235,14 +239,17 @@ private fun UpdatesGroup(updates: AppUpdates, appSettings: AppSettingsController
       },
     )
   }
+  notes?.let { request ->
+    ReleaseNotesDialog(updates, request, onDismiss = { notes = null })
+  }
 }
 
-/** The release [this] is about, as its version and release notes page; `null` before a check. */
-private fun AppUpdateState.release(): Pair<String, String>? = when (this) {
-  is AppUpdateState.Available -> version to notesUrl
-  is AppUpdateState.Downloading -> version to notesUrl
-  is AppUpdateState.Ready -> version to notesUrl
-  is AppUpdateState.Failed -> if (version != null && notesUrl != null) version to notesUrl else null
+/** The version of the newer release [this] is about; `null` until one is found. */
+private fun AppUpdateState.releaseVersion(): String? = when (this) {
+  is AppUpdateState.Available -> version
+  is AppUpdateState.Downloading -> version
+  is AppUpdateState.Ready -> version
+  is AppUpdateState.Failed -> version
   AppUpdateState.Idle, AppUpdateState.Checking, AppUpdateState.UpToDate -> null
 }
 
@@ -483,7 +490,8 @@ private fun LinkRow(title: String, description: String, url: String) {
   )
 }
 
-private fun openUri(uriHandler: UriHandler, url: String) {
+/** Opens [url] with [uriHandler]; a failure is only logged. */
+internal fun openUri(uriHandler: UriHandler, url: String) {
   try {
     uriHandler.openUri(url)
   } catch (e: Exception) {

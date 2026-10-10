@@ -407,6 +407,26 @@
   <string name="settings_about_update_restart">Restart to update</string>
   <string name="settings_about_update_open_installer">Open installer</string>
   <string name="settings_about_update_release_page">Release page</string>
+  <!-- Toast after Ketch started on a newer version than the one that ran before. -->
+  <string name="settings_about_update_installed">Updated to Ketch %1$s</string>
+  <!-- Toast button: shows the release notes. -->
+  <string name="settings_about_update_whats_new">What's new</string>
+  <!-- The release notes dialog, titled with settings_about_update_notes. -->
+  <string name="settings_about_notes_loading">Loading the release notes…</string>
+  <string name="settings_about_notes_failed">Couldn't load the release notes</string>
+  <!-- When the release came out. %1$s is the date, such as Oct 8. -->
+  <string name="settings_about_notes_released">Released %1$s</string>
+  <!-- The notes of %1$d releases, those after the version %2$s. -->
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d release since %2$s</item>
+    <item quantity="other">%1$d releases since %2$s</item>
+  </plurals>
+  <!-- Headings over the kinds of changes in a release. -->
+  <string name="settings_about_notes_new">New</string>
+  <string name="settings_about_notes_fixed">Fixed</string>
+  <string name="settings_about_notes_improved">Improved</string>
+  <!-- A release whose changes only concern Ketch's developers. -->
+  <string name="settings_about_notes_quiet">Maintenance and behind-the-scenes improvements.</string>
   <!-- How the desktop app hands over its log files. -->
   <string name="settings_logs_open">Open log folder</string>
   <!-- When the folder could not be opened. %1$s is why. -->

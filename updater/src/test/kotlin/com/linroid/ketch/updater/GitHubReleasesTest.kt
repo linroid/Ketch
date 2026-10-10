@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class GitHubReleasesTest {
   private val api = "https://api.test"
@@ -71,6 +72,37 @@ class GitHubReleasesTest {
   }
 
   @Test
+  fun latest_readsTheNotesAndPublishTime() = runTest {
+    val engine = FakeHttpEngine(mapOf("$api/repos/linroid/Ketch/releases/latest" to RELEASE_JSON))
+    val release = GitHubReleases({ engine }, apiUrl = api).latest()
+
+    assertEquals(
+      "## What's Changed\n* feat: add a thing by @linroid in https://x/pull/1",
+      release.notes,
+    )
+    assertEquals(Instant.parse("2026-10-08T04:22:27Z"), release.publishedAt)
+  }
+
+  @Test
+  fun releases_leavesOutDraftsAndTagsThatAreNotVersions() = runTest {
+    val body = """
+      [
+        {"tag_name": "v0.3.1", "html_url": "https://x/v0.3.1", "body": null},
+        {"tag_name": "v0.3.2", "html_url": "https://x/v0.3.2", "draft": true},
+        {"tag_name": "extension-v0.3.1.7", "html_url": "https://x/ext"},
+        {"tag_name": "v0.3.0-rc1", "html_url": "https://x/v0.3.0-rc1", "published_at": "soon"}
+      ]
+    """.trimIndent().encodeToByteArray()
+    val url = "$api/repos/linroid/Ketch/releases?per_page=10&page=2"
+    val releases = GitHubReleases({ FakeHttpEngine(mapOf(url to body)) }, apiUrl = api).releases(2)
+
+    assertEquals(listOf("0.3.1", "0.3.0-rc1"), releases.map { it.version.toString() })
+    assertEquals("", releases[0].notes)
+    // A time GitHub never sends is no reason to lose the notes.
+    assertNull(releases[1].publishedAt)
+  }
+
+  @Test
   fun latest_notJson_fails() = runTest {
     val body = "<html>".encodeToByteArray()
     val engine = FakeHttpEngine(mapOf("$api/repos/linroid/Ketch/releases/latest" to body))
@@ -83,6 +115,8 @@ class GitHubReleasesTest {
         "tag_name": "v0.0.2-rc1",
         "html_url": "https://github.com/linroid/Ketch/releases/tag/v0.0.2-rc1",
         "draft": false,
+        "body": "## What's Changed\n* feat: add a thing by @linroid in https://x/pull/1",
+        "published_at": "2026-10-08T04:22:27Z",
         "assets": [
           {
             "name": "ketch-cli-0.0.2-rc1-linux-x64.tar.gz",

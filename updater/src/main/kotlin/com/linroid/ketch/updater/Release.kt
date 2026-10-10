@@ -1,5 +1,7 @@
 package com.linroid.ketch.updater
 
+import kotlin.time.Instant
+
 /** The GitHub repository Ketch is released from. */
 const val KETCH_REPOSITORY: String = "linroid/Ketch"
 
@@ -9,11 +11,16 @@ const val KETCH_REPOSITORY: String = "linroid/Ketch"
  * @property version the version its tag names.
  * @property pageUrl web page of the release, with its notes.
  * @property assets the files it ships.
+ * @property notes its release notes in Markdown, empty when it has none: the download list,
+ *   then the changes GitHub generated from the pull requests merged since the release before.
+ * @property publishedAt when it was published; `null` when the feed does not say.
  */
 data class Release(
   val version: ReleaseVersion,
   val pageUrl: String,
   val assets: List<ReleaseAsset>,
+  val notes: String = "",
+  val publishedAt: Instant? = null,
 ) {
   /** The universal Android APK published by the release workflow, or `null` before upload. */
   fun androidAsset(): ReleaseAsset? = assets.firstOrNull {

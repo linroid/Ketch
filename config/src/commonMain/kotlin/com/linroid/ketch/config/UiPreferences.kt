@@ -105,6 +105,8 @@ data class IntakePreferences(
  *   `null` until Settings has been opened.
  * @property discoverHistory whether Discover shows its history beside the chat on windows wide
  *   enough to dock it.
+ * @property lastVersion the version of the app that ran last, which tells a launch of a newer
+ *   one that the app was updated; `null` until an app that updates itself has run.
  */
 @Serializable
 data class UiPreferences(
@@ -130,6 +132,7 @@ data class UiPreferences(
   val reduceMotion: Boolean = false,
   val settingsPage: String? = null,
   val discoverHistory: Boolean = true,
+  val lastVersion: String? = null,
 ) {
   companion object {
     /** Docked inspector width until the user resizes it, in dp. */

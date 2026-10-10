@@ -7,13 +7,16 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.HttpEngine
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /** Where Ketch finds its releases. */
 interface ReleaseFeed {
@@ -22,7 +25,38 @@ interface ReleaseFeed {
 
   /** The release of [version]. */
   suspend fun release(version: ReleaseVersion): Release
+
+  /**
+   * One [page] of the published releases, newest first, starting at 1; an empty list past the
+   * last. Pre-releases are included; releases whose tag is not a version, such as the browser
+   * extension's, are left out.
+   */
+  suspend fun releases(page: Int): List<Release>
 }
+
+/**
+ * The releases after [since] up to [version], newest first, for the notes of everything an
+ * update brings: those the pages of [ReleaseFeed.releases] list, read until one reaches [since]
+ * or for [MAX_RELEASE_PAGES] pages, and [version], asked for on its own when they do not list
+ * it. Only [version] when [since] is `null` or not older.
+ */
+suspend fun ReleaseFeed.releasesBetween(
+  since: ReleaseVersion?,
+  version: ReleaseVersion,
+): List<Release> {
+  if (since == null || since >= version) return listOf(release(version))
+  val found = mutableListOf<Release>()
+  for (page in 1..MAX_RELEASE_PAGES) {
+    val releases = releases(page)
+    found += releases.filter { it.version > since && it.version <= version }
+    if (releases.isEmpty() || releases.any { it.version <= since }) break
+  }
+  if (found.none { it.version == version }) found += release(version)
+  return found.distinctBy { it.version }.sortedByDescending { it.version }
+}
+
+/** The most pages of [ReleaseFeed.releases] that [releasesBetween] reads. */
+const val MAX_RELEASE_PAGES: Int = 5
 
 /**
  * The releases of a GitHub [repository], read from the GitHub REST API. GitHub allows 60 requests
@@ -40,13 +74,34 @@ class GitHubReleases(
   private val log = KetchLogger("GitHubReleases")
 
   override suspend fun latest(): Release =
-    fetch("releases/latest", missing = "$repository has no published release")
+    single("releases/latest", missing = "$repository has no published release")
 
   override suspend fun release(version: ReleaseVersion): Release =
-    fetch("releases/tags/v$version", missing = "$repository has no release v$version")
+    single("releases/tags/v$version", missing = "$repository has no release v$version")
+
+  override suspend fun releases(page: Int): List<Release> {
+    val path = "releases?per_page=$RELEASES_PER_PAGE&page=$page"
+    val releases = fetch(path, ListSerializer(GitHubRelease.serializer()), "$repository is gone")
+    // Drafts only show to the repository's maintainers.
+    return releases.filterNot { it.draft }.mapNotNull { release ->
+      ReleaseVersion.parse(release.tagName)?.let { release.toRelease(it) }
+    }
+  }
 
   /** Reads the release at [path] of the repository's API; [missing] explains a 404. */
-  private suspend fun fetch(path: String, missing: String): Release {
+  private suspend fun single(path: String, missing: String): Release {
+    val release = fetch(path, GitHubRelease.serializer(), missing)
+    val version = ReleaseVersion.parse(release.tagName)
+      ?: throw UpdateException("The release tag ${release.tagName} is not a version")
+    return release.toRelease(version)
+  }
+
+  /** Reads [path] of the repository's API as [what]; [missing] explains a 404. */
+  private suspend fun <T> fetch(
+    path: String,
+    what: DeserializationStrategy<T>,
+    missing: String,
+  ): T {
     val url = "$apiUrl/repos/$repository/$path"
     log.d { "Fetching $url" }
     val body = ByteArrayOutputStream()
@@ -78,32 +133,43 @@ class GitHubReleases(
     } finally {
       engine.close()
     }
-    val release = try {
-      JSON.decodeFromString(GitHubRelease.serializer(), body.toString(Charsets.UTF_8.name()))
+    return try {
+      JSON.decodeFromString(what, body.toString(Charsets.UTF_8.name()))
     } catch (e: SerializationException) {
       throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
     } catch (e: IllegalArgumentException) {
       throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
     }
-    val version = ReleaseVersion.parse(release.tagName)
-      ?: throw UpdateException("The release tag ${release.tagName} is not a version")
-    return Release(
-      version = version,
-      pageUrl = release.htmlUrl,
-      assets = release.assets.map { asset ->
-        ReleaseAsset(
-          name = asset.name,
-          url = asset.url,
-          size = asset.size,
-          sha256 = asset.digest?.takeIf { it.startsWith(SHA256_PREFIX) }
-            ?.removePrefix(SHA256_PREFIX)?.lowercase(),
-        )
-      },
-    )
   }
+
+  private fun GitHubRelease.toRelease(version: ReleaseVersion) = Release(
+    version = version,
+    pageUrl = htmlUrl,
+    assets = assets.map { asset ->
+      ReleaseAsset(
+        name = asset.name,
+        url = asset.url,
+        size = asset.size,
+        sha256 = asset.digest?.takeIf { it.startsWith(SHA256_PREFIX) }
+          ?.removePrefix(SHA256_PREFIX)?.lowercase(),
+      )
+    },
+    notes = body.orEmpty(),
+    publishedAt = publishedAt?.let { time ->
+      try {
+        Instant.parse(time)
+      } catch (e: IllegalArgumentException) {
+        log.d { "Ignoring the publish time of $tagName: ${e.describeCauses()}" }
+        null
+      }
+    },
+  )
 
   private companion object {
     const val SHA256_PREFIX = "sha256:"
+
+    /** A release takes about 25 KiB with its files, so a page about 250 KiB. */
+    const val RELEASES_PER_PAGE = 10
     const val MAX_BODY_BYTES = 4 * 1024 * 1024
     val HEADERS = mapOf(
       "Accept" to "application/vnd.github+json",
@@ -115,12 +181,18 @@ class GitHubReleases(
   }
 }
 
-/** The fields Ketch reads of GitHub's release object. */
+/**
+ * The fields Ketch reads of GitHub's release object: `body` holds its notes in Markdown and
+ * `published_at` an ISO 8601 time, both `null` for a draft.
+ */
 @Serializable
 internal class GitHubRelease(
   @SerialName("tag_name") val tagName: String,
   @SerialName("html_url") val htmlUrl: String,
   val assets: List<GitHubAsset> = emptyList(),
+  val body: String? = null,
+  @SerialName("published_at") val publishedAt: String? = null,
+  val draft: Boolean = false,
 )
 
 /** The fields Ketch reads of a release asset; `digest` is `sha256:<hex>`. */

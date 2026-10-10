@@ -305,6 +305,18 @@
   <string name="settings_about_update_restart">재시작하여 업데이트</string>
   <string name="settings_about_update_open_installer">설치 프로그램 열기</string>
   <string name="settings_about_update_release_page">릴리스 페이지</string>
+  <string name="settings_about_update_installed">Ketch %1$s 버전으로 업데이트됨</string>
+  <string name="settings_about_update_whats_new">새로운 기능</string>
+  <string name="settings_about_notes_loading">릴리스 노트를 불러오는 중…</string>
+  <string name="settings_about_notes_failed">릴리스 노트를 불러올 수 없음</string>
+  <string name="settings_about_notes_released">%1$s 출시</string>
+  <plurals name="settings_about_notes_since">
+    <item quantity="other">%2$s 이후 릴리스 %1$d개</item>
+  </plurals>
+  <string name="settings_about_notes_new">새로운 기능</string>
+  <string name="settings_about_notes_fixed">수정됨</string>
+  <string name="settings_about_notes_improved">개선됨</string>
+  <string name="settings_about_notes_quiet">유지 관리 및 내부 개선.</string>
   <string name="settings_logs_open">로그 폴더 열기</string>
   <string name="settings_logs_open_failed">로그 폴더를 열 수 없음: %1$s</string>
   <string name="settings_logs_share">로그 공유</string>

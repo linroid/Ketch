@@ -5,9 +5,11 @@ import android.content.pm.PackageManager
 import androidx.core.content.pm.PackageInfoCompat
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
-import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.platform.AppUpdates
+import com.linroid.ketch.app.platform.ReleaseNotesRequest
 import com.linroid.ketch.app.platform.postAppUpdateNotice
+import com.linroid.ketch.app.platform.postAppUpdatedNotice
+import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
@@ -15,15 +17,21 @@ import com.linroid.ketch.updater.ReleaseVersion
 import com.linroid.ketch.updater.UpdateException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** The Play source set supplies a null provider instead, with no updater dependency. */
+/**
+ * The updater of the direct distribution, which tells about what it finds, and an update since
+ * the last launch, in [controller]'s toasts; their What's new opens the release notes. The Play
+ * source set supplies a null provider instead, with no updater dependency.
+ */
 internal fun createAppUpdates(
   scope: CoroutineScope,
   app: KetchApplication,
-  messages: MessageCenter,
+  controller: AppController,
 ): AppUpdates {
+  val showNotes = { request: ReleaseNotesRequest -> controller.state.releaseNotesRequest = request }
   val downloader = ReleaseDownloader(
     httpEngine = { KtorHttpEngine() },
     logger = Logger.combine(Logger.console(LogLevel.DEBUG), app.fileLogger),
@@ -46,9 +54,22 @@ internal fun createAppUpdates(
       )
     },
     automaticChecks = !BuildConfig.DEBUG,
-    onNotice = { state -> postAppUpdateNotice(state, messages, updater) },
+    onNotice = { state -> postAppUpdateNotice(state, controller.messages, updater, showNotes) },
   )
   updater.setCheckAutomatically(app.configStore.load().desktop.checkForUpdates)
+  // The screen asks for the updater while it composes, so this waits for the main thread.
+  scope.launch(Dispatchers.Main) {
+    val appSettings = controller.appSettings
+    val lastVersion = appSettings.ui.lastVersion
+    val since = updater.updatedFrom(lastVersion)
+    val current = updater.currentVersion
+    if (since != null && current != null) {
+      postAppUpdatedNotice(current, since, controller.messages, showNotes)
+    }
+    if (lastVersion != BuildConfig.VERSION_NAME) {
+      appSettings.saveUi { it.copy(lastVersion = BuildConfig.VERSION_NAME) }
+    }
+  }
   return updater
 }
 
