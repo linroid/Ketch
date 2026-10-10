@@ -44,6 +44,8 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.isMobilePlatform
+import com.linroid.ketch.app.platform.keepAwakeSupported
+import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
@@ -80,6 +82,8 @@ import ketch.app.shared.generated.resources.settings_general_density
 import ketch.app.shared.generated.resources.settings_general_density_hint
 import ketch.app.shared.generated.resources.settings_general_device_name
 import ketch.app.shared.generated.resources.settings_general_device_name_hint
+import ketch.app.shared.generated.resources.settings_general_keep_awake
+import ketch.app.shared.generated.resources.settings_general_keep_awake_hint
 import ketch.app.shared.generated.resources.settings_general_language
 import ketch.app.shared.generated.resources.settings_general_language_current
 import ketch.app.shared.generated.resources.settings_general_language_in_settings
@@ -88,6 +92,7 @@ import ketch.app.shared.generated.resources.settings_general_login_add_failed
 import ketch.app.shared.generated.resources.settings_general_login_remove_failed
 import ketch.app.shared.generated.resources.settings_general_login_update_failed
 import ketch.app.shared.generated.resources.settings_general_open_at_login
+import ketch.app.shared.generated.resources.settings_general_power
 import ketch.app.shared.generated.resources.settings_general_reduce_motion
 import ketch.app.shared.generated.resources.settings_general_reduce_motion_auto
 import ketch.app.shared.generated.resources.settings_general_reduce_motion_on
@@ -106,8 +111,8 @@ import org.jetbrains.compose.resources.stringResource
 private val log = KetchLogger("GeneralSettings")
 
 /**
- * The name of this device, how the app looks and moves, and on desktop what happens when its
- * window closes and whether it opens at login.
+ * The name of this device, how the app looks and moves, on desktop what happens when its window
+ * closes and whether it opens at login, and whether the system stays awake while downloading.
  *
  * @param systemDeviceName name the device goes by when none is set, or `null` when there is no
  *   device of this app's own to name (the web app).
@@ -188,6 +193,7 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
+  if (keepAwakeSupported) PowerGroup(appSettings)
   // Phones have no keyboard to speak of.
   if (!isMobilePlatform) {
     val chord = KetchCommands.Shortcuts.shortcutLabel(KeyboardPlatform.current)
@@ -320,6 +326,19 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
         appSettings.saveDesktop { it.copy(dockBadge = mode) }
         hooks.setDockBadgeMode(mode)
       },
+    )
+  }
+}
+
+/** Whether the system stays awake while downloads run, on desktop and Android. */
+@Composable
+private fun PowerGroup(appSettings: AppSettingsController) {
+  SettingsGroup(title = stringResource(Res.string.settings_general_power)) {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_general_keep_awake),
+      description = Res.string.settings_general_keep_awake_hint.text(localDeviceNoun()).resolve(),
+      checked = appSettings.config.power.keepAwake,
+      onCheckedChange = { on -> appSettings.savePower { it.copy(keepAwake = on) } },
     )
   }
 }

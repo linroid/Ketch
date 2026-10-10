@@ -124,6 +124,9 @@
   <string name="settings_general_badge_active">进行中的下载</string>
   <string name="settings_general_badge_failures">仅失败</string>
   <string name="settings_general_badge_off">不显示</string>
+  <string name="settings_general_power">电源</string>
+  <string name="settings_general_keep_awake">下载时保持唤醒</string>
+  <string name="settings_general_keep_awake_hint">下载进行时，%1$s不会自动进入睡眠。屏幕仍可关闭。</string>
 
   <string name="settings_notifications_downloads">下载</string>
   <string name="settings_notifications_footer">“通知”使用系统通知。“仅在应用内”只在 Ketch 中显示。</string>
@@ -531,6 +534,7 @@
   <string name="settings_search_start_hidden_keywords">开机启动, 后台, 菜单栏, 托盘, 静默启动</string>
   <string name="settings_search_badge">程序坞或任务栏图标显示的内容</string>
   <string name="settings_search_badge_keywords">数字, 角标, 程序坞, dock, 任务栏</string>
+  <string name="settings_search_keep_awake_keywords">睡眠, 休眠, 电源, 电池, 防止睡眠, 唤醒锁</string>
   <string name="settings_search_shortcuts">所有键盘快捷键</string>
   <string name="settings_search_shortcuts_keywords">按键, 快捷键, 热键, 键位</string>
   <string name="settings_search_finished_keywords">完成, 下载完成, 提醒</string>

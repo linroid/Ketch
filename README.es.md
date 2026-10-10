@@ -155,6 +155,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   directamente desde la lista.
 - **Integrado en cada plataforma** — Barra de menús o bandeja, notificaciones y progreso en el Dock
   y la barra de tareas en escritorio; descargas en segundo plano en Android y en iOS 26.
+- **Activo mientras descarga** — Las apps de escritorio y Android evitan que el sistema entre en
+  reposo por sí mismo mientras hay descargas en curso; la pantalla puede apagarse igualmente
+  (**Ajustes → General**).
 - **Tu estilo y tu idioma** — Temas claro y oscuro con cuatro colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
   ([traducciones](docs/development/localization.md)).
@@ -237,8 +240,8 @@ la [documentación de la CLI](cli/README.md) enumera todos los comandos.
   propias carpetas según tus reglas
 - **Elegir archivos de un torrent en cualquier momento** — Seleccionarlos cuando lleguen los
   detalles de un enlace magnet y cambiar la selección durante la descarga
-- **Mantener el equipo activo** — Evitar la suspensión durante las descargas y, opcionalmente,
-  suspender o apagar al terminar
+- **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
+  la cola quede vacía
 - **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle
 - **Línea de comandos para dispositivos en ejecución** — `ketch` y los agentes de IA añaden, listan,
   pausan y observan las descargas de la aplicación o de un servidor sin iniciar un segundo motor

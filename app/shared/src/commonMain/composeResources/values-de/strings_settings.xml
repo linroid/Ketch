@@ -128,6 +128,9 @@
   <string name="settings_general_badge_active">Aktive Downloads</string>
   <string name="settings_general_badge_failures">Nur Fehler</string>
   <string name="settings_general_badge_off">Nichts</string>
+  <string name="settings_general_power">Energie</string>
+  <string name="settings_general_keep_awake">Während Downloads wach bleiben</string>
+  <string name="settings_general_keep_awake_hint">%1$s wechselt nicht von selbst in den Ruhezustand, solange Downloads laufen. Der Bildschirm kann sich trotzdem ausschalten.</string>
 
   <string name="settings_notifications_downloads">Downloads</string>
   <string name="settings_notifications_footer">„Benachrichtigen“ verwendet Systembenachrichtigungen. „Nur in der App“ bleibt in Ketch.</string>
@@ -546,6 +549,7 @@
   <string name="settings_search_start_hidden_keywords">Autostart, Hintergrund, Menüleiste, Tray, Infobereich</string>
   <string name="settings_search_badge">Was das Symbol im Dock oder in der Taskleiste zeigt</string>
   <string name="settings_search_badge_keywords">Anzahl, Kennzeichen, Badge, Dock, Taskleiste</string>
+  <string name="settings_search_keep_awake_keywords">Ruhezustand, Energie, Akku, Standby, Schlaf verhindern, Wakelock</string>
   <string name="settings_search_shortcuts">Alle Tastenkürzel</string>
   <string name="settings_search_shortcuts_keywords">Tasten, Tastenkombinationen, Kurzbefehle, Hotkeys</string>
   <string name="settings_search_finished_keywords">fertig, abgeschlossen, Hinweis, Mitteilung</string>
