@@ -4,11 +4,16 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.torrent.TorrentFileOrder
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class DownloadArgsTest {
 
@@ -193,4 +198,143 @@ class DownloadArgsTest {
       assertIs<DownloadArgs.Invalid>(args, "$options")
     }
   }
+
+  @Test
+  fun parse_files_buildsTheSelection() {
+    val parsed = parseDownloadArgs(listOf(MAGNET, "--files", "3, 0,3"))
+
+    val download = assertIs<DownloadArgs.Download>(parsed)
+    assertEquals(setOf("3", "0"), download.fileIds)
+    assertEquals(setOf("3", "0"), download.toRequest(Destination("./")).selectedFileIds)
+  }
+
+  @Test
+  fun parse_withoutFiles_downloadsEveryFile() {
+    val download = assertIs<DownloadArgs.Download>(parseDownloadArgs(listOf(MAGNET)))
+
+    assertEquals(emptySet(), download.toRequest(Destination("./")).selectedFileIds)
+    assertFalse(download.listFiles)
+  }
+
+  @Test
+  fun parse_emptyFiles_isInvalid() {
+    for (value in listOf("", " ", "1,,2", "1,")) {
+      assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(MAGNET, "--files", value)), value)
+    }
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf(MAGNET, "--files")))
+  }
+
+  @Test
+  fun parse_listFiles_setsTheMode() {
+    val download = assertIs<DownloadArgs.Download>(
+      parseDownloadArgs(listOf("--list-files", MAGNET)),
+    )
+
+    assertTrue(download.listFiles)
+    assertEquals(TorrentFileOrder.TORRENT, download.fileOrder)
+    assertFalse(download.reverse)
+  }
+
+  @Test
+  fun parse_listFilesWithFiles_isInvalid() {
+    val parsed = parseDownloadArgs(listOf("--list-files", "--files", "1", MAGNET))
+
+    assertEquals(
+      DownloadArgs.Invalid("--list-files and --files cannot be used together"),
+      parsed,
+    )
+  }
+
+  @Test
+  fun parse_listFilesSortAndReverse_setTheOrder() {
+    val orders = mapOf(
+      "name" to TorrentFileOrder.NAME,
+      "SIZE" to TorrentFileOrder.SIZE,
+      "type" to TorrentFileOrder.EXTENSION,
+    )
+    for ((value, order) in orders) {
+      val download = assertIs<DownloadArgs.Download>(
+        parseDownloadArgs(listOf("--list-files", "--sort", value, "--reverse", MAGNET)),
+      )
+      assertEquals(order, download.fileOrder, value)
+      assertTrue(download.reverse)
+    }
+  }
+
+  @Test
+  fun parse_unknownSortOrSortWithoutListFiles_isInvalid() {
+    assertEquals(
+      DownloadArgs.Invalid("invalid sort 'kind' (valid values: name, size, type)"),
+      parseDownloadArgs(listOf("--list-files", "--sort", "kind", MAGNET)),
+    )
+    assertEquals(
+      DownloadArgs.Invalid("--sort and --reverse require --list-files"),
+      parseDownloadArgs(listOf("--sort", "size", MAGNET)),
+    )
+    assertIs<DownloadArgs.Invalid>(parseDownloadArgs(listOf("--reverse", MAGNET)))
+  }
+
+  @Test
+  fun fileListRows_sortedBySize_printsAlignedRowsLargestFirst() {
+    val rows = fileListRows(torrent(), TorrentFileOrder.SIZE, reverse = true)
+
+    // Sizes follow the default locale's decimal separator.
+    val sizes = listOf(formatBytes(1_048_576), formatBytes(204_800), formatBytes(100))
+    val width = sizes.maxOf { it.length }
+    assertEquals(
+      listOf(
+        "ID  ${"SIZE".padStart(width)}  PATH",
+        "2   ${sizes[0].padStart(width)}  Pack/Episode 10.mkv",
+        "0   ${sizes[1].padStart(width)}  Pack/Episode 2.mkv",
+        "1   ${sizes[2].padStart(width)}  Pack/notes.txt",
+      ),
+      rows,
+    )
+  }
+
+  @Test
+  fun fileListRows_byNameOrType_usesNaturalAndExtensionOrder() {
+    assertEquals(
+      listOf("0", "2", "1"),
+      fileListRows(torrent(), TorrentFileOrder.NAME).drop(1).map { it.substringBefore(' ') },
+    )
+    assertEquals(
+      listOf("0", "2", "1"),
+      fileListRows(torrent(), TorrentFileOrder.EXTENSION).drop(1).map { it.substringBefore(' ') },
+    )
+    assertEquals(
+      listOf("0", "1", "2"),
+      fileListRows(torrent()).drop(1).map { it.substringBefore(' ') },
+    )
+  }
+
+  @Test
+  fun fileListRows_pathWithControlCharacters_printsOneLine() {
+    val source = torrent().copy(files = listOf(SourceFile("0", "a\nb\u001b[2Jc.txt", 1)))
+
+    val row = fileListRows(source).last()
+
+    assertFalse(row.any { it == '\n' || it == '\u001b' }, row)
+  }
+
+  @Test
+  fun fileListRows_singleFileSource_isEmpty() {
+    assertEquals(emptyList(), fileListRows(torrent().copy(files = emptyList())))
+  }
+
+  private fun torrent() = ResolvedSource(
+    url = MAGNET,
+    sourceType = "torrent",
+    totalBytes = 1_249_700,
+    supportsResume = true,
+    suggestedFileName = "Pack",
+    maxSegments = 1,
+    files = listOf(
+      SourceFile("0", "Pack/Episode 2.mkv", 204_800, mapOf("path" to "Pack/Episode 2.mkv")),
+      SourceFile("1", "Pack/notes.txt", 100, mapOf("path" to "Pack/notes.txt")),
+      SourceFile("2", "Pack/Episode 10.mkv", 1_048_576, mapOf("path" to "Pack/Episode 10.mkv")),
+    ),
+  )
 }
+
+private const val MAGNET = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
