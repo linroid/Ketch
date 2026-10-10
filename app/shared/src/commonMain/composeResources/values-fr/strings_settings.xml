@@ -437,11 +437,13 @@
   <string name="settings_proxy_system_hint">Suit les réglages de proxy de %1$s.</string>
   <string name="settings_proxy_address">Adresse</string>
   <string name="settings_proxy_address_hint">Un proxy HTTP ou SOCKS5.</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
   <string name="settings_proxy_address_invalid">Utilisez http://host:port ou socks5://host:port</string>
   <string name="settings_proxy_username">Nom d'utilisateur</string>
   <string name="settings_proxy_password">Mot de passe</string>
   <string name="settings_proxy_optional">Facultatif</string>
   <string name="settings_proxy_bypass">Se connecter directement à</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
   <string name="settings_proxy_bypass_hint">Hôtes, adresses IP ou plages, séparés par des virgules. Les sous-domaines sont inclus.</string>
   <string name="settings_proxy_bypass_invalid">%1$s n'est ni un hôte, ni une adresse, ni une plage</string>
   <string name="settings_proxy_footer">Pour les téléchargements HTTP, à leur démarrage ou à leur reprise. FTP et les torrents se connectent directement.</string>

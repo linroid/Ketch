@@ -203,6 +203,9 @@ downloads to [its folders](#save-folders).
 | `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
 | `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
 | `--referer <url>` | Send this `Referer` |
+| `--proxy <url>` | Download through this HTTP or SOCKS5 proxy instead of the instance's [proxy setting](#downloadproxy) |
+| `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated |
+| `--no-proxy` | Connect directly, whatever the instance's proxy |
 | `--idempotency-key <key>` | Running the command again with the same key adds the download once |
 | `--json` | Print the task as JSON (see [Task JSON](#task-json)) instead of its ID |
 

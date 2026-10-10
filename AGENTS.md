@@ -242,17 +242,18 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (domains with subdomains, IPs, CIDR, `<local>`, `*`); loopback hosts always go directly and
   `toString` masks the password. Sources call `HttpEngine.withProxy` (internal `through()`) only
   for non-SYSTEM modes; its default refuses them with `KetchError.Unsupported`, so a proxy is
-  never skipped. `Multi`/`ConfigurableNetworkHttpEngine` return views sharing their selection and
-  round robin. `KtorHttpEngine` resolves a `ProxyRoute` per request and redirect hop and keeps one
-  client per route (`HttpTransports`): JVM uses CIO for direct requests the JVM `ProxySelector`
+  never skipped. `Ketch` lists `KetchFeatures.PROXY` only when `HttpEngine.supportsProxies`, and
+  otherwise refuses such proxies in `updateConfig` and `download`. `Multi`/`ConfigurableNetworkHttpEngine` return views sharing their selection and
+  round robin. `KtorHttpEngine` resolves a `ProxyRoute` per request and redirect hop, keeps one
+  client per route (`HttpTransports`) and remembers redirects per proxy (`RedirectCache.Key`): JVM uses CIO for direct requests the JVM `ProxySelector`
   would not proxy and OkHttp (HTTP/1.1) otherwise, SYSTEM reading `https_proxy`/`http_proxy`/
   `all_proxy`/`no_proxy` (`EnvironmentProxies`) then the JVM selector, which reads the OS settings
   with `-Djava.net.useSystemProxies=true` (the desktop launcher sets it); Android leaves SYSTEM to
   OkHttp; iOS sets `NSURLSession` proxy dictionaries. HTTP proxy credentials only go in `CONNECT`
   and proxied plain-HTTP requests; SOCKS5 is Ketch's own `Socks5Socket` (RFC 1928/1929, names
   resolved by the proxy). The interface-bound engines reach proxies through their address or
-  network; a custom `HttpClient` only follows SYSTEM. `KetchFeatures.PROXY` (`http.proxy`), and
-  `RemoteKetch` refuses a proxy for servers without it. See [proxies](docs/proxy.md)
+  network; a custom `HttpClient` only follows SYSTEM. `RemoteKetch` refuses a proxy for servers
+  without `KetchFeatures.PROXY` (`http.proxy`). See [proxies](docs/proxy.md)
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)

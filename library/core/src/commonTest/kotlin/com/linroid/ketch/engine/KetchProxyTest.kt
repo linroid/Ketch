@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
@@ -20,6 +21,8 @@ import okio.FileSystem
 import okio.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -61,6 +64,28 @@ class KetchProxyTest {
     ketch.resolve("https://example.com/file.bin")
 
     assertEquals(listOf(socks), proxies)
+  }
+
+  @Test
+  fun status_listsProxyFeatureOnlyForCapableEngines() = withKetch(DownloadConfig()) {
+    assertTrue(KetchFeatures.PROXY in ketch.status().features)
+  }
+
+  @Test
+  fun proxy_engineWithoutSupport_isRefusedUpFront() = withKetch(
+    DownloadConfig(),
+    fake = FakeHttpEngine(),
+  ) {
+    assertFalse(KetchFeatures.PROXY in ketch.status().features)
+    assertFailsWith<UnsupportedOperationException> {
+      ketch.updateConfig(DownloadConfig(proxy = http))
+    }
+    assertFailsWith<UnsupportedOperationException> {
+      ketch.download(request().copy(proxy = ProxyConfig.Direct))
+    }
+    assertTrue(ketch.tasks.value.isEmpty())
+    // The system's proxy needs nothing of the engine.
+    ketch.updateConfig(DownloadConfig(proxy = ProxyConfig(url = "http://kept.test:3128")))
   }
 
   @Test
@@ -121,6 +146,8 @@ class KetchProxyTest {
     private val fake: FakeHttpEngine = FakeHttpEngine(),
   ) : HttpEngine by fake {
     val proxies = mutableListOf<ProxyConfig>()
+
+    override val supportsProxies: Boolean = true
 
     override fun withProxy(proxy: ProxyConfig): HttpEngine = object : HttpEngine by fake {
       override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {

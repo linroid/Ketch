@@ -93,6 +93,10 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
     withEngine { it.download(url, range, headers, onData) }
   }
 
+  /** Whether the engine of the current selection supports proxies. */
+  override val supportsProxies: Boolean
+    get() = current.load()?.engine?.supportsProxies == true
+
   override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
 
   private suspend fun <T> withEngine(block: suspend (HttpEngine) -> T): T {
@@ -134,6 +138,9 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
     ) {
       withEngine { it.withProxy(proxy).download(url, range, headers, onData) }
     }
+
+    override val supportsProxies: Boolean
+      get() = this@ConfigurableNetworkHttpEngine.supportsProxies
 
     override fun withProxy(proxy: ProxyConfig): HttpEngine =
       this@ConfigurableNetworkHttpEngine.withProxy(proxy)

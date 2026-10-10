@@ -574,6 +574,8 @@
   <string name="settings_proxy_system_hint">Follows the proxy settings of %1$s.</string>
   <string name="settings_proxy_address">Address</string>
   <string name="settings_proxy_address_hint">An HTTP or SOCKS5 proxy.</string>
+  <!-- An example address in the empty field. Keep the URL as it is. -->
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
   <!-- Keep http://host:port and socks5://host:port as they are. -->
   <string name="settings_proxy_address_invalid">Use http://host:port or socks5://host:port</string>
   <string name="settings_proxy_username">Username</string>
@@ -582,6 +584,8 @@
   <string name="settings_proxy_optional">Optional</string>
   <!-- Hosts that skip the proxy. -->
   <string name="settings_proxy_bypass">Connect directly to</string>
+  <!-- Example entries in the empty field. Keep them, and the ASCII comma between them, as they are. -->
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
   <string name="settings_proxy_bypass_hint">Hosts, IP addresses or ranges, separated by commas. Subdomains are included.</string>
   <!-- %1$s is what was typed, such as "a/b". -->
   <string name="settings_proxy_bypass_invalid">%1$s isn't a host, address or range</string>

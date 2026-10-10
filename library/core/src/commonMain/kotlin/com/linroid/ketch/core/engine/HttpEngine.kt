@@ -72,14 +72,20 @@ interface HttpEngine {
   }
 
   /**
+   * Whether [withProxy] accepts modes other than [ProxyMode.SYSTEM]. Ketch lists
+   * [com.linroid.ketch.api.KetchFeatures.PROXY], and accepts such proxies, only when it does.
+   */
+  val supportsProxies: Boolean get() = false
+
+  /**
    * Returns an engine whose requests reach their servers as [proxy] says, sharing this engine's
    * resources. It stays usable until this engine is closed; closing it does nothing.
    *
    * An engine follows the system's proxy settings ([ProxyMode.SYSTEM]) by itself, so Ketch only
    * asks for other modes. Engines that wrap another must override this method to keep wrapping
-   * the engine it returns. The default returns this engine for [ProxyMode.SYSTEM] and refuses
-   * any other mode with [KetchError.Unsupported], so a download never silently skips the proxy
-   * it was given.
+   * the engine it returns. Engines that override it must also report [supportsProxies]. The
+   * default returns this engine for [ProxyMode.SYSTEM] and refuses any other mode with
+   * [KetchError.Unsupported], so a download never silently skips the proxy it was given.
    */
   fun withProxy(proxy: ProxyConfig): HttpEngine {
     if (proxy.mode == ProxyMode.SYSTEM) return this

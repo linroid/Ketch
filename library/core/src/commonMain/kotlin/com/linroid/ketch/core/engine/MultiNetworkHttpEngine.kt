@@ -52,6 +52,9 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
     nextEngine().download(url, range, headers, onData)
   }
 
+  /** Whether every network's engine supports proxies. */
+  override val supportsProxies: Boolean = this.engines.all { it.supportsProxies }
+
   override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
 
   private fun nextEngine(): HttpEngine {
@@ -101,6 +104,8 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
     ) {
       nextEngine().withProxy(proxy).download(url, range, headers, onData)
     }
+
+    override val supportsProxies: Boolean get() = this@MultiNetworkHttpEngine.supportsProxies
 
     override fun withProxy(proxy: ProxyConfig): HttpEngine =
       this@MultiNetworkHttpEngine.withProxy(proxy)

@@ -212,8 +212,9 @@ request follows the redirects again.
 `KtorHttpEngine` applies `DownloadConfig.proxy` and `DownloadRequest.proxy` (see
 [proxies](proxy.md)): every request, and every hop of a redirect, goes directly or through an
 HTTP or SOCKS5 proxy as the setting says for its URL. An engine built around an `HttpClient` of
-your own only follows the system's proxy settings, in the client's own way, and fails downloads
-given any other proxy with `KetchError.Unsupported`.
+your own only follows the system's proxy settings, in the client's own way. `Ketch` lists the
+`http.proxy` feature only when its engine reports `HttpEngine.supportsProxies`, and otherwise
+refuses other proxies in `updateConfig` and `download` with `UnsupportedOperationException`.
 
 For downloading across multiple interfaces, wrap network-bound engines in
 `MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;

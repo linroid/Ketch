@@ -14,6 +14,8 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
@@ -66,7 +68,9 @@ import kotlin.uuid.Uuid
 /**
  * Core in-process implementation of [KetchApi]. No HTTP involved.
  *
- * @param httpEngine the HTTP engine for HTTP/HTTPS downloads
+ * @param httpEngine the HTTP engine for HTTP/HTTPS downloads. Proxies other than the system's
+ *   need one that [supports them][HttpEngine.supportsProxies]; with any other, downloads given
+ *   one fail with [KetchError.Unsupported]
  * @param taskStore persistent storage for task records
  * @param config initial global download configuration; replace it at
  *   runtime with [updateConfig]
@@ -113,7 +117,7 @@ class Ketch(
     add(KetchFeatures.AUTO_CONNECTIONS)
     add(KetchFeatures.QUEUE_POSITION)
     add(KetchFeatures.REQUEST_ID)
-    add(KetchFeatures.PROXY)
+    if (httpEngine.supportsProxies) add(KetchFeatures.PROXY)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)
@@ -177,6 +181,7 @@ class Ketch(
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
+    requireProxySupport(request.proxy)
     if (request.requestId == null) return createDownload(request)
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
@@ -518,6 +523,7 @@ class Ketch(
    * download when it starts or resumes. See [KetchApi.updateConfig].
    */
   override suspend fun updateConfig(config: DownloadConfig) {
+    requireProxySupport(config.proxy)
     val directory = config.defaultDirectory
     if (directory != null && directory != currentConfig.defaultDirectory) {
       requireDownloadDirectory(directory)
@@ -540,6 +546,12 @@ class Ketch(
     queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
 
     log.i { "Config updated: $config" }
+  }
+
+  /** Refuses a [proxy] other than the system's when the HTTP engine cannot apply it. */
+  private fun requireProxySupport(proxy: ProxyConfig?) {
+    if (proxy == null || proxy.mode == ProxyMode.SYSTEM || KetchFeatures.PROXY in features) return
+    throw UnsupportedOperationException("The HTTP engine cannot use a proxy")
   }
 
   override suspend fun networkInterfaces(): NetworkInterfaces =

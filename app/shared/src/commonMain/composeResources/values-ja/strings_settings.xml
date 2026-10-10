@@ -429,11 +429,13 @@
   <string name="settings_proxy_system_hint">%1$sのプロキシ設定に従います。</string>
   <string name="settings_proxy_address">アドレス</string>
   <string name="settings_proxy_address_hint">HTTPまたはSOCKS5プロキシ。</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
   <string name="settings_proxy_address_invalid">http://host:port または socks5://host:port の形式で入力してください</string>
   <string name="settings_proxy_username">ユーザー名</string>
   <string name="settings_proxy_password">パスワード</string>
   <string name="settings_proxy_optional">任意</string>
   <string name="settings_proxy_bypass">直接接続する宛先</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
   <string name="settings_proxy_bypass_hint">ホスト、IPアドレス、または範囲をカンマ区切りで入力します。サブドメインも含まれます。</string>
   <string name="settings_proxy_bypass_invalid">%1$s はホスト、アドレス、範囲のいずれでもありません</string>
   <string name="settings_proxy_footer">HTTPダウンロードの開始時と再開時に適用されます。FTPとトレントは直接接続します。</string>

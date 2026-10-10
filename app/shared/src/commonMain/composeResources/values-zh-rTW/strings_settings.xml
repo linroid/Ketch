@@ -429,11 +429,13 @@
   <string name="settings_proxy_system_hint">依照 %1$s 的代理伺服器設定。</string>
   <string name="settings_proxy_address">位址</string>
   <string name="settings_proxy_address_hint">HTTP 或 SOCKS5 代理伺服器。</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
   <string name="settings_proxy_address_invalid">請使用 http://host:port 或 socks5://host:port</string>
   <string name="settings_proxy_username">使用者名稱</string>
   <string name="settings_proxy_password">密碼</string>
   <string name="settings_proxy_optional">選填</string>
   <string name="settings_proxy_bypass">直接連線至</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
   <string name="settings_proxy_bypass_hint">主機、IP 位址或位址範圍，以逗號分隔。包含子網域。</string>
   <string name="settings_proxy_bypass_invalid">%1$s 不是有效的主機、位址或範圍</string>
   <string name="settings_proxy_footer">適用於開始或繼續時的 HTTP 下載。FTP 和種子一律直接連線。</string>

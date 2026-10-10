@@ -16,7 +16,7 @@ class KetchFeaturesTest {
   @Test
   fun status_optionalSourceFeatures_onlyAdvertisedWhenRegistered() = runTest {
     val base = setOf(KetchFeatures.AUTO_CONNECTIONS, KetchFeatures.QUEUE_POSITION,
-      KetchFeatures.REQUEST_ID, KetchFeatures.PROXY)
+      KetchFeatures.REQUEST_ID)
     val dispatcher = StandardTestDispatcher(testScheduler)
     for (features in listOf(emptySet(), setOf(KetchFeatures.FINITE_HLS),
       setOf(KetchFeatures.FINITE_DASH),

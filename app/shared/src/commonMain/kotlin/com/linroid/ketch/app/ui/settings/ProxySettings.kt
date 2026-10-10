@@ -22,9 +22,11 @@ import ketch.app.shared.generated.resources.settings_proxy
 import ketch.app.shared.generated.resources.settings_proxy_address
 import ketch.app.shared.generated.resources.settings_proxy_address_hint
 import ketch.app.shared.generated.resources.settings_proxy_address_invalid
+import ketch.app.shared.generated.resources.settings_proxy_address_placeholder
 import ketch.app.shared.generated.resources.settings_proxy_bypass
 import ketch.app.shared.generated.resources.settings_proxy_bypass_hint
 import ketch.app.shared.generated.resources.settings_proxy_bypass_invalid
+import ketch.app.shared.generated.resources.settings_proxy_bypass_placeholder
 import ketch.app.shared.generated.resources.settings_proxy_direct
 import ketch.app.shared.generated.resources.settings_proxy_footer
 import ketch.app.shared.generated.resources.settings_proxy_manual
@@ -95,7 +97,7 @@ internal fun ProxySettings(state: AppState, device: InstanceEntry) {
       SettingsTextInput(
         value = proxy.url.orEmpty(),
         onCommit = { typed -> if (typed.isNotEmpty()) onChange(withAddress(proxy, typed)) },
-        placeholder = "socks5://127.0.0.1:1080",
+        placeholder = stringResource(Res.string.settings_proxy_address_placeholder),
         validate = { typed ->
           if (typed.isBlank() || ProxyAddress.parse(typed) != null) {
             null
@@ -139,7 +141,7 @@ internal fun ProxySettings(state: AppState, device: InstanceEntry) {
       SettingsTextInput(
         value = proxy.bypass.joinToString(", "),
         onCommit = { typed -> onChange(proxy.copy(bypass = bypassEntries(typed))) },
-        placeholder = "*.lan, 10.0.0.0/8",
+        placeholder = stringResource(Res.string.settings_proxy_bypass_placeholder),
         normalize = { bypassEntries(it).joinToString(", ") },
         validate = { typed ->
           bypassEntries(typed).firstOrNull { !ProxyConfig.isValidBypass(it) }

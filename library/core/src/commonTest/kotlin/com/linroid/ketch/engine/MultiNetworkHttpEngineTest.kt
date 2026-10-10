@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -125,6 +126,13 @@ class MultiNetworkHttpEngineTest {
   }
 
   @Test
+  fun supportsProxies_onlyWhenEveryNetworkDoes() {
+    val capable = RecordingEngine(supportsProxies = true)
+    assertTrue(MultiNetworkHttpEngine(listOf(capable, capable)).supportsProxies)
+    assertFalse(MultiNetworkHttpEngine(listOf(capable, RecordingEngine())).supportsProxies)
+  }
+
+  @Test
   fun emptyDelegates_areRejected() {
     assertFailsWith<IllegalArgumentException> { MultiNetworkHttpEngine(emptyList()) }
   }
@@ -136,6 +144,7 @@ class MultiNetworkHttpEngineTest {
   )
 
   private class RecordingEngine(
+    override val supportsProxies: Boolean = false,
     val closeFailure: Exception? = null,
     val beforeData: suspend () -> Unit = {},
     val afterData: suspend () -> Unit = {},

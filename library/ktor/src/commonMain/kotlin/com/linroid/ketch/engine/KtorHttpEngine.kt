@@ -215,8 +215,12 @@ class KtorHttpEngine private constructor(
     }
   }
 
+  /** `false` when this engine was given its own client, which only follows the system's. */
+  override val supportsProxies: Boolean get() = transports.supports(ProxyConfig.Direct)
+
   /**
-   * An engine sharing this one's clients whose requests reach their servers as [proxy] says.
+   * An engine sharing this one's clients and remembered redirects, whose requests reach their
+   * servers as [proxy] says; the redirects followed through each proxy are remembered apart.
    *
    * @throws KetchError.Unsupported when this engine was given its own client and [proxy] is not
    *   the system's
@@ -270,7 +274,7 @@ class KtorHttpEngine private constructor(
     reuseTarget: Boolean,
     handle: suspend (HttpResponse) -> T,
   ): T {
-    val key = RedirectCache.Key(url, headers)
+    val key = RedirectCache.Key(url, headers, proxy)
     val cached = if (reuseTarget) redirects.get(key) else null
     if (cached != null) {
       val result = try {

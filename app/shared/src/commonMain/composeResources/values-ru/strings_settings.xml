@@ -453,11 +453,13 @@
   <string name="settings_proxy_system_hint">Использует настройки прокси устройства %1$s.</string>
   <string name="settings_proxy_address">Адрес</string>
   <string name="settings_proxy_address_hint">HTTP- или SOCKS5-прокси.</string>
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
   <string name="settings_proxy_address_invalid">Укажите http://host:port или socks5://host:port</string>
   <string name="settings_proxy_username">Имя пользователя</string>
   <string name="settings_proxy_password">Пароль</string>
   <string name="settings_proxy_optional">Необязательно</string>
   <string name="settings_proxy_bypass">Подключаться напрямую к</string>
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
   <string name="settings_proxy_bypass_hint">Хосты, IP-адреса или диапазоны через запятую. Поддомены тоже учитываются.</string>
   <string name="settings_proxy_bypass_invalid">%1$s — не хост, не адрес и не диапазон</string>
   <string name="settings_proxy_footer">Для HTTP-загрузок при запуске или возобновлении. FTP и торренты подключаются напрямую.</string>

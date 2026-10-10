@@ -34,8 +34,11 @@ bypass = ["*.lan", "10.0.0.0/8"]
 ```
 
 The apps edit it in Settings → Network, for the embedded device or, when it lists the
-`http.proxy` feature, a remote one. `RemoteKetch` refuses a proxy for a server without that
-feature, which would ignore it, with `UnsupportedOperationException`.
+`http.proxy` feature, a remote one. `Ketch` lists the feature when its `HttpEngine` reports
+`supportsProxies`, as `KtorHttpEngine` does unless it was given an `HttpClient` of its own, and
+otherwise refuses proxies other than the system's in `updateConfig` and `download` with
+`UnsupportedOperationException`. `RemoteKetch` does the same for a server without the feature,
+which would ignore the proxy.
 
 ### Proxy URLs
 
@@ -90,7 +93,9 @@ A `:port` suffix is ignored. `ProxyConfig.isValidBypass(entry)` checks an entry.
 
 On the JVM, requests that go directly use CIO, as before; those through a proxy, and direct ones
 whose URL the JVM's `ProxySelector` would send through a proxy, use OkHttp limited to HTTP/1.1, so
-that each segment keeps a connection of its own. One client is kept per route. Android uses
+that each segment keeps a connection of its own. One client is kept per route, and the redirects
+a request followed are remembered per proxy, since a server may send each proxy to another
+mirror. Android uses
 OkHttp and iOS `NSURLSession` sessions with their proxy dictionary set (empty for direct
 requests); HTTP proxy credentials answer the proxy's challenge, SOCKS5 ones go in the dictionary.
 

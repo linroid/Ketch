@@ -1258,6 +1258,10 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
     out.println("                           -H 'Cookie: sid=1'; repeatable")
     out.println("  --user-agent <value>     Send this User-Agent")
     out.println("  --referer <url>          Send this Referer")
+    out.println("  --proxy <url>            Download through this HTTP or SOCKS5")
+    out.println("                           proxy instead of Ketch's setting")
+    out.println("  --proxy-bypass <hosts>   Hosts to reach directly with --proxy")
+    out.println("  --no-proxy               Connect directly, without a proxy")
     out.println("  --idempotency-key <key>  Running the command again with the")
     out.println("                           same key adds the download once")
   }
