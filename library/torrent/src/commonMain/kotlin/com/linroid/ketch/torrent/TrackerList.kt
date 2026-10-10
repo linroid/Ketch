@@ -226,6 +226,8 @@ internal class TrackerLists(
 ) {
   private val log = KetchLogger("TrackerList")
   private val mutex = Mutex()
+  // Held while onTrackers is called, so a later call never passes on older trackers.
+  private val publishMutex = Mutex()
   private val subscribed = MutableStateFlow(emptyList<Pair<String, TrackerListSubscription>>())
   // The lists [publish] combines. It is set before new lists subscribe, because each publishes
   // as it subscribes, and [subscribed] still holds the previous lists then (none at first).
@@ -274,7 +276,7 @@ internal class TrackerLists(
       onTrackers = { publish() }, bundled = bundled, clock = clock)
   }
 
-  private suspend fun publish() {
+  private suspend fun publish() = publishMutex.withLock {
     onTrackers(publishing.load().flatMap { it.state.value.trackers }.distinct())
   }
 }

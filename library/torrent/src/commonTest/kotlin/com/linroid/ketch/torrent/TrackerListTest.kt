@@ -7,17 +7,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
 import okio.IOException
 import okio.Path
+import kotlin.concurrent.Volatile
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,14 +33,16 @@ class TrackerListTest {
   private val cacheFile: Path = directory / "tracker-list.txt"
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val clock = object : Clock {
-    var now = Instant.fromEpochMilliseconds(1_790_000_000_000)
+    // Moved by the tests while the lists' coroutines read it.
+    @Volatile var now = Instant.fromEpochMilliseconds(1_790_000_000_000)
     override fun now(): Instant = now
   }
   private var body: String? = "$UDP\n$HTTP\n"
   // Bodies by URL, for lists that differ; others get [body].
   private val bodies = mutableMapOf<String, String?>()
-  private val requests = mutableListOf<String>()
-  private val published = mutableListOf<List<String>>()
+  // Added to by the lists' coroutines while the tests read them.
+  private val requests = MutableStateFlow(emptyList<String>())
+  private val published = MutableStateFlow(emptyList<List<String>>())
 
   @AfterTest
   fun cleanUp() {
@@ -68,7 +70,7 @@ class TrackerListTest {
     val subscription = subscription()
     subscription.subscribe("ftp://example.org/trackers.txt")
     assertEquals(TrackerListState(), subscription.state.value)
-    assertEquals(emptyList(), requests)
+    assertEquals(emptyList(), requests.value)
   }
 
   @Test
@@ -78,16 +80,16 @@ class TrackerListTest {
     val state = subscription.state.first { it.updatedAt != null }
     assertEquals(listOf(UDP, HTTP), state.trackers)
     assertEquals(clock.now, state.updatedAt)
-    assertEquals(listOf(LIST), requests)
-    assertEquals(listOf(UDP, HTTP), published.last())
+    assertEquals(listOf(LIST), requests.value)
+    // onTrackers gets the download just after the state shows it.
+    assertEquals(listOf(emptyList(), listOf(UDP, HTTP)), published.first { it.size >= 2 })
     assertTrue(FileSystem.SYSTEM.exists(cacheFile))
   }
 
   @Test
   fun subscribe_usesAFreshCopyWithoutDownloading() = realTime {
-    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
+    saveCopy()
     val saved = clock.now
-    requests.clear()
     clock.now = saved + 23.hours
 
     val restarted = subscription()
@@ -95,36 +97,34 @@ class TrackerListTest {
     val state = restarted.state.first { it.trackers.isNotEmpty() }
     assertEquals(listOf(UDP, HTTP), state.trackers)
     assertEquals(saved, state.updatedAt)
-    assertEquals(emptyList(), requests)
+    assertEquals(emptyList(), requests.value)
   }
 
   @Test
   fun subscribe_downloadsAgainWhenTheCopyIsADayOld() = realTime {
-    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
-    requests.clear()
+    saveCopy()
     clock.now += 25.hours
     body = "$HTTP\n"
 
     val restarted = subscription()
     restarted.subscribe(LIST)
     assertEquals(listOf(HTTP), restarted.state.first { it.updatedAt == clock.now }.trackers)
-    assertEquals(listOf(LIST), requests)
+    assertEquals(listOf(LIST), requests.value)
   }
 
   @Test
   fun subscribe_ignoresTheCopyOfAnotherList() = realTime {
-    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
-    requests.clear()
+    saveCopy()
 
     val other = subscription()
     other.subscribe(OTHER_LIST)
     other.state.first { it.updatedAt != null }
-    assertEquals(listOf(OTHER_LIST), requests)
+    assertEquals(listOf(OTHER_LIST), requests.value)
   }
 
   @Test
   fun failedDownload_keepsTheOlderCopy() = realTime {
-    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
+    saveCopy()
     val saved = clock.now
     clock.now += 25.hours
     body = null
@@ -134,7 +134,7 @@ class TrackerListTest {
     val state = restarted.state.first { it.failed }
     assertEquals(listOf(UDP, HTTP), state.trackers)
     assertEquals(saved, state.updatedAt)
-    assertEquals(listOf(UDP, HTTP), published.last())
+    assertEquals(listOf(UDP, HTTP), published.value.last())
   }
 
   @Test
@@ -156,7 +156,7 @@ class TrackerListTest {
     clock.now += 1.hours
     subscription.refresh()
     assertEquals(listOf(HTTP), subscription.state.first { it.updatedAt == clock.now }.trackers)
-    assertEquals(listOf(LIST, LIST), requests)
+    assertEquals(listOf(LIST, LIST), requests.value)
   }
 
   @Test
@@ -167,7 +167,7 @@ class TrackerListTest {
     val state = subscription.state.first { it.failed }
     assertEquals(listOf(BUNDLED), state.trackers)
     assertNull(state.updatedAt)
-    assertEquals(listOf(BUNDLED), published.last())
+    assertEquals(listOf(BUNDLED), published.value.last())
 
     body = "$UDP\n"
     subscription.refresh()
@@ -176,14 +176,13 @@ class TrackerListTest {
 
   @Test
   fun subscribe_returnsWithTheSavedCopyPublished() = realTime {
-    subscription().also { it.subscribe(LIST) }.state.first { it.updatedAt != null }
-    published.clear()
+    saveCopy()
     body = null
 
     val restarted = subscription()
     restarted.subscribe(LIST)
     assertEquals(listOf(UDP, HTTP), restarted.state.value.trackers)
-    assertEquals(listOf(UDP, HTTP), published.single())
+    assertEquals(listOf(UDP, HTTP), published.value.single())
   }
 
   @Test
@@ -192,7 +191,7 @@ class TrackerListTest {
     val subscription = subscription()
     subscription.subscribe(BUNDLED_LIST)
     assertEquals(listOf(BUNDLED), subscription.state.value.trackers)
-    assertEquals(listOf(BUNDLED), published.single())
+    assertEquals(listOf(BUNDLED), published.value.single())
   }
 
   @Test
@@ -233,7 +232,7 @@ class TrackerListTest {
     subscription.subscribe(RAW_LIST)
     val state = subscription.state.first { it.updatedAt != null }
     assertEquals(listOf(HTTP), state.trackers)
-    assertEquals(listOf(RAW_LIST, mirror), requests)
+    assertEquals(listOf(RAW_LIST, mirror), requests.value)
   }
 
   @Test
@@ -243,10 +242,10 @@ class TrackerListTest {
     val lists = lists()
     lists.subscribe(listOf(LIST, OTHER_LIST))
     lists.state.first { states -> states.size == 2 && states.all { it.updatedAt != null } }
-    published.waitFor { it == listOf(UDP, HTTP, OTHER) }
+    published.first { listOf(UDP, HTTP, OTHER) in it }
 
     lists.subscribe(listOf(OTHER_LIST))
-    assertEquals(listOf(HTTP, OTHER), published.last())
+    assertEquals(listOf(HTTP, OTHER), published.value.last())
     assertEquals(listOf(OTHER_LIST), lists.state.first { it.size == 1 }.map { it.url })
   }
 
@@ -262,7 +261,7 @@ class TrackerListTest {
     body = null
     val lists = lists()
     lists.subscribe(listOf(BUNDLED_LIST, LIST))
-    assertEquals(listOf(listOf(BUNDLED)), lock.withLock { published.distinct() })
+    assertEquals(listOf(listOf(BUNDLED)), published.value.distinct())
   }
 
   @Test
@@ -278,7 +277,7 @@ class TrackerListTest {
     subscription.state.first { it.updatedAt != null }
     subscription.subscribe(null)
     assertEquals(TrackerListState(), subscription.state.value)
-    assertEquals(emptyList(), published.last())
+    assertEquals(emptyList(), published.value.last())
   }
 
   // Stops the lists before the test ends, so cleanUp never deletes the directory while a
@@ -295,24 +294,32 @@ class TrackerListTest {
     http = { TorrentHttp(http) },
     stateDirectory = directory,
     scope = scope,
-    onTrackers = { synchronizedAdd(published, it) },
-    bundled = { if (it == BUNDLED_LIST) listOf(BUNDLED) else emptyList() },
+    onTrackers = { trackers -> published.update { it + listOf(trackers) } },
+    bundled = ::bundled,
     clock = clock,
   )
-
-  // Waits until a published list matches [predicate].
-  private suspend fun List<List<String>>.waitFor(predicate: (List<String>) -> Boolean) {
-    while (lock.withLock { none(predicate) }) delay(10)
-  }
 
   private fun subscription() = TrackerListSubscription(
     http = { TorrentHttp(http) },
     cacheFile = cacheFile,
     scope = scope,
-    onTrackers = { synchronizedAdd(published, it) },
-    bundled = { if (it == BUNDLED_LIST) listOf(BUNDLED) else emptyList() },
+    onTrackers = { trackers -> published.update { it + listOf(trackers) } },
+    bundled = ::bundled,
     clock = clock,
   )
+
+  private fun bundled(url: String) = if (url == BUNDLED_LIST) listOf(BUNDLED) else emptyList()
+
+  // Saves a copy of the list as an earlier run would, then stops that run, so it neither
+  // downloads again when the test moves the clock nor adds to what the test checks.
+  private suspend fun saveCopy() {
+    val earlier = subscription()
+    earlier.subscribe(LIST)
+    earlier.state.first { it.updatedAt != null }
+    earlier.subscribe(null)
+    requests.value = emptyList()
+    published.value = emptyList()
+  }
 
   private val http = object : HttpEngine {
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
@@ -324,19 +331,13 @@ class TrackerListTest {
       headers: Map<String, String>,
       onData: suspend (ByteArray) -> Unit,
     ) {
-      synchronizedAdd(requests, url)
+      requests.update { it + url }
       val text = if (url in bodies) bodies[url] else body
       onData((text ?: throw IOException("List unavailable")).encodeToByteArray())
     }
 
     override fun close() {}
   }
-
-  private suspend fun <T> synchronizedAdd(list: MutableList<T>, value: T) {
-    lock.withLock { list.add(value) }
-  }
-
-  private val lock = Mutex()
 
   private companion object {
     const val LIST = "https://lists.example/trackers_best.txt"
