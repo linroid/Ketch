@@ -363,7 +363,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [verification](docs/development/torrent-verification.md)
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
-- LLM agent-driven discovery using Koog framework (v1.2.0)
+- LLM agent-driven discovery using Koog framework (v1.3.0)
 - Providers are `LlmProvider` presets, data: id, `LlmApi` (OpenAI Responses, chat completions,
   Anthropic, Gemini, Ollama), endpoints per region, model suggestions, key variables and key
   page. OpenAI, Anthropic, Gemini, Ollama, LM Studio, hosted chat-completions services
@@ -543,6 +543,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `RemotePairing`): both devices show the same four digits, and the shared device asks its
   owner in `PairingApprovalHost`, from the tray (desktop) or with Allow and Don't allow
   notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
+- Android 17 blocks the local network until `ACCESS_LOCAL_NETWORK` is granted: `NearbyAccess`
+  asks before searching for or connecting to a device (13 to 16 ask `NEARBY_WIFI_DEVICES` only to
+  search), and `MainActivity` asks once a remote device is saved or this device is shared
 - Every keyboard command lives in `KetchCommands`, each in a `CommandScope` (Global, List,
   Intake, Palette, Discover): `ShortcutHost` runs the global chords, and the list, the add
   sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`

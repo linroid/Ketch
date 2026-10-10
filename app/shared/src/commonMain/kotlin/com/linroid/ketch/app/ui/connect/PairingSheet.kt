@@ -60,6 +60,7 @@ internal fun PairingSheet(
   val form = remember(pairing) { ConnectForm(pairing.link) }
   val connector = rememberDeviceConnector(state)
   val scope = rememberCoroutineScope()
+  val access = rememberNearbyAccess()
   val instances by state.instances.collectAsState()
   val known = instances.filterIsInstance<RemoteInstance>()
     .firstOrNull { it.host == link.host && it.port == link.port }
@@ -68,9 +69,11 @@ internal fun PairingSheet(
     link = link,
     known = known,
     onSubmit = { check ->
-      form.connect(scope, connector, check) { device ->
-        state.reportConnected(device, tried = check)
-        onDone()
+      access.request(search = false) {
+        form.connect(scope, connector, check) { device ->
+          state.reportConnected(device, tried = check)
+          onDone()
+        }
       }
     },
     onDismiss = {
