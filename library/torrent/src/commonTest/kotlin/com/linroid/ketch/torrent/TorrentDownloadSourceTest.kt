@@ -194,14 +194,14 @@ class TorrentDownloadSourceTest {
   @Test
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.TORRENT_FILE_SELECTION,
-      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION), source.features)
+      KetchFeatures.TORRENT_AWAIT_FILE_SELECTION, KetchFeatures.TORRENT_CONTROL), source.features)
     assertEquals(setOf("file-selection", "v1", "v2", "hybrid"), source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)
   }
 
   @Test
-  fun ketchStatus_withTorrentSource_listsSelectionFeatures() = runTest {
+  fun ketchStatus_withTorrentSource_listsTorrentFeatures() = runTest {
     // A default folder of its own: the platform's needs an Android context.
     val ketch = Ketch(UnusedHttp, config = DownloadConfig(
       defaultDirectory = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.toString()),
@@ -210,7 +210,8 @@ class TorrentDownloadSourceTest {
       val features = ketch.status().features
       assertTrue(KetchFeatures.TORRENT_FILE_SELECTION in features)
       assertTrue(KetchFeatures.TORRENT_AWAIT_FILE_SELECTION in features)
-      assertFalse(KetchFeatures.TORRENT_CONTROL in features)
+      assertTrue(KetchFeatures.TORRENT_CONTROL in features)
+      assertNotNull(ketch.torrents)
     } finally {
       ketch.close()
     }
