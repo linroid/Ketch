@@ -1,12 +1,14 @@
 package com.linroid.ketch.server.api
 
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.model.FileSelectionRequest
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TasksResponse
@@ -210,6 +212,58 @@ internal fun Route.downloadRoutes(ketch: KetchApi, destinations: DestinationGuar
     }
     task.setConnections(body.connections)
     log.d { "Connections set for taskId=$taskId: ${body.connections}" }
+    call.respond(TaskMapper.toSnapshot(task))
+  }
+
+  put<Api.Tasks.ById.Files> { resource ->
+    val taskId = resource.parent.id
+    log.d { "PUT /api/tasks/$taskId/files" }
+    val task = ketch.tasks.value.find { it.taskId == taskId }
+    if (task == null) {
+      log.w { "Task not found: taskId=$taskId" }
+      call.respond(
+        HttpStatusCode.NotFound,
+        ErrorResponse("not_found", "Task not found: $taskId"),
+      )
+      return@put
+    }
+    val body = call.receiveJson<FileSelectionRequest>()
+    val ids = body.fileIds
+    if (ids.size !in 1..DownloadTask.MAX_SELECTED_FILES ||
+      ids.any { it.length !in 1..DownloadTask.MAX_FILE_ID_LENGTH }
+    ) {
+      call.respond(
+        HttpStatusCode.BadRequest,
+        ErrorResponse(
+          "invalid_selection",
+          "Choose between 1 and ${DownloadTask.MAX_SELECTED_FILES} files, each with an ID " +
+            "of 1 to ${DownloadTask.MAX_FILE_ID_LENGTH} characters",
+        ),
+      )
+      return@put
+    }
+    val refusal = try {
+      task.selectFiles(ids)
+      null
+    } catch (e: IllegalArgumentException) {
+      HttpStatusCode.BadRequest to ErrorResponse(
+        "invalid_selection", e.message ?: "Invalid file selection",
+      )
+    } catch (e: UnsupportedOperationException) {
+      HttpStatusCode.NotImplemented to ErrorResponse(
+        "unsupported", e.message ?: "Changing the files of this download is unavailable",
+      )
+    } catch (e: IllegalStateException) {
+      HttpStatusCode.Conflict to ErrorResponse(
+        "selection_unavailable", e.message ?: "The files of this download cannot change now",
+      )
+    }
+    if (refusal != null) {
+      log.d { "Refused the file selection of taskId=$taskId: ${refusal.second.error}" }
+      call.respond(refusal.first, refusal.second)
+      return@put
+    }
+    log.d { "Selected ${ids.size} file(s) of taskId=$taskId" }
     call.respond(TaskMapper.toSnapshot(task))
   }
 }

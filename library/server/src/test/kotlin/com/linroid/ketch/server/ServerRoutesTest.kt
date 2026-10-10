@@ -6,9 +6,13 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -21,6 +25,7 @@ import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -44,6 +49,41 @@ class ServerRoutesTest {
     )
     assertEquals(KetchApi.VERSION, status.version)
     assertNotNull(status.revision)
+  }
+
+  @Test
+  fun resolve_logsTheRedactedUrl() = testApplication {
+    val ketch = createTestKetch()
+    val lines = java.util.Collections.synchronizedList(mutableListOf<String>())
+    val capture = object : Logger {
+      override fun v(message: String) { lines += message }
+      override fun d(message: String) { lines += message }
+      override fun i(message: String) { lines += message }
+      override fun w(message: String, throwable: Throwable?) { lines += message }
+      override fun e(message: String, throwable: Throwable?) { lines += message }
+    }
+    application {
+      val server = createTestServer(ketch)
+      with(server) { configureServer() }
+    }
+    // Ketch installs its own logger when it is created.
+    KetchLogger.setLogger(capture)
+    try {
+      client.post("/api/resolve") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          json.encodeToString(
+            ResolveUrlRequest("https://user:hunter2@example.com/file.zip?token=s3cret")
+          )
+        )
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+    val line = lines.first { "POST /api/resolve" in it }
+    assertFalse("hunter2" in line, line)
+    assertFalse("s3cret" in line, line)
+    assertTrue("example.com/file.zip" in line, line)
   }
 
   @Test

@@ -987,8 +987,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TrackerList", "RemoteKetch", "RemoteTask", "RemotePairing", "TokenBucket", "SqliteStore",
-  "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes",
+  "TorrentTracker", "TrackerList", "TorrentController", "RemoteKetch", "RemoteTask", "RemotePairing",
+  "RemoteTorrents", "TokenBucket", "SqliteStore", "SqliteDriver", "ConfigStore", "KetchServer",
+  "ServerRoutes", "DownloadRoutes", "TorrentRoutes", "EventRoutes",
   "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
