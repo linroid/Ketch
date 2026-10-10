@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,7 +75,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * What the user asked, in a bubble at the end of the thread's column at most 80% of its width,
- * with the websites the message was limited to under it.
+ * with the websites the message was limited to under it. Its text can be selected and copied.
  */
 @Composable
 internal fun UserMessage(turn: DiscoverTurn, modifier: Modifier = Modifier) {
@@ -82,19 +83,21 @@ internal fun UserMessage(turn: DiscoverTurn, modifier: Modifier = Modifier) {
   val spacing = KetchTheme.spacing
   Column(horizontalAlignment = Alignment.End, modifier = modifier.fillMaxWidth()) {
     Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.fillMaxWidth(BUBBLE_SHARE)) {
-      Text(
-        text = turn.message,
-        style = KetchTheme.typography.body,
-        color = colors.textPrimary,
-        modifier = Modifier
-          .ketchSurface(
-            level = KetchElevationLevel.E0,
-            shape = KetchTheme.shapes.lg,
-            fill = colors.surfaceSunken,
-            border = colors.hairline,
-          )
-          .padding(horizontal = spacing.s4, vertical = spacing.s2 + spacing.s0_5),
-      )
+      SelectionContainer {
+        Text(
+          text = turn.message,
+          style = KetchTheme.typography.body,
+          color = colors.textPrimary,
+          modifier = Modifier
+            .ketchSurface(
+              level = KetchElevationLevel.E0,
+              shape = KetchTheme.shapes.lg,
+              fill = colors.surfaceSunken,
+              border = colors.hairline,
+            )
+            .padding(horizontal = spacing.s4, vertical = spacing.s2 + spacing.s0_5),
+        )
+      }
     }
     if (turn.sites.isNotEmpty()) {
       Text(
@@ -163,20 +166,25 @@ internal fun AccessLine(notes: List<AccessNote>, modifier: Modifier = Modifier) 
   }
 }
 
-/** The agent's short reply in plain text, folded to six lines with Show more when longer. */
+/**
+ * The agent's short reply in plain text, which can be selected and copied, folded to six lines
+ * with Show more when longer.
+ */
 @Composable
 internal fun AgentSummary(text: String, modifier: Modifier = Modifier) {
   var expanded by rememberSaveable { mutableStateOf(false) }
   var overflows by remember { mutableStateOf(false) }
   Column(modifier, verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
-    Text(
-      text = text,
-      style = KetchTheme.typography.body,
-      color = KetchTheme.colors.textPrimary,
-      maxLines = if (expanded) Int.MAX_VALUE else SUMMARY_LINES,
-      overflow = TextOverflow.Ellipsis,
-      onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-    )
+    SelectionContainer {
+      Text(
+        text = text,
+        style = KetchTheme.typography.body,
+        color = KetchTheme.colors.textPrimary,
+        maxLines = if (expanded) Int.MAX_VALUE else SUMMARY_LINES,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
+      )
+    }
     if (overflows || expanded) {
       TextLink(
         text = stringResource(

@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -1019,6 +1020,38 @@ class AiDiscoverControllerTest {
     assertTrue(controller.selected.isEmpty())
     assertEquals("blender.org", controller.draft.sites)
     assertEquals("", controller.draft.text.text)
+  }
+
+  @Test
+  fun newSession_afterASession_offersOtherExamples() = runTest {
+    val controller = AiDiscoverController(
+      aiSettings = settingsWith(FakeAiProvider()),
+      scope = backgroundScope,
+      random = Random(7),
+    )
+    val first = controller.examples
+    controller.say("ubuntu")
+    runCurrent()
+
+    controller.newSession()
+
+    assertEquals(EXAMPLE_COUNT, first.distinct().size)
+    assertEquals(EXAMPLE_COUNT, controller.examples.distinct().size)
+    assertTrue(controller.examples.none { it in first }, "Offered again: ${controller.examples}")
+  }
+
+  @Test
+  fun newSession_whileANewOneShows_offersOtherExamples() = runTest {
+    val controller = AiDiscoverController(AiSettingsController(), backgroundScope)
+    val shown = mutableListOf(controller.examples)
+
+    repeat(10) {
+      controller.newSession()
+      assertTrue(controller.examples.none { it in shown.last() }, "Offered again: $shown")
+      shown += controller.examples
+    }
+    assertNull(controller.currentId)
+    assertTrue(shown.flatten().all { it in ExampleSearches })
   }
 
   @Test
