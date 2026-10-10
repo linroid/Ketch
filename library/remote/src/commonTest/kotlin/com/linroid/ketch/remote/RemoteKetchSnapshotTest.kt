@@ -130,6 +130,108 @@ class RemoteKetchSnapshotTest {
   }
 
   @Test
+  fun handleEvent_taskAddedSnapshotOlderThanSse_keepsNewerState() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(5_000) {
+        coroutineScope {
+          val original = snapshot("task")
+          val completed = DownloadState.Completed("/output")
+          val started = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          val engine = MockEngine { request ->
+            if (request.method == HttpMethod.Get) {
+              started.complete(Unit)
+              release.await()
+            }
+            respond(
+              Json.encodeToString(original),
+              headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+          }
+          val remote = RemoteKetch("localhost", 8642, null, false, engine)
+          // TaskAdded can arrive before the POST that created the task returns.
+          val added = async { remote.handleEvent(TaskEvent.TaskAdded("task", original.state)) }
+          try {
+            started.await()
+            val task = remote.download(original.request)
+            remote.handleEvent(TaskEvent.StateChanged(task.taskId, completed))
+            release.complete(Unit)
+            added.await()
+            assertSame(task, remote.tasks.value.single())
+            assertEquals(completed, task.state.value)
+          } finally {
+            added.cancelAndJoin()
+            remote.close()
+            engine.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun handleEvent_taskAddedForKnownTask_keepsNewerState() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(5_000) {
+        coroutineScope {
+          val original = snapshot("task")
+          val completed = DownloadState.Completed("/output")
+          val started = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          val engine = MockEngine { request ->
+            if (request.method == HttpMethod.Get) {
+              started.complete(Unit)
+              release.await()
+            }
+            respond(
+              Json.encodeToString(original),
+              headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+          }
+          val remote = RemoteKetch("localhost", 8642, null, false, engine)
+          val task = remote.download(original.request)
+          val added = async { remote.handleEvent(TaskEvent.TaskAdded("task", original.state)) }
+          try {
+            started.await()
+            remote.handleEvent(TaskEvent.StateChanged(task.taskId, completed))
+            release.complete(Unit)
+            added.await()
+            assertSame(task, remote.tasks.value.single())
+            assertEquals(completed, task.state.value)
+          } finally {
+            added.cancelAndJoin()
+            remote.close()
+            engine.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun handleEvent_taskAddedForKnownTask_appliesNewerSnapshot() = runTest {
+    val original = snapshot("task")
+    val completed = original.copy(state = DownloadState.Completed("/output"))
+    val engine = MockEngine { request ->
+      val body = if (request.method == HttpMethod.Post) original else completed
+      respond(
+        Json.encodeToString(body),
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    val remote = RemoteKetch("localhost", 8642, null, false, engine)
+    try {
+      val task = remote.download(original.request)
+      // Older servers send no state event after TaskAdded, so the snapshot is all there is.
+      remote.handleEvent(TaskEvent.TaskAdded("task", completed.state))
+      assertEquals(completed.state, task.state.value)
+    } finally {
+      remote.close()
+      engine.close()
+    }
+  }
+
+  @Test
   fun fetchAllTasks_olderServerJson_loadsTasksWithDefaults() = runTest {
     // Written by hand as a server without queue positions, pause reasons or finish times
     // sends it.

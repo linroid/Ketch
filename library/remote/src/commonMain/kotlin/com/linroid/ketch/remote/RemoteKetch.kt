@@ -346,6 +346,9 @@ class RemoteKetch internal constructor(
     }
     when (event) {
       is TaskEvent.TaskAdded -> {
+        // Some servers send no state after this event until the task changes, so the snapshot
+        // is fetched even for a task this client already knows.
+        val known = taskMutex.withLock { taskMap[event.taskId]?.let { it to it.updates } }
         try {
           val response = httpClient.get(
             Api.Tasks.ById(id = event.taskId),
@@ -353,7 +356,18 @@ class RemoteKetch internal constructor(
           if (response.status.isSuccess()) {
             val wire: TaskSnapshot = response.body()
             val task = createRemoteTask(wire)
-            taskMutex.withLock { addOrUpdate(task) }
+            taskMutex.withLock {
+              // A POST response, command or SSE event may have reported newer state while the
+              // snapshot was in flight, or the task may have been removed; never write the
+              // older snapshot over either.
+              val current = taskMap[task.taskId]
+              val unchanged = if (known == null) {
+                current == null
+              } else {
+                current === known.first && current.updates == known.second
+              }
+              if (unchanged) addOrUpdate(task)
+            }
           }
         } catch (e: Exception) {
           log.w(e) { "Failed to fetch added task: ${event.taskId}" }
