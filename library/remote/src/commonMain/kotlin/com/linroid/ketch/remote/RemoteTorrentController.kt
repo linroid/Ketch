@@ -35,8 +35,10 @@ import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readUTF8Line
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -90,6 +92,33 @@ internal class RemoteTorrentController(
 
   override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
     requireCapability(TorrentCapability.INSPECT)
+    // Engines such as Darwin's run execute's block on another dispatcher, where a plain flow may
+    // not emit; the stream is read in a channel flow and its outcome is replayed here in order,
+    // so a snapshot read just before a failure is still delivered.
+    streamEvents(taskId).collect { event ->
+      when (event) {
+        is StreamEvent.Update -> emit(event.snapshot)
+        is StreamEvent.Failed -> throw event.error
+      }
+    }
+  }
+
+  private fun streamEvents(taskId: String): Flow<StreamEvent> = channelFlow {
+    try {
+      readEvents(taskId) { send(StreamEvent.Update(it)) }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Throwable) {
+      send(StreamEvent.Failed(e))
+    }
+  }
+
+  private sealed interface StreamEvent {
+    class Update(val snapshot: TorrentSnapshot?) : StreamEvent
+    class Failed(val error: Throwable) : StreamEvent
+  }
+
+  private suspend fun readEvents(taskId: String, deliver: suspend (TorrentSnapshot?) -> Unit) {
     val connection = generation.value
     var current: TorrentRevision? = null
     var ended = false
@@ -119,13 +148,13 @@ internal class RemoteTorrentController(
                 when (current?.compareIncoming(snapshot.revision)) {
                   null, TorrentRevisionDecision.APPLY -> {
                     current = snapshot.revision
-                    emit(snapshot)
+                    deliver(snapshot)
                   }
                   TorrentRevisionDecision.IGNORE -> {}
                   TorrentRevisionDecision.RESYNC -> throw connectionChanged()
                 }
               }
-              EVENT_REMOVED -> emit(null)
+              EVENT_REMOVED -> deliver(null)
               EVENT_ERROR -> {
                 val body = json.decodeFromString<ErrorResponse>(data.toString())
                 throw TorrentCommandException(
