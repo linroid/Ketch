@@ -29,14 +29,17 @@ private const val AGENT_ORIGIN = "agent"
  *
  * Each method wraps a [KetchApi] or `DownloadTask` operation and returns a JSON-encoded
  * string; [tools] describes them to the agent.
+ *
+ * @param connect returns the instance each call works on. It is asked on every call, so it may
+ *   connect when first needed, or again after losing the instance; what it throws fails the call
+ *   with its message.
  */
 class KetchToolSet(
-  private val ketch: KetchApi,
-  private val json: Json = Json {
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-  },
+  private val connect: suspend () -> KetchApi,
+  private val json: Json = defaultJson,
 ) {
+  /** Tools that always work on [ketch]. */
+  constructor(ketch: KetchApi, json: Json = defaultJson) : this({ ketch }, json)
 
   /** The methods as tools, with the names, descriptions and parameters agents see. */
   internal fun tools(): List<Tool<*, *>> = listOf(
@@ -85,6 +88,13 @@ class KetchToolSet(
             "one is given.",
           required = false,
         ),
+        stringParameter(
+          "requestId",
+          "A UUID you make up for this download. Calling again with the same requestId and " +
+            "arguments, e.g. after a timeout, returns the download it started instead of " +
+            "adding another. Omit to add a download every time.",
+          required = false,
+        ),
       ),
     ) {
       startDownload(
@@ -94,6 +104,7 @@ class KetchToolSet(
         priority = string("priority", "NORMAL"),
         speedLimit = string("speedLimit", "unlimited"),
         headers = string("headers", ""),
+        requestId = string("requestId", ""),
       )
     },
     TextTool(
@@ -180,8 +191,8 @@ class KetchToolSet(
     },
   )
 
-  fun listDownloads(): String {
-    val tasks = ketch.tasks.value
+  suspend fun listDownloads(): String {
+    val tasks = connect().tasks.value
     return json.encodeToString(
       buildJsonArray {
         tasks.forEach { task -> add(taskToJson(task)) }
@@ -189,7 +200,7 @@ class KetchToolSet(
     )
   }
 
-  fun getDownload(
+  suspend fun getDownload(
     taskId: String,
   ): String {
     val task = findTask(taskId) ?: return notFound(taskId)
@@ -203,6 +214,7 @@ class KetchToolSet(
     priority: String = "NORMAL",
     speedLimit: String = "unlimited",
     headers: String = "",
+    requestId: String = "",
   ): String {
     val request = DownloadRequest(
       url = url,
@@ -212,8 +224,9 @@ class KetchToolSet(
       speedLimit = parseSpeedLimit(speedLimit),
       headers = parseHeaders(headers),
       properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
+      requestId = requestId.ifEmpty { null },
     )
-    val task = ketch.download(request)
+    val task = connect().download(request)
     return json.encodeToString(taskToJson(task))
   }
 
@@ -252,14 +265,14 @@ class KetchToolSet(
   suspend fun resolveUrl(
     url: String,
   ): String {
-    val resolved = ketch.resolve(url)
+    val resolved = connect().resolve(url)
     return json.encodeToString(
       json.encodeToJsonElement(resolved),
     )
   }
 
   suspend fun getStatus(): String {
-    val status = ketch.status()
+    val status = connect().status()
     return json.encodeToString(
       json.encodeToJsonElement(status),
     )
@@ -288,6 +301,7 @@ class KetchToolSet(
     maxConcurrentDownloads: Int = 0,
     maxConnectionsPerDownload: Int = 0,
   ): String {
+    val ketch = connect()
     val current = ketch.status().config
     val updated = current.copy(
       speedLimit = if (speedLimit.isEmpty()) {
@@ -312,8 +326,8 @@ class KetchToolSet(
     )
   }
 
-  private fun findTask(taskId: String) =
-    ketch.tasks.value.find { it.taskId == taskId }
+  private suspend fun findTask(taskId: String) =
+    connect().tasks.value.find { it.taskId == taskId }
 
   private fun notFound(taskId: String): String =
     buildJsonObject {
@@ -413,4 +427,9 @@ class KetchToolSet(
             "a raw byte count, or 'unlimited'.",
         )
     }
+}
+
+private val defaultJson = Json {
+  encodeDefaults = true
+  ignoreUnknownKeys = true
 }

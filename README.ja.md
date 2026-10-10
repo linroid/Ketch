@@ -129,6 +129,9 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   サイドバーのデバイスにドロップしたり、ダウンロードを別のデバイスへ送信・移動したりできます。
 - **NAS やサーバーでヘッドレス実行** — `ketch server` は REST API と Web アプリを内蔵した
   同じエンジンを実行します。アプリからネットワーク上のサーバーを見つけられます。
+- **ターミナルから操作** — `ketch add`・`list`・`pause`・`resume`・`watch` で、Ketch アプリや
+  サーバーのダウンロードをターミナルやスクリプトから操作できます。`watch` は JSON Lines を出力します
+  （[CLI](cli/README.md#work-on-a-running-ketch)）。
 
 ### 帯域幅をコントロール
 
@@ -164,7 +167,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   Ollama、OpenAI 互換サービスなど、自分のモデルサービスを利用できます。
   デスクトップ、Android、`ketch ai-discover` で使えます（[設定方法](docs/ai-discovery.md)）。
 - **MCP サーバー** — `ketch mcp` を使うと、AI アシスタントが
-  [Model Context Protocol](cli/README.md#mcp-server) を通じてダウンロードを開始・確認・管理できます。
+  [Model Context Protocol](cli/README.md#mcp-server) を通じて Ketch アプリやサーバーのダウンロードを
+  開始・確認・管理できます。
 
 <a id="getting-started"></a>
 
@@ -226,8 +230,6 @@ ketch https://example.com/file.zip
 - **トレントのファイルをいつでも選択** — マグネットリンクの詳細取得後に選び、ダウンロード中も変更
 - **スリープを防止** — ダウンロード中は PC を起動状態に保ち、完了後のスリープやシャットダウンも選択可能に
 - **自動化フック** — 完了時や失敗時にコマンド実行や webhook 呼び出し
-- **実行中のデバイスをコマンドラインで操作** — `ketch` や AI エージェントから、別のエンジンを起動せずに
-  Ketch アプリやサーバーのダウンロードを追加・一覧表示・一時停止・確認
 - **Docker イメージ** — x64 と ARM の NAS・ホームサーバー向け公式イメージ。
   ヘルスチェックと固定トレントポートに対応
 - **デバイス間転送** — 送信・移動時にダウンロード済みデータも渡し、別のデバイスで最初からやり直さずに再開

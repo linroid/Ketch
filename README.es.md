@@ -132,6 +132,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   arrástralo sobre uno en la barra lateral o envía o mueve una descarga a otro sin cambiar de vista.
 - **Sin interfaz gráfica en un NAS o servidor** — `ketch server` ejecuta el mismo motor con una API
   REST y la aplicación web integradas; las aplicaciones lo encuentran en tu red.
+- **Desde la terminal** — `ketch add`, `list`, `pause`, `resume` y `watch` gestionan las descargas
+  de la aplicación o de un servidor desde una terminal o un script; `watch` emite líneas JSON
+  ([CLI](cli/README.md#work-on-a-running-ketch)).
 
 ### Controla tu ancho de banda
 
@@ -168,8 +171,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   abrir un sitio web, salvo que ya lo hayas autorizado. Usa tu propio modelo: OpenAI, Anthropic,
   Gemini, Ollama o cualquier servicio compatible con OpenAI. Disponible en las aplicaciones de
   escritorio y Android y con `ketch ai-discover` ([configuración](docs/ai-discovery.md)).
-- **Servidor MCP** — `ketch mcp` permite a los asistentes de IA iniciar, observar y gestionar tus
-  descargas mediante el [Model Context Protocol](cli/README.md#mcp-server).
+- **Servidor MCP** — `ketch mcp` permite a los asistentes de IA iniciar, observar y gestionar las
+  descargas de la aplicación o de un servidor mediante el
+  [Model Context Protocol](cli/README.md#mcp-server).
 
 <a id="getting-started"></a>
 
@@ -240,8 +244,6 @@ la [documentación de la CLI](cli/README.md) enumera todos los comandos.
 - **Mantener el equipo activo** — Evitar la suspensión durante las descargas y, opcionalmente,
   suspender o apagar al terminar
 - **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle
-- **Línea de comandos para dispositivos en ejecución** — `ketch` y los agentes de IA añaden, listan,
-  pausan y observan las descargas de la aplicación o de un servidor sin iniciar un segundo motor
 - **Imagen Docker** — Una imagen oficial para NAS y servidores domésticos x64 y ARM, con
   comprobación de estado y puerto fijo para torrents
 - **Transferencias entre dispositivos** — Enviar a y Mover a transfieren los datos ya descargados

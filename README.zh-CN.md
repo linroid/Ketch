@@ -125,6 +125,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   或将下载任务发送或移动到另一台设备，无需切换当前设备。
 - **在 NAS 或服务器上无界面运行** — `ketch server` 运行同一个引擎，内置 REST API 和网页应用，
   其他 Ketch 应用可在局域网中发现它。
+- **在终端中操作** — `ketch add`、`list`、`pause`、`resume` 和 `watch` 可在终端或脚本中管理 Ketch
+  应用或服务器的下载任务；`watch` 输出 JSON 行（[CLI](cli/README.md#work-on-a-running-ketch)）。
 
 ### 掌控带宽
 
@@ -158,7 +160,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   Gemini、Ollama 或任意兼容 OpenAI 的服务。桌面端、Android 应用和 `ketch ai-discover`
   均可使用（[配置方法](docs/ai-discovery.md)）。
 - **MCP 服务器** — `ketch mcp` 让 AI 助手通过
-  [Model Context Protocol](cli/README.md#mcp-server) 启动、查看和管理下载任务。
+  [Model Context Protocol](cli/README.md#mcp-server) 启动、查看和管理 Ketch 应用或服务器中的下载任务。
 
 <a id="getting-started"></a>
 
@@ -216,8 +218,6 @@ ketch https://example.com/file.zip
 - **随时选择种子文件** — 磁力链接的详情获取后再选择文件，下载中也可调整选择
 - **保持唤醒** — 下载时防止电脑休眠，可选在完成后休眠或关机
 - **自动化钩子** — 下载完成或失败时执行命令或调用 webhook
-- **控制运行中设备的命令行** — `ketch` 和 AI 智能体可添加、列出、暂停和查看 Ketch 应用
-  或服务器中的下载任务，无需启动第二个引擎
 - **Docker 镜像** — 为 x64 和 ARM 的 NAS 与家庭服务器提供官方镜像，支持健康检查和固定种子端口
 - **设备间传输** — 「发送到」和「移动到」携带已下载的数据，让另一台设备继续下载，
   无需从头开始（[计划](docs/plans/task-transfer.md)）

@@ -24,6 +24,8 @@ import kotlin.concurrent.thread
  * with Ketch, so a later launch hands its arguments to the running app over loopback and exits.
  * macOS delivers opened files to the running app itself. Other processes of this user, such as
  * the browser extension's native messaging host, can also [request] a reply from the running app.
+ * The `ketch` command line sends requests too, with a client of its own (`DesktopApp` in `cli`),
+ * so keep the endpoint file and the request framing in step with it.
  *
  * A token in the owner-only endpoint file keeps other users on the machine from reaching it.
  */

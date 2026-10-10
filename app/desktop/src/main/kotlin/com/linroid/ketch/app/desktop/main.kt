@@ -183,14 +183,18 @@ fun main(args: Array<String>) {
     file = File(configDir, "browser-extension.properties"),
     browsers = registration::browsers,
   )
-  val extensionServer = BrowserExtensionServer(
+  val localApiServer = LocalApiServer(
     onConnect = { integration.extensionConnected(connectingBrowser()) },
   )
   val singleInstance = SingleInstance.acquire(
     configDir,
     launched.toArguments() + listOfNotNull(BACKGROUND_FLAG.takeIf { background }),
     onRequest = { request ->
-      if (request == NativeMessagingHost.CONNECT_REQUEST) extensionServer.connect() else null
+      when (request) {
+        NativeMessagingHost.CONNECT_REQUEST -> localApiServer.connect()
+        CLI_CONNECT_REQUEST -> localApiServer.connect(fromExtension = false)
+        else -> null
+      }
     },
   ) { forwarded ->
     open(fileArguments(forwarded), LinkSource.Arguments)
@@ -252,7 +256,7 @@ fun main(args: Array<String>) {
     windowRequests = windowRequests.receiveAsFlow(),
     background = background,
     singleInstance = singleInstance,
-    extensionServer = extensionServer,
+    localApiServer = localApiServer,
     integration = integration,
     logger = logger,
     fileLogger = fileLogger,
@@ -288,7 +292,7 @@ private class LaunchContext(
   val windowRequests: Flow<Unit>,
   val background: Boolean,
   val singleInstance: SingleInstance,
-  val extensionServer: BrowserExtensionServer,
+  val localApiServer: LocalApiServer,
   val integration: DesktopIntegrationStatus,
   val logger: Logger,
   val fileLogger: FileLogger,
@@ -602,7 +606,7 @@ private fun createInstanceManager(
             FtpDownloadSource(), torrentSource,
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
           ),
-        ).also(launch.extensionServer::attach)
+        ).also(launch.localApiServer::attach)
       },
       localServerFactory = { ketchApi, pairingRequests ->
         // Reloaded here so a restart from Settings picks up the
@@ -691,7 +695,7 @@ private class AppResources(
     closed = true
     controller.close()
     localSpeed.close()
-    launch.extensionServer.close()
+    launch.localApiServer.close()
     controller.instanceManager.close()
     launch.singleInstance.close()
   }

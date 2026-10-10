@@ -76,6 +76,45 @@ class KetchToolSetTest {
   }
 
   @Test
+  fun startDownload_requestId_isSentWithTheRequest() = runTest {
+    val ketch = RecordingKetchApi()
+
+    KetchToolSet(ketch).startDownload(
+      url = "https://example.com/a.iso",
+      requestId = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a",
+    )
+
+    assertEquals("6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a", ketch.requests.single().requestId)
+  }
+
+  @Test
+  fun startDownload_requestIdNotAUuid_isRejected() = runTest {
+    val ketch = RecordingKetchApi()
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso", requestId = "job-42")
+    }
+    assertTrue(ketch.requests.isEmpty())
+  }
+
+  // `ketch mcp` hands its tools the instance it is attached to, which changes when the instance
+  // restarts, so every call asks for it again.
+  @Test
+  fun tools_connectProvider_askedOnEveryCall() = runTest {
+    val first = RecordingKetchApi()
+    val second = RecordingKetchApi()
+    var current: KetchApi = first
+    val tools = KetchToolSet({ current })
+
+    tools.startDownload(url = "https://example.com/a.iso")
+    current = second
+    tools.startDownload(url = "https://example.com/b.iso")
+
+    assertEquals(listOf("https://example.com/a.iso"), first.requests.map { it.url })
+    assertEquals(listOf("https://example.com/b.iso"), second.requests.map { it.url })
+  }
+
+  @Test
   fun resolveUrl_anyUrl_sendsNoOriginToResolve() = runTest {
     val ketch = RecordingKetchApi()
 
@@ -85,7 +124,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_queuedTask_includesQueuePosition() {
+  fun getDownload_queuedTask_includesQueuePosition() = runTest {
     val task = QueuedTask(request(), queuePosition = 2)
 
     val json = getDownload(task)
@@ -95,7 +134,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_preemptedTask_includesPauseReasonAndPreemptedBy() {
+  fun getDownload_preemptedTask_includesPauseReasonAndPreemptedBy() = runTest {
     val state = DownloadState.Paused(
       DownloadProgress(10, 100),
       PauseReason.Preempted("task-urgent"),
@@ -111,7 +150,7 @@ class KetchToolSetTest {
   }
 
   @Test
-  fun getDownload_completedTask_includesCompletedAt() {
+  fun getDownload_completedTask_includesCompletedAt() = runTest {
     val completedAt = Instant.parse("2026-10-03T08:00:03.123Z")
     val state = DownloadState.Completed("/d/a.iso", 100, completedAt = completedAt)
     val task = QueuedTask(request(), state)
@@ -124,7 +163,7 @@ class KetchToolSetTest {
 
   private fun request() = DownloadRequest(url = "https://example.com/a.iso")
 
-  private fun getDownload(task: DownloadTask): JsonObject {
+  private suspend fun getDownload(task: DownloadTask): JsonObject {
     val result = KetchToolSet(RecordingKetchApi(listOf(task))).getDownload(task.taskId)
     return Json.parseToJsonElement(result).jsonObject
   }

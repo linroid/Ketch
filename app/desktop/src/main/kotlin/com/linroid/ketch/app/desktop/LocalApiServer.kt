@@ -15,20 +15,21 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The API server the browser extension reaches this app through, separate from the one users
- * turn on in Settings: it only listens on 127.0.0.1, on a port the system picks, requires a token
- * made for this run, and starts the first time the extension asks for it through
- * [NativeMessagingHost].
+ * The API server the browser extension and the `ketch` command line reach this app through,
+ * separate from the one users turn on in Settings: it only listens on 127.0.0.1, on a port the
+ * system picks, requires a token made for this run, and starts the first time one of them asks
+ * for it over [SingleInstance]: the extension through [NativeMessagingHost]
+ * ([NativeMessagingHost.CONNECT_REQUEST]), the command line with [CLI_CONNECT_REQUEST].
  *
  * @param onConnect called on the requesting thread each time the extension connects, before it
  *   gets the reply, while the native messaging host that asked for it still runs. A failure there
  *   is logged and the extension still gets its reply.
  */
-internal class BrowserExtensionServer(
+internal class LocalApiServer(
   private val onConnect: () -> Unit = {},
   private val startServer: (api: KetchApi, token: String) -> Started = ::startKetchServer,
 ) : AutoCloseable {
-  private val log = KetchLogger("BrowserExtension")
+  private val log = KetchLogger("LocalApi")
   private val api = CompletableFuture<KetchApi>()
   private var started: Started? = null
 
@@ -41,11 +42,13 @@ internal class BrowserExtensionServer(
   }
 
   /**
-   * Returns the reply for the extension: the server's address and token as JSON, starting the
-   * server first if needed, or an error reply.
+   * Returns the reply for a client: the server's address and token as JSON, starting the server
+   * first if needed, or an error reply.
+   *
+   * @param fromExtension whether the browser extension asks, which [onConnect] hears of
    */
   @Synchronized
-  fun connect(timeout: Duration = 20.seconds): String {
+  fun connect(timeout: Duration = 20.seconds, fromExtension: Boolean = true): String {
     val server = started ?: run {
       val ketch = try {
         api.get(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
@@ -58,10 +61,12 @@ internal class BrowserExtensionServer(
         return errorReply("server_failed", "Couldn't start the connection: ${e.message}")
       }.also { started = it }
     }
-    try {
-      onConnect()
-    } catch (e: Exception) {
-      log.w { "Couldn't record the extension's connection: ${e.describeCauses()}" }
+    if (fromExtension) {
+      try {
+        onConnect()
+      } catch (e: Exception) {
+        log.w { "Couldn't record the extension's connection: ${e.describeCauses()}" }
+      }
     }
     return buildJsonObject {
       put("url", "http://127.0.0.1:${server.port}")
@@ -76,10 +81,16 @@ internal class BrowserExtensionServer(
   }
 }
 
+/**
+ * [SingleInstance] request of the `ketch` command line for [LocalApiServer]'s address and token;
+ * the command line has its own copy of it.
+ */
+internal const val CLI_CONNECT_REQUEST = "cli/connect"
+
 private fun newToken(): String =
   ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 
-private fun startKetchServer(api: KetchApi, token: String): BrowserExtensionServer.Started {
+private fun startKetchServer(api: KetchApi, token: String): LocalApiServer.Started {
   val server = KetchServer(
     ketch = api,
     host = "127.0.0.1",
@@ -88,5 +99,5 @@ private fun startKetchServer(api: KetchApi, token: String): BrowserExtensionServ
     mdnsEnabled = false,
   )
   server.start(wait = false)
-  return BrowserExtensionServer.Started(runBlocking { server.port() }, token, server::stop)
+  return LocalApiServer.Started(runBlocking { server.port() }, token, server::stop)
 }
