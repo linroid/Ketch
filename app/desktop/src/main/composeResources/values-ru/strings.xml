@@ -19,6 +19,7 @@
   <string name="tray_recent">Недавние</string>
   <string name="tray_show_ketch">Показать Ketch</string>
   <string name="tray_speed">Скорость</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Показать</string>
   <string name="tray_enter_token">Ввести токен…</string>
   <string name="tray_retry_now">Повторить сейчас</string>

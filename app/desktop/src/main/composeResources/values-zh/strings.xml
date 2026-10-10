@@ -19,6 +19,7 @@
   <string name="tray_recent">最近</string>
   <string name="tray_show_ketch">显示 Ketch</string>
   <string name="tray_speed">速度</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">显示</string>
   <string name="tray_enter_token">输入令牌…</string>
   <string name="tray_retry_now">立即重试</string>
