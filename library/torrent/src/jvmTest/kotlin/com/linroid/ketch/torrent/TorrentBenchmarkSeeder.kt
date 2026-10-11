@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive

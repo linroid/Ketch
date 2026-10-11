@@ -10,12 +10,25 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskStore
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.sha256Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentListener
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerExtensions
+import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.peer.pieceBitfield
+import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.v2.peer.PeerHashMessage
+import com.linroid.ketch.torrent.v2.peer.PeerHashWire
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +52,12 @@ import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
 import okio.use
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class TorrentPublicV2WorkflowTest {
   @Test fun pureV2SelectionSurvivesKetchRecreationAndRechecksFiles() = runTest {

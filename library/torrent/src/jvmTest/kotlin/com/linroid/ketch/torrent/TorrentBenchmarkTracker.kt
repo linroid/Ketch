@@ -1,8 +1,9 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.metainfo.Bencode
 import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
 import java.net.InetAddress
+import java.net.InetSocketAddress
 
 /**
  * Both downloaders discover the same seeder through this loopback-only fixture tracker. It reads

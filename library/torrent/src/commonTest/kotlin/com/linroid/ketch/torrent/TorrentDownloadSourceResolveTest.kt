@@ -3,6 +3,9 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlinx.coroutines.test.runTest
 import okio.IOException
 import kotlin.test.Test

@@ -78,7 +78,7 @@ These are code inspection findings; no baseline test run was performed during ro
 
 Relevant implementation files:
 [source](../../library/torrent/src/commonMain/kotlin/com/linroid/ketch/torrent/TorrentDownloadSource.kt),
-[metadata](../../library/torrent/src/commonMain/kotlin/com/linroid/ketch/torrent/TorrentMetadata.kt),
+[metadata](../../library/torrent/src/commonMain/kotlin/com/linroid/ketch/torrent/metainfo/TorrentMetadata.kt),
 [native session at the inspected baseline](https://github.com/linroid/Ketch/blob/077a0c9d/library/torrent/src/jvmAndAndroidMain/kotlin/com/linroid/ketch/torrent/Libtorrent4jSession.kt),
 [execution](../../library/core/src/commonMain/kotlin/com/linroid/ketch/core/engine/DownloadExecution.kt),
 and [CI](../../.github/workflows/tests.yml).

@@ -148,11 +148,50 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   URL/header handling and sequential transfer; each owns its parser and tests
 
 ### `library:torrent`
-- `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
-  `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
-  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `PeerTraffic`,
-  `TorrentEncryption`, `TorrentMulticastLock`; internal `TorrentLocalDiscovery` (BEP 14, with
-  `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that `openLsdMulticast()` opens)
+- `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
+  `DownloadSource`), `TorrentConfig`, `TorrentEncryption`, `TorrentUploadPolicy`,
+  `TorrentDiscoveryPrivacy`, `TorrentMulticastLock` and `TrackerListState`; internal
+  `TorrentResumeState`, `TorrentSourceMetainfo` and the helpers every package uses
+  (`TorrentLog`, `monotonicClock()`). Everything else is internal, in sub-packages by concern:
+- `com.linroid.ketch.torrent.engine` -- `TorrentEngine`, `KotlinTorrentEngine`,
+  `TorrentSession`, `KotlinTorrentSession`, session admission and registry, `TorrentActiveSlots`,
+  `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets and
+  `TorrentRateLimiter`
+- `com.linroid.ketch.torrent.metainfo` -- `Bencode`, `InfoHash`, `TorrentIdentity`
+  (`V2InfoHash`), `TorrentMetadata`, `TorrentV2Info`, `TorrentV2Document`, piece layers and the
+  hybrid and content layouts
+- `com.linroid.ketch.torrent.magnet` -- `MagnetUri` and BEP 9 metadata lookup
+  (`TorrentMetadataExchange`, `TorrentV2MetadataExchange`, `TorrentMetadataPeers`,
+  `TorrentMetadataCache`)
+- `com.linroid.ketch.torrent.crypto` -- `Sha1` and `Sha256` (aliases of core's `digest` ones,
+  `Digests`), the BEP 52 Merkle tree (`TorrentMerkleRoot`, `TorrentMerkleProof`,
+  `TorrentMerkleFrontier`, `merkleZeroHash()`) and `torrentRandomBytes()`
+- `com.linroid.ketch.torrent.net` -- `TorrentNetwork`, `TorrentConnection` and `PeerEndpoint`
+  (`TorrentTransport`), DNS, `TorrentHttp`, `TorrentUdpPort`, `LocalIpv4Network` and the address
+  helpers (`TorrentAddresses`)
+- `com.linroid.ketch.torrent.mse` (MSE/PE: `MseHandshake`, `Rc4`, `TorrentPeerEncryption`),
+  `.utp` (`UtpSocket`, `UtpPacket`, `UtpEndpoint`), `.portmap` (`NatPmpClient`, `UpnpClient`,
+  `TorrentPortMapper`), `.dht` (`DhtNode`, `DhtRpc`, `DhtRoutingTable`), `.tracker`
+  (`TorrentTracker`, `TrackerDiscovery`, `TrackerList`, `PrivateTrackerGroup`) and `.lsd`
+  (BEP 14: `TorrentLocalDiscovery`, with `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that
+  `openLsdMulticast()` opens)
+- `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
+  `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
+  (BEP 11), `PeerIdentityHandshake`, `PeerTraffic`, `PeerDiagnostics` and `TorrentChoker`
+- `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `TorrentPieceScheduler`,
+  `TorrentPeerDownloader`, `TorrentUploadCache`
+- `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
+  `TorrentV2SessionLoop` (`TorrentV2Swarm`), `TorrentV2PieceScheduler`, `TorrentV2Candidates`,
+  `TorrentV2Uploader`, `TorrentV2Extensions`, `TorrentV2ServeWorker` and their peers' views
+- `com.linroid.ketch.torrent.v2.peer` -- v2 peer connections: `PeerV2Connector`,
+  `PeerV2Dialer`, `PeerV2Pool`, `PeerV2DownloadActor`, `PeerBlockExchange` and the BEP 52 hash
+  exchange (`PeerHashWire`, `PeerHashTransport`, `PeerHashExchange`, `TorrentV2HashServer`)
+- `com.linroid.ketch.torrent.storage` -- files on disk: `TorrentPieceStore` (v1),
+  `TorrentV2PieceStore`, `TorrentCheckpoint`, `TorrentV2Checkpoint`, `TorrentV2CreationLog`,
+  `TorrentOwnershipJournal`, `TorrentContentCatalog`, `TorrentOutputMapping`, `TorrentFileIo`
+  and the platform file systems
+- `com.linroid.ketch.torrent.webseed` -- BEP 19: `WebSeedWorker` and `WebSeedLayout`
+  (`TorrentWebSeed`), `TorrentV2WebSeeds`
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)

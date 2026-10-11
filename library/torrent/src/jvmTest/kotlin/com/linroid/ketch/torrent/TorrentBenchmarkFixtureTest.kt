@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import java.nio.file.Files
 import java.security.MessageDigest
 import kotlin.test.Test

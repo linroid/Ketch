@@ -5,16 +5,27 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okio.Path.Companion.toPath
+import org.junit.runner.RunWith
+import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.Test
-import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidTorrentSmokeTest {
