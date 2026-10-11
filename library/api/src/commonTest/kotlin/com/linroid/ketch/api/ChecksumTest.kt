@@ -22,7 +22,10 @@ class ChecksumTest {
 
   @Test
   fun parse_bareHex_namesAlgorithmByLength() {
-    assertEquals(ChecksumAlgorithm.MD5, Checksum.parse("d41d8cd98f00b204e9800998ecf8427e").algorithm)
+    assertEquals(
+      ChecksumAlgorithm.MD5,
+      Checksum.parse("d41d8cd98f00b204e9800998ecf8427e").algorithm,
+    )
     assertEquals(
       ChecksumAlgorithm.SHA_1,
       Checksum.parse("da39a3ee5e6b4b0d3255bfef95601890afd80709").algorithm,

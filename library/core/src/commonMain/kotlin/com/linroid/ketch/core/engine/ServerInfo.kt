@@ -69,8 +69,10 @@ data class ServerInfo(
         if (separator <= 0) return@mapNotNull null
         val name = item.substring(0, separator).trim().lowercase()
         // RFC 3230 calls SHA-1 `SHA`.
-        val algorithm = if (name == "sha") ChecksumAlgorithm.SHA_1 else ChecksumAlgorithm.named(name)
-        algorithm ?: return@mapNotNull null
+        val algorithm = when (name) {
+          "sha" -> ChecksumAlgorithm.SHA_1
+          else -> ChecksumAlgorithm.named(name) ?: return@mapNotNull null
+        }
         try {
           Checksum.parse(algorithm, item.substring(separator + 1).trim().removeSurrounding("\""))
         } catch (_: IllegalArgumentException) {

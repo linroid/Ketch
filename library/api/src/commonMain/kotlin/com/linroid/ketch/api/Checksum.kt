@@ -147,7 +147,8 @@ data class Checksum(
       Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL),
     )
 
-    private fun Char.isHexDigit(): Boolean = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
+    private fun Char.isHexDigit(): Boolean =
+      this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
     private fun ByteArray.toHex(): String = buildString(size * 2) {
       for (byte in this@toHex) {
