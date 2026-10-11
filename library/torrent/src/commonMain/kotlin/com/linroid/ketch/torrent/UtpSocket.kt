@@ -84,6 +84,8 @@ internal class UtpSocket private constructor(
   private var eofSeq: Int? = null
   private var closeRequested = false
   private var ackNeeded = false
+  /** The sequence our STATE answering the SYN carried, answering a repeated SYN the same way. */
+  private var synAnswerSeq = -1
 
   /** Why the connection failed, once [state] is [State.FAILED]. */
   var failure: String? = null
@@ -158,15 +160,19 @@ internal class UtpSocket private constructor(
         return
       }
       UtpType.SYN -> {
-        // Our STATE answering it was lost: answer again.
-        if (packet.seq == ackNr) sendState(now)
+        // Our STATE answering it was lost: answer again with the sequence our stream starts at,
+        // though data may have gone out since, or the peer would skip that data.
+        if (packet.seq == ackNr && synAnswerSeq != -1) emit(UtpType.STATE, synAnswerSeq, null, now)
         return
       }
-      else -> Unit
+      // Anything else means the peer connected: a later SYN is a stale duplicate.
+      else -> synAnswerSeq = -1
     }
     if (state == State.SYN_SENT) {
-      if (packet.type != UtpType.STATE) return
-      // The responder's STATE carries the sequence its first packet will use.
+      // Only the STATE acknowledging our SYN connects: it carries the sequence the responder's
+      // first packet will use, as in libtorrent and libutp. Data arriving first cannot tell
+      // where the stream starts, so it waits for the STATE our next SYN draws.
+      if (packet.type != UtpType.STATE || packet.ack != utpSeq(seqNr, -1)) return
       ackNr = utpSeq(packet.seq, -1)
       state = State.CONNECTED
     }
@@ -363,9 +369,9 @@ internal class UtpSocket private constructor(
     val distance = (packet.seq - ackNr) and 0xffff
     if (distance == 0 || distance >= 0x8000) return
     if (distance > 1) {
-      // Only what the window we advertised allows is held.
+      // Only what the window we advertised allows is held, unread bytes included.
       if (distance <= MAX_REORDER && packet.seq !in reorder &&
-        reorderBytes + packet.payload.size <= options.receiveBuffer) {
+        packet.payload.size <= advertisedWindow()) {
         reorder[packet.seq] = packet
         reorderBytes += packet.payload.size
       }
@@ -461,6 +467,7 @@ internal class UtpSocket private constructor(
       socket.ackNr = syn.seq
       socket.replyMicros = now.toInt() - syn.timestamp
       socket.peerWindow = syn.window
+      socket.synAnswerSeq = initialSeq
       socket.sendState(now)
       return socket
     }
