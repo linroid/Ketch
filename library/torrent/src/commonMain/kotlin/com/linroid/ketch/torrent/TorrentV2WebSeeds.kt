@@ -6,7 +6,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 
 /**
  * Maps v2 and hybrid pieces onto the files of one web seed (BEP 19). A v2 piece lies in a single
@@ -74,8 +75,12 @@ internal class TorrentV2WebSeeds private constructor(
   private val log = KetchLogger("TorrentWebSeed")
   val stats = WebSeedStats()
   private val events = Channel<Event>(Channel.UNLIMITED)
-  private val assignments = urls.map {
-    Channel<TorrentV2PieceScheduler.WebSeedClaim>(1, onUndeliveredElement = { it.lease.close() })
+  // A claim no seed took goes back to the loop, which returns the piece to the scheduler.
+  private val assignments = urls.indices.map { seed ->
+    Channel<TorrentV2PieceScheduler.WebSeedClaim>(1, onUndeliveredElement = { claim ->
+      events.trySend(Event.Done(seed, claim.index, verified = false))
+      claim.lease.close()
+    })
   }
 
   /** What the seeds tell the session loop. */
@@ -138,8 +143,11 @@ internal class TorrentV2WebSeeds private constructor(
         waiting = true
       }
       // A piece usually follows at once; a seed left waiting closes its connection meanwhile.
-      val claim = withTimeoutOrNull(IDLE_CONNECTION_MS) { assignments[seed].receive() }
-        ?: return null
+      // A select either takes the claim or times out, never both, so no claim is lost.
+      val claim = select<TorrentV2PieceScheduler.WebSeedClaim?> {
+        assignments[seed].onReceive { it }
+        onTimeout(IDLE_CONNECTION_MS) { null }
+      } ?: return null
       waiting = false
       return claim
     }
