@@ -177,6 +177,54 @@ class UtpEndpointTest {
     }
 
   @Test
+  fun fallback_peersKnownForUtp_skipTcp() = endpoints { network, scope ->
+    val b = side(network, scope)
+    val a = side(network, scope)
+    var tcp = 0
+    val refused = object : TorrentNetwork by network {
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        tcp++
+        throw IOException("Connection refused")
+      }
+    }
+    val fallback = TorrentUtpFallback(refused) { a.endpoint }
+    // Peer exchange said it speaks uTP: no TCP connect first.
+    fallback.preferUtp(listOf(b.address))
+    fallback.connect(b.address).close()
+    assertEquals(0, tcp)
+    // Another peer reached over uTP after TCP failed is dialed over uTP next time.
+    val c = side(network, scope)
+    fallback.connect(c.address).close()
+    fallback.connect(c.address).close()
+    assertEquals(1, tcp)
+  }
+
+  @Test
+  fun fallback_peerNoLongerOnUtp_usesTcpAndIsForgotten() = endpoints { network, scope ->
+    val a = side(network, scope, dialOptions = UtpOptions(synRetries = 0))
+    // TCP works; nothing answers uTP there.
+    val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+    val target = PeerEndpoint("127.0.0.1", listener.local.port)
+    var tcp = 0
+    val counting = object : TorrentNetwork by network {
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        tcp++
+        return network.connect(remote)
+      }
+    }
+    try {
+      val fallback = TorrentUtpFallback(counting) { a.endpoint }
+      fallback.preferUtp(listOf(target))
+      fallback.connect(target).close()
+      fallback.connect(target).close()
+      // uTP was tried once, then forgotten: both dials ended on TCP.
+      assertEquals(2, tcp)
+    } finally {
+      listener.close()
+    }
+  }
+
+  @Test
   fun udpPort_givesDhtEverythingButUtp() = endpoints { network, scope ->
     val b = side(network, scope)
     val dht = b.port.openDht()

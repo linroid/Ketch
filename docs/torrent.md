@@ -133,7 +133,8 @@ including a development run, hands its files to the running app instead of openi
   require it; it is obfuscation, not authentication. Peers reached encrypted are advertised with
   the BEP 11 encryption flag
 - uTP (BEP 29, `TorrentConfig.utpEnabled`, on by default) reaches peers TCP cannot, often ones
-  behind NAT: a dial that fails over TCP tries uTP next, and peers may connect to the listen port
+  behind NAT: a dial that fails over TCP tries uTP next, peers that peer exchange flags as uTP
+  or that answered uTP before are dialed over uTP first, and peers may connect to the listen port
   over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
   control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
   use it too: BEP 27 only rules out DHT and peer exchange
