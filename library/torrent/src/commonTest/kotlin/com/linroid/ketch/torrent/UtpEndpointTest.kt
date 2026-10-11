@@ -7,6 +7,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -104,6 +105,41 @@ class UtpEndpointTest {
     val connection = a.endpoint.dial(PeerEndpoint("127.0.0.1", port.local.port))
     incoming.await()
     assertFailsWith<IOException> { connection.readExactly(1) }
+  }
+
+  @Test
+  fun udpPort_reportsASocketThatFailed_butNotOneClosed() = endpoints { network, scope ->
+    val failed = CompletableDeferred<Unit>()
+    val failing = object : TorrentDatagramSocket {
+      override val local = PeerEndpoint("127.0.0.1", 1)
+      override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) = Unit
+      override suspend fun receive(): TorrentDatagram = throw IOException("Socket broke")
+      override fun close() = Unit
+    }
+    TorrentUdpPort(failing, scope, utp = null, onStopped = { failed.complete(Unit) })
+    failed.await()
+    var stopped = false
+    val port = TorrentUdpPort(network.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope, utp = null,
+      onStopped = { stopped = true })
+    port.close()
+    delay(100)
+    assertEquals(false, stopped)
+  }
+
+  @Test
+  fun fallback_asksForTheEndpointOnEveryFailedDial() = endpoints { network, scope ->
+    val b = side(network, scope)
+    val a = side(network, scope)
+    var lookups = 0
+    val refused = object : TorrentNetwork by network {
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection =
+        throw IOException("Connection refused")
+    }
+    // The lookup is where a port that stopped is bound again; it runs for each dial.
+    val fallback = TorrentUtpFallback(refused) { lookups++; a.endpoint }
+    fallback.connect(b.address).close()
+    fallback.connect(b.address).close()
+    assertEquals(2, lookups)
   }
 
   @Test

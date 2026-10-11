@@ -106,7 +106,13 @@ internal class KotlinTorrentEngine(
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
   private val network = TorrentConnectionBudget(
-    TorrentUtpFallback(rawNetwork) { remote -> utpEndpoints.load()[udpHostFor(remote)] },
+    TorrentUtpFallback(rawNetwork) { remote ->
+      if (!config.utpEnabled || !running.load()) return@TorrentUtpFallback null
+      val host = udpHostFor(remote)
+      // A port whose socket failed is bound again, so dials never use a dead endpoint.
+      attempt("Binding the uTP port on $host") { udpPort(host) }
+      utpEndpoints.load()[host]
+    },
     config.maxConnections,
   )
   private val udpMutex = Mutex()
@@ -1042,7 +1048,13 @@ internal class KotlinTorrentEngine(
     var endpoint: UtpEndpoint? = null
     val udp = TorrentUdpPort(bound, scope, utp = if (config.utpEnabled) {
       { datagram -> endpoint?.receive(datagram) }
-    } else null)
+    } else null, onStopped = {
+      // Incoming uTP needs the port back without waiting for a dial or a DHT lookup.
+      if (config.utpEnabled && running.load()) scope.launch {
+        delay(1_000)
+        attempt("Binding the uTP port on $host again") { udpPort(host) }
+      }
+    })
     if (config.utpEnabled) {
       endpoint = UtpEndpoint(scope, send = udp::send, onIncoming = { connection ->
         val admitted = network.admit(connection)

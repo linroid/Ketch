@@ -22,6 +22,8 @@ internal class TorrentUdpPort(
   scope: CoroutineScope,
   /** Handles one uTP datagram; null drops them, as with uTP switched off. */
   private val utp: (suspend (TorrentDatagram) -> Unit)?,
+  /** Runs once the socket stopped receiving on its own, not when [close] stopped it. */
+  private val onStopped: () -> Unit = {},
 ) {
   private val log = KetchLogger("TorrentEngine")
   private val dhtPackets = AtomicReference<Channel<TorrentDatagram>?>(null)
@@ -48,6 +50,7 @@ internal class TorrentUdpPort(
       throw e
     } catch (e: Exception) {
       log.d { "UDP port ${socket.local} stopped: ${e.describeWithoutUrls()}" }
+      onStopped()
     } finally {
       dhtPackets.exchange(null)?.close(IOException("UDP port closed"))
       socket.close()

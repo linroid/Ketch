@@ -255,7 +255,8 @@ internal class UtpEndpoint(
  */
 internal class TorrentUtpFallback(
   private val delegate: TorrentNetwork,
-  private val utp: (PeerEndpoint) -> UtpEndpoint?,
+  /** The running endpoint for a peer's address family, rebinding a port that stopped. */
+  private val utp: suspend (PeerEndpoint) -> UtpEndpoint?,
 ) : TorrentNetwork by delegate {
   override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
     val failure: Throwable = try {
