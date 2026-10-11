@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.concurrent.Volatile
 
 /**
  * Bundles everything a [DownloadSource] needs to execute a download.
@@ -60,6 +62,11 @@ import kotlinx.coroutines.flow.update
  *   [com.linroid.ketch.api.KetchApi.activeConnections] reports. Sources open a handle when a
  *   transfer starts, count its bytes and close it when the transfer ends, also on failure and
  *   cancellation.
+ * @property publishedChecksum the digest the server publishes for the whole file, which Ketch
+ *   verifies the finished file against when the request names no
+ *   [checksum][DownloadRequest.checksum]. Starts as [preResolved]'s
+ *   [checksum][ResolvedSource.checksum]; sources that ask the server again, as an HTTP resume
+ *   does, replace it with what the server says now, `null` included.
  */
 class DownloadContext(
   val taskId: String,
@@ -83,6 +90,9 @@ class DownloadContext(
     MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
   val connections: ConnectionReporter = ConnectionReporter.None,
 ) {
+  @Volatile
+  var publishedChecksum: Checksum? = preResolved?.checksum
+
   private val acknowledged = MutableStateFlow(0)
 
   /** The latest [selection] revision the source confirmed with [acknowledgeSelection]. */

@@ -1,7 +1,11 @@
-package com.linroid.ketch.torrent
+package com.linroid.ketch.core.digest
 
-/** Incremental SHA-1 for BitTorrent v1 identity and piece integrity. */
-internal class Sha1 {
+/**
+ * Incremental SHA-1 (FIPS 180-4), used for BitTorrent v1 identity and piece integrity and for
+ * [com.linroid.ketch.api.ChecksumAlgorithm.SHA_1] checksums. Instances are confined to one owner
+ * and cannot be updated after [digest].
+ */
+class Sha1 : MessageDigest {
   private val state = intArrayOf(
     0x67452301, 0xefcdab89.toInt(), 0x98badcfe.toInt(), 0x10325476, 0xc3d2e1f0.toInt()
   )
@@ -11,7 +15,7 @@ internal class Sha1 {
   private var length = 0L
   private var finished = false
 
-  fun update(data: ByteArray, offset: Int = 0, count: Int = data.size - offset): Sha1 {
+  override fun update(data: ByteArray, offset: Int, count: Int): Sha1 {
     check(!finished) { "Digest already finished" }
     require(offset >= 0 && count >= 0 && offset <= data.size - count)
     require(length <= Long.MAX_VALUE - count)
@@ -32,7 +36,7 @@ internal class Sha1 {
     return this
   }
 
-  fun digest(): ByteArray {
+  override fun digest(): ByteArray {
     check(!finished) { "Digest already finished" }
     val bits = length * 8
     update(byteArrayOf(0x80.toByte()))
@@ -82,4 +86,4 @@ internal class Sha1 {
 }
 
 /** Returns the 20-byte SHA-1 digest of [data]. */
-internal fun sha1Digest(data: ByteArray): ByteArray = Sha1().update(data).digest()
+fun sha1Digest(data: ByteArray): ByteArray = Sha1().update(data).digest()

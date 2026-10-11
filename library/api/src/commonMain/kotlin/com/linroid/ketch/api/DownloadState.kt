@@ -68,6 +68,10 @@ sealed class DownloadState {
    *   server
    * @property sharing `true` while its source shares the finished content with others, such as a
    *   torrent that seeds. Not persisted; `false` from servers that do not report it.
+   * @property checksum the digest the file was verified against when it finished: the request's
+   *   [DownloadRequest.checksum], or else one the server published. `null` when the file was not
+   *   verified. A published digest is reported by the run that checked it; a task restored after
+   *   a restart reports only the request's checksum.
    */
   @Serializable
   @SerialName("completed")
@@ -77,6 +81,7 @@ sealed class DownloadState {
     val downloadTime: Duration? = null,
     val completedAt: Instant? = null,
     val sharing: Boolean = false,
+    val checksum: Checksum? = null,
   ) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */

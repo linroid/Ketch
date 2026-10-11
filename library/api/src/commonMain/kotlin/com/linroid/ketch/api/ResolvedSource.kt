@@ -30,6 +30,9 @@ import kotlinx.serialization.Serializable
  *   single choice lists its default variant first: see [defaultSelection].
  * @property contentType media type of the content as the source reports it, such as an HTTP
  *   `Content-Type` of `video/mp4`, or `null` when unknown. [DownloadCategory.mimeTypes] match it.
+ * @property checksum the digest the source publishes for the whole content, such as an HTTP
+ *   `Repr-Digest`, or `null`. A download without its own [DownloadRequest.checksum] is verified
+ *   against it.
  */
 @Serializable
 data class ResolvedSource(
@@ -43,6 +46,7 @@ data class ResolvedSource(
   val files: List<SourceFile> = emptyList(),
   val selectionMode: FileSelectionMode = FileSelectionMode.MULTIPLE,
   val contentType: String? = null,
+  val checksum: Checksum? = null,
 ) {
   companion object {
     /**

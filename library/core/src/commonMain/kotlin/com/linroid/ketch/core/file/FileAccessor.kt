@@ -15,6 +15,20 @@ interface FileAccessor {
   /** Writes [data] starting at the given byte [offset]. */
   suspend fun writeAt(offset: Long, data: ByteArray)
 
+  /**
+   * Reads up to [byteCount] bytes at [offset] into [buffer] from [bufferOffset], returning how
+   * many were read, or -1 at the end of the file. Ketch reads a finished file to verify its
+   * checksum. The default throws [UnsupportedOperationException]: such files are verified only
+   * against a [com.linroid.ketch.api.DownloadRequest.checksum], which then fails the download
+   * with [com.linroid.ketch.api.KetchError.Unsupported].
+   */
+  suspend fun readAt(
+    offset: Long,
+    buffer: ByteArray,
+    bufferOffset: Int = 0,
+    byteCount: Int = buffer.size - bufferOffset,
+  ): Int = throw UnsupportedOperationException("This file cannot be read")
+
   /** Flushes buffered writes to disk. */
   suspend fun flush()
 

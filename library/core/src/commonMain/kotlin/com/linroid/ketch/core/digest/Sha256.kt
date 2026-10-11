@@ -1,11 +1,12 @@
-package com.linroid.ketch.torrent
+package com.linroid.ketch.core.digest
 
 /**
- * Incremental SHA-256 for BitTorrent v2 identity and Merkle integrity.
+ * Incremental SHA-256 for BitTorrent v2 identity and Merkle integrity and for
+ * [com.linroid.ketch.api.ChecksumAlgorithm.SHA_256] checksums.
  * Algorithm: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf (sections 4–6).
  * Instances are confined to one owner and cannot be updated after finalization.
  */
-internal class Sha256 {
+class Sha256 : MessageDigest {
   private val state = intArrayOf(
     0x6a09e667, 0xbb67ae85.toInt(), 0x3c6ef372, 0xa54ff53a.toInt(),
     0x510e527f, 0x9b05688c.toInt(), 0x1f83d9ab, 0x5be0cd19
@@ -16,7 +17,7 @@ internal class Sha256 {
   private var length = 0L
   private var finished = false
 
-  fun update(data: ByteArray, offset: Int = 0, count: Int = data.size - offset): Sha256 {
+  override fun update(data: ByteArray, offset: Int, count: Int): Sha256 {
     check(!finished) { "Digest already finished" }
     require(offset >= 0 && count >= 0 && offset <= data.size - count)
     // SHA-256 encodes an unsigned 64-bit bit length. Byte inputs must stay below 2^61 bytes.
@@ -38,7 +39,7 @@ internal class Sha256 {
     return this
   }
 
-  fun digest(): ByteArray {
+  override fun digest(): ByteArray {
     check(!finished) { "Digest already finished" }
     finished = true
     val bits = length shl 3
@@ -124,4 +125,4 @@ internal class Sha256 {
 }
 
 /** Returns the 32-byte SHA-256 digest of [data] without retaining the input. */
-internal fun sha256Digest(data: ByteArray): ByteArray = Sha256().update(data).digest()
+fun sha256Digest(data: ByteArray): ByteArray = Sha256().update(data).digest()

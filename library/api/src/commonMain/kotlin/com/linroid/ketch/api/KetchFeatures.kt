@@ -38,6 +38,12 @@ object KetchFeatures {
    */
   const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
 
+  /**
+   * [DownloadRequest.checksum] is verified once a download finishes, and HTTP downloads are
+   * checked against the digest their server publishes ([KetchError.ChecksumMismatch]).
+   */
+  const val CHECKSUM: String = "download.checksum"
+
   /** [KetchApi.activeConnections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
@@ -47,6 +53,6 @@ object KetchFeatures {
    */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
-    CATEGORY_FOLDERS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS
+    CATEGORY_FOLDERS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS, CHECKSUM
   )
 }

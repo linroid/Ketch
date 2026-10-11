@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
@@ -20,6 +21,7 @@ import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.withoutBulkMetadata
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.defaultDownloadDirectory
+import com.linroid.ketch.core.digest.newDigest
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
@@ -289,7 +291,7 @@ internal class DownloadExecution(
     }
 
     if (total == 0L && !source.managesOwnFileIo) {
-      completeZeroByteFile(outputPath, source.type)
+      completeZeroByteFile(outputPath, source.type, resolvedUrl.checksum)
       return null
     }
 
@@ -632,6 +634,9 @@ internal class DownloadExecution(
       }
       totalBytes = finalTotal
 
+      // Hashed after the last flush, so the digest covers the bytes on disk.
+      val verified = if (selfManagedIo) null else verify(fa, ctx.publishedChecksum, finalTotal)
+
       val finalTime = downloadTime()
       val finishedAt = finishTime()
       handle.record.update {
@@ -652,6 +657,7 @@ internal class DownloadExecution(
         totalBytes = finalTotal.takeIf { it >= 0 },
         downloadTime = finalTime,
         completedAt = finishedAt,
+        checksum = verified,
       )
     } finally {
       val accessor = opened
@@ -660,6 +666,60 @@ internal class DownloadExecution(
       }
     }
   }
+
+  /**
+   * Verifies the finished file of [size] bytes against the request's checksum, or else the one
+   * the server [published], and returns the checksum it matched; `null` when there is none to
+   * check. The task keeps reporting every byte downloaded while it is hashed. A file that does
+   * not match is deleted and its progress discarded, so it never stays where it looks complete
+   * and a resume downloads it again.
+   *
+   * @throws KetchError.ChecksumMismatch when the file does not match
+   * @throws KetchError.Unsupported when the request has a checksum but the file cannot be read
+   */
+  private suspend fun verify(fa: FileAccessor, published: Checksum?, size: Long): Checksum? {
+    val expected = handle.record.value.request.checksum
+    val target = expected ?: published ?: return null
+    val origin = if (expected != null) "requested" else "published"
+    log.i { "Verifying taskId=$taskId against the $origin ${target.algorithm.label} checksum" }
+    val actual = try {
+      withContext(dispatchers.io) { fileDigest(fa, target.algorithm, size) }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: UnsupportedOperationException) {
+      if (expected == null) {
+        log.w { "Cannot read the file of taskId=$taskId to verify it; skipping the check" }
+        return null
+      }
+      throw KetchError.Unsupported(e)
+    } catch (e: KetchError) {
+      throw e
+    } catch (e: Exception) {
+      throw KetchError.Disk(e)
+    }
+    if (target.matches(actual)) {
+      log.i { "Verified taskId=$taskId: ${target.algorithm.label} matches" }
+      return target
+    }
+    log.w { "Checksum mismatch for taskId=$taskId: ${target.algorithm.label}, $origin" }
+    withContext(NonCancellable) {
+      discardProgress()
+      try {
+        fa.delete()
+      } catch (e: Exception) {
+        log.w(e) { "Failed to delete the mismatching file of taskId=$taskId" }
+      }
+    }
+    throw mismatch(target, actual, published = expected == null)
+  }
+
+  private fun mismatch(target: Checksum, actual: ByteArray, published: Boolean) =
+    KetchError.ChecksumMismatch(
+      algorithm = target.algorithm,
+      expected = target.value,
+      actual = Checksum.of(target.algorithm, actual).value,
+      published = published,
+    )
 
   /** Keeps the segment layout but drops its progress, so a resume downloads every byte again. */
   private suspend fun discardProgress() {
@@ -671,8 +731,17 @@ internal class DownloadExecution(
   private suspend fun completeZeroByteFile(
     outputPath: String,
     sourceType: String,
+    published: Checksum?,
   ) {
     log.i { "Zero-byte file for taskId=$taskId, completing" }
+    // An empty file has the digest of no bytes, which needs no reading.
+    val expected = handle.record.value.request.checksum
+    val target = expected ?: published
+    val empty = target?.algorithm?.newDigest()?.digest()
+    if (target != null && empty != null && !target.matches(empty)) {
+      log.w { "Checksum mismatch for empty taskId=$taskId: ${target.algorithm.label}" }
+      throw mismatch(target, empty, published = expected == null)
+    }
     val fa = openFile(outputPath, dispatchers.io)
     try {
       // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
@@ -705,6 +774,7 @@ internal class DownloadExecution(
       totalBytes = 0,
       downloadTime = handle.record.value.downloadTime,
       completedAt = finishedAt,
+      checksum = target,
     )
   }
 

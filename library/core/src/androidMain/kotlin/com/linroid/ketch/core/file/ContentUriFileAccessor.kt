@@ -59,6 +59,21 @@ internal class ContentUriFileAccessor(
     }
   }
 
+  override suspend fun readAt(
+    offset: Long,
+    buffer: ByteArray,
+    bufferOffset: Int,
+    byteCount: Int,
+  ): Int = withContext(dispatcher) {
+    if (byteCount == 0) return@withContext 0
+    try {
+      val read = Os.pread(fileDescriptor, buffer, bufferOffset, byteCount, offset)
+      if (read == 0) -1 else read
+    } catch (e: ErrnoException) {
+      throw IOException(e.message).apply { initCause(e) }
+    }
+  }
+
   override suspend fun flush() {
     withContext(dispatcher) {
       fileDescriptor.sync()
