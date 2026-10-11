@@ -6,10 +6,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-def download_notes(artifacts, server_url, repository, tag, docker_image):
+def download_notes(artifacts, server_url, repository, tag, docker_image, extension_tag=""):
   version = tag.removeprefix("v")
   release_url = f"{server_url}/{repository}/releases/download/{quote(tag, safe='')}"
   source_url = f"{server_url}/{repository}/tree/{quote(tag, safe='')}"
+  setup_url = f"{source_url}/app/browser-extension/README.md#installing"
   links = []
 
   def download(label, asset):
@@ -33,6 +34,14 @@ def download_notes(artifacts, server_url, repository, tag, docker_image):
   def cli(os, arch):
     extension = "zip" if os == "windows" else "tar.gz"
     return download(extension.upper(), f"cli-{{version}}-{os}-{arch}.{extension}")
+
+  # A link to the release itself: GitHub's release search is full text, so a query for the
+  # extension's tags lists the app releases that mention them first.
+  def extension_release():
+    if not extension_tag:
+      return f"[Set up your extension]({setup_url})"
+    label = f"Browser extension {extension_tag.removeprefix('extension-v')}"
+    return f"[{label}]({server_url}/{repository}/releases/tag/{quote(extension_tag, safe='')})"
 
   def table(rows):
     return "\n".join("| " + " | ".join(row) + " |" for row in rows)
@@ -60,8 +69,7 @@ def download_notes(artifacts, server_url, repository, tag, docker_image):
     ("---", "---"),
     ("Chrome, Edge, Brave and other Chromium browsers",
      "[Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)"),
-    ("Firefox and Safari",
-     f"[Extension releases]({server_url}/{repository}/releases?q=extension-v&expanded=true)"),
+    ("Firefox and Safari", extension_release()),
   ])
   web = download("Download the web bundle", "web-{version}.zip")
   docker = f"`docker pull {docker_image}:{version}`"
@@ -85,7 +93,7 @@ Send links and downloads straight to Ketch from your browser.
 
 {extensions}
 
-[Set up your extension]({source_url}/app/browser-extension/README.md#installing).
+[Set up your extension]({setup_url}).
 
 </details>
 
@@ -125,7 +133,9 @@ if __name__ == "__main__":
   parser.add_argument("--repository", required=True)
   parser.add_argument("--tag", required=True)
   parser.add_argument("--docker-image", required=True)
+  parser.add_argument("--extension-tag", default="", help="the latest extension release's tag")
   args = parser.parse_args()
   print(download_notes(
     args.artifacts, args.server_url, args.repository, args.tag, args.docker_image,
+    args.extension_tag,
   ))

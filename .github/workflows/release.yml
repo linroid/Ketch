@@ -469,13 +469,16 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f | sort
 
+      # Extension releases are numbered so the highest version is the newest one.
       - name: Generate download list
         run: |
+          extension_tag=$(git tag --list 'extension-v*' --sort=-v:refname | head -n 1)
           python3 .github/scripts/release-notes.py \
             --artifacts artifacts \
             --server-url "$GITHUB_SERVER_URL" \
             --repository "$GITHUB_REPOSITORY" \
             --docker-image "ghcr.io/$GITHUB_REPOSITORY_OWNER/ketch" \
+            --extension-tag "$extension_tag" \
             --tag "$KETCH_VERSION" > release-notes.md
 
       - name: Create GitHub Release

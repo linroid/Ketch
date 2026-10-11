@@ -41,8 +41,9 @@ are unavailable. See [Safari packaging](#safari-limited-macos-target).
 - **Chrome, Edge, Brave and other Chromium browsers**: install Ketch from the
   [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka).
 
-The extension has its own releases, tagged `extension-v<app version>.<number>`
-([list](https://github.com/linroid/Ketch/releases?q=extension-v&expanded=true)). Each includes
+The extension has its own releases, tagged `extension-v<app version>.<number>` and named
+like "Browser extension 0.4.0.1" on the [releases page](https://github.com/linroid/Ketch/releases);
+each app release links the latest one under *Add Ketch to your browser*. Each includes
 `ketch-extension-<version>-chrome.zip` (the Chrome Web Store package),
 `ketch-extension-<version>-firefox.zip` and `ketch-extension-<version>-safari.zip`. The Safari
 archive contains extension sources, not an installable app. Until the other stores list it:
