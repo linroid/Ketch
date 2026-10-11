@@ -1,6 +1,7 @@
 package com.linroid.ketch.server.api
 
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -68,7 +69,8 @@ internal class ConnectionStreams(
 
 /**
  * Installs `GET /api/connections` and its SSE stream `GET /api/connections/events` over
- * [KetchApi.activeConnections]. Both take a `limit` in 1..[ActiveConnections.MAX_LIMIT] (`400`
+ * [Interest.Connections]. The stream is deprecated: clients of the event stream follow the
+ * connections there. Both take a `limit` in 1..[ActiveConnections.MAX_LIMIT] (`400`
  * `invalid_limit` otherwise); an engine that does not report connections answers `501`
  * `unsupported`, or sends that `error` event. They carry peer addresses, so they are only served
  * here, behind the access token, and never on `/api/events`.
@@ -77,7 +79,7 @@ internal fun Route.connectionRoutes(ketch: KetchApi, streams: ConnectionStreams)
   get<Api.ActiveConnections> { resource ->
     if (!call.checkLimit(resource.limit)) return@get
     val snapshot = try {
-      ketch.activeConnections(resource.limit).first()
+      ketch.subscribe(Interest.Connections(resource.limit)).first()
     } catch (e: UnsupportedOperationException) {
       call.respond(HttpStatusCode.NotImplemented, unsupported(e))
       return@get
@@ -113,8 +115,11 @@ private suspend fun ApplicationCall.checkLimit(limit: Int): Boolean {
   return false
 }
 
-/** Responds with an SSE stream run by [handler], as Ktor's `sse` routes do. */
-private suspend fun ApplicationCall.respondEvents(handler: suspend ServerSSESession.() -> Unit) {
+/**
+ * Responds with an SSE stream run by [handler], as Ktor's `sse` routes do, and tells proxies not
+ * to buffer it.
+ */
+internal suspend fun ApplicationCall.respondEvents(handler: suspend ServerSSESession.() -> Unit) {
   response.header(HttpHeaders.ContentType, ContentType.Text.EventStream.toString())
   response.header(HttpHeaders.CacheControl, "no-store")
   if (request.httpVersion.startsWith("HTTP/1.")) {
@@ -136,7 +141,7 @@ private suspend fun ServerSSESession.streamConnections(
   try {
     var sequence = 0L
     var failure: Throwable? = null
-    ketch.activeConnections(limit)
+    ketch.subscribe(Interest.Connections(limit))
       .repeatWhileIdle(streams.keepAlive)
       // Only the engine's failures; a failed send means the client left, and ends the stream.
       .catch { failure = it }

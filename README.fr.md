@@ -110,7 +110,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   et mot de passe, ou sans proxy, en joignant directement les hôtes de votre choix ; aussi pour un
   seul téléchargement ([détails](docs/proxy.md)).
 - **Pause et reprise, même après un redémarrage** — Avant de reprendre, Ketch vérifie que le fichier
-  sur le serveur n'a pas changé et relance automatiquement les connexions en échec.
+  sur le serveur n'a pas changé et relance automatiquement les connexions en échec. Jusqu'à la
+  fin du téléchargement, le fichier s'appelle `nom.ketch` : un fichier incomplet ne semble jamais
+  terminé.
 
 ### Tous les types de liens
 
@@ -263,8 +265,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   publiée par le serveur
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
   aux plus lentes pour ne plus attendre la connexion la plus lente
-- **Distinguer les fichiers incomplets** — Écrire sous un nom temporaire et attribuer le nom
-  définitif une fois le téléchargement terminé
 - **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
   au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un

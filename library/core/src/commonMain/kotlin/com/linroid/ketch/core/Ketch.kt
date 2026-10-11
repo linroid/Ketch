@@ -1,6 +1,5 @@
 package com.linroid.ketch.core
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
@@ -12,9 +11,11 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
@@ -71,15 +72,23 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
@@ -1032,11 +1041,41 @@ class Ketch(
   }
 
   /**
-   * Live connections of every task, sampled once a second while collected. Reports HTTP and
-   * media requests, FTP transfers and the peers of sources that report them.
+   * Follows [interest]: segments as the tasks report them, stats every [interval] from [tasks],
+   * which are live, and [Interest.Connections] sampled once a second while collected (HTTP and
+   * media requests, FTP transfers and the peers of sources that report them). The sources'
+   * extensions answer the interests of their modules.
    */
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
-    connectionRegistry.snapshots(limit)
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+    require(interval.isPositive()) { "interval must be positive" }
+    return when (interest) {
+      is Interest.Segments -> segmentsOf(interest.taskIds)
+      Interest.Stats -> statsEvery(interval)
+      is Interest.Connections -> connectionRegistry.snapshots(interest.limit)
+      else -> extensions.firstNotNullOfOrNull { (_, extension) ->
+        extension.subscribe(interest, interval)
+      } ?: flow { throw UnsupportedOperationException("Ketch does not report $interest") }
+    } as Flow<T>
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun segmentsOf(taskIds: Set<String>): Flow<Map<String, List<Segment>>> =
+    tasks.flatMapLatest { all ->
+      val named = all.filter { it.taskId in taskIds }
+      if (named.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(named.map { task -> task.segments.map { task.taskId to it } }) { it.toMap() }
+      }
+    }.distinctUntilChanged()
+
+  private fun statsEvery(interval: Duration): Flow<KetchStats> = flow {
+    while (true) {
+      emit(KetchStats.of(tasks.value.map { it.state.value }))
+      delay(interval)
+    }
+  }.distinctUntilChanged()
 
   override fun close() {
     log.i { "Closing Ketch" }

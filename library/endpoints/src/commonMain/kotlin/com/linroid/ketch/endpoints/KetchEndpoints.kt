@@ -1,6 +1,7 @@
 package com.linroid.ketch.endpoints
 
 import com.linroid.ketch.api.ActiveConnections as ConnectionsSnapshot
+import com.linroid.ketch.endpoints.stream.StreamEvents
 import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 
@@ -40,7 +41,11 @@ import kotlinx.serialization.Serializable
  * - `GET /api/connections`        — a snapshot of the live connections (`?limit=1..1024`)
  * - `GET /api/connections/events` — SSE stream of their snapshots (`?limit=1..1024`)
  *
- * ### Events (SSE)
+ * ### Event stream (SSE), on servers listing [StreamEvents.FEATURE]
+ * - `GET /api/stream`                        — the subscribed event stream
+ * - `PUT /api/stream/{id}/subscription`      — what the stream sends
+ *
+ * ### Events (SSE), deprecated: use the event stream
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
@@ -149,6 +154,40 @@ class Api {
     data class Events(val parent: ActiveConnections = ActiveConnections())
   }
 
+  /**
+   * The subscribed event stream, named in [StreamEvents]: one SSE stream per client, which
+   * starts with the task lifecycle and sends what its subscription asks for. A server streams
+   * to a few clients at once and answers `429` `too_many_streams` beyond them.
+   */
+  @Serializable
+  @Resource("stream")
+  data class Stream(val parent: Api = Api()) {
+
+    @Serializable
+    @Resource("{id}")
+    data class ById(
+      val parent: Stream = Stream(),
+      val id: String,
+    ) {
+
+      /**
+       * `PUT` a [StreamSubscription][com.linroid.ketch.endpoints.stream.StreamSubscription] to
+       * replace what the stream sends; answers a
+       * [StreamSubscribed][com.linroid.ketch.endpoints.stream.StreamSubscribed]. A stream that
+       * closed is `404` `unknown_stream`, a subscription beyond the limits `400`
+       * `invalid_subscription`.
+       */
+      @Serializable
+      @Resource("subscription")
+      data class Subscription(val parent: ById)
+    }
+  }
+
+  /**
+   * Task events of the first protocol, every task's progress as often as it changes.
+   * Deprecated: servers listing [StreamEvents.FEATURE] serve [Stream], which sends only what a
+   * client asks for. Kept for older clients.
+   */
   @Serializable
   @Resource("events")
   data class Events(val parent: Api = Api()) {

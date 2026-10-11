@@ -2,6 +2,7 @@ package com.linroid.ketch.server
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -71,7 +72,7 @@ class RemoteConnectionsTest {
             ),
           )
 
-          val open = client.activeConnections(limit = 2).first { it.total == 3 }
+          val open = client.subscribe(Interest.Connections(limit = 2)).first { it.total == 3 }
 
           assertEquals(2, open.connections.size)
           for (connection in open.connections) {
@@ -84,7 +85,7 @@ class RemoteConnectionsTest {
           val streaming = CompletableDeferred<Unit>()
           val ended = async {
             runCatching {
-              client.activeConnections().onEach { streaming.complete(Unit) }.collect()
+              client.subscribe(Interest.Connections()).onEach { streaming.complete(Unit) }.collect()
             }.exceptionOrNull()
           }
           streaming.await()

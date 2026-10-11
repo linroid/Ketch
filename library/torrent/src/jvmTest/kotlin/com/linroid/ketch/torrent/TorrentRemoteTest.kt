@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -10,7 +11,9 @@ import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -20,6 +23,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class TorrentRemoteTest {
   @Test
@@ -66,6 +70,9 @@ class TorrentRemoteTest {
           val task = client.download(DownloadRequest(magnet,
             destination = Destination(output.absolutePath), selectedFileIds = setOf("1"),
             resolvedSource = resolved, speedLimit = SpeedLimit.of(16_384)))
+          // A remote task's segments only come while followed.
+          val segments = Interest.Segments(setOf(task.taskId))
+          val following = launch { client.subscribe(segments, 200.milliseconds).collect() }
           while (task.segments.value.sumOf { it.downloadedBytes } == 0L) delay(25)
           task.pause()
           task.state.first { it is DownloadState.Paused }
@@ -77,7 +84,10 @@ class TorrentRemoteTest {
             val failed = ketch.tasks.value.first().state.value as? DownloadState.Failed
             throw AssertionError("Local torrent failed: ${failed?.error}", failed?.error)
           }
-          assertEquals(131_072L, task.segments.value.sumOf { it.downloadedBytes })
+          client.subscribe(segments, 200.milliseconds).first { bySegments ->
+            bySegments[task.taskId].orEmpty().sumOf { it.downloadedBytes } == 131_072L
+          }
+          following.cancel()
           assertFalse(output.resolve("skip").exists())
           assertContentEquals(bytes.copyOfRange(131_072, bytes.size),
             output.resolve("keep").readBytes())

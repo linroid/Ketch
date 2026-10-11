@@ -140,7 +140,9 @@ class TorrentV2WebSeedTest {
       for ((url, range) in mirror.requests) {
         assertTrue(checkNotNull(range).last < mirrorFiles(fixture).getValue(url).size)
       }
-      assertEquals(fixture.layout.pieceCount.toInt(), mirror.requests.size)
+      // Every piece in one run: a range request per file, each file whole.
+      assertEquals(files.indices.map { 0L..<files[it].second.toLong() },
+        mirror.requests.map { it.second })
       // Mirrors pay the task's limit as peers do.
       assertEquals(files.sumOf { it.second }.toLong(), run.throttled)
     }
@@ -161,8 +163,56 @@ class TorrentV2WebSeedTest {
     download(fixture, mirror) { run ->
       assertEquals(TorrentSessionState.FINISHED, run.state, run.failure?.toString())
       assertFiles(fixture, run.output, listOf(0))
-      // Whole pieces, one range request each.
-      assertEquals(4, mirror.requests.size)
+      // The four pieces in one run, one range request.
+      assertEquals(listOf(0L..<100_000L), mirror.requests.map { it.second })
+    }
+  }
+
+  @Test
+  fun v2Only_sixteenPieces_fetchesTheRunInOneRequest() = runTest {
+    val size = 16 * 32_768
+    val fixture = TorrentV2Fixture.build(listOf("data.iso" to size),
+      webSeeds = listOf("http://mirror.test/data.iso"))
+    val mirror = MirrorEngine(mapOf("http://mirror.test/data.iso" to fixture.payloads[0]))
+    download(fixture, mirror) { run ->
+      assertEquals(TorrentSessionState.FINISHED, run.state, run.failure?.toString())
+      assertFiles(fixture, run.output, listOf(0))
+      assertEquals(listOf(0L..<size.toLong()), mirror.requests.map { it.second })
+    }
+  }
+
+  @Test
+  fun hybrid_corruptPieceInARun_failsOnlyThatPieceAndIsFetchedAgain() = runTest {
+    val size = 8 * 32_768
+    val fixture = TorrentV2Fixture.build(listOf("data.iso" to size), hybrid = true,
+      webSeeds = listOf("http://mirror.test/pub"))
+    // A hybrid's v1 view lists its files, so the URL names the folder.
+    val url = "http://mirror.test/pub/pack/data.iso"
+    // A byte of piece 5 is wrong in the first response only.
+    val mirror = MirrorEngine(mapOf(url to fixture.payloads[0]),
+      damage = mapOf(url to 5L * 32_768 + 7))
+    download(fixture, mirror) { run ->
+      assertEquals(TorrentSessionState.FINISHED, run.state, run.failure?.toString())
+      assertFiles(fixture, run.output, listOf(0))
+      assertEquals(listOf(0L..<size.toLong(), 5L * 32_768..<size.toLong()),
+        mirror.requests.map { it.second })
+    }
+  }
+
+  @Test
+  fun v2Only_connectionDroppedMidRun_keepsTheVerifiedPieces() = runTest {
+    val size = 8 * 32_768
+    val fixture = TorrentV2Fixture.build(listOf("data.iso" to size),
+      webSeeds = listOf("http://mirror.test/data.iso"))
+    val url = "http://mirror.test/data.iso"
+    // The first response ends inside piece 2.
+    val mirror = MirrorEngine(mapOf(url to fixture.payloads[0]),
+      drop = mapOf(url to 2 * 32_768 + 1_000))
+    download(fixture, mirror) { run ->
+      assertEquals(TorrentSessionState.FINISHED, run.state, run.failure?.toString())
+      assertFiles(fixture, run.output, listOf(0))
+      assertEquals(listOf(0L..<size.toLong(), 2L * 32_768..<size.toLong()),
+        mirror.requests.map { it.second })
     }
   }
 

@@ -5,15 +5,18 @@ import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
@@ -23,7 +26,20 @@ import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.InterestError
+import com.linroid.ketch.endpoints.stream.InterestRef
+import com.linroid.ketch.endpoints.stream.InterestUpdate
+import com.linroid.ketch.endpoints.stream.StreamError
+import com.linroid.ketch.endpoints.stream.StreamEvents
+import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamSerializers
+import com.linroid.ketch.endpoints.stream.StreamSubscribed
+import com.linroid.ketch.endpoints.stream.StreamTaskRef
+import com.linroid.ketch.endpoints.stream.TaskProgressUpdate
+import com.linroid.ketch.endpoints.stream.TaskSegmentsUpdate
+import com.linroid.ketch.endpoints.stream.TaskStateUpdate
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
@@ -34,35 +50,56 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.resources.Resources
 import io.ktor.client.plugins.resources.get
 import io.ktor.client.plugins.resources.post
+import io.ktor.client.plugins.resources.prepareGet
 import io.ktor.client.plugins.resources.put
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.sse.sse
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Remote implementation of [KetchApi] that communicates with a
@@ -71,10 +108,18 @@ import kotlinx.serialization.json.Json
  * Calls the server refuses, here and on its tasks, throw [RemoteApiException] with the server's
  * reason, unless [KetchApi] names another exception for the case.
  *
+ * Servers listing `events.stream` send their events on one stream that carries only what this
+ * client asks for: every task's lifecycle and state changes at once, the progress of downloading
+ * tasks every [progressInterval], and what its callers [subscribe] to, such as the segments of
+ * the tasks they show. Set [foreground] to `false` while nothing is shown. Older servers send
+ * every change of every task.
+ *
  * @param host server hostname or IP address
  * @param port server port (default 8642)
  * @param apiToken optional Bearer token for authentication
  * @param secure use HTTPS instead of HTTP
+ * @param progressInterval how often every downloading task's progress updates, or `null` for
+ *   only with its state changes; see [progressInterval]
  */
 class RemoteKetch internal constructor(
   val host: String,
@@ -82,13 +127,15 @@ class RemoteKetch internal constructor(
   private val apiToken: String?,
   val secure: Boolean,
   engine: HttpClientEngine?,
+  progressInterval: Duration? = DEFAULT_PROGRESS_INTERVAL,
 ) : KetchApi {
   constructor(
     host: String,
     port: Int = 8642,
     apiToken: String? = null,
     secure: Boolean = false,
-  ) : this(host, port, apiToken, secure, null)
+    progressInterval: Duration? = DEFAULT_PROGRESS_INTERVAL,
+  ) : this(host, port, apiToken, secure, null, progressInterval)
 
 
   private val scheme = if (secure) "https" else "http"
@@ -100,6 +147,7 @@ class RemoteKetch internal constructor(
 
   private val json = Json {
     ignoreUnknownKeys = true
+    serializersModule = StreamSerializers
     encodeDefaults = true
     isLenient = true
     coerceInputValues = true
@@ -157,12 +205,55 @@ class RemoteKetch internal constructor(
   private var cachedFeatures: Pair<Long, Set<String>>? = null
 
   /**
+   * Whether this client reads the server's event stream: once [start] connected to a server
+   * that serves it. Topics beyond the tasks come from that stream then, and from their own
+   * endpoints otherwise.
+   */
+  private val streamed = MutableStateFlow(false)
+  private val interests = StreamInterests(progressInterval)
+  private val topics = StreamTopics()
+
+  /**
+   * How often every downloading task's progress updates on a server with the event stream, or
+   * `null` for only with its state changes. Changes apply at once.
+   */
+  var progressInterval: Duration?
+    get() = interests.progress.value
+    set(value) {
+      require(value == null || value.isPositive()) { "progressInterval must be positive" }
+      interests.progress.value = value
+    }
+
+  /**
+   * Whether progress and the callers' interests come, `true` by default. An app in the
+   * background sets it to `false`: the event stream then carries only the tasks' lifecycle and
+   * state changes, and the rest comes again once it is `true`. Servers without the event stream
+   * send everything.
+   */
+  var foreground: Boolean
+    get() = interests.active.value
+    set(value) {
+      interests.active.value = value
+    }
+
+  /**
+   * Tasks this client added since the event stream's last task snapshot, guarded by
+   * [taskMutex]: the snapshot may predate them.
+   */
+  private val postedSinceSnapshot = mutableSetOf<String>()
+
+  /**
    * Torrent controls of the server, over its `/api/torrents` routes. A server without them, an
    * older one or one without a torrent source, fails every command with
    * [com.linroid.ketch.torrent.api.TorrentCommandError.UNSUPPORTED] before sending it.
    */
-  private val torrents: TorrentController =
-    RemoteTorrentController(httpClient, connectionGeneration.asStateFlow(), json)
+  private val torrents = RemoteTorrentController(
+    httpClient = httpClient,
+    generation = connectionGeneration.asStateFlow(),
+    json = json,
+    streamed = streamed,
+    streamTorrent = { interest, interval -> streamInterest(interest, interval) },
+  )
 
   /**
    * The server's controller for [key]: [TorrentController.Key] returns the server's torrent
@@ -190,6 +281,7 @@ class RemoteKetch internal constructor(
     checkSuccess(response)
     val task = createRemoteTask(response.body())
     return taskMutex.withLock {
+      postedSinceSnapshot += task.taskId
       // SSE may already have delivered newer progress or completion before this POST returns.
       taskMap[task.taskId] ?: addOrUpdate(task)
     }
@@ -302,26 +394,103 @@ class RemoteKetch internal constructor(
   }
 
   /**
-   * The server's live connections, over `GET /api/connections/events`. A server whose
-   * [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], such as an older one, fails
-   * with [UnsupportedOperationException] before the stream is asked for. The flow ends with the
-   * failure when the connection to the server drops or the server ends the stream; it does not
-   * reconnect, so collect it again to resume.
+   * Follows [interest] on the server, about every [interval]. While [start] keeps the event
+   * stream of a server that serves it open, every interest comes on that stream: segments as
+   * updates of [tasks], others as values the server encodes with [Interest.valueSerializer]; an
+   * interest the server cannot serve fails with [UnsupportedOperationException]. Otherwise
+   * [Interest.Segments], [Interest.Stats], [Interest.Connections] and `TorrentInterest` come from
+   * their own endpoints or from [tasks], and others fail with [UnsupportedOperationException]
+   * when collected, as do interests whose type `StreamSerializers` does not name.
+   *
+   * On older servers, live connections fail with [UnsupportedOperationException] when the
+   * server's [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], before anything is
+   * asked for. Interests other than segments and stats end with a failure when the connection to
+   * the server drops or the server ends the stream; they do not reconnect, so collect them again
+   * to resume. Stats keep their last value while the server is unreachable.
    */
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> {
-    require(limit in 1..ActiveConnections.MAX_LIMIT) {
-      "limit must be in 1..${ActiveConnections.MAX_LIMIT}"
-    }
-    return flow {
-      if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
-        throw UnsupportedOperationException("This device does not report its connections")
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+    require(interval.isPositive()) { "interval must be positive" }
+    return when (interest) {
+      is Interest.Segments -> followSegments(interest, interval)
+      Interest.Stats -> followStats(interval)
+      is Interest.Connections -> followConnections(interest, interval)
+      is TorrentInterest -> torrents.observe(interest.taskId, interval)
+      else -> followInterest(interest, interval)
+    } as Flow<T>
+  }
+
+  /** The segments of the tasks [interest] names, as the stream updates their tasks. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun followSegments(
+    interest: Interest.Segments,
+    interval: Duration,
+  ): Flow<Map<String, List<Segment>>> {
+    val segments = tasks.flatMapLatest { all ->
+      val named = all.filter { it.taskId in interest.taskIds }
+      if (named.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(named.map { task -> task.segments.map { task.taskId to it } }) { it.toMap() }
       }
-      emitAll(httpClient.activeConnectionEvents(limit, json))
+    }.distinctUntilChanged()
+    return flow { interests.holding(interest, interval) { emitAll(segments) } }
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun followStats(interval: Duration): Flow<KetchStats> {
+    // Older servers send every change of every task, so their totals are computed here.
+    val computed = flow {
+      while (true) {
+        emit(KetchStats.of(tasks.value.map { it.state.value }))
+        delay(interval)
+      }
     }
+    return streamed.flatMapLatest { streamed ->
+      if (!streamed) {
+        computed
+      } else {
+        // The last stats stay until a new stream sends some.
+        streamInterest(Interest.Stats, interval)
+          .retryWhen { cause, _ -> cause is StreamLostException }
+          .mapInterestFailures()
+      }
+    }.distinctUntilChanged()
+  }
+
+  private fun followConnections(
+    interest: Interest.Connections,
+    interval: Duration,
+  ): Flow<ActiveConnections> = flow {
+    if (streamed.value) {
+      emitAll(streamInterest(interest, interval).distinctUntilChanged().mapInterestFailures())
+      return@flow
+    }
+    if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
+      throw UnsupportedOperationException("This device does not report its connections")
+    }
+    emitAll(httpClient.activeConnectionEvents(interest.limit, json))
+  }
+
+  /** An interest only the event stream serves. */
+  private fun <T> followInterest(interest: Interest<T>, interval: Duration): Flow<T> = flow {
+    // The subscription could not be sent with an interest it cannot encode.
+    @OptIn(ExperimentalSerializationApi::class)
+    val encodable = json.serializersModule.getPolymorphic(Interest::class, interest) != null
+    if (!streamed.value || !encodable) {
+      throw UnsupportedOperationException("This client does not follow $interest")
+    }
+    emitAll(streamInterest(interest, interval).mapInterestFailures())
+  }
+
+  /** Fails with what callers of [subscribe] expect when the server fails the interest. */
+  private fun <T> Flow<T>.mapInterestFailures(): Flow<T> = catch { error ->
+    throw if (error is InterestFailedException) error.error.toException() else error
   }
 
   override fun close() {
     log.d { "Close" }
+    streamed.value = false
     try {
       scope.cancel()
     } finally {
@@ -329,35 +498,31 @@ class RemoteKetch internal constructor(
     }
   }
 
-  // -- SSE connection with reconnection --
+  // -- Event connection with reconnection --
 
   private suspend fun connectSse() {
     var reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
     var failures = 0
+    val connected = {
+      _connectionState.value = ConnectionState.Connected
+      reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
+      failures = 0
+    }
     while (true) {
       try {
-        fetchAllTasks()
-        _connectionState.value = ConnectionState.Connected
-        reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
-        failures = 0
-        httpClient.sse(
-          urlString = "/api/events",
-        ) {
-          connectionGeneration.update { it + 1 }
-          log.i { "Connected to $baseUrl/api/events" }
-          incoming.collect { sseEvent ->
-            val data = sseEvent.data ?: return@collect
-            try {
-              val taskEvent: TaskEvent =
-                json.decodeFromString(data)
-              handleEvent(taskEvent)
-            } catch (error: Exception) {
-              log.e(error) { "Failed to handle event" }
-            }
-          }
+        if (servesStream()) {
+          streamed.value = true
+          readStream(onConnected = connected)
+        } else {
+          streamed.value = false
+          fetchAllTasks()
+          connected()
+          readEvents()
         }
       } catch (_: UnauthorizedException) {
         log.w { "Server $baseUrl rejected the API token (HTTP 401); not reconnecting" }
+        streamed.value = false
+        topics.closed()
         _connectionState.value = ConnectionState.Unauthorized
         return
       } catch (error: Exception) {
@@ -368,6 +533,7 @@ class RemoteKetch internal constructor(
         }
       }
 
+      topics.closed()
       _connectionState.value = ConnectionState.Disconnected()
 
       log.d { "Reconnecting to $baseUrl in ${reconnectDelayMs}ms" }
@@ -375,6 +541,218 @@ class RemoteKetch internal constructor(
       _connectionState.value = ConnectionState.Connecting
       reconnectDelayMs = (reconnectDelayMs * 2)
         .coerceAtMost(MAX_RECONNECT_DELAY_MS)
+    }
+  }
+
+  /** Whether the server lists the event stream; one without a status route does not. */
+  private suspend fun servesStream(): Boolean {
+    val response = httpClient.get(Api.Status())
+    if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+    if (response.status == HttpStatusCode.NotFound) return false
+    checkSuccess(response)
+    return StreamEvents.FEATURE in response.body<KetchStatus>().features
+  }
+
+  /** Reads the task events of a server without the event stream, `/api/events`. */
+  private suspend fun readEvents() {
+    httpClient.sse(urlString = "/api/events") {
+      connectionGeneration.update { it + 1 }
+      log.i { "Connected to $baseUrl/api/events" }
+      incoming.collect { sseEvent ->
+        val data = sseEvent.data ?: return@collect
+        try {
+          val taskEvent: TaskEvent = json.decodeFromString(data)
+          handleEvent(taskEvent)
+        } catch (error: Exception) {
+          log.e(error) { "Failed to handle event" }
+        }
+      }
+    }
+  }
+
+  /**
+   * Reads the event stream, `/api/stream`, until it ends, sending the callers' subscription each
+   * time it changes. [onConnected] runs once the stream's task snapshot is applied. The stream is
+   * read as plain text, which any engine can serve.
+   */
+  private suspend fun readStream(onConnected: () -> Unit) {
+    httpClient.prepareGet(Api.Stream()) {
+      header(HttpHeaders.Accept, "text/event-stream")
+    }.execute { response ->
+      if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+      checkSuccess(response)
+      coroutineScope {
+        var subscriber: Job? = null
+        try {
+          response.bodyAsChannel().readServerSentEvents { name, data ->
+            when (name) {
+              StreamEvents.HELLO -> {
+                val hello = json.decodeFromString<StreamHello>(data)
+                val generation = connectionGeneration.updateAndGet { it + 1 }
+                topics.opened(generation)
+                log.i { "Connected to $baseUrl/api/stream" }
+                subscriber?.cancel()
+                subscriber = launch { sendSubscriptions(hello.streamId) }
+              }
+              StreamEvents.TASKS -> {
+                applyStreamSnapshot(json.decodeFromString<TasksResponse>(data).tasks)
+                onConnected()
+              }
+              StreamEvents.ERROR -> {
+                val error = json.decodeFromString<StreamError>(data)
+                throw IllegalStateException("The server ended the event stream: ${error.error}")
+              }
+              else -> try {
+                handleStreamEvent(name, data)
+              } catch (error: CancellationException) {
+                throw error
+              } catch (error: Exception) {
+                log.e(error) { "Failed to handle stream event $name" }
+              }
+            }
+          }
+        } finally {
+          subscriber?.cancel()
+        }
+      }
+    }
+    log.i { "The event stream of $baseUrl ended" }
+  }
+
+  /** Sends the callers' subscription to the stream with [streamId] each time it changes. */
+  @OptIn(FlowPreview::class)
+  private suspend fun sendSubscriptions(streamId: String) {
+    var revision = 0L
+    // The first goes out at once; later changes wait for others that follow right after.
+    interests.subscriptions.debounce { if (revision == 0L) 0 else SUBSCRIPTION_DEBOUNCE_MS }
+      .collect { wanted ->
+        revision++
+        try {
+          val response = httpClient.put(
+            Api.Stream.ById.Subscription(Api.Stream.ById(id = streamId)),
+          ) {
+            contentType(ContentType.Application.Json)
+            setBody(wanted.copy(revision = revision))
+          }
+          // The stream applies it with its `subscribed` event; one that closed is reconnected
+          // by the stream loop.
+          if (!response.status.isSuccess()) {
+            log.w { "Event stream refused a subscription (HTTP ${response.status.value})" }
+          }
+        } catch (error: CancellationException) {
+          throw error
+        } catch (error: Exception) {
+          log.w { "Failed to send the event subscription: ${error.describeCauses()}" }
+        }
+      }
+  }
+
+  internal suspend fun handleStreamEvent(name: String, data: String) {
+    when (name) {
+      StreamEvents.TASK_ADDED -> {
+        val task = createRemoteTask(json.decodeFromString<TaskSnapshot>(data))
+        taskMutex.withLock { addOrUpdate(task) }
+      }
+      StreamEvents.TASK_REMOVED -> {
+        val taskId = json.decodeFromString<StreamTaskRef>(data).taskId
+        taskMutex.withLock { removeTask(taskId) }
+      }
+      StreamEvents.TASK_STATE -> {
+        val update = json.decodeFromString<TaskStateUpdate>(data)
+        taskMutex.withLock {
+          val task = taskMap[update.taskId] ?: return
+          task.applyEvent(update.state, update.request, null, update.queuePosition)
+          taskRevision++
+        }
+      }
+      StreamEvents.TASK_PROGRESS -> {
+        val update = json.decodeFromString<TaskProgressUpdate>(data)
+        taskMutex.withLock { taskMap[update.taskId]?.applyProgress(update.progress) }
+      }
+      StreamEvents.TASK_SEGMENTS -> {
+        val update = json.decodeFromString<TaskSegmentsUpdate>(data)
+        taskMutex.withLock { taskMap[update.taskId]?.applySegments(update.segments) }
+      }
+      StreamEvents.INTEREST -> {
+        val update = json.decodeFromString<InterestUpdate>(data)
+        topics.value(update.id, update.value)
+      }
+      StreamEvents.INTEREST_END -> {
+        topics.ended(json.decodeFromString<InterestRef>(data).id, TopicEnd.Completed)
+      }
+      StreamEvents.INTEREST_ERROR -> {
+        val error = json.decodeFromString<InterestError>(data)
+        log.d { "Event stream interest ${error.id} failed: ${error.error}" }
+        topics.ended(error.id, TopicEnd.Failed(error))
+      }
+      StreamEvents.SUBSCRIBED -> {
+        topics.applied(json.decodeFromString<StreamSubscribed>(data).subscription)
+        log.d { "Event stream subscription applied" }
+      }
+      else -> log.v { "Ignoring stream event $name" }
+    }
+  }
+
+  /**
+   * Replaces the task list with the event stream's snapshot. Tasks this client added that the
+   * snapshot lacks may have been added after it; they stay until the server says otherwise.
+   */
+  internal suspend fun applyStreamSnapshot(snapshots: List<TaskSnapshot>) {
+    val tasks = snapshots.map(::createRemoteTask)
+    val unconfirmed = taskMutex.withLock {
+      val ids = tasks.mapTo(HashSet()) { it.taskId }
+      val posted = postedSinceSnapshot - ids
+      postedSinceSnapshot.clear()
+      taskMap.keys.retainAll(ids + posted)
+      tasks.forEach { addOrUpdate(it) }
+      taskRevision++
+      _tasks.value = taskMap.values.toList()
+      posted
+    }
+    if (unconfirmed.isNotEmpty()) scope.launch { confirmTasks(unconfirmed) }
+  }
+
+  /** Removes the tasks of [taskIds] the server no longer has. */
+  private suspend fun confirmTasks(taskIds: Set<String>) {
+    for (taskId in taskIds) {
+      try {
+        val response = httpClient.get(Api.Tasks.ById(id = taskId))
+        if (response.status == HttpStatusCode.NotFound) {
+          taskMutex.withLock { removeTask(taskId) }
+        }
+      } catch (error: CancellationException) {
+        throw error
+      } catch (error: Exception) {
+        log.d { "Failed to confirm taskId=$taskId: ${error.describeCauses()}" }
+      }
+    }
+  }
+
+  /**
+   * The values the event stream sends for [interest], ending when the server ends it; fails with
+   * [InterestFailedException] when the server fails it, and with [StreamLostException] when the
+   * stream closes.
+   */
+  private fun <T> streamInterest(interest: Interest<T>, interval: Duration): Flow<T> = flow {
+    val generation = topics.live.filterNotNull().first()
+    interests.holding(interest, interval) { id ->
+      var emitted = 0L
+      combine(topics.live, topics.states.map { it[id] }, ::Pair)
+        .distinctUntilChanged()
+        .transformWhile { (live, state) ->
+          if (live != generation) throw StreamLostException()
+          val value = state?.value
+          if (value != null && state.sequence > emitted) {
+            emitted = state.sequence
+            emit(json.decodeFromJsonElement(interest.valueSerializer, value))
+          }
+          when (val end = state?.end) {
+            null -> true
+            TopicEnd.Completed -> false
+            is TopicEnd.Failed -> throw InterestFailedException(end.error)
+          }
+        }
+        .collect { emit(it) }
     }
   }
 
@@ -520,7 +898,11 @@ class RemoteKetch internal constructor(
     Exception("Server requires authentication")
 
   companion object {
+    /** How often every downloading task's progress updates unless set otherwise. */
+    val DEFAULT_PROGRESS_INTERVAL: Duration = 1.seconds
+
     private const val INITIAL_RECONNECT_DELAY_MS = 1000L
     private const val MAX_RECONNECT_DELAY_MS = 30_000L
+    private const val SUBSCRIPTION_DEBOUNCE_MS = 50L
   }
 }

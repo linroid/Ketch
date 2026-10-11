@@ -2,6 +2,7 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -201,7 +202,7 @@ class ConnectionGridModel(
   private fun samples(source: ConnectionSource, limit: Int): Flow<DeviceSample> = flow {
     var failures = 0
     val stream = flow<DeviceSample> {
-      source.api.activeConnections(limit).collect { emit(DeviceSample.Data(it)) }
+      source.api.subscribe(Interest.Connections(limit)).collect { emit(DeviceSample.Data(it)) }
       throw StreamEnded()
     }
     emitAll(

@@ -13,3 +13,10 @@ internal actual fun resolveChildFolder(
 ): String = (directory.toPath() / folderName).toString()
 
 internal actual fun isContentUri(directory: String): Boolean = false
+
+internal actual fun createPartialDocument(
+  directory: String,
+  fileName: String,
+): CreatedDocument? = null
+
+internal actual fun finishPartialDocument(partial: String): String? = null

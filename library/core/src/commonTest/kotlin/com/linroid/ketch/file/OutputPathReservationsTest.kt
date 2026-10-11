@@ -24,6 +24,27 @@ class OutputPathReservationsTest {
   }
 
   @Test
+  fun reserveUnique_existingPartialFile_getsNextFreeName() = withFolder { folder ->
+    // A paused download writing file.zip.ketch keeps file.zip taken.
+    platformFileSystem.write(folder / "file.zip.ketch") {}
+
+    val path = OutputPathReservations.reserveUnique("$folder/file.zip")
+
+    assertEquals((folder / "file (1).zip").toString(), path)
+    OutputPathReservations.release(path)
+  }
+
+  @Test
+  fun reserveUnique_nameOfReservedPartialFile_getsNextFreeName() = withFolder { folder ->
+    val first = OutputPathReservations.reserveUnique("$folder/file.zip")
+    val second = OutputPathReservations.reserveUnique("$folder/file.zip.ketch")
+
+    assertEquals((folder / "file.zip (1).ketch").toString(), second)
+    OutputPathReservations.release(first)
+    OutputPathReservations.release(second)
+  }
+
+  @Test
   fun reserveUnique_existingFile_getsNextFreeName() = withFolder { folder ->
     platformFileSystem.write(folder / "file.zip") {}
 

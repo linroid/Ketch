@@ -1457,7 +1457,8 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
       out.println("they change. Each line has an \"event\": snapshot (each task")
       out.println("when watch starts), added, state, progress or removed.")
       out.println("With task IDs it follows those only and exits once each has")
-      out.println("finished: 0 when all completed, 1 otherwise.")
+      out.println("finished: 0 when all completed, 1 otherwise. Progress comes")
+      out.println("every second unless --interval says otherwise.")
     }
   }
   out.println()
@@ -1486,6 +1487,10 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
   }
   if (name == "pause" || name == "resume") {
     out.println("  --all                    Every download it applies to")
+  }
+  if (name == "watch") {
+    out.println("  --interval <duration>    How often progress updates, e.g.")
+    out.println("                           500ms or 5s (default 1s)")
   }
   out.println("  --server <url>           Use the Ketch server at this address;")
   out.println("                           also read from $SERVER_ENV")

@@ -109,7 +109,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   contraseña, o sin proxy, con conexión directa a los hosts que indiques; también para una sola
   descarga ([detalles](docs/proxy.md)).
 - **Pausa y reanudación, incluso tras reiniciar** — Ketch comprueba que el archivo del servidor
-  no haya cambiado antes de continuar y reintenta automáticamente las conexiones fallidas.
+  no haya cambiado antes de continuar y reintenta automáticamente las conexiones fallidas. Hasta
+  que termina, la descarga se guarda como `nombre.ketch`, así un archivo incompleto nunca parece
+  terminado.
 
 ### Todo tipo de enlaces
 
@@ -256,8 +258,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   servidor
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
-- **Archivos incompletos reconocibles** — Usar un nombre temporal durante la descarga y asignar el
-  definitivo al terminar
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
   la cola quede vacía
 - **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle

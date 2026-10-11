@@ -24,6 +24,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -638,7 +639,7 @@ class KetchTorrentControllerTest {
       val received = mutableListOf<TorrentSnapshot?>()
       val done = CompletableDeferred<Unit>()
       launch {
-        ketch.controller.observe(task.taskId).collect { received += it }
+        ketch.subscribe(TorrentInterest(task.taskId)).collect { received += it }
         done.complete(Unit)
       }
       runCurrent()
@@ -649,7 +650,7 @@ class KetchTorrentControllerTest {
 
       assertTrue(done.isCompleted)
       assertNull(received.last())
-      assertEquals(listOf<TorrentSnapshot?>(null), ketch.controller.observe("missing").toList())
+      assertEquals(listOf<TorrentSnapshot?>(null), ketch.subscribe(TorrentInterest("missing")).toList())
     } finally {
       ketch.close()
     }
@@ -662,7 +663,7 @@ class KetchTorrentControllerTest {
     try {
       val task = pausedTask(ketch)
       val received = mutableListOf<TorrentSnapshot?>()
-      val job = launch { ketch.controller.observe(task.taskId).collect { received += it } }
+      val job = launch { ketch.subscribe(TorrentInterest(task.taskId)).collect { received += it } }
       runCurrent()
 
       task.selectFiles(setOf("1"))
@@ -684,17 +685,17 @@ class KetchTorrentControllerTest {
     try {
       val task = pausedTask(ketch)
       val subscribers = List(16) {
-        launch { ketch.controller.observe(task.taskId).collect() }
+        launch { ketch.subscribe(TorrentInterest(task.taskId)).collect() }
       }
       runCurrent()
 
       failure(TorrentCommandError.RESOURCE_EXHAUSTED) {
-        ketch.controller.observe(task.taskId).first()
+        ketch.subscribe(TorrentInterest(task.taskId)).first()
       }
 
       subscribers.first().cancel()
       runCurrent()
-      assertEquals(task.taskId, ketch.controller.observe(task.taskId).first()?.taskId)
+      assertEquals(task.taskId, ketch.subscribe(TorrentInterest(task.taskId)).first()?.taskId)
       subscribers.forEach { it.cancel() }
     } finally {
       ketch.close()

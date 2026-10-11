@@ -1,5 +1,6 @@
 package com.linroid.ketch.server.api
 
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
@@ -9,6 +10,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
@@ -35,8 +37,10 @@ private const val MAX_CURSOR_LENGTH = 4096
  * `control(TorrentController)`; a server whose instance has none installs no routes, so clients
  * read their absence as no torrent controls. Command failures throw [TorrentCommandException],
  * which the server's status pages answer with the error's wire name ([torrentErrorStatus]).
+ * The deprecated per-torrent event stream follows [TorrentInterest] on [ketch]; clients of the
+ * event stream follow it there.
  */
-internal fun Route.torrentRoutes(controller: TorrentController) {
+internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController) {
   get<Torrents.Capabilities> {
     call.respond(controller.capabilities())
   }
@@ -92,7 +96,7 @@ internal fun Route.torrentRoutes(controller: TorrentController) {
     val taskId = call.parameters["id"]!!
     log.d { "SSE client connected to /api/torrents/$taskId/events" }
     try {
-      controller.observe(taskId)
+      ketch.subscribe(TorrentInterest(taskId))
         .transformWhile { snapshot ->
           emit(snapshot)
           snapshot != null

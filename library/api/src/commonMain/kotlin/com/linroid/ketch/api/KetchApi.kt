@@ -2,7 +2,7 @@ package com.linroid.ketch.api
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flow
+import kotlin.time.Duration
 
 /**
  * Service interface for managing downloads. Both core (in-process)
@@ -13,6 +13,20 @@ interface KetchApi {
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
+  /** Reactive task list updated on any state change. */
+  val tasks: StateFlow<List<DownloadTask>>
+
+  /**
+   * Follows [interest] while the flow is collected, reporting what it names; see the interests
+   * nested in [Interest]. A remote instance asks its server to send updates about every
+   * [interval], the shortest of its callers' winning; an in-process one reports changes as they
+   * happen, and stats every [interval]. Interests an instance does not know fail with
+   * [UnsupportedOperationException] when collected.
+   *
+   * @throws IllegalArgumentException if [interval] is not positive
+   */
+  fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
+
   /**
    * The optional controller this backend offers for [key], or `null` when it offers none. Modules
    * beside this one define controllers and their keys; the in-process engine returns those its
@@ -22,8 +36,13 @@ interface KetchApi {
    */
   fun <T : Any> control(key: ControlKey<T>): T? = null
 
-  /** Reactive task list updated on any state change. */
-  val tasks: StateFlow<List<DownloadTask>>
+  /**
+   * Initialize backend runtime state.
+   *
+   * - Core backend restores persisted tasks.
+   * - Remote backend establishes connection and syncs tasks.
+   */
+  suspend fun start()
 
   /**
    * Create a new download and return the task handle.
@@ -74,14 +93,6 @@ interface KetchApi {
   }
 
   /**
-   * Initialize backend runtime state.
-   *
-   * - Core backend restores persisted tasks.
-   * - Remote backend establishes connection and syncs tasks.
-   */
-  suspend fun start()
-
-  /**
    * Returns a point-in-time status snapshot including
    * configuration, system information, and storage details, and the optional
    * behaviors the instance supports in [KetchStatus.features].
@@ -124,22 +135,6 @@ interface KetchApi {
    */
   suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
-  }
-
-  /**
-   * Live network connections of every task: HTTP requests, FTP transfers, media fetches and
-   * torrent peers, sampled once a second while collected. Emits a snapshot right away, then one
-   * each time something changes (rates, opens, closes), at most once a second.
-   *
-   * Check that [KetchStatus.features] lists [KetchFeatures.ACTIVE_CONNECTIONS] first; without
-   * it, collecting the flow throws [UnsupportedOperationException].
-   *
-   * @param limit the most connections a snapshot holds, in 1..[ActiveConnections.MAX_LIMIT]
-   * @throws IllegalArgumentException if [limit] is out of range
-   */
-  fun activeConnections(limit: Int = ActiveConnections.DEFAULT_LIMIT): Flow<ActiveConnections> {
-    require(limit in 1..ActiveConnections.MAX_LIMIT) { "limit must be in 1..1024" }
-    return flow { throw UnsupportedOperationException("Active connections are not supported") }
   }
 
   /** Release resources (HTTP client, SSE connection, etc.). */

@@ -99,7 +99,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and
   password, or none, skipping the hosts you list; for one download too ([details](docs/proxy.md)).
 - **Pause and resume, even after a restart** — Ketch checks that the file on the server has not
-  changed before it continues, and retries failed connections on its own.
+  changed before it continues, and retries failed connections on its own. Until a download
+  finishes it is saved as `name.ketch`, so an unfinished file never looks complete.
 
 ### Every kind of link
 
@@ -235,8 +236,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Checksums** — Check a download against a hash you provide, or one the server publishes
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
-- **Unfinished files look unfinished** — Downloads are written under a temporary name and get
-  their real name once complete
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
   once the queue is empty
 - **Automation hooks** — Run a command or call a webhook when a download finishes or fails

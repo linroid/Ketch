@@ -4,6 +4,7 @@ import ai.koog.agents.core.tools.ToolRegistry
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
@@ -13,8 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -370,6 +373,9 @@ class KetchMcpServerTest {
   }
 
   private class FakeKetchApi(private val statusDelay: Duration = Duration.ZERO) : KetchApi {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      flow { throw UnsupportedOperationException("Not followed in tests") }
+
     var config = DownloadConfig()
       private set
 

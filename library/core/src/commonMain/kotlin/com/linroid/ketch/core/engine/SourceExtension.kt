@@ -3,6 +3,7 @@ package com.linroid.ketch.core.engine
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
@@ -10,17 +11,26 @@ import com.linroid.ketch.core.task.ControlOutcome
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration
 
 /**
  * What a [DownloadSource] adds to the [com.linroid.ketch.core.Ketch] that runs it beyond
  * downloading, through [DownloadSource.attach]: typed controllers that
- * [com.linroid.ketch.api.KetchApi.control] returns, and hooks into the lifecycle of the tasks.
+ * [com.linroid.ketch.api.KetchApi.control] returns, the interests of its module that
+ * [com.linroid.ketch.api.KetchApi.subscribe] follows, and hooks into the lifecycle of the tasks.
  * Ketch calls the hooks on its own coordination scope; long work belongs in [SourceHost.scope].
  */
 interface SourceExtension {
   /** This extension's controller for [key], or `null` when it offers none. */
   fun <T : Any> control(key: ControlKey<T>): T? = null
+
+  /**
+   * What this extension reports for [interest], about every [interval], or `null` when it does
+   * not know it.
+   */
+  fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T>? = null
 
   /** Called once, when [com.linroid.ketch.core.Ketch.start] has loaded the saved tasks. */
   suspend fun start() {}

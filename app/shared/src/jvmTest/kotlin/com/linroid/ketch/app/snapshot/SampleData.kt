@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
@@ -379,8 +380,13 @@ internal class SampleKetchApi(
     connections = data.connections,
   )
 
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
-    fixedConnections(connections, limit)
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest is Interest.Connections) {
+      fixedConnections(connections, interest.limit) as Flow<T>
+    } else {
+      emptyFlow()
+    }
 
   private val taskList = MutableStateFlow(initial)
 
@@ -464,8 +470,13 @@ internal class SampleDeviceApi(
   private val resolve: (suspend (String) -> ResolvedSource)? = null,
   private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
 ) : KetchApi {
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
-    fixedConnections(connections, limit)
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest is Interest.Connections) {
+      fixedConnections(connections, interest.limit) as Flow<T>
+    } else {
+      emptyFlow()
+    }
 
   override val backendLabel: String = status.name
   override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)

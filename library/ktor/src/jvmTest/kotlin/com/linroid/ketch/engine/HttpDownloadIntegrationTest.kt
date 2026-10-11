@@ -170,6 +170,7 @@ class HttpDownloadIntegrationTest {
       task.cancel()
       assertEquals(DownloadState.Canceled, task.state.value)
       assertTrue(!fixture.output.exists())
+      assertTrue(!fixture.partial.exists())
     }
   }
 
@@ -247,7 +248,7 @@ class HttpDownloadIntegrationTest {
       val task = fixture.start(connections = 1)
       fixture.firstChunk.await()
       task.pause()
-      fixture.output.writeBytes(byteArrayOf(0))
+      fixture.partial.writeBytes(byteArrayOf(0))
       task.resume()
       val state = task.state.first { it.isTerminal }
       assertContentEquals(fixture.content, File(assertIs<DownloadState.Completed>(state).outputPath)
@@ -316,6 +317,9 @@ class HttpDownloadIntegrationTest {
       mode == Mode.STREAMED_PAUSE_FIRST
     private val directory = Files.createTempDirectory("ketch-http-integration-").toFile()
     val output = File(directory, "download.bin")
+
+    /** The file the download writes until it completes. */
+    val partial = File(directory, "download.bin.ketch")
     private val executor = Executors.newCachedThreadPool()
     private val server = HttpServer.create(
       InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0

@@ -113,7 +113,8 @@ internal class KetchTorrentController(
     return snapshotOf(task)
   }
 
-  override fun observe(taskId: String): Flow<TorrentSnapshot?> = channelFlow {
+  /** What [TorrentInterest] reports in process; see there. */
+  fun observe(taskId: String): Flow<TorrentSnapshot?> = channelFlow {
     if (!subscriptions.tryAcquire()) {
       throw TorrentCommandException(
         TorrentCommandError.RESOURCE_EXHAUSTED,

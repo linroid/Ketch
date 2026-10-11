@@ -3,16 +3,20 @@ package com.linroid.ketch.torrent.control
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 /**
  * What a torrent source adds to the Ketch that runs it ([SourceExtension]): the
@@ -40,7 +44,7 @@ internal class TorrentControls(
   private val stops = MutableStateFlow<Map<String, Long>>(emptyMap())
 
   /** The torrent controller of this source's tasks. */
-  val controller: TorrentController = KetchTorrentController(
+  val controller: KetchTorrentController = KetchTorrentController(
     source = source,
     sourceType = sourceType,
     host = host,
@@ -61,6 +65,10 @@ internal class TorrentControls(
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> control(key: ControlKey<T>): T? =
     if (key === TorrentController.Key) controller as T else null
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T>? =
+    if (interest is TorrentInterest) controller.observe(interest.taskId) as Flow<T> else null
 
   override suspend fun start() {
     host.scope.launch { followSeeding() }

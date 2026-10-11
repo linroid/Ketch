@@ -81,9 +81,9 @@ interface KetchApi {
   suspend fun resolveContent(content: ByteArray, fileName: String? = null): ResolvedSource
   suspend fun status(): KetchStatus
   suspend fun updateConfig(config: DownloadConfig)
+  fun <T> subscribe(interest: Interest<T>, interval: Duration = 1.seconds): Flow<T>
   fun close()
-  // ... plus backendLabel, torrents, networkInterfaces(), updateNetworkInterfaces(),
-  // activeConnections()
+  // ... plus backendLabel, control(), networkInterfaces(), updateNetworkInterfaces()
 }
 ```
 
@@ -178,13 +178,32 @@ Older servers send fewer, so
 their tasks report no position and `setConnections(0)` on them throws
 `UnsupportedOperationException`.
 
-`KetchApi.activeConnections(limit)` streams `ActiveConnections` snapshots of every task's live
-network connections (HTTP requests, FTP transfers, media fetches, torrent peers), once a second
-while something changes, on instances listing `ACTIVE_CONNECTIONS`. `limit` (1..1024, default 256)
-caps the connections a snapshot holds; `total` and the rates count all of them. Without the
-feature, collecting it throws `UnsupportedOperationException`. `RemoteKetch` reads it from
-`GET /api/connections/events`, refusing servers without the feature before asking; its flow ends
-with the failure when the connection drops, so collect it again to resume.
+`KetchApi.subscribe(interest, interval)` follows an `Interest` while the flow is collected and
+reports what it names. Interests are serializable, so a remote instance sends its server the
+ones its callers hold and receives only those; `interval` (default 1 s) is how often updates come
+at most, the shortest of the callers' winning. The built-in ones are nested in `Interest`:
+
+- `Interest.Segments(taskIds)`: the named tasks' segments, by task ID, which also update on
+  `DownloadTask.segments`. A remote instance sends a task's lifecycle, state changes and progress
+  anyway, but its segments (one per file for a torrent) only while followed.
+- `Interest.Stats`: `KetchStats`, the totals of the tasks that are downloading.
+- `Interest.Connections(limit)`: `ActiveConnections` snapshots of every task's live network
+  connections (HTTP requests, FTP transfers, media fetches, torrent peers), once a second while
+  something changes, on instances listing `ACTIVE_CONNECTIONS`. `limit` (1..1024, default 256)
+  caps the connections a snapshot holds; `total` and the rates count all of them. Without the
+  feature, collecting it throws `UnsupportedOperationException`.
+
+Modules define their own, such as `TorrentInterest` in `library:torrent-api`; an instance fails
+the interests it does not know with `UnsupportedOperationException` when collected. A flow ends
+when what it follows is gone, as a removed torrent's does after its `null`.
+
+Each interest names its `valueSerializer`, which a server encodes what it reports with, so any
+interest whose type `StreamSerializers` (`library:endpoints`) names reaches a remote instance
+without code of its own on either side. A remote instance's interests other than segments and
+stats end with the failure when the connection drops, so collect them again to resume.
+
+`RemoteKetch(progressInterval = 1.seconds)` sets how often every downloading task's progress
+comes; set `foreground = false` while nothing is shown, and the server sends only state changes.
 
 `KetchApi.control(key)` returns an optional typed controller a backend offers beyond the download
 API, or `null`; `library:api` defines only the `ControlKey` lookup, and the module that defines a
@@ -195,12 +214,13 @@ controller defines its key. `library:api` also holds the file orders every clien
 
 The torrent control contract, with the targets of `library:api`, so browser and remote clients
 use it without linking the torrent engine. `ketch.control(TorrentController)` is a
-`TorrentController`, or `null` without a torrent source: capabilities, a task's snapshot and
-`observe` stream, its files a page at a time (`files`, sorted by `TorrentFileOrder`, which names a
+`TorrentController`, or `null` without a torrent source: capabilities, a task's snapshot, its
+files a page at a time (`files`, sorted by `TorrentFileOrder`, which names a
 `FileOrder`, and optionally descending), and the `select` and `setSeeding` commands, each guarded
 by a `TorrentCommandContext` (an idempotency key and the expected revision). Failures throw
 `TorrentCommandException` with a `TorrentCommandError`. `RemoteKetch` returns one that fails closed
-against servers without `TorrentFeatures.CONTROL`. See the
+against servers without `TorrentFeatures.CONTROL`. A task's snapshots, as they change, come from
+`subscribe(TorrentInterest(taskId))`. See the
 [control contract](design/torrent-control-contract.md#version-1-runtime).
 
 ### `library:core`
