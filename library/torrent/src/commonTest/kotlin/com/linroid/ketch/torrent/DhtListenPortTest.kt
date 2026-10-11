@@ -1,11 +1,13 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -39,10 +41,26 @@ class DhtListenPortTest {
     }
   }
 
-  /** A port no listener holds; the system picks it, and it is free again once closed. */
+  /**
+   * A port no TCP listener holds, from below every system's ephemeral range (Linux starts at
+   * 32768, macOS and Windows at 49152). A port the system hands out for port 0 is free for TCP
+   * only, and any UDP socket bound to port 0 meanwhile, by another test or process, may get it,
+   * which leaves DHT on another port. UDP is not probed: a closed UDP socket frees its port only
+   * once its selector gets to it, so the probe itself would hold the port the engine wants.
+   */
   private suspend fun freePort(network: TorrentNetwork): Int {
-    val listener = network.listen(PeerEndpoint("0.0.0.0", 0))
-    return listener.local.port.also { listener.close() }
+    repeat(100) {
+      val port = Random.nextInt(20_000, 32_000)
+      try {
+        network.listen(PeerEndpoint("0.0.0.0", port)).close()
+        return port
+      } catch (e: CancellationException) {
+        throw e
+      } catch (_: Exception) {
+        // Taken, or reserved by the system: try another.
+      }
+    }
+    error("No free TCP port")
   }
 
   /** Starts the engine's DHT through a public magnet lookup that finds no peers. */
