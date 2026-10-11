@@ -170,37 +170,55 @@ class TaskListModelTest {
 
   @Test
   fun view_heldOrderWithNothingElseChanging_resortsOnceTheIntervalPasses() = runTest {
-    val running = task("a", downloading(10))
-    val model = model(listOf(source(listOf(running, task("b", completed("b"))))))
+    val ahead = task("a", downloading(900))
+    val behind = task("b", downloading(100))
+    val model = model(listOf(source(listOf(ahead, behind))))
 
     advanceTimeBy(300)
-    running.state.value = completed("a")
+    ahead.state.value = downloading(100)
+    behind.state.value = downloading(900)
     advanceTimeBy(300)
     val held = model.view.value
     advanceTimeBy(3_000)
     val resorted = model.view.value
 
-    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title }.load())
-    assertEquals(listOf("Added today"), resorted.groups.map { it.title }.load())
-    assertEquals(listOf("a", "b"), resorted.keys.map { it.taskId })
+    assertEquals(listOf("a", "b"), held.keys.map { it.taskId })
+    assertEquals(listOf("b", "a"), resorted.keys.map { it.taskId })
   }
 
   @Test
   fun view_frozen_holdsOrderUntilReleased() = runTest {
-    val running = task("a", downloading(10))
+    val ahead = task("a", downloading(900))
+    val behind = task("b", downloading(100))
     val frozen = MutableStateFlow(true)
-    val model = model(listOf(source(listOf(running, task("b", completed("b"))))), frozen = frozen)
+    val model = model(listOf(source(listOf(ahead, behind))), frozen = frozen)
 
     advanceTimeBy(300)
-    running.state.value = completed("a")
+    ahead.state.value = downloading(100)
+    behind.state.value = downloading(900)
     advanceTimeBy(5_000)
     val held = model.view.value
     frozen.value = false
     advanceTimeBy(1)
     val released = model.view.value
 
-    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title }.load())
-    assertEquals(listOf("Added today"), released.groups.map { it.title }.load())
+    assertEquals(listOf("a", "b"), held.keys.map { it.taskId })
+    assertEquals(listOf("b", "a"), released.keys.map { it.taskId })
+  }
+
+  @Test
+  fun view_frozen_finishedTaskLeavesDownloadingAtOnce() = runTest {
+    val running = task("a", downloading(10))
+    val model = model(
+      listOf(source(listOf(running, task("b", completed("b"))))),
+      frozen = MutableStateFlow(true),
+    )
+
+    advanceTimeBy(300)
+    running.state.value = completed("a")
+    advanceTimeBy(300)
+
+    assertEquals(listOf("Added today"), model.view.value.groups.map { it.title }.load())
   }
 
   @Test
