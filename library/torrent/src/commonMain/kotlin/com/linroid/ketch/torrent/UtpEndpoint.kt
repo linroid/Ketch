@@ -51,6 +51,7 @@ internal class UtpEndpoint(
   private val clock = TimeSource.Monotonic.markNow()
   private var resets = 0
   private var resetWindow = 0L
+  private var lastReport = 0L
 
   private fun now(): Long = clock.elapsedNow().inWholeMicroseconds
 
@@ -80,6 +81,15 @@ internal class UtpEndpoint(
             if (entry.socket.isFinished && entry.released) finished += key
           }
           finished.forEach { entries.remove(it) }
+          // Every 10 s, how each connection with data to send is doing.
+          if (now - lastReport >= 10_000_000) {
+            lastReport = now
+            for (entry in entries.values) {
+              if (entry.socket.inFlight > 0 || entry.socket.writable == 0) {
+                log.d { "uTP ${entry.remote}: ${entry.socket.describe()}" }
+              }
+            }
+          }
         }
   }
 

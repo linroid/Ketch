@@ -1,5 +1,8 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -87,6 +90,8 @@ class PublicV2IndependentLeecherTest {
         "libtorrent4j ${LibTorrent.libtorrent4jVersion()}")
       val root = Files.createTempDirectory("ketch-public-v2-leecher").toFile()
       val leech = root.resolve("leech").apply { mkdirs() }
+      // uTP runs log at debug, so a stalled run shows what the connection was doing.
+      if (utpOnly) KetchLogger.setLogger(Logger.console(LogLevel.DEBUG))
       val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
         uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
       val manager = SessionManager()
@@ -123,6 +128,7 @@ class PublicV2IndependentLeecherTest {
         assertEquals(0, engine.admittedSessionBytes)
         session
       } finally {
+        KetchLogger.setLogger(Logger.None)
         manager.stop()
         engine.stop()
         assertEquals(0, engine.admittedSessionBytes)

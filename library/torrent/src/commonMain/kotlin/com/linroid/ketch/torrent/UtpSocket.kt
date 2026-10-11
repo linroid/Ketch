@@ -109,6 +109,12 @@ internal class UtpSocket private constructor(
 
   val roundTripMicros: Long get() = rtt
 
+  /** One line of internal state, for logs explaining a stalled connection. */
+  fun describe(): String = "state=$state inFlight=$flightBytes packets=${outgoing.size} " +
+    "window=${window.toInt()} peerWindow=$peerWindow pending=${pending.size} " +
+    "available=${received.size} held=${reorder.size} rtt=${rtt / 1000}ms " +
+    "timeout=${timeout / 1000}ms timeouts=$timeouts ack=$ackNr seq=$seqNr"
+
   /** No more traffic: closed, failed, or every byte acknowledged after both sides finished. */
   val isFinished: Boolean get() = state == State.CLOSED || state == State.FAILED
 

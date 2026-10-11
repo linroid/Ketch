@@ -42,7 +42,7 @@ internal class TorrentUdpPort(
           // Windows reports an ICMP error for an earlier send on the next receive; the socket
           // still works. Only a socket closed, or failing again and again, stops the port.
           if (closed.load() || ++failures > MAX_RECEIVE_FAILURES) throw e
-          log.v { "UDP port ${socket.local} receive failed: ${e.describeWithoutUrls()}" }
+          log.d { "UDP port ${socket.local} receive failed: ${e.describeWithoutUrls()}" }
           delay(10)
           continue
         }
