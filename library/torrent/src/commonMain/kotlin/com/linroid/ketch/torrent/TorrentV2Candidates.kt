@@ -27,7 +27,10 @@ internal data class TorrentV2DialTarget(
   val generation: Long,
   /** Flags a peer advertised for this endpoint, for later transports to choose by. */
   val pexFlags: Int = 0,
-)
+) {
+  /** How far this dial got; its worker writes it, the loop reads it once the dial failed. */
+  val attempt: PeerAttempt = PeerAttempt(incoming = false, mode = mode)
+}
 
 /**
  * The endpoints a v2 session may dial, owned by its loop. Endpoints are deduplicated, retried
@@ -65,6 +68,9 @@ internal class TorrentV2Candidates(
   private var resetGeneration = 0L
   private var queued = 0
   private var dialing = 0
+
+  /** The BEP 11 flags peer exchange advertised for [endpoint], 0 when none did. */
+  fun flagsOf(endpoint: PeerEndpoint): Int = flags[endpoint]
 
   /** Endpoints waiting to be dialed now or after a backoff; for logs. */
   val pendingCount: Int get() = queued + waiting.size

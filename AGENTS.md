@@ -1122,9 +1122,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Logger.combine`); Settings → About opens the folder (desktop) or shares a copy (phones)
 - The desktop app logs uncaught exceptions on any thread there, and quits with status 1 when
   `application {}` fails, rather than linger without a window holding the single-instance lock
-- `Ketch` logs every task state transition; torrent swarms log a debug summary every 30s, v1
-  swarms with how their peer connections ended (`PeerDiagnostics`, `PeerOutcome`), at info
-  when they run out of peers; `PeerSurveyTest` (`KETCH_TORRENT_SURVEY`) measures public swarms
+- `Ketch` logs every task state transition; torrent swarms (v1 `TorrentSwarm`, v2/hybrid
+  `TorrentV2SessionLoop`) log a debug summary every 30s with how their peer connections ended
+  (`PeerDiagnostics`, `PeerOutcome`), at info when they run out of peers; `PeerSurveyTest`
+  (`KETCH_TORRENT_SURVEY`, `KETCH_TORRENT_SURVEY_WIRE`) measures public swarms
 - See [logging](docs/logging.md) for the format, troubleshooting and sensitive-data rules
 - `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging
 - `Logger` interface accepts `String` messages; lazy evaluation handled by `KetchLogger`

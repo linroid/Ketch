@@ -10,9 +10,11 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.channels.SendChannel
@@ -63,6 +65,8 @@ internal class TorrentV2Runtime(
   val dhtPortFor: (PeerEndpoint) -> Int = { 0 },
   /** A DHT node a peer named with `PORT`; must return at once. */
   val onDhtNode: (PeerEndpoint) -> Unit = {},
+  /** Test hook: hears how each peer connection of the session ended, for diagnostics. */
+  val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
 )
 
 /** Per-owner limits and the discovery it runs while transferring. */
@@ -549,6 +553,9 @@ internal class TorrentV2DownloadSession private constructor(
     val loopControls = Channel<TorrentV2SessionLoop.Control>(CONTROL_CAPACITY)
     val dial = Channel<TorrentV2DialTarget>(DIAL_QUEUE)
     val failures = dialFailures(maxPeers)
+    // Diagnostics only: under a burst of failing incoming peers the oldest are not counted.
+    val incomingFailures =
+      Channel<PeerAttemptFailure>(INCOMING_FAILURES, BufferOverflow.DROP_OLDEST)
     controls.store(loopControls)
     room.store(true)
     val discovery = launch {
@@ -574,16 +581,28 @@ internal class TorrentV2DownloadSession private constructor(
               memory, mode = target.mode, allowUpgrade = target.upgrade, extensions = true,
               generation = target.generation,
               // Private and tracker-only torrents never touch the DHT (BEP 27).
-              dht = !restricted && runtime.dhtPortFor(target.endpoint) > 0)
+              dht = !restricted && runtime.dhtPortFor(target.endpoint) > 0,
+              attempt = target.attempt)
           },
           incoming = incoming,
           respondParallelism = RESPOND_WORKERS,
           respond = { peer ->
             // The pool filled while the peer waited: it is closed unanswered.
             if (!room.load()) null else {
-              PeerV2Connector.respond(peer.connection, document, layout, peerId, buffers, memory,
-                extensions = true, generation = peer.generation,
-                dht = !restricted && runtime.dhtPortFor(peer.connection.remote) > 0)
+              val attempt = PeerAttempt(incoming = true)
+              try {
+                PeerV2Connector.respond(peer.connection, document, layout, peerId, buffers,
+                  memory, extensions = true, generation = peer.generation,
+                  dht = !restricted && runtime.dhtPortFor(peer.connection.remote) > 0,
+                  attempt = attempt)
+              } catch (error: Exception) {
+                // A handshake deadline counts; the transfer stopping does not.
+                if (error !is CancellationException || error is TimeoutCancellationException) {
+                  incomingFailures.trySend(
+                    PeerAttemptFailure(peer.connection.remote, attempt, error))
+                }
+                throw error
+              }
             }
           },
           failures = failures,
@@ -610,7 +629,8 @@ internal class TorrentV2DownloadSession private constructor(
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
-                  onRoom = room::store, onIncomplete = ::incomplete))
+                  onRoom = room::store, onIncomplete = ::incomplete,
+                  incomingFailures = incomingFailures))
             }
           }
         }
@@ -633,6 +653,7 @@ internal class TorrentV2DownloadSession private constructor(
           discovered.cancel()
           dial.cancel()
           failures.cancel()
+          incomingFailures.cancel()
         }
       }
     }
@@ -676,6 +697,8 @@ internal class TorrentV2DownloadSession private constructor(
     const val DIAL_QUEUE = 4
     const val DIAL_WORKERS = 4
     private const val RESPOND_WORKERS = 4
+    /** Incoming handshake failures queued for the loop's diagnostics between its passes. */
+    private const val INCOMING_FAILURES = 64
 
     /**
      * The queue dial workers report failures to. The loop counts every target it queues until

@@ -75,15 +75,20 @@ val ketch = Ketch(
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
   newly discovered and failed peers, corrupt pieces, upload slots, interested peers and
   uploaded bytes; v2 and hybrid swarms also count incoming peers, a hybrid's v1 peers, hash
-  requests served and rejected, and candidates being dialed. A v1 swarm's summary ends with how
-  its peer connections ended, each dialed endpoint counted once by the furthest it got
+  requests served and rejected, and candidates being dialed. Every swarm's summary (v1, v2 and
+  hybrid) ends with how its peer connections ended, each dialed endpoint counted once by the
+  furthest it got
   (`refused`, `connectTimeout`, `unreachable`, `connectFailed`, then `handshakeRejected`,
   `handshakeTimeout`, `handshakeClosed`, then `connected` and `received` for peers that sent
   payload), the same for incoming connections, how many connected peers negotiated protocol
-  encryption, and how many dialed endpoints peers advertised as
+  encryption and how many ran over uTP, and how many dialed endpoints peers advertised as
   supporting uTP or preferring encryption, and how many of those failed. `handshakeClosed` is a
   peer that accepted the connection and closed it on the plaintext handshake, as peers requiring
-  encryption do. A swarm that runs out of peers logs this at info
+  encryption do. A v2 or hybrid swarm also counts peers it closed right after their handshake: a
+  peer of another torrent or a banned one as `handshakeRejected`, a duplicate as `connected`. A
+  swarm that runs out of peers logs this at info; a v2 or hybrid swarm, which keeps waiting for
+  discovery, logs it each time every peer it tried is gone and none is left to dial, at most once
+  per 30 seconds
 
 ### Verbose Level (For Detailed Diagnostics)
 - Speed limiter waits
@@ -138,7 +143,7 @@ dialed in, `v1` peers on the v1 protocol, which get no hashes):
 
 ```
 [INFO] [TorrentSession] Seeding taskId=51d0 (v2 3991fc2074c5): upload=SEED_AFTER_COMPLETION
-[DEBUG] [TorrentSwarm] V2 swarm taskId=51d0 (3991fc2074c5): pieces 524/524, peers=2 (in=1, v1=1) uploadSlots=2/4 interestedPeers=2 uploaded=7340032 hashServed=3 hashRejected=0 candidates=4 dialing=0 unchoked=0, pendingCommits=0
+[DEBUG] [TorrentSwarm] V2 swarm taskId=51d0 (3991fc2074c5): pieces 524/524, peers=2 (in=1, v1=1) uploadSlots=2/4 interestedPeers=2 uploaded=7340032 hashServed=3 hashRejected=0 candidates=4 dialing=0 unchoked=0, pendingCommits=0; dialed 9 [refused=3 connectTimeout=4 connected=1 received=1], incoming [connected=1], encrypted 1, utp 0, pex flags utp=2 (failed 2) encryption=3 (failed 3)
 ```
 
 ## Troubleshooting

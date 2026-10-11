@@ -60,6 +60,8 @@ internal class TorrentV2Swarm(
    * uploads as the policy allows while downloading, until [onCompleted] runs once more.
    */
   val onIncomplete: suspend () -> Unit = {},
+  /** Handshakes of peers that dialed us which failed, for the loop's peer diagnostics. */
+  val incomingFailures: ReceiveChannel<PeerAttemptFailure>? = null,
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -94,6 +96,7 @@ internal object TorrentV2SessionLoop {
     data class Controlled(val value: ChannelResult<Control>) : Event
     data class Served(val value: ChannelResult<TorrentV2ServeWorker.Result>) : Event
     data object Retry : Event
+    data class IncomingFailed(val value: ChannelResult<PeerAttemptFailure>) : Event
 
     /** The commit worker or the pool closed its queue, which they only do as the loop stops. */
     data class Stopped(val cause: Throwable?) : Event
@@ -103,7 +106,19 @@ internal object TorrentV2SessionLoop {
    * A swarm peer from attach until it closes. Its [peerId] is only what it claims; [host], where
    * its connection came from or went to, is what bans and learned endpoints are tied to.
    */
-  private class Member(val peerId: ByteString, val host: String, val order: Long) {
+  private class Member(
+    val peerId: ByteString,
+    val host: String,
+    val order: Long,
+    /** Where we dialed it, or where it dialed us from; what diagnostics key it by. */
+    val endpoint: PeerEndpoint,
+    /** It dialed us. */
+    val incoming: Boolean,
+    /** Its connection, connected since attach, and the payload it brought. */
+    val attempt: PeerAttempt,
+    /** The BEP 11 flags peer exchange advertised for a dialed [endpoint]. */
+    val flags: Int,
+  ) {
     /** Where the peer listens, when known; always on [host]. */
     var listen: PeerEndpoint? = null
     /** [listen] is an endpoint we dialed, so it returns to the candidates when this closes. */
@@ -168,6 +183,9 @@ internal object TorrentV2SessionLoop {
     var uploader: TorrentV2Uploader? = null
     val peers = linkedMapOf<PeerV2Pool.Peer, TorrentV2PeerView>()
     val resets = mutableListOf<PendingReset>()
+    val members = linkedMapOf<PeerV2Pool.Peer, Member>()
+    // How each connection of a swarm ended: the same report v1 swarms log.
+    val diagnostics = swarm?.let { PeerDiagnostics(listener = it.runtime.peerOutcomes) }
     try {
       val pieces = checkNotNull(TorrentV2PieceScheduler.create(layout, selectedIds,
         store.verifiedPieces(), buffers, state, maxActive)) { "Piece scheduler budget exhausted" }
@@ -190,7 +208,6 @@ internal object TorrentV2SessionLoop {
       val extensions = swarm?.let { TorrentV2Extensions(it, checkNotNull(book), nowMs) }
       val hashes = swarm?.let { TorrentV2HashRequests(layout, it) }
       val pieceCount = layout.pieceCount.toInt()
-      val members = linkedMapOf<PeerV2Pool.Peer, Member>()
       val byPeerId = mutableMapOf<PeerKey, PeerV2Pool.Peer>()
       val stopping = mutableSetOf<PeerV2Pool.Peer>()
       var limit = swarm?.connectionLimit()?.coerceIn(1, maxPeers) ?: maxPeers
@@ -200,6 +217,7 @@ internal object TorrentV2SessionLoop {
       var failuresOpen = swarm != null
       var controlsOpen = swarm != null
       var servingOpen = swarm?.serve != null
+      var incomingFailuresOpen = swarm?.incomingFailures != null
       // Every selected piece is verified; a seed keeps serving peers after that.
       var complete = false
       var seeding = false
@@ -380,6 +398,7 @@ internal object TorrentV2SessionLoop {
               // What crossed the wire: on a v1 route, the canonical block with its padding.
               view.traffic?.received(block.ticket.wire.length)
               view.receivedSinceRechoke += block.ticket.request.length
+              members[peer]?.attempt?.let { it.payload += block.ticket.request.length }
               uploads?.received(peer, block.ticket.request.length)
             }
             pieces.receive(peer.blocks, value.value)
@@ -428,8 +447,22 @@ internal object TorrentV2SessionLoop {
           is PeerV2Origin.Incoming -> origin.remote.host
         }
         if (dialed != null) dialing = (dialing - 1).coerceAtLeast(0)
-        fun refuse(reason: String) {
+        val endpoint = dialed ?: info.link.remote
+        val flags = if (dialed != null) book.flagsOf(dialed) else 0
+        fun attempt(stage: PeerStage) = PeerAttempt(dialed == null, info.mode).also {
+          it.stage = stage
+          it.encrypted = info.link.encrypted
+          it.utp = info.link.utp
+        }
+        // A peer closed at once: a rejected one is of no use, the others completed it.
+        fun record(rejected: Boolean) {
+          val failure = if (rejected) IllegalArgumentException("Peer refused") else null
+          val stage = if (rejected) PeerStage.HANDSHAKING else PeerStage.CONNECTED
+          diagnostics?.record(endpoint, attempt(stage), failure, dialed == null, flags)
+        }
+        fun refuse(reason: String, rejected: Boolean = false) {
           log.v { "V2 peer of $label closed: $reason" }
+          record(rejected)
           if (dialed != null) book.closed(dialed, violation = false, complete = complete)
         }
         // An older generation predates a tracker reset; its candidates are already forgotten.
@@ -437,9 +470,12 @@ internal object TorrentV2SessionLoop {
           log.v { "V2 peer of $label closed: dialed before a reset" }
           return
         }
-        if (connected.route.identity.v2 != layout.infoHash) return refuse("another torrent")
+        if (connected.route.identity.v2 != layout.infoHash) {
+          return refuse("another torrent", rejected = true)
+        }
         if (book.isBanned(host, info.peerId)) {
           log.v { "V2 peer of $label closed: banned" }
+          record(rejected = true)
           if (dialed != null) book.ban(dialed)
           return
         }
@@ -466,6 +502,7 @@ internal object TorrentV2SessionLoop {
               book.closed(dialed, violation = false, complete = complete)
             }
             log.v { "V2 peer of $label closed: already connected" }
+            record(rejected = false)
             return
           }
           if (member.listenDialed) {
@@ -479,7 +516,8 @@ internal object TorrentV2SessionLoop {
         val peer = connected.attach(pool) ?: return refuse("no capacity left")
         // Before the peer hears from us: peers that dial us next see a full pool at once.
         swarm.onRoom(pool.size < limit && pool.remainingCapacity > 0)
-        val member = Member(info.peerId, host, attached++)
+        val member = Member(info.peerId, host, attached++, endpoint, incoming = dialed == null,
+          attempt = attempt(PeerStage.CONNECTED), flags = flags)
         member.listen = dialed ?: learned
         member.listenDialed = member.listen != null
         members[peer] = member
@@ -494,6 +532,7 @@ internal object TorrentV2SessionLoop {
       fun forget(peer: PeerV2Pool.Peer, cause: Throwable?) {
         if (book == null) return
         val member = members.remove(peer) ?: return
+        diagnostics?.record(member.endpoint, member.attempt, cause, member.incoming, member.flags)
         val key = PeerKey(member.host, member.peerId)
         if (byPeerId[key] === peer) byPeerId.remove(key)
         val violation = cause is IllegalArgumentException || member.violation
@@ -584,10 +623,13 @@ internal object TorrentV2SessionLoop {
 
       onProgress()
       var preference = 0
-      val branches = if (swarm == null) 3 else 7
+      val branches = if (swarm == null) 3 else 8
       var acceptingConnections = connections != null
       // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
       var nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
+      // Running out of peers is told once each time it happens, at most once per interval.
+      var reportedOutOfPeers = false
+      var nextOutOfPeersReport = 0L
       while (true) {
         if (swarm == null) {
           if (pieces.completed()) break
@@ -620,11 +662,22 @@ internal object TorrentV2SessionLoop {
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
                 " candidates=${book.pendingCount} dialing=$dialing"
             }
+            val outcomes = diagnostics?.let { "; ${it.summary()}" }.orEmpty()
             "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size}" +
               "$swarmPart unchoked=${peers.values.count { !it.choked }}, pendingCommits=" +
-              "${pieces.pendingCommitCount}"
+              "${pieces.pendingCommitCount}$outcomes"
           }
         }
+        // Every peer tried is gone and nobody is left to dial: an owner waits for discovery to
+        // find more, other sessions fail below.
+        val outOfPeers = !seeding && !complete && pool.size == 0 && dialing == 0 &&
+          book?.hasWork() == false && (diagnostics?.recorded ?: 0) > 0
+        if (diagnostics != null && outOfPeers && !reportedOutOfPeers &&
+          nowMs() >= nextOutOfPeersReport) {
+          nextOutOfPeersReport = nowMs() + SWARM_SUMMARY_INTERVAL_MS
+          log.i { "V2 swarm $label ran out of peers: ${diagnostics.summary()}" }
+        }
+        reportedOutOfPeers = outOfPeers
         check(seeding || pool.size > 0 || pieces.pendingCommitCount > 0 ||
           acceptingConnections && (swarm == null || dialing > 0 || book?.hasWork() == true ||
             discoveryOpen || swarm.waitForPeers)) {
@@ -657,6 +710,10 @@ internal object TorrentV2SessionLoop {
               }
               6 -> if (servingOpen) {
                 checkNotNull(swarm?.serve).results.onReceiveCatching { Event.Served(it) }
+              }
+              7 -> if (incomingFailuresOpen) {
+                checkNotNull(swarm?.incomingFailures)
+                  .onReceiveCatching { Event.IncomingFailed(it) }
               }
             }
           }
@@ -702,6 +759,12 @@ internal object TorrentV2SessionLoop {
               log.v {
                 "V2 dial for $label failed: ${failure.cause.describeWithoutUrls()}"
               }
+              val target = failure.endpoint
+              // A target from before a tracker reset fails without dialing; it says nothing.
+              if (target.generation == checkNotNull(swarm).generation()) {
+                diagnostics?.record(target.endpoint, target.attempt, failure.cause,
+                  incoming = false, flags = target.pexFlags)
+              }
               checkNotNull(book).failed(failure.endpoint, failure.cause, complete)
             }
           }
@@ -743,6 +806,12 @@ internal object TorrentV2SessionLoop {
             wakeAdmission()
           }
           is Event.Retry -> wakeAdmission()
+          is Event.IncomingFailed -> {
+            val ended = event.value.getOrNull()
+            if (ended == null) incomingFailuresOpen = false
+            else diagnostics?.record(ended.endpoint, ended.attempt, ended.failure,
+              incoming = true, flags = 0)
+          }
           is Event.Stopped -> {
             // Cancelling the transfer stops the workers too; whichever is seen first, it is that.
             currentCoroutineContext().ensureActive()
@@ -810,6 +879,13 @@ internal object TorrentV2SessionLoop {
         check(store.completed()) { "Selected store completion does not match session state" }
       }
     } finally {
+      if (diagnostics != null) {
+        drainIncomingFailures(swarm, diagnostics)
+        // Peers still connected when the loop stops count as connected too.
+        for (member in members.values) {
+          diagnostics.record(member.endpoint, member.attempt, null, member.incoming, member.flags)
+        }
+      }
       peers.values.forEach { it.close() }
       resets.forEach { it.done.complete(Unit) }
       uploader?.close()
@@ -817,6 +893,15 @@ internal object TorrentV2SessionLoop {
       scheduler?.close()
       picker?.close()
       lease.close()
+    }
+  }
+
+  /** Records the failed handshakes of peers that dialed us still queued as the loop stops. */
+  private fun drainIncomingFailures(swarm: TorrentV2Swarm?, diagnostics: PeerDiagnostics) {
+    val failures = swarm?.incomingFailures ?: return
+    while (true) {
+      val ended = failures.tryReceive().getOrNull() ?: return
+      diagnostics.record(ended.endpoint, ended.attempt, ended.failure, incoming = true, flags = 0)
     }
   }
 

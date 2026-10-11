@@ -34,10 +34,15 @@ import kotlin.time.Duration.Companion.minutes
  * Measures why public swarms do or do not connect; set `KETCH_TORRENT_SURVEY` to magnets or
  * `.torrent` URLs separated by whitespace (`KETCH_TORRENT_SURVEY_MINUTES` per torrent, default
  * 3; `KETCH_TORRENT_SURVEY_LOG` a level such as `debug` logs to stdout;
- * `KETCH_TORRENT_SURVEY_ENCRYPTION` a [TorrentEncryption], `preferred` by default). Each runs as a real download, then the peers it could not use are probed over uTP (a SYN,
- * answered by peers that speak uTP) and, for those that closed our plaintext handshake, with an
- * MSE/PE opening (96 bytes, answered by peers that speak protocol encryption). The report goes to
- * stdout and `build/reports/torrent-survey.md`. Only v1 peers are recorded.
+ * `KETCH_TORRENT_SURVEY_ENCRYPTION` a [TorrentEncryption], `preferred` by default;
+ * `KETCH_TORRENT_SURVEY_WIRE` `v1` or `v2` counts only peers whose handshake ran on that wire,
+ * every peer by default). Each runs as a real download, then the peers it could not use are
+ * probed over uTP (a SYN, answered by peers that speak uTP) and, for those that closed our
+ * plaintext handshake, with an MSE/PE opening (96 bytes, answered by peers that speak protocol
+ * encryption). The report goes to stdout and `build/reports/torrent-survey.md`. v1 torrents run
+ * as v1 swarms; v2 and hybrid ones (a `.torrent`, or a btih magnet of a hybrid) as v2 sessions,
+ * whose hybrid peers are v1 or v2 by the handshake they ran; incoming peers whose handshake
+ * failed are of no known wire, so a wire filter leaves them out.
  */
 class PeerSurveyTest {
   @Test
@@ -85,9 +90,13 @@ class PeerSurveyTest {
       directory.deleteRecursively()
     }
 
+    val wire = System.getenv("KETCH_TORRENT_SURVEY_WIRE")?.takeIf { it.isNotBlank() }
+      ?.let { PeerIdentityHandshake.Mode.valueOf(it.uppercase()) }
+    val wires = reports.groupingBy { it.mode }.eachCount()
+    val counted = reports.filter { wire == null || it.mode == wire }
     val dialed = LinkedHashMap<PeerEndpoint, PeerOutcomeReport>()
     val incoming = mutableMapOf<PeerOutcome, Int>()
-    for (report in reports) {
+    for (report in counted) {
       if (report.incoming) {
         incoming.merge(report.outcome, 1, Int::plus)
         continue
@@ -106,6 +115,10 @@ class PeerSurveyTest {
     return buildString {
       append("\n## ${target.take(120)}\n\n")
       append("- Encryption: $encryption\n")
+      val v1 = wires[PeerIdentityHandshake.Mode.V1] ?: 0
+      val v2 = wires[PeerIdentityHandshake.Mode.V2] ?: 0
+      append("- Wire: ${wire?.name?.lowercase() ?: "all"} " +
+        "(reports v1=$v1 v2=$v2 unknown=${wires[null] ?: 0})\n")
       append("- Ended as ${ended::class.simpleName}")
       progressOf(ended)?.let { append(", ${it.first} of ${it.second} bytes") }
       append(" after at most $minutes min\n")
@@ -118,10 +131,10 @@ class PeerSurveyTest {
         if (outcome.failed) append(" (uTP answered $answeredUtp)")
         append("\n")
       }
-      append("- Encrypted connections: ${reports.count { !it.outcome.failed && it.encrypted }} " +
-        "of ${reports.count { !it.outcome.failed }}\n")
-      append("- uTP connections: ${reports.count { !it.outcome.failed && it.utp }} " +
-        "of ${reports.count { !it.outcome.failed }}\n")
+      append("- Encrypted connections: ${counted.count { !it.outcome.failed && it.encrypted }} " +
+        "of ${counted.count { !it.outcome.failed }}\n")
+      append("- uTP connections: ${counted.count { !it.outcome.failed && it.utp }} " +
+        "of ${counted.count { !it.outcome.failed }}\n")
       append("- Incoming: ${incoming.entries.joinToString { "${it.key.label}=${it.value}" }
         .ifEmpty { "none" }}\n")
       append("- PEX flags: uTP ${count(dialed.values, PEX_FLAG_UTP)} " +

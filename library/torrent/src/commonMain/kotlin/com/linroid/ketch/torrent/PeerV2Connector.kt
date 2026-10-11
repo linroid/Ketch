@@ -63,6 +63,8 @@ internal object PeerV2Connector {
     generation: Long = 0,
     /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
     dht: Boolean = false,
+    /** Learns how far the dial got and how it was carried, for diagnostics. */
+    attempt: PeerAttempt? = null,
   ): Connected? {
     require(layout.infoHash == document.info.hash) { "Layout belongs to another torrent" }
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
@@ -76,6 +78,7 @@ internal object PeerV2Connector {
       // timeout fires.
       connection = network.connectPeer(remote, document.identity.wireTag(mode), connectTimeoutMs)
       val socket = checkNotNull(connection)
+      attempt?.handshaking(socket)
       val route = PeerIdentityHandshake(document.identity, extensions, dht).initiate(
         socket, mode, peerId, handshakes,
         allowUpgrade = allowUpgrade, expectedPeerId = expectedPeerId)
@@ -107,6 +110,8 @@ internal object PeerV2Connector {
     generation: Long = 0,
     /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
     dht: Boolean = false,
+    /** Learns how the connection was carried, for diagnostics. */
+    attempt: PeerAttempt? = null,
   ): Connected? {
     var admission: TorrentBufferBudget.Lease? = null
     try {
@@ -118,6 +123,7 @@ internal object PeerV2Connector {
         connection.close()
         return null
       }
+      attempt?.handshaking(connection)
       val route = PeerIdentityHandshake(document.identity, extensions, dht).respond(connection,
         peerId, handshakes, allowUpgrade = document.hybrid != null)
       return negotiated(connection, route, PeerV2Origin.Incoming(connection.remote), document,
@@ -127,6 +133,12 @@ internal object PeerV2Connector {
       admission?.close()
       throw error
     }
+  }
+
+  private fun PeerAttempt.handshaking(connection: TorrentConnection) {
+    stage = PeerStage.HANDSHAKING
+    encrypted = connection.encrypted
+    utp = connection.utp
   }
 
   private fun availabilityBytes(layout: TorrentContentLayout): Int =

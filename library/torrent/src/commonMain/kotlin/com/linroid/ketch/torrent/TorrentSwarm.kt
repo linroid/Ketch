@@ -220,7 +220,7 @@ internal class TorrentSwarm(
         attemptedAt[endpoint] = now()
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
-      val attempt = PeerAttempt(incoming)
+      val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
       active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         var listen: PeerEndpoint? = if (incoming) null else endpoint

@@ -92,7 +92,7 @@ internal class KotlinTorrentEngine(
    * loopback connections from a wildcard listener and resets them when it closes.
    */
   private val listenHost: String = WILDCARD_IPV4,
-  /** Test hook: hears how each v1 peer connection of every torrent ended. */
+  /** Test hook: hears how each peer connection of every torrent (v1, v2 or hybrid) ended. */
   private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
   /**
    * Whether this engine may ask the router to forward its listen port at all; whether it does is
@@ -790,7 +790,7 @@ internal class KotlinTorrentEngine(
           uploadPolicy = { uploadPolicy.load() },
           listenPortFor = { advertisedPort.current() }, allowLocalPeers = allowLocalPeers,
           uploadBuffers = exchangeBudgets.uploads, dhtPortFor = ::dhtPortFor,
-          onDhtNode = { dhtIntroductions.trySend(it) }),
+          onDhtNode = { dhtIntroductions.trySend(it) }, peerOutcomes = peerOutcomes),
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,

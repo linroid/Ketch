@@ -11,8 +11,15 @@ internal const val PEX_FLAG_UTP = 0x04
 /** How far one peer connection got: dialing, then the BitTorrent handshake, then connected. */
 internal enum class PeerStage { DIALING, HANDSHAKING, CONNECTED }
 
-/** The stage of one connection and the payload it brought, written by its worker only. */
-internal class PeerAttempt(incoming: Boolean) {
+/**
+ * The stage of one connection and the payload it brought, written by one owner at a time: its
+ * worker, then (in a v2 session) the loop once the peer attached.
+ */
+internal class PeerAttempt(
+  incoming: Boolean,
+  /** The handshake the connection offered or answered; `null` while unknown (incoming). */
+  var mode: PeerIdentityHandshake.Mode? = null,
+) {
   var stage: PeerStage = if (incoming) PeerStage.HANDSHAKING else PeerStage.DIALING
   var payload: Long = 0
   /** The connection negotiated protocol encryption. */
@@ -53,6 +60,18 @@ internal data class PeerOutcomeReport(
   val encrypted: Boolean = false,
   /** The connection ran over uTP. */
   val utp: Boolean = false,
+  /** The handshake it ran, v1 or v2 (a hybrid's v1-swarm peers are v1); `null` when unknown. */
+  val mode: PeerIdentityHandshake.Mode? = null,
+)
+
+/**
+ * A connection that failed before its handshake completed, outside the loop that owns the
+ * diagnostics: a v2 session's responders queue them for its loop.
+ */
+internal class PeerAttemptFailure(
+  val endpoint: PeerEndpoint,
+  val attempt: PeerAttempt,
+  val failure: Throwable,
 )
 
 /**
@@ -88,7 +107,8 @@ private fun Throwable.mentions(vararg words: String): Boolean =
   }
 
 /**
- * Each endpoint's best outcome and the flags advertised for it, owned by the swarm's loop. It
+ * Each endpoint's best outcome and the flags advertised for it, owned by a v1 swarm's loop or a
+ * v2 session's loop (`TorrentSwarm`, `TorrentV2SessionLoop`), never shared between threads. It
  * explains a swarm that finds peers but cannot use them: refused or timed out dials point at
  * peers behind NAT, closed handshakes at peers requiring encryption, and the uTP flag at peers
  * reachable another way.
@@ -103,12 +123,16 @@ internal class PeerDiagnostics(
   private var encrypted = 0
   /** Connections, either way, that completed the BitTorrent handshake over uTP. */
   private var overUtp = 0
+  /** Connections recorded so far, either way. */
+  var recorded: Int = 0
+    private set
 
   fun record(endpoint: PeerEndpoint, attempt: PeerAttempt, failure: Throwable?, incoming: Boolean,
     flags: Int) {
     val outcome = classifyPeerOutcome(attempt, failure) ?: return
+    recorded++
     listener(PeerOutcomeReport(endpoint, outcome, incoming, flags, attempt.encrypted,
-      attempt.utp))
+      attempt.utp, attempt.mode))
     if (!outcome.failed && attempt.encrypted) encrypted++
     if (!outcome.failed && attempt.utp) overUtp++
     if (incoming) {

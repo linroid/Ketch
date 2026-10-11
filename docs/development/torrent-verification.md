@@ -41,14 +41,20 @@ Network restrictions on trackers, DHT bootstrap or peers fail the test rather th
 
 `PeerSurveyTest` measures why public swarms do or do not connect. It runs each magnet or
 `.torrent` URL in `KETCH_TORRENT_SURVEY` (separated by whitespace) as a download for
-`KETCH_TORRENT_SURVEY_MINUTES` (default 3), records how every v1 peer connection ended, then
+`KETCH_TORRENT_SURVEY_MINUTES` (default 3), records how every peer connection ended, then
 probes the peers it could not use: a uTP SYN (answered by peers speaking uTP) and, for peers that
 closed the plaintext handshake, a 96-byte MSE/PE opening (answered by peers speaking protocol
-encryption). It writes `library/torrent/build/reports/torrent-survey.md` and is excluded unless
-the variable is set:
+encryption). v1 torrents run as v1 swarms and v2 or hybrid ones (a `.torrent`, or the btih magnet
+of a hybrid) as v2 sessions, which record the same outcomes. The report counts the reports per
+wire; `KETCH_TORRENT_SURVEY_WIRE=v1` or `v2` keeps only peers whose handshake ran on that wire,
+such as a hybrid's v1-swarm peers (incoming peers whose handshake failed have no known wire).
+It writes `library/torrent/build/reports/torrent-survey.md` and is excluded unless the variable
+is set:
 
 ```sh
 KETCH_TORRENT_SURVEY='magnet:?xt=urn:btih:…' ./gradlew :library:torrent:jvmTest --tests '*PeerSurveyTest'
+KETCH_TORRENT_SURVEY='https://example.org/hybrid.torrent' KETCH_TORRENT_SURVEY_WIRE=v2 \
+  ./gradlew :library:torrent:jvmTest --tests '*PeerSurveyTest'
 ```
 
 CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Windows jobs exercise
