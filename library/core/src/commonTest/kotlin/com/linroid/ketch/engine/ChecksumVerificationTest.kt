@@ -79,7 +79,9 @@ class ChecksumVerificationTest {
       assertEquals(wrong.value, error.expected)
       assertEquals(sha256.value, error.actual)
       assertFalse(error.published)
+      // Checked before the move, so neither the final name nor the partial file holds it.
       assertFalse(platformFileSystem.exists(output(folder)))
+      assertFalse(platformFileSystem.exists(output(folder, "file.bin.ketch")))
       val segments = store.load(task.taskId)?.segments.orEmpty()
       assertTrue(segments.isNotEmpty() && segments.all { it.downloadedBytes == 0L })
 

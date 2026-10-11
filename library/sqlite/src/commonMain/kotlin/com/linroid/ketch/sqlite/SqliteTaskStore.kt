@@ -68,6 +68,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
         control_json = controlJson,
+        partial_path = record.partialPath,
       )
       queries.update(
         task_id = record.taskId,
@@ -82,6 +83,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
         control_json = controlJson,
+        partial_path = record.partialPath,
       )
     }
   }
@@ -168,6 +170,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
           null
         }
       },
+      partialPath = partial_path,
     )
   }
 }

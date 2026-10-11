@@ -4,7 +4,8 @@ package com.linroid.ketch.torrent
  * One session actor owns assignments; peers and the commit worker retain their separate leases.
  * The wanted pieces follow the selection through [retarget]; unwanted pieces are never begun,
  * requested or committed, and their assemblies go once no request is out for them. Web seeds
- * fetch whole pieces it hands out with [claimWebSeed], kept from peers until [webSeedDone].
+ * fetch runs of whole pieces it hands out with [claimWebSeedRun], each kept from peers until its
+ * [webSeedDone].
  */
 internal class TorrentV2PieceScheduler private constructor(
   private val layout: TorrentContentLayout,
@@ -189,6 +190,48 @@ internal class TorrentV2PieceScheduler private constructor(
     webSeedCursor = index
     version++
     return claim
+  }
+
+  /**
+   * A run of whole pieces for a web seed, each with its buffer reserved: the piece [claimWebSeed]
+   * takes, then the wanted pieces that follow it while nobody fetches them, at most [maxPieces]
+   * and [maxBytes] in all. A run takes no more than its share of the free pieces, split between
+   * the [fetchers] (peers and seeds), and its later pieces only buffers that leave half the budget
+   * free and active slots below the limit, so peers keep pieces to fetch and buffers to fetch them
+   * with. An endgame duplicate is never extended, and the cursor stays on the run's first piece,
+   * so pieces a failed run gives back are fetched next. Empty when there is nothing to fetch.
+   */
+  fun claimWebSeedRun(
+    fetchers: Int,
+    maxPieces: Int = WEB_SEED_RUN_PIECES,
+    maxBytes: Int = WEB_SEED_RUN_BYTES,
+  ): List<WebSeedClaim> {
+    val first = claimWebSeed() ?: return emptyList()
+    // A duplicate of a piece peers assemble: the endgame.
+    if (first.index in assemblies) return listOf(first)
+    val run = mutableListOf(first)
+    val free = verified.indices.count { wanted[it] && !verified[it] && !isBusy(it) }
+    val share = maxOf(1, (free + 1) / maxOf(1, fetchers))
+    var bytes = first.bytes.size
+    var index = first.index + 1
+    while (run.size < minOf(maxPieces, share) && index < verified.size) {
+      if (!wanted[index] || verified[index] || isBusy(index) || activeCount >= maxActive) break
+      val length = layout.v2Piece(index.toLong()).length.toInt()
+      val reserved = length + 512
+      if (bytes + length > maxBytes ||
+        buffers.capacity - buffers.allocated - reserved < buffers.capacity / 2) break
+      val lease = buffers.reserve(reserved) ?: break
+      val claim = try { WebSeedClaim(index, ByteArray(length), lease) } catch (error: Throwable) {
+        lease.close()
+        throw error
+      }
+      webSeeds[index] = 1
+      markBusy(index, true)
+      run += claim
+      bytes += length
+      index++
+    }
+    return run
   }
 
   /** A web seed gave back [index]: [verified] when the store holds it now. */

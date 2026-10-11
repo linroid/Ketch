@@ -204,6 +204,41 @@ class SqliteTaskStoreTest {
     }
   }
 
+  @Test
+  fun migrate_fromVersion6_keepsRowsWritingToTheirOutputPath() = runTest {
+    val dir = Files.createTempDirectory("ketch-sqlite").toFile()
+    try {
+      val path = File(dir, "ketch.db").absolutePath
+      // The schema of version 6, before partial_path existed.
+      JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+        driver.execute(null, VERSION_5_TABLE.replace("completed_at INTEGER", VERSION_6_COLUMNS), 0)
+        driver.execute(
+          null,
+          "INSERT INTO task_records(task_id, request_json, output_path, state, total_bytes) " +
+            "VALUES ('old', '{\"url\":\"https://example.com/a\"}', '/d/a', 'PAUSED', 100)",
+          0
+        )
+        driver.execute(null, "PRAGMA user_version = 6", 0)
+      }
+
+      val driver = DriverFactory(path).createDriver()
+      val records = try {
+        val store = SqliteTaskStore(driver)
+        store.save(record("new").copy(outputPath = "/d/b", partialPath = "/d/b.ketch"))
+        store.loadAll().associateBy { it.taskId }
+      } finally {
+        driver.close()
+      }
+
+      val old = records.getValue("old")
+      assertEquals("/d/a", old.outputPath)
+      assertNull(old.partialPath)
+      assertEquals("/d/b.ketch", records.getValue("new").partialPath)
+    } finally {
+      dir.deleteRecursively()
+    }
+  }
+
   private fun record(taskId: String) = TaskRecord(
     taskId = taskId,
     request = DownloadRequest(url = "https://example.com/$taskId"),
@@ -228,6 +263,9 @@ class SqliteTaskStoreTest {
   ).value ?: 0
 
   private companion object {
+    /** The columns version 6 ends with, replacing version 5's last one. */
+    const val VERSION_6_COLUMNS = "completed_at INTEGER,\n  control_json TEXT"
+
     val VERSION_5_TABLE = """
       CREATE TABLE IF NOT EXISTS task_records (
         task_id TEXT NOT NULL PRIMARY KEY,
