@@ -13,11 +13,13 @@ import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
+import com.linroid.ketch.server.api.streamRoutes
 import com.linroid.ketch.server.api.toErrorResponse
 import com.linroid.ketch.server.api.torrentErrorStatus
 import com.linroid.ketch.server.api.torrentRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
+import com.linroid.ketch.server.stream.EventHub
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import io.ktor.http.ContentType
@@ -119,20 +121,31 @@ import kotlin.coroutines.cancellation.CancellationException
  *   (`?limit=1..1000&cursor=&sort=torrent|name|size|extension|selected&desc=true`)
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
  * - `PUT /api/torrents/{id}/seeding`   — start or stop seeding it, guarded by a revision
- * - `GET /api/torrents/{id}/events`    — SSE: `snapshot` events, then `removed` or `error`
+ * - `GET /api/torrents/{id}/events`    — SSE: `snapshot` events, then `removed` or `error`;
+ *   deprecated, the event stream carries them
  *
  * ### Live connections
  *
- * Served from [KetchApi.activeConnections]; servers listing `net.activeConnections` report
+ * Served from `Interest.Connections`; servers listing `net.activeConnections` report
  * them. Both take `?limit=1..1024` (default 256; `400` `invalid_limit` otherwise), and an engine
  * that does not report connections answers `501` `unsupported`. They carry hosts and peer
  * addresses, which `/api/events` never does.
  * - `GET /api/connections`        — a snapshot of the live connections
  * - `GET /api/connections/events` — SSE: a `snapshot` event right away, then one when the
  *   connections change and every 15 seconds while they do not; an `error` event ends it. At
- *   most 16 streams run at once; more are `429` `too_many_streams`
+ *   most 16 streams run at once; more are `429` `too_many_streams`. Deprecated, the event
+ *   stream carries them
  *
- * ### Events (SSE)
+ * ### Event stream (SSE)
+ *
+ * One stream per client carries the task lifecycle and whatever the `Interest`s of its
+ * subscription ask for, at the intervals they ask; `/api/status` lists `events.stream`. At most
+ * 32 run at once; more are `429` `too_many_streams`. Idle streams send a comment every 15 s.
+ * - `GET /api/stream`                   — SSE: `hello`, `subscribed`, `tasks`, then changes
+ * - `PUT /api/stream/{id}/subscription` — replace its interests: `404` `unknown_stream`, `400`
+ *   `invalid_subscription`
+ *
+ * ### Events (SSE), deprecated: the event stream replaces them
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
@@ -277,6 +290,7 @@ class KetchServer(
   )
   private val throttle = AuthThrottle()
   private val connectionStreams = ConnectionStreams()
+  private val events = EventHub(ketch, scope)
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -494,10 +508,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, destinations, connectionStreams)
+          apiRoutes(ketch, destinations, connectionStreams, events)
         }
       } else {
-        apiRoutes(ketch, destinations, connectionStreams)
+        apiRoutes(ketch, destinations, connectionStreams, events)
       }
       pairing?.let { pairingRoutes(it) }
       healthRoutes { ready }
@@ -530,11 +544,13 @@ private fun Route.apiRoutes(
   ketch: KetchApi,
   destinations: DestinationGuard,
   connectionStreams: ConnectionStreams,
+  events: EventHub,
 ) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
-  ketch.control(TorrentController)?.let { torrentRoutes(it) }
+  ketch.control(TorrentController)?.let { torrentRoutes(ketch, it) }
   connectionRoutes(ketch, connectionStreams)
+  streamRoutes(events)
   eventRoutes(ketch)
 }
 

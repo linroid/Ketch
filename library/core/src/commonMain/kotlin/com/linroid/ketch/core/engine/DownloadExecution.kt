@@ -26,7 +26,12 @@ import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.OutputPathReservations
 import com.linroid.ketch.core.file.createFileAccessor
+import com.linroid.ketch.core.file.createPartialDocument
+import com.linroid.ketch.core.file.finishPartialDocument
 import com.linroid.ketch.core.file.isInsideDirectory
+import com.linroid.ketch.core.file.movePartialToFinal
+import com.linroid.ketch.core.file.partialPathFor
+import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildFolder
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.file.sanitizeFileName
@@ -50,6 +55,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okio.Path.Companion.toPath
 
 /**
  * Encapsulates the execution logic for a single download task.
@@ -136,8 +142,8 @@ internal class DownloadExecution(
     return true
   }
 
-  /** The output path held in [OutputPathReservations] until this execution stops. */
-  private var reservedPath: String? = null
+  /** The output paths held in [OutputPathReservations] until this execution stops. */
+  private val reservedPaths = mutableListOf<String>()
 
   /**
    * Executes a download — either fresh or resumed.
@@ -154,8 +160,8 @@ internal class DownloadExecution(
         executeFresh()
       }
     } finally {
-      reservedPath?.let(OutputPathReservations::release)
-      reservedPath = null
+      reservedPaths.forEach(OutputPathReservations::release)
+      reservedPaths.clear()
     }
   }
 
@@ -271,7 +277,7 @@ internal class DownloadExecution(
 
     val fileName = resolvedUrl.suggestedFileName
       ?: fileNameResolver.resolve(req, resolvedUrl)
-    val outputPath = resolveDestPath(
+    val target = resolveDestPath(
       destination = req.destination,
       // Resolved only when needed: the platform default may need an Android context. Sources
       // that write their own files need a filesystem folder, so a default folder given as a URI,
@@ -282,14 +288,17 @@ internal class DownloadExecution(
       },
       serverFileName = fileName,
       contentType = resolvedUrl.contentType,
+      // A source writing its own files names them itself; nothing is moved when it completes.
+      partial = !source.managesOwnFileIo,
     )
+    val outputPath = target.path
     log.i {
       "Resolved taskId=$taskId: source=${source.type}, totalBytes=$total, " +
         "outputPath=$outputPath"
     }
 
     if (total == 0L && !source.managesOwnFileIo) {
-      completeZeroByteFile(outputPath, source.type)
+      completeZeroByteFile(target, source.type)
       return null
     }
 
@@ -307,6 +316,7 @@ internal class DownloadExecution(
     handle.record.update {
       it.copy(
         outputPath = outputPath,
+        partialPath = target.partial,
         state = TaskState.DOWNLOADING,
         totalBytes = total,
         sourceType = source.type,
@@ -321,7 +331,7 @@ internal class DownloadExecution(
         updatedAt = now,
       )
     }
-    return Prepared(outputPath, total, resolvedUrl) { ctx -> source.download(ctx) }
+    return Prepared(target, total, resolvedUrl) { ctx -> source.download(ctx) }
   }
 
   /**
@@ -397,6 +407,7 @@ internal class DownloadExecution(
           ?: source.buildResumeState(resolved, resolved.totalBytes),
         totalBytes = resolved.totalBytes,
         outputPath = null,
+        partialPath = null,
         segments = null,
         request = it.request.copy(resolvedSource = resolved),
         updatedAt = now,
@@ -448,7 +459,14 @@ internal class DownloadExecution(
           "No resume state for taskId=${taskRecord.taskId}",
         )
       backfillResolvedSource(source, resumeState)
-      Prepared(outputPath, record.totalBytes, null) { ctx -> source.resume(ctx, resumeState) }
+      // A record without a partial file, as tasks saved before them have, keeps writing to its
+      // output path: its bytes are there, and nothing is moved when it completes.
+      val target = OutputTarget(
+        path = outputPath,
+        partial = record.partialPath.takeUnless { source.managesOwnFileIo },
+        replace = record.request.destination?.isFile() == true,
+      )
+      Prepared(target, record.totalBytes, null) { ctx -> source.resume(ctx, resumeState) }
     }
   }
 
@@ -483,7 +501,7 @@ internal class DownloadExecution(
 
   /** What a download needs once it is prepared under the task's control lock. */
   private class Prepared(
-    val outputPath: String,
+    val target: OutputTarget,
     val total: Long,
     val preResolved: ResolvedSource?,
     val block: suspend (DownloadContext) -> Unit,
@@ -519,7 +537,7 @@ internal class DownloadExecution(
         val accessor = if (selfManagedIo) {
           NoOpFileAccessor
         } else {
-          openFile(prepared.outputPath, dispatchers.io)
+          openFile(prepared.target.writePath, dispatchers.io)
         }
         opened = accessor
         fileAccessor = accessor
@@ -527,12 +545,12 @@ internal class DownloadExecution(
           fileAccessor = accessor,
           totalBytes = prepared.total,
           preResolved = prepared.preResolved,
-          outputPath = prepared.outputPath,
+          outputPath = prepared.target.path,
         )
         context = built
         prepared to built
       }
-      val outputPath = prepared.outputPath
+      val target = prepared.target
       val total = prepared.total
       val fa = ctx.fileAccessor
 
@@ -617,6 +635,7 @@ internal class DownloadExecution(
 
       // Kept current by deliverSelection, so a selection the source took is the size it reports.
       var finalTotal = totalBytes
+      var outputPath = target.path
       if (!selfManagedIo) {
         try {
           fa.flush()
@@ -629,6 +648,9 @@ internal class DownloadExecution(
           if (e is KetchError) throw e
           throw KetchError.Disk(e)
         }
+        // Closed before the move: some systems, such as Windows, cannot move an open file.
+        fa.close()
+        outputPath = moveToFinal(target)
       }
       totalBytes = finalTotal
 
@@ -637,6 +659,8 @@ internal class DownloadExecution(
       handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
+          outputPath = outputPath,
+          partialPath = null,
           totalBytes = finalTotal,
           segments = null,
           downloadTime = finalTime,
@@ -669,11 +693,11 @@ internal class DownloadExecution(
   }
 
   private suspend fun completeZeroByteFile(
-    outputPath: String,
+    target: OutputTarget,
     sourceType: String,
   ) {
     log.i { "Zero-byte file for taskId=$taskId, completing" }
-    val fa = openFile(outputPath, dispatchers.io)
+    val fa = openFile(target.writePath, dispatchers.io)
     try {
       // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
       fa.preallocate(0)
@@ -688,10 +712,12 @@ internal class DownloadExecution(
         log.w(e) { "Failed to close file for taskId=$taskId" }
       }
     }
+    val outputPath = moveToFinal(target)
     val finishedAt = finishTime()
     handle.record.update {
       it.copy(
         outputPath = outputPath,
+        partialPath = null,
         state = TaskState.COMPLETED,
         totalBytes = 0,
         segments = null,
@@ -886,13 +912,16 @@ internal class DownloadExecution(
   }
 
   /**
-   * Picks the output path and reserves it until the execution stops. A file [destination] is
-   * used as it is. Otherwise the name, a [destination] name or else [serverFileName] made safe
-   * with [sanitizeFileName], is joined to the folder, must stay inside it, and gets a ` (n)`
-   * suffix when the file exists or another download reserved the path. The folder is a
+   * Picks the output path and reserves it until the execution stops, along with the partial file
+   * the download writes to until it completes when [partial] asks for one ([OutputTarget]). A
+   * file [destination] is used as it is, and replaced once the download completes. Otherwise
+   * the name, a [destination] name or else [serverFileName] made safe with [sanitizeFileName],
+   * is joined to the folder, must stay inside it, and gets a ` (n)` suffix when the file or its
+   * partial file exists or another download reserved the path. The folder is a
    * [destination] folder; without one, it is the folder of the first of
    * [DownloadConfig.categories] that the name, [contentType] and the URL host match, or else
-   * the default one.
+   * the default one. In an Android content:// folder the partial document is created now, and
+   * stands for the output path until it is renamed ([createPartialDocument]).
    *
    * @throws KetchError.Disk if the name would leave the folder
    */
@@ -901,9 +930,13 @@ internal class DownloadExecution(
     defaultDir: () -> String,
     serverFileName: String,
     contentType: String?,
-  ): String {
+    partial: Boolean,
+  ): OutputTarget {
+    fun partialOf(path: String) =
+      if (partial && !path.contains("://")) partialPathFor(path) else null
     if (destination != null && destination.isFile()) {
-      return destination.value.also(::reserve)
+      val path = destination.value.also(::reserve)
+      return OutputTarget(path, partialOf(path), replace = true)
     }
     val fileName = when {
       destination != null && destination.isName() ->
@@ -915,15 +948,57 @@ internal class DownloadExecution(
         destination.value.trimEnd('/', '\\')
       else -> categoryDirectory(defaultDir(), fileName, contentType)
     }
+    if (directory.contains("://")) {
+      // A content:// document is created now, under a name its provider makes unique.
+      val document = if (partial) createPartialDocument(directory, fileName) else null
+      if (document != null) {
+        return OutputTarget(document.uri, document.uri.takeIf { document.partial }, replace = false)
+      }
+      return OutputTarget(resolveChildPath(directory, fileName), partial = null, replace = false)
+    }
     val outputPath = resolveChildPath(directory, fileName)
-    // A content:// document was just created under a name its provider made unique.
-    if (directory.contains("://")) return outputPath
     if (!isInsideDirectory(directory, outputPath)) {
       throw KetchError.Disk(
         IllegalArgumentException("File name \"$fileName\" leaves the folder $directory"),
       )
     }
-    return OutputPathReservations.reserveUnique(outputPath).also { reservedPath = it }
+    val reserved = OutputPathReservations.reserveUnique(outputPath).also { reservedPaths += it }
+    return OutputTarget(reserved, partialOf(reserved), replace = false)
+  }
+
+  /**
+   * Moves [target]'s finished partial file to its output path ([movePartialToFinal]), or renames
+   * its partial document, and returns where the download is now. A download without a partial
+   * file is where it was written, as is a document its provider failed to rename, which keeps
+   * the partial name rather than failing a finished download.
+   *
+   * @throws KetchError.Disk if the file cannot be moved
+   */
+  private suspend fun moveToFinal(target: OutputTarget): String {
+    val partial = target.partial ?: return target.path
+    return withContext(dispatchers.io) {
+      try {
+        when {
+          partial.contains("://") -> finishPartialDocument(partial) ?: partial.also {
+            log.w { "Finished taskId=$taskId keeps its partial name: it could not be renamed" }
+          }
+          // Nothing to move, as when a source wrote nothing; the output path stays as it is.
+          !platformFileSystem.exists(partial.toPath()) -> {
+            log.w { "No partial file to move for taskId=$taskId" }
+            target.path
+          }
+          else -> movePartialToFinal(partial, target.path, target.replace) { reservedPaths += it }
+            .also { moved ->
+              if (moved != target.path) {
+                log.i { "Output of taskId=$taskId exists, saved as $moved instead" }
+              }
+            }
+        }
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        throw KetchError.Disk(e)
+      }
+    }
   }
 
   /**
@@ -954,7 +1029,17 @@ internal class DownloadExecution(
   private fun reserve(path: String) {
     if (path.contains("://")) return
     OutputPathReservations.reserve(path)
-    reservedPath = path
+    reservedPaths += path
+  }
+
+  /**
+   * Where a download saves: its output [path], and the [partial] file it writes until it
+   * completes and is moved to [path] (`null` to write to [path] itself). An Android content://
+   * partial document is its own [path] until it is renamed. A finished download [replace]s an
+   * existing [path] only when the caller named that file.
+   */
+  private class OutputTarget(val path: String, val partial: String?, val replace: Boolean) {
+    val writePath: String get() = partial ?: path
   }
 
   /**

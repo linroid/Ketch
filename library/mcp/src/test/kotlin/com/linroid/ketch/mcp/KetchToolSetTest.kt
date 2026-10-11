@@ -12,6 +12,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
@@ -34,7 +35,7 @@ import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -50,6 +51,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 class KetchToolSetTest {
@@ -442,8 +444,6 @@ class KetchToolSetTest {
 
     override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
 
-    override fun observe(taskId: String): Flow<TorrentSnapshot?> = emptyFlow()
-
     override suspend fun files(
       taskId: String,
       page: TorrentPageRequest,
@@ -498,6 +498,9 @@ class KetchToolSetTest {
     private val resolved: ResolvedSource? = null,
     private val config: DownloadConfig = DownloadConfig(),
   ) : KetchApi {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      flow { throw UnsupportedOperationException("Not followed in tests") }
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> control(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T? else null

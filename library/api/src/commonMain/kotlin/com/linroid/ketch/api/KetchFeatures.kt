@@ -44,7 +44,7 @@ object KetchFeatures {
    */
   const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
 
-  /** [KetchApi.activeConnections] reports live connections. */
+  /** [Interest.Connections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
   /**

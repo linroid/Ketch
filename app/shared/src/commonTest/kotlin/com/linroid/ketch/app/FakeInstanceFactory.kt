@@ -3,6 +3,7 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
@@ -11,7 +12,10 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlin.time.Duration
 
 /**
  * Builds the [InstanceFactory] of an [InstanceManager] under test, whose remote devices are
@@ -70,6 +74,8 @@ class FakeRemote(
   private val announcedName: String,
   private val announcedOs: String,
 ) : KetchApi {
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+
   /** `host:port` of the device. */
   val deviceId: String = "${config.host}:${config.port}"
 

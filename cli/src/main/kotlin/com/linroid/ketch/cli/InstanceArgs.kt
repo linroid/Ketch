@@ -4,6 +4,8 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
 import java.util.UUID
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** The commands that work on a running instance rather than an engine of their own. */
 internal val INSTANCE_COMMANDS = setOf("add", "list", "pause", "resume", "watch")
@@ -51,7 +53,15 @@ internal sealed interface InstanceCommand {
   ) : InstanceCommand
 
   /** `ketch watch`: prints task changes as JSON lines, of [ids] only when given. */
-  data class Watch(override val target: Target, val ids: List<String>) : InstanceCommand
+  /**
+   * @property interval how often the progress of downloading tasks updates, or `null` for the
+   *   client's default
+   */
+  data class Watch(
+    override val target: Target,
+    val ids: List<String>,
+    val interval: Duration? = null,
+  ) : InstanceCommand
 }
 
 /** The arguments of an attaching command. */
@@ -88,7 +98,12 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   val proxy = ProxyOptions()
   val positional = mutableListOf<String>()
 
-  val valueOptions = if (command == "add") addValueOptions else targetOptions
+  var interval: Duration? = null
+  val valueOptions = when (command) {
+    "add" -> addValueOptions
+    "watch" -> targetOptions + "--interval"
+    else -> targetOptions
+  }
   val flags = when (command) {
     "add" -> setOf("--json", NO_PROXY_OPTION)
     "list" -> setOf("--json")
@@ -120,6 +135,8 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
             ?: return InstanceArgs.Invalid("--connections must be 0 (automatic) or more")
           "--idempotency-key" -> requestId = value.takeIf { it.isNotBlank() }?.let(::requestIdFor)
             ?: return InstanceArgs.Invalid("--idempotency-key must not be empty")
+          "--interval" -> interval = parseInterval(value)
+            ?: return InstanceArgs.Invalid("invalid interval '$value' (e.g. 500ms, 2s)")
           in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
           else -> headers.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
         }
@@ -174,7 +191,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
         InstanceCommand.Resume(target, positional, all)
       }
     }
-    "watch" -> InstanceCommand.Watch(target, positional)
+    "watch" -> InstanceCommand.Watch(target, positional, interval)
     else -> throw IllegalArgumentException("Not an instance command: $command")
   }
   return InstanceArgs.Run(parsed)
@@ -192,3 +209,12 @@ internal fun requestIdFor(key: String): String {
 }
 
 private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
+
+/**
+ * A positive [Duration] such as `500ms`, `2s` or `1m 30s`, or a plain number of seconds; `null`
+ * for anything else.
+ */
+internal fun parseInterval(value: String): Duration? {
+  val interval = Duration.parseOrNull(value) ?: value.toDoubleOrNull()?.seconds
+  return interval?.takeIf { it.isPositive() && it.isFinite() }
+}

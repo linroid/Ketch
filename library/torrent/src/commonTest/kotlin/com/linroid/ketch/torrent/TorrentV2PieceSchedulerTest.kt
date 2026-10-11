@@ -612,4 +612,55 @@ class TorrentV2PieceSchedulerTest {
     scheduler.close()
     assertEquals(0, buffers.allocated)
   }
+
+  @Test
+  fun claimWebSeedRun_extendsOverFreePiecesWithinItsShare() {
+    // Pieces 0 to 7 lie in "a", 8 and 9 in "b".
+    val fixture = TorrentV2Fixture.build(listOf("a" to 8 * 32_768, "b" to 2 * 32_768))
+    val buffers = TorrentBufferBudget(4 * 1024 * 1024)
+    val state = TorrentBufferBudget(1024 * 1024)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(fixture.layout, emptySet(),
+      BooleanArray(10), buffers, state, maxActive = 64))
+    // A peer assembles piece 5: the first run stops before it.
+    assertTrue(scheduler.begin(5))
+    val first = scheduler.claimWebSeedRun(fetchers = 1)
+    assertEquals(listOf(0, 1, 2, 3, 4), first.map { it.index })
+    // Two fetchers share the four free pieces left.
+    val second = scheduler.claimWebSeedRun(fetchers = 2)
+    assertEquals(listOf(6, 7), second.map { it.index })
+    // A run follows the pieces into the next file, up to its limit.
+    val third = scheduler.claimWebSeedRun(fetchers = 1, maxPieces = 1)
+    assertEquals(listOf(8), third.map { it.index })
+    val fourth = scheduler.claimWebSeedRun(fetchers = 1)
+    assertEquals(listOf(9), fourth.map { it.index })
+    // Nothing is free: the endgame duplicate of the peer's piece is never extended.
+    val duplicate = scheduler.claimWebSeedRun(fetchers = 1)
+    assertEquals(listOf(5), duplicate.map { it.index })
+    assertTrue(scheduler.claimWebSeedRun(fetchers = 1).isEmpty())
+    for (claim in first + second + third + fourth + duplicate) {
+      scheduler.webSeedDone(claim.index, verified = claim.index != 3)
+      claim.lease.close()
+    }
+    // A piece given back is free again, alone between verified ones.
+    val again = scheduler.claimWebSeedRun(fetchers = 1)
+    assertEquals(listOf(3), again.map { it.index })
+    again.single().lease.close()
+    scheduler.close()
+    assertEquals(0, buffers.allocated)
+  }
+
+  @Test
+  fun claimWebSeedRun_laterPiecesLeaveHalfTheBuffersFree() {
+    val fixture = TorrentV2Fixture.build(listOf("a" to 8 * 32_768))
+    // Room for eight claims of a piece and its overhead: a run takes four.
+    val buffers = TorrentBufferBudget(8 * (32_768 + 512))
+    val state = TorrentBufferBudget(1024 * 1024)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(fixture.layout, emptySet(),
+      BooleanArray(8), buffers, state, maxActive = 64))
+    val run = scheduler.claimWebSeedRun(fetchers = 1)
+    assertEquals(listOf(0, 1, 2, 3), run.map { it.index })
+    // The next run starts on what is left, then extends no further.
+    assertEquals(listOf(4), scheduler.claimWebSeedRun(fetchers = 1).map { it.index })
+    scheduler.close()
+  }
 }

@@ -54,8 +54,8 @@ private val log = KetchLogger("Seeding")
  * otherwise Seed, while the device can seed (its upload setting allows it, read again as the
  * torrent's activity changes). Nothing on other devices.
  *
- * The task is followed through one [TorrentController.observe] subscription while this shows;
- * commands carry a new idempotency key and the revision of the last snapshot.
+ * The task is followed through one `TorrentInterest` subscription while this shows; commands
+ * carry a new idempotency key and the revision of the last snapshot.
  */
 @Composable
 internal fun SeedingControl(
@@ -71,7 +71,8 @@ internal fun SeedingControl(
   var snapshot by remember(row.key, controller) { mutableStateOf<TorrentSnapshot?>(null) }
   var canSeed by remember(row.key, controller) { mutableStateOf(false) }
   LaunchedEffect(row.key, controller) {
-    catchingUnlessCancelled { controller.observe(row.key.taskId).collect { snapshot = it } }
+    val snapshots = state.torrentSnapshotsOf(row.key) ?: return@LaunchedEffect
+    catchingUnlessCancelled { snapshots.collect { snapshot = it } }
       .onFailure { e ->
         log.d { "Stopped following taskId=${row.key.taskId}: ${e.describeCauses()}" }
       }

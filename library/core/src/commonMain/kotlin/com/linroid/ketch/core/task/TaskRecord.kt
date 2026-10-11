@@ -20,6 +20,11 @@ import kotlin.time.Instant
  *   created before it was tracked, which keep it unknown rather than undercount it
  * @property completedAt when the task last completed; `null` before completion, for records
  *   completed before it was tracked, and while a selection that added files reopens the task
+ * @property partialPath the file an unfinished download writes to until it completes and moves
+ *   it to [outputPath], such as `name.ext.ketch`, or an Android document URI; `null` once it
+ *   completes, and for a download that writes to [outputPath] itself: one whose name leaves no
+ *   room for the suffix, one resumed with a new destination, or one started before partial files
+ *   existed
  * @property control state of typed controls (selection generations, the sharing intent and the
  *   retry ledger of controller commands) that Ketch owns; `null` until the first control change
  */
@@ -39,6 +44,7 @@ data class TaskRecord(
   val updatedAt: Instant,
   val completedAt: Instant? = null,
   val control: TaskControl? = null,
+  val partialPath: String? = null,
 )
 
 /**

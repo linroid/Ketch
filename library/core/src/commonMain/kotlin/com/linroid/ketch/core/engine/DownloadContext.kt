@@ -79,7 +79,11 @@ class DownloadContext(
   val maxConnections: MutableStateFlow<Int> =
     MutableStateFlow(request.connections.coerceAtLeast(0)),
   var pendingResegment: Int = 0,
-  /** Final destination resolved by Ketch, including default directory and deduplication. */
+  /**
+   * Final destination resolved by Ketch, including default directory and deduplication. Sources
+   * writing through [fileAccessor] write its partial file (`name.ext.ketch`) instead, which Ketch
+   * moves here once the download completes.
+   */
   val outputPath: String? = null,
   /** Optional payload speed for sources whose verified progress advances in whole pieces. */
   val reportedSpeed: MutableStateFlow<Long?> = MutableStateFlow(null),

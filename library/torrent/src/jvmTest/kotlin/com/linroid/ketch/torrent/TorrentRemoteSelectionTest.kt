@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
@@ -17,6 +18,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentInterest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.prepareGet
@@ -28,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -44,6 +47,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * File selection and the torrent controller end to end: a daemon ([KetchServer]) runs the real
@@ -215,6 +219,10 @@ class TorrentRemoteSelectionTest {
       val task = daemon.remote.download(DownloadRequest(GatedSeeder.URL,
         destination = Destination(daemon.output.toString()), selectedFileIds = setOf("0"),
         resolvedSource = resolved))
+      // A remote task's segments only come while followed.
+      val following = launch {
+        daemon.remote.subscribe(Interest.Segments(setOf(task.taskId)), 200.milliseconds).collect()
+      }
       eventually("progress") { task.downloaded() > 0 }
       val connections = seeder.accepted.load()
       val before = controller.context(task.taskId, "expand")
@@ -265,7 +273,7 @@ class TorrentRemoteSelectionTest {
       assertFile(daemon.output, torrent, 2)
 
       val final = awaitStage("the final snapshot") {
-        controller.observe(task.taskId).first {
+        daemon.remote.subscribe(TorrentInterest(task.taskId)).first {
           it != null && it.selectionComplete && it.selectionGeneration == 3L
         }.let(::assertNotNull)
       }
@@ -274,6 +282,7 @@ class TorrentRemoteSelectionTest {
       assertEquals(listOf(false, true, true), files.files.map { it.selected })
       daemon.source.assertNoLeaks()
 
+      following.cancel()
       val captured = daemon.capturedEvents()
       assertTrue("state_changed" in captured, captured.take(500))
       assertFalse("metainfo" in captured, "the event stream carried a torrent's metainfo")

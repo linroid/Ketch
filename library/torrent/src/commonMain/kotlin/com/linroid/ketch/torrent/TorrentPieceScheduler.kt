@@ -25,7 +25,8 @@ internal class TorrentPieceScheduler(
   private var version = 0L
   private val rarity = IntArray(wanted.size)
   private val owners = mutableMapOf<Int, MutableSet<Int>>()
-  private val claims = mutableMapOf<Int, Claim>()
+  // A peer's single claim, or the run a web seed fetches.
+  private val claims = mutableMapOf<Int, MutableList<Claim>>()
 
   class Claim(override val index: Int, val lease: TorrentBufferBudget.Lease) : WebSeedPiece {
     override val bytes: ByteArray = ByteArray(lease.bytes)
@@ -66,9 +67,47 @@ internal class TorrentPieceScheduler(
     peer: Int,
     sequential: Boolean = false,
     eligible: (Int) -> Boolean = { true },
-  ): Claim? = mutex.withLock {
+  ): Claim? = mutex.withLock { claimLocked(peer, sequential, eligible) }
+
+  /**
+   * Claims a run for web seed [peer]: the piece a sequential [claim] takes, then the wanted
+   * pieces that follow it while nobody fetches them, at most [maxPieces] and [maxBytes] in all.
+   * A run takes no more than its share of the pieces nobody fetches, split between every peer
+   * and seed, and its later pieces only buffers that leave half the budget free, so peers keep
+   * pieces to fetch and buffers to fetch them with. An endgame duplicate is never extended.
+   */
+  suspend fun claimRun(peer: Int, maxPieces: Int, maxBytes: Int): List<Claim> = mutex.withLock {
+    val first = claimLocked(peer, sequential = true) ?: return@withLock emptyList()
+    val run = checkNotNull(claims[peer])
+    if (checkNotNull(owners[first.index]).size > 1) return@withLock listOf(first)
+    val free = wanted.indices.count {
+      wanted[it] && !verified[it] && owners[it].isNullOrEmpty()
+    }
+    val share = maxOf(1, (free + 1) / maxOf(1, availability.size))
+    var bytes = first.lease.bytes
+    var index = first.index + 1
+    while (run.size < minOf(maxPieces, share) && index < wanted.size) {
+      if (!wanted[index] || verified[index] || !owners[index].isNullOrEmpty()) break
+      val size = pieceSize(index)
+      if (bytes + size > maxBytes ||
+        budget.capacity - budget.allocated - size < budget.capacity / 2) break
+      val lease = budget.reserve(size) ?: break
+      val claim = try { Claim(index, lease) } catch (e: Throwable) { lease.close(); throw e }
+      owners.getOrPut(index) { mutableSetOf() }.add(peer)
+      run += claim
+      bytes += size
+      index++
+    }
+    run.toList()
+  }
+
+  private fun claimLocked(
+    peer: Int,
+    sequential: Boolean,
+    eligible: (Int) -> Boolean = { true },
+  ): Claim? {
     check(peer !in claims)
-    val available = availability[peer] ?: return@withLock null
+    val available = availability[peer] ?: return null
     val candidates = wanted.indices.filter {
       wanted[it] && !verified[it] && available[it] && eligible(it)
     }
@@ -80,12 +119,12 @@ internal class TorrentPieceScheduler(
     }
     val index = (if (sequential) choices.minOrNull()
     else choices.minWithOrNull(compareBy<Int> { rarity[it] }.thenBy { it }))
-      ?: return@withLock null
-    val lease = budget.reserve(pieceSize(index)) ?: return@withLock null
+      ?: return null
+    val lease = budget.reserve(pieceSize(index)) ?: return null
     val claim = try { Claim(index, lease) } catch (e: Throwable) { lease.close(); throw e }
     owners.getOrPut(index) { mutableSetOf() }.add(peer)
-    claims[peer] = claim
-    claim
+    claims[peer] = mutableListOf(claim)
+    return claim
   }
 
   suspend fun isVerified(index: Int): Boolean = mutex.withLock { verified[index] }
@@ -124,18 +163,29 @@ internal class TorrentPieceScheduler(
 
   suspend fun release(peer: Int) = mutex.withLock { releaseLocked(peer) }
 
+  /** Gives back piece [index] of the run [peer] fetches, keeping the rest of it. */
+  suspend fun release(peer: Int, index: Int) = mutex.withLock {
+    val run = claims[peer] ?: return@withLock
+    val claim = run.firstOrNull { it.index == index } ?: return@withLock
+    run.remove(claim)
+    if (run.isEmpty()) claims.remove(peer)
+    releaseClaim(peer, claim)
+  }
+
   suspend fun remove(peer: Int) = mutex.withLock {
     releaseLocked(peer)
     availability.remove(peer)?.forEachIndexed { index, present -> if (present) rarity[index]-- }
   }
 
   private fun releaseLocked(peer: Int) {
-    claims.remove(peer)?.let { claim ->
-      owners[claim.index]?.let { peers ->
-        peers.remove(peer)
-        if (peers.isEmpty()) owners.remove(claim.index)
-      }
-      claim.lease.close()
+    claims.remove(peer)?.forEach { releaseClaim(peer, it) }
+  }
+
+  private fun releaseClaim(peer: Int, claim: Claim) {
+    owners[claim.index]?.let { peers ->
+      peers.remove(peer)
+      if (peers.isEmpty()) owners.remove(claim.index)
     }
+    claim.lease.close()
   }
 }
