@@ -78,6 +78,35 @@ class DhtBootstrapRouterTest {
   }
 
   @Test
+  fun introduce_answeringPeerNode_joinsTheTable_andReservedOnesAreNotAsked() = runTest {
+    val peerNode = PeerEndpoint("8.8.8.8", 6881)
+    val peerId = DhtIdentity.create(numericAddress(peerNode.host)!!)
+    val packets = Channel<TorrentDatagram>(64)
+    val asked = mutableListOf<PeerEndpoint>()
+    val socket = object : TorrentDatagramSocket {
+      override val local = PeerEndpoint("0.0.0.0", 6881)
+      override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) {
+        asked += remote
+        val query = DhtCodec.parse(bytes)
+        val body = mapOf("id" to peerId.toByteArray())
+        packets.send(TorrentDatagram(remote, DhtCodec.response(query.transaction, body, remote)))
+      }
+      override suspend fun receive(): TorrentDatagram = packets.receive()
+      override fun close() { packets.close() }
+    }
+    val node = DhtNode(socket, backgroundScope)
+    node.start()
+    try {
+      assertEquals(false, node.introduce(PeerEndpoint("192.168.1.2", 6881)))
+      assertEquals(true, node.introduce(peerNode))
+      assertEquals(1, node.contactCount())
+      assertEquals(listOf(peerNode), asked)
+    } finally {
+      node.close()
+    }
+  }
+
+  @Test
   fun bootstrap_savedNodeAtReservedAddress_isNotAsked() = runTest {
     val asked = mutableListOf<PeerEndpoint>()
     val socket = object : TorrentDatagramSocket {

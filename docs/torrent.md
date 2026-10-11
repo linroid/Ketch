@@ -119,6 +119,10 @@ including a development run, hands its files to the running app instead of openi
   Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
+- v1 peers of public torrents exchange DHT ports (BEP 5 `PORT`): Ketch sets the DHT bit in its
+  handshake and tells peers that set it where its DHT listens, and pings the nodes peers name, so
+  the DHT starts from a tracker's peers even where no bootstrap router answers. Private and
+  tracker-only torrents do neither
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after

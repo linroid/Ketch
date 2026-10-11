@@ -86,6 +86,13 @@ internal class DhtNode(
     lookup(routing.localId, announcePort = null, peers = false)
   }
 
+  /**
+   * Pings a node a peer named (BEP 5 `PORT`); one that answers with a valid ID joins the routing
+   * table. False when it is not a public address of this family or does not answer.
+   */
+  suspend fun introduce(endpoint: PeerEndpoint): Boolean =
+    validEndpoint(endpoint) && ask(endpoint, "ping", emptyMap()) != null
+
   /** The valid nodes a bootstrap router names near our ID, or none when it does not answer. */
   private suspend fun askRouter(router: PeerEndpoint): List<DhtContact> {
     val address = numericAddress(router.host) ?: return emptyList()

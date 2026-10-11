@@ -71,6 +71,10 @@ internal class TorrentSwarm(
   private val reporter: ConnectionReporter = ConnectionReporter.None,
   /** Hears how each peer connection ended, for diagnostics. */
   private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
+  /** Our DHT port for a peer at that address (BEP 5 `PORT`); 0 when DHT does not run. */
+  private val dhtPortFor: (PeerEndpoint) -> Int = { 0 },
+  /** A DHT node a peer named with `PORT`; must return at once. */
+  private val onDhtNode: (PeerEndpoint) -> Unit = {},
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -510,7 +514,10 @@ internal class TorrentSwarm(
     }
 
     private suspend fun open() {
-      val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
+      // Private and tracker-only torrents never touch the DHT (BEP 27).
+      val dhtPort = if (trackerRestricted) 0 else dhtPortFor(connection.remote)
+      val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true,
+        dht = dhtPort > 0))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
       attempt.stage = PeerStage.CONNECTED
       traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
@@ -527,6 +534,7 @@ internal class TorrentSwarm(
       }
       advertised = store.verifiedPieces()
       wire.send(PeerMessage.Bitfield(pieceBitfield(advertised)))
+      if (dhtPort > 0 && handshake.dht) wire.send(PeerMessage.Port(dhtPort))
       wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
     }
 
@@ -574,6 +582,11 @@ internal class TorrentSwarm(
         is PeerMessage.Cancel ->
           uploads.remove(PeerMessage.Request(message.index, message.begin, message.length))
         is PeerMessage.Extended -> receiveExtension(message)
+        // The peer's own address with its DHT port: a node that can start a DHT whose routers
+        // do not answer.
+        is PeerMessage.Port -> if (!trackerRestricted) {
+          onDhtNode(PeerEndpoint(connection.remote.host, message.port))
+        }
         else -> Unit
       }
     }
