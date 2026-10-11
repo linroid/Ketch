@@ -2,8 +2,10 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -252,7 +254,8 @@ class IndependentSeederTest {
           TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024)).run(peers)
           assertContentEquals(payload, output.readBytes())
         } finally {
-          scope.cancel()
+          // Stopped before its socket closes, which fails rather than cancels its receive.
+          withContext(NonCancellable) { scope.coroutineContext.job.cancelAndJoin() }
           raw.close()
           manager.stop()
           root.deleteRecursively()

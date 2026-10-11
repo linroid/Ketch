@@ -1,11 +1,14 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -39,18 +42,28 @@ class PortMappingTest {
 
   private fun ip(value: String): ByteArray = assertNotNull(numericAddress(value))
 
+  /**
+   * Runs [test] with a network and a scope for the gateways and mappers it starts. A failure in
+   * that scope fails the test rather than reaching the global handler, which fails whichever
+   * test runs then, or ends the process on Native. The scope's coroutines have finished before
+   * the network closes: a socket closed under a running accept or receive throws rather than
+   * cancels, even once the coroutine was asked to stop.
+   */
   private fun gateways(test: suspend CoroutineScope.(TorrentNetwork, CoroutineScope) -> Unit) =
     runTest {
       withContext(Dispatchers.Default) {
         withTimeout(30_000) {
           val network = createTorrentNetwork()
-          val scope = CoroutineScope(Dispatchers.Default)
+          val failures = MutableStateFlow(emptyList<Throwable>())
+          val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, e -> failures.update { it + e } })
           try {
             coroutineScope { test(network, scope) }
           } finally {
-            scope.cancel()
+            withContext(NonCancellable) { scope.coroutineContext.job.cancelAndJoin() }
             network.close()
           }
+          failures.value.firstOrNull()?.let { throw it }
         }
       }
     }
@@ -66,7 +79,8 @@ class PortMappingTest {
     /** Added to UDP mappings only, as a gateway that gives UDP another port. */
     udpOffset: Int = 0,
     refuse: Int = 0,
-    requests: MutableList<Pair<Int, Int>> = mutableListOf(),
+    /** Opcode and lifetime of each mapping request; the test reads it while the gateway runs. */
+    requests: MutableStateFlow<List<Pair<Int, Int>>> = MutableStateFlow(emptyList()),
   ): Int {
     val socket = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
     scope.launch {
@@ -84,7 +98,7 @@ class PortMappingTest {
             val internal = input.readShort().toInt() and 0xffff
             val external = input.readShort().toInt() and 0xffff
             val lifetime = input.readInt()
-            requests += opcode to lifetime
+            requests.update { it + (opcode to lifetime) }
             reply.writeShort(internal)
               .writeShort(if (lifetime == 0) 0 else {
                 // A port asked for that is not the internal one is granted, as a free port is.
@@ -104,7 +118,7 @@ class PortMappingTest {
 
   @Test
   fun natPmp_externalAddressAndMappings() = gateways { network, scope ->
-    val requests = mutableListOf<Pair<Int, Int>>()
+    val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
     val port = natPmpGateway(network, scope, offset = 1000, requests = requests)
     val client = NatPmpClient(network, port)
     val (gateway, external) = assertNotNull(client.discover(listOf(loopback)))
@@ -114,7 +128,7 @@ class PortMappingTest {
     // The gateway picked another external port.
     assertEquals(PortMapping(MappedProtocol.TCP, 6881, 7881, 3600), tcp)
     assertNotNull(client.map(gateway, MappedProtocol.UDP, 6881, 7881, 3600))
-    assertEquals(listOf(2 to 3600, 1 to 3600), requests)
+    assertEquals(listOf(2 to 3600, 1 to 3600), requests.value)
   }
 
   @Test
@@ -268,7 +282,7 @@ class PortMappingTest {
   @Test
   fun mapper_natPmp_mapsBothProtocolsToOneExternalPort_andRemovesThem() =
     gateways { network, scope ->
-      val requests = mutableListOf<Pair<Int, Int>>()
+      val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
       val port = natPmpGateway(network, scope, offset = 100, requests = requests)
       val mapped = MutableStateFlow<Int?>(-1)
       val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
@@ -281,7 +295,7 @@ class PortMappingTest {
       // The gateway gave TCP another port; UDP asked for that same port.
       assertEquals(6981, mapped.first { it != -1 })
       mapper.stop(timeoutMs = stopMs)
-      assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests)
+      assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests.value)
     }
 
   @Test
@@ -310,7 +324,7 @@ class PortMappingTest {
 
   @Test
   fun mapper_natPmpUdpOnAnotherPort_isRemoved() = gateways { network, scope ->
-    val requests = mutableListOf<Pair<Int, Int>>()
+    val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
     val port = natPmpGateway(network, scope, udpOffset = 5, requests = requests)
     val mapped = MutableStateFlow<Int?>(-1)
     val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
@@ -322,12 +336,12 @@ class PortMappingTest {
     assertEquals(6881, mapped.first { it != -1 })
     mapper.stop(timeoutMs = stopMs)
     // TCP, UDP on 6886 then removed; at stop only TCP is left to remove.
-    assertEquals(listOf(2 to 3600, 1 to 3600, 1 to 0, 2 to 0), requests)
+    assertEquals(listOf(2 to 3600, 1 to 3600, 1 to 0, 2 to 0), requests.value)
   }
 
   @Test
   fun mapper_udpBoundLater_isMappedWithoutWaitingForRenewal() = gateways { network, scope ->
-    val requests = mutableListOf<Pair<Int, Int>>()
+    val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
     val port = natPmpGateway(network, scope, requests = requests)
     var udp: Int? = null
     val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { udp },
@@ -337,11 +351,11 @@ class PortMappingTest {
       networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) },
       udpCheckMs = 100)
     mapper.start()
-    withTimeout(5_000) { while (requests.isEmpty()) delay(20) }
-    assertEquals(listOf(2 to 3600), requests.toList())
+    requests.first { it.isNotEmpty() }
+    assertEquals(listOf(2 to 3600), requests.value)
     // DHT binds its socket after the first pass.
     udp = 6881
-    withTimeout(5_000) { while (requests.none { it.first == 1 }) delay(20) }
+    requests.first { list -> list.any { it.first == 1 } }
     mapper.stop(timeoutMs = stopMs)
   }
 
