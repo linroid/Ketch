@@ -47,7 +47,8 @@ closed the plaintext handshake, a 96-byte MSE/PE opening (answered by peers spea
 encryption). v1 torrents run as v1 swarms and v2 or hybrid ones (a `.torrent`, or the btih magnet
 of a hybrid) as v2 sessions, which record the same outcomes. The report counts the reports per
 wire; `KETCH_TORRENT_SURVEY_WIRE=v1` or `v2` keeps only peers whose handshake ran on that wire,
-such as a hybrid's v1-swarm peers (incoming peers whose handshake failed have no known wire).
+such as a hybrid's v1-swarm peers (incoming peers whose handshake failed have no known wire,
+including those the engine refused before they named a torrent).
 It writes `library/torrent/build/reports/torrent-survey.md` and is excluded unless the variable
 is set:
 

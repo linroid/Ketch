@@ -92,7 +92,10 @@ internal class KotlinTorrentEngine(
    * loopback connections from a wildcard listener and resets them when it closes.
    */
   private val listenHost: String = WILDCARD_IPV4,
-  /** Test hook: hears how each peer connection of every torrent (v1, v2 or hybrid) ended. */
+  /**
+   * Test hook: hears how each peer connection of every torrent (v1, v2 or hybrid) ended, and
+   * incoming ones that failed before naming a torrent.
+   */
   private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
   /**
    * Whether this engine may ask the router to forward its listen port at all; whether it does is
@@ -277,26 +280,40 @@ internal class KotlinTorrentEngine(
    */
   internal suspend fun dispatchIncoming(connection: TorrentConnection) {
     var handedOff = false
+    val attempt = PeerAttempt(incoming = true).apply { utp = connection.utp }
     try {
       // MSE/PE first when the peer opens with it, then the BitTorrent handshake.
       val (stream, header) = withTimeout(15_000) {
         val stream = network.accept(connection, incomingTags())
+        attempt.encrypted = stream.encrypted
         stream to stream.readExactly(68)
       }
       val tag = header.copyOfRange(28, 48)
       PeerWire.decodeHandshake(header, InfoHash.fromBytes(tag))
       handedOff = route(tag.toByteString(), PrefixedConnection(stream, header))
       if (!handedOff) log.v { "Refused incoming peer ${connection.remote}: no accepting owner" }
-    } catch (_: TimeoutCancellationException) {
+    } catch (e: TimeoutCancellationException) {
       log.v { "Refused incoming peer ${connection.remote}: no handshake within 15s" }
+      reportUnrouted(connection.remote, attempt, e)
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       // Malformed handshakes and failed reads are isolated to this connection.
       log.v { "Refused incoming peer ${connection.remote}: ${e.describeWithoutUrls()}" }
+      reportUnrouted(connection.remote, attempt, e)
     } finally {
       if (!handedOff) connection.close()
     }
+  }
+
+  /**
+   * An incoming handshake that failed before naming its torrent belongs to no swarm's
+   * diagnostics; only [peerOutcomes] hears it, without a wire.
+   */
+  private fun reportUnrouted(remote: PeerEndpoint, attempt: PeerAttempt, failure: Throwable) {
+    val outcome = classifyPeerOutcome(attempt, failure) ?: return
+    peerOutcomes(PeerOutcomeReport(remote, outcome, incoming = true, flags = 0,
+      encrypted = attempt.encrypted, utp = attempt.utp))
   }
 
   /** Hands [connection] to the owner of [tag] under the engine mutex; true when it took it. */
