@@ -61,17 +61,20 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
         val expectedBytes = part.range?.let { it.last - it.first + 1 }
         val headers = mediaHeaders(context.url, part.url, context.headers)
         observeExchanges(connection, spec) {
-          engine.download(part.url, part.range, headers) { data ->
-            currentCoroutineContext().ensureActive()
-            mediaRequire(expectedBytes == null || data.size <= expectedBytes - received,
-              "Media server returned a different byte range")
-            mediaRequire(data.size <= Long.MAX_VALUE - written, "Media output is too large")
-            context.throttle(data.size)
-            disk { context.fileAccessor.writeAt(written, data) }
-            written += data.size
-            received += data.size
-            connection.received(data.size)
-            context.onProgress(written, 0)
+          context.watchdog.watch { monitor ->
+            engine.download(part.url, part.range, headers) { data ->
+              currentCoroutineContext().ensureActive()
+              monitor.received(data.size)
+              mediaRequire(expectedBytes == null || data.size <= expectedBytes - received,
+                "Media server returned a different byte range")
+              mediaRequire(data.size <= Long.MAX_VALUE - written, "Media output is too large")
+              monitor.throttled { context.throttle(data.size) }
+              disk { context.fileAccessor.writeAt(written, data) }
+              written += data.size
+              received += data.size
+              connection.received(data.size)
+              context.onProgress(written, 0)
+            }
           }
         }
         mediaRequire(received > 0 && (expectedBytes == null || received == expectedBytes),

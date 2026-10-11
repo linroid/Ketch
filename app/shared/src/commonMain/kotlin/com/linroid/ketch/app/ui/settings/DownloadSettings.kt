@@ -33,6 +33,7 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.spanText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
@@ -88,10 +89,18 @@ import ketch.app.shared.generated.resources.settings_downloads_retries_hint
 import ketch.app.shared.generated.resources.settings_downloads_retries_more
 import ketch.app.shared.generated.resources.settings_downloads_retries_never
 import ketch.app.shared.generated.resources.settings_downloads_retries_never_state
+import ketch.app.shared.generated.resources.settings_downloads_retries_unlimited_state
 import ketch.app.shared.generated.resources.settings_downloads_run_at_once
 import ketch.app.shared.generated.resources.settings_downloads_run_at_once_hint
 import ketch.app.shared.generated.resources.settings_downloads_save_to
 import ketch.app.shared.generated.resources.settings_downloads_save_to_row
+import ketch.app.shared.generated.resources.settings_downloads_stall
+import ketch.app.shared.generated.resources.settings_downloads_stall_hint
+import ketch.app.shared.generated.resources.settings_downloads_stall_later
+import ketch.app.shared.generated.resources.settings_downloads_stall_off
+import ketch.app.shared.generated.resources.settings_downloads_stall_off_state
+import ketch.app.shared.generated.resources.settings_downloads_stall_sooner
+import ketch.app.shared.generated.resources.settings_downloads_stall_state
 import ketch.app.shared.generated.resources.settings_downloads_torrents_own_folder
 import ketch.app.shared.generated.resources.settings_downloads_unpin
 import ketch.app.shared.generated.resources.settings_downloads_use_default
@@ -101,6 +110,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Duration.Companion.seconds
 
 private val log = KetchLogger("DownloadSettings")
 
@@ -136,10 +146,15 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
     device !is RemoteInstance || presence.firstOrNull { it.deviceId == device.deviceId }
       ?.status?.let { KetchFeatures.CATEGORY_FOLDERS in it.features } ?: true
   }
+  // Until a remote device reports, it may be older than idle timeouts and ignore them.
+  val dropsStalls = remember(presence, device) {
+    device !is RemoteInstance || presence.firstOrNull { it.deviceId == device.deviceId }
+      ?.status?.let { KetchFeatures.TRANSFER_TIMEOUTS in it.features } ?: false
+  }
   FolderGroup(device, config, onChange)
   CategoryGroup(device, { controller.download ?: config }, sortsIntoFolders, onChange)
   FolderShortcuts(state, device, config)
-  QueueGroup(config, onChange)
+  QueueGroup(config, dropsStalls, onChange)
 }
 
 /** Where [device] saves downloads, with the free space there and ways to change it. */
@@ -402,9 +417,16 @@ private fun FolderShortcutRow(path: String, pinned: Boolean, onToggle: () -> Uni
   }
 }
 
-/** How many downloads run, per device and per server, and how often failures are retried. */
+/**
+ * How many downloads run, per device and per server, and how often failures are retried. With
+ * [dropsStalls], retries can be unlimited and stalled connections are dropped after a while.
+ */
 @Composable
-private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Unit) {
+private fun QueueGroup(
+  config: DownloadConfig,
+  dropsStalls: Boolean,
+  onChange: (DownloadConfig) -> Unit,
+) {
   SettingsGroup(
     title = stringResource(Res.string.settings_downloads_queue),
     footer = stringResource(Res.string.settings_downloads_queue_footer),
@@ -441,23 +463,56 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       more = stringResource(Res.string.settings_downloads_per_server_more),
       onChange = { onChange(config.copy(maxConnectionsPerHost = it)) },
     )
-    val retries = config.retryCount
+    val retries =
+      if (dropsStalls && config.unlimitedRetries) UnlimitedRetries else config.retryCount
+    val retryChoices = (RetryChoices + config.retryCount).distinct().sorted()
     SettingsStepperRow(
       title = stringResource(Res.string.settings_downloads_retries),
       description = stringResource(Res.string.settings_downloads_retries_hint),
       value = retries,
-      values = (RetryChoices + retries).distinct().sorted(),
-      label = countLabel(retries, Res.string.settings_downloads_retries_never),
-      state = if (retries == 0) {
-        stringResource(Res.string.settings_downloads_retries_never_state)
-      } else {
-        pluralStringResource(Res.plurals.settings_downloads_retries_count, retries, retries)
+      values = if (dropsStalls) retryChoices + UnlimitedRetries else retryChoices,
+      label = when (retries) {
+        UnlimitedRetries -> stringResource(Res.string.settings_count_unlimited)
+        else -> countLabel(retries, Res.string.settings_downloads_retries_never)
+      },
+      state = when (retries) {
+        0 -> stringResource(Res.string.settings_downloads_retries_never_state)
+        UnlimitedRetries -> stringResource(Res.string.settings_downloads_retries_unlimited_state)
+        else -> pluralStringResource(Res.plurals.settings_downloads_retries_count, retries, retries)
       },
       fewer = stringResource(Res.string.settings_downloads_retries_fewer),
       more = stringResource(Res.string.settings_downloads_retries_more),
-      onChange = { onChange(config.copy(retryCount = it)) },
+      onChange = {
+        onChange(
+          if (it == UnlimitedRetries) config.copy(unlimitedRetries = true)
+          else config.copy(retryCount = it, unlimitedRetries = false),
+        )
+      },
     )
+    if (dropsStalls) StallRow(config, onChange)
   }
+}
+
+/** How long a connection may receive nothing before it is dropped and retried. */
+@Composable
+private fun StallRow(config: DownloadConfig, onChange: (DownloadConfig) -> Unit) {
+  val seconds = (config.idleTimeoutMs / 1000).toInt()
+  val wait = spanText(seconds.seconds).resolve()
+  SettingsStepperRow(
+    title = stringResource(Res.string.settings_downloads_stall),
+    description = stringResource(Res.string.settings_downloads_stall_hint),
+    value = seconds,
+    values = (StallChoices + seconds).distinct().sorted(),
+    label = if (seconds == 0) stringResource(Res.string.settings_downloads_stall_off) else wait,
+    state = if (seconds == 0) {
+      stringResource(Res.string.settings_downloads_stall_off_state)
+    } else {
+      stringResource(Res.string.settings_downloads_stall_state, wait)
+    },
+    fewer = stringResource(Res.string.settings_downloads_stall_sooner),
+    more = stringResource(Res.string.settings_downloads_stall_later),
+    onChange = { onChange(config.copy(idleTimeoutMs = it * 1000L)) },
+  )
 }
 
 /** [count] as a stepper shows it, or the word [zero] stands for, such as "Unlimited". */
@@ -479,3 +534,9 @@ private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {
 private val RunAtOnceChoices = (1..10).toList() + 0
 private val PerServerChoices = (1..8).toList() + listOf(10, 12, 16, 0)
 private val RetryChoices = (0..10).toList()
+
+/** The Retries stepper's step past the largest count: [DownloadConfig.unlimitedRetries]. */
+private const val UnlimitedRetries = -1
+
+/** Seconds the stalled connections stepper offers; 0 is off. */
+private val StallChoices = listOf(0, 15, 30, 60, 120, 300)

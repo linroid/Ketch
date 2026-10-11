@@ -40,8 +40,12 @@ maxConcurrentDownloads = 4
 maxConnectionsPerHost = 16
 
 # Advanced settings (defaults are usually fine):
-# retryCount = 3
-# retryDelayMs = 1000
+# retryCount = 3  # retries in a row without progress before a download fails
+# unlimitedRetries = false  # true retries until the download is paused
+# retryDelayMs = 1000  # first retry delay, doubled for each further one...
+# maxRetryDelayMs = 60000  # ...up to this, then randomized between half and all of it
+# idleTimeoutMs = 60000  # retry a connection that receives nothing this long; 0 is off
+# minSpeed = 0  # bytes/s a connection must average over 30 s, or it is retried; 0 is off
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192

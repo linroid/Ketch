@@ -92,6 +92,7 @@ internal fun okHttpClient(
     }
   }
   install(HttpTimeout) {
+    connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
     socketTimeoutMillis = Long.MAX_VALUE
     requestTimeoutMillis = Long.MAX_VALUE
   }

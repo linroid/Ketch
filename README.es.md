@@ -256,8 +256,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   servidor
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
-- **Detección de bloqueos y ajustes de reintento** — Reconectar si una conexión deja de enviar datos
-  y elegir tiempos de espera y número de reintentos, incluidos reintentos ilimitados
 - **Archivos incompletos reconocibles** — Usar un nombre temporal durante la descarga y asignar el
   definitivo al terminar
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando

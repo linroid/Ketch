@@ -292,8 +292,12 @@ Selection is runtime-only. SDK instances enable these controls with
 DownloadConfig(
   defaultDirectory = null,        // null = platform default, e.g. ~/Downloads on JVM
   maxConnectionsPerDownload = 4,  // default concurrent segments per task
-  retryCount = 3,                 // automatic retries after a retryable failure
-  retryDelayMs = 1000,            // base delay (exponential backoff)
+  retryCount = 3,                 // retries in a row without progress before failing
+  retryDelayMs = 1000,            // first retry delay, doubled for each further retry
+  unlimitedRetries = false,       // true retries until the task is paused or canceled
+  maxRetryDelayMs = 60_000,       // retry delay cap; each delay is randomized from half to all
+  idleTimeoutMs = 60_000,         // retry a connection that receives no data this long (0 = off)
+  minSpeed = 0,                   // bytes/s a connection must average over 30 s (0 = off)
   progressIntervalMs = 200,       // progress throttle
   saveIntervalMs = 5000,          // how often segment progress is persisted
   bufferSize = 8192,              // FTP read buffer size

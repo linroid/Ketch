@@ -771,8 +771,12 @@ maxConcurrentDownloads = 4
 maxConnectionsPerHost = 16
 
 # Advanced settings (defaults are usually fine):
-# retryCount = 3
-# retryDelayMs = 1000
+# retryCount = 3  # retries in a row without progress before a download fails
+# unlimitedRetries = false  # true retries until the download is paused
+# retryDelayMs = 1000  # first retry delay, doubled for each further one...
+# maxRetryDelayMs = 60000  # ...up to this, then randomized between half and all of it
+# idleTimeoutMs = 60000  # retry a connection that receives nothing this long; 0 is off
+# minSpeed = 0  # bytes/s a connection must average over 30 s, or it is retried; 0 is off
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
@@ -857,8 +861,12 @@ maxConnectionsPerHost = 16
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
 | `maxConcurrentDownloads` | int | `4` | Max simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `16` | Max simultaneous downloads per host (`0` = unlimited) |
-| `retryCount` | int | `3` | Max automatic retries after a retryable failure |
-| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `retryCount` | int | `3` | Max automatic retries in a row, without progress, after a retryable failure |
+| `unlimitedRetries` | bool | `false` | Retry retryable failures until the download is paused |
+| `retryDelayMs` | long | `1000` | Delay before the first retry, doubled for each further one |
+| `maxRetryDelayMs` | long | `60000` | Longest retry delay; each delay is randomized between half and all of it |
+| `idleTimeoutMs` | long | `60000` | Retry a connection that receives no data this long (`0` = off) |
+| `minSpeed` | long | `0` | Bytes per second a connection must average over 30 s, or it is retried (`0` = off) |
 | `progressIntervalMs` | long | `200` | Progress update throttle interval |
 | `saveIntervalMs` | long | `5000` | Segment progress persistence interval |
 | `bufferSize` | int | `8192` | FTP read buffer size in bytes |

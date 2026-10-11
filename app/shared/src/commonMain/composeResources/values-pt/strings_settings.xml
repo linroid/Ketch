@@ -443,6 +443,14 @@
   <string name="settings_downloads_retries_never_state">Nunca tenta novamente</string>
   <string name="settings_downloads_retries_fewer">Menos tentativas</string>
   <string name="settings_downloads_retries_more">Mais tentativas</string>
+  <string name="settings_downloads_retries_unlimited_state">Tenta novamente até pausar</string>
+  <string name="settings_downloads_stall">Conexões travadas</string>
+  <string name="settings_downloads_stall_hint">Tenta novamente uma conexão que não recebe nada por esse tempo.</string>
+  <string name="settings_downloads_stall_off">Desativado</string>
+  <string name="settings_downloads_stall_off_state">Espera nas conexões travadas</string>
+  <string name="settings_downloads_stall_state">Tenta novamente após %1$s sem dados</string>
+  <string name="settings_downloads_stall_sooner">Tentar antes</string>
+  <string name="settings_downloads_stall_later">Esperar mais</string>
 
   <string name="settings_speed_mode_full">Velocidade máxima</string>
   <string name="settings_speed_mode_slow_lane">Modo lento</string>

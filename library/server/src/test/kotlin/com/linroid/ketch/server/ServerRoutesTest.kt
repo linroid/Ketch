@@ -256,6 +256,29 @@ class ServerRoutesTest {
   }
 
   @Test
+  fun `PUT config without timeout and retry fields keeps them`() = testApplication {
+    val set = DownloadConfig(
+      unlimitedRetries = true,
+      maxRetryDelayMs = 5_000,
+      idleTimeoutMs = 20_000,
+      minSpeed = 1_024,
+    )
+    val ketch = createTestKetch(config = set)
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // As a client older than idle timeouts sends it.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"retryCount": 5}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(set.copy(retryCount = 5), ketch.status().config)
+  }
+
+  @Test
   fun `PUT config with categories replaces them`() = testApplication {
     val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
     val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))

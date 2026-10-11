@@ -60,6 +60,11 @@ import kotlinx.coroutines.flow.update
  *   [com.linroid.ketch.api.KetchApi.activeConnections] reports. Sources open a handle when a
  *   transfer starts, count its bytes and close it when the transfer ends, also on failure and
  *   cancellation.
+ * @property watchdog fails transfers that stall, from [DownloadConfig.idleTimeoutMs] and
+ *   [DownloadConfig.minSpeed] of [config]. Sources run each network transfer in
+ *   [TransferWatchdog.watch], reporting received bytes and running [throttle] in the monitor's
+ *   [TransferMonitor.throttled], so a stalled connection fails with a retryable
+ *   [com.linroid.ketch.api.KetchError.Network] instead of hanging.
  */
 class DownloadContext(
   val taskId: String,
@@ -82,6 +87,7 @@ class DownloadContext(
   val selection: StateFlow<SelectionUpdate> =
     MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
   val connections: ConnectionReporter = ConnectionReporter.None,
+  val watchdog: TransferWatchdog = TransferWatchdog.of(config),
 ) {
   private val acknowledged = MutableStateFlow(0)
 

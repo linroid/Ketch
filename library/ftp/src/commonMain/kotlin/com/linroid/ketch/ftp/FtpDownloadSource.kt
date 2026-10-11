@@ -337,55 +337,58 @@ class FtpDownloadSource : DownloadSource {
     var handle = ConnectionHandle.None
 
     try {
-      client.connect()
-      handle = context.connections.open(connectionSpec(ftpUrl))
-      if (ftpUrl.isTls) client.upgradeToTls()
-      client.login(ftpUrl.username, ftpUrl.password)
-      client.setBinaryMode()
+      context.watchdog.watch { monitor ->
+        client.connect()
+        handle = context.connections.open(connectionSpec(ftpUrl))
+        if (ftpUrl.isTls) client.upgradeToTls()
+        client.login(ftpUrl.username, ftpUrl.password)
+        client.setBinaryMode()
 
-      val fileOffset = segment.start + downloadedBytes
+        val fileOffset = segment.start + downloadedBytes
 
-      log.d {
-        "Starting segment ${segment.index}: " +
-          "offset=$fileOffset, " +
-          "remaining=$remaining bytes"
-      }
-
-      client.retrieve(
-        ftpUrl.path,
-        offset = fileOffset,
-      ) { data ->
-        currentCoroutineContext().ensureActive()
-
-        val bytesNeeded = segment.totalBytes - downloadedBytes
-        if (bytesNeeded <= 0) {
-          throw SegmentCompleteException()
+        log.d {
+          "Starting segment ${segment.index}: " +
+            "offset=$fileOffset, " +
+            "remaining=$remaining bytes"
         }
 
-        // Truncate if this chunk would exceed our segment boundary
-        val chunk = if (data.size.toLong() > bytesNeeded) {
-          data.copyOf(bytesNeeded.toInt())
-        } else {
-          data
-        }
+        client.retrieve(
+          ftpUrl.path,
+          offset = fileOffset,
+        ) { data ->
+          currentCoroutineContext().ensureActive()
+          monitor.received(data.size)
 
-        context.throttle(chunk.size)
+          val bytesNeeded = segment.totalBytes - downloadedBytes
+          if (bytesNeeded <= 0) {
+            throw SegmentCompleteException()
+          }
 
-        val writeOffset = segment.start + downloadedBytes
-        try {
-          context.fileAccessor.writeAt(writeOffset, chunk)
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          if (e is KetchError) throw e
-          throw KetchError.Disk(e)
-        }
-        downloadedBytes += chunk.size
-        handle.received(chunk.size)
-        onProgress(downloadedBytes)
+          // Truncate if this chunk would exceed our segment boundary
+          val chunk = if (data.size.toLong() > bytesNeeded) {
+            data.copyOf(bytesNeeded.toInt())
+          } else {
+            data
+          }
 
-        // Stop reading once segment is complete
-        if (downloadedBytes >= segment.totalBytes) {
-          throw SegmentCompleteException()
+          monitor.throttled { context.throttle(chunk.size) }
+
+          val writeOffset = segment.start + downloadedBytes
+          try {
+            context.fileAccessor.writeAt(writeOffset, chunk)
+          } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (e is KetchError) throw e
+            throw KetchError.Disk(e)
+          }
+          downloadedBytes += chunk.size
+          handle.received(chunk.size)
+          onProgress(downloadedBytes)
+
+          // Stop reading once segment is complete
+          if (downloadedBytes >= segment.totalBytes) {
+            throw SegmentCompleteException()
+          }
         }
       }
     } catch (_: SegmentCompleteException) {

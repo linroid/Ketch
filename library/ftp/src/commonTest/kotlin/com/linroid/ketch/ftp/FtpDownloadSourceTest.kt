@@ -7,8 +7,10 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.TransferStalledException
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
@@ -16,6 +18,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -190,6 +193,24 @@ class FtpDownloadSourceTest {
     source.download(context)
 
     assertEquals(listOf(0L, 300L), server.retrieveOffsets)
+    assertContentEquals(server.content, file.bytes)
+  }
+
+  @Test
+  fun download_stalledTransfer_failsAsNetworkErrorAndRetryKeepsProgress() = runTest {
+    val server = FakeFtpServer(content(1000))
+    server.stallNextTransferAfter = 400
+    val file = MemoryFileAccessor()
+    val context = context(file, connections = 1, config = DownloadConfig(idleTimeoutMs = 10_000))
+    val source = source(server)
+
+    val error = assertFailsWith<KetchError.Network> { source.download(context) }
+    assertIs<TransferStalledException>(error.cause)
+    assertTrue(currentTime >= 10_000)
+    assertEquals(400L, context.segments.value.sumOf { it.downloadedBytes })
+    source.download(context)
+
+    assertEquals(listOf(0L, 400L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
   }
 

@@ -24,8 +24,23 @@ import kotlinx.serialization.Serializable
  *   (FTP) support always use a single connection. Sources that do not split files into byte
  *   ranges, such as BitTorrent, ignore this default.
  * @property retryCount Maximum number of automatic retries after a retryable failure
- *   ([KetchError.isRetryable]). Segment progress is kept between attempts.
- * @property retryDelayMs Base delay in milliseconds between retry attempts (uses exponential backoff)
+ *   ([KetchError.isRetryable]). Segment progress is kept between attempts, and the count starts
+ *   over once an attempt gets further than every attempt before it, so only failures in a row
+ *   without progress use it up. Ignored while [unlimitedRetries] is `true`.
+ * @property unlimitedRetries Retries retryable failures until the download is paused or
+ *   canceled, instead of giving up after [retryCount] of them.
+ * @property retryDelayMs Base delay in milliseconds before the first retry. Each further retry in
+ *   a row doubles it, up to [maxRetryDelayMs], and waits a random time between half of that delay
+ *   and all of it, so downloads that failed together do not retry together. An HTTP 429
+ *   response's `Retry-After` replaces the delay.
+ * @property maxRetryDelayMs The longest delay before a retry, before the random part is applied.
+ * @property idleTimeoutMs How long an HTTP(S), FTP(S), HLS or DASH transfer may receive no data
+ *   before it counts as stalled: its connection is dropped and the download retried, as after a
+ *   network error. Time a transfer waits for a speed limit does not count. `0` turns it off.
+ * @property minSpeed A speed in bytes per second that a transfer has to reach, averaged over
+ *   [MIN_SPEED_WINDOW_MS], or it counts as stalled like [idleTimeoutMs]. Each connection of a
+ *   segmented download is checked on its own, and time spent waiting for a speed limit is left
+ *   out of the average. `0` (the default) turns it off.
  * @property progressIntervalMs Minimum interval between progress updates of segmented
  *   (HTTP/FTP) downloads, to prevent UI spam
  * @property saveIntervalMs Interval for persisting segment progress during downloads
@@ -56,6 +71,10 @@ data class DownloadConfig(
   val defaultDirectory: String? = null,
   val retryCount: Int = 3,
   val retryDelayMs: Long = 1_000,
+  val unlimitedRetries: Boolean = false,
+  val maxRetryDelayMs: Long = 60_000,
+  val idleTimeoutMs: Long = 60_000,
+  val minSpeed: Long = 0,
   val progressIntervalMs: Long = 200,
   val saveIntervalMs: Long = 5_000,
   val bufferSize: Int = 8 * 1024,
@@ -69,6 +88,9 @@ data class DownloadConfig(
   init {
     require(retryCount >= 0) { "retryCount must be non-negative" }
     require(retryDelayMs >= 0) { "retryDelayMs must be non-negative" }
+    require(maxRetryDelayMs >= 0) { "maxRetryDelayMs must be non-negative" }
+    require(idleTimeoutMs >= 0) { "idleTimeoutMs must be non-negative" }
+    require(minSpeed >= 0) { "minSpeed must be non-negative" }
     require(progressIntervalMs > 0) { "progressIntervalMs must be greater than 0" }
     require(saveIntervalMs > 0) { "saveIntervalMs must be greater than 0" }
     require(bufferSize > 0) { "bufferSize must be greater than 0" }
@@ -78,6 +100,9 @@ data class DownloadConfig(
   }
 
   companion object {
+    /** The span [minSpeed] is averaged over. */
+    const val MIN_SPEED_WINDOW_MS: Long = 30_000
+
     /** Default settings shared by the engine and its clients. */
     val Default: DownloadConfig = DownloadConfig()
   }

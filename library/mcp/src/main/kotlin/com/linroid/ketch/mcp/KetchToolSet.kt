@@ -261,12 +261,33 @@ class KetchToolSet(
           "Maximum connections per download. 0 to keep current.",
           required = false,
         ),
+        integerParameter(
+          "retryCount",
+          "Retries in a row without progress before a download fails; -1 retries until " +
+            "paused. Omit to keep current.",
+          required = false,
+        ),
+        integerParameter(
+          "idleTimeoutSeconds",
+          "Seconds a connection may receive no data before it is retried; 0 turns it off. " +
+            "Omit to keep current.",
+          required = false,
+        ),
+        integerParameter(
+          "minSpeed",
+          "Bytes per second a connection must average over 30 seconds, or it is retried; " +
+            "0 turns it off. Omit to keep current.",
+          required = false,
+        ),
       ),
     ) {
       updateConfig(
         speedLimit = string("speedLimit", ""),
         maxConcurrentDownloads = int("maxConcurrentDownloads", 0),
         maxConnectionsPerDownload = int("maxConnectionsPerDownload", 0),
+        retryCount = int("retryCount", KEEP),
+        idleTimeoutSeconds = int("idleTimeoutSeconds", KEEP),
+        minSpeed = int("minSpeed", KEEP),
       )
     },
   )
@@ -450,10 +471,30 @@ class KetchToolSet(
     speedLimit: String = "",
     maxConcurrentDownloads: Int = 0,
     maxConnectionsPerDownload: Int = 0,
+    retryCount: Int = KEEP,
+    idleTimeoutSeconds: Int = KEEP,
+    minSpeed: Int = KEEP,
   ): String {
     val ketch = connect()
     val current = ketch.status().config
+    if (retryCount != KEEP && retryCount < -1) {
+      throw ToolException.ValidationFailure("retryCount must be -1 or more")
+    }
+    if (idleTimeoutSeconds != KEEP && idleTimeoutSeconds < 0) {
+      throw ToolException.ValidationFailure("idleTimeoutSeconds must not be negative")
+    }
+    if (minSpeed != KEEP && minSpeed < 0) {
+      throw ToolException.ValidationFailure("minSpeed must not be negative")
+    }
     val updated = current.copy(
+      retryCount = if (retryCount >= 0) retryCount else current.retryCount,
+      unlimitedRetries = if (retryCount == KEEP) current.unlimitedRetries else retryCount == -1,
+      idleTimeoutMs = if (idleTimeoutSeconds == KEEP) {
+        current.idleTimeoutMs
+      } else {
+        idleTimeoutSeconds * 1000L
+      },
+      minSpeed = if (minSpeed == KEEP) current.minSpeed else minSpeed.toLong(),
       speedLimit = if (speedLimit.isEmpty()) {
         current.speedLimit
       } else {
@@ -695,6 +736,9 @@ class KetchToolSet(
         )
     }
 }
+
+/** An `updateConfig` argument that was left out, keeping the current value. */
+private const val KEEP = Int.MIN_VALUE
 
 /** The files [KetchToolSet.listDownloadFiles] lists when the agent names no limit. */
 private const val DEFAULT_FILES_PER_PAGE = 100

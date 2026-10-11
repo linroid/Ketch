@@ -298,7 +298,7 @@ internal class HttpDownloadSource(
       }
       val downloader = SegmentDownloader(
         engine, context.fileAccessor,
-        throttleLimiter, SpeedLimiter.Unlimited, context.taskId
+        throttleLimiter, SpeedLimiter.Unlimited, context.taskId, context.watchdog,
       )
       // One connection per segment request; a complete segment sends none.
       val spec = httpConnectionSpec(TYPE, context.url, context.config.proxy)
@@ -337,21 +337,24 @@ internal class HttpDownloadSource(
     val handle = context.connections.open(spec)
     try {
       observeExchanges(handle, spec) {
-        engine.download(context.url, null, context.headers) { data ->
-          currentCoroutineContext().ensureActive()
-          context.throttle(data.size)
-          try {
-            context.fileAccessor.writeAt(downloaded, data)
-          } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            if (e is KetchError) throw e
-            throw KetchError.Disk(e)
-          }
-          downloaded += data.size
-          handle.received(data.size)
-          if (lastProgress.elapsedNow() >= progressInterval) {
-            context.onProgress(downloaded, 0)
-            lastProgress = TimeSource.Monotonic.markNow()
+        context.watchdog.watch { monitor ->
+          engine.download(context.url, null, context.headers) { data ->
+            currentCoroutineContext().ensureActive()
+            monitor.received(data.size)
+            monitor.throttled { context.throttle(data.size) }
+            try {
+              context.fileAccessor.writeAt(downloaded, data)
+            } catch (e: Exception) {
+              if (e is CancellationException) throw e
+              if (e is KetchError) throw e
+              throw KetchError.Disk(e)
+            }
+            downloaded += data.size
+            handle.received(data.size)
+            if (lastProgress.elapsedNow() >= progressInterval) {
+              context.onProgress(downloaded, 0)
+              lastProgress = TimeSource.Monotonic.markNow()
+            }
           }
         }
       }

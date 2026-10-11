@@ -737,12 +737,29 @@ internal class DownloadExecution(
     }
   }
 
+  /**
+   * The most bytes any attempt of this execution reported or kept in its segments. An attempt
+   * that gets past it made progress, and the retries in a row start over.
+   */
+  @Volatile
+  private var furthestProgress =
+    handle.record.value.segments.orEmpty().sumOf { it.downloadedBytes }
+
+  /** Updates [furthestProgress] with the bytes the segments hold now, and returns it. */
+  private fun progressReached(): Long {
+    val kept = handle.mutableSegments.value.sumOf { it.downloadedBytes }
+    if (kept > furthestProgress) furthestProgress = kept
+    return furthestProgress
+  }
+
   private suspend fun <T> downloadWithRetry(
     ctx: DownloadContext? = null,
     block: suspend () -> T,
   ): T {
+    val policy = RetryPolicy(config)
     var retryCount = 0
     while (true) {
+      val reached = progressReached()
       try {
         return block()
       } catch (e: CancellationException) {
@@ -753,7 +770,11 @@ internal class DownloadExecution(
           else -> KetchError.Unknown(e)
         }
 
-        if (!error.isRetryable || retryCount >= config.retryCount) {
+        if (retryCount > 0 && progressReached() > reached) {
+          log.d { "taskId=$taskId made progress before failing; retries start over" }
+          retryCount = 0
+        }
+        if (!error.isRetryable || !policy.allows(retryCount)) {
           // DownloadCoordinator logs the failure itself, with its stack trace.
           log.i {
             if (error.isRetryable) "Giving up on taskId=$taskId after $retryCount retries"
@@ -763,21 +784,21 @@ internal class DownloadExecution(
         }
 
         retryCount++
+        val limit = if (config.unlimitedRetries) "unlimited" else "${config.retryCount}"
 
         val delayMs: Long
         if (error is KetchError.Http && error.code == 429) {
           if (ctx != null) reduceConnections(ctx, error.rateLimitRemaining)
-          delayMs = error.retryAfterSeconds?.let { it * 1000L }
-            ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
+          delayMs = error.retryAfterSeconds?.let { it * 1000L } ?: policy.delayMs(retryCount)
           log.w {
-            "Rate limited (429) for taskId=$taskId. Retry $retryCount/${config.retryCount} " +
+            "Rate limited (429) for taskId=$taskId. Retry $retryCount/$limit " +
               "in ${delayMs}ms, connections=" +
               "${ctx?.maxConnections?.value ?: request.connections}"
           }
         } else {
-          delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
+          delayMs = policy.delayMs(retryCount)
           log.w {
-            "Retry $retryCount/${config.retryCount} for taskId=$taskId in ${delayMs}ms: " +
+            "Retry $retryCount/$limit for taskId=$taskId in ${delayMs}ms: " +
               error.describeCauses()
           }
         }
@@ -826,6 +847,7 @@ internal class DownloadExecution(
       fileAccessor = fileAccessor,
       segments = handle.mutableSegments,
       onProgress = { downloaded, total ->
+        if (downloaded > furthestProgress) furthestProgress = downloaded
         val now = timeSource.markNow()
         val elapsed = (now - lastMark).inWholeMilliseconds
         if (elapsed >= 500) {
