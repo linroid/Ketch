@@ -133,7 +133,9 @@ interface KetchApi {
    * @throws IllegalArgumentException if an ID is unknown or unavailable
    * @throws UnsupportedOperationException if this backend cannot configure interfaces
    */
-  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces
+  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
+  }
 
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
