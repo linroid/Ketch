@@ -13,6 +13,7 @@ package com.linroid.ketch.torrent
  * @property comment optional comment from the torrent creator
  * @property createdBy optional tool that created the torrent
  * @property isHybrid the info dictionary also describes a v2 torrent; this is only its v1 view
+ * @property webSeeds HTTP(S) web seeds (BEP 19 `url-list`), outside the info dictionary
  */
 internal data class TorrentMetadata(
   val infoHash: InfoHash,
@@ -30,6 +31,7 @@ internal data class TorrentMetadata(
   val metainfoBytes: ByteArray = ByteArray(0),
   val isMultiFile: Boolean = files.size > 1,
   val isHybrid: Boolean = false,
+  val webSeeds: List<String> = emptyList(),
 ) {
   /**
    * A single file within a torrent.
@@ -143,7 +145,23 @@ internal data class TorrentMetadata(
         metainfoBytes = data.copyOf(),
         isMultiFile = fileNodes != null,
         isHybrid = hybrid,
+        webSeeds = webSeedsOf(root["url-list"]),
       )
+    }
+
+    /**
+     * The http and https URLs of a BEP 19 `url-list`, a string or a list of strings. It lies
+     * outside the info dictionary, so an unusable entry is skipped rather than failing the torrent.
+     */
+    private fun webSeedsOf(node: Bencode.Node?): List<String> {
+      if (node == null) return emptyList()
+      val entries = node.list ?: listOf(node)
+      return entries.asSequence()
+        .mapNotNull { entry -> runCatching { entry.text() }.getOrNull()?.trim() }
+        .filter(::isWebSeedUrl)
+        .distinct()
+        .take(MAX_WEB_SEEDS)
+        .toList()
     }
 
     internal fun validatePathComponent(value: String) {
@@ -158,6 +176,17 @@ internal data class TorrentMetadata(
           stem.last() in '1'..'9')) { "Reserved torrent path" }
     }
   }
+}
+
+/** The most web seeds a torrent keeps; further `url-list` entries are ignored. */
+internal const val MAX_WEB_SEEDS = 16
+
+/** Whether [url] is a web seed Ketch can fetch: an absolute http or https URL with a host. */
+internal fun isWebSeedUrl(url: String): Boolean {
+  if (url.length > 4096 || url.any { it <= ' ' }) return false
+  val scheme = url.substringBefore("://", "").lowercase()
+  if (scheme != "http" && scheme != "https") return false
+  return url.substringAfter("://").substringBefore('/').substringAfterLast('@').isNotEmpty()
 }
 
 /** Filesystem collision key; hashes use the original encoded bytes. */

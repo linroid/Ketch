@@ -166,10 +166,16 @@ internal class TorrentMetadataExchange(
 }
 
 /** Wraps the original info bytes without re-encoding their identity-bearing dictionary. */
-internal fun metainfoFromInfo(info: ByteArray, trackerTiers: List<List<String>>): ByteArray {
+internal fun metainfoFromInfo(
+  info: ByteArray,
+  trackerTiers: List<List<String>>,
+  webSeeds: List<String> = emptyList(),
+): ByteArray {
   val prefix = Bencode.encode(mapOf("announce-list" to trackerTiers))
-  return Buffer().write(prefix, 0, prefix.size - 1).writeUtf8("4:info").write(info)
-    .writeByte('e'.code).readByteArray()
+  val output = Buffer().write(prefix, 0, prefix.size - 1).writeUtf8("4:info").write(info)
+  // Keys stay sorted: `url-list` follows `info`.
+  if (webSeeds.isNotEmpty()) output.writeUtf8("8:url-list").write(Bencode.encode(webSeeds))
+  return output.writeByte('e'.code).readByteArray()
 }
 
 internal class PrivateTorrentMagnetException :

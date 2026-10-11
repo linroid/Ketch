@@ -10,12 +10,14 @@ import okio.Buffer
  * @property identity all supplied exact topics, retaining the full v2 digest
  * @property displayName optional human-readable name (`dn` parameter)
  * @property trackers list of tracker announce URLs (`tr` parameters)
+ * @property webSeeds http and https web seeds (`ws` parameters, BEP 19)
  */
 internal data class MagnetUri(
   val identity: TorrentIdentity,
   val displayName: String? = null,
   val trackers: List<String> = emptyList(),
   val explicitPeers: List<String> = emptyList(),
+  val webSeeds: List<String> = emptyList(),
 ) {
 
   constructor(
@@ -48,6 +50,7 @@ internal data class MagnetUri(
       append("&tr=")
       append(urlEncode(tracker))
     }
+    for (seed in webSeeds) append("&ws=${urlEncode(seed)}")
   }
 
   companion object {
@@ -70,6 +73,7 @@ internal data class MagnetUri(
       var displayName: String? = null
       val trackers = mutableListOf<String>()
       val peers = mutableListOf<String>()
+      val webSeeds = mutableListOf<String>()
 
       for (param in params) {
         val (key, value) = param.split('=', limit = 2)
@@ -93,6 +97,8 @@ internal data class MagnetUri(
           "x.pe" -> peers.add(urlDecode(value))
           "dn" -> displayName = urlDecode(value)
           "tr" -> trackers.add(urlDecode(value))
+          // Only http and https; other schemes are skipped, never a reason to refuse the magnet.
+          "ws" -> urlDecode(value).trim().takeIf(::isWebSeedUrl)?.let(webSeeds::add)
         }
       }
 
@@ -106,6 +112,7 @@ internal data class MagnetUri(
         displayName = displayName,
         trackers = trackers.distinct(),
         explicitPeers = peers.distinct(),
+        webSeeds = webSeeds.distinct().take(MAX_WEB_SEEDS),
       )
     }
 

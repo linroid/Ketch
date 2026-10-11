@@ -77,6 +77,10 @@ internal class TorrentSwarm(
   private val onDhtNode: (PeerEndpoint) -> Unit = {},
   /** Peers that peer exchange says speak uTP; must return at once. */
   private val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
+  /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
+  private val webSeedHttp: TorrentHttp? = null,
+  /** The first backoff of a failed web seed; tests pass a short one. */
+  private val webSeedRetryMs: Long = WEB_SEED_RETRY_MS,
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -178,6 +182,26 @@ internal class TorrentSwarm(
     var corruptPieces = 0
     var lastSummary = now()
     val diagnostics = PeerDiagnostics(listener = peerOutcomes)
+    val webSeedStats = WebSeedStats()
+    // A web seed's storage failure stops the swarm, as a peer's does.
+    val webSeedFailures = Channel<TorrentStorageException>(1)
+    val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
+    val webSeeds = webSeedUrls.mapIndexed { number, url ->
+      // Negative IDs never collide with peer workers'.
+      val worker = WebSeedWorker(-1 - number, url, store, scheduler, checkNotNull(webSeedHttp),
+        webSeedStats, logLabel, reporter, webSeedRetryMs, downloadPayload = downloadPayload,
+        onVerified = { progressEvents.trySend(Unit) })
+      launch(Dispatchers.Default) {
+        try {
+          worker.run()
+        } catch (e: TorrentStorageException) {
+          webSeedFailures.trySend(e)
+        }
+      }
+    }
+    if (webSeeds.isNotEmpty()) {
+      log.i { "Swarm $logLabel: downloading from ${webSeeds.size} web seed(s) too" }
+    }
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       peerFlags.record(update.flags)
       onUtpPeers(update.flags.filterValues { it and PEX_FLAG_UTP != 0 }.keys)
@@ -201,7 +225,9 @@ internal class TorrentSwarm(
           "active=${active.size}/${connections()}, queued=${pending.size}, " +
           "known=${attempts.size}, discovered=$discovered, failed=$connectFailures, " +
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
-          "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}"
+          "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}" +
+          if (webSeeds.isEmpty()) "" else
+            "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeeds.size)}"
       }
       discovered = 0
       connectFailures = 0
@@ -293,7 +319,8 @@ internal class TorrentSwarm(
           }
           launchPeer(endpoint, overhead)
         }
-        if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null) {
+        if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null &&
+          webSeeds.none { it.isActive }) {
           if (!complete) logSummary()
           if (!complete) log.i { "Swarm $logLabel ran out of peers: ${diagnostics.summary()}" }
           check(complete) { "No peer could complete the torrent" }
@@ -369,14 +396,17 @@ internal class TorrentSwarm(
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
+          webSeedFailures.onReceive { throw it }
           progressEvents.onReceive { onProgress(store.progress().sum()) }
           onTimeout(100) {}
         }
       }
     } finally {
       verifiers.forEach { it.cancel() }
+      webSeeds.forEach { it.cancel() }
       active.values.forEach { it.cancel() }
       active.values.forEach { it.join() }
+      webSeeds.forEach { it.join() }
       verifiers.forEach { it.join() }
       // Peers still connected when the swarm stops count as connected too.
       while (true) {
@@ -385,6 +415,7 @@ internal class TorrentSwarm(
           result.flags)
       }
       rechecked.close()
+      webSeedFailures.close()
       results.close()
       progressEvents.close()
       pexEvents.close()

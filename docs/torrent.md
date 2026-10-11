@@ -138,6 +138,21 @@ including a development run, hands its files to the running app instead of openi
   over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
   control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
   use it too: BEP 27 only rules out DHT and peer exchange
+- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1
+  torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable peer still
+  completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A single-file
+  torrent's URL names the file (or, ending in `/`, the folder holding it); a multi-file torrent's
+  URL names the folder holding the torrent's folder, and each file is fetched from the URL, the
+  torrent name and the file's path, each segment percent-encoded. Each web seed fetches whole
+  pieces in order, one range request per file a piece spans, pieces no peer or other seed is
+  fetching, and only pieces the selection wants; every piece passes the same SHA-1 check as a
+  peer's. A failed request or a corrupt piece backs that seed off (2 s, doubling up to a minute);
+  five failures in a row drop it until the task runs again. Requests go through the source's HTTP
+  engine, with its system proxy settings like HTTP metainfo, count against the download limits,
+  fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
+  URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its
+  metadata, which still comes from peers. V2 and hybrid torrents (which run as v2 owners) do not
+  use web seeds yet
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
@@ -367,10 +382,10 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement web seeds, local service discovery, torrent creation, or ratio
-management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
-connection/buffer/task budgets. Configuring many peers or large pieces increases process memory
-beyond the piece-buffer budget.
+This version does not implement web seeds for v2 and hybrid torrents, local service discovery,
+torrent creation, or ratio management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB
+pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
+increases process memory beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the
 [current implementation progress](plans/pure-kotlin-torrent-v2-progress.md).

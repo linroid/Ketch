@@ -133,6 +133,13 @@ A magnet download (dates omitted, task IDs shortened):
 [DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, failed=31, corrupt=0, uploadSlots=0/4 interestedPeers=3 uploaded=0, discovery=open
 ```
 
+A torrent with web seeds (BEP 19) ends its summary with them: seeds still running of all, those
+dropped after repeated failures, pieces they delivered, their payload and failed requests:
+
+```
+[DEBUG] [TorrentSwarm] Swarm taskId=4f2a (89abcdef0123): pieces 300/512, peers connected=0 active=0/100, queued=0, known=0, discovered=0, failed=0, corrupt=0, uploadSlots=0/4 interestedPeers=0 uploaded=0, discovery=open; ...; webSeeds=1/2 (dropped=1), webSeedPieces=300, webSeedPayload=314572800, webSeedFailures=5
+```
+
 A hybrid torrent seeding to two peers, one of them from its v1 swarm (`in` counts peers that
 dialed in, `v1` peers on the v1 protocol, which get no hashes):
 
@@ -149,7 +156,7 @@ dialed in, `v1` peers on the v1 protocol, which get no hashes):
 | A resume restarts from zero | `ETag mismatch`, `Last-Modified mismatch` or `Local file integrity check failed` |
 | A task stays queued | `[DownloadQueue]` lines showing the concurrency and per-host limits |
 | A magnet never resolves | `Metadata for magnet ... not found within`, tracker announce failures, DHT contacts |
-| A torrent stays at 0% | The swarm summary: `discovered=0` points at trackers or DHT, `connected=0` at reachability, `corrupt>0` at bad peers |
+| A torrent stays at 0% | The swarm summary: `discovered=0` points at trackers or DHT, `connected=0` at reachability, `corrupt>0` at bad peers, `webSeedFailures` at mirrors |
 | A remote instance is offline | `[RemoteKetch] Connection to ... failed (attempt n)` or `rejected the API token` |
 
 The apps choose their level as follows:

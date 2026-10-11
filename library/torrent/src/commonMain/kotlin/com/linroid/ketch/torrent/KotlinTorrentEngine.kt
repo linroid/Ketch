@@ -437,7 +437,8 @@ internal class KotlinTorrentEngine(
     // Cache the immutable info dictionary, retaining this caller's tracker list. A hybrid's v1
     // view only tells the caller the v2 identity to download it by.
     return TorrentMetadata.fromBencode(metainfoFromInfo(metadata.infoBytes,
-      magnet.trackers.map { listOf(it) }), config.maxMetadataBytes, allowHybrid = true)
+      magnet.trackers.map { listOf(it) }, magnet.webSeeds), config.maxMetadataBytes,
+      allowHybrid = true)
   }
 
   suspend fun fetchV2Metadata(
@@ -667,6 +668,7 @@ internal class KotlinTorrentEngine(
         seedOnly = spec.seedOnly,
         reporter = spec.connections,
         peerOutcomes = peerOutcomes,
+        webSeedHttp = http,
       )
       target = session
       entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())

@@ -56,7 +56,11 @@ internal class TorrentPieceScheduler(
     }
   }
 
-  suspend fun claim(peer: Int): Claim? = mutex.withLock {
+  /**
+   * Claims a piece [peer] has: the rarest one nobody else fetches, or, with [sequential] (web
+   * seeds, which have every piece), the first one, so their HTTP reads follow the files.
+   */
+  suspend fun claim(peer: Int, sequential: Boolean = false): Claim? = mutex.withLock {
     check(peer !in claims)
     val available = availability[peer] ?: return@withLock null
     val candidates = wanted.indices.filter { wanted[it] && !verified[it] && available[it] }
@@ -66,7 +70,8 @@ internal class TorrentPieceScheduler(
       if (wanted.indices.count { wanted[it] && !verified[it] } > availability.size) emptyList()
       else candidates.filter { (owners[it]?.size ?: 0) < 2 }
     }
-    val index = choices.minWithOrNull(compareBy<Int> { rarity[it] }.thenBy { it })
+    val index = (if (sequential) choices.minOrNull()
+    else choices.minWithOrNull(compareBy<Int> { rarity[it] }.thenBy { it }))
       ?: return@withLock null
     val lease = budget.reserve(pieceSize(index)) ?: return@withLock null
     val claim = try { Claim(index, lease) } catch (e: Throwable) { lease.close(); throw e }

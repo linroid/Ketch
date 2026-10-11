@@ -336,7 +336,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   wire both ways (a v1 route's padding included). `TorrentTaskSpec`/`TorrentV2TaskSpec`
   `.connections` carry the task's reporter for the session's life, so a seeding session (lent
   after its download returned, started by `startSeeding`, restored or adopted) keeps reporting.
-  Magnet metadata peers, trackers and DHT are not reported
+  Magnet metadata peers, trackers and DHT are not reported. A web seed (BEP 19) is one
+  connection while it fetches, protocol `HTTP` until the engine reports its hops
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
@@ -457,6 +458,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   plaintext only. Peers reached encrypted carry the BEP 11 encryption flag in PEX
 - Btih magnets of hybrid torrents resolve their v2 identity (`TorrentMetadata` with
   `allowHybrid`, on the magnet path only) and run as v2 owners
+- Web seeds (BEP 19): `TorrentMetadata.webSeeds` from the metainfo's `url-list` (a string or
+  list, http/https only, at most 16) and magnet `ws` parameters (`MagnetUri.webSeeds`, carried
+  into the rebuilt metainfo by `metainfoFromInfo`). The v1 swarm runs a `WebSeedWorker` per URL
+  (`TorrentWebSeed.kt`) through the engine's `TorrentHttp` (`fetchRange`, which fails with
+  `HttpIdleException` after 30 s without data): to `TorrentPieceScheduler` it is a peer with every
+  piece that claims in order (`claim(sequential = true)`), so peers and seeds never fetch the same
+  piece outside the endgame. `WebSeedLayout` maps a piece to one range request per file it spans
+  (multi-file: URL + name + path, segments percent-encoded). Pieces are SHA-1 checked like peers';
+  a failure backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row drop it.
+  Payload goes through the swarm's download limits and is reported as a `torrent` connection
+  with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners use none
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
@@ -1214,8 +1226,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TrackerList", "TorrentController", "TorrentControls", "Connections",
-  "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
+  "TorrentTracker", "TorrentWebSeed", "TrackerList", "TorrentController", "TorrentControls",
+  "Connections", "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket",
+  "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "EventRoutes", "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
