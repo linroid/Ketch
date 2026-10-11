@@ -406,8 +406,8 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement local service discovery, torrent creation, or ratio management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB
-pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
+This version does not implement torrent creation or ratio management. Bounds include 4 MiB
+metainfo, 10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
 increases process memory beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the
