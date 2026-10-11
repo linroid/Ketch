@@ -230,7 +230,8 @@ including a development run, hands its files to the running app instead of openi
 - The apps and the CLI read encryption, uTP, port mapping and local service discovery from
   `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
   `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
-  under Settings → BitTorrent → Connections and apply them at once through
+  under Settings → BitTorrent → Connections (local service discovery only on desktop and
+  Android, as iOS cannot join the group) and apply them at once through
   `TorrentDownloadSource.setEncryption`, `setUtpEnabled`, `setPortMapping` and
   `setLocalDiscovery`, which never start the engine: encryption and uTP apply to connections
   opened after the change (open ones keep running, and a uTP port stays bound for DHT), port

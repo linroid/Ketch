@@ -29,6 +29,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.platform.localPeerDiscoverySupported
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
@@ -300,12 +301,15 @@ private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettin
       checked = settings.portMapping,
       onCheckedChange = { onChange(settings.copy(portMapping = it)) },
     )
-    SettingsSwitchRow(
-      title = stringResource(Res.string.settings_torrent_local_discovery),
-      description = stringResource(Res.string.settings_torrent_local_discovery_hint),
-      checked = settings.localDiscovery,
-      onCheckedChange = { onChange(settings.copy(localDiscovery = it)) },
-    )
+    // Only the embedded device's settings show here, so its platform decides.
+    if (localPeerDiscoverySupported) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_local_discovery),
+        description = stringResource(Res.string.settings_torrent_local_discovery_hint),
+        checked = settings.localDiscovery,
+        onCheckedChange = { onChange(settings.copy(localDiscovery = it)) },
+      )
+    }
   }
 }
 

@@ -697,7 +697,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. `encryption`
   (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as `preferred`,
   mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and `localDiscovery`
-  (all on), edited under Settings → BitTorrent → Connections, apply live through
+  (all on), edited under Settings → BitTorrent → Connections (local discovery only on desktop
+  and Android, `localPeerDiscoverySupported`), apply live through
   `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
   `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
   mapper started or stopped, and the LAN discovery group joined or left)
