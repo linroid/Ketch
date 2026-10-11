@@ -114,6 +114,8 @@ class PeerSurveyTest {
         if (outcome.failed) append(" (uTP answered $answeredUtp)")
         append("\n")
       }
+      append("- uTP connections: ${reports.count { !it.outcome.failed && it.utp }} " +
+        "of ${reports.count { !it.outcome.failed }}\n")
       append("- Incoming: ${incoming.entries.joinToString { "${it.key.label}=${it.value}" }
         .ifEmpty { "none" }}\n")
       append("- PEX flags: uTP ${count(dialed.values, PEX_FLAG_UTP)} " +

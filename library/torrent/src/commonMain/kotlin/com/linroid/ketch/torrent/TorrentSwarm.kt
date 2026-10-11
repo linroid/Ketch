@@ -396,6 +396,7 @@ internal class TorrentSwarm(
   ) {
     val connection = accepted ?: network.connect(endpoint)
     attempt.stage = PeerStage.HANDSHAKING
+    attempt.utp = connection.utp
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
         scheduler, progressEvents, pexEvents)

@@ -123,6 +123,11 @@ including a development run, hands its files to the running app instead of openi
   the DHT bit in its handshake, tells peers that set it where its DHT listens, and pings the nodes
   peers name, so the DHT starts from a tracker's peers even where no bootstrap router answers.
   Private and tracker-only torrents do neither
+- uTP (BEP 29, `TorrentConfig.utpEnabled`, on by default) reaches peers TCP cannot, often ones
+  behind NAT: a dial that fails over TCP tries uTP next, and peers may connect to the listen port
+  over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
+  control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
+  use it too: BEP 27 only rules out DHT and peer exchange
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
@@ -161,10 +166,11 @@ including a development run, hands its files to the running app instead of openi
   the lists are changed. `TorrentConfig.trackerListUrls` itself is empty for SDK users.
   `setTrackerLists` and `refreshTrackerLists` change or update them at runtime, `trackerLists`
   reports each; the apps show them under Settings → BitTorrent → Tracker lists.
-- `listenPort` is the port incoming peers connect to over TCP. DHT binds the same port over UDP
-  when it can (a dual-stack system refuses the IPv6 socket on it, which then takes any port), so
-  one forwarded port, TCP and UDP, reaches both; trackers and DHT announce it. `0`, the default,
-  lets the system pick each port at every start. `ketch server` takes it from `[torrent]
+- `listenPort` is the port incoming peers connect to over TCP. DHT and uTP share one UDP socket
+  on the same port when they can (a dual-stack system refuses the IPv6 socket on it, which then
+  takes any port), so one forwarded port, TCP and UDP, reaches all three; trackers and DHT
+  announce it. `0`, the default, lets the system pick the TCP port at every start, and UDP takes
+  the same one when it can. `ketch server` takes it from `[torrent]
   listenPort`, `KETCH_TORRENT_PORT` or `--torrent-port`, and the [Docker image](docker.md) sets
   16881; the apps and the CLI's other commands always let the system pick. A port in use fails
   the torrents that start with `KetchError.Network`, retried like other transient failures.
@@ -334,7 +340,7 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement uTP, protocol encryption, web seeds, NAT mapping, local service
+This version does not implement protocol encryption, web seeds, NAT mapping, local service
 discovery, torrent creation, or ratio management. No automatic incoming-port mapping is
 performed. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
 connection/buffer/task budgets. Configuring many peers or large pieces increases process memory

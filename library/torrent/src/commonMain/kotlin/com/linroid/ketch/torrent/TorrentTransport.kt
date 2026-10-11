@@ -28,6 +28,8 @@ internal data class PeerEndpoint(val host: String, val port: Int) {
 
 internal interface TorrentConnection {
   val remote: PeerEndpoint
+  /** The connection runs over uTP rather than TCP. */
+  val utp: Boolean get() = false
   suspend fun readExactly(size: Int): ByteArray
   suspend fun write(bytes: ByteArray)
   fun close()

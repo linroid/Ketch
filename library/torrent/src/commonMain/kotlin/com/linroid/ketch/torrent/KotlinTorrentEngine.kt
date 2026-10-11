@@ -105,7 +105,15 @@ internal class KotlinTorrentEngine(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext +
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
-  private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
+  private val network = TorrentConnectionBudget(
+    TorrentUtpFallback(rawNetwork) { remote -> utpEndpoints.load()[udpHostFor(remote)] },
+    config.maxConnections,
+  )
+  private val udpMutex = Mutex()
+  // Guarded by udpMutex.
+  private val udpPorts = mutableMapOf<String, TorrentUdpPort>()
+  /** The running uTP endpoint of each UDP host, read by dials without [udpMutex]. */
+  private val utpEndpoints = AtomicReference(emptyMap<String, UtpEndpoint>())
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
   private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
@@ -187,6 +195,10 @@ internal class KotlinTorrentEngine(
     advertisedPort.setListen(listener.local.port)
     running.store(true)
     acceptIncoming(listener)
+    // uTP peers dial the port we announce, over UDP; DHT shares the socket.
+    if (config.utpEnabled) {
+      for (host in UDP_HOSTS) attempt("Binding the uTP port on $host") { udpPort(host) }
+    }
     if (config.dhtEnabled) scope.launch { pingIntroducedNodes() }
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
     val ipv6 = listenHost == WILDCARD_IPV4 && try {
@@ -319,6 +331,11 @@ internal class KotlinTorrentEngine(
           }
         }
         nodes?.forEach { it.close() }
+        udpMutex.withLock {
+          udpPorts.values.forEach { it.close() }
+          udpPorts.clear()
+        }
+        utpEndpoints.store(emptyMap())
       } finally {
         scope.cancel()
         try { network.close() } finally {
@@ -997,26 +1014,50 @@ internal class KotlinTorrentEngine(
       } }.awaitAll().flatten().distinct()
     }.also { peers -> log.d { "DHT lookup for ${logHash(hash.hex)} found ${peers.size} peer(s)" } }
 
+  /** DHT's view of the UDP port on [host], which it shares with uTP. */
+  private suspend fun bindDhtSocket(host: String): TorrentDatagramSocket = udpPort(host).openDht()
+
   /**
-   * Binds a DHT socket on [host] at the configured listen port, so a port forwarded for peers
-   * reaches DHT too, or at any port when none is configured or it cannot be had: dual-stack
-   * systems refuse an IPv6 socket on the port the IPv4 one holds.
+   * The UDP port on [host], bound on first use and again once it stopped: at the TCP listen
+   * port, so a port forwarded for peers reaches DHT and uTP too, or at any port when that
+   * cannot be had (dual-stack systems refuse an IPv6 socket on the port the IPv4 one holds),
+   * where uTP still dials out. Its uTP endpoint goes with it.
    */
-  private suspend fun bindDhtSocket(host: String): TorrentDatagramSocket {
-    if (config.listenPort != 0) {
+  private suspend fun udpPort(host: String): TorrentUdpPort = udpMutex.withLock {
+    udpPorts[host]?.let { if (it.isRunning) return@withLock it else it.close() }
+    val port = listenPort.takeIf { it != 0 } ?: config.listenPort
+    val socket = if (port != 0) {
       try {
-        return network.bindUdp(PeerEndpoint(host, config.listenPort))
+        network.bindUdp(PeerEndpoint(host, port))
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         log.d {
-          "DHT cannot use UDP port ${config.listenPort} on $host, using any port: " +
-            e.describeWithoutUrls()
+          "Cannot use UDP port $port on $host, using any port: ${e.describeWithoutUrls()}"
         }
+        null
       }
+    } else null
+    val bound = socket ?: network.bindUdp(PeerEndpoint(host, 0))
+    var endpoint: UtpEndpoint? = null
+    val udp = TorrentUdpPort(bound, scope, utp = if (config.utpEnabled) {
+      { datagram -> endpoint?.receive(datagram) }
+    } else null)
+    if (config.utpEnabled) {
+      endpoint = UtpEndpoint(scope, send = udp::send, onIncoming = { connection ->
+        val admitted = network.admit(connection)
+        admitted?.let(::launchIncoming)
+        admitted != null
+      })
+      utpEndpoints.store(utpEndpoints.load() + (host to endpoint))
     }
-    return network.bindUdp(PeerEndpoint(host, 0))
+    udpPorts[host] = udp
+    udp
   }
+
+  /** Which UDP host's endpoint dials [remote]: its address family's. */
+  private fun udpHostFor(remote: PeerEndpoint): String =
+    if (':' in remote.host) UDP_HOSTS[1] else UDP_HOSTS[0]
 
   private suspend fun dht(): List<DhtNode> = dhtMutex.withLock {
     nodes?.let { current ->
@@ -1025,7 +1066,7 @@ internal class KotlinTorrentEngine(
       current.forEach { attempt { it.close() } }
     }
     val result = mutableListOf<DhtNode>()
-    for (host in listOf("0.0.0.0", "::")) {
+    for (host in UDP_HOSTS) {
       val family = if (':' in host) "IPv6" else "IPv4"
       val node = attempt("Binding the $family DHT socket") {
         DhtNode(bindDhtSocket(host), scope, allowLocalAddresses = allowLocalPeers)
@@ -1268,6 +1309,8 @@ internal class KotlinTorrentEngine(
 }
 
 private const val WILDCARD_IPV4 = "0.0.0.0"
+/** The hosts DHT and uTP bind UDP on: every IPv4 and every IPv6 interface. */
+private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128

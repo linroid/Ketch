@@ -42,6 +42,12 @@ class PublicV2IndependentLeecherTest {
   }
 
   @Test
+  fun libtorrentOverUtpOnly_downloadsFromKetch() = runTest {
+    // libtorrent dials our listen port over UDP; TCP is off on its side.
+    upload(TorrentV2Fixture.build(files, hybrid = true), utpOnly = true) { it.identity }
+  }
+
+  @Test
   fun libtorrentJoinsHybridThroughTheV1Topic() = runTest {
     val session = upload(TorrentV2Fixture.build(files, hybrid = true)) {
       TorrentIdentity(v1 = it.identity.v1)
@@ -56,6 +62,7 @@ class PublicV2IndependentLeecherTest {
    */
   private suspend fun upload(
     fixture: TorrentV2Fixture,
+    utpOnly: Boolean = false,
     topics: (TorrentV2Document) -> TorrentIdentity,
   ): TorrentV2DownloadSession = withContext(Dispatchers.Default) {
     withTimeout(60_000) {
@@ -82,7 +89,7 @@ class PublicV2IndependentLeecherTest {
 
         // The memory-mapped back end guards its writes with SIGSEGV and SIGBUS handlers that take
         // the JVM's implicit null checks down with them; plain file I/O installs none.
-        manager.start(SessionParams(leecherSettings()).apply { setPosixDiskIO() })
+        manager.start(SessionParams(leecherSettings(utpOnly)).apply { setPosixDiskIO() })
         // libtorrent reads x.pe without unescaping it, so the peer goes in as written.
         val identity = topics(fixture.document)
         val magnet = MagnetUri(identity).toUri() + "&x.pe=127.0.0.1:${engine.listenPort}"
@@ -128,17 +135,22 @@ class PublicV2IndependentLeecherTest {
   }
 
   /**
-   * Loopback only, no DHT, local discovery or port mapping; plaintext TCP, since Ketch speaks
-   * neither protocol encryption nor uTP yet.
+   * Loopback only, no DHT, local discovery or port mapping, and plaintext, since Ketch speaks no
+   * protocol encryption yet; TCP, or uTP only when [utpOnly].
    */
-  private fun leecherSettings(): SettingsPack {
+  private fun leecherSettings(utpOnly: Boolean): SettingsPack {
     val settings = SettingsPack()
     settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
-    for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
-      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp,
-      settings_pack.bool_types.enable_outgoing_utp, settings_pack.bool_types.enable_incoming_utp)) {
-      settings.setBoolean(flag.swigValue(), false)
-    }
+    val off = listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
+      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp) +
+      if (utpOnly) {
+        listOf(settings_pack.bool_types.enable_outgoing_tcp,
+          settings_pack.bool_types.enable_incoming_tcp)
+      } else {
+        listOf(settings_pack.bool_types.enable_outgoing_utp,
+          settings_pack.bool_types.enable_incoming_utp)
+      }
+    for (flag in off) settings.setBoolean(flag.swigValue(), false)
     settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(),
       settings_pack.enc_policy.pe_disabled.swigValue())
     return settings

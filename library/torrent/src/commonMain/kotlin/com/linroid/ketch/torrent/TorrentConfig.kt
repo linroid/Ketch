@@ -23,6 +23,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 data class TorrentConfig(
   val dhtEnabled: Boolean = true,
+  /**
+   * Whether peers are also reached over uTP (BEP 29): incoming on the UDP port DHT shares with
+   * the TCP listen port, and outgoing to peers that TCP cannot reach.
+   */
+  val utpEnabled: Boolean = true,
   val maxActiveTorrents: Int = 5,
   val metadataTimeoutSeconds: Int = 120,
   val connectionsPerTorrent: Int = 100,

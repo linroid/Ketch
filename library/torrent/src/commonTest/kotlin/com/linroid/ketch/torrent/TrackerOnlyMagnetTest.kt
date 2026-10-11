@@ -39,10 +39,9 @@ class TrackerOnlyMagnetTest {
       return delegate.connect(remote)
     }
     override suspend fun listen(local: PeerEndpoint): TorrentListener = delegate.listen(local)
-    override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
-      udp.fetchAndAdd(1)
-      error("Unexpected public discovery")
-    }
+    /** uTP may bind the port; [udp] counts DHT or UDP tracker datagrams sent. */
+    override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket =
+      delegate.bindUdp(local).countingPublicDiscovery(udp)
     override fun close() = delegate.close()
   }
 

@@ -53,6 +53,10 @@ internal class TorrentConnectionBudget(
     }
   }
 
+  /** Counts a connection that arrived another way, such as over uTP; null when full. */
+  fun admit(connection: TorrentConnection): TorrentConnection? =
+    if (reserve()) wrap(connection) else null
+
   private fun wrap(connection: TorrentConnection): TorrentConnection {
     val closed = AtomicBoolean(false)
     val wrapped = object : TorrentConnection by connection {
