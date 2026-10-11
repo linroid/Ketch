@@ -418,15 +418,15 @@ class FtpDownloadSource : DownloadSource {
 
   /**
    * The connection a segment transfer reports: its control host and port. FTP ignores the proxy
-   * setting, so it goes directly. The data channel of FTPS is not encrypted yet, so whether the
-   * transfer is secure is left unknown.
+   * setting, so it goes directly. FTPS protects every data connection (`PROT P`) and fails
+   * rather than transfer in the clear, so its transfers are secure.
    */
   private fun connectionSpec(ftpUrl: FtpUrl) = ConnectionSpec(
     source = TYPE,
     host = ftpUrl.host.removePrefix("[").removeSuffix("]").lowercase(),
     port = ftpUrl.port,
     protocol = if (ftpUrl.isTls) "FTPS" else "FTP",
-    secure = if (ftpUrl.isTls) null else false,
+    secure = ftpUrl.isTls,
     route = ConnectionRoute.DIRECT,
   )
 

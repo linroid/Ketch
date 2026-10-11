@@ -122,6 +122,26 @@ class FtpDownloadSourceTest {
   }
 
   @Test
+  fun download_overFtps_reportsSecureConnections() = runTest {
+    val server = FakeFtpServer(content(1000))
+    val connections = RecordingConnections()
+    val context = context(
+      MemoryFileAccessor(),
+      connections = 2,
+      reporter = connections,
+      url = FTPS_URL,
+    )
+
+    source(server).download(context)
+
+    assertEquals(2, connections.opened.size)
+    for (connection in connections.opened) {
+      assertEquals("FTPS", connection.spec.protocol)
+      assertEquals(true, connection.spec.secure)
+    }
+  }
+
+  @Test
   fun resolve_withConfig_reportsDefaultConnectionsAsMaxSegments() = runTest {
     val resolved = source(FakeFtpServer(content(1000)))
       .resolve(URL, emptyMap(), DownloadConfig(maxConnectionsPerDownload = 6))
@@ -255,10 +275,11 @@ class FtpDownloadSourceTest {
     maxConnections: MutableStateFlow<Int> = MutableStateFlow(connections),
     throttle: suspend (Int) -> Unit = {},
     reporter: ConnectionReporter = ConnectionReporter.None,
+    url: String = URL,
   ) = DownloadContext(
     taskId = "ftp",
-    url = URL,
-    request = DownloadRequest(URL, connections = connections),
+    url = url,
+    request = DownloadRequest(url, connections = connections),
     fileAccessor = file,
     segments = MutableStateFlow(emptyList()),
     onProgress = { _, _ -> },
@@ -271,5 +292,6 @@ class FtpDownloadSourceTest {
 
   private companion object {
     const val URL = "ftp://user:secret@ftp.example.com/pub/file.bin"
+    const val FTPS_URL = "ftps://user:secret@ftp.example.com/pub/file.bin"
   }
 }

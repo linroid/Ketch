@@ -322,8 +322,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (a coroutine context element, so wrapping engines pass it on unchanged); `KtorHttpEngine`
   reports every hop's host, port, TLS, HTTP version (`HTTP/1.1`, `HTTP/2`) and `ProxyRoute`, the
   final hop last, and engines that report nothing leave the URL's values
-- FTP: one per segment transfer, with the control host and port (FTPS leaves `secure` unknown:
-  its data channel is not encrypted yet). HLS/DASH: one per task, following the host of the part
+- FTP: one per segment transfer, with the control host and port (FTPS reports `secure`, as its
+  data connections are encrypted too). HLS/DASH: one per task, following the host of the part
   being fetched. HEAD, probes, manifests and `resolve` are never reported. Hosts and peer
   addresses are never logged (`ConnectionSpec`'s `toString` leaves the host out)
 - Torrent: one per connected peer once its handshake succeeds, v1 (`TorrentSwarm`'s workers) and
