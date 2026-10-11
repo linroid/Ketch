@@ -2420,8 +2420,9 @@ scope, Android `KetchService`, the iOS controller, or web `main`):
 - The host calls it only when the app is in the background **and** the notification setting allows
   it. In the foreground the host passes the event to `App(activityEvents = …)`, which shows an
   in-app toast.
-- More than 3 completions within 10 s are coalesced into "4 downloads finished · 8.2 GB".
-  `QueueDrained` replaces the last individual completion.
+- Completions are reported as they happen; from the 4th within 10 s of a burst's first, they are
+  held until those 10 s end and coalesced into "2 downloads finished · 8.2 GB".
+  `QueueDrained` replaces the last individual completion and any still held.
 
 | Event | Notification copy | Actions |
 |---|---|---|
@@ -2998,7 +2999,7 @@ existing screens render unchanged.
   `suspend (DownloadConfig) -> Unit`; Slow lane default from the observed peak.
 - `SpeedScheduler` (kotlinx-datetime, `TimeZone.currentSystemDefault()`).
 - `ActivityMonitor`: baseline first, then `ActivityEvent`s from the device flows it is given;
-  coalescing of more than 3 completions within 10 s; `QueueDrained`.
+  completions beyond the first 3 within 10 s coalesced; `QueueDrained`.
 
 *Acceptance:* counts match `StatusFilter`; the cap reflects a config change; Slow lane never drops
 below 256 KB/s; `SpeedScheduler` boundary math crosses midnight and DST; `ActivityMonitor` emits

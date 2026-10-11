@@ -20,7 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -231,17 +230,14 @@ class ActivityMonitorTest {
   }
 
   @Test
-  fun events_completionWhileOthersRun_heldForWindow() = runTest {
+  fun events_completionWhileOthersRun_reportedAtOnce() = runTest {
     val first = task("a", downloading())
     val harness = monitor(listOf(first, task("b", downloading())))
     harness.events.clear()
 
     first.state.value = completed(1000)
-    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW - 1.milliseconds)
-    assertEquals(emptyList(), harness.events)
-
-    advanceTimeBy(1.milliseconds)
     runCurrent()
+
     assertEquals(
       listOf<ActivityEvent>(
         ActivityEvent.Completed(TaskKey(DEVICE, "a"), first.request, completed(1000))
@@ -251,33 +247,59 @@ class ActivityMonitorTest {
   }
 
   @Test
-  fun events_fourCompletionsWithinWindow_coalescedIntoOneEvent() = runTest {
-    val finishing = List(4) { task("t$it", downloading()) }
+  fun events_completionsBeyondLimitWithinWindow_heldThenBatched() = runTest {
+    val finishing = List(5) { task("t$it", downloading()) }
     val harness = monitor(finishing + task("still", downloading()))
     harness.events.clear()
 
     finishing.forEachIndexed { index, finished ->
       finished.state.value = completed(1000L * (index + 1))
-      advanceTimeBy(2.seconds)
+      advanceTimeBy(1.seconds)
     }
-    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
+    runCurrent()
+    assertEquals(
+      finishing.take(3).map { it.taskId },
+      harness.events.map { assertIs<ActivityEvent.Completed>(it).taskKey.taskId }
+    )
 
-    val batch = assertIs<ActivityEvent.CompletedBatch>(harness.events.single())
-    assertEquals(finishing.map { it.taskId }, batch.completions.map { it.taskKey.taskId })
+    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
+    runCurrent()
+    val batch = assertIs<ActivityEvent.CompletedBatch>(harness.events.drop(3).single())
+    assertEquals(finishing.drop(3).map { it.taskId }, batch.completions.map { it.taskKey.taskId })
   }
 
   @Test
-  fun events_threeCompletionsWithinWindow_reportedOneByOne() = runTest {
-    val finishing = List(3) { task("t$it", downloading()) }
+  fun events_oneCompletionBeyondLimit_reportedAloneWhenWindowEnds() = runTest {
+    val finishing = List(4) { task("t$it", downloading()) }
     val harness = monitor(finishing + task("still", downloading()))
     harness.events.clear()
 
     finishing.forEach { it.state.value = completed(1000) }
+    runCurrent()
+    assertEquals(3, harness.events.size)
+
     advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
     runCurrent()
-
-    assertEquals(3, harness.events.size)
+    assertEquals(4, harness.events.size)
     harness.events.forEach { assertIs<ActivityEvent.Completed>(it) }
+  }
+
+  @Test
+  fun events_completionAfterWindowEnds_reportedAtOnce() = runTest {
+    val finishing = List(4) { task("t$it", downloading()) }
+    val harness = monitor(finishing + task("still", downloading()))
+    harness.events.clear()
+
+    finishing.take(3).forEach { it.state.value = completed(1000) }
+    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
+    runCurrent()
+    finishing[3].state.value = completed(1000)
+    runCurrent()
+
+    assertEquals(
+      finishing.map { it.taskId },
+      harness.events.map { assertIs<ActivityEvent.Completed>(it).taskKey.taskId }
+    )
   }
 
   @Test
@@ -293,9 +315,31 @@ class ActivityMonitorTest {
     runCurrent()
 
     assertEquals(
-      listOf<ActivityEvent>(ActivityEvent.QueueDrained(DEVICE, files = 3, bytes = 6000)),
+      listOf(
+        ActivityEvent.Completed(TaskKey(DEVICE, "t0"), finishing[0].request, completed(1000)),
+        ActivityEvent.Completed(TaskKey(DEVICE, "t1"), finishing[1].request, completed(2000)),
+        ActivityEvent.QueueDrained(DEVICE, files = 3, bytes = 6000)
+      ),
       harness.events
     )
+  }
+
+  @Test
+  fun events_queueDrainsWhileCompletionsHeld_replacesThem() = runTest {
+    val finishing = List(5) { task("t$it", downloading()) }
+    val harness = monitor(finishing)
+    harness.events.clear()
+
+    finishing.take(4).forEach { it.state.value = completed(1000) }
+    runCurrent()
+    finishing[4].state.value = completed(1000)
+    runCurrent()
+    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
+    runCurrent()
+
+    assertEquals(4, harness.events.size)
+    harness.events.take(3).forEach { assertIs<ActivityEvent.Completed>(it) }
+    assertEquals(ActivityEvent.QueueDrained(DEVICE, files = 5, bytes = 5000), harness.events[3])
   }
 
   @Test
@@ -306,7 +350,6 @@ class ActivityMonitorTest {
     harness.events.clear()
 
     first.state.value = completed(1000)
-    advanceTimeBy(ActivityMonitor.COALESCE_WINDOW)
     runCurrent()
     last.state.value = completed(2000)
     runCurrent()
