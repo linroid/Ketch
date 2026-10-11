@@ -457,6 +457,7 @@ class Ketch(
         throw IllegalStateException("Only completed downloads can be shared")
       }
       val generation = record.control?.selectionGeneration ?: 0
+      command.beforeSave()
       val revision = command.reserve(generation, sharing)
       val entry = ledger.entry(command, revision, generation, sharing)
       handle.record.update {
@@ -532,12 +533,17 @@ class Ketch(
       }
     }
 
-    override suspend fun saveSharingIntent(task: DownloadTask, sharing: Boolean) {
+    override suspend fun saveSharingIntent(
+      task: DownloadTask,
+      sharing: Boolean,
+      onlyIf: () -> Boolean,
+    ) {
       val handle = handleOf(task) ?: return
       handle.controlLock.withLock {
         val record = handle.record.value
         if ((record.control?.sharing ?: false) == sharing) return@withLock
         if (sharing && record.state != TaskState.COMPLETED) return@withLock
+        if (!onlyIf()) return@withLock
         handle.record.update {
           it.copy(
             control = (it.control ?: TaskControl()).copy(sharing = sharing),
@@ -612,6 +618,7 @@ class Ketch(
       if (command == null || ledger == null) {
         return ControlOutcome(control.selectionGeneration, control.sharing, null, replayed = false)
       }
+      command.beforeSave()
       val revision = command.reserve(control.selectionGeneration, control.sharing)
       val entry = ledger.entry(command, revision, control.selectionGeneration, sharing = null)
       handle.record.update {
@@ -627,6 +634,7 @@ class Ketch(
     val running = coordinator.isActive(taskId)
     val reopen = !running && state is DownloadState.Completed && plan.expands
     val generation = control.selectionGeneration + if (plan.changed) 1 else 0
+    command?.beforeSave()
     val revision = command?.reserve(generation, control.sharing)
     val entry = if (command != null && ledger != null && revision != null) {
       ledger.entry(command, revision, generation, sharing = null)

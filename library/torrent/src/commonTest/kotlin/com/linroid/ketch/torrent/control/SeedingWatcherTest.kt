@@ -18,7 +18,10 @@ import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentController
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -30,6 +33,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -101,7 +105,13 @@ class SeedingWatcherTest {
       return outcome
     }
 
-    override suspend fun stopSeeding(taskId: String) = ids.update { it - taskId }
+    /** Holds [stopSeeding] until it completes. */
+    var stopGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun stopSeeding(taskId: String) {
+      stopGate?.await()
+      ids.update { it - taskId }
+    }
 
     companion object {
       const val TYPE = "seed"
@@ -172,6 +182,72 @@ class SeedingWatcherTest {
 
       assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
       assertEquals(true, store.load("done")?.control?.sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun stopCommand_watcherSaveQueuedBehindIt_keepsTheStop() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("done", 1_000, seeding = null))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      val task = ketch.tasks.value.single()
+      val controller = assertNotNull(ketch.control(TorrentController))
+      val revision = assertNotNull(controller.snapshot("done")).revision
+      val gate = CompletableDeferred<Unit>()
+      source.stopGate = gate
+      val stop = async {
+        controller.setSeeding("done", false, TorrentCommandContext("stop", revision))
+      }
+      runCurrent()
+      // Seeding starts while the stop holds the task's control lock: the watcher's save of the
+      // intent queues behind it.
+      source.ids.value = setOf("done")
+      runCurrent()
+      assertEquals(null, store.load("done")?.control?.sharing)
+
+      gate.complete(Unit)
+      runCurrent()
+      val stopped = stop.await()
+
+      assertEquals(false, stopped.seeding)
+      assertEquals(emptySet(), source.ids.value)
+      assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+      assertEquals(false, store.load("done")?.control?.sharing)
+      // The stop's revision stays current: nothing changed the intent after it.
+      val again = controller.setSeeding("done", false,
+        TorrentCommandContext("again", stopped.revision))
+      assertEquals(false, again.seeding)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun stopCommand_revisionFromBeforeTheIntentWasSaved_isCurrent() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("done", 1_000, seeding = null))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      val controller = assertNotNull(ketch.control(TorrentController))
+      // A client sees the task seeding before the watcher saved the intent to seed it again.
+      source.ids.value = setOf("done")
+      val revision = assertNotNull(controller.snapshot("done")).revision
+      runCurrent()
+      assertEquals(true, store.load("done")?.control?.sharing)
+
+      val stopped = controller.setSeeding("done", false, TorrentCommandContext("stop", revision))
+
+      assertEquals(false, stopped.seeding)
+      assertEquals(false, store.load("done")?.control?.sharing)
     } finally {
       ketch.close()
     }

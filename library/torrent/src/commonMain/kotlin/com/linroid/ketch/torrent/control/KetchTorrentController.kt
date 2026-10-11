@@ -64,6 +64,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param sourceType the [com.linroid.ketch.core.engine.DownloadSource.type] of [source]
  * @param handlesUrl whether [source] downloads a URL, for tasks that have not resolved yet
  * @param seed starts seeding a completed task in the background
+ * @param seedingStopped runs once a Stop command stopped a task's seeding, under the task's
+ *   control lock and before the command saves its intent
  */
 internal class KetchTorrentController(
   private val source: TorrentControlSource,
@@ -71,6 +73,7 @@ internal class KetchTorrentController(
   private val host: SourceHost,
   private val handlesUrl: (String) -> Boolean,
   private val seed: (DownloadTask) -> Unit,
+  private val seedingStopped: (taskId: String) -> Unit = {},
   private val revisions: TorrentRevisions = TorrentRevisions(),
 ) : TorrentController {
   private val log = KetchLogger("TorrentController")
@@ -92,9 +95,9 @@ internal class KetchTorrentController(
     val generation: Long,
     val selectionComplete: Boolean,
     val counters: TorrentCounters?,
-    val seedingIntent: Boolean,
+    val seeding: Boolean,
   ) {
-    val control get() = TorrentRevisions.Control(generation, seedingIntent)
+    val control get() = TorrentRevisions.Control(generation, seeding)
   }
 
   override suspend fun capabilities(): TorrentCapabilities = TorrentCapabilities(
@@ -250,7 +253,14 @@ internal class KetchTorrentController(
       host.setSharing(
         task,
         seeding,
-        command(task, context, digest) {
+        // Stopped before the intent is saved, under the same lock as the watcher's saves, so
+        // none that saw the task seeding before the stop can save the intent again.
+        command(task, context, digest, beforeSave = {
+          if (!seeding) {
+            source.stopSeeding(taskId)
+            seedingStopped(taskId)
+          }
+        }) {
           if (task.state.value !is DownloadState.Completed) {
             throw TorrentCommandException(
               TorrentCommandError.INVALID_STATE,
@@ -276,21 +286,19 @@ internal class KetchTorrentController(
         },
       )
     }
-    if (!outcome.replayed) {
-      if (!seeding) {
-        mapErrors { source.stopSeeding(taskId) }
-      } else if (!alreadyActive) {
-        seed(task)
-      }
-    }
+    if (!outcome.replayed && seeding && !alreadyActive) seed(task)
     return result(taskId, outcome, outcome.sharing)
   }
 
-  /** The command [context] asks for, which checks the revision and then [check]. */
+  /**
+   * The command [context] asks for, which checks the revision and then [check], and runs
+   * [beforeSave] once accepted.
+   */
   private fun command(
     task: DownloadTask,
     context: TorrentCommandContext,
     digest: String,
+    beforeSave: suspend () -> Unit = {},
     check: suspend () -> Unit,
   ) = ControlCommand(
     key = context.idempotencyKey,
@@ -305,6 +313,7 @@ internal class KetchTorrentController(
       val revision = revisions.markControl(task.taskId, control)
       ControlRevision(revision.epoch, revision.sequence)
     },
+    beforeSave = beforeSave,
   )
 
   private fun result(taskId: String, outcome: ControlOutcome, seeding: Boolean?) =
@@ -426,8 +435,16 @@ internal class KetchTorrentController(
 
   private fun currentControl(task: DownloadTask): TorrentRevisions.Control {
     val control = recordOf(task).control ?: TaskControl()
-    return TorrentRevisions.Control(control.selectionGeneration, control.sharing)
+    return TorrentRevisions.Control(control.selectionGeneration, seedingOf(task, control))
   }
+
+  /**
+   * Whether [task] seeds as far as revisions go: it seeds now or is meant to. Saving the intent
+   * of a task that already seeds, as the seeding watcher does once seeding starts, is then no
+   * control change, so it never makes a client's revision stale.
+   */
+  private fun seedingOf(task: DownloadTask, control: TaskControl): Boolean =
+    control.sharing || task.taskId in source.seedingTaskIds.value
 
   private suspend fun snapshotOf(task: DownloadTask): TorrentSnapshot {
     val content = contentOf(task)
@@ -454,7 +471,7 @@ internal class KetchTorrentController(
       generation = control.selectionGeneration,
       selectionComplete = state is DownloadState.Completed && counters != null,
       counters = counters,
-      seedingIntent = control.sharing,
+      seeding = seedingOf(task, control),
     )
   }
 
