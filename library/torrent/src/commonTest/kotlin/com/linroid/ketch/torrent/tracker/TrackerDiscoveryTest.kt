@@ -75,6 +75,34 @@ class TrackerDiscoveryTest {
   }
 
   @Test
+  fun stopped_afterACanceledStartAtAFallback_goesToThatTracker() = runTest {
+    val requests = mutableListOf<Pair<String, TrackerEvent>>()
+    val sent = CompletableDeferred<Unit>()
+    var firstOnline = false
+    val tiers = TrackerTiers(listOf(listOf("a"), listOf("b"))) { url, request, _ ->
+      requests += url to request.event
+      if (url == "a" && !firstOnline) error("offline")
+      if (url == "b" && request.event == TrackerEvent.STARTED) {
+        sent.complete(Unit)
+        CompletableDeferred<Unit>().await()
+      }
+      TrackerResponse(emptyList(), 60)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers)
+    val verified = booleanArrayOf(true, true)
+    // The first tracker fails; the fallback gets the start but never answers.
+    val announce = async { discovery.poll(verified, 0, 0) }
+    sent.await()
+    announce.cancel()
+    assertFailsWith<CancellationException> { announce.await() }
+    // The first tracker is back, yet the one that may count the peer hears the stop.
+    firstOnline = true
+    discovery.poll(verified, 0, 0, stopped = true)
+    assertEquals(listOf("a" to TrackerEvent.STARTED, "b" to TrackerEvent.STARTED,
+      "b" to TrackerEvent.STOPPED), requests)
+  }
+
+  @Test
   fun privateTrackerSwitch_dropsPriorPeersBeforeReturningNewPeers() = runTest {
     var firstOnline = true
     val tiers = TrackerTiers(listOf(listOf("a"), listOf("b"))) { url, _, _ ->

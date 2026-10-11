@@ -310,6 +310,11 @@ internal class TrackerTiers(
   private val scrapeRetryAt = mutableMapOf<String, Long>()
   private var oldPeersClosed = false
   private var beforeSwitch: suspend () -> Unit = {}
+  /**
+   * The tracker a canceled `started` announce was sent to, which may count us without having
+   * answered: the next `stopped` goes there first, whichever tracker would otherwise be asked.
+   */
+  private var unconfirmedStart: String? = null
 
   constructor(
     tiers: List<List<String>>,
@@ -339,6 +344,7 @@ internal class TrackerTiers(
     }
     current = null
     oldPeersClosed = false
+    unconfirmedStart = null
     statusListener(status())
   }
 
@@ -404,8 +410,10 @@ internal class TrackerTiers(
   suspend fun announce(request: TrackerAnnounce): TrackerResponse {
     require(topic == null || topic == request.topic) { "Tracker tiers belong to another topic" }
     topic = request.topic
-    val ordered = if (preferCurrent && current != null) {
-      listOf(listOf(current!!)) + tiers.map { tier -> tier.filter { it != current } }
+    val first = unconfirmedStart?.takeIf { request.event == TrackerEvent.STOPPED }
+      ?: current?.takeIf { preferCurrent }
+    val ordered = if (first != null) {
+      listOf(listOf(first)) + tiers.map { tier -> tier.filter { it != first } }
     } else tiers
     for (tier in ordered) {
       for (url in tier.toList()) {
@@ -428,6 +436,7 @@ internal class TrackerTiers(
       attempts = previous.attempts + 1))
     try {
       val result = announce(url, request, ids[url])
+      unconfirmedStart = null
       result.trackerId?.let { ids[url] = it }
       val original = tiers.first { url in it }
       original.remove(url)
@@ -455,6 +464,7 @@ internal class TrackerTiers(
       failed(url, TrackerStatus.Outcome.TIMED_OUT)
       announceFailed(url, request, "timed out")
     } catch (e: CancellationException) {
+      if (request.event == TrackerEvent.STARTED) unconfirmedStart = url
       throw e
     } catch (e: Exception) {
       currentCoroutineContext().ensureActive()
