@@ -18,7 +18,10 @@ internal class TorrentRevisions(val epoch: String = Uuid.random().toString()) {
   private val mutex = Mutex()
   private val tasks = mutableMapOf<String, Entry>()
 
-  /** The control state a revision describes: the selection generation and the seeding intent. */
+  /**
+   * The control state a revision describes: the selection generation and whether the task seeds
+   * or is meant to (the saved intent or a running seeding session).
+   */
   data class Control(val generation: Long, val seeding: Boolean)
 
   private class Entry(

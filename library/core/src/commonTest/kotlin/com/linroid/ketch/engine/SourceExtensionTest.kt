@@ -108,11 +108,16 @@ class SourceExtensionTest {
     return task
   }
 
-  private fun command(key: String, digest: Char = 'a') = ControlCommand(
+  private fun command(
+    key: String,
+    digest: Char = 'a',
+    afterSave: suspend () -> Unit = {},
+  ) = ControlCommand(
     key = key,
     digest = digest.toString().repeat(64),
     precondition = {},
     reserve = { generation, _ -> ControlRevision("epoch", generation + 10) },
+    afterSave = afterSave,
   )
 
   @Test
@@ -205,6 +210,33 @@ class SourceExtensionTest {
   }
 
   @Test
+  fun setSharing_afterSave_runsOnceTheIntentIsSaved() = runTest {
+    val source = ExtendedSource()
+    val ketch = ketch(source)
+    try {
+      val task = completedTask(ketch, source)
+      val host = assertNotNull(source.host)
+      val seen = mutableListOf<Boolean?>()
+      val share = command("k", afterSave = { seen += host.record(task)?.control?.sharing })
+
+      host.setSharing(task, true, share)
+      host.setSharing(task, true, share)
+
+      // An exact retry answers from the ledger without running it again.
+      assertEquals(listOf<Boolean?>(true), seen)
+      val failed = assertFailsWith<IllegalStateException> {
+        host.setSharing(task, false, command("j", afterSave = { error("failed") }))
+      }
+      assertEquals("failed", failed.message)
+      // The change stays saved.
+      assertEquals(false, host.record(task)?.control?.sharing)
+      assertEquals(2, host.record(task)?.control?.commands?.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun setSharing_unfinishedTask_isRefused() = runTest {
     val source = ExtendedSource()
     val ketch = ketch(source)
@@ -248,6 +280,22 @@ class SourceExtensionTest {
 
       assertEquals(true, host.record(task)?.control?.sharing)
       assertEquals(emptyList(), host.record(task)?.control?.commands)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun saveSharingIntent_onlyIfFalse_savesNothing() = runTest {
+    val source = ExtendedSource()
+    val ketch = ketch(source)
+    try {
+      val task = completedTask(ketch, source)
+      val host = assertNotNull(source.host)
+
+      host.saveSharingIntent(task, true) { false }
+
+      assertNull(host.record(task)?.control)
     } finally {
       ketch.close()
     }

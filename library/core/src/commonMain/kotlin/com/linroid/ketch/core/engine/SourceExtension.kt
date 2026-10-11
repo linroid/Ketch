@@ -95,7 +95,13 @@ interface SourceHost {
 
   /**
    * Saves whether the completed [task] is shared again after a restart ([TaskControl.sharing]),
-   * without a command. Saving `true` for a task that is no longer completed does nothing.
+   * without a command. Saving `true` for a task that is no longer completed does nothing, and
+   * nothing is saved unless [onlyIf], checked under the task's control lock, holds: a save that
+   * waited for the lock must not undo a command that changed the intent meanwhile.
    */
-  suspend fun saveSharingIntent(task: DownloadTask, sharing: Boolean)
+  suspend fun saveSharingIntent(
+    task: DownloadTask,
+    sharing: Boolean,
+    onlyIf: () -> Boolean = { true },
+  )
 }

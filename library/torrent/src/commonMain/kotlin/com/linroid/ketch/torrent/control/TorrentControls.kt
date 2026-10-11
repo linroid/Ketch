@@ -10,6 +10,8 @@ import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.torrent.api.TorrentController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -30,6 +32,13 @@ internal class TorrentControls(
 ) : SourceExtension {
   private val log = KetchLogger("TorrentControls")
 
+  /**
+   * How many Stop commands stopped each task's seeding. One counts only once its session
+   * stopped, so a watcher that reads it before [TorrentControlSource.seedingTaskIds] and still
+   * finds the task seeding saw seeding that started after every stop it counted.
+   */
+  private val stops = MutableStateFlow<Map<String, Long>>(emptyMap())
+
   /** The torrent controller of this source's tasks. */
   val controller: TorrentController = KetchTorrentController(
     source = source,
@@ -44,6 +53,9 @@ internal class TorrentControls(
         }
       }
     },
+    seedingStopped = { taskId ->
+      stops.update { it + (taskId to (it[taskId] ?: 0) + 1) }
+    },
   )
 
   @Suppress("UNCHECKED_CAST")
@@ -56,7 +68,8 @@ internal class TorrentControls(
   }
 
   override suspend fun taskCompleted(task: DownloadTask) {
-    syncSeeding(task, source.seedingTaskIds.value)
+    val seen = stops.value
+    syncSeeding(task, source.seedingTaskIds.value, seen)
   }
 
   override suspend fun selectionChanged(task: DownloadTask, fileIds: Set<String>) {
@@ -66,9 +79,12 @@ internal class TorrentControls(
 
   /** Shows on every completed task of the source whether it seeds, as the source reports it. */
   private suspend fun followSeeding() {
-    source.seedingTaskIds.collect { ids ->
+    source.seedingTaskIds.collect {
+      // The stops first, then the tasks seeding now: see [stops].
+      val seen = stops.value
+      val ids = source.seedingTaskIds.value
       for (task in host.tasks.value) {
-        if (host.record(task)?.sourceType == sourceType) syncSeeding(task, ids)
+        if (host.record(task)?.sourceType == sourceType) syncSeeding(task, ids, seen)
       }
     }
   }
@@ -77,12 +93,19 @@ internal class TorrentControls(
    * Publishes whether a completed task seeds, and saves the intent to seed it again after a
    * restart once it does. Nothing here clears the intent: a seeder that a download stopped, or
    * that stopped with Ketch, seeds again later.
+   *
+   * The save runs later, and not after a Stop command that [seen], the [stops] read before
+   * [ids], did not count: the user's stop wins over seeding the watcher saw before it.
    */
-  private suspend fun syncSeeding(task: DownloadTask, ids: Set<String>) {
-    val seeding = task.taskId in ids
+  private suspend fun syncSeeding(task: DownloadTask, ids: Set<String>, seen: Map<String, Long>) {
+    val taskId = task.taskId
+    val seeding = taskId in ids
     host.showSharing(task, seeding)
     if (seeding && host.record(task)?.control?.sharing != true) {
-      host.scope.launch { host.saveSharingIntent(task, true) }
+      val stopped = seen[taskId]
+      host.scope.launch {
+        host.saveSharingIntent(task, true) { stops.value[taskId] == stopped }
+      }
     }
   }
 

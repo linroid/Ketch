@@ -21,6 +21,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okio.IOException
 
 /**
  * A copy of core's test source of the same name. A source with several files of [sizes] (IDs "0",
@@ -185,7 +186,11 @@ internal class RecordingTaskStore : TaskStore {
   private val inner = MemoryTaskStore()
   val saves = mutableListOf<TaskRecord>()
 
+  /** Makes every save fail, as a full disk would. */
+  var failSaves = false
+
   override suspend fun save(record: TaskRecord) {
+    if (failSaves) throw IOException("No space left")
     saves += record
     inner.save(record)
   }
