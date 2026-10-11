@@ -1,33 +1,26 @@
 package com.linroid.ketch.remote
 
-import com.linroid.ketch.api.TaskInterest
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.endpoints.stream.StreamEvents
+import com.linroid.ketch.endpoints.stream.StreamInterest
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.endpoints.stream.TaskInterval
+import com.linroid.ketch.torrent.api.TorrentInterest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.time.Duration
 
-/** What one caller of a [RemoteKetch] wants from its event stream. */
-internal sealed interface StreamInterest {
-  data class Tasks(val interest: TaskInterest) : StreamInterest
-  data class Stats(val interval: Duration) : StreamInterest
-  data class Torrent(val taskId: String) : StreamInterest
-  data class Connections(val limit: Int) : StreamInterest
-}
-
 /**
- * What the callers of one [RemoteKetch] want from its event stream, merged into one
- * subscription. Callers hold an interest while they run ([holding]); the stream sends the
- * merged subscription each time it changes, and again on every new connection.
+ * What the callers of one [RemoteKetch] want from its event stream. Callers hold an interest
+ * while they run ([holding]); the stream sends the server the subscription each time it changes,
+ * and again on every new connection.
  *
- * @param baseProgress how often every task reports progress whatever the callers ask, or `null`
- *   for only as they ask
+ * @param initialProgress how often every downloading task reports progress, or `null` for only
+ *   with its state changes, until [progress] changes
  */
-internal class StreamInterests(private val baseProgress: Duration?) {
+internal class StreamInterests(initialProgress: Duration?) {
   private class Registry(
     val nextId: Long = 0,
     val entries: Map<Long, StreamInterest> = emptyMap(),
@@ -35,20 +28,25 @@ internal class StreamInterests(private val baseProgress: Duration?) {
 
   private val registry = MutableStateFlow(Registry())
 
-  /** The subscription the callers ask for, with revision 0, each time it changes. */
+  /** How often every downloading task reports progress, or `null`. */
+  val progress = MutableStateFlow(initialProgress)
+
+  /** While `false`, the stream carries only the task lifecycle and state changes. */
+  val active = MutableStateFlow(true)
+
+  /** The subscription to send, with revision 0, each time it changes. */
   val subscriptions: Flow<StreamSubscription> =
-    registry.map { subscriptionOf(it.entries.values, baseProgress) }.distinctUntilChanged()
+    combine(registry, progress, active) { registry, progress, active ->
+      if (active) subscriptionOf(registry.entries.values, progress) else StreamSubscription()
+    }.distinctUntilChanged()
 
-  /** Whether some caller holds [interest]. */
-  fun isHeld(predicate: (StreamInterest) -> Boolean): Boolean =
-    registry.value.entries.values.any(predicate)
-
-  /** Runs [block] while [interest] is held. */
-  suspend fun <T> holding(interest: StreamInterest, block: suspend () -> T): T {
+  /** Runs [block] while [interest] is followed about every [interval]. */
+  suspend fun <T> holding(interest: Interest<*>, interval: Duration, block: suspend () -> T): T {
+    val held = StreamInterest(interest, interval.inWholeMilliseconds.coerceAtLeast(1))
     var id = 0L
     registry.update { current ->
       id = current.nextId
-      Registry(current.nextId + 1, current.entries + (id to interest))
+      Registry(current.nextId + 1, current.entries + (id to held))
     }
     try {
       return block()
@@ -59,78 +57,58 @@ internal class StreamInterests(private val baseProgress: Duration?) {
 }
 
 /**
- * The subscription that serves every one of [interests], and the progress of every task every
- * [baseProgress]. Intervals are rounded up to the server's steps; task IDs a rule for every task
- * already covers as often are left out, and beyond the server's limits the latest are dropped.
+ * The subscription that serves [held] interests, with every downloading task's progress every
+ * [progress], within the server's limits. Where several callers follow the same interest, the
+ * shortest interval wins; segments are merged by interval step, each task at its shortest, the
+ * shortest stats interval wins, and one connections interest asks for the largest limit at the
+ * shortest interval. Beyond the limits the latest are dropped.
  */
 internal fun subscriptionOf(
-  interests: Collection<StreamInterest>,
-  baseProgress: Duration?,
+  held: Collection<StreamInterest>,
+  progress: Duration?,
 ): StreamSubscription {
-  val progress = IntervalRules()
-  val segments = IntervalRules()
-  baseProgress?.let { progress.add(it, null) }
+  val segments = LinkedHashMap<String, Long>()
   var stats: Long? = null
-  val torrents = LinkedHashSet<String>()
-  var connections: Int? = null
-  for (interest in interests) {
+  var connectionsLimit: Int? = null
+  var connectionsStep: Long? = null
+  val torrents = LinkedHashMap<TorrentInterest, Long>()
+  val others = LinkedHashMap<Interest<*>, Long>()
+  for ((interest, intervalMs) in held) {
+    val step = StreamEvents.intervalStep(intervalMs)
     when (interest) {
-      is StreamInterest.Tasks -> {
-        val taskIds = interest.interest.taskIds
-        interest.interest.progressInterval?.let { progress.add(it, taskIds) }
-        interest.interest.segmentsInterval?.let { segments.add(it, taskIds) }
+      is Interest.Segments -> for (taskId in interest.taskIds) segments.keepShortest(taskId, step)
+      Interest.Stats -> stats = minOf(stats ?: step, step)
+      is Interest.Connections -> {
+        connectionsLimit = maxOf(connectionsLimit ?: interest.limit, interest.limit)
+        connectionsStep = minOf(connectionsStep ?: step, step)
       }
-      is StreamInterest.Stats -> {
-        val step = stepOf(interest.interval)
-        stats = stats?.let { minOf(it, step) } ?: step
-      }
-      is StreamInterest.Torrent -> torrents += interest.taskId
-      is StreamInterest.Connections -> {
-        connections = connections?.let { maxOf(it, interest.limit) } ?: interest.limit
-      }
+      is TorrentInterest -> torrents.keepShortest(interest, step)
+      else -> others.keepShortest(interest, step)
     }
   }
+  val interests = buildList {
+    segments.entries.take(StreamEvents.MAX_TASK_IDS)
+      .groupBy({ it.value }, { it.key })
+      .entries.sortedBy { it.key }
+      .forEach { (step, taskIds) -> add(StreamInterest(Interest.Segments(taskIds.toSet()), step)) }
+    stats?.let { add(StreamInterest(Interest.Stats, it)) }
+    connectionsLimit?.let { limit ->
+      add(StreamInterest(Interest.Connections(limit), checkNotNull(connectionsStep)))
+    }
+    torrents.entries.take(StreamEvents.MAX_TORRENTS)
+      .forEach { (interest, step) -> add(StreamInterest(interest, step)) }
+    others.forEach { (interest, step) -> add(StreamInterest(interest, step)) }
+  }
   return StreamSubscription(
-    revision = 0,
-    tasks = true,
-    progress = progress.rules(),
-    segments = segments.rules(),
-    statsIntervalMs = stats,
-    torrents = torrents.take(StreamEvents.MAX_TORRENTS),
-    connectionsLimit = connections,
+    progressIntervalMs = progress?.let(::stepOf),
+    interests = interests.take(StreamEvents.MAX_INTERESTS),
   )
 }
 
 private fun stepOf(interval: Duration): Long =
   StreamEvents.intervalStep(interval.inWholeMilliseconds.coerceAtLeast(1))
 
-/** Task IDs per interval step, and the fastest step that covers every task. */
-private class IntervalRules {
-  private var everyTask: Long? = null
-  private val byStep = HashMap<Long, LinkedHashSet<String>>()
-
-  fun add(interval: Duration, taskIds: Set<String>?) {
-    val step = stepOf(interval)
-    if (taskIds == null) {
-      everyTask = everyTask?.let { minOf(it, step) } ?: step
-    } else {
-      byStep.getOrPut(step) { LinkedHashSet() } += taskIds
-    }
-  }
-
-  fun rules(): List<TaskInterval> {
-    val rules = ArrayList<TaskInterval>()
-    var budget = StreamEvents.MAX_TASK_IDS
-    val seen = HashSet<String>()
-    for (step in byStep.keys.sorted()) {
-      // Every task already reports this often, and an ID keeps its shortest step only.
-      if (everyTask?.let { it <= step } == true) break
-      val taskIds = byStep.getValue(step).filter { seen.add(it) }.take(budget)
-      if (taskIds.isEmpty()) continue
-      budget -= taskIds.size
-      rules += TaskInterval(step, taskIds)
-    }
-    everyTask?.let { rules += TaskInterval(it, null) }
-    return rules
-  }
+/** Keeps [step] for [key] unless it already has a shorter one. */
+private fun <K> MutableMap<K, Long>.keepShortest(key: K, step: Long) {
+  this[key] = this[key]?.let { minOf(it, step) } ?: step
 }

@@ -552,6 +552,7 @@ private fun PageBodyContent(
       }
     }
   }
+  if (content == PageContent.Rows) WatchShownTasks(state, page.listState)
   when (content) {
     PageContent.Blank -> Box(Modifier.fillMaxSize())
     PageContent.Loading -> SkeletonRows(

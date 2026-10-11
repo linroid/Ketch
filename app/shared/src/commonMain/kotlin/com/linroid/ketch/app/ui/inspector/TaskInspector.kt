@@ -34,12 +34,14 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.InspectedSegmentsInterval
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.followSegments
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
@@ -121,6 +123,7 @@ internal fun InspectorContent(
     else -> last.value
   }
   SideEffect { last.value = shown }
+  WatchInspected(state, if (selectedKeys.size >= 2) selectedKeys else setOfNotNull(taskKey))
   val spacing = KetchTheme.spacing
   val padding = if (placement == InspectorPlacement.Sheet) {
     // The sheet's drag handle already leaves room above.
@@ -307,5 +310,16 @@ private fun runReason(
     ReasonAction.SpeedSettings -> {
       state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, row.key.deviceId))
     }
+  }
+}
+
+/**
+ * Follows the segments of the tasks the inspector shows every [InspectedSegmentsInterval], for
+ * the lane strip, the Connections tab and the files of torrents.
+ */
+@Composable
+private fun WatchInspected(state: AppState, keys: Set<TaskKey>) {
+  LaunchedEffect(state, keys) {
+    if (keys.isNotEmpty()) state.followSegments(keys, InspectedSegmentsInterval)
   }
 }

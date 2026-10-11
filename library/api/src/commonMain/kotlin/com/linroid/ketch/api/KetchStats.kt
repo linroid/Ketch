@@ -3,7 +3,7 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Totals of the tasks that are downloading, which [KetchApi.stats] reports. Counts per state
+ * Totals of the tasks that are downloading, which [Interest.Stats] reports. Counts per state
  * follow from [KetchApi.tasks].
  *
  * @property downloadBps the summed download speed, in bytes per second

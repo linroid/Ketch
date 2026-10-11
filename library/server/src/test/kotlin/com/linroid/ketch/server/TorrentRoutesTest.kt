@@ -1,6 +1,7 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
@@ -15,6 +16,7 @@ import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -34,6 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 /** The `/api/torrents` routes over a scripted [TorrentController]. */
 class TorrentRoutesTest {
@@ -62,7 +65,7 @@ class TorrentRoutesTest {
     override suspend fun snapshot(taskId: String): TorrentSnapshot? =
       if (taskId == "t1") this@TorrentRoutesTest.snapshot(taskId) else null
 
-    override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+    fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
       when (taskId) {
         "busy" -> throw TorrentCommandException(
           TorrentCommandError.RESOURCE_EXHAUSTED,
@@ -116,12 +119,22 @@ class TorrentRoutesTest {
   }
 
   private class ControlledKetch(
-    delegate: KetchApi,
+    private val delegate: KetchApi,
     private val torrents: TorrentController,
   ) : KetchApi by delegate {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> control(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T else null
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+      val scripted = torrents as? ScriptedController
+      return if (interest is TorrentInterest && scripted != null) {
+        scripted.observe(interest.taskId) as Flow<T>
+      } else {
+        delegate.subscribe(interest, interval)
+      }
+    }
   }
 
   private suspend fun HttpResponse.error(): ErrorResponse = json.decodeFromString(bodyAsText())

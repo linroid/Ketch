@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
@@ -18,8 +19,10 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteApiException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -236,6 +239,8 @@ private class FakeKetch(
   val submitted = mutableListOf<DownloadRequest>()
   override val backendLabel = "Fake"
   override val tasks = MutableStateFlow(tasks)
+
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
 
   override suspend fun download(request: DownloadRequest): DownloadTask {
     submitted += request

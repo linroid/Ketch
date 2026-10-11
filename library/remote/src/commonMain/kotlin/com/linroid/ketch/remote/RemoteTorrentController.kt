@@ -1,5 +1,6 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration
 
 /**
  * [TorrentController] of a Ketch server, over its `/api/torrents` routes. It fails closed: a
@@ -65,7 +67,8 @@ internal class RemoteTorrentController(
   private val generation: StateFlow<Long>,
   private val json: Json,
   private val streamed: StateFlow<Boolean> = MutableStateFlow(false),
-  private val streamTorrent: (String) -> Flow<TopicItem<TorrentSnapshot>> = { emptyFlow() },
+  private val streamTorrent: (String, Duration) -> Flow<TopicItem<TorrentSnapshot>> =
+    { _, _ -> emptyFlow() },
 ) : TorrentController {
   private val log = KetchLogger("RemoteTorrents")
   private val mutex = Mutex()
@@ -98,10 +101,14 @@ internal class RemoteTorrentController(
     return call(notFoundIsNull = true) { httpClient.get(Torrents.ById(id = taskId)) }
   }
 
-  override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+  /** What `TorrentInterest` reports about every [interval]; see there. */
+  fun observe(
+    taskId: String,
+    interval: Duration = Interest.DEFAULT_INTERVAL,
+  ): Flow<TorrentSnapshot?> = flow {
     requireCapability(TorrentCapability.INSPECT)
     if (streamed.value) {
-      emitAll(observeOnStream(taskId))
+      emitAll(observeOnStream(taskId, interval))
       return@flow
     }
     // Engines such as Darwin's run execute's block on another dispatcher, where a plain flow may
@@ -116,10 +123,10 @@ internal class RemoteTorrentController(
   }
 
   /** The snapshots of [taskId] the event stream sends, under the same rules as its own stream. */
-  private fun observeOnStream(taskId: String): Flow<TorrentSnapshot?> = flow {
+  private fun observeOnStream(taskId: String, interval: Duration): Flow<TorrentSnapshot?> = flow {
     var current: TorrentRevision? = null
     try {
-      streamTorrent(taskId).collect { item ->
+      streamTorrent(taskId, interval).collect { item ->
         when (item) {
           is TopicItem.Value -> when (current?.compareIncoming(item.value.revision)) {
             null, TorrentRevisionDecision.APPLY -> {

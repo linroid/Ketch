@@ -3,7 +3,6 @@ package com.linroid.ketch.api
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.time.Duration
 
 class KetchStatsTest {
   @Test
@@ -23,10 +22,11 @@ class KetchStatsTest {
   }
 
   @Test
-  fun taskInterest_refusesIntervalsThatAreNotPositive() {
-    assertFailsWith<IllegalArgumentException> { TaskInterest(progressInterval = Duration.ZERO) }
+  fun interests_refuseValuesOutOfRange() {
+    assertFailsWith<IllegalArgumentException> { Interest.Segments(emptySet()) }
+    assertFailsWith<IllegalArgumentException> { Interest.Connections(0) }
     assertFailsWith<IllegalArgumentException> {
-      TaskInterest(segmentsInterval = -Duration.INFINITE)
+      Interest.Connections(ActiveConnections.MAX_LIMIT + 1)
     }
   }
 }

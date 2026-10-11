@@ -9,20 +9,26 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /** A device that records the downloads and the settings it is given. */
 internal class FakeDevice : KetchApi {
   private val list = MutableStateFlow<List<DownloadTask>>(emptyList())
+
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
 
   /** Requests passed to [download], in order. */
   val requests = mutableListOf<DownloadRequest>()

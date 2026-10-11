@@ -63,6 +63,8 @@ import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFeatures
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
@@ -945,6 +947,16 @@ class AppState(
     if (TorrentFeatures.CONTROL !in featuresOf(deviceId)) return null
     return instances.value.firstOrNull { it.deviceId == deviceId }?.instance
       ?.control(TorrentController)
+  }
+
+  /**
+   * The snapshots of the torrent task [key] names, from its device, or `null` when the device
+   * has no torrent controls; see [TorrentInterest].
+   */
+  fun torrentSnapshotsOf(key: TaskKey): Flow<TorrentSnapshot?>? {
+    if (TorrentFeatures.CONTROL !in featuresOf(key.deviceId)) return null
+    return instances.value.firstOrNull { it.deviceId == key.deviceId }?.instance
+      ?.subscribe(TorrentInterest(key.taskId))
   }
 
   /**

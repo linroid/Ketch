@@ -4,6 +4,7 @@ import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.PeerDetails
@@ -98,10 +99,10 @@ class RemoteActiveConnectionsTest {
     headersOf(HttpHeaders.ContentType, "application/json"),
   )
 
-  /** Collects [RemoteKetch.activeConnections] until it fails, returning what came and why. */
+  /** Collects [Interest.Connections] until it fails, returning what came and why. */
   private suspend fun RemoteKetch.drain(limit: Int): Pair<List<ActiveConnections>, Throwable?> {
     var failure: Throwable? = null
-    val snapshots = activeConnections(limit).catch { failure = it }.toList()
+    val snapshots = subscribe(Interest.Connections(limit)).catch { failure = it }.toList()
     return snapshots to failure
   }
 
@@ -109,9 +110,9 @@ class RemoteActiveConnectionsTest {
   fun limitOutOfRange_isRefusedBeforeSending() = runTest {
     val fixture = fixture { events() }
     try {
-      assertFailsWith<IllegalArgumentException> { fixture.remote.activeConnections(0) }
+      assertFailsWith<IllegalArgumentException> { fixture.remote.subscribe(Interest.Connections(0)) }
       assertFailsWith<IllegalArgumentException> {
-        fixture.remote.activeConnections(ActiveConnections.MAX_LIMIT + 1)
+        fixture.remote.subscribe(Interest.Connections(ActiveConnections.MAX_LIMIT + 1))
       }
       assertEquals(emptyList(), fixture.requests)
     } finally {

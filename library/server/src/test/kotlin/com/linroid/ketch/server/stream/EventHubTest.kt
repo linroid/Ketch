@@ -1,6 +1,5 @@
 package com.linroid.ketch.server.stream
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
@@ -11,6 +10,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
@@ -21,13 +21,14 @@ import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamInterest
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
-import com.linroid.ketch.endpoints.stream.TaskInterval
 import com.linroid.ketch.endpoints.stream.TaskProgressUpdate
 import com.linroid.ketch.endpoints.stream.TaskSegmentsUpdate
 import com.linroid.ketch.endpoints.stream.TaskStateUpdate
+import com.linroid.ketch.endpoints.stream.UnknownInterest
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapabilities
 import com.linroid.ketch.torrent.api.TorrentCommandContext
@@ -37,6 +38,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -62,6 +64,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -141,7 +144,7 @@ class EventHubTest {
     val task = FakeTask("a", downloading(0))
     val hub = hub(FakeKetch(task))
     val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(400))))
+    hub.subscribe(client.stream.id, null, subscription(progressMs = 400))
     runCurrent()
     client.clear()
 
@@ -167,7 +170,7 @@ class EventHubTest {
     val task = FakeTask("a", downloading(0))
     val hub = hub(FakeKetch(task))
     val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(5_000))))
+    hub.subscribe(client.stream.id, null, subscription(progressMs = 5_000))
     runCurrent()
     task.state.value = downloading(1)
     runCurrent()
@@ -186,39 +189,34 @@ class EventHubTest {
   }
 
   @Test
-  fun shortestRuleWins_andTasksNewlyNamedGetProgressAtOnce() = runTest {
+  fun newlyAsked_progressAndSegmentsComeAtOnce() = runTest {
     val task = FakeTask("a", downloading(0))
-    val other = FakeTask("b", downloading(0))
-    val hub = hub(FakeKetch(task, other))
+    val hub = hub(FakeKetch(task))
     val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(10_000))))
-    runCurrent()
-    task.state.value = downloading(1)
-    other.state.value = downloading(1)
-    runCurrent()
-    task.state.value = downloading(2)
-    runCurrent()
     client.clear()
+
+    task.state.value = downloading(2)
+    task.segments.value = listOf(Segment(0, 0, 99, 2))
+    runCurrent()
+    // Nobody asked for either.
+    assertEquals(emptyList(), client.names())
 
     hub.subscribe(
       client.stream.id,
       null,
       subscription(
-        revision = 2,
-        progress = listOf(TaskInterval(10_000), TaskInterval(500, listOf("a"))),
+        progressMs = 10_000,
+        interests = listOf(follow(Interest.Segments(setOf("a")), 10_000)),
       ),
     )
     runCurrent()
-    // Still under the 10 s rule's quiet interval, "a" is sent at once.
-    assertEquals(listOf(StreamEvents.SUBSCRIBED, StreamEvents.TASK_PROGRESS), client.names())
-    assertEquals(2, client.decode<TaskProgressUpdate>(1).progress.downloadedBytes)
 
-    task.state.value = downloading(3)
-    other.state.value = downloading(3)
-    advanceTimeBy(600)
-    runCurrent()
-    assertEquals(listOf(2L, 3L), client.progress("a"))
-    assertEquals(emptyList(), client.progress("b"))
+    assertEquals(
+      listOf(StreamEvents.SUBSCRIBED, StreamEvents.TASK_PROGRESS, StreamEvents.TASK_SEGMENTS),
+      client.names(),
+    )
+    assertEquals(2, client.decode<TaskProgressUpdate>(1).progress.downloadedBytes)
+    assertEquals(task.segments.value, client.decode<TaskSegmentsUpdate>(2).segments)
   }
 
   @Test
@@ -234,7 +232,7 @@ class EventHubTest {
         events += event
       }
     }
-    hub.subscribe(stream.id, null, subscription(progress = listOf(TaskInterval(200))))
+    hub.subscribe(stream.id, null, subscription(progressMs = 200))
     runCurrent()
     task.state.value = downloading(1)
     runCurrent()
@@ -262,7 +260,7 @@ class EventHubTest {
     hub.subscribe(
       client.stream.id,
       null,
-      subscription(segments = listOf(TaskInterval(1_000, listOf("a")))),
+      subscription(interests = listOf(follow(Interest.Segments(setOf("a")), 1_000))),
     )
     runCurrent()
     client.clear()
@@ -280,7 +278,8 @@ class EventHubTest {
     val task = FakeTask("a", downloading(0, bps = 100))
     val hub = hub(FakeKetch(task))
     val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(statsIntervalMs = 1_000))
+    val subscription = subscription(interests = listOf(follow(Interest.Stats, 1_000)))
+    hub.subscribe(client.stream.id, null, subscription)
     runCurrent()
     assertEquals(100, client.decode<KetchStats>(client.names().lastIndex).downloadBps)
     client.clear()
@@ -318,7 +317,8 @@ class EventHubTest {
   fun subscribe_staleRevision_changesNothing() = runTest {
     val hub = hub(FakeKetch())
     val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(revision = 2, statsIntervalMs = 700))
+    val stats = subscription(revision = 2, interests = listOf(follow(Interest.Stats, 700)))
+    hub.subscribe(client.stream.id, null, stats)
     runCurrent()
     client.clear()
 
@@ -326,7 +326,7 @@ class EventHubTest {
     runCurrent()
 
     assertEquals(2, answer.revision)
-    assertEquals(1_000, answer.subscription.statsIntervalMs)
+    assertEquals(listOf(follow(Interest.Stats, 700)), answer.subscription.interests)
     assertEquals(emptyList(), client.names())
   }
 
@@ -345,50 +345,45 @@ class EventHubTest {
   }
 
   @Test
-  fun normalized_roundsIntervalsAndRejectsLimits() {
-    val applied = subscription(
-      progress = listOf(TaskInterval(1, listOf("a", "a"))),
-      statsIntervalMs = 90_000,
-      torrents = listOf("t", "t"),
-    ).normalized()
-    assertEquals(TaskInterval(200, listOf("a")), applied.progress.single())
-    assertEquals(60_000, applied.statsIntervalMs)
-    assertEquals(listOf("t"), applied.torrents)
+  fun planOf_roundsIntervalsMergesInterestsAndRejectsLimits() {
+    val plan = planOf(
+      subscription(
+        progressMs = 1,
+        interests = listOf(
+          follow(Interest.Segments(setOf("a")), 400),
+          follow(Interest.Segments(setOf("a", "b")), 2_000),
+          follow(Interest.Stats, 90_000),
+          follow(Interest.Stats, 5_000),
+          follow(Interest.Connections(36), 2_000),
+          follow(Interest.Connections(512), 500),
+          follow(TorrentInterest("t"), 1_000),
+          follow(TorrentInterest("t"), 300),
+          follow(UnknownInterest, 1_000),
+        ),
+      ),
+    )
+    assertEquals(200, plan.progress.step("any"))
+    assertEquals(500, plan.segments.step("a"))
+    assertEquals(2_000, plan.segments.step("b"))
+    assertNull(plan.segments.step("c"))
+    assertEquals(5_000, plan.statsIntervalMs)
+    assertEquals(512, plan.connectionsLimit)
+    assertEquals(500, plan.connectionsIntervalMs)
+    assertEquals(mapOf("t" to 500L), plan.torrents)
 
+    assertFailsWith<IllegalArgumentException> { planOf(subscription(progressMs = 0)) }
     assertFailsWith<IllegalArgumentException> {
-      subscription(progress = listOf(TaskInterval(0))).normalized()
+      val interests = List(StreamEvents.MAX_INTERESTS + 1) { follow(Interest.Stats, 1_000) }
+      planOf(subscription(interests = interests))
     }
     assertFailsWith<IllegalArgumentException> {
-      subscription(progress = List(StreamEvents.MAX_RULES + 1) { TaskInterval(500) }).normalized()
+      val ids = List(StreamEvents.MAX_TASK_IDS + 1) { "t$it" }.toSet()
+      planOf(subscription(interests = listOf(follow(Interest.Segments(ids), 1_000))))
     }
     assertFailsWith<IllegalArgumentException> {
-      val ids = List(StreamEvents.MAX_TASK_IDS + 1) { "t$it" }
-      subscription(segments = listOf(TaskInterval(500, ids))).normalized()
+      val torrents = List(StreamEvents.MAX_TORRENTS + 1) { follow(TorrentInterest("t$it"), 1_000) }
+      planOf(subscription(interests = torrents))
     }
-    assertFailsWith<IllegalArgumentException> {
-      subscription(torrents = List(StreamEvents.MAX_TORRENTS + 1) { "t$it" }).normalized()
-    }
-    assertFailsWith<IllegalArgumentException> {
-      subscription(connectionsLimit = ActiveConnections.MAX_LIMIT + 1).normalized()
-    }
-  }
-
-  @Test
-  fun tasksTurnedBackOn_sendsSnapshotAgain() = runTest {
-    val ketch = FakeKetch(FakeTask("a"))
-    val hub = hub(ketch)
-    val client = connect(hub)
-    hub.subscribe(client.stream.id, null, subscription(tasks = false))
-    runCurrent()
-    ketch.tasks.value = listOf(ketch.task("a"), FakeTask("b"))
-    runCurrent()
-    client.clear()
-
-    hub.subscribe(client.stream.id, null, subscription(revision = 2))
-    runCurrent()
-
-    assertEquals(listOf(StreamEvents.SUBSCRIBED, StreamEvents.TASKS), client.names())
-    assertEquals(listOf("a", "b"), client.decode<TasksResponse>(1).tasks.map { it.taskId })
   }
 
   // -- Streams and shared sources --
@@ -414,8 +409,9 @@ class EventHubTest {
     val first = connect(hub)
     val second = connect(hub)
 
-    hub.subscribe(first.stream.id, null, subscription(torrents = listOf("t1")))
-    hub.subscribe(second.stream.id, null, subscription(torrents = listOf("t1")))
+    val torrent = subscription(interests = listOf(follow(TorrentInterest("t1"))))
+    hub.subscribe(first.stream.id, null, torrent)
+    hub.subscribe(second.stream.id, null, torrent)
     runCurrent()
     assertEquals(1, controller.observers)
     assertEquals("t1", first.decode<TorrentSnapshot>(first.names().lastIndex).taskId)
@@ -434,7 +430,8 @@ class EventHubTest {
     val client = connect(hub)
     client.clear()
 
-    hub.subscribe(client.stream.id, null, subscription(torrents = listOf("gone", "busy")))
+    val torrents = listOf(follow(TorrentInterest("gone")), follow(TorrentInterest("busy")))
+    hub.subscribe(client.stream.id, null, subscription(interests = torrents))
     runCurrent()
 
     assertTrue(StreamEvents.TORRENT_REMOVED in client.names())
@@ -454,7 +451,9 @@ class EventHubTest {
     hub.subscribe(
       client.stream.id,
       null,
-      subscription(torrents = listOf("t1"), connectionsLimit = 10),
+      subscription(
+        interests = listOf(follow(TorrentInterest("t1")), follow(Interest.Connections(10))),
+      ),
     )
     runCurrent()
     val errors = client.events.filter { it.event == StreamEvents.ERROR }
@@ -501,21 +500,12 @@ class EventHubTest {
 
   private fun subscription(
     revision: Long = 1,
-    tasks: Boolean = true,
-    progress: List<TaskInterval> = emptyList(),
-    segments: List<TaskInterval> = emptyList(),
-    statsIntervalMs: Long? = null,
-    torrents: List<String> = emptyList(),
-    connectionsLimit: Int? = null,
-  ) = StreamSubscription(
-    revision = revision,
-    tasks = tasks,
-    progress = progress,
-    segments = segments,
-    statsIntervalMs = statsIntervalMs,
-    torrents = torrents,
-    connectionsLimit = connectionsLimit,
-  )
+    progressMs: Long? = null,
+    interests: List<StreamInterest> = emptyList(),
+  ) = StreamSubscription(revision, progressMs, interests)
+
+  private fun follow(interest: Interest<*>, intervalMs: Long = 200) =
+    StreamInterest(interest, intervalMs)
 
   private fun downloading(bytes: Long, bps: Long = 0) =
     DownloadState.Downloading(DownloadProgress(bytes, 100, bps))
@@ -546,7 +536,7 @@ class EventHubTest {
   /** An engine with [initial] tasks, the torrent controls given, and no live connections. */
   private class FakeKetch(
     vararg initial: DownloadTask,
-    private val torrents: TorrentController? = null,
+    private val torrents: ScriptedController? = null,
   ) : KetchApi {
     override val backendLabel = "Fake"
     override val tasks = MutableStateFlow(initial.toList())
@@ -556,6 +546,14 @@ class EventHubTest {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> control(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T? else null
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      if (interest is TorrentInterest && torrents != null) {
+        torrents.observe(interest.taskId) as Flow<T>
+      } else {
+        flow { throw UnsupportedOperationException("Not followed in tests") }
+      }
 
     override suspend fun download(request: DownloadRequest) = error("Unexpected call")
     override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
@@ -570,7 +568,7 @@ class EventHubTest {
   private class ScriptedController : TorrentController {
     var observers = 0
 
-    override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+    fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
       when (taskId) {
         "busy" -> throw TorrentCommandException(
           TorrentCommandError.RESOURCE_EXHAUSTED,

@@ -1,44 +1,47 @@
 package com.linroid.ketch.endpoints.stream
 
+import com.linroid.ketch.api.Interest
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * What a client wants on its event stream, sent whole with `PUT
- * /api/stream/{streamId}/subscription`. A stream starts at revision 0 with [tasks] only.
+ * What a client wants on its event stream beyond the task lifecycle and state changes, which
+ * every stream carries at once: how often the progress of downloading tasks comes, and the
+ * [Interest]s its callers follow, each with how often. Sent whole with `PUT
+ * /api/stream/{streamId}/subscription`; the server merges the interests, the shortest interval
+ * winning. A stream starts at revision 0 with neither.
  *
  * @property revision counts the client's subscriptions; one not above the applied revision
  *   changes nothing
- * @property tasks the task lifecycle and state changes, starting with a snapshot of every task
- * @property progress how often downloading tasks report progress; the shortest rule that names a
- *   task wins, and tasks no rule names report it only in state changes
- * @property segments how often tasks report their segments
- * @property statsIntervalMs how often `KetchStats` are sent, or `null` for never
- * @property torrents task IDs whose torrent snapshots are sent
- * @property connectionsLimit the limit of the live connections sent, or `null` for none
+ * @property progressIntervalMs how often every downloading task's progress comes, rounded up
+ *   with [StreamEvents.intervalStep], or `null` for only with its state changes
+ * @property interests at most [StreamEvents.MAX_INTERESTS], naming at most
+ *   [StreamEvents.MAX_TASK_IDS] tasks and [StreamEvents.MAX_TORRENTS] torrents; serialized with
+ *   [StreamSerializers]
  */
 @Serializable
 data class StreamSubscription(
   val revision: Long = 0,
-  val tasks: Boolean = true,
-  val progress: List<TaskInterval> = emptyList(),
-  val segments: List<TaskInterval> = emptyList(),
-  val statsIntervalMs: Long? = null,
-  val torrents: List<String> = emptyList(),
-  val connectionsLimit: Int? = null,
+  val progressIntervalMs: Long? = null,
+  val interests: List<StreamInterest> = emptyList(),
 )
 
 /**
- * How often the tasks with [taskIds] report a topic.
+ * An [interest] a client follows, and how often it wants its updates.
  *
- * @property intervalMs the shortest time between two reports; the server rounds it up with
- *   [StreamEvents.intervalStep]
- * @property taskIds the tasks this rule is about, or `null` for every task
+ * @property interest serialized with [StreamSerializers]
+ * @property intervalMs the shortest time between two updates, rounded up with
+ *   [StreamEvents.intervalStep]; the first comes at once
  */
 @Serializable
-data class TaskInterval(
+data class StreamInterest(
+  val interest: Interest<*>,
   val intervalMs: Long,
-  val taskIds: List<String>? = null,
-)
+) {
+  init {
+    require(intervalMs > 0) { "intervalMs must be positive" }
+  }
+}
 
 /**
  * The first event of a stream.
@@ -57,11 +60,17 @@ data class StreamHello(
 /**
  * A subscription the stream applies: the answer to a subscription request, and an event on the
  * stream before the snapshots of the topics it adds.
- *
- * @property subscription the subscription as applied, its intervals rounded up to steps
  */
 @Serializable
 data class StreamSubscribed(
   val revision: Long,
   val subscription: StreamSubscription,
 )
+
+/**
+ * An interest of a kind this version does not know, as a newer client may send; the server
+ * ignores it.
+ */
+@Serializable
+@SerialName("unknown")
+data object UnknownInterest : Interest<Nothing>

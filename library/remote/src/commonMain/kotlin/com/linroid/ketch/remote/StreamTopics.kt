@@ -2,10 +2,12 @@ package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamSubscription
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,9 +55,11 @@ internal class StreamTopics {
    * caller asking for them again waits for current ones.
    */
   fun applied(subscription: StreamSubscription) {
-    if (subscription.statsIntervalMs == null) stats.value = null
-    if (subscription.connectionsLimit == null) connections.value = null
-    torrents.update { items -> items.filterKeys { it in subscription.torrents } }
+    val interests = subscription.interests.map { it.interest }
+    if (interests.none { it == Interest.Stats }) stats.value = null
+    if (interests.none { it is Interest.Connections }) connections.value = null
+    val followed = interests.mapNotNullTo(HashSet()) { (it as? TorrentInterest)?.taskId }
+    torrents.update { items -> items.filterKeys { it in followed } }
   }
 
   fun torrent(taskId: String, item: TopicItem<TorrentSnapshot>) {

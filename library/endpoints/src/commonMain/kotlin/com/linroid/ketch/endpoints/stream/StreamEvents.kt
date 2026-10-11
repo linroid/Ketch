@@ -3,7 +3,7 @@ package com.linroid.ketch.endpoints.stream
 /**
  * The server-sent events, error codes and limits of the subscribed event stream, `GET
  * /api/stream`. The stream starts with [HELLO] and carries the task lifecycle; everything else
- * is sent once the client asks for it with a [StreamSubscription].
+ * is sent once the client asks for it with a [StreamSubscription] of interests.
  */
 object StreamEvents {
   /**
@@ -24,7 +24,7 @@ object StreamEvents {
    */
   const val SUBSCRIBED: String = "subscribed"
 
-  /** A `TasksResponse` with every task, sent when [StreamSubscription.tasks] turns on. */
+  /** A `TasksResponse` with every task, sent once, right after the first [SUBSCRIBED]. */
   const val TASKS: String = "tasks"
 
   /** A `TaskSnapshot` of a task that was added. */
@@ -78,13 +78,13 @@ object StreamEvents {
   /** Error code of a topic that failed on the server. */
   const val INTERNAL_ERROR: String = "internal_error"
 
-  /** Most rules in [StreamSubscription.progress] or [StreamSubscription.segments]. */
-  const val MAX_RULES: Int = 16
+  /** Most interests in a subscription. */
+  const val MAX_INTERESTS: Int = 64
 
-  /** Most task IDs in one list of a subscription. */
+  /** Most task IDs the `Interest.Segments` of a subscription name together. */
   const val MAX_TASK_IDS: Int = 1024
 
-  /** Most torrents in [StreamSubscription.torrents]. */
+  /** Most torrents a subscription follows. */
   const val MAX_TORRENTS: Int = 16
 
   /**

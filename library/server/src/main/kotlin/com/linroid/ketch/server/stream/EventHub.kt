@@ -1,6 +1,7 @@
 package com.linroid.ketch.server.stream
 
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -8,27 +9,32 @@ import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.endpoints.stream.TaskInterval
 import com.linroid.ketch.server.api.toErrorResponse
 import com.linroid.ketch.torrent.api.TorrentCommandException
-import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 private val log = KetchLogger("EventHub")
 
 /** How many event streams a server serves at once. */
 internal const val MAX_EVENT_STREAMS = 32
+
+/**
+ * The interval the hub asks the engine for torrents and connections at: as often as it reports
+ * them; each stream sends them as often as its own subscription asks.
+ */
+private val INTERNAL_INTERVAL = StreamEvents.INTERVALS_MS.first().milliseconds
 
 /**
  * The event streams of a server: every stream reads the same [TaskFrame]s, kept by one
@@ -96,7 +102,7 @@ internal class EventHub(
   ): StreamSubscribed {
     val stream = synchronized(lock) { streams[streamId] }
     if (stream == null || stream.owner != owner) throw UnknownStreamException()
-    return stream.apply(subscription.normalized())
+    return stream.apply(subscription, planOf(subscription))
   }
 
   private fun closed(stream: EventStream) {
@@ -110,43 +116,40 @@ internal class EventHub(
     }
   }
 
-  private fun torrentItems(taskId: String): Flow<SourceItem<TorrentSnapshot>> {
-    val controller = ketch.control(TorrentController)
-      ?: return flowOf(
-        SourceItem.Failed(
-          StreamError(
-            StreamEvents.UNSUPPORTED,
-            "This server has no torrent controls",
-            StreamEvents.TOPIC_TORRENTS,
-            taskId,
-          ),
-        ),
-      )
-    return controller.observe(taskId)
+  private fun torrentItems(taskId: String): Flow<SourceItem<TorrentSnapshot>> =
+    ketch.subscribe(TorrentInterest(taskId), INTERNAL_INTERVAL)
       .transformWhile { snapshot ->
         emit(if (snapshot == null) SourceItem.Removed else SourceItem.Value(snapshot))
         snapshot != null
       }
       .catch { error ->
         if (error is CancellationException) throw error
-        val failure = if (error is TorrentCommandException) {
-          val response = error.toErrorResponse()
-          StreamError(response.error, response.message, StreamEvents.TOPIC_TORRENTS, taskId)
-        } else {
-          log.w { "Torrent events of taskId=$taskId failed: ${error.describeCauses()}" }
-          StreamError(
-            StreamEvents.INTERNAL_ERROR,
-            "Torrent events are unavailable",
+        val failure = when (error) {
+          is TorrentCommandException -> {
+            val response = error.toErrorResponse()
+            StreamError(response.error, response.message, StreamEvents.TOPIC_TORRENTS, taskId)
+          }
+          is UnsupportedOperationException -> StreamError(
+            StreamEvents.UNSUPPORTED,
+            "This server has no torrent controls",
             StreamEvents.TOPIC_TORRENTS,
             taskId,
           )
+          else -> {
+            log.w { "Torrent events of taskId=$taskId failed: ${error.describeCauses()}" }
+            StreamError(
+              StreamEvents.INTERNAL_ERROR,
+              "Torrent events are unavailable",
+              StreamEvents.TOPIC_TORRENTS,
+              taskId,
+            )
+          }
         }
         emit(SourceItem.Failed(failure))
       }
-  }
 
   private fun connectionItems(limit: Int): Flow<SourceItem<ActiveConnections>> =
-    ketch.activeConnections(limit)
+    ketch.subscribe(Interest.Connections(limit), INTERNAL_INTERVAL)
       .map<ActiveConnections, SourceItem<ActiveConnections>> { SourceItem.Value(it) }
       .catch { error ->
         if (error is CancellationException) throw error
@@ -166,44 +169,4 @@ internal class EventHub(
         }
         emit(SourceItem.Failed(failure))
       }
-}
-
-/**
- * This subscription with its intervals rounded up to steps and its lists without repeats.
- *
- * @throws IllegalArgumentException when it goes beyond the limits of [StreamEvents]
- */
-internal fun StreamSubscription.normalized(): StreamSubscription {
-  require(revision >= 0) { "revision must not be negative" }
-  require(torrents.size <= StreamEvents.MAX_TORRENTS) {
-    "At most ${StreamEvents.MAX_TORRENTS} torrents can be followed"
-  }
-  require(torrents.none { it.isBlank() }) { "Torrent task IDs must not be blank" }
-  connectionsLimit?.let { limit ->
-    require(limit in 1..ActiveConnections.MAX_LIMIT) {
-      "connectionsLimit must be between 1 and ${ActiveConnections.MAX_LIMIT}"
-    }
-  }
-  return copy(
-    progress = progress.normalized("progress"),
-    segments = segments.normalized("segments"),
-    statsIntervalMs = statsIntervalMs?.let { interval ->
-      require(interval > 0) { "statsIntervalMs must be positive" }
-      StreamEvents.intervalStep(interval)
-    },
-    torrents = torrents.distinct(),
-  )
-}
-
-private fun List<TaskInterval>.normalized(name: String): List<TaskInterval> {
-  require(size <= StreamEvents.MAX_RULES) {
-    "At most ${StreamEvents.MAX_RULES} $name rules are allowed"
-  }
-  require(sumOf { it.taskIds?.size ?: 0 } <= StreamEvents.MAX_TASK_IDS) {
-    "At most ${StreamEvents.MAX_TASK_IDS} task IDs are allowed in $name rules"
-  }
-  return map { rule ->
-    require(rule.intervalMs > 0) { "Intervals of $name rules must be positive" }
-    TaskInterval(StreamEvents.intervalStep(rule.intervalMs), rule.taskIds?.distinct())
-  }
 }

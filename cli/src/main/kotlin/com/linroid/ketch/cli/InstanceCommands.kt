@@ -65,6 +65,7 @@ internal suspend fun runInstanceCommand(
     is InstanceCommand.Pause -> attach(endpoint).use { pause(it, command, out, err) }
     is InstanceCommand.Resume -> attach(endpoint).use { resume(it, command, out, err) }
     is InstanceCommand.Watch -> attach(endpoint).use { attachment ->
+      command.interval?.let { attachment.ketch.progressInterval = it }
       watchTasks(
         ketch = attachment.ketch,
         connection = attachment.ketch.connectionState,

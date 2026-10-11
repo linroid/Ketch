@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
@@ -7,9 +8,9 @@ import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamInterest
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.endpoints.stream.TaskInterval
 import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.server.api.streamRoutes
 import com.linroid.ketch.server.stream.EventHub
@@ -111,11 +112,11 @@ class StreamRoutesTest {
 
       val answer = client.subscribe(
         hello.streamId,
-        StreamSubscription(revision = 1, statsIntervalMs = 300),
+        StreamSubscription(revision = 1, interests = listOf(StreamInterest(Interest.Stats, 300))),
       )
       assertEquals(HttpStatusCode.OK, answer.status)
       val applied = ServerJson.decodeFromString<StreamSubscribed>(answer.bodyAsText())
-      assertEquals(500, applied.subscription.statsIntervalMs)
+      assertEquals(listOf(StreamInterest(Interest.Stats, 300)), applied.subscription.interests)
 
       assertEquals(StreamEvents.SUBSCRIBED, channel.nextEvent().first)
       val (statsName, statsData) = channel.nextEvent()
@@ -135,7 +136,7 @@ class StreamRoutesTest {
       val streamId = ServerJson.decodeFromString<StreamHello>(channel.nextEvent().second).streamId
       val invalid = client.subscribe(
         streamId,
-        StreamSubscription(revision = 1, progress = listOf(TaskInterval(intervalMs = 0))),
+        StreamSubscription(revision = 1, progressIntervalMs = 0),
       )
       assertEquals(HttpStatusCode.BadRequest, invalid.status)
       assertEquals(StreamEvents.INVALID_SUBSCRIPTION, invalid.error().error)

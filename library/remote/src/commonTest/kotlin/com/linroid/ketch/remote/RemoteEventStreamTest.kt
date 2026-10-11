@@ -1,15 +1,16 @@
 package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.api.TaskInterest
 import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamInterest
+import com.linroid.ketch.endpoints.stream.StreamSerializers
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.endpoints.stream.TaskInterval
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.HttpRequestData
@@ -22,6 +23,7 @@ import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -29,13 +31,17 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** How [RemoteKetch] chooses and reads its server's events. */
 class RemoteEventStreamTest {
-  private val json = Json { encodeDefaults = true }
+  private val json = Json {
+    encodeDefaults = true
+    serializersModule = StreamSerializers
+  }
   private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
   private val eventHeaders = headersOf(HttpHeaders.ContentType, "text/event-stream")
 
@@ -82,7 +88,7 @@ class RemoteEventStreamTest {
   }
 
   @Test
-  fun start_streamServer_sendsTheMergedSubscriptionAndUpdatesIt() = runTest {
+  fun start_streamServer_sendsTheSubscriptionAndFollowsItsChanges() = runTest {
     val subscriptions = Channel<StreamSubscription>(Channel.UNLIMITED)
     val events = ByteChannel()
     val remote = RemoteKetch(
@@ -126,20 +132,29 @@ class RemoteEventStreamTest {
 
           val first = subscriptions.receive()
           assertEquals(1, first.revision)
-          assertEquals(listOf(TaskInterval(10_000, null)), first.progress)
+          assertEquals(10_000, first.progressIntervalMs)
+          assertEquals(emptyList(), first.interests)
 
-          val watching = launch {
-            remote.watch(TaskInterest(setOf("a"), progressInterval = 300.milliseconds))
+          val following = launch {
+            remote.subscribe(Interest.Segments(setOf("a")), 300.milliseconds).collect()
           }
           val second = subscriptions.receive()
           assertEquals(2, second.revision)
           assertEquals(
-            listOf(TaskInterval(500, listOf("a")), TaskInterval(10_000, null)),
-            second.progress,
+            listOf(StreamInterest(Interest.Segments(setOf("a")), 500)),
+            second.interests,
           )
 
-          watching.cancel()
-          assertEquals(listOf(TaskInterval(10_000, null)), subscriptions.receive().progress)
+          following.cancel()
+          assertEquals(emptyList(), subscriptions.receive().interests)
+
+          // In the background only the task lifecycle and state changes come.
+          remote.foreground = false
+          assertNull(subscriptions.receive().progressIntervalMs)
+
+          remote.progressInterval = 2.seconds
+          remote.foreground = true
+          assertEquals(2_000, subscriptions.receive().progressIntervalMs)
           assertTrue(remote.connectionState.value == ConnectionState.Connected)
         }
       }

@@ -15,8 +15,6 @@ import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -204,8 +202,6 @@ internal class PagedController(
   override suspend fun capabilities(): TorrentCapabilities = TorrentCapabilities()
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
-
-  override fun observe(taskId: String): Flow<TorrentSnapshot?> = emptyFlow()
 
   override suspend fun files(
     taskId: String,

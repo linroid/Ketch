@@ -9,7 +9,6 @@ import com.linroid.ketch.endpoints.stream.StreamHello
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
-import com.linroid.ketch.endpoints.stream.TaskInterval
 import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CoroutineScope
@@ -34,10 +33,11 @@ internal class UnknownStreamException : Exception("No such event stream")
  * latest torrent and connection items); a single writer, [run], turns them into events, so the
  * order of events is the order the writer chose:
  *
- * 1. `subscribed`, then snapshots of the topics it adds;
+ * 1. `subscribed`, then the snapshot of every task after the first, and the current progress
+ *    and segments of tasks it newly asks for;
  * 2. task lifecycle and state changes, at once;
- * 3. torrent and connection items;
- * 4. progress and segments whose interval is due, then stats.
+ * 3. progress, segments, torrent and connection items whose interval is due, then stats; a
+ *    torrent's removal and a topic's failure never wait.
  *
  * The writer remembers the versions it sent of each task and sends the difference to the
  * current [TaskFrame], so a client that reads slowly skips intermediate progress rather than
@@ -58,7 +58,8 @@ internal class EventStream(
 
   // The inbox, guarded by lock.
   private var applied = StreamSubscription()
-  private var newSubscription: StreamSubscription? = applied
+  private var appliedPlan = StreamPlan()
+  private var newSubscription: Pair<StreamSubscription, StreamPlan>? = applied to appliedPlan
   private val dirty = LinkedHashSet<String>()
   private val torrentJobs = HashMap<String, Job>()
   private val torrentInbox = LinkedHashMap<String, SourceItem<TorrentSnapshot>>()
@@ -68,13 +69,16 @@ internal class EventStream(
 
   // The writer's own state.
   private var subscription: StreamSubscription? = null
-  private var progressRules = IntervalRules.NONE
-  private var segmentsRules = IntervalRules.NONE
+  private var plan = StreamPlan()
   private val sent = HashMap<String, SentTask>()
   private val pendingProgress = HashMap<Long, LinkedHashSet<String>>()
   private val pendingSegments = HashMap<Long, LinkedHashSet<String>>()
   private val progressFlushed = HashMap<Long, ComparableTimeMark>()
   private val segmentsFlushed = HashMap<Long, ComparableTimeMark>()
+  private val pendingTorrents = LinkedHashMap<String, SourceItem<TorrentSnapshot>>()
+  private val torrentsSent = HashMap<String, ComparableTimeMark>()
+  private var pendingConnections: SourceItem<ActiveConnections>? = null
+  private var connectionsSentAt: ComparableTimeMark? = null
   private var statsSentAt: ComparableTimeMark? = null
   private var lastStats: KetchStats? = null
   private var sequence = 0L
@@ -86,21 +90,25 @@ internal class EventStream(
   }
 
   /**
-   * Applies [next], already validated, unless its revision is not above the applied one.
-   * Returns the subscription that applies.
+   * Applies [next], whose interests [nextPlan] merges, unless its revision is not above the
+   * applied one. Returns the subscription that applies.
    */
-  fun apply(next: StreamSubscription): StreamSubscribed = synchronized(lock) {
-    if (closed) throw UnknownStreamException()
-    if (next.revision > applied.revision) {
-      val previousLimit = applied.connectionsLimit
-      applied = next
-      newSubscription = next
-      followTorrents(next.torrents.toSet())
-      if (next.connectionsLimit != previousLimit) followConnections(next.connectionsLimit)
-      wake.trySend(Unit)
+  fun apply(next: StreamSubscription, nextPlan: StreamPlan): StreamSubscribed =
+    synchronized(lock) {
+      if (closed) throw UnknownStreamException()
+      if (next.revision > applied.revision) {
+        val previousLimit = appliedPlan.connectionsLimit
+        applied = next
+        appliedPlan = nextPlan
+        newSubscription = next to nextPlan
+        followTorrents(nextPlan.torrents.keys)
+        if (nextPlan.connectionsLimit != previousLimit) {
+          followConnections(nextPlan.connectionsLimit)
+        }
+        wake.trySend(Unit)
+      }
+      StreamSubscribed(applied.revision, applied)
     }
-    StreamSubscribed(applied.revision, applied)
-  }
 
   /** Sends the stream's events through [send] until it is closed or the caller is cancelled. */
   suspend fun run(send: suspend (OutgoingEvent) -> Unit) {
@@ -168,7 +176,7 @@ internal class EventStream(
       connections.subscribe(limit).collect { item ->
         synchronized(lock) {
           // Items of a limit no longer asked for are dropped.
-          if (applied.connectionsLimit == limit) connectionsInbox = item
+          if (appliedPlan.connectionsLimit == limit) connectionsInbox = item
         }
         wake.trySend(Unit)
       }
@@ -190,7 +198,7 @@ internal class EventStream(
   }
 
   private class Inbox(
-    val subscription: StreamSubscription?,
+    val subscription: Pair<StreamSubscription, StreamPlan>?,
     val taskIds: List<String>,
     val torrents: List<Pair<String, SourceItem<TorrentSnapshot>>>,
     val connections: SourceItem<ActiveConnections>?,
@@ -199,28 +207,36 @@ internal class EventStream(
   // -- Writer --
 
   private suspend fun process(inbox: Inbox, send: suspend (OutgoingEvent) -> Unit) {
-    inbox.subscription?.let { subscribe(it, send) }
+    inbox.subscription?.let { (next, nextPlan) -> subscribe(next, nextPlan, send) }
     for (taskId in inbox.taskIds) processTask(taskId, send)
-    val current = subscription ?: return
     for ((taskId, item) in inbox.torrents) {
-      if (taskId in current.torrents) send(torrentEvent(taskId, item))
+      if (taskId in plan.torrents) pendingTorrents[taskId] = item
     }
     inbox.connections?.let { item ->
-      if (current.connectionsLimit != null) connectionsEvent(item)?.let { send(it) }
+      if (plan.connectionsLimit != null) pendingConnections = item
     }
     flushDue(send)
   }
 
-  private suspend fun subscribe(next: StreamSubscription, send: suspend (OutgoingEvent) -> Unit) {
-    val previous = subscription
-    val previousProgress = progressRules
-    val previousSegments = segmentsRules
+  private suspend fun subscribe(
+    next: StreamSubscription,
+    nextPlan: StreamPlan,
+    send: suspend (OutgoingEvent) -> Unit,
+  ) {
+    val first = subscription == null
+    val previous = plan
     subscription = next
-    progressRules = IntervalRules.of(next.progress)
-    segmentsRules = IntervalRules.of(next.segments)
+    plan = nextPlan
     send(event(StreamEvents.SUBSCRIBED, encode(StreamSubscribed(next.revision, next))))
-    if (next.tasks && previous?.tasks != true) sendTasks(send)
-    if (next.statsIntervalMs != previous?.statsIntervalMs) {
+    if (first) sendTasks(send)
+    // A torrent followed again, or a new connection limit, sends its first item at once.
+    pendingTorrents.keys.retainAll(nextPlan.torrents.keys)
+    torrentsSent.keys.retainAll(nextPlan.torrents.keys)
+    if (nextPlan.connectionsLimit != previous.connectionsLimit) {
+      pendingConnections = null
+      connectionsSentAt = null
+    }
+    if (nextPlan.statsIntervalMs != previous.statsIntervalMs) {
       statsSentAt = null
       lastStats = null
     }
@@ -230,18 +246,18 @@ internal class EventStream(
     for ((taskId, known) in sent) {
       val frame = tracker.frame(taskId) ?: continue
       if (hasNewProgress(frame, known)) {
-        val step = progressRules.step(taskId)
+        val step = plan.progress.step(taskId)
         when {
           step == null -> {}
-          previousProgress.step(taskId) == null -> sendProgress(frame, known, send)
+          previous.progress.step(taskId) == null -> sendProgress(frame, known, send)
           else -> pendingProgress.getOrPut(step) { LinkedHashSet() } += taskId
         }
       }
       if (frame.segmentsVersion > known.segmentsVersion) {
-        val step = segmentsRules.step(taskId)
+        val step = plan.segments.step(taskId)
         when {
           step == null -> {}
-          previousSegments.step(taskId) == null -> sendSegments(frame, known, send)
+          previous.segments.step(taskId) == null -> sendSegments(frame, known, send)
           else -> pendingSegments.getOrPut(step) { LinkedHashSet() } += taskId
         }
       }
@@ -256,28 +272,24 @@ internal class EventStream(
   }
 
   private suspend fun processTask(taskId: String, send: suspend (OutgoingEvent) -> Unit) {
-    val tasksOn = subscription?.tasks == true
+    // Before the first subscription, the task snapshot that follows it covers every task.
+    if (subscription == null) return
     val frame = tracker.frame(taskId)
     if (frame == null) {
       if (sent.remove(taskId) != null) {
         pendingProgress.values.forEach { it -= taskId }
         pendingSegments.values.forEach { it -= taskId }
-        if (tasksOn) send(event(StreamEvents.TASK_REMOVED, encode(StreamTaskRef(taskId))))
+        send(event(StreamEvents.TASK_REMOVED, encode(StreamTaskRef(taskId))))
       }
       return
     }
-    val known = sent[taskId]
-    val current = when {
-      known == null && tasksOn -> {
-        send(event(StreamEvents.TASK_ADDED, frame.addedJson))
-        SentTask.of(frame).also { sent[taskId] = it }
-      }
-      // Without the lifecycle, the client learns of the task from its progress or segments.
-      known == null -> SentTask(frame.stateVersion, frame.requestVersion, 0, 0)
-        .also { sent[taskId] = it }
-      else -> known
+    var current = sent[taskId]
+    if (current == null) {
+      send(event(StreamEvents.TASK_ADDED, frame.addedJson))
+      current = SentTask.of(frame)
+      sent[taskId] = current
     }
-    if (tasksOn && frame.stateVersion > current.stateVersion) {
+    if (frame.stateVersion > current.stateVersion) {
       val withRequest = frame.requestVersion > current.requestVersion
       val json = if (withRequest) frame.stateJson else frame.stateOnlyJson
       send(event(StreamEvents.TASK_STATE, json))
@@ -286,10 +298,10 @@ internal class EventStream(
       current.progressVersion = frame.progressVersion
     }
     if (hasNewProgress(frame, current)) {
-      progressRules.step(taskId)?.let { pendingProgress.getOrPut(it) { LinkedHashSet() } += taskId }
+      plan.progress.step(taskId)?.let { pendingProgress.getOrPut(it) { LinkedHashSet() } += taskId }
     }
     if (frame.segmentsVersion > current.segmentsVersion) {
-      segmentsRules.step(taskId)?.let { pendingSegments.getOrPut(it) { LinkedHashSet() } += taskId }
+      plan.segments.step(taskId)?.let { pendingSegments.getOrPut(it) { LinkedHashSet() } += taskId }
     }
   }
 
@@ -303,7 +315,7 @@ internal class EventStream(
   ) {
     if (!hasNewProgress(frame, known)) return
     // A state change the client has not had yet carries the progress, and comes first.
-    if (subscription?.tasks == true && frame.stateVersion > known.stateVersion) return
+    if (frame.stateVersion > known.stateVersion) return
     send(event(StreamEvents.TASK_PROGRESS, frame.progressJson))
     known.progressVersion = frame.progressVersion
   }
@@ -326,7 +338,9 @@ internal class EventStream(
     flush(pendingSegments, segmentsFlushed, now) { frame, known ->
       sendSegments(frame, known, send)
     }
-    val interval = subscription?.statsIntervalMs ?: return
+    flushTorrents(now, send)
+    flushConnections(now, send)
+    val interval = plan.statsIntervalMs ?: return
     val sentAt = statsSentAt
     if (sentAt != null && now - sentAt < interval.milliseconds) return
     statsSentAt = now
@@ -362,6 +376,35 @@ internal class EventStream(
     }
   }
 
+  private suspend fun flushTorrents(
+    now: ComparableTimeMark,
+    send: suspend (OutgoingEvent) -> Unit,
+  ) {
+    val due = pendingTorrents.entries.filter { (taskId, item) ->
+      val last = torrentsSent[taskId]
+      val step = plan.torrents[taskId] ?: return@filter false
+      item !is SourceItem.Value || last == null || now - last >= step.milliseconds
+    }
+    for ((taskId, item) in due) {
+      pendingTorrents.remove(taskId)
+      torrentsSent[taskId] = now
+      send(torrentEvent(taskId, item))
+    }
+  }
+
+  private suspend fun flushConnections(
+    now: ComparableTimeMark,
+    send: suspend (OutgoingEvent) -> Unit,
+  ) {
+    val item = pendingConnections ?: return
+    val last = connectionsSentAt
+    val interval = plan.connectionsIntervalMs.milliseconds
+    if (item is SourceItem.Value && last != null && now - last < interval) return
+    pendingConnections = null
+    connectionsSentAt = now
+    connectionsEvent(item)?.let { send(it) }
+  }
+
   /** How long the writer may wait for the inbox before an interval is due; `null` for ever. */
   private fun nextWait(): Duration? {
     var wait: Duration? = null
@@ -374,7 +417,11 @@ internal class EventStream(
     for ((step, taskIds) in pendingSegments) {
       if (taskIds.isNotEmpty()) consider(dueIn(segmentsFlushed[step], step))
     }
-    subscription?.statsIntervalMs?.let { consider(dueIn(statsSentAt, it)) }
+    for (taskId in pendingTorrents.keys) {
+      plan.torrents[taskId]?.let { consider(dueIn(torrentsSent[taskId], it)) }
+    }
+    if (pendingConnections != null) consider(dueIn(connectionsSentAt, plan.connectionsIntervalMs))
+    plan.statsIntervalMs?.let { consider(dueIn(statsSentAt, it)) }
     return wait
   }
 
@@ -412,36 +459,6 @@ internal class EventStream(
         frame.progressVersion,
         frame.segmentsVersion,
       )
-    }
-  }
-}
-
-/** The interval step of each task under a list of [TaskInterval] rules; the shortest wins. */
-internal class IntervalRules private constructor(
-  private val everyTask: Long?,
-  private val byTask: Map<String, Long>,
-) {
-  /** The interval of [taskId] in milliseconds, or `null` when no rule names it. */
-  fun step(taskId: String): Long? {
-    val own = byTask[taskId] ?: return everyTask
-    return if (everyTask == null) own else minOf(own, everyTask)
-  }
-
-  companion object {
-    val NONE = IntervalRules(null, emptyMap())
-
-    fun of(rules: List<TaskInterval>): IntervalRules {
-      var everyTask: Long? = null
-      val byTask = HashMap<String, Long>()
-      for (rule in rules) {
-        val taskIds = rule.taskIds
-        if (taskIds == null) {
-          everyTask = minOf(everyTask ?: rule.intervalMs, rule.intervalMs)
-        } else {
-          for (taskId in taskIds) byTask.merge(taskId, rule.intervalMs, ::minOf)
-        }
-      }
-      return IntervalRules(everyTask, byTask)
     }
   }
 }

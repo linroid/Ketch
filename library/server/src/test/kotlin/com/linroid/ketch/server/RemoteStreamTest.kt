@@ -4,8 +4,8 @@ import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.TaskInterest
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -18,6 +18,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -28,7 +29,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -38,6 +38,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /** A [RemoteKetch] reading a [KetchServer]'s event stream over a real socket. */
@@ -105,7 +106,7 @@ class RemoteStreamTest {
   }
 
   @Test
-  fun remote_getsProgressOnlyWhileWatched_andStateChangesAtOnce() = runTest {
+  fun remote_getsProgressAtItsInterval_segmentsWhileFollowed_andStateChangesAtOnce() = runTest {
     val ketch = Ketch(httpEngine = TrickleEngine())
     withServer(ketch) { client, folder ->
       val task = ketch.download(
@@ -121,8 +122,9 @@ class RemoteStreamTest {
       // Settles the state changes that come with the start, such as the resolved source.
       delay(500)
       val before = assertIs<DownloadState.Downloading>(remoteTask.state.value).progress
+      val segmentsBefore = remoteTask.segments.value
 
-      // Nobody watches the task: its progress moves on the server only.
+      // Without a progress interval, progress moves on the server only.
       task.state.first {
         (it as? DownloadState.Downloading)?.progress?.downloadedBytes?.let { bytes ->
           bytes > before.downloadedBytes + 20 * 1024
@@ -131,31 +133,29 @@ class RemoteStreamTest {
       delay(300)
       assertEquals(before, assertIs<DownloadState.Downloading>(remoteTask.state.value).progress)
 
-      val watching = launch {
-        client.watch(
-          TaskInterest(
-            taskIds = setOf(task.taskId),
-            progressInterval = 200.milliseconds,
-            segmentsInterval = 200.milliseconds,
-          ),
-        )
-      }
+      client.progressInterval = 200.milliseconds
       remoteTask.state.first {
         (it as? DownloadState.Downloading)?.progress?.downloadedBytes?.let { bytes ->
           bytes > before.downloadedBytes
         } == true
       }
-      remoteTask.segments.first { segments -> segments.sumOf { it.downloadedBytes } > 0 }
+      // Segments only come while followed.
+      assertEquals(segmentsBefore, remoteTask.segments.value)
+      val segments = client.subscribe(Interest.Segments(setOf(task.taskId)), 200.milliseconds)
+        .first { bySegments ->
+          bySegments[task.taskId].orEmpty().sumOf { it.downloadedBytes } >
+            segmentsBefore.sumOf { it.downloadedBytes }
+        }
+      assertEquals(segments[task.taskId], remoteTask.segments.value)
 
-      val stats = client.stats(500.milliseconds).first { it.downloading == 1 }
+      val stats = client.subscribe(Interest.Stats, 500.milliseconds).first { it.downloading == 1 }
       assertEquals(TrickleEngine.SIZE, stats.totalBytes)
 
-      val connections = client.activeConnections(limit = 4).first { it.total >= 1 }
+      val connections = client.subscribe(Interest.Connections(limit = 4)).first { it.total >= 1 }
       assertTrue(connections.connections.all { it.taskId == task.taskId })
 
       task.pause()
       remoteTask.state.first { it is DownloadState.Paused }
-      watching.cancel()
     }
   }
 
@@ -163,21 +163,27 @@ class RemoteStreamTest {
   fun remote_observesTorrentsOnTheStream() = runTest {
     val ketch = ControlledKetch(Ketch(httpEngine = TrickleEngine()), OneTorrent())
     withServer(ketch) { client, _ ->
-      val controller = assertIs<TorrentController>(client.control(TorrentController))
-
-      val snapshot = controller.observe("t1").first()
+      val snapshot = client.subscribe(TorrentInterest("t1")).first()
 
       assertEquals("t1", snapshot?.taskId)
     }
   }
 
   private class ControlledKetch(
-    delegate: KetchApi,
-    private val torrents: TorrentController,
+    private val delegate: KetchApi,
+    private val torrents: OneTorrent,
   ) : KetchApi by delegate {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> control(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T else null
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      if (interest is TorrentInterest) {
+        torrents.observe(interest.taskId) as Flow<T>
+      } else {
+        delegate.subscribe(interest, interval)
+      }
   }
 
   /** One torrent, `t1`, whose snapshot never changes. */
@@ -187,7 +193,7 @@ class RemoteStreamTest {
 
     override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
 
-    override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+    fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
       emit(
         TorrentSnapshot(
           taskId = taskId,

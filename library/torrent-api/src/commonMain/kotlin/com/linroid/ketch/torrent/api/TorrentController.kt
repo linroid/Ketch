@@ -1,7 +1,6 @@
 package com.linroid.ketch.torrent.api
 
 import com.linroid.ketch.api.ControlKey
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Backend-owned torrent inspection and capability negotiation.
@@ -40,18 +39,6 @@ interface TorrentController {
    * Callers must merge concurrent HTTP/event results using [TorrentRevision.compareIncoming].
    */
   suspend fun snapshot(taskId: String): TorrentSnapshot?
-
-  /**
-   * Observe full snapshots for one task, starting with its current value. Null is a tombstone and
-   * completes the stream. Unknown tasks emit null and complete. The backend bounds subscriptions;
-   * each slow subscriber receives the latest full snapshot, not an unbounded queue of updates.
-   *
-   * The adapter cancels old subscriptions before reconnecting, obtains a new authoritative
-   * snapshot,
-   * and discards all late responses from the old connection generation. Revisions within an epoch
-   * never decrease. Transport errors terminate the stream and require explicit reconnect.
-   */
-  fun observe(taskId: String): Flow<TorrentSnapshot?>
 
   /**
    * One page of every content file of the task, sorted by [order] ([descending] reverses it;

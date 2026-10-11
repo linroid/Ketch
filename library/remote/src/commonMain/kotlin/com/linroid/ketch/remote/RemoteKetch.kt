@@ -5,6 +5,7 @@ import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
@@ -15,7 +16,7 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.TaskInterest
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
@@ -28,12 +29,14 @@ import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamSerializers
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
 import com.linroid.ketch.endpoints.stream.TaskProgressUpdate
 import com.linroid.ketch.endpoints.stream.TaskSegmentsUpdate
 import com.linroid.ketch.endpoints.stream.TaskStateUpdate
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
@@ -66,7 +69,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -82,6 +84,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
@@ -100,17 +103,18 @@ import kotlin.time.Duration.Companion.seconds
  * Calls the server refuses, here and on its tasks, throw [RemoteApiException] with the server's
  * reason, unless [KetchApi] names another exception for the case.
  *
- * Servers listing `events.stream` send their events on one stream that carries only what the
- * callers ask for: every task's state changes at once, its progress every [progressInterval] and
- * as often as a [watch] asks, its segments only as a [watch] asks. Older servers send every
- * change of every task.
+ * Servers listing `events.stream` send their events on one stream that carries only what this
+ * client asks for: every task's lifecycle and state changes at once, the progress of downloading
+ * tasks every [progressInterval], and what its callers [subscribe] to, such as the segments of
+ * the tasks they show. Set [foreground] to `false` while nothing is shown. Older servers send
+ * every change of every task.
  *
  * @param host server hostname or IP address
  * @param port server port (default 8642)
  * @param apiToken optional Bearer token for authentication
  * @param secure use HTTPS instead of HTTP
  * @param progressInterval how often every downloading task's progress updates, or `null` for
- *   only the tasks a [watch] names
+ *   only with its state changes; see [progressInterval]
  */
 class RemoteKetch internal constructor(
   val host: String,
@@ -118,7 +122,7 @@ class RemoteKetch internal constructor(
   private val apiToken: String?,
   val secure: Boolean,
   engine: HttpClientEngine?,
-  private val progressInterval: Duration? = DEFAULT_PROGRESS_INTERVAL,
+  progressInterval: Duration? = DEFAULT_PROGRESS_INTERVAL,
 ) : KetchApi {
   constructor(
     host: String,
@@ -138,6 +142,7 @@ class RemoteKetch internal constructor(
 
   private val json = Json {
     ignoreUnknownKeys = true
+    serializersModule = StreamSerializers
     encodeDefaults = true
     isLenient = true
     coerceInputValues = true
@@ -204,6 +209,29 @@ class RemoteKetch internal constructor(
   private val topics = StreamTopics()
 
   /**
+   * How often every downloading task's progress updates on a server with the event stream, or
+   * `null` for only with its state changes. Changes apply at once.
+   */
+  var progressInterval: Duration?
+    get() = interests.progress.value
+    set(value) {
+      require(value == null || value.isPositive()) { "progressInterval must be positive" }
+      interests.progress.value = value
+    }
+
+  /**
+   * Whether progress and the callers' interests come, `true` by default. An app in the
+   * background sets it to `false`: the event stream then carries only the tasks' lifecycle and
+   * state changes, and the rest comes again once it is `true`. Servers without the event stream
+   * send everything.
+   */
+  var foreground: Boolean
+    get() = interests.active.value
+    set(value) {
+      interests.active.value = value
+    }
+
+  /**
    * Tasks this client added since the event stream's last task snapshot, guarded by
    * [taskMutex]: the snapshot may predate them.
    */
@@ -214,7 +242,7 @@ class RemoteKetch internal constructor(
    * older one or one without a torrent source, fails every command with
    * [com.linroid.ketch.torrent.api.TorrentCommandError.UNSUPPORTED] before sending it.
    */
-  private val torrents: TorrentController = RemoteTorrentController(
+  private val torrents = RemoteTorrentController(
     httpClient = httpClient,
     generation = connectionGeneration.asStateFlow(),
     json = json,
@@ -361,54 +389,83 @@ class RemoteKetch internal constructor(
   }
 
   /**
-   * The server's live connections, over `GET /api/connections/events`. A server whose
-   * [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], such as an older one, fails
-   * with [UnsupportedOperationException] before the stream is asked for. The flow ends with the
-   * failure when the connection to the server drops or the server ends the stream; it does not
-   * reconnect, so collect it again to resume.
+   * Follows [interest] on the server, about every [interval]: [Interest.Segments],
+   * [Interest.Stats], [Interest.Connections] and `TorrentInterest` come on the event stream
+   * while [start] keeps it open, on a server that serves it, and from their own endpoints or
+   * from [tasks] otherwise. Other interests fail with [UnsupportedOperationException] when
+   * collected.
+   *
+   * Live connections fail with [UnsupportedOperationException] on a server whose
+   * [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], such as an older one, before
+   * anything is asked for. Their flow, like a torrent's, ends with the failure when the
+   * connection to the server drops or the server ends the stream; it does not reconnect, so
+   * collect it again to resume. Stats keep their last value while the server is unreachable.
    */
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> {
-    require(limit in 1..ActiveConnections.MAX_LIMIT) {
-      "limit must be in 1..${ActiveConnections.MAX_LIMIT}"
-    }
-    return flow {
-      if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
-        throw UnsupportedOperationException("This device does not report its connections")
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+    require(interval.isPositive()) { "interval must be positive" }
+    return when (interest) {
+      is Interest.Segments -> followSegments(interest, interval)
+      Interest.Stats -> followStats(interval)
+      is Interest.Connections -> followConnections(interest, interval)
+      is TorrentInterest -> torrents.observe(interest.taskId, interval)
+      else -> flow<T> {
+        throw UnsupportedOperationException("This client does not follow $interest")
       }
-      if (streamed.value) {
-        emitAll(streamConnections(limit))
-      } else {
-        emitAll(httpClient.activeConnectionEvents(limit, json))
-      }
-    }
+    } as Flow<T>
   }
 
-  /**
-   * Keeps the tasks of [interest] as fresh as it asks while the caller runs. Servers without the
-   * event stream send every change anyway.
-   */
-  override suspend fun watch(interest: TaskInterest): Nothing =
-    interests.holding(StreamInterest.Tasks(interest)) { awaitCancellation() }
-
-  /**
-   * Totals of the server's downloading tasks: sent by servers with the event stream, so they
-   * stay current while the tasks' own progress updates less often, and computed from [tasks]
-   * otherwise. They keep their last value while the server is unreachable.
-   */
+  /** The segments of the tasks [interest] names, as the stream updates their tasks. */
   @OptIn(ExperimentalCoroutinesApi::class)
-  override fun stats(interval: Duration): Flow<KetchStats> {
-    val computed = super.stats(interval)
+  private fun followSegments(
+    interest: Interest.Segments,
+    interval: Duration,
+  ): Flow<Map<String, List<Segment>>> {
+    val segments = tasks.flatMapLatest { all ->
+      val named = all.filter { it.taskId in interest.taskIds }
+      if (named.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(named.map { task -> task.segments.map { task.taskId to it } }) { it.toMap() }
+      }
+    }.distinctUntilChanged()
+    return flow { interests.holding(interest, interval) { emitAll(segments) } }
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun followStats(interval: Duration): Flow<KetchStats> {
+    // Older servers send every change of every task, so their totals are computed here.
+    val computed = flow {
+      while (true) {
+        emit(KetchStats.of(tasks.value.map { it.state.value }))
+        delay(interval)
+      }
+    }
     return streamed.flatMapLatest { streamed ->
       if (!streamed) {
         computed
       } else {
         flow {
-          interests.holding(StreamInterest.Stats(interval)) {
+          interests.holding(Interest.Stats, interval) {
             topics.stats.filterNotNull().collect { emit(it) }
           }
         }
       }
     }.distinctUntilChanged()
+  }
+
+  private fun followConnections(
+    interest: Interest.Connections,
+    interval: Duration,
+  ): Flow<ActiveConnections> = flow {
+    if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
+      throw UnsupportedOperationException("This device does not report its connections")
+    }
+    if (streamed.value) {
+      emitAll(streamConnections(interest, interval))
+    } else {
+      emitAll(httpClient.activeConnectionEvents(interest.limit, json))
+    }
   }
 
   override fun close() {
@@ -659,10 +716,14 @@ class RemoteKetch internal constructor(
     }
   }
 
-  /** The live connections the event stream sends, cut to [limit]; fails when it closes. */
-  private fun streamConnections(limit: Int): Flow<ActiveConnections> = flow {
+  /** The live connections the event stream sends, cut to the limit; fails when it closes. */
+  private fun streamConnections(
+    interest: Interest.Connections,
+    interval: Duration,
+  ): Flow<ActiveConnections> = flow {
+    val limit = interest.limit
     val generation = topics.live.filterNotNull().first()
-    interests.holding(StreamInterest.Connections(limit)) {
+    interests.holding(interest, interval) {
       combine(topics.live, topics.connections, ::Pair).collect { (live, item) ->
         if (live != generation) throw StreamLostException()
         when (item) {
@@ -678,9 +739,12 @@ class RemoteKetch internal constructor(
    * The items the event stream sends for the torrent of [taskId], ending with its removal or
    * failure; fails with [StreamLostException] when the stream closes.
    */
-  private fun streamTorrent(taskId: String): Flow<TopicItem<TorrentSnapshot>> = flow {
+  private fun streamTorrent(
+    taskId: String,
+    interval: Duration,
+  ): Flow<TopicItem<TorrentSnapshot>> = flow {
     val generation = topics.live.filterNotNull().first()
-    interests.holding(StreamInterest.Torrent(taskId)) {
+    interests.holding(TorrentInterest(taskId), interval) {
       combine(topics.live, topics.torrents.map { it[taskId] }, ::Pair)
         .distinctUntilChanged()
         .transformWhile { (live, item) ->
@@ -834,7 +898,7 @@ class RemoteKetch internal constructor(
     Exception("Server requires authentication")
 
   companion object {
-    /** How often every task's progress updates unless a caller asks for more. */
+    /** How often every downloading task's progress updates unless set otherwise. */
     val DEFAULT_PROGRESS_INTERVAL: Duration = 1.seconds
 
     private const val INITIAL_RECONNECT_DELAY_MS = 1000L

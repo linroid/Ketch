@@ -7,6 +7,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class InstanceArgsTest {
 
@@ -110,6 +112,20 @@ class InstanceArgsTest {
   fun `watch follows every task without IDs`() {
     assertEquals(InstanceCommand.Watch(Target(), emptyList()), run("watch"))
     assertEquals(InstanceCommand.Watch(Target(), listOf("3f2a")), run("watch", "3f2a"))
+  }
+
+  @Test
+  fun `watch takes the interval of progress`() {
+    assertEquals(
+      InstanceCommand.Watch(Target(), listOf("3f2a"), 500.milliseconds),
+      run("watch", "--interval", "500ms", "3f2a"),
+    )
+    val plain = assertIs<InstanceCommand.Watch>(run("watch", "--interval", "2.5"))
+    assertEquals(2.5.seconds, plain.interval)
+    for (invalid in listOf("0s", "-1s", "soon")) {
+      assertIs<InstanceArgs.Invalid>(parseInstanceArgs("watch", listOf("--interval", invalid)))
+    }
+    assertIs<InstanceArgs.Invalid>(parseInstanceArgs("list", listOf("--interval", "1s")))
   }
 
   @Test

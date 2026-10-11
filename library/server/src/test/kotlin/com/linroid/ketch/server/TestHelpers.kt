@@ -1,6 +1,5 @@
 package com.linroid.ketch.server
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -9,6 +8,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
@@ -18,15 +18,16 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlin.time.Duration
 
 internal class NoOpHttpEngine : HttpEngine {
   override suspend fun head(
@@ -107,8 +108,7 @@ internal class RecordingKetchApi(
   override suspend fun status(): KetchStatus = delegate.status()
   override suspend fun updateConfig(config: DownloadConfig) =
     delegate.updateConfig(config)
-  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
-    delegate.activeConnections(limit)
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = delegate.subscribe(interest, interval)
   override fun close() {
     scope.cancel()
     delegate.close()
