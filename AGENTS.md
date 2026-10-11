@@ -504,9 +504,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentUtpFallback`, below the budget, dials TCP first and uTP (two SYN retries, 7 s) when
   TCP fails, except for the last 4096 peers known to speak uTP (BEP 11 flags the v1 swarm
   passes from PEX, `preferUtp`, or a uTP fallback that worked), which get uTP first and are
-  forgotten when it fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the swarm summary
-  counts uTP connections. Private and tracker-only torrents use uTP too: tests count DHT and
-  UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
+  forgotten when it fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the
+  swarm summary counts uTP connections. Private and tracker-only torrents use uTP too: tests
+  count DHT and UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
   V2/hybrid incoming routing through one engine route table keyed by 20-byte wire tags
   (`TorrentRouteTable`, `launchIncoming`/`dispatchIncoming`), upload and seeding with 4-slot
