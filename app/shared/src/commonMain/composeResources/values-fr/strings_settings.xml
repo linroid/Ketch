@@ -443,6 +443,14 @@
   <string name="settings_downloads_retries_never_state">Aucune nouvelle tentative</string>
   <string name="settings_downloads_retries_fewer">Moins de tentatives</string>
   <string name="settings_downloads_retries_more">Plus de tentatives</string>
+  <string name="settings_downloads_retries_unlimited_state">Réessaie jusqu’à la pause</string>
+  <string name="settings_downloads_stall">Connexions bloquées</string>
+  <string name="settings_downloads_stall_hint">Réessaie une connexion qui ne reçoit rien pendant cette durée.</string>
+  <string name="settings_downloads_stall_off">Désactivé</string>
+  <string name="settings_downloads_stall_off_state">Attend les connexions bloquées</string>
+  <string name="settings_downloads_stall_state">Réessaie après %1$s sans données</string>
+  <string name="settings_downloads_stall_sooner">Réessayer plus tôt</string>
+  <string name="settings_downloads_stall_later">Attendre plus longtemps</string>
 
   <string name="settings_speed_mode_full">Pleine vitesse</string>
   <string name="settings_speed_mode_slow_lane">Vitesse réduite</string>

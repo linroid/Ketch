@@ -400,13 +400,15 @@ limits once it was read, like uploading it: a limit owes at most a tenth of a se
 of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
 starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
 so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
-answering their handshake, v2 and hybrid like v1. v1 connections negotiate the Fast extension
-(BEP 6): availability as Have All or Have None, requests the other side will not serve rejected
-rather than dropped, a choke that leaves requests to be rejected (those still unanswered after
-5 seconds are canceled), and each side's allowed-fast pieces requested and served while choked;
-Ketch offers IPv4 peers BEP 6's canonical set of 10 pieces only while it uploads, within the
-upload limits. A rejected piece goes to other peers without counting against the peer. v2 and
-hybrid routes, including a hybrid's v1 peers, do not negotiate it yet.
+answering their handshake, v2 and hybrid like v1. Every connection, v1, v2 and hybrid (a
+hybrid's v1 peers included), negotiates the Fast extension (BEP 6): availability as Have All or
+Have None, requests the other side will not serve rejected rather than dropped, a choke that
+leaves requests to be rejected (those still unanswered after 5 seconds are canceled), and each
+side's allowed-fast pieces requested and served while choked. Ketch offers IPv4 peers BEP 6's
+canonical set of 10 pieces only while it uploads, within the upload limits, drawn from the info
+hash the handshake named (on a hybrid, the v2 one, or the v1 one in the v1 swarm). A rejected
+piece goes to other peers without counting against the peer. BEP 52 hash rejects are separate
+messages, unaffected.
 Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
 when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
 when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;

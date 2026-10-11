@@ -263,8 +263,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer
   Verbindungen, damit der Download nicht auf die langsamste warten muss
-- **Stillstand erkennen und Wiederholungen einstellen** — Neu verbinden, wenn keine Daten mehr
-  ankommen; Zeitlimits und Wiederholungszahlen wählen, auch unbegrenzt
 - **Unfertige Dateien erkennbar machen** — Unter einem temporären Namen speichern und erst nach
   Abschluss den endgültigen Namen vergeben
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder

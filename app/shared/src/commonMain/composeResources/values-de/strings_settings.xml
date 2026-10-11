@@ -443,6 +443,14 @@
   <string name="settings_downloads_retries_never_state">Keine Wiederholungen</string>
   <string name="settings_downloads_retries_fewer">Weniger Wiederholungen</string>
   <string name="settings_downloads_retries_more">Mehr Wiederholungen</string>
+  <string name="settings_downloads_retries_unlimited_state">Wiederholt bis zum Pausieren</string>
+  <string name="settings_downloads_stall">Hängende Verbindungen</string>
+  <string name="settings_downloads_stall_hint">Eine Verbindung, die so lange nichts empfängt, wird neu versucht.</string>
+  <string name="settings_downloads_stall_off">Aus</string>
+  <string name="settings_downloads_stall_off_state">Wartet auf hängende Verbindungen</string>
+  <string name="settings_downloads_stall_state">Wiederholt nach %1$s ohne Daten</string>
+  <string name="settings_downloads_stall_sooner">Früher wiederholen</string>
+  <string name="settings_downloads_stall_later">Länger warten</string>
 
   <string name="settings_speed_mode_full">Volle Geschwindigkeit</string>
   <string name="settings_speed_mode_slow_lane">Drosselung</string>

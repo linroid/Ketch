@@ -21,7 +21,10 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * FTP client implementation using ktor-network raw sockets.
@@ -74,7 +77,7 @@ internal class RealFtpClient(
     try {
       val sm = SelectorManager(Dispatchers.IO)
       selectorManager = sm
-      val socket = aSocket(sm).tcp().connect(host, port)
+      val socket = connectWithin(sm, host, port)
       controlSocket = socket
       reader = socket.openReadChannel()
       writer = socket.openWriteChannel(autoFlush = true)
@@ -279,9 +282,8 @@ internal class RealFtpClient(
   override suspend fun disconnect() {
     log.v { "Disconnecting from $host:$port" }
     try {
-      if (isConnected) {
-        sendCommand("QUIT")
-      }
+      // A server that stopped answering must not hold the segment that gave up on it.
+      if (isConnected) withWallClockTimeout(QUIT_TIMEOUT) { sendCommand("QUIT") }
     } catch (_: Exception) {
       // Ignore errors during disconnect
     } finally {
@@ -369,7 +371,7 @@ internal class RealFtpClient(
       Exception("Not connected")
     )
     return try {
-      aSocket(sm).tcp().connect(dataHost, dataPort)
+      connectWithin(sm, dataHost, dataPort)
     } catch (e: Exception) {
       if (e is CancellationException) throw e
       throw KetchError.Network(e)
@@ -474,7 +476,28 @@ internal class RealFtpClient(
     return sb.toString()
   }
 
+  /**
+   * Connects to [host] and [port], failing with [KetchError.Network] after [CONNECT_TIMEOUT].
+   * Transfers have no read timeout: the download's transfer watchdog drops stalled ones.
+   */
+  private suspend fun connectWithin(sm: SelectorManager, host: String, port: Int): Socket =
+    withWallClockTimeout(CONNECT_TIMEOUT) { aSocket(sm).tcp().connect(host, port) }
+      ?: throw KetchError.Network(Exception("Connection timed out after $CONNECT_TIMEOUT"))
+
+  /**
+   * Runs [block] for at most [timeout] of real time, `null` once it runs out: on
+   * [Dispatchers.IO], whose clock a test's virtual time does not advance while a socket waits.
+   */
+  private suspend fun <T> withWallClockTimeout(timeout: Duration, block: suspend () -> T): T? =
+    withContext(Dispatchers.IO) { withTimeoutOrNull(timeout) { block() } }
+
   companion object {
+    /** How long a control or data connection may take to open. */
+    internal val CONNECT_TIMEOUT: Duration = 30.seconds
+
+    /** How long [disconnect] waits for the reply to `QUIT`. */
+    internal val QUIT_TIMEOUT: Duration = 5.seconds
+
     /**
      * Parses EPSV response to extract port number.
      * Format: "Entering Extended Passive Mode (|||port|)"

@@ -2,6 +2,7 @@ package com.linroid.ketch.ftp
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.file.FileAccessor
+import kotlinx.coroutines.awaitCancellation
 
 /**
  * In-memory FTP server shared by the [FakeFtpClient]s it creates, one per
@@ -24,6 +25,9 @@ internal class FakeFtpServer(
   /** When non-negative, the next transfer closes its data connection after this many bytes. */
   var dropNextTransferAfter: Long = -1
 
+  /** When non-negative, the next transfer stops sending after this many bytes until cancelled. */
+  var stallNextTransferAfter: Long = -1
+
   fun client(bufferSize: Int): FtpClient {
     bufferSizes += bufferSize
     return FakeFtpClient(this)
@@ -35,10 +39,12 @@ internal class FakeFtpServer(
       throw KetchError.Unsupported(IllegalStateException("REST not supported"))
     }
     val limit = dropNextTransferAfter.also { dropNextTransferAfter = -1 }
+    val stall = stallNextTransferAfter.also { stallNextTransferAfter = -1 }
     var position = offset.toInt()
     var sent = 0L
     while (position < content.size) {
       if (limit in 0..sent) return
+      if (stall in 0..sent) awaitCancellation()
       val end = minOf(position + chunkSize, content.size)
       onData(content.copyOfRange(position, end))
       sent += end - position

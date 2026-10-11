@@ -12,6 +12,10 @@ import okio.IOException
  * only to peers we unchoke, only for verified pieces and only within the piece as the peer's
  * swarm knows it: bytes past a file's end inside that piece (a hybrid's padding, or a v2 piece's
  * alignment) are zeros.
+ *
+ * With the Fast extension (BEP 6), peers learn our pieces as Have All or Have None when that is
+ * all of them or none, hear back about every request we will not serve (a Reject), and while we
+ * upload are offered the canonical allowed-fast pieces, which they may download while choked.
  */
 internal class TorrentV2Uploader private constructor(
   private val layout: TorrentContentLayout,
@@ -49,15 +53,71 @@ internal class TorrentV2Uploader private constructor(
   private var loadRetryAt = 0L
   private var turn = 0
   private var closed = false
+  /** The upload policy lets us upload, as the last [pump] heard; allowed-fast pieces need it. */
+  private var uploading = false
 
-  /** A peer became ready: it learns what we have before anything else. */
+  /**
+   * A peer became ready: it learns what we have before anything else, then, with the Fast
+   * extension and while we upload, the pieces it may download while we choke it.
+   */
   fun ready(peer: PeerV2Pool.Peer, view: TorrentV2PeerView, verified: ByteArray?): Verdict {
     choker.add(peer)
     view.haveCursor = haveCount
-    // An empty bitfield may be left out (BEP 3); peers that see none assume we have nothing.
-    if (verified == null) return Verdict.KEEP
-    val bitfield = PeerV2DownloadActor.Command.Send(PeerMessage.Bitfield(verified))
-    return if (view.commands.trySend(bitfield).isSuccess) Verdict.KEEP else Verdict.STOP
+    val availability = when {
+      // An empty bitfield may be left out (BEP 3); peers that see none assume we have nothing.
+      !view.fast -> verified?.let { PeerMessage.Bitfield(it) }
+      // A Fast peer always hears it, in a message of its own for all or nothing (BEP 6).
+      verified == null -> PeerMessage.HaveNone
+      (0 until layout.pieceCount.toInt()).all {
+        verified[it / 8].toInt() and (128 ushr (it % 8)) != 0
+      } -> PeerMessage.HaveAll
+      else -> PeerMessage.Bitfield(verified)
+    }
+    if (availability != null &&
+      view.commands.trySend(PeerV2DownloadActor.Command.Send(availability)).isFailure) {
+      return Verdict.STOP
+    }
+    if (view.fast && uploading) offerFast(view)
+    return Verdict.KEEP
+  }
+
+  /**
+   * Tells an IPv4 peer the canonical allowed-fast pieces (BEP 6) of the swarm it joined, held or
+   * not: the set stays the same for the connection, and a piece verified later is served once
+   * its Have went out.
+   */
+  private fun offerFast(view: TorrentV2PeerView) {
+    val info = view.info ?: return
+    val pieces = allowedFastOffer(info.host, swarm.document.identity.wireTag(info.mode),
+      layout.pieceCount.toInt())
+    if (pieces.isEmpty()) return
+    if (view.commands.trySend(PeerV2DownloadActor.Command.AllowFast(pieces)).isSuccess) {
+      view.offeredFast = pieces.toSet()
+    }
+  }
+
+  /** We serve [request] to a peer we choke: an allowed-fast piece, while we upload (BEP 6). */
+  private fun servesChoked(view: TorrentV2PeerView, request: PeerMessage.Request): Boolean =
+    view.fast && uploading && request.index in view.offeredFast
+
+  /** Whether [view]'s queued requests may be served: unchoked, or allowed fast (BEP 6). */
+  private fun servable(view: TorrentV2PeerView): Boolean =
+    !view.amChoking || view.fast && uploading
+
+  /** A Fast peer hears about a request we will not serve (BEP 6); others are left to time out. */
+  private fun reject(view: TorrentV2PeerView, request: PeerMessage.Request) {
+    if (view.fast && view.rejectQueue.size < MAX_QUEUED_REJECTS) view.rejectQueue.addLast(request)
+  }
+
+  /** Drops the queued requests of [view] that [which] picks, rejecting them to a Fast peer. */
+  private fun dropUploads(
+    view: TorrentV2PeerView,
+    which: (PeerMessage.Request) -> Boolean = { true },
+  ) {
+    val dropped = view.uploads.filter(which)
+    if (dropped.isEmpty()) return
+    view.uploads.removeAll(dropped)
+    for (request in dropped) reject(view, request)
   }
 
   fun closed(peer: PeerV2Pool.Peer) = choker.remove(peer)
@@ -77,7 +137,7 @@ internal class TorrentV2Uploader private constructor(
   fun revoked(index: Int, peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>) {
     loading.remove(index)
     waiting.remove(index)
-    for (view in peers.values) view.uploads.removeAll { it.index == index }
+    for (view in peers.values) dropUploads(view) { it.index == index }
   }
 
   /** Payload [peer] sent us, which earns it a regular slot while we download. */
@@ -99,14 +159,17 @@ internal class TorrentV2Uploader private constructor(
         PeerMessage.Signal.NOT_INTERESTED -> {
           view.remoteInterested = false
           // A peer that wants nothing more has no requests left (BEP 3).
-          view.uploads.clear()
+          dropUploads(view)
           choker.interested(peer, false)
         }
         else -> Unit
       }
       is PeerMessage.Request -> return request(view, message, verified)
-      is PeerMessage.Cancel ->
-        view.uploads.remove(PeerMessage.Request(message.index, message.begin, message.length))
+      is PeerMessage.Cancel -> {
+        val request = PeerMessage.Request(message.index, message.begin, message.length)
+        // A Fast peer hears back about each queued request it cancels (BEP 6).
+        if (view.uploads.remove(request)) reject(view, request)
+      }
       else -> Unit
     }
     return Verdict.KEEP
@@ -120,15 +183,20 @@ internal class TorrentV2Uploader private constructor(
     // The wire already bounds the index, begin and length; the piece bounds the end.
     if (request.begin.toLong() + request.length >
       layout.protocolPieceLength(request.index.toLong())) return Verdict.BAN
-    // Requests racing our CHOKE are dropped without holding them against the peer.
-    if (view.amChoking) return Verdict.KEEP
-    if (!view.remoteInterested || !verified(request.index) || request in view.uploads ||
-      view.uploads.size >= MAX_QUEUED_UPLOADS) {
-      return if (++view.strikes > MAX_STRIKES) Verdict.STOP else Verdict.KEEP
+    if (request in view.uploads) return strike(view)
+    val slot = !view.amChoking && view.remoteInterested
+    if ((slot || servesChoked(view, request)) && verified(request.index) &&
+      view.uploads.size < MAX_QUEUED_UPLOADS) {
+      view.uploads.addLast(request)
+      return Verdict.KEEP
     }
-    view.uploads.addLast(request)
-    return Verdict.KEEP
+    reject(view, request)
+    // Requests racing our CHOKE are dropped without holding them against the peer.
+    return if (view.amChoking) Verdict.KEEP else strike(view)
   }
+
+  private fun strike(view: TorrentV2PeerView): Verdict =
+    if (++view.strikes > MAX_STRIKES) Verdict.STOP else Verdict.KEEP
 
   /** What became of a [PeerV2DownloadActor.Command.Send]. */
   fun sent(view: TorrentV2PeerView, event: PeerV2DownloadActor.Event.Sent): Verdict {
@@ -139,7 +207,8 @@ internal class TorrentV2Uploader private constructor(
         if (!event.sent) view.amChoking = message.signal != PeerMessage.Signal.CHOKE
       }
       // A peer that missed our availability would never ask for those pieces.
-      is PeerMessage.Bitfield, is PeerMessage.Have -> if (!event.sent) return Verdict.STOP
+      is PeerMessage.Bitfield, is PeerMessage.Have, PeerMessage.HaveAll, PeerMessage.HaveNone ->
+        if (!event.sent) return Verdict.STOP
       else -> Unit
     }
     return Verdict.KEEP
@@ -158,7 +227,8 @@ internal class TorrentV2Uploader private constructor(
       store.recordUploaded(length)
       if (peer.info?.mode == PeerIdentityHandshake.Mode.V1) swarm.uploadedOverV1(length)
       choker.uploaded(peer, length.toLong())
-    } else if (!view.amChoking && view.uploads.size < MAX_QUEUED_UPLOADS) {
+    } else if ((!view.amChoking || servesChoked(view, event.request)) &&
+      view.uploads.size < MAX_QUEUED_UPLOADS) {
       // No frame credit: the block goes first once the actor has room again.
       view.uploads.addFirst(event.request)
       view.uploadRetryAt = nowMs() + RETRY_MS
@@ -195,7 +265,7 @@ internal class TorrentV2Uploader private constructor(
         }
       }
       TorrentV2PieceStore.ReadOutcome.NotCommitted ->
-        for (view in peers.values) view.uploads.removeAll { it.index == result.index }
+        for (view in peers.values) dropUploads(view) { it.index == result.index }
       is TorrentV2PieceStore.ReadOutcome.Revoked -> {
         val cause = outcome.cause
         // Fails the session like a v1 storage failure: progress and peers no longer agree.
@@ -214,7 +284,8 @@ internal class TorrentV2Uploader private constructor(
     allowed: Boolean,
     seeding: Boolean,
   ) {
-    choker.update(allowed && serve != null, seeding)
+    uploading = allowed && serve != null
+    choker.update(uploading, seeding)
     cache.expire()
     for ((peer, view) in peers) {
       val choking = !choker.isUnchoked(peer)
@@ -224,14 +295,19 @@ internal class TorrentV2Uploader private constructor(
         if (view.commands.trySend(command).isSuccess) {
           view.amChoking = choking
           view.chokeInFlight = true
-          // Choking a peer discards what it asked for (BEP 3).
-          if (choking) view.uploads.clear()
         }
       }
+      // Choking a peer discards what it asked for (BEP 3), rejected after the CHOKE to a Fast
+      // peer, except allowed-fast pieces while we still upload (BEP 6).
+      if (view.amChoking) dropUploads(view) { !servesChoked(view, it) }
       while (view.haveCursor < haveCount) {
         val have = PeerV2DownloadActor.Command.Send(PeerMessage.Have(haveLog[view.haveCursor]))
         if (!view.commands.trySend(have).isSuccess) break
         view.haveCursor++
+      }
+      if (view.rejectQueue.isNotEmpty() && view.commands.trySend(
+          PeerV2DownloadActor.Command.Reject(view.rejectQueue.toList())).isSuccess) {
+        view.rejectQueue.clear()
       }
     }
     if (serve == null) return
@@ -245,7 +321,7 @@ internal class TorrentV2Uploader private constructor(
     }
   }
 
-  private fun canServe(view: TorrentV2PeerView, now: Long): Boolean = !view.amChoking &&
+  private fun canServe(view: TorrentV2PeerView, now: Long): Boolean = servable(view) &&
     view.uploads.isNotEmpty() && view.uploadsInFlight < MAX_UPLOADS_IN_FLIGHT &&
     view.uploadRetryAt <= now
 
@@ -297,7 +373,7 @@ internal class TorrentV2Uploader private constructor(
     val worker = serve ?: return
     if (index in loading) return
     val pinned = peers.values.mapNotNullTo(mutableSetOf()) { view ->
-      view.uploads.firstOrNull()?.index?.takeIf { !view.amChoking }
+      view.uploads.firstOrNull()?.index?.takeIf { servable(view) }
     }
     // Pieces nobody waits for any more give their turn up.
     waiting.retainAll(pinned)
@@ -320,12 +396,15 @@ internal class TorrentV2Uploader private constructor(
   fun nextDueMs(peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>): Long? {
     val now = nowMs()
     val waits = peers.values.filter {
-      !it.amChoking && it.uploads.isNotEmpty() && it.uploadsInFlight < MAX_UPLOADS_IN_FLIGHT
+      servable(it) && it.uploads.isNotEmpty() && it.uploadsInFlight < MAX_UPLOADS_IN_FLIGHT
     }.map { it.uploadRetryAt }
+    // Rejects the actor's queue had no room for go out again shortly.
+    val rejects = if (peers.values.any { it.rejectQueue.isNotEmpty() }) RETRY_MS else null
     val retry = waits.filter { it > now }.minOrNull()?.let { it - now }
     // Peers due now wait for a read: its result wakes the loop, unless reads must back off.
     val reads = if (loadRetryAt > now && waits.any { it <= now }) loadRetryAt - now else null
-    return listOfNotNull(choker.nextDueMs(), cache.nextExpiryMs(), retry, reads).minOrNull()
+    return listOfNotNull(choker.nextDueMs(), cache.nextExpiryMs(), retry, reads, rejects)
+      .minOrNull()
   }
 
   /** Downloads come first: gives the cached pieces' reservations back. */

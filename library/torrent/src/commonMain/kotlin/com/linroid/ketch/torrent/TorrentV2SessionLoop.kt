@@ -267,13 +267,19 @@ internal object TorrentV2SessionLoop {
           }
           // A peer that told us how many requests it queues (BEP 10 `reqq`) gets no more.
           val window = minOf(pipeline, view.extensions.requestQueue ?: pipeline)
-          if (!interested || !view.interested || view.interestPending || view.choked ||
+          // Choked, a Fast peer still serves its allowed-fast pieces (BEP 6).
+          if (!interested || !view.interested || view.interestPending ||
+            view.choked && view.allowedFast.isEmpty() ||
             view.inFlight >= window || view.admissionBlocked) continue
-          var plan = pieces.planNext(peer.blocks) { rarity.has(peer, it) }
+          val eligible = { index: Int ->
+            rarity.has(peer, index) && index !in view.refused &&
+              (!view.choked || index in view.allowedFast)
+          }
+          var plan = pieces.planNext(peer.blocks, eligible)
           if (plan == null) {
-            val index = rarity.pick(peer) { pieces.canBegin(it) }
+            val index = rarity.pick(peer) { pieces.canBegin(it) && eligible(it) }
             if (index != null) {
-              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks) { rarity.has(peer, it) }
+              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, eligible)
               else {
                 view.admissionBlocked = true
                 // Downloads come first: the upload cache gives its pieces back.
@@ -362,6 +368,25 @@ internal object TorrentV2SessionLoop {
         member.listen = PeerEndpoint(origin.remote.host, port)
       }
 
+      /**
+       * A request came back unserved, which is no fault of the peer. Dropped by a CHOKE, its block
+       * goes to whoever asks next; rejected by a Fast peer that serves us (unchoked, or allowed
+       * fast), it is asked for again, until the piece has had as many rejects as blocks and is
+       * left to other peers until this one unchokes us anew (BEP 6).
+       */
+      fun rejected(view: TorrentV2PeerView, response: PeerBlockExchange.Response.Rejected) {
+        val index = response.ticket.request.index
+        if (view.choked && index !in view.allowedFast) return
+        val count = (view.rejects[index] ?: 0) + 1
+        val blocks = (layout.v2Piece(index.toLong()).length + PeerWire.BLOCK_SIZE - 1) /
+          PeerWire.BLOCK_SIZE
+        if (count < blocks) view.rejects[index] = count else {
+          view.rejects.remove(index)
+          view.refused += index
+          log.v { "V2 peer of $label keeps rejecting piece $index" }
+        }
+      }
+
       suspend fun message(peer: PeerV2Pool.Peer, value: PeerV2DownloadActor.Event) {
         val view = peers[peer] ?: return
         when (value) {
@@ -373,6 +398,20 @@ internal object TorrentV2SessionLoop {
                 view.remoteHaveCount = update.bytes.sumOf { it.toInt().and(255).countOneBits() }
               }
             }
+            // A Fast peer's availability (BEP 6): all of it, or nothing to add.
+            PeerMessage.HaveAll -> {
+              if (!rarity.update(peer, pieceBitfield(BooleanArray(pieceCount) { true }))) {
+                stop(peer)
+              } else {
+                view.needed = pieces.neededCount { rarity.has(peer, it) }
+                view.remoteHaveCount = pieceCount
+              }
+            }
+            // Its block exchange keeps the first ones too; requests follow both.
+            is PeerMessage.AllowedFast ->
+              if (view.allowedFast.size < PeerProtocolState.MAX_ALLOWED_FAST) {
+                view.allowedFast += update.index
+              }
             is PeerMessage.Have -> {
               val known = rarity.has(peer, update.index)
               val newlyNeeded = !known && pieces.isNeeded(update.index)
@@ -385,7 +424,12 @@ internal object TorrentV2SessionLoop {
             is PeerMessage.Control -> {
               when (update.signal) {
                 PeerMessage.Signal.CHOKE -> view.choked = true
-                PeerMessage.Signal.UNCHOKE -> view.choked = false
+                PeerMessage.Signal.UNCHOKE -> {
+                  view.choked = false
+                  // Unchoked anew, the peer may serve what it refused (BEP 6).
+                  view.refused.clear()
+                  view.rejects.clear()
+                }
                 else -> Unit
               }
               uploads?.update(peer, view, update, pieces::isVerified)
@@ -427,6 +471,7 @@ internal object TorrentV2SessionLoop {
             check(view.inFlight > 0)
             view.inFlight--
             val block = value.value as? PeerBlockExchange.Response.Block
+            (value.value as? PeerBlockExchange.Response.Rejected)?.let { rejected(view, it) }
             if (block != null) {
               store.recordReceived(block.ticket.request.length)
               // What crossed the wire: on a v1 route, the canonical block with its padding.
@@ -692,7 +737,9 @@ internal object TorrentV2SessionLoop {
               val incoming = members.keys.count { it.info?.origin is PeerV2Origin.Incoming }
               // A hybrid's peers from the v1 swarm, on canonical v1 blocks without hashes.
               val legacy = members.keys.count { it.info?.mode == PeerIdentityHandshake.Mode.V1 }
-              " (in=$incoming, v1=$legacy) ${uploads?.summary().orEmpty()}" +
+              // Peers that negotiated the Fast extension (BEP 6).
+              val fast = members.keys.count { it.info?.fast == true }
+              " (in=$incoming, v1=$legacy, fast=$fast) ${uploads?.summary().orEmpty()}" +
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
                 " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers"
             }

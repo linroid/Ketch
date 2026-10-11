@@ -588,6 +588,18 @@
   <string name="settings_downloads_retries_never_state">Never retries</string>
   <string name="settings_downloads_retries_fewer">Fewer retries</string>
   <string name="settings_downloads_retries_more">More retries</string>
+  <string name="settings_downloads_retries_unlimited_state">Retries until paused</string>
+  <!-- A row under Retries: how long a connection may receive no data before it is dropped and
+       retried. Its stepper shows a duration, or the Off label. -->
+  <string name="settings_downloads_stall">Stalled connections</string>
+  <string name="settings_downloads_stall_hint">Retry a connection that receives nothing for this long.</string>
+  <string name="settings_downloads_stall_off">Off</string>
+  <!-- What screen readers say for the stalled connections stepper, and its buttons.
+       %1$s is a duration, such as 30s or 2 min. -->
+  <string name="settings_downloads_stall_off_state">Waits on stalled connections</string>
+  <string name="settings_downloads_stall_state">Retries after %1$s without data</string>
+  <string name="settings_downloads_stall_sooner">Retry sooner</string>
+  <string name="settings_downloads_stall_later">Wait longer</string>
 
   <!-- Speed. -->
   <!-- The speed modes, as the Speed page names them. -->

@@ -102,7 +102,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
   `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
-  `HttpExchangeObserver`
+  `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferStalledException`,
+  `RetryPolicy`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
   `SegmentedDownloadHelper`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
@@ -297,7 +298,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   torrent source's `torrent.control` (`TorrentFeatures.CONTROL`, outside `KetchFeatures.ALL`).
   `DownloadSource.previousTypes` lets stored tasks with the old `media` type route to the
   matching protocol by URL
-- Retry with exponential backoff for transient errors
+- Retries of transient errors (`KetchError.isRetryable`) follow `RetryPolicy`: `retryCount` in a
+  row (or forever with `DownloadConfig.unlimitedRetries`), counted again from zero once an attempt
+  gets further than every attempt before it (`DownloadExecution.progressReached`, from reported
+  progress and kept segment bytes). Retry `n` waits `retryDelayMs` doubled `n - 1` times, capped
+  at `maxRetryDelayMs` (60 s), with equal jitter (half to all of it); a 429's `Retry-After`
+  replaces it
+- Stalled transfers: `TransferWatchdog` (`DownloadContext.watchdog`, from
+  `DownloadConfig.idleTimeoutMs`, 60 s by default, and `minSpeed` bytes per second averaged over
+  `MIN_SPEED_WINDOW_MS`, 30 s, off by default; `0` turns either off) wraps each HTTP segment
+  request, the unknown-size stream, each HLS/DASH part and each FTP segment connection (connect,
+  login and `RETR`). Sources report bytes with `TransferMonitor.received` and run `throttle` in
+  `TransferMonitor.throttled`, so speed limit waits count as neither idle nor slow; a stall
+  cancels the transfer and fails it with a retryable `KetchError.Network` whose cause is a
+  `TransferStalledException`. It checks every tenth of the idle timeout (10 ms to 1 s) with
+  `delay`, so tests run it on virtual time. Request and socket timeouts stay infinite;
+  `KtorHttpEngine`'s own clients (not Darwin) and `RealFtpClient` connect within 30 s, and FTP's
+  `QUIT` waits 5 s. Listed as `KetchFeatures.TRANSFER_TIMEOUTS` (`download.timeouts`)
 - Persistent task metadata via `TaskStore` interface
 - Unreadable storage never stops a start: `SqliteTaskStore.loadAll` skips (and logs) rows it
   cannot decode, leaving them in the table, and `DriverFactory` (JVM and Android) moves a
@@ -376,8 +393,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### Live Configuration
 - `Ketch` keeps the current `DownloadConfig`; `updateConfig` applies speed and queue limits
-  immediately, other fields (default directory, connections, retries, intervals, buffer size)
-  are snapshotted into `DownloadContext.config` when a download starts or resumes
+  immediately, other fields (default directory, connections, retries, idle timeout and minimum
+  speed, intervals, buffer size) are snapshotted into `DownloadContext.config` when a download starts or resumes
 - Sources read defaults from `DownloadContext.config` and `DownloadContext.effectiveConnections()`
 - Per-task `setSpeedLimit` / `setConnections` / `setPriority` / `reschedule` persist to the
   `TaskRecord` in any non-terminal state and apply live when the task is running
@@ -591,20 +608,30 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   one of the `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its
   intent), or until Ketch closes; a torrent that finishes while a download waits does not seed.
   Seeding runs only while the process runs
-- Fast extension (BEP 6) on v1 connections (`TorrentSwarm`'s `PeerWorker`; v2 and hybrid routes
-  do not offer it yet): the handshake sets reserved byte 7 bit 0x04 (`PeerHandshake.fast`), and
-  with both bits set `PeerProtocolState(fast = true)` takes Have All / Have None in place of a
-  bitfield (we send them when we hold every piece or none), Suggest Piece (ignored), Allowed
-  Fast (at most 32, requested while choked through `TorrentPieceScheduler.claim`'s `eligible`)
-  and Reject Request. A CHOKE keeps our requests until the peer rejects them; requests left
-  unanswered for `FAST_REJECT_GRACE_MS` (5 s) are canceled. A reject while choked hands the piece
-  back to the scheduler at once; unchoked, the block is asked for again until the piece has had
-  as many rejects as blocks, then other peers fetch it (`refused` until the peer unchokes us
-  anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
+- Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
+  hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
+  0x04 (`PeerHandshake.fast`), and with both bits set `PeerProtocolState(fast = true)` takes
+  Have All / Have None in place of a bitfield (we send them when we hold every piece or none),
+  Suggest Piece (ignored), Allowed Fast (at most 32, requested while choked through
+  `TorrentPieceScheduler.claim`'s `eligible`) and Reject Request. A CHOKE keeps our requests
+  until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
+  canceled. A reject while choked hands the piece back to the scheduler at once; unchoked, the
+  block is asked for again until the piece has had as many rejects as blocks, then other peers
+  fetch it (`refused` until the peer unchokes us anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
   Fast messages on a connection that did not negotiate it close the peer. The v1 pipeline also
   stays within the peer's BEP 10 `reqq`. The summary counts `fast` peers
+- On v2 and hybrid connections `PeerV2Connector` sets the bit (`PeerIdentityHandshake`'s `fast`,
+  `PeerInfo.fast`) and `PeerBlockExchange(fast = true)` runs the same `PeerProtocolState`: a CHOKE
+  keeps requests, `releaseChoked` cancels those still unanswered after `FAST_REJECT_GRACE_MS`
+  (the inbox's `Released` event; the actor hands them back like dropped ones), allowed-fast
+  requests stay. The session loop follows Have All, Allowed Fast and rejects per peer
+  (`TorrentV2PeerView`'s `allowedFast`, `rejects`, `refused`) when it plans requests, and
+  `TorrentV2Uploader` sends Have All / Have None, rejects what it will not serve (batched as
+  `Command.Reject`, also after its CHOKE), offers `allowedFastOffer` for the connection's wire
+  tag (`Command.AllowFast`, only while uploading) and serves those pieces while it chokes the
+  peer. BEP 52 hash rejects are separate messages. The v2 summary counts `fast` peers too
 - See [support and migration](docs/torrent.md) and
   [verification](docs/development/torrent-verification.md)
 
@@ -771,7 +798,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `KetchApi.updateConfig` / `updateNetworkInterfaces`. Downloads settings are saved to
   `config.toml` only for the embedded instance; the network selection is runtime-only and
   never saved. The Network page also edits the device's proxy (`ProxySettings`), shown for
-  devices listing `KetchFeatures.PROXY`
+  devices listing `KetchFeatures.PROXY`. On devices listing `KetchFeatures.TRANSFER_TIMEOUTS`,
+  the Downloads page's Retries stepper ends in Unlimited (`unlimitedRetries`) and a Stalled
+  connections stepper sets `idleTimeoutMs` (Off, 15 s to 5 min); `minSpeed` has no control yet
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, `allowedDirectories`, mDNS,
   `autoStart` (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
@@ -998,8 +1027,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
   `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without
   `KetchFeatures.CHECKSUM`
-- `PUT /api/config` keeps the server's `categories` when the body has no `categories` field, as
-  clients older than category folders send it
+- `PUT /api/config` keeps the server's value of every field the body leaves out (merged over
+  the current config), as clients older than category folders or idle timeouts send it
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
   `POST /api/tasks`, 16 MiB for uploaded content, 4 KiB for pairing; longer is 413
   `payload_too_large`
@@ -1136,9 +1165,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `resolveUrl` (without the metainfo), `listDownloadFiles` (`cursor`, `limit` up to 1000, `sort`
   and `descending`, from `control(TorrentController)`, else the request's resolved files),
   `selectDownloadFiles` (comma-separated IDs), `getStatus`, `setSpeedLimit`, `setPriority`,
-  `updateConfig`; `startDownload` takes `fileIds` and `checksum` (`sha256:<hex>` or the like),
-  and task JSON has `selectedFiles`, `totalFiles`, the request's `checksum` and a completed
-  task's `sharing` and `verifiedChecksum`. There is no seeding tool. Downloads it starts
+  `updateConfig` (also `retryCount`, -1 for unlimited, `idleTimeoutSeconds` and `minSpeed`,
+  each kept when left out); `startDownload` takes `fileIds` and `checksum` (`sha256:<hex>` or the
+  like), and task JSON has `selectedFiles`, `totalFiles`, the request's `checksum` and a
+  completed task's `sharing` and `verifiedChecksum`. There is no seeding tool. Downloads it starts
   carry `DownloadRequest.properties["ketch.origin"] = "agent"`
 - Agent tools are `TextTool`s (`library:mcp` and `ai:discover` each have a copy): a name, a
   description and string or integer parameters (also boolean ones in `library:mcp`), required
@@ -1360,22 +1390,17 @@ Planned features not yet implemented:
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-7. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
-   speed, unlimited retries and a capped, jittered backoff that resets once bytes are saved; a
-   watchdog around HTTP segments and FTP transfers raises a retryable `KetchError.Network`.
-   Today socket and request timeouts are `Long.MAX_VALUE`, so a stalled connection hangs until
-   the task is paused, and the backoff (`retryDelayMs * (1 shl n)`) has no cap
-8. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
+7. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
    renamed to the final, deduplicated name after the last flush, never replacing a file that
    appeared meanwhile. Today they write to the final name, preallocated to full size, so an
    unfinished file looks complete
-9. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+8. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-10. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
-    command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-11. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+9. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+   command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
+10. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-12. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+11. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
     [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6

@@ -216,9 +216,21 @@ All errors are modeled as sealed class `KetchError`:
 | `Canceled` | No | User-initiated cancellation |
 | `Unknown` | No | Unexpected exceptions |
 
-Retryable errors are retried up to `retryCount` times with exponential backoff from
-`retryDelayMs`. An HTTP 429 uses the server's `Retry-After` delay when present and reduces
-the task's connections (to `RateLimit-Remaining` when given, otherwise by half).
+Retryable errors are retried up to `retryCount` times in a row, or until the task is paused
+with `unlimitedRetries`; an attempt that gets further than every attempt before it starts the
+count over. Retry `n` waits `retryDelayMs` doubled `n - 1` times, capped at `maxRetryDelayMs`,
+and then a random time between half of that and all of it. An HTTP 429 uses the server's
+`Retry-After` delay when present and reduces the task's connections (to `RateLimit-Remaining`
+when given, otherwise by half).
+
+Transfers never time out on their own: request and socket timeouts are infinite, so a large
+body can take as long as it needs. Instead `TransferWatchdog` watches each HTTP segment request,
+unknown-size stream, HLS/DASH part and FTP segment connection. A transfer that receives no data
+for `idleTimeoutMs` (60 s by default), or averages less than `minSpeed` bytes per second over
+30 s (off by default), is cancelled and fails with a retryable `KetchError.Network`, so the
+engine retries it from the saved segment progress. Time spent waiting for a speed limit counts
+as neither. Opening a connection is limited to 30 s (`KtorHttpEngine`'s own clients on the JVM
+and Android, and FTP).
 
 ## Speed Limiting
 

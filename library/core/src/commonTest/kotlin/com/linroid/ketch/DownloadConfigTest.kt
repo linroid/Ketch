@@ -28,6 +28,13 @@ class DownloadConfigTest {
   }
 
   @Test
+  fun negativeTimeoutsAndCaps_throw() {
+    assertFailsWith<IllegalArgumentException> { DownloadConfig(maxRetryDelayMs = -1) }
+    assertFailsWith<IllegalArgumentException> { DownloadConfig(idleTimeoutMs = -1) }
+    assertFailsWith<IllegalArgumentException> { DownloadConfig(minSpeed = -1) }
+  }
+
+  @Test
   fun zeroProgressInterval_throws() {
     assertFailsWith<IllegalArgumentException> {
       DownloadConfig(progressIntervalMs = 0)
