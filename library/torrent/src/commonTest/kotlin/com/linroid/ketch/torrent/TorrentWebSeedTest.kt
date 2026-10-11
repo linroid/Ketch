@@ -78,10 +78,11 @@ class TorrentWebSeedTest {
     store: TorrentPieceStore,
     vararg engines: HttpEngine,
     connections: RecordingConnections = RecordingConnections(),
+    buffers: Int = 4 * 1024 * 1024,
   ) {
     val network = createTorrentNetwork()
     val peers = Channel<PeerEndpoint>().also { it.close() }
-    val budget = TorrentBufferBudget(4 * 1024 * 1024)
+    val budget = TorrentBufferBudget(buffers)
     try {
       // One engine per seed: each worker gets the one its URL's host names.
       TorrentSwarm(store, network, budget, reporter = connections,
@@ -148,8 +149,8 @@ class TorrentWebSeedTest {
           runSwarm(store, mirror, connections = connections)
           assertTrue(store.completed())
           assertContentEquals(payload, torrentFileSystem.read(output) { readByteArray() })
-          // Whole pieces, one range request each.
-          assertEquals(4, mirror.requests.size)
+          // The four pieces in one run, one range request.
+          assertEquals(listOf(0L..<payload.size.toLong()), mirror.requests.map { it.second })
         }
         val seed = connections.opened.first()
         assertEquals("mirror.test", seed.spec.host)
@@ -176,6 +177,107 @@ class TorrentWebSeedTest {
           }
           // The empty file is never asked for.
           assertTrue(mirror.requests.none { it.first.endsWith("/empty") })
+          // One run over every piece: a range request per file, each file whole.
+          assertEquals(listOf(
+            "http://mirror.test/pub/my%20set/a%20b.bin" to 0L..19_999L,
+            "http://mirror.test/pub/my%20set/dir/%C3%BCn%C3%AF.bin" to 0L..29_999L,
+            "http://mirror.test/pub/my%20set/c.bin" to 0L..39_999L,
+          ), mirror.requests)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun singleFile_sixteenPieces_fetchesTheRunInOneRequest() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(16 * PIECE) { (it * 17 + 3).toByte() }
+        val mirror = MirrorEngine(mapOf("http://mirror.test/data" to payload))
+        withStore(singleFile(payload, "http://mirror.test/data")) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          assertContentEquals(payload, torrentFileSystem.read(output) { readByteArray() })
+          assertEquals(listOf(0L..<payload.size.toLong()), mirror.requests.map { it.second })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun corruptPieceInARun_failsOnlyThatPieceAndIsFetchedAgain() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(16 * PIECE) { (it * 11 + 1).toByte() }
+        val url = "http://mirror.test/data"
+        // A byte of piece 5 is wrong in the first response only.
+        val mirror = MirrorEngine(mapOf(url to payload), damage = mapOf(url to 5L * PIECE + 100))
+        withStore(singleFile(payload, url)) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          assertContentEquals(payload, torrentFileSystem.read(output) { readByteArray() })
+          // Pieces 0 to 4 were kept; the next run starts at the corrupt piece.
+          assertEquals(listOf(0L..<16L * PIECE, 5L * PIECE..<16L * PIECE),
+            mirror.requests.map { it.second })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun connectionDroppedMidRun_keepsTheVerifiedPieces() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(8 * PIECE) { (it * 19 + 2).toByte() }
+        val url = "http://mirror.test/data"
+        // The first response ends halfway through piece 3.
+        val mirror = MirrorEngine(mapOf(url to payload), drop = mapOf(url to 3 * PIECE + 500))
+        withStore(singleFile(payload, url)) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          assertContentEquals(payload, torrentFileSystem.read(output) { readByteArray() })
+          assertEquals(listOf(0L..<8L * PIECE, 3L * PIECE..<8L * PIECE),
+            mirror.requests.map { it.second })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun selectionHole_splitsTheRun() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val mirror = MirrorEngine(mirrorFiles)
+        // "a b.bin" is pieces 0 and 1, "c.bin" pieces 3 to 5; piece 2 lies in "ünï.bin" only.
+        withStore(multiFile("http://mirror.test/pub/"), selected = setOf(0, 3)) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          assertContentEquals(parts[0].second,
+            torrentFileSystem.read(output / "a b.bin") { readByteArray() })
+          assertContentEquals(parts[3].second,
+            torrentFileSystem.read(output / "c.bin") { readByteArray() })
+          // The two runs ask for the ends of "ünï.bin" apart, never its unwanted middle.
+          assertEquals(listOf(0L..12_767L, 29_152L..29_999L), mirror.requests
+            .filter { it.first.endsWith("%C3%AF.bin") }.map { it.second })
+          assertEquals(4, mirror.requests.size)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun bufferBudget_limitsTheRunLength() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(16 * PIECE) { (it * 23 + 9).toByte() }
+        val mirror = MirrorEngine(mapOf("http://mirror.test/data" to payload))
+        withStore(singleFile(payload, "http://mirror.test/data")) { store, output ->
+          // A run's later pieces leave half of a twelve pieces' budget free: six in a run.
+          runSwarm(store, mirror, buffers = 12 * PIECE)
+          assertTrue(store.completed())
+          assertContentEquals(payload, torrentFileSystem.read(output) { readByteArray() })
+          assertEquals(listOf(0L..<6L * PIECE, 6L * PIECE..<12L * PIECE,
+            12L * PIECE..<16L * PIECE), mirror.requests.map { it.second })
         }
       }
     }

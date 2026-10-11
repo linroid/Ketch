@@ -145,14 +145,19 @@ including a development run, hands its files to the running app instead of openi
   single-file torrent's URL names the file (or, ending in `/`, the folder holding it); a
   multi-file torrent's URL names the folder holding the torrent's folder, and each file is
   fetched from the URL, the torrent name and the file's path, each segment percent-encoded. Each
-  web seed fetches whole pieces in order, one range request per file a piece spans, pieces no
-  peer or other seed is fetching, and only pieces the selection wants; every piece passes the
-  same check as a peer's: SHA-1 for v1, the file's piece layer (BEP 52) for v2 and hybrid
-  torrents. A v2 or hybrid piece lies in one file, so it is a single range request, and BEP 47
-  padding files are never requested. When every piece left is being fetched, a seed may also
-  fetch one a peer is fetching, and whichever arrives verified first is kept. A failed request or
-  a corrupt piece backs that seed off (2 s, doubling up to a minute); five failures in a row drop
-  it until the task runs again. Requests go through the source's HTTP
+  web seed fetches runs of whole pieces in order, up to 16 pieces or 4 MiB, with one range
+  request per file a run spans, pieces no peer or other seed is fetching, and only pieces the
+  selection wants: a piece someone else fetches or the selection leaves out ends the run. A run
+  takes no more than its share of the free pieces, split between the peers and seeds, and its
+  later pieces only buffers that leave half the torrent buffer limit free, so peers keep pieces
+  and memory to fetch with. Each piece is checked as soon as its bytes arrive, with the same
+  check as a peer's: SHA-1 for v1, the file's piece layer (BEP 52) for v2 and hybrid torrents. A
+  v2 or hybrid piece lies in one file, and BEP 47 padding files are never requested. When every
+  piece left is being fetched, a seed may also fetch one a peer is fetching, a single piece
+  rather than a run, and whichever arrives verified first is kept. A failed request or a corrupt
+  piece ends the run there: the pieces stored before it are kept, the rest are given back, and
+  the seed backs off (2 s, doubling up to a minute); five failures in a row drop it until the
+  task runs again. Requests go through the source's HTTP
   engine, with its system proxy settings like HTTP metainfo, count against the download limits,
   fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
   URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its

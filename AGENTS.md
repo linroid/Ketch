@@ -464,20 +464,30 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   into the rebuilt metainfo by `metainfoFromInfo`). The v1 swarm runs a `WebSeedWorker` per URL
   (`TorrentWebSeed.kt`) through the engine's `TorrentHttp` (`fetchRange`, which fails with
   `HttpIdleException` after 30 s without data): to `TorrentPieceScheduler` it is a peer with every
-  piece that claims in order (`claim(sequential = true)`), so peers and seeds never fetch the same
-  piece outside the endgame. `WebSeedLayout` maps a piece to one range request per file it spans
-  (multi-file: URL + name + path, segments percent-encoded). Pieces are SHA-1 checked like peers';
-  a failure backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row drop it.
+  piece that claims runs in order (`claimRun`), so peers and seeds never fetch the same piece
+  outside the endgame. A run is the first free wanted piece and the free wanted pieces after it,
+  at most `WEB_SEED_RUN_PIECES` (16) and `WEB_SEED_RUN_BYTES` (4 MiB), no more than its share of
+  the free pieces split between every peer and seed (the swarm joins every seed before any
+  claims), and later pieces only take buffers that leave half the budget free; an endgame
+  duplicate is a single piece. `WebSeedLayout` maps a piece to one range request per file it spans
+  (multi-file: URL + name + path, segments percent-encoded); the worker joins a run's spans that
+  follow each other in a file into one request, and commits and gives back each piece as its last
+  byte arrives (`WebSeedPieces.release(piece, verified)`), so a corrupt piece or a dropped
+  response keeps the pieces before it and gives the rest back. Pieces are SHA-1 checked like
+  peers'; a failed run backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row
+  drop it.
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
   with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
   `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`
   builds) and run the same worker through `TorrentV2WebSeeds` (`WebSeedPieces` is the worker's
   view: `SwarmWebSeedPieces` for v1, the hub's for v2): an idle seed tells the session loop, which
-  claims a whole piece from `TorrentV2PieceScheduler.claimWebSeed` (the next free wanted piece
-  from a cursor, in the endgame one peers assemble that no seed fetches) and assigns it; the seed
-  fetches it with one range request (`WebSeedV2Layout`: a v2 piece lies in one file, padding is
-  never requested), `TorrentV2PieceStore.commitOwned` checks it against the piece layers, and
-  `webSeedDone` returns it. Mirrors pay the engine's, owner's and task's limits, keep a transfer
+  claims a run from `TorrentV2PieceScheduler.claimWebSeedRun` (`claimWebSeed`'s next free wanted
+  piece from a cursor, extended as for v1 with the loop's peers and running seeds as the
+  fetchers and active slots below the limit; in the endgame a single piece peers assemble that no
+  seed fetches) and assigns it; the seed fetches it with one range request per file
+  (`WebSeedV2Layout`: a v2 piece lies in one file, padding is never requested),
+  `TorrentV2PieceStore.commitOwned` checks each piece against the piece layers, and `webSeedDone`
+  returns each. Mirrors pay the engine's, owner's and task's limits, keep a transfer
   without peers alive while one runs, and add `WebSeedStats` to the v2 swarm summary
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before

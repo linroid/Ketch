@@ -196,10 +196,14 @@ internal class TorrentSwarm(
     // A web seed's storage failure stops the swarm, as a peer's does.
     val webSeedFailures = Channel<TorrentStorageException>(1)
     val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
+    // Negative IDs never collide with peer workers'. Every seed joins before any claims a run,
+    // so the first runs leave the other seeds their share.
+    val webSeedPieces = webSeedUrls.mapIndexed { number, url ->
+      SwarmWebSeedPieces(-1 - number, url, store, scheduler,
+        onVerified = { progressEvents.trySend(Unit) }).also { it.join() }
+    }
     val webSeeds = webSeedUrls.mapIndexed { number, url ->
-      // Negative IDs never collide with peer workers'.
-      val pieces = SwarmWebSeedPieces(-1 - number, url, store, scheduler,
-        onVerified = { progressEvents.trySend(Unit) })
+      val pieces = webSeedPieces[number]
       val worker = WebSeedWorker(url, pieces, checkNotNull(webSeedHttp), webSeedStats, logLabel,
         reporter, webSeedRetryMs, downloadPayload = downloadPayload)
       launch(Dispatchers.Default) {

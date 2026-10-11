@@ -56,10 +56,10 @@ internal class WebSeedV2Layout private constructor(
 
 /**
  * The web seeds of one v2 or hybrid transfer. Each runs a [WebSeedWorker] whose pieces the session
- * loop hands out: a seed tells the loop it is idle through [updates], the loop claims a piece from
- * its scheduler ([TorrentV2PieceScheduler.claimWebSeed]) and [assign]s it, and the seed reports
- * the piece [Event.Done] once the store verified and wrote it, or gave it back. The store verifies
- * a mirror's piece against the piece layers as it does a peer's.
+ * loop hands out: a seed tells the loop it is idle through [updates], the loop claims a run of
+ * pieces from its scheduler ([TorrentV2PieceScheduler.claimWebSeedRun]) and [assign]s it, and the
+ * seed reports each piece [Event.Done] once the store verified and wrote it, or gave it back. The
+ * store verifies a mirror's piece against the piece layers as it does a peer's.
  */
 internal class TorrentV2WebSeeds private constructor(
   private val layouts: List<WebSeedV2Layout>,
@@ -75,11 +75,13 @@ internal class TorrentV2WebSeeds private constructor(
   private val log = KetchLogger("TorrentWebSeed")
   val stats = WebSeedStats()
   private val events = Channel<Event>(Channel.UNLIMITED)
-  // A claim no seed took goes back to the loop, which returns the piece to the scheduler.
+  // A run no seed took goes back to the loop, which returns its pieces to the scheduler.
   private val assignments = urls.indices.map { seed ->
-    Channel<TorrentV2PieceScheduler.WebSeedClaim>(1, onUndeliveredElement = { claim ->
-      events.trySend(Event.Done(seed, claim.index, verified = false))
-      claim.lease.close()
+    Channel<List<TorrentV2PieceScheduler.WebSeedClaim>>(1, onUndeliveredElement = { run ->
+      for (claim in run) {
+        events.trySend(Event.Done(seed, claim.index, verified = false))
+        claim.lease.close()
+      }
     })
   }
 
@@ -100,9 +102,9 @@ internal class TorrentV2WebSeeds private constructor(
     class Failed(val cause: TorrentStorageException) : Event
   }
 
-  /** Hands [claim] to [seed], which said it was idle; false when it cannot take it. */
-  fun assign(seed: Int, claim: TorrentV2PieceScheduler.WebSeedClaim): Boolean =
-    assignments[seed].trySend(claim).isSuccess
+  /** Hands [run] to [seed], which said it was idle; false when it cannot take it. */
+  fun assign(seed: Int, run: List<TorrentV2PieceScheduler.WebSeedClaim>): Boolean =
+    assignments[seed].trySend(run).isSuccess
 
   /** Runs every seed until they are all dropped or the transfer cancels them. */
   suspend fun run(): Unit = coroutineScope {
@@ -130,10 +132,9 @@ internal class TorrentV2WebSeeds private constructor(
     WebSeedPieces<TorrentV2PieceScheduler.WebSeedClaim> {
     private val layout = layouts[seed]
     private var waiting = false
-    private var next: TorrentV2PieceScheduler.WebSeedClaim? = null
-    private var stored: TorrentV2PieceScheduler.WebSeedClaim? = null
+    private var next: List<TorrentV2PieceScheduler.WebSeedClaim>? = null
 
-    override suspend fun claim(): TorrentV2PieceScheduler.WebSeedClaim? {
+    override suspend fun claim(): List<TorrentV2PieceScheduler.WebSeedClaim> {
       next?.let {
         next = null
         return it
@@ -142,14 +143,14 @@ internal class TorrentV2WebSeeds private constructor(
         events.trySend(Event.Idle(seed))
         waiting = true
       }
-      // A piece usually follows at once; a seed left waiting closes its connection meanwhile.
-      // A select either takes the claim or times out, never both, so no claim is lost.
-      val claim = select<TorrentV2PieceScheduler.WebSeedClaim?> {
+      // A run usually follows at once; a seed left waiting closes its connection meanwhile.
+      // A select either takes the run or times out, never both, so no claim is lost.
+      val run = select<List<TorrentV2PieceScheduler.WebSeedClaim>?> {
         assignments[seed].onReceive { it }
         onTimeout(IDLE_CONNECTION_MS) { null }
-      } ?: return null
+      } ?: return emptyList()
       waiting = false
-      return claim
+      return run
     }
 
     override suspend fun idle() {
@@ -162,13 +163,9 @@ internal class TorrentV2WebSeeds private constructor(
 
     // The claim's buffer is this seed's alone and never changes once fetched.
     override suspend fun commit(piece: TorrentV2PieceScheduler.WebSeedClaim): CommitOutcome =
-      store.commitOwned(piece.index, piece.bytes).also { outcome ->
-        if (outcome == CommitOutcome.VERIFIED) stored = piece
-      }
+      store.commitOwned(piece.index, piece.bytes)
 
-    override suspend fun release(piece: TorrentV2PieceScheduler.WebSeedClaim) {
-      val verified = stored === piece
-      stored = null
+    override suspend fun release(piece: TorrentV2PieceScheduler.WebSeedClaim, verified: Boolean) {
       events.trySend(Event.Done(seed, piece.index, verified))
       piece.lease.close()
     }
