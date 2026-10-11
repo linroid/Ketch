@@ -75,7 +75,14 @@ val ketch = Ketch(
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
   newly discovered and failed peers, corrupt pieces, upload slots, interested peers and
   uploaded bytes; v2 and hybrid swarms also count incoming peers, a hybrid's v1 peers, hash
-  requests served and rejected, and candidates being dialed
+  requests served and rejected, and candidates being dialed. A v1 swarm's summary ends with how
+  its peer connections ended, each dialed endpoint counted once by the furthest it got
+  (`refused`, `connectTimeout`, `unreachable`, `connectFailed`, then `handshakeRejected`,
+  `handshakeTimeout`, `handshakeClosed`, then `connected` and `received` for peers that sent
+  payload), the same for incoming connections, and how many dialed endpoints peers advertised as
+  supporting uTP or preferring encryption, and how many of those failed. `handshakeClosed` is a
+  peer that accepted the connection and closed it on the plaintext handshake, as peers requiring
+  encryption do. A swarm that runs out of peers logs this at info
 
 ### Verbose Level (For Detailed Diagnostics)
 - Speed limiter waits

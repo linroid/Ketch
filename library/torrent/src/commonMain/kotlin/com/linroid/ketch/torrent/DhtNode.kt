@@ -57,17 +57,54 @@ internal class DhtNode(
 
   suspend fun snapshot(): ByteArray = routing.snapshot()
 
-  suspend fun bootstrap(endpoints: List<PeerEndpoint>) = bootstrapMutex.withLock {
-    for (endpoint in endpoints.take(64)) {
+  /**
+   * Pings [endpoints], nodes saved from earlier runs, and [routers]. Routers come from names we
+   * resolved ourselves, so they are asked whatever their address: a proxy's fake-IP DNS answers
+   * with reserved addresses (198.18.0.0/15) it routes. A router at such an address only
+   * introduces the nodes it names near our ID and never enters the routing table.
+   */
+  suspend fun bootstrap(
+    endpoints: List<PeerEndpoint>,
+    routers: List<PeerEndpoint> = emptyList(),
+  ) = bootstrapMutex.withLock {
+    val (publicRouters, reservedRouters) = routers.take(16).partition(::validEndpoint)
+    for (endpoint in (endpoints.take(64) + publicRouters)) {
       if (validEndpoint(endpoint)) bootstrapCandidates += canonical(endpoint)
     }
     while (bootstrapCandidates.size > 64) bootstrapCandidates.remove(bootstrapCandidates.first())
     coroutineScope {
+      val introduced = reservedRouters.map { router -> async { askRouter(router) } }.awaitAll()
+        .flatten().distinctBy { it.endpoint }.take(32)
       bootstrapCandidates.toList().chunked(3).forEach { batch ->
         batch.map { endpoint -> async { ask(endpoint, "ping", emptyMap()) } }.awaitAll()
       }
+      introduced.chunked(3).forEach { batch ->
+        batch.map { node -> async { ask(node.endpoint, "ping", emptyMap(), node.id) } }.awaitAll()
+      }
     }
     lookup(routing.localId, announcePort = null, peers = false)
+  }
+
+  /** The valid nodes a bootstrap router names near our ID, or none when it does not answer. */
+  private suspend fun askRouter(router: PeerEndpoint): List<DhtContact> {
+    val address = numericAddress(router.host) ?: return emptyList()
+    if (router.port == 0 || (address.size == 16) != ipv6) return emptyList()
+    val remote = canonical(router)
+    return try {
+      val response = rpc.query(remote, "find_node", mapOf(
+        "id" to routing.localId.toByteArray(),
+        "target" to routing.localId.toByteArray(),
+        "want" to listOf(if (ipv6) "n6" else "n4"),
+      ), queryTimeoutMs)
+      if (response?.type != "r") return emptyList()
+      response.body?.get(if (ipv6) "nodes6" else "nodes")?.bytes
+        ?.let { runCatching { DhtCodec.nodes(it, ipv6) }.getOrNull() }.orEmpty()
+        .filter(::validContact)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Exception) {
+      emptyList()
+    }
   }
 
   suspend fun peers(hash: InfoHash, announcePort: Int? = null): List<PeerEndpoint> =

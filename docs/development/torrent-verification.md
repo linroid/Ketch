@@ -39,6 +39,18 @@ resumes, and checks the result against Debian's published `SHA256SUMS`. It is ex
 
 Network restrictions on trackers, DHT bootstrap or peers fail the test rather than skipping it.
 
+`PeerSurveyTest` measures why public swarms do or do not connect. It runs each magnet or
+`.torrent` URL in `KETCH_TORRENT_SURVEY` (separated by whitespace) as a download for
+`KETCH_TORRENT_SURVEY_MINUTES` (default 3), records how every v1 peer connection ended, then
+probes the peers it could not use: a uTP SYN (answered by peers speaking uTP) and, for peers that
+closed the plaintext handshake, a 96-byte MSE/PE opening (answered by peers speaking protocol
+encryption). It writes `library/torrent/build/reports/torrent-survey.md` and is excluded unless
+the variable is set:
+
+```sh
+KETCH_TORRENT_SURVEY='magnet:?xt=urn:btih:…' ./gradlew :library:torrent:jvmTest --tests '*PeerSurveyTest'
+```
+
 CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Windows jobs exercise
 the OS filesystem adapters. The JVM job builds the pinned Transmission, runs with
 `-PtorrentConformance=true` and `:library:torrent:verifyNoNativeTorrentRuntime`, then requires

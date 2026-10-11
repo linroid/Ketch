@@ -65,6 +65,8 @@ internal class KotlinTorrentSession(
    * runs, seeding included.
    */
   private val reporter: ConnectionReporter = ConnectionReporter.None,
+  /** Hears how each peer connection ended, for diagnostics. */
+  private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -393,7 +395,7 @@ internal class KotlinTorrentSession(
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
-              listenPortFor = listenPortFor, reporter = reporter,
+              listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()

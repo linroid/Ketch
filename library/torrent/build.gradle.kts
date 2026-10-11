@@ -100,9 +100,11 @@ tasks.withType<Test>().configureEach {
   val measuring = providers.environmentVariable("KETCH_TORRENT_MEMORY").orNull == "1"
   val publicSwarm = providers.gradleProperty("publicTorrentTests").orNull == "true"
   inputs.property("publicTorrentTests", publicSwarm)
-  outputs.upToDateWhen { !conformance && !benchmark && !measuring && !publicSwarm }
-  outputs.cacheIf { !conformance && !benchmark && !measuring && !publicSwarm }
+  val surveying = !providers.environmentVariable("KETCH_TORRENT_SURVEY").orNull.isNullOrBlank()
+  outputs.upToDateWhen { !conformance && !benchmark && !measuring && !publicSwarm && !surveying }
+  outputs.cacheIf { !conformance && !benchmark && !measuring && !publicSwarm && !surveying }
   if (!publicSwarm) filter.excludeTestsMatching("*PublicSwarmTest")
+  if (!surveying) filter.excludeTestsMatching("*PeerSurveyTest")
   if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
     filter.excludeTestsMatching("*TransmissionInteropTest")
   }
@@ -113,7 +115,8 @@ tasks.withType<Test>().configureEach {
   for (name in listOf("TRANSMISSION_DAEMON", "KETCH_TORRENT_BENCHMARK",
     "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
     "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT", "KETCH_TORRENT_MEMORY",
-    "KETCH_TORRENT_MEMORY_REPORT")) {
+    "KETCH_TORRENT_MEMORY_REPORT", "KETCH_TORRENT_SURVEY", "KETCH_TORRENT_SURVEY_MINUTES",
+    "KETCH_TORRENT_SURVEY_LOG")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())

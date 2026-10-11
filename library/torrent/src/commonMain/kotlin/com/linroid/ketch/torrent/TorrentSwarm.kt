@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -68,6 +69,8 @@ internal class TorrentSwarm(
   private val logLabel: String = logHash(store.metadata.infoHash.hex),
   /** Reports each connected peer and its payload among the task's live connections. */
   private val reporter: ConnectionReporter = ConnectionReporter.None,
+  /** Hears how each peer connection ended, for diagnostics. */
+  private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -78,6 +81,8 @@ internal class TorrentSwarm(
     val failure: Throwable?,
     val incoming: Boolean,
     val listen: PeerEndpoint?,
+    val attempt: PeerAttempt,
+    val flags: Int,
   )
 
   private val log = KetchLogger("TorrentSwarm")
@@ -166,6 +171,7 @@ internal class TorrentSwarm(
     var connectFailures = 0
     var corruptPieces = 0
     var lastSummary = now()
+    val diagnostics = PeerDiagnostics(listener = peerOutcomes)
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       peerFlags.record(update.flags)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
@@ -188,7 +194,7 @@ internal class TorrentSwarm(
           "active=${active.size}/${connections()}, queued=${pending.size}, " +
           "known=${attempts.size}, discovered=$discovered, failed=$connectFailures, " +
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
-          "discovery=${if (discoveryClosed) "closed" else "open"}"
+          "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}"
       }
       discovered = 0
       connectFailures = 0
@@ -207,13 +213,17 @@ internal class TorrentSwarm(
         attemptedAt[endpoint] = now()
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
+      val attempt = PeerAttempt(incoming)
       active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         var listen: PeerEndpoint? = if (incoming) null else endpoint
         try {
-          peer(id, endpoint, flags, scheduler, progressEvents, pexEvents, connection) {
+          peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, connection) {
             listen = it
           }
+        } catch (e: TimeoutCancellationException) {
+          // A connect, handshake or idle deadline of this peer, not the swarm stopping it.
+          failure = e
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
@@ -226,7 +236,7 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
-          results.trySend(PeerResult(endpoint, failure, incoming, listen))
+          results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags))
         }
       }
     }
@@ -278,6 +288,7 @@ internal class TorrentSwarm(
         }
         if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null) {
           if (!complete) logSummary()
+          if (!complete) log.i { "Swarm $logLabel ran out of peers: ${diagnostics.summary()}" }
           check(complete) { "No peer could complete the torrent" }
           break
         }
@@ -329,6 +340,7 @@ internal class TorrentSwarm(
             val endpoint = result.endpoint
             val failure = result.failure
             active.remove(endpoint)
+            diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
             if (failure != null) {
               connectFailures++
@@ -371,6 +383,7 @@ internal class TorrentSwarm(
     id: Int,
     endpoint: PeerEndpoint,
     receivedFlags: Int,
+    attempt: PeerAttempt,
     scheduler: TorrentPieceScheduler,
     progressEvents: SendChannel<Unit>,
     pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
@@ -378,9 +391,10 @@ internal class TorrentSwarm(
     onListen: (PeerEndpoint?) -> Unit,
   ) {
     val connection = accepted ?: network.connect(endpoint)
+    attempt.stage = PeerStage.HANDSHAKING
     try {
-      val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, scheduler,
-        progressEvents, pexEvents)
+      val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
+        scheduler, progressEvents, pexEvents)
       try { worker.run() } finally { onListen(worker.listen) }
     } finally {
       connection.close()
@@ -400,6 +414,7 @@ internal class TorrentSwarm(
     private val incoming: Boolean,
     /** Flags other peers advertised for [endpoint] (BEP 11), for later transports. */
     val receivedFlags: Int,
+    private val attempt: PeerAttempt,
     private val scheduler: TorrentPieceScheduler,
     private val progressEvents: SendChannel<Unit>,
     private val pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
@@ -497,6 +512,7 @@ internal class TorrentSwarm(
     private suspend fun open() {
       val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      attempt.stage = PeerStage.CONNECTED
       traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
       chokerMutex.withLock { choker.add(id) }
       publishContact()
@@ -526,6 +542,7 @@ internal class TorrentSwarm(
         val throttling = TimeSource.Monotonic.markNow()
         val throttledAt = nowMs()
         traffic?.received(message.bytes.size)
+        attempt.payload += message.bytes.size
         downloadPayload(message.bytes.size)
         lastBlock += throttling.elapsedNow()
         lastUsefulPayload += nowMs() - throttledAt

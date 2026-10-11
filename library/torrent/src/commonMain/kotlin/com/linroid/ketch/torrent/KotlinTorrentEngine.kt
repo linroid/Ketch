@@ -91,6 +91,8 @@ internal class KotlinTorrentEngine(
    * loopback connections from a wildcard listener and resets them when it closes.
    */
   private val listenHost: String = WILDCARD_IPV4,
+  /** Test hook: hears how each v1 peer connection of every torrent ended. */
+  private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -608,6 +610,7 @@ internal class KotlinTorrentEngine(
         listenPortFor = { advertisedPort.current() },
         seedOnly = spec.seedOnly,
         reporter = spec.connections,
+        peerOutcomes = peerOutcomes,
       )
       target = session
       entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())
@@ -1039,9 +1042,7 @@ internal class KotlinTorrentEngine(
           // A large snapshot must not crowd out the routers when its nodes have gone stale.
           val saved = restored.filter { it !in endpoints }
             .take((64 - endpoints.size).coerceAtLeast(0))
-          attempt("$family DHT bootstrap") {
-            node.bootstrap((saved + endpoints).distinct().take(64))
-          }
+          attempt("$family DHT bootstrap") { node.bootstrap(saved, routers = endpoints) }
           log.d {
             "$family DHT bootstrap from ${endpoints.size} router(s) and ${saved.size} saved " +
               "node(s): ${node.contactCount()} contact(s)"
