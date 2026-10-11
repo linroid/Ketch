@@ -37,6 +37,11 @@ graalvmNative {
         "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
+        // kotlinx.coroutines' scheduler reads these as it initializes, which is here, at build
+        // time, so setting them in main is too late for the binary: Dispatchers.IO at 16 threads
+        // rather than 64, idle workers ended after 10 s rather than 60 (capCoroutineThreads).
+        "-Dkotlinx.coroutines.io.parallelism=16",
+        "-Dkotlinx.coroutines.scheduler.keep.alive.sec=10",
         "--initialize-at-build-time=ch.qos.logback",
         "--initialize-at-build-time=org.slf4j",
         // Logback parses logback.xml at build time and keeps SAX helper objects from it.

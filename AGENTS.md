@@ -1493,8 +1493,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   streams, CIO resolves names and selects), at most 64, started only when every one is busy and
   ended after 30 s idle. Our apps cap the app-wide `Dispatchers.IO` at 16
   (`kotlinx.coroutines.io.parallelism`) and idle workers at 10 s: the desktop launcher's
-  `jvmArgs`, the CLI's `main` and the Android `KetchApplication`'s constructor. The library sets
-  neither
+  `jvmArgs`, the CLI's `main` (and `native-image`'s `-D` arguments, as the binary initializes
+  kotlinx.coroutines while it is built) and the Android `KetchApplication`'s constructor. The
+  library sets neither
 - Console logger: platform-specific implementations
 
 ### Coroutine-Based Concurrency
