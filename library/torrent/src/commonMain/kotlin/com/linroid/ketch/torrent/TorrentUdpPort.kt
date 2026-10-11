@@ -6,8 +6,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -27,10 +29,23 @@ internal class TorrentUdpPort(
 ) {
   private val log = KetchLogger("TorrentEngine")
   private val dhtPackets = AtomicReference<Channel<TorrentDatagram>?>(null)
+  private val closed = AtomicBoolean(false)
   private val receiver: Job = scope.launch {
+    var failures = 0
     try {
       while (true) {
-        val datagram = socket.receive()
+        val datagram = try {
+          socket.receive().also { failures = 0 }
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          // Windows reports an ICMP error for an earlier send on the next receive; the socket
+          // still works. Only a socket closed, or failing again and again, stops the port.
+          if (closed.load() || ++failures > MAX_RECEIVE_FAILURES) throw e
+          log.v { "UDP port ${socket.local} receive failed: ${e.describeWithoutUrls()}" }
+          delay(10)
+          continue
+        }
         if (UtpPacket.looksLikeUtp(datagram.bytes)) {
           utp?.let { handle ->
             try {
@@ -50,7 +65,7 @@ internal class TorrentUdpPort(
       throw e
     } catch (e: Exception) {
       log.d { "UDP port ${socket.local} stopped: ${e.describeWithoutUrls()}" }
-      onStopped()
+      if (!closed.load()) onStopped()
     } finally {
       dhtPackets.exchange(null)?.close(IOException("UDP port closed"))
       socket.close()
@@ -84,7 +99,13 @@ internal class TorrentUdpPort(
   }
 
   fun close() {
+    closed.store(true)
     receiver.cancel()
     socket.close()
+  }
+
+  private companion object {
+    /** Receive errors in a row before the port gives up as broken. */
+    const val MAX_RECEIVE_FAILURES = 64
   }
 }

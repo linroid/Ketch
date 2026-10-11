@@ -58,6 +58,17 @@ internal class UtpEndpoint(
     scope.launch {
       while (isActive) {
         delay(50)
+        // One failed tick must not stop retransmitting for every connection.
+        try { tickAll() } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          log.d { "uTP tick failed: ${e.describeWithoutUrls()}" }
+        }
+      }
+    }
+  }
+
+  private suspend fun tickAll() {
         step {
           val now = now()
           val finished = mutableListOf<Key>()
@@ -70,8 +81,6 @@ internal class UtpEndpoint(
           }
           finished.forEach { entries.remove(it) }
         }
-      }
-    }
   }
 
   val connectionCount: Int get() = entries.size
@@ -85,7 +94,10 @@ internal class UtpEndpoint(
     for ((remote, packet) in packets) {
       try {
         send(remote, packet.encode())
-      } catch (e: IOException) {
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        // A closed or full socket loses the packet; retransmission covers it.
         log.v { "uTP packet to $remote not sent: ${e.describeWithoutUrls()}" }
       }
     }
@@ -173,8 +185,16 @@ internal class UtpEndpoint(
     }
   }
 
-  fun close() {
-    entries.values.forEach { it.released = true }
+  /** Fails every connection, as when the port under it stopped: readers and writers throw. */
+  suspend fun close() {
+    step {
+      val now = now()
+      for (entry in entries.values) {
+        entry.socket.abort(now)
+        entry.released = true
+        entry.version.update { it + 1 }
+      }
+    }
   }
 
   /** One uTP socket as a [TorrentConnection]. One reader and one writer at a time. */

@@ -1056,8 +1056,10 @@ internal class KotlinTorrentEngine(
     val udp = TorrentUdpPort(bound, scope, utp = if (config.utpEnabled) {
       { datagram -> endpoint?.receive(datagram) }
     } else null, onStopped = {
-      // Incoming uTP needs the port back without waiting for a dial or a DHT lookup.
+      // Its connections fail rather than wait on a dead socket, and incoming uTP needs the
+      // port back without waiting for a dial or a DHT lookup.
       if (config.utpEnabled && running.load()) scope.launch {
+        endpoint?.close()
         delay(1_000)
         attempt("Binding the uTP port on $host again") { udpPort(host) }
       }

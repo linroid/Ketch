@@ -102,9 +102,12 @@ class UtpEndpointTest {
     val port = TorrentUdpPort(network.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
       utp = { endpoint?.receive(it) })
     endpoint = UtpEndpoint(scope, port::send, onIncoming = { incoming.complete(Unit); false })
-    val connection = a.endpoint.dial(PeerEndpoint("127.0.0.1", port.local.port))
+    // The RESET may arrive before the dial saw the connection open, or after: either way the
+    // connection fails.
+    assertFailsWith<IOException> {
+      a.endpoint.dial(PeerEndpoint("127.0.0.1", port.local.port)).readExactly(1)
+    }
     incoming.await()
-    assertFailsWith<IOException> { connection.readExactly(1) }
   }
 
   @Test
@@ -141,6 +144,37 @@ class UtpEndpointTest {
     fallback.connect(b.address).close()
     assertEquals(2, lookups)
   }
+
+  @Test
+  fun udpPort_survivesReceiveErrors_andClosingTheEndpointFailsItsConnections() =
+    endpoints { network, scope ->
+      // A socket that fails a few receives, as Windows does after an ICMP error, then works.
+      val real = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      var errors = 3
+      val flaky = object : TorrentDatagramSocket by real {
+        override suspend fun receive(): TorrentDatagram {
+          if (errors-- > 0) throw IOException("Connection reset by peer")
+          return real.receive()
+        }
+      }
+      var stopped = false
+      val port = TorrentUdpPort(flaky, scope, utp = null, onStopped = { stopped = true })
+      val dht = port.openDht()
+      val sender = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      try {
+        sender.send(PeerEndpoint("127.0.0.1", real.local.port), "d1:y1:qe".encodeToByteArray())
+        assertEquals("d1:y1:qe", dht.receive().bytes.decodeToString())
+        assertEquals(false, stopped)
+      } finally {
+        sender.close()
+        port.close()
+      }
+      val a = side(network, scope)
+      val b = side(network, scope)
+      val connection = a.endpoint.dial(b.address)
+      a.endpoint.close()
+      assertFailsWith<IOException> { connection.readExactly(1) }
+    }
 
   @Test
   fun udpPort_givesDhtEverythingButUtp() = endpoints { network, scope ->
