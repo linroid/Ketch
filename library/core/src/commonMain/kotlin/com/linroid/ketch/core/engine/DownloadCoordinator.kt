@@ -25,10 +25,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,7 +54,8 @@ internal class DownloadCoordinator(
   private val clock: Clock = Clock.System,
   private val connections: (taskId: String) -> ConnectionReporter = { ConnectionReporter.None },
 ) {
-  private val scope: CoroutineScope = CoroutineScope(dispatchers.network)
+  // A supervisor, so one execution that fails does not cancel the others.
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.network)
   private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
@@ -302,6 +306,12 @@ internal class DownloadCoordinator(
         try {
           execution.execute(resumeInfo)
         } catch (e: CancellationException) {
+          // Thrown while this job is still active, it is not a pause, cancel or close of this
+          // task but a failure of the download, such as a timeout leaking from a library.
+          if (currentCoroutineContext().isActive) {
+            fail(handle, KetchError.Unknown(e))
+            return@launch
+          }
           val s = handle.mutableState.value
           when {
             // A download that completed just before the cancellation keeps its state.
@@ -325,21 +335,10 @@ internal class DownloadCoordinator(
             else -> handle.mutableState.value = DownloadState.Canceled
           }
           throw e
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          val error = when (e) {
-            is KetchError -> e
-            else -> KetchError.Unknown(e)
-          }
-          log.e(error) { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
-          handle.record.update {
-            it.copy(
-              state = TaskState.FAILED,
-              error = error,
-              updatedAt = Clock.System.now(),
-            )
-          }
-          handle.mutableState.value = DownloadState.Failed(error)
+        } catch (e: Throwable) {
+          // Errors too, such as a class that fails to load: the task fails on its own and the
+          // other downloads keep running.
+          fail(handle, e as? KetchError ?: KetchError.Unknown(e))
         } finally {
           val finished = currentCoroutineContext()[Job]
           withContext(NonCancellable) {
@@ -353,6 +352,18 @@ internal class DownloadCoordinator(
 
       activeDownloads[taskId] = ActiveEntry(handle, execution, job)
     }
+  }
+
+  private suspend fun fail(handle: TaskHandle, error: KetchError) {
+    log.e(error) { "Download failed for taskId=${handle.taskId}: ${error.describeCauses()}" }
+    handle.record.update {
+      it.copy(
+        state = TaskState.FAILED,
+        error = error,
+        updatedAt = Clock.System.now(),
+      )
+    }
+    handle.mutableState.value = DownloadState.Failed(error)
   }
 
   /**
@@ -453,10 +464,13 @@ internal class DownloadCoordinator(
   /**
    * Stops every execution. Running tasks pause for [PauseReason.Shutdown] and keep their
    * partial files and DOWNLOADING records.
+   *
+   * @return the job that completes once every execution has finished
    */
-  fun close() {
+  fun close(): Job {
     closing = true
     scope.cancel()
+    return scope.coroutineContext.job
   }
 
   private companion object {

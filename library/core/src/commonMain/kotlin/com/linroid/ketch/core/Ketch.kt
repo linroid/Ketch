@@ -69,6 +69,9 @@ import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -78,6 +81,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -1034,12 +1039,25 @@ class Ketch(
 
   override fun close() {
     log.i { "Closing Ketch" }
-    coordinator.close()
+    val executions = coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()
     sourceResolver.close()
     httpEngine.close()
-    dispatchers.close()
+    closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
+  }
+
+  /**
+   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
+   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
+   * Native pool cannot close from one of its own threads.
+   */
+  @OptIn(DelicateCoroutinesApi::class)
+  private fun closeDispatchersAfter(jobs: List<Job>) {
+    GlobalScope.launch(Dispatchers.Default) {
+      jobs.joinAll()
+      dispatchers.close()
+    }
   }
 }
 

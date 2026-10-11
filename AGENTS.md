@@ -266,7 +266,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
-  `DOWNLOADING` records, so the next `start()` resumes them
+  `DOWNLOADING` records, so the next `start()` resumes them. It closes its thread pools only once
+  the cancelled coroutines have finished (from `Dispatchers.Default`), never under them
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
