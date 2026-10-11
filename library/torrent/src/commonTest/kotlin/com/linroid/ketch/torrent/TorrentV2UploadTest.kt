@@ -135,6 +135,9 @@ class TorrentV2UploadTest {
     private val controls = Channel<TorrentV2SessionLoop.Control>(8)
     /** Runs when a selection change leaves the complete loop with pieces to download. */
     var onIncomplete: suspend () -> Unit = {}
+    /** Our DHT port as peers see it, none when zero; DHT nodes peers named arrive in [dhtNodes]. */
+    var dhtPort = 0
+    val dhtNodes = Channel<PeerEndpoint>(8)
     private val remotes = mutableListOf<Remote>()
     private var port = 40_000
     private val network = object : TorrentNetwork {
@@ -156,6 +159,7 @@ class TorrentV2UploadTest {
       extensions: Boolean = false,
       dialed: TorrentV2DialTarget? = null,
       frames: TorrentBufferBudget = buffers,
+      dht: Boolean = false,
     ): Remote {
       val remote = Remote(pieceCount, dialed?.endpoint ?: PeerEndpoint(host, port++))
       remotes += remote
@@ -168,7 +172,7 @@ class TorrentV2UploadTest {
         extensions = extensions, dht = false)
       val origin = if (dialed != null) PeerV2Origin.Outgoing(remote.remote)
         else PeerV2Origin.Incoming(remote.remote)
-      val info = PeerInfo(id, mode, origin, extensions = extensions, link = remote)
+      val info = PeerInfo(id, mode, origin, extensions = extensions, link = remote, dht = dht)
       val admission = checkNotNull(state.reserve(1024))
       check(connections.trySend(PeerV2Connector.Connected(route, info, transport, blocks,
         admission, generation = dialed?.generation ?: 0)).isSuccess)
@@ -211,7 +215,8 @@ class TorrentV2UploadTest {
         TorrentV2Swarm(fixture.document,
           TorrentV2Runtime(network, ByteArray(20) { 9 }.toByteString(), buffers, state,
             uploadRate = global, uploadPolicy = { policy.load() },
-            listenPortFor = { listenPort }, uploadBuffers = uploads),
+            listenPortFor = { listenPort }, uploadBuffers = uploads,
+            dhtPortFor = { dhtPort }, onDhtNode = { dhtNodes.trySend(it) }),
           restricted = false, waitForPeers = true, discovered = discovered, dial = dial,
           dialFailures = failures, controls = controls, connectionLimit = { 8 },
           generation = { 0 }, serve = serve, sessionUploadRate = session,
@@ -291,6 +296,25 @@ class TorrentV2UploadTest {
       // Counted once the actor wrote it.
       while (store.uploadedBytes() < 16_384) delay(10)
       assertEquals(16_384L, store.uploadedBytes())
+    }
+  }
+
+  @Test
+  fun hybridV1PeerExchangesDhtPorts() = upload(hybrid) {
+    hybrid.seed(store)
+    dhtPort = 4321
+    run {
+      val peer = connect(1, PeerIdentityHandshake.Mode.V1, dht = true)
+      // Where our DHT listens follows what we have.
+      assertIs<PeerMessage.Bitfield>(peer.next())
+      assertEquals(PeerMessage.Port(4321), peer.next())
+      peer.send(PeerMessage.Port(5555))
+      assertEquals(PeerEndpoint("192.0.2.1", 5555), dhtNodes.receive())
+      // A peer without the DHT bit hears no port.
+      val other = connect(2, PeerIdentityHandshake.Mode.V1)
+      assertIs<PeerMessage.Bitfield>(other.next())
+      other.send(interested)
+      assertEquals(unchoke, other.next())
     }
   }
 

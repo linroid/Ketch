@@ -443,9 +443,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
 - DHT bootstrap routers are asked whatever address their names resolve to, reserved ranges such
   as 198.18.0.0/15 included; such a router only introduces nodes and never joins the routing
-  table, while addresses learned from the network stay filtered. v1 peers of public torrents
-  exchange DHT ports (BEP 5 `PORT`); the engine pings the nodes they name (the last 1024 once each,
-  four at a time), so trackers' peers start a DHT whose routers do not answer
+  table, while addresses learned from the network stay filtered. Peers of public torrents (v1,
+  v2 and hybrid) exchange DHT ports (BEP 5 `PORT`) while a DHT node of their family runs; the
+  engine pings the nodes they name (the last 1024 once each, four at a time), so trackers' peers
+  start a DHT whose routers do not answer
 - Btih magnets of hybrid torrents resolve their v2 identity (`TorrentMetadata` with
   `allowHybrid`, on the magnet path only) and run as v2 owners
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and

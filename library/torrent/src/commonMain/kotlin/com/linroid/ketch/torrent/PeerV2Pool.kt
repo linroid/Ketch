@@ -34,7 +34,15 @@ internal class PeerInfo(
   val extensions: Boolean,
   /** The socket the handshake ran on; later transports and encryption describe themselves. */
   val link: TorrentConnection,
-)
+  /** Both sides set the BEP 5 DHT bit, so they exchange DHT ports. */
+  val dht: Boolean = false,
+) {
+  /** The peer's address: where we dialed it, or where it dialed us from. */
+  val host: String get() = when (origin) {
+    is PeerV2Origin.Outgoing -> origin.endpoint.host
+    is PeerV2Origin.Incoming -> origin.remote.host
+  }
+}
 
 /** The session owns membership; peer children forward ordered events into one bounded queue. */
 internal class PeerV2Pool private constructor(

@@ -59,6 +59,10 @@ internal class TorrentV2Runtime(
    * pieces, the pieces block proofs hash and the proofs waiting to be sent.
    */
   val uploadBuffers: TorrentBufferBudget = buffers,
+  /** Our DHT port for a peer at that address (BEP 5 `PORT`); 0 when DHT does not run. */
+  val dhtPortFor: (PeerEndpoint) -> Int = { 0 },
+  /** A DHT node a peer named with `PORT`; must return at once. */
+  val onDhtNode: (PeerEndpoint) -> Unit = {},
 )
 
 /** Per-owner limits and the discovery it runs while transferring. */
@@ -568,7 +572,9 @@ internal class TorrentV2DownloadSession private constructor(
             check(target.generation == generation.load()) { "Peer target predates a reset" }
             PeerV2Connector.connect(network, target.endpoint, document, layout, peerId, buffers,
               memory, mode = target.mode, allowUpgrade = target.upgrade, extensions = true,
-              generation = target.generation)
+              generation = target.generation,
+              // Private and tracker-only torrents never touch the DHT (BEP 27).
+              dht = !restricted && runtime.dhtPortFor(target.endpoint) > 0)
           },
           incoming = incoming,
           respondParallelism = RESPOND_WORKERS,
@@ -576,7 +582,8 @@ internal class TorrentV2DownloadSession private constructor(
             // The pool filled while the peer waited: it is closed unanswered.
             if (!room.load()) null else {
               PeerV2Connector.respond(peer.connection, document, layout, peerId, buffers, memory,
-                extensions = true, generation = peer.generation)
+                extensions = true, generation = peer.generation,
+                dht = !restricted && runtime.dhtPortFor(peer.connection.remote) > 0)
             }
           },
           failures = failures,

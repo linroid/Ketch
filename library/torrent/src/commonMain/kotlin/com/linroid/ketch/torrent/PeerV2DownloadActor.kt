@@ -29,12 +29,13 @@ internal class PeerV2DownloadActor private constructor(
     data class RejectHashes(val selector: PeerHashSelector) : Command
 
     /**
-     * A message the session sends of its own accord: CHOKE or UNCHOKE, Have, Bitfield or an
-     * extension message. Interest, requests and payload have commands of their own.
+     * A message the session sends of its own accord: CHOKE or UNCHOKE, Have, Bitfield, our DHT
+     * port or an extension message. Interest, requests and payload have commands of their own.
      */
     data class Send(val message: PeerMessage) : Command {
       init {
         require(message is PeerMessage.Have || message is PeerMessage.Bitfield ||
+          message is PeerMessage.Port ||
           message is PeerMessage.Extended || message is PeerMessage.Control &&
           (message.signal == PeerMessage.Signal.CHOKE ||
             message.signal == PeerMessage.Signal.UNCHOKE)) { "Not a session message" }

@@ -342,6 +342,11 @@ internal object TorrentV2SessionLoop {
               verdict(peer, uploads.update(peer, view, update, pieces::isVerified),
                 "an invalid or excess request")
             }
+            // The peer's own address with its DHT port: a node that can start a DHT whose
+            // routers do not answer.
+            is PeerMessage.Port -> if (swarm != null && !swarm.restricted) {
+              view.info?.let { swarm.runtime.onDhtNode(PeerEndpoint(it.host, update.port)) }
+            }
             is PeerMessage.Extended -> if (extensions != null) {
               verdict(peer, extensions.receive(view, update), "a bad extension message")
               if (update.id == 0) {
@@ -769,6 +774,14 @@ internal object TorrentV2SessionLoop {
                     val ready = uploads.ready(peerEvent.peer, view, verified)
                     verdict(peerEvent.peer, if (greeted) ready else TorrentV2Uploader.Verdict.STOP,
                       "our handshake or bitfield could not be queued")
+                  }
+                  // After what we have: where our DHT listens, for peers that run one too.
+                  val dhtPort = if (swarm != null && info?.dht == true) {
+                    swarm.runtime.dhtPortFor(info.link.remote)
+                  } else 0
+                  if (dhtPort > 0) {
+                    view.commands.trySend(
+                      PeerV2DownloadActor.Command.Send(PeerMessage.Port(dhtPort)))
                   }
                 }
               }

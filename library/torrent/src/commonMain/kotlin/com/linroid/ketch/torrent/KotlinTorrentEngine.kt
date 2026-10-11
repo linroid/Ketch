@@ -166,8 +166,8 @@ internal class KotlinTorrentEngine(
   internal val advertisedPort = TorrentAdvertisedPort()
   val listenPort: Int get() = advertisedPort.listenPort
   private var nodes: List<DhtNode>? = null
-  /** The running DHT nodes' local endpoints, read by peers without [dhtMutex]. */
-  private val dhtLocals = AtomicReference(emptyList<PeerEndpoint>())
+  /** The DHT nodes, read by peers without [dhtMutex]; only running ones count. */
+  private val dhtNodes = AtomicReference(emptyList<DhtNode>())
   /** DHT nodes peers named with `PORT`, waiting to be pinged; the oldest go when it is full. */
   private val dhtIntroductions = Channel<PeerEndpoint>(64, BufferOverflow.DROP_OLDEST)
   private val downloadRate = TorrentRateLimiter()
@@ -741,7 +741,8 @@ internal class KotlinTorrentEngine(
           downloadRate = downloadRate, uploadRate = uploadRate,
           uploadPolicy = { uploadPolicy.load() },
           listenPortFor = { advertisedPort.current() }, allowLocalPeers = allowLocalPeers,
-          uploadBuffers = exchangeBudgets.uploads),
+          uploadBuffers = exchangeBudgets.uploads, dhtPortFor = ::dhtPortFor,
+          onDhtNode = { dhtIntroductions.trySend(it) }),
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,
@@ -1086,32 +1087,34 @@ internal class KotlinTorrentEngine(
     }
     if (result.isEmpty()) log.w { "DHT is unavailable: no UDP socket could be bound" }
     nodes = result
-    dhtLocals.store(result.map { it.local })
+    dhtNodes.store(result)
     result
   }
 
   /** Our DHT port for a peer at [peer]'s address family; 0 while no DHT node runs for it. */
-  private fun dhtPortFor(peer: PeerEndpoint): Int =
-    dhtLocals.load().firstOrNull { (':' in it.host) == (':' in peer.host) }?.port ?: 0
+  private fun dhtPortFor(peer: PeerEndpoint): Int = dhtNodes.load()
+    .firstOrNull { it.isRunning && (':' in it.local.host) == (':' in peer.host) }?.local?.port ?: 0
 
   /**
    * Pings the DHT nodes peers named (BEP 5 `PORT`), each once while it is among the last 1024,
    * four at a time. A node that answers joins the routing table, so a DHT whose routers do not
-   * answer still starts once trackers found peers.
+   * answer still starts once trackers found peers. One named while no DHT node of its family
+   * runs is not counted as asked, so the peer's next `PORT` tries again.
    */
   private suspend fun pingIntroducedNodes() = coroutineScope {
     val asked = LinkedHashSet<PeerEndpoint>()
     val permits = Semaphore(4)
     for (endpoint in dhtIntroductions) {
-      if (!asked.add(endpoint)) continue
+      if (endpoint in asked) continue
+      val node = dhtNodes.load().firstOrNull {
+        it.isRunning && (':' in it.local.host) == (':' in endpoint.host)
+      } ?: continue
+      asked += endpoint
       if (asked.size > 1024) asked.remove(asked.first())
       permits.acquire()
       launch {
         try {
-          val node = dhtMutex.withLock { nodes }?.firstOrNull {
-            it.isRunning && (':' in it.local.host) == (':' in endpoint.host)
-          }
-          if (node != null && node.introduce(endpoint)) {
+          if (node.introduce(endpoint)) {
             log.v { "DHT node introduced by a peer answered; contacts=${node.contactCount()}" }
           }
         } finally {

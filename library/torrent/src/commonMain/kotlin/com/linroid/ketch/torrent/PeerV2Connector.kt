@@ -61,6 +61,8 @@ internal object PeerV2Connector {
     connectTimeoutMs: Long = 10_000,
     extensions: Boolean = false,
     generation: Long = 0,
+    /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
+    dht: Boolean = false,
   ): Connected? {
     require(layout.infoHash == document.info.hash) { "Layout belongs to another torrent" }
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
@@ -72,11 +74,11 @@ internal object PeerV2Connector {
       // Capture inside the timeout: cancellation at its return boundary must not lose a socket.
       withTimeout(connectTimeoutMs) { connection = network.connect(remote) }
       val socket = checkNotNull(connection)
-      val route = PeerIdentityHandshake(document.identity, extensions).initiate(
+      val route = PeerIdentityHandshake(document.identity, extensions, dht).initiate(
         socket, mode, peerId, handshakes,
         allowUpgrade = allowUpgrade, expectedPeerId = expectedPeerId)
       return negotiated(socket, route, PeerV2Origin.Outgoing(remote), document, layout, buffers,
-        admission, extensions, maxPending, generation)
+        admission, extensions, dht, maxPending, generation)
     } catch (error: Throwable) {
       try { connection?.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
       admission.close()
@@ -101,6 +103,8 @@ internal object PeerV2Connector {
     extensions: Boolean = false,
     maxPending: Int = 32,
     generation: Long = 0,
+    /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
+    dht: Boolean = false,
   ): Connected? {
     var admission: TorrentBufferBudget.Lease? = null
     try {
@@ -112,10 +116,10 @@ internal object PeerV2Connector {
         connection.close()
         return null
       }
-      val route = PeerIdentityHandshake(document.identity, extensions).respond(connection, peerId,
-        handshakes, allowUpgrade = document.hybrid != null)
+      val route = PeerIdentityHandshake(document.identity, extensions, dht).respond(connection,
+        peerId, handshakes, allowUpgrade = document.hybrid != null)
       return negotiated(connection, route, PeerV2Origin.Incoming(connection.remote), document,
-        layout, buffers, admission, extensions, maxPending, generation)
+        layout, buffers, admission, extensions, dht, maxPending, generation)
     } catch (error: Throwable) {
       try { connection.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
       admission?.close()
@@ -135,6 +139,7 @@ internal object PeerV2Connector {
     buffers: TorrentBufferBudget,
     admission: TorrentBufferBudget.Lease,
     extensions: Boolean,
+    dht: Boolean,
     maxPending: Int,
     generation: Long,
   ): Connected {
@@ -148,7 +153,8 @@ internal object PeerV2Connector {
       pieceCount = layout.pieceCount.toInt(), hashMessages = v2)
     val blocks = PeerBlockExchange(layout, transport, buffers, maxPending = maxPending,
       mode = route.mode)
-    val info = PeerInfo(route.peerId, route.mode, origin, extensions && route.extensions, socket)
+    val info = PeerInfo(route.peerId, route.mode, origin, extensions && route.extensions, socket,
+      dht = dht && route.dht)
     return Connected(route, info, transport, blocks, admission, generation)
   }
 }
