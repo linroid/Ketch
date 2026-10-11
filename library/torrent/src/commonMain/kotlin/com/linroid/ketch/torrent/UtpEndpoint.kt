@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
 
 /**
@@ -281,14 +283,55 @@ internal class UtpEndpoint(
 
 /**
  * Dials TCP first and, when the peer cannot be reached that way, uTP through the [utp] endpoint
- * of its address family: peers behind NAT or with TCP blocked often still answer uTP.
+ * of its address family: peers behind NAT or with TCP blocked often still answer uTP. Peers
+ * known to speak uTP, from peer exchange ([preferUtp]) or a uTP dial that worked, are dialed
+ * over uTP first, saving the TCP connect timeout; the last [capacity] are remembered.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TorrentUtpFallback(
   private val delegate: TorrentNetwork,
+  private val capacity: Int = 4096,
   /** The running endpoint for a peer's address family, rebinding a port that stopped. */
   private val utp: suspend (PeerEndpoint) -> UtpEndpoint?,
 ) : TorrentNetwork by delegate {
+  private val utpPeers = AtomicReference<Set<PeerEndpoint>>(emptySet())
+
+  /** Remembers [endpoints] as reachable over uTP, newest last. */
+  fun preferUtp(endpoints: Collection<PeerEndpoint>) {
+    if (endpoints.isEmpty()) return
+    while (true) {
+      val current = utpPeers.load()
+      val next = LinkedHashSet(current).apply {
+        removeAll(endpoints.toSet())
+        addAll(endpoints)
+        while (size > capacity) remove(first())
+      }
+      if (utpPeers.compareAndSet(current, next)) return
+    }
+  }
+
+  private fun forget(endpoint: PeerEndpoint) {
+    while (true) {
+      val current = utpPeers.load()
+      if (endpoint !in current) return
+      if (utpPeers.compareAndSet(current, current - endpoint)) return
+    }
+  }
+
   override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+    val first = if (remote in utpPeers.load()) utp(remote) else null
+    if (first != null) {
+      try {
+        return first.dial(remote)
+      } catch (e: TimeoutCancellationException) {
+        forget(remote)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        // It no longer answers uTP; TCP may still work.
+        forget(remote)
+      }
+    }
     val failure: Throwable = try {
       return delegate.connect(remote)
     } catch (e: TimeoutCancellationException) {
@@ -300,9 +343,11 @@ internal class TorrentUtpFallback(
       e
     }
     currentCoroutineContext().ensureActive()
+    // uTP was tried first already.
+    if (first != null) throw failure
     val endpoint = utp(remote) ?: throw failure
     return try {
-      endpoint.dial(remote)
+      endpoint.dial(remote).also { preferUtp(listOf(remote)) }
     } catch (e: TimeoutCancellationException) {
       failure.addSuppressed(e)
       throw failure

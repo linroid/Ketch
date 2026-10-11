@@ -71,6 +71,8 @@ internal class KotlinTorrentSession(
   private val dhtPortFor: (PeerEndpoint) -> Int = { 0 },
   /** A DHT node a peer named with `PORT`. */
   private val onDhtNode: (PeerEndpoint) -> Unit = {},
+  /** Peers that peer exchange says speak uTP. */
+  private val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -400,7 +402,7 @@ internal class KotlinTorrentSession(
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
               listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
-              dhtPortFor = dhtPortFor, onDhtNode = onDhtNode,
+              dhtPortFor = dhtPortFor, onDhtNode = onDhtNode, onUtpPeers = onUtpPeers,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()

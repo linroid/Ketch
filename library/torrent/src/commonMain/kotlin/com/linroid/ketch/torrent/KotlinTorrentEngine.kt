@@ -118,16 +118,14 @@ internal class KotlinTorrentEngine(
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMappingEnabled = AtomicBoolean(config.portMapping)
   // Encryption over the connection budget over TCP, falling back to uTP.
-  private val connectionBudget = TorrentConnectionBudget(
-    TorrentUtpFallback(rawNetwork) { remote ->
-      if (!utpEnabled.load() || !running.load()) return@TorrentUtpFallback null
-      val host = udpHostFor(remote)
-      // A port whose socket failed is bound again, so dials never use a dead endpoint.
-      attempt("Binding the uTP port on $host") { udpPort(host) }
-      utpEndpoints.load()[host]
-    },
-    config.maxConnections,
-  )
+  private val utpFallback = TorrentUtpFallback(rawNetwork) { remote ->
+    if (!utpEnabled.load() || !running.load()) return@TorrentUtpFallback null
+    val host = udpHostFor(remote)
+    // A port whose socket failed is bound again, so dials never use a dead endpoint.
+    attempt("Binding the uTP port on $host") { udpPort(host) }
+    utpEndpoints.load()[host]
+  }
+  private val connectionBudget = TorrentConnectionBudget(utpFallback, config.maxConnections)
   private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
   private val udpMutex = Mutex()
   // Guarded by udpMutex.
@@ -664,6 +662,7 @@ internal class KotlinTorrentEngine(
         listenPortFor = { advertisedPort.current() },
         dhtPortFor = ::dhtPortFor,
         onDhtNode = { dhtIntroductions.trySend(it) },
+        onUtpPeers = utpFallback::preferUtp,
         seedOnly = spec.seedOnly,
         reporter = spec.connections,
         peerOutcomes = peerOutcomes,

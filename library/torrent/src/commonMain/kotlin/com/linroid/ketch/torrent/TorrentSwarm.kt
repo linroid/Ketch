@@ -75,6 +75,8 @@ internal class TorrentSwarm(
   private val dhtPortFor: (PeerEndpoint) -> Int = { 0 },
   /** A DHT node a peer named with `PORT`; must return at once. */
   private val onDhtNode: (PeerEndpoint) -> Unit = {},
+  /** Peers that peer exchange says speak uTP; must return at once. */
+  private val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -178,6 +180,7 @@ internal class TorrentSwarm(
     val diagnostics = PeerDiagnostics(listener = peerOutcomes)
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       peerFlags.record(update.flags)
+      onUtpPeers(update.flags.filterValues { it and PEX_FLAG_UTP != 0 }.keys)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
       for (endpoint in pexDirectory.candidates()) {
