@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.control
 
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +90,8 @@ internal class LiveTorrent(
  * @property resumeState the task's saved source state
  * @property outputPath where the task saved its files
  * @property selectedFileIds the task's files; empty for every file
+ * @property connections opens the task's live network connections while it seeds, as
+ *   [DownloadContext.connections] does while it downloads
  */
 internal class SeedingTask(
   val taskId: String,
@@ -96,6 +99,7 @@ internal class SeedingTask(
   val resumeState: SourceResumeState,
   val outputPath: String,
   val selectedFileIds: Set<String>,
+  val connections: ConnectionReporter = ConnectionReporter.None,
 )
 
 /** How an attempt to share a completed task ended, or why it would not start. */

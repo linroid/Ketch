@@ -3,6 +3,7 @@ package com.linroid.ketch.core.engine
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlOutcome
@@ -51,6 +52,12 @@ interface SourceHost {
    * tasks. A task removed since keeps its last record; [tasks] tells whether it is still there.
    */
   fun record(task: DownloadTask): TaskRecord?
+
+  /**
+   * Where a session the extension starts for [task] outside a download, such as one sharing its
+   * finished files, reports its live connections ([KetchApi.activeConnections]).
+   */
+  fun connections(task: DownloadTask): ConnectionReporter = ConnectionReporter.None
 
   /**
    * Chooses the files [task] downloads, like [DownloadTask.selectFiles], guarded by [command]:

@@ -82,7 +82,8 @@ interface KetchApi {
   suspend fun status(): KetchStatus
   suspend fun updateConfig(config: DownloadConfig)
   fun close()
-  // ... plus backendLabel, torrents, networkInterfaces(), updateNetworkInterfaces()
+  // ... plus backendLabel, torrents, networkInterfaces(), updateNetworkInterfaces(),
+  // activeConnections()
 }
 ```
 
@@ -167,7 +168,8 @@ in the order the queue starts them, priority first, then age.
 
 `KetchStatus.features` lists the optional behaviors an instance supports, from
 `KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`), `QUEUE_POSITION`, `REQUEST_ID`,
-`PROXY`, `CATEGORY_FOLDERS`, the media sources' `FINITE_HLS` and `FINITE_DASH`, `FILE_SELECTION`
+`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, the media sources' `FINITE_HLS` and
+`FINITE_DASH`, `FILE_SELECTION`
 (`download.fileSelection`, `selectFiles`) and `AWAIT_FILE_SELECTION`
 (`download.awaitFileSelection`, `awaitFileSelection`), listed by the sources that choose files
 (the torrent source today). Modules beside `library:api` name their own: the torrent source lists
@@ -175,6 +177,14 @@ in the order the queue starts them, priority first, then age.
 Older servers send fewer, so
 their tasks report no position and `setConnections(0)` on them throws
 `UnsupportedOperationException`.
+
+`KetchApi.activeConnections(limit)` streams `ActiveConnections` snapshots of every task's live
+network connections (HTTP requests, FTP transfers, media fetches, torrent peers), once a second
+while something changes, on instances listing `ACTIVE_CONNECTIONS`. `limit` (1..1024, default 256)
+caps the connections a snapshot holds; `total` and the rates count all of them. Without the
+feature, collecting it throws `UnsupportedOperationException`. `RemoteKetch` reads it from
+`GET /api/connections/events`, refusing servers without the feature before asking; its flow ends
+with the failure when the connection drops, so collect it again to resume.
 
 `KetchApi.control(key)` returns an optional typed controller a backend offers beyond the download
 API, or `null`; `library:api` defines only the `ControlKey` lookup, and the module that defines a

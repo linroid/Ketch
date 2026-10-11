@@ -177,4 +177,66 @@
   <string name="pulse_timeline_limit_removed">Limit removed</string>
   <!-- %1$s is the new priority, such as High. -->
   <string name="pulse_timeline_priority">Priority → %1$s</string>
+
+  <!-- The live connections grid: a small square per network connection, left of the Activity
+       bell on the Downloads page, and its popover. -->
+  <string name="pulse_connections_title">Connections</string>
+  <!-- The popover's header, followed by pulse_connections_rates after " · ". -->
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d connection</item>
+    <item quantity="other">%1$d connections</item>
+  </plurals>
+  <!-- %1$s is the speed received, %2$s the speed sent, such as "1.2 MB/s". -->
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <!-- After the bar's grid: how many connections it has no room for, such as "+12". -->
+  <string name="pulse_connections_more">+%1$d</string>
+  <!-- After the popover's grid: how many connections it has no room for. -->
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">%1$d more</item>
+    <item quantity="other">%1$d more</item>
+  </plurals>
+  <string name="pulse_connections_none">No active connections</string>
+  <!-- Under the grid while all devices show, about the ones too old to say. -->
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d device doesn't report connections</item>
+    <item quantity="other">%1$d devices don't report connections</item>
+  </plurals>
+  <!-- The legend: what a square's color says a connection is doing. -->
+  <string name="pulse_connections_legend_download">Downloading</string>
+  <string name="pulse_connections_legend_upload">Uploading</string>
+  <!-- Downloading and uploading at once. -->
+  <string name="pulse_connections_legend_both">Both</string>
+  <string name="pulse_connections_legend_idle">Idle</string>
+  <!-- Details of one connection. Which side opened it. -->
+  <string name="pulse_connection_outgoing">Outgoing</string>
+  <string name="pulse_connection_incoming">Incoming</string>
+  <!-- How it reaches the server or peer. -->
+  <string name="pulse_connection_direct">Direct</string>
+  <string name="pulse_connection_via_http_proxy">Via HTTP proxy</string>
+  <string name="pulse_connection_via_socks_proxy">Via SOCKS5 proxy</string>
+  <!-- After the protocol, such as "HTTP/2 · Encrypted": the connection uses TLS. -->
+  <string name="pulse_connection_secure">Encrypted</string>
+  <!-- %1$s is a size, such as "4.2 MB". -->
+  <string name="pulse_connection_received">Received %1$s</string>
+  <string name="pulse_connection_sent">Sent %1$s</string>
+  <!-- %1$s is a duration, such as "3m 12s". -->
+  <string name="pulse_connection_open_for">Open for %1$s</string>
+  <!-- A BitTorrent peer that does not send data to this device for now. -->
+  <string name="pulse_connection_peer_choking">Peer is choking</string>
+  <!-- This device may send data to the BitTorrent peer. -->
+  <string name="pulse_connection_upload_slot">Uploading to this peer</string>
+  <!-- A button that shows the connection's download in the details panel. -->
+  <string name="pulse_connection_show_task">Show task</string>
+  <!-- The grid's tooltip while no square is pointed at. -->
+  <string name="pulse_connections_tooltip">Live connections</string>
+  <!-- What a screen reader says for one square. %1$s is the download's name, %2$s where it
+       connects, such as "example.org:443", %3$s what it does (pulse_connections_legend_*),
+       %4$s and %5$s the speeds received and sent. -->
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, down %4$s, up %5$s</string>
+  <!-- What a screen reader says for the whole grid. %1$d is how many connections show, %2$d
+       how many of them download, %3$d how many upload. -->
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d connection, %2$d downloading, %3$d uploading</item>
+    <item quantity="other">%1$d connections, %2$d downloading, %3$d uploading</item>
+  </plurals>
 </resources>

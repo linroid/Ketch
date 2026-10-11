@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.ConnectionReporter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -153,6 +154,8 @@ internal object TorrentV2SessionLoop {
     requestDelay: suspend (Int, () -> Boolean) -> Long = { _, admit -> admit(); 0 },
     nowMs: () -> Long = monotonicClock(),
     swarm: TorrentV2Swarm? = null,
+    /** Reports each ready peer and its payload among the task's live connections. */
+    reporter: ConnectionReporter = ConnectionReporter.None,
   ) {
     require(maxPeers in 1..500 && pipeline in 1..256)
     require(swarm == null || connections != null) { "A swarm needs a connection stream" }
@@ -286,6 +289,8 @@ internal object TorrentV2SessionLoop {
           uploads.pump(live, allowed, seeding)
           extensions?.pump(live) { members[it]?.listen }
         }
+        // What this pass and the events before it changed of each peer's state.
+        for (view in peers.values) view.reportState()
       }
 
       fun verdict(peer: PeerV2Pool.Peer, verdict: TorrentV2Uploader.Verdict, reason: String) {
@@ -339,7 +344,13 @@ internal object TorrentV2SessionLoop {
             }
             is PeerMessage.Extended -> if (extensions != null) {
               verdict(peer, extensions.receive(view, update), "a bad extension message")
-              if (update.id == 0) learnListen(peer, view)
+              if (update.id == 0) {
+                learnListen(peer, view)
+                // An incoming peer shows where it listens rather than its source port.
+                if (view.info?.origin is PeerV2Origin.Incoming) {
+                  view.extensions.listenPort?.let { view.traffic?.listenPort(it) }
+                }
+              }
             }
             else -> Unit
           }
@@ -361,6 +372,8 @@ internal object TorrentV2SessionLoop {
             val block = value.value as? PeerBlockExchange.Response.Block
             if (block != null) {
               store.recordReceived(block.ticket.request.length)
+              // What crossed the wire: on a v1 route, the canonical block with its padding.
+              view.traffic?.received(block.ticket.wire.length)
               view.receivedSinceRechoke += block.ticket.request.length
               uploads?.received(peer, block.ticket.request.length)
             }
@@ -385,7 +398,10 @@ internal object TorrentV2SessionLoop {
             extensions?.sent(view, value)
             verdict(peer, uploads.sent(view, value), "our availability went unsent")
           }
-          is PeerV2DownloadActor.Event.Served -> uploads?.served(peer, view, value)
+          is PeerV2DownloadActor.Event.Served -> {
+            if (value.sent) view.traffic?.sent(value.request.length)
+            uploads?.served(peer, view, value)
+          }
           else -> Unit
         }
       }
@@ -737,8 +753,14 @@ internal object TorrentV2SessionLoop {
                   log.v { "V2 peer of $label closed: no session state left for its view" }
                   stop(peerEvent.peer)
                 } else {
-                  val view = TorrentV2PeerView(peerEvent.commands, peerEvent.peer.info, viewLease,
-                    nowMs)
+                  val info = peerEvent.peer.info
+                  val traffic = info?.let {
+                    PeerTraffic.open(reporter, it.link.remote,
+                      incoming = it.origin is PeerV2Origin.Incoming,
+                      v1 = it.mode == PeerIdentityHandshake.Mode.V1)
+                  }
+                  val view = TorrentV2PeerView(peerEvent.commands, info, viewLease, nowMs,
+                    traffic)
                   peers[peerEvent.peer] = view
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.

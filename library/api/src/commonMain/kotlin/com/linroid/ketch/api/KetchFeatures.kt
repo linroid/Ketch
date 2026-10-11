@@ -38,12 +38,15 @@ object KetchFeatures {
    */
   const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
 
+  /** [KetchApi.activeConnections] reports live connections. */
+  const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
+
   /**
    * Every feature named here, which this version of Ketch supports, including those of its
    * optional sources. Modules beside this one name the features of their own controllers.
    */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
-    CATEGORY_FOLDERS, FILE_SELECTION, AWAIT_FILE_SELECTION
+    CATEGORY_FOLDERS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS
   )
 }

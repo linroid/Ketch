@@ -124,4 +124,44 @@
   <string name="pulse_timeline_limit">Límite → %1$s</string>
   <string name="pulse_timeline_limit_removed">Límite eliminado</string>
   <string name="pulse_timeline_priority">Prioridad → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Conexiones</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d conexión</item>
+    <item quantity="other">%1$d conexiones</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">%1$d más</item>
+    <item quantity="other">%1$d más</item>
+  </plurals>
+  <string name="pulse_connections_none">No hay conexiones activas</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d dispositivo no informa de sus conexiones</item>
+    <item quantity="other">%1$d dispositivos no informan de sus conexiones</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Descargando</string>
+  <string name="pulse_connections_legend_upload">Subiendo</string>
+  <string name="pulse_connections_legend_both">Ambos</string>
+  <string name="pulse_connections_legend_idle">Inactivo</string>
+  <string name="pulse_connection_outgoing">Saliente</string>
+  <string name="pulse_connection_incoming">Entrante</string>
+  <string name="pulse_connection_direct">Directa</string>
+  <string name="pulse_connection_via_http_proxy">A través de proxy HTTP</string>
+  <string name="pulse_connection_via_socks_proxy">A través de proxy SOCKS5</string>
+  <string name="pulse_connection_secure">Cifrada</string>
+  <string name="pulse_connection_received">Recibido %1$s</string>
+  <string name="pulse_connection_sent">Enviado %1$s</string>
+  <string name="pulse_connection_open_for">Abierta desde hace %1$s</string>
+  <string name="pulse_connection_peer_choking">El par no envía datos por ahora</string>
+  <string name="pulse_connection_upload_slot">Subiendo a este par</string>
+  <string name="pulse_connection_show_task">Mostrar descarga</string>
+  <string name="pulse_connections_tooltip">Conexiones activas</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, bajada %4$s, subida %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d conexión, %2$d descargando, %3$d subiendo</item>
+    <item quantity="other">%1$d conexiones, %2$d descargando, %3$d subiendo</item>
+  </plurals>
 </resources>

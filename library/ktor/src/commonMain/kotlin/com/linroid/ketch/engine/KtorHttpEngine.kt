@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ProxyConfig
@@ -7,6 +8,8 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.HttpExchange
+import com.linroid.ketch.core.engine.HttpExchangeObserver
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.ServerInfo
 import io.ktor.client.HttpClient
@@ -19,6 +22,7 @@ import io.ktor.client.statement.request
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpProtocolVersion
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
@@ -27,6 +31,7 @@ import io.ktor.http.isSecure
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -345,12 +350,34 @@ class KtorHttpEngine private constructor(
     if (logRequests && routed.route.isProxy) log.d {
       "Sending ${method.value} for ${redactUrl(target.toString())} through ${routed.route}"
     }
+    val observer = currentCoroutineContext()[HttpExchangeObserver]
     return routed.client.prepareRequest {
       this.method = method
       url(target)
       headers.forEach { (name, value) -> header(name, value) }
       if (range != null) header(HttpHeaders.Range, "bytes=${range.first}-${range.last}")
-    }.execute { onResponse(it) }
+    }.execute { response ->
+      // Every hop reports; the last one, the final target, is what the caller keeps.
+      observer?.onExchange(exchangeOf(response, routed.route))
+      onResponse(response)
+    }
+  }
+
+  /** Where [response]'s request went, for an [HttpExchangeObserver]. */
+  private fun exchangeOf(response: HttpResponse, route: ProxyRoute): HttpExchange {
+    val url = response.call.request.url
+    return HttpExchange(
+      host = url.host.removePrefix("[").removeSuffix("]").lowercase(),
+      port = url.port,
+      secure = url.protocol.isSecure(),
+      protocol = protocolLabel(response.version),
+      route = when (route) {
+        ProxyRoute.Direct -> ConnectionRoute.DIRECT
+        ProxyRoute.Platform -> ConnectionRoute.UNKNOWN
+        is ProxyRoute.Http -> ConnectionRoute.HTTP_PROXY
+        is ProxyRoute.Socks5 -> ConnectionRoute.SOCKS5_PROXY
+      },
+    )
   }
 
   private fun logResponse(label: String, response: HttpResponse) {
@@ -408,6 +435,14 @@ class KtorHttpEngine private constructor(
       "user-agent", "accept", "accept-encoding", "accept-language",
     )
     private val SENSITIVE_HEADERS = setOf("set-cookie", "cookie", "authorization")
+    /** `HTTP/1.1` as it is, `HTTP/2.0` as `HTTP/2` and `HTTP/3.0` as `HTTP/3`. */
+    internal fun protocolLabel(version: HttpProtocolVersion): String =
+      if (version.name == "HTTP" && version.major >= 2 && version.minor == 0) {
+        "HTTP/${version.major}"
+      } else {
+        version.toString()
+      }
+
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
 
     /** [headers] for a debug log line, with the values of [SENSITIVE_HEADERS] masked. */

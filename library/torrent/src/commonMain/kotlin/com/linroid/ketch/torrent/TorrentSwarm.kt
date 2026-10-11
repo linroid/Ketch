@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.ConnectionReporter
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
@@ -65,6 +66,8 @@ internal class TorrentSwarm(
   private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
   private val nowMs: () -> Long = monotonicClock(),
   private val logLabel: String = logHash(store.metadata.infoHash.hex),
+  /** Reports each connected peer and its payload among the task's live connections. */
+  private val reporter: ConnectionReporter = ConnectionReporter.None,
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -435,6 +438,8 @@ internal class TorrentSwarm(
     private var sawComplete = false
     private var lastBlock = TimeSource.Monotonic.markNow()
     private var lastWrite = TimeSource.Monotonic.markNow()
+    /** This connection among the task's live connections, once its handshake succeeded. */
+    private var traffic: PeerTraffic? = null
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     suspend fun run() = supervisorScope {
@@ -484,6 +489,7 @@ internal class TorrentSwarm(
           }
         }
       } finally {
+        traffic?.close()
         uploadCache.close()
       }
     }
@@ -491,6 +497,7 @@ internal class TorrentSwarm(
     private suspend fun open() {
       val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
       chokerMutex.withLock { choker.add(id) }
       publishContact()
       extensionsNegotiated = handshake.extensions
@@ -518,6 +525,7 @@ internal class TorrentSwarm(
       if (message is PeerMessage.Piece) {
         val throttling = TimeSource.Monotonic.markNow()
         val throttledAt = nowMs()
+        traffic?.received(message.bytes.size)
         downloadPayload(message.bytes.size)
         lastBlock += throttling.elapsedNow()
         lastUsefulPayload += nowMs() - throttledAt
@@ -615,6 +623,8 @@ internal class TorrentSwarm(
         onUploaded(request.length)
         wire.send(PeerMessage.Piece(request.index, request.begin,
           bytes.copyOfRange(request.begin, request.begin + request.length)))
+        // Counted once sent, as v2 does: a blocked or failed write moved nothing yet.
+        traffic?.sent(request.length)
         uploaded.fetchAndAdd(request.length.toLong())
         chokerMutex.withLock { choker.uploaded(id, request.length.toLong()) }
       }
@@ -632,7 +642,10 @@ internal class TorrentSwarm(
         extensions.receive(message.payload, 4 * 1024 * 1024)
         // An incoming peer becomes a contact once it says where it listens.
         val port = extensions.listenPort
-        if (incoming && port != null) listen = PeerEndpoint(connection.remote.host, port)
+        if (incoming && port != null) {
+          listen = PeerEndpoint(connection.remote.host, port)
+          traffic?.listenPort(port)
+        }
         publishContact()
       } else if (message.id == PeerExtensions.METADATA) {
         val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
@@ -772,6 +785,8 @@ internal class TorrentSwarm(
         wire.send(PeerMessage.KeepAlive)
         lastWrite = TimeSource.Monotonic.markNow()
       }
+      traffic?.state(peerChoking = state.choking, uploadSlot = uploadSlot,
+        peerInterested = state.interested)
     }
   }
 }

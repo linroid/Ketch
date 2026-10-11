@@ -94,6 +94,9 @@ class PulseBarState {
   /** Whether the speed history popover is open. */
   var speedOpen: Boolean by mutableStateOf(false)
 
+  /** Whether the live connections popover is open. */
+  var connectionsOpen: Boolean by mutableStateOf(false)
+
   /** Opens the Activity popover, or closes it when it is open. */
   fun toggleActivity() {
     activityOpen = !activityOpen
@@ -110,17 +113,22 @@ fun rememberPulseBarState(): PulseBarState = remember { PulseBarState() }
  * downloading, waiting and failed counts (each opens its tab), free space, the device's
  * connection and the Activity bell with its unread count.
  *
- * While rows are selected, the connection gives way to a summary of the selection. As the card
- * narrows, free space goes below 720 dp and the counts below 600 dp, and any part that still
- * does not fit is left out from the end. Metrics of a device that is not online are dimmed.
+ * While rows are selected, the connection gives way to a summary of the selection. With
+ * [showConnections], a grid of the live connections of the shown devices that report them sits
+ * left of the connection, from 540 dp. As the card narrows, free space goes below 720 dp and the
+ * counts below 600 dp, and any part that still does not fit is left out from the end. Metrics of
+ * a device that is not online are dimmed.
  *
  * @param barState which popovers are open; hoist it to open Activity from a shortcut.
+ * @param showConnections whether the connections grid shows, as it does on the Downloads page;
+ *   the devices are asked for their connections only while it does.
  */
 @Composable
 fun PulseBar(
   state: AppState,
   modifier: Modifier = Modifier,
   barState: PulseBarState = rememberPulseBarState(),
+  showConnections: Boolean = false,
 ) {
   val pulse by state.pulse.state.collectAsState()
   val unread by state.messages.unreadCount.collectAsState()
@@ -149,6 +157,11 @@ fun PulseBar(
     onActivityClick = { barState.toggleActivity() },
     modifier = modifier,
     pill = { SpeedModePill(state) },
+    connections = if (showConnections) {
+      { ConnectionStripHost(state, barState) }
+    } else {
+      null
+    },
     speedPopover = {
       SpeedHistoryPopover(
         state = state,
@@ -172,6 +185,8 @@ fun PulseBar(
  * @param selection summary of the selected rows, shown in place of the connection; `null` when
  *   nothing is selected.
  * @param pill the speed mode pill.
+ * @param connections the live connections grid with its popover, shown from 540 dp; `null` for
+ *   none.
  * @param speedPopover popover anchored to the speed, such as the speed history.
  * @param activityPopover popover anchored to the bell.
  */
@@ -186,6 +201,7 @@ internal fun PulseBarContent(
   onActivityClick: () -> Unit,
   modifier: Modifier = Modifier,
   pill: @Composable () -> Unit,
+  connections: (@Composable () -> Unit)? = null,
   speedPopover: @Composable () -> Unit = {},
   activityPopover: @Composable () -> Unit = {},
 ) {
@@ -203,6 +219,7 @@ internal fun PulseBarContent(
     val showCounts = maxWidth >= CountsMinWidth
     val showSparkline = maxWidth >= SparklineMinWidth
     val showHealthLabel = maxWidth >= HealthLabelMinWidth
+    val showConnections = maxWidth >= ConnectionsMinWidth
     Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.hairline))
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -243,6 +260,10 @@ internal fun PulseBarContent(
             )
           }
         }
+      }
+      if (connections != null && showConnections) {
+        connections()
+        Spacer(Modifier.width(spacing.s1))
       }
       if (selection != null) {
         Text(
@@ -436,7 +457,7 @@ private fun BarLink(text: String, description: String, color: Color, onClick: ()
 
 /** A clickable stretch of the bar, 24 dp tall, with the hover overlay and focus ring. */
 @Composable
-private fun BarButton(
+internal fun BarButton(
   onClick: () -> Unit,
   description: String,
   modifier: Modifier = Modifier,
@@ -524,6 +545,7 @@ private val DiskMinWidth = 720.dp
 private val CountsMinWidth = 600.dp
 private val SparklineMinWidth = 480.dp
 private val HealthLabelMinWidth = 420.dp
+private val ConnectionsMinWidth = 540.dp
 private val SparklineWidth = 64.dp
 private val SparklineHeight = 14.dp
 private val DiskBarWidth = 24.dp

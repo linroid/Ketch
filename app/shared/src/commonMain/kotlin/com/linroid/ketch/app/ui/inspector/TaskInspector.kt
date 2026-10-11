@@ -139,6 +139,14 @@ internal fun InspectorContent(
       state.filesRequestHandled()
     }
   }
+  // The connections grid's Show task asks for the Connections tab of an HTTP or FTP task.
+  val connectionsRequest = state.connectionsRequest
+  LaunchedEffect(connectionsRequest, taskKey) {
+    if (connectionsRequest != null && connectionsRequest == taskKey) {
+      tab = InspectorTab.Connections
+      state.connectionsRequestHandled()
+    }
+  }
   val shows = when (shown) {
     is Shown.Selection -> "selection"
     is Shown.Task -> shown.row.key

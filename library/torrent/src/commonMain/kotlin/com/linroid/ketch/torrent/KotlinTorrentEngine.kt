@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.ConnectionReporter
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -69,6 +70,8 @@ internal data class TorrentV2TaskSpec(
    * [IncompleteSeedException] instead of downloading, before any discovery.
    */
   val seedOnly: Boolean = false,
+  /** Reports the owner's peers among the task's live connections. */
+  val connections: ConnectionReporter = ConnectionReporter.None,
 )
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
@@ -604,6 +607,7 @@ internal class KotlinTorrentEngine(
         allowLocalPeers = allowLocalPeers,
         listenPortFor = { advertisedPort.current() },
         seedOnly = spec.seedOnly,
+        reporter = spec.connections,
       )
       target = session
       entries[hash] = Entry(hash, Owner.V1(session), claim, lease, listOf(hash), output.toString())
@@ -730,7 +734,7 @@ internal class KotlinTorrentEngine(
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,
-          discovery = discovery, seedOnly = spec.seedOnly))
+          discovery = discovery, seedOnly = spec.seedOnly, connections = spec.connections))
       target = session
       val entry = Entry(key, Owner.V2(session), claim, lease, hexes, output.toString())
       entries[key] = entry

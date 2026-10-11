@@ -115,4 +115,40 @@
   <string name="pulse_timeline_limit">限制 → %1$s</string>
   <string name="pulse_timeline_limit_removed">已移除速度限制</string>
   <string name="pulse_timeline_priority">優先順序 → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">連線</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="other">%1$d 個連線</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="other">還有 %1$d 個</item>
+  </plurals>
+  <string name="pulse_connections_none">沒有作用中的連線</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="other">%1$d 台裝置不回報連線</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">下載中</string>
+  <string name="pulse_connections_legend_upload">上傳中</string>
+  <string name="pulse_connections_legend_both">上傳和下載</string>
+  <string name="pulse_connections_legend_idle">閒置</string>
+  <string name="pulse_connection_outgoing">傳出</string>
+  <string name="pulse_connection_incoming">傳入</string>
+  <string name="pulse_connection_direct">直接連線</string>
+  <string name="pulse_connection_via_http_proxy">透過 HTTP 代理伺服器</string>
+  <string name="pulse_connection_via_socks_proxy">透過 SOCKS5 代理伺服器</string>
+  <string name="pulse_connection_secure">已加密</string>
+  <string name="pulse_connection_received">已接收 %1$s</string>
+  <string name="pulse_connection_sent">已傳送 %1$s</string>
+  <string name="pulse_connection_open_for">已連線 %1$s</string>
+  <string name="pulse_connection_peer_choking">對等端暫不傳送資料</string>
+  <string name="pulse_connection_upload_slot">正在上傳至此對等端</string>
+  <string name="pulse_connection_show_task">顯示下載</string>
+  <string name="pulse_connections_tooltip">作用中的連線</string>
+  <string name="pulse_connection_description">%1$s，%2$s，%3$s，下載 %4$s，上傳 %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="other">%1$d 個連線，%2$d 個下載中，%3$d 個上傳中</item>
+  </plurals>
 </resources>

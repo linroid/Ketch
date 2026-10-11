@@ -2,14 +2,18 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.HttpExchange
+import com.linroid.ketch.core.engine.HttpExchangeObserver
 import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * A fake HttpEngine for unit testing. Simulates a server with configurable behavior
  * including range support, ETags, and content delivery. A transfer that reaches
  * [stallAfterBytes] stops sending until it is cancelled. [headErrorCode] refuses only
- * `HEAD`, as a URL presigned for `GET` does, while [probe] still answers.
+ * `HEAD`, as a URL presigned for `GET` does, while [probe] still answers. Each transfer reports
+ * [exchange], when set, to the caller's [HttpExchangeObserver].
  */
 class FakeHttpEngine(
   var serverInfo: ServerInfo = ServerInfo(
@@ -27,6 +31,7 @@ class FakeHttpEngine(
   var httpErrorCode: Int = 0,
   var retryAfterSeconds: Long? = null,
   var rateLimitRemaining: Long? = null,
+  var exchange: HttpExchange? = null,
 ) : HttpEngine {
 
   var headCallCount = 0
@@ -83,6 +88,7 @@ class FakeHttpEngine(
     downloadCallCount++
     lastDownloadHeaders = headers
     lastDownloadRange = range
+    exchange?.let { currentCoroutineContext()[HttpExchangeObserver]?.onExchange(it) }
 
     if (httpErrorCode > 0) {
       throw KetchError.Http(

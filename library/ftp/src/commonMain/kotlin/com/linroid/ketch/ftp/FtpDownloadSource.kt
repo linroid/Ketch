@@ -1,11 +1,14 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.core.engine.ConnectionHandle
+import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
@@ -331,9 +334,11 @@ class FtpDownloadSource : DownloadSource {
     val client = clientFactory(ftpUrl, context.config.bufferSize)
     var downloadedBytes = segment.downloadedBytes
     val remaining = segment.totalBytes - downloadedBytes
+    var handle = ConnectionHandle.None
 
     try {
       client.connect()
+      handle = context.connections.open(connectionSpec(ftpUrl))
       if (ftpUrl.isTls) client.upgradeToTls()
       client.login(ftpUrl.username, ftpUrl.password)
       client.setBinaryMode()
@@ -375,6 +380,7 @@ class FtpDownloadSource : DownloadSource {
           throw KetchError.Disk(e)
         }
         downloadedBytes += chunk.size
+        handle.received(chunk.size)
         onProgress(downloadedBytes)
 
         // Stop reading once segment is complete
@@ -385,6 +391,7 @@ class FtpDownloadSource : DownloadSource {
     } catch (_: SegmentCompleteException) {
       // Expected: segment boundary reached, stop reading
     } finally {
+      handle.close()
       client.disconnect()
     }
 
@@ -408,6 +415,20 @@ class FtpDownloadSource : DownloadSource {
 
     return segment.copy(downloadedBytes = downloadedBytes)
   }
+
+  /**
+   * The connection a segment transfer reports: its control host and port. FTP ignores the proxy
+   * setting, so it goes directly. The data channel of FTPS is not encrypted yet, so whether the
+   * transfer is secure is left unknown.
+   */
+  private fun connectionSpec(ftpUrl: FtpUrl) = ConnectionSpec(
+    source = TYPE,
+    host = ftpUrl.host.removePrefix("[").removeSuffix("]").lowercase(),
+    port = ftpUrl.port,
+    protocol = if (ftpUrl.isTls) "FTPS" else "FTP",
+    secure = if (ftpUrl.isTls) null else false,
+    route = ConnectionRoute.DIRECT,
+  )
 
   /**
    * Thrown internally to break out of the [FtpClient.retrieve]

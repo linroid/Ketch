@@ -1,9 +1,11 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +97,28 @@ class FtpDownloadSourceTest {
     assertEquals(listOf(0L, 334L, 667L), server.retrieveOffsets.sorted())
     assertContentEquals(server.content, file.bytes)
     assertTrue(server.bufferSizes.all { it == 4096 })
+  }
+
+  @Test
+  fun download_eachSegment_reportsOneFtpConnection() = runTest {
+    val server = FakeFtpServer(content(1000))
+    val connections = RecordingConnections()
+    val context = context(MemoryFileAccessor(), connections = 3, reporter = connections)
+
+    source(server).download(context)
+
+    assertEquals(3, connections.opened.size)
+    for (connection in connections.opened) {
+      assertEquals("ftp", connection.spec.source)
+      assertEquals("FTP", connection.spec.protocol)
+      assertEquals("ftp.example.com", connection.spec.host)
+      assertEquals(21, connection.spec.port)
+      assertEquals(false, connection.spec.secure)
+      assertEquals(ConnectionRoute.DIRECT, connection.spec.route)
+      assertTrue(connection.closed)
+    }
+    val received = connections.opened.map { it.received }.sortedDescending()
+    assertEquals(listOf(334L, 333L, 333L), received)
   }
 
   @Test
@@ -230,6 +254,7 @@ class FtpDownloadSourceTest {
     config: DownloadConfig = DownloadConfig.Default,
     maxConnections: MutableStateFlow<Int> = MutableStateFlow(connections),
     throttle: suspend (Int) -> Unit = {},
+    reporter: ConnectionReporter = ConnectionReporter.None,
   ) = DownloadContext(
     taskId = "ftp",
     url = URL,
@@ -241,6 +266,7 @@ class FtpDownloadSourceTest {
     headers = emptyMap(),
     maxConnections = maxConnections,
     config = config,
+    connections = reporter,
   )
 
   private companion object {

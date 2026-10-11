@@ -602,7 +602,7 @@ class TorrentDownloadSource(
           trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
           magnetUri = magnet, privacy = privacy, recoverCreations = true,
           legacySelections = listOfNotNull(state.selectedFileIds.takeIf { it.isNotEmpty() }),
-          seedOnly = true))
+          seedOnly = true, connections = task.connections))
       }
     }
     require(state.version != 3) { "Cannot downgrade a v2 task" }
@@ -612,7 +612,7 @@ class TorrentDownloadSource(
     return SeedPlan(hash) {
       getEngine().addTask(TorrentTaskSpec(task.taskId, metadata, output,
         selected.mapTo(LinkedHashSet()) { it.toInt() }, magnet, resumeData?.let(::decodeBase64),
-        privacy = privacy, seedOnly = true))
+        privacy = privacy, seedOnly = true, connections = task.connections))
     }
   }
 
@@ -904,7 +904,7 @@ class TorrentDownloadSource(
         selected.mapTo(LinkedHashSet()) { it.toInt() },
         context.url.takeIf { it.startsWith("magnet:", true) },
         previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
-        privacy = privacy))
+        privacy = privacy, connections = context.connections))
     }
   }
 
@@ -943,6 +943,8 @@ class TorrentDownloadSource(
         privacy = privacy, throttle = context.throttle, recoverCreations = true,
         // The creation log may still be bound to the selection the task last ran with.
         legacySelections = listOfNotNull(previous?.selectedFileIds?.takeIf { it.isNotEmpty() }),
+        // Task-scoped: a session that keeps seeding after this run returns still reports.
+        connections = context.connections,
       ))
     }
   }

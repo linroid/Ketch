@@ -2,6 +2,9 @@ package com.linroid.ketch.hls
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.engine.ConnectionHandle
+import com.linroid.ketch.core.engine.ConnectionReporter
+import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -94,6 +97,34 @@ class HlsDownloadSourceTest {
   }
 
   @Test
+  fun download_parts_reportOneConnectionFollowingEachPartsHost() = runTest {
+    val engine = MediaEngine(
+      manifest = MediaEngine().manifest.replace("b.ts", "https://edge.example:8443/b.ts"),
+    )
+    val connections = RecordingConnections()
+    val context = DownloadContext(
+      taskId = "media",
+      url = engine.url,
+      request = DownloadRequest(engine.url),
+      fileAccessor = MemoryFile(),
+      segments = MutableStateFlow(emptyList()),
+      onProgress = { _, _ -> },
+      throttle = {},
+      headers = emptyMap(),
+      connections = connections,
+    )
+
+    HlsDownloadSource(engine).download(context)
+
+    val connection = connections.opened.single()
+    assertEquals(listOf("cdn.example" to 443, "edge.example" to 8443),
+      connection.specs.map { it.host to it.port })
+    assertTrue(connection.specs.all { it.source == "hls" && it.secure == true })
+    assertEquals(11L, connection.received)
+    assertTrue(connection.closed)
+  }
+
+  @Test
   fun download_oversizedManifestAndLivePlaylist_neverWriteOutput() = runTest {
     for (text in listOf("x".repeat(1024 * 1024 + 1), "#EXTM3U\n#EXTINF:1,\na.ts")) {
       val engine = MediaEngine(text)
@@ -135,6 +166,34 @@ class HlsDownloadSourceTest {
       onData(content.encodeToByteArray())
     }
     override fun close() {}
+  }
+
+  /** Records the connections a source opens and every host each one reports. */
+  private class RecordingConnections : ConnectionReporter {
+    val opened = mutableListOf<Connection>()
+
+    override fun open(spec: ConnectionSpec): ConnectionHandle =
+      Connection(spec).also { opened += it }
+
+    class Connection(spec: ConnectionSpec) : ConnectionHandle {
+      val specs = mutableListOf(spec)
+      var received = 0L
+      var closed = false
+
+      override fun received(bytes: Int) {
+        received += bytes
+      }
+
+      override fun sent(bytes: Int) {}
+
+      override fun describe(spec: ConnectionSpec) {
+        specs += spec
+      }
+
+      override fun close() {
+        closed = true
+      }
+    }
   }
 
   private class MemoryFile : FileAccessor {

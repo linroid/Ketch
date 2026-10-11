@@ -124,4 +124,44 @@
   <string name="pulse_timeline_limit">Limite → %1$s</string>
   <string name="pulse_timeline_limit_removed">Limite retirée</string>
   <string name="pulse_timeline_priority">Priorité → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Connexions</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">%1$d de plus</item>
+    <item quantity="other">%1$d de plus</item>
+  </plurals>
+  <string name="pulse_connections_none">Aucune connexion active</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d appareil n'indique pas ses connexions</item>
+    <item quantity="other">%1$d appareils n'indiquent pas leurs connexions</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Téléchargement</string>
+  <string name="pulse_connections_legend_upload">Envoi</string>
+  <string name="pulse_connections_legend_both">Les deux</string>
+  <string name="pulse_connections_legend_idle">Inactif</string>
+  <string name="pulse_connection_outgoing">Sortante</string>
+  <string name="pulse_connection_incoming">Entrante</string>
+  <string name="pulse_connection_direct">Directe</string>
+  <string name="pulse_connection_via_http_proxy">Via un proxy HTTP</string>
+  <string name="pulse_connection_via_socks_proxy">Via un proxy SOCKS5</string>
+  <string name="pulse_connection_secure">Chiffrée</string>
+  <string name="pulse_connection_received">Reçu : %1$s</string>
+  <string name="pulse_connection_sent">Envoyé : %1$s</string>
+  <string name="pulse_connection_open_for">Ouverte depuis %1$s</string>
+  <string name="pulse_connection_peer_choking">Le pair n'envoie rien pour l'instant</string>
+  <string name="pulse_connection_upload_slot">Envoi vers ce pair</string>
+  <string name="pulse_connection_show_task">Afficher le téléchargement</string>
+  <string name="pulse_connections_tooltip">Connexions actives</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, réception %4$s, envoi %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d connexion, %2$d en téléchargement, %3$d en envoi</item>
+    <item quantity="other">%1$d connexions, %2$d en téléchargement, %3$d en envoi</item>
+  </plurals>
 </resources>

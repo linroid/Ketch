@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.ConnectionReporter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,11 @@ internal class KotlinTorrentSession(
   private val seedOnly: Boolean = false,
   /** The swarm's clock, for its peer deadlines; tests pass virtual time. */
   private val nowMs: () -> Long = monotonicClock(),
+  /**
+   * Reports each connected peer among the task's live connections, for as long as the session
+   * runs, seeding included.
+   */
+  private val reporter: ConnectionReporter = ConnectionReporter.None,
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -387,7 +393,7 @@ internal class KotlinTorrentSession(
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
-              listenPortFor = listenPortFor,
+              listenPortFor = listenPortFor, reporter = reporter,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()

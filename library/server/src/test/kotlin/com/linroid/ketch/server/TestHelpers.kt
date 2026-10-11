@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -17,6 +18,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -105,6 +107,8 @@ internal class RecordingKetchApi(
   override suspend fun status(): KetchStatus = delegate.status()
   override suspend fun updateConfig(config: DownloadConfig) =
     delegate.updateConfig(config)
+  override fun activeConnections(limit: Int): Flow<ActiveConnections> =
+    delegate.activeConnections(limit)
   override fun close() {
     scope.cancel()
     delegate.close()

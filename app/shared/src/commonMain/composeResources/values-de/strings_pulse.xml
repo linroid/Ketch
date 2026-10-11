@@ -124,4 +124,44 @@
   <string name="pulse_timeline_limit">Limit → %1$s</string>
   <string name="pulse_timeline_limit_removed">Limit entfernt</string>
   <string name="pulse_timeline_priority">Priorität → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Verbindungen</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d Verbindung</item>
+    <item quantity="other">%1$d Verbindungen</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">%1$d weitere</item>
+    <item quantity="other">%1$d weitere</item>
+  </plurals>
+  <string name="pulse_connections_none">Keine aktiven Verbindungen</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d Gerät meldet keine Verbindungen</item>
+    <item quantity="other">%1$d Geräte melden keine Verbindungen</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Download</string>
+  <string name="pulse_connections_legend_upload">Upload</string>
+  <string name="pulse_connections_legend_both">Beides</string>
+  <string name="pulse_connections_legend_idle">Inaktiv</string>
+  <string name="pulse_connection_outgoing">Ausgehend</string>
+  <string name="pulse_connection_incoming">Eingehend</string>
+  <string name="pulse_connection_direct">Direkt</string>
+  <string name="pulse_connection_via_http_proxy">Über HTTP-Proxy</string>
+  <string name="pulse_connection_via_socks_proxy">Über SOCKS5-Proxy</string>
+  <string name="pulse_connection_secure">Verschlüsselt</string>
+  <string name="pulse_connection_received">Empfangen: %1$s</string>
+  <string name="pulse_connection_sent">Gesendet: %1$s</string>
+  <string name="pulse_connection_open_for">Offen seit %1$s</string>
+  <string name="pulse_connection_peer_choking">Peer sendet gerade nicht</string>
+  <string name="pulse_connection_upload_slot">Upload an diesen Peer</string>
+  <string name="pulse_connection_show_task">Download zeigen</string>
+  <string name="pulse_connections_tooltip">Aktive Verbindungen</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, empfangen %4$s, gesendet %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d Verbindung, %2$d laden herunter, %3$d laden hoch</item>
+    <item quantity="other">%1$d Verbindungen, %2$d laden herunter, %3$d laden hoch</item>
+  </plurals>
 </resources>

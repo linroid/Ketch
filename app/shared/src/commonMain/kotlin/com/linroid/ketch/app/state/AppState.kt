@@ -13,6 +13,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
@@ -401,6 +402,13 @@ class AppState(
   var filesRequest by mutableStateOf<TaskKey?>(null)
     private set
 
+  /**
+   * A task whose connections the inspector should show on its Connections tab, as
+   * [showConnections] asks; the inspector clears it with [connectionsRequestHandled].
+   */
+  var connectionsRequest by mutableStateOf<TaskKey?>(null)
+    private set
+
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
 
@@ -548,6 +556,24 @@ class AppState(
     pulseScope = shownScope().map { it.toPulseScope() },
     mode = combine(activeInstance, deviceScope, localMode) { entry, shown, mode ->
       if (entry is RemoteInstance && shown != DeviceScope.All) SpeedMode.Full else mode
+    },
+    scope = scope,
+  )
+
+  /**
+   * Live connections of the shown devices that report them, for the Pulse bar's grid. Each
+   * device's stream runs only while the grid is on screen.
+   */
+  val connectionGrid: ConnectionGridModel = ConnectionGridModel(
+    sources = shownInstances.flatMapLatest { entries ->
+      if (entries.isEmpty()) {
+        flowOf(emptyList())
+      } else {
+        combine(entries.map(::connectionSourceOf)) { it.toList() }
+      }
+    },
+    rows = combine(taskList.view, taskList.allRows) { view, all ->
+      if (view.rows.size == all.size) view.rows else (view.rows + all).distinctBy { it.key }
     },
     scope = scope,
   )
@@ -894,6 +920,21 @@ class AppState(
   /** Clears [filesRequest] once the inspector shows the Files tab. */
   fun filesRequestHandled() {
     filesRequest = null
+  }
+
+  /**
+   * Shows [key] in the inspector on the Downloads page, on its Connections tab when [segments]
+   * is set and the task has one, such as for an HTTP or FTP download.
+   */
+  fun showConnections(key: TaskKey, segments: Boolean) {
+    showDownloads(statusFilter)
+    inspectedTask = key
+    connectionsRequest = if (segments) key else null
+  }
+
+  /** Clears [connectionsRequest] once the inspector shows the Connections tab. */
+  fun connectionsRequestHandled() {
+    connectionsRequest = null
   }
 
   /**
@@ -1850,6 +1891,22 @@ class AppState(
       },
       features = featuresFlow(entry),
     )
+  }
+
+  private fun connectionSourceOf(entry: InstanceEntry): Flow<ConnectionSource> {
+    val online = when (entry) {
+      is RemoteInstance -> entry.connectionState.map { it == ConnectionState.Connected }
+      else -> flowOf(true)
+    }
+    return combine(featuresFlow(entry), online.distinctUntilChanged()) { features, up ->
+      ConnectionSource(
+        deviceId = entry.deviceId,
+        name = entry.displayName,
+        api = entry.instance,
+        supported = KetchFeatures.ACTIVE_CONNECTIONS in features,
+        online = up,
+      )
+    }
   }
 
   private fun deferRemoval(

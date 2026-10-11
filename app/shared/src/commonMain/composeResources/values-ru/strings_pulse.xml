@@ -142,4 +142,52 @@
   <string name="pulse_timeline_limit">Ограничение → %1$s</string>
   <string name="pulse_timeline_limit_removed">Ограничение снято</string>
   <string name="pulse_timeline_priority">Приоритет → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Подключения</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d подключение</item>
+    <item quantity="few">%1$d подключения</item>
+    <item quantity="many">%1$d подключений</item>
+    <item quantity="other">%1$d подключения</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">ещё %1$d</item>
+    <item quantity="few">ещё %1$d</item>
+    <item quantity="many">ещё %1$d</item>
+    <item quantity="other">ещё %1$d</item>
+  </plurals>
+  <string name="pulse_connections_none">Нет активных подключений</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d устройство не сообщает о подключениях</item>
+    <item quantity="few">%1$d устройства не сообщают о подключениях</item>
+    <item quantity="many">%1$d устройств не сообщают о подключениях</item>
+    <item quantity="other">%1$d устройства не сообщают о подключениях</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Загрузка</string>
+  <string name="pulse_connections_legend_upload">Отдача</string>
+  <string name="pulse_connections_legend_both">Оба направления</string>
+  <string name="pulse_connections_legend_idle">Простой</string>
+  <string name="pulse_connection_outgoing">Исходящее</string>
+  <string name="pulse_connection_incoming">Входящее</string>
+  <string name="pulse_connection_direct">Напрямую</string>
+  <string name="pulse_connection_via_http_proxy">Через HTTP-прокси</string>
+  <string name="pulse_connection_via_socks_proxy">Через SOCKS5-прокси</string>
+  <string name="pulse_connection_secure">Зашифровано</string>
+  <string name="pulse_connection_received">Получено %1$s</string>
+  <string name="pulse_connection_sent">Отправлено %1$s</string>
+  <string name="pulse_connection_open_for">Открыто %1$s</string>
+  <string name="pulse_connection_peer_choking">Пир пока не отдаёт данные</string>
+  <string name="pulse_connection_upload_slot">Отдача этому пиру</string>
+  <string name="pulse_connection_show_task">Показать загрузку</string>
+  <string name="pulse_connections_tooltip">Активные подключения</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, приём %4$s, отдача %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d подключение, загружают: %2$d, отдают: %3$d</item>
+    <item quantity="few">%1$d подключения, загружают: %2$d, отдают: %3$d</item>
+    <item quantity="many">%1$d подключений, загружают: %2$d, отдают: %3$d</item>
+    <item quantity="other">%1$d подключения, загружают: %2$d, отдают: %3$d</item>
+  </plurals>
 </resources>
