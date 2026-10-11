@@ -52,11 +52,12 @@ internal class TorrentMetadataExchange(
     var connection: TorrentConnection? = null
     try {
       log.v { "Metadata exchange with $endpoint: connecting" }
-      connection = network.connect(endpoint)
+      val mode = if (identity.v2 != null) PeerIdentityHandshake.Mode.V2
+        else PeerIdentityHandshake.Mode.V1
+      connection = network.connectPeer(endpoint, identity.wireTag(mode))
       val workspace = TorrentBufferBudget(256 * 1024)
       val handshake = PeerIdentityHandshake(identity, extensions = true).initiate(connection,
-        if (identity.v2 != null) PeerIdentityHandshake.Mode.V2 else PeerIdentityHandshake.Mode.V1,
-        torrentRandomBytes(20).toByteString(), workspace)
+        mode, torrentRandomBytes(20).toByteString(), workspace)
       val wire = PeerWire(connection)
       require(handshake.extensions) {
         "Peer does not support metadata exchange"

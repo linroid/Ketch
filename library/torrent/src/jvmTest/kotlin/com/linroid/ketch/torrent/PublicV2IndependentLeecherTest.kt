@@ -42,6 +42,12 @@ class PublicV2IndependentLeecherTest {
   }
 
   @Test
+  fun libtorrentRequiringEncryption_downloadsOverRc4() = runTest {
+    // libtorrent dials in with MSE/PE and its handshake as the initial payload.
+    upload(TorrentV2Fixture.build(files, hybrid = true), encrypted = true) { it.identity }
+  }
+
+  @Test
   fun libtorrentJoinsHybridThroughTheV1Topic() = runTest {
     val session = upload(TorrentV2Fixture.build(files, hybrid = true)) {
       TorrentIdentity(v1 = it.identity.v1)
@@ -53,9 +59,11 @@ class PublicV2IndependentLeecherTest {
   /**
    * Seeds [fixture] from a Ketch engine, has libtorrent download it from a magnet of the topics
    * [topics] picks with Ketch as its only peer, and returns the seeding owner once removed.
+   * With [encrypted], libtorrent only connects over RC4.
    */
   private suspend fun upload(
     fixture: TorrentV2Fixture,
+    encrypted: Boolean = false,
     topics: (TorrentV2Document) -> TorrentIdentity,
   ): TorrentV2DownloadSession = withContext(Dispatchers.Default) {
     withTimeout(60_000) {
@@ -82,7 +90,7 @@ class PublicV2IndependentLeecherTest {
 
         // The memory-mapped back end guards its writes with SIGSEGV and SIGBUS handlers that take
         // the JVM's implicit null checks down with them; plain file I/O installs none.
-        manager.start(SessionParams(leecherSettings()).apply { setPosixDiskIO() })
+        manager.start(SessionParams(leecherSettings(encrypted)).apply { setPosixDiskIO() })
         // libtorrent reads x.pe without unescaping it, so the peer goes in as written.
         val identity = topics(fixture.document)
         val magnet = MagnetUri(identity).toUri() + "&x.pe=127.0.0.1:${engine.listenPort}"
@@ -128,10 +136,10 @@ class PublicV2IndependentLeecherTest {
   }
 
   /**
-   * Loopback only, no DHT, local discovery or port mapping; plaintext TCP, since Ketch speaks
-   * neither protocol encryption nor uTP yet.
+   * Loopback only, no DHT, local discovery or port mapping, and TCP, since Ketch speaks no uTP
+   * yet; plaintext unless [encrypted], then RC4 only.
    */
-  private fun leecherSettings(): SettingsPack {
+  private fun leecherSettings(encrypted: Boolean): SettingsPack {
     val settings = SettingsPack()
     settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
     for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
@@ -139,8 +147,14 @@ class PublicV2IndependentLeecherTest {
       settings_pack.bool_types.enable_outgoing_utp, settings_pack.bool_types.enable_incoming_utp)) {
       settings.setBoolean(flag.swigValue(), false)
     }
-    settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(),
-      settings_pack.enc_policy.pe_disabled.swigValue())
+    val policy = if (encrypted) settings_pack.enc_policy.pe_forced
+      else settings_pack.enc_policy.pe_disabled
+    settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(), policy.swigValue())
+    settings.setInteger(settings_pack.int_types.in_enc_policy.swigValue(), policy.swigValue())
+    if (encrypted) {
+      settings.setInteger(settings_pack.int_types.allowed_enc_level.swigValue(),
+        settings_pack.enc_level.pe_rc4.swigValue())
+    }
     return settings
   }
 }

@@ -56,7 +56,8 @@ class TorrentV2EngineRateTest {
             }
           } finally { connection.close() }
         }
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false))
         try {
           engine.start()
           engine.setDownloadRateLimit(1)

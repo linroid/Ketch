@@ -28,6 +28,8 @@ internal data class PeerEndpoint(val host: String, val port: Int) {
 
 internal interface TorrentConnection {
   val remote: PeerEndpoint
+  /** The bytes travel RC4-encrypted (MSE/PE). */
+  val encrypted: Boolean get() = false
   suspend fun readExactly(size: Int): ByteArray
   suspend fun write(bytes: ByteArray)
   fun close()
@@ -54,6 +56,15 @@ internal interface TorrentNetwork {
   suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket
   fun close()
 }
+
+/**
+ * Opens a peer connection for the torrent with 20-byte wire tag [tag], ready for the BitTorrent
+ * handshake: [TorrentPeerEncryption] negotiates MSE/PE first, other networks just connect. Not a
+ * member, so networks that wrap another by delegation keep routing dials through their own
+ * [TorrentNetwork.connect].
+ */
+internal suspend fun TorrentNetwork.connectPeer(remote: PeerEndpoint, tag: ByteArray):
+  TorrentConnection = if (this is TorrentPeerEncryption) dial(remote, tag) else connect(remote)
 
 /** Owns live sockets only; closing a connection removes its runtime reference immediately. */
 @OptIn(ExperimentalAtomicApi::class)

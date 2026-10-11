@@ -72,7 +72,8 @@ class TorrentV2IncomingTest {
   ) {
     val root = root()
     val output = root / "payload"
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false), listenHost = "127.0.0.1")
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), listenHost = "127.0.0.1")
     try {
       engine.start()
       val session = engine.addV2Task(spec(document, output, discover))

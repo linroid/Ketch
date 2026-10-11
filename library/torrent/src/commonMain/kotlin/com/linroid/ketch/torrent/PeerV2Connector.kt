@@ -72,7 +72,9 @@ internal object PeerV2Connector {
     var connection: TorrentConnection? = null
     try {
       // Capture inside the timeout: cancellation at its return boundary must not lose a socket.
-      withTimeout(connectTimeoutMs) { connection = network.connect(remote) }
+      withTimeout(connectTimeoutMs) {
+        connection = network.connectPeer(remote, document.identity.wireTag(mode))
+      }
       val socket = checkNotNull(connection)
       val route = PeerIdentityHandshake(document.identity, extensions, dht).initiate(
         socket, mode, peerId, handshakes,

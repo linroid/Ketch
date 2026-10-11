@@ -15,6 +15,8 @@ internal enum class PeerStage { DIALING, HANDSHAKING, CONNECTED }
 internal class PeerAttempt(incoming: Boolean) {
   var stage: PeerStage = if (incoming) PeerStage.HANDSHAKING else PeerStage.DIALING
   var payload: Long = 0
+  /** The connection negotiated protocol encryption. */
+  var encrypted: Boolean = false
 }
 
 /**
@@ -45,6 +47,8 @@ internal data class PeerOutcomeReport(
   val incoming: Boolean,
   /** The BEP 11 flags other peers advertised for [endpoint], 0 when none did. */
   val flags: Int,
+  /** The connection negotiated protocol encryption. */
+  val encrypted: Boolean = false,
 )
 
 /**
@@ -91,11 +95,14 @@ internal class PeerDiagnostics(
 ) {
   private val dialed = LinkedHashMap<PeerEndpoint, Pair<PeerOutcome, Int>>()
   private val incoming = IntArray(PeerOutcome.entries.size)
+  /** Connections, either way, that completed the BitTorrent handshake encrypted. */
+  private var encrypted = 0
 
   fun record(endpoint: PeerEndpoint, attempt: PeerAttempt, failure: Throwable?, incoming: Boolean,
     flags: Int) {
     val outcome = classifyPeerOutcome(attempt, failure) ?: return
-    listener(PeerOutcomeReport(endpoint, outcome, incoming, flags))
+    listener(PeerOutcomeReport(endpoint, outcome, incoming, flags, attempt.encrypted))
+    if (!outcome.failed && attempt.encrypted) encrypted++
     if (incoming) {
       this.incoming[outcome.ordinal]++
       return
@@ -125,6 +132,7 @@ internal class PeerDiagnostics(
     fun table(values: IntArray) = PeerOutcome.entries.filter { values[it.ordinal] > 0 }
       .joinToString(" ") { "${it.label}=${values[it.ordinal]}" }.ifEmpty { "none" }
     return "dialed ${dialed.size} [${table(counts)}], incoming [${table(incoming)}], " +
+      "encrypted $encrypted, " +
       "pex flags utp=$utp (failed $failedUtp) encryption=$encryption (failed $failedEncryption)"
   }
 }

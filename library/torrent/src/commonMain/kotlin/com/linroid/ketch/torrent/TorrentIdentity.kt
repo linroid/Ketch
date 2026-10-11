@@ -51,6 +51,12 @@ internal value class V2InfoHash(val hex: String) {
 internal data class TorrentIdentity(val v1: InfoHash? = null, val v2: V2InfoHash? = null) {
   init { require(v1 != null || v2 != null) { "Torrent identity needs an exact topic" } }
 
+  /** The 20-byte tag a handshake in [mode] names the torrent by, also its MSE/PE key. */
+  fun wireTag(mode: PeerIdentityHandshake.Mode): ByteArray = when (mode) {
+    PeerIdentityHandshake.Mode.V1 -> checkNotNull(v1) { "No v1 identity" }.toBytes()
+    PeerIdentityHandshake.Mode.V2 -> checkNotNull(v2) { "No v2 identity" }.wireBytes()
+  }
+
   /** Authenticates identity only; metainfo structure and external layers need validation too. */
   fun matchesInfo(rawInfo: ByteArray): Boolean =
     (v1 == null || v1.toBytes().contentEquals(sha1Digest(rawInfo))) &&

@@ -23,6 +23,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 data class TorrentConfig(
   val dhtEnabled: Boolean = true,
+  /**
+   * Protocol encryption (MSE/PE) for peer connections. [TorrentEncryption.PREFERRED] dials
+   * encrypted first and plaintext when a peer refuses, and accepts both.
+   */
+  val encryption: TorrentEncryption = TorrentEncryption.PREFERRED,
   val maxActiveTorrents: Int = 5,
   val metadataTimeoutSeconds: Int = 120,
   val connectionsPerTorrent: Int = 100,
@@ -163,4 +168,20 @@ data class TorrentConfig(
       "udp://retracker01-msk-virt.corbina.net:80/announce",
     )
   }
+}
+
+/**
+ * Whether peer connections use protocol encryption (MSE/PE): RC4 over a Diffie-Hellman key,
+ * which hides BitTorrent from traffic shaping and reaches peers that require it. It is
+ * obfuscation, not authentication.
+ */
+enum class TorrentEncryption {
+  /** Plaintext only: encrypted incoming connections are refused. */
+  DISABLED,
+
+  /** Dial encrypted first, plaintext when the peer refuses; accept both. */
+  PREFERRED,
+
+  /** RC4 only, both ways: peers that cannot encrypt are not used. */
+  REQUIRED,
 }

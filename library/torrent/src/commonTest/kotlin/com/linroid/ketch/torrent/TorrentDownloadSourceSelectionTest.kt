@@ -50,7 +50,8 @@ class TorrentDownloadSourceSelectionTest {
     /** A source whose engine dials through a counting network; [networks] keeps it. */
     fun source(policy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED): TorrentDownloadSource {
       val network = CountingTorrentNetwork().also { networks += it }
-      return TorrentDownloadSource(TorrentConfig(dhtEnabled = false, uploadPolicy = policy),
+      return TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false, uploadPolicy = policy),
         seeder.http).also { source ->
         source.engineFactory = { config ->
           KotlinTorrentEngine(config, network, TorrentHttp(seeder.http),

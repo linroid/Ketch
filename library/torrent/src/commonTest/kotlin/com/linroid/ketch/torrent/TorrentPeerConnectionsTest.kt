@@ -196,7 +196,8 @@ class TorrentPeerConnectionsTest {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val requests = mutableListOf<PeerMessage.Request>()
         val recorder = RecordingConnections()
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false),
           listenHost = "127.0.0.1")
         val seeder = async(start = CoroutineStart.LAZY) {
           val connection = if (incoming) {

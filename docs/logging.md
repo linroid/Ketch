@@ -79,7 +79,8 @@ val ketch = Ketch(
   its peer connections ended, each dialed endpoint counted once by the furthest it got
   (`refused`, `connectTimeout`, `unreachable`, `connectFailed`, then `handshakeRejected`,
   `handshakeTimeout`, `handshakeClosed`, then `connected` and `received` for peers that sent
-  payload), the same for incoming connections, and how many dialed endpoints peers advertised as
+  payload), the same for incoming connections, how many connected peers negotiated protocol
+  encryption, and how many dialed endpoints peers advertised as
   supporting uTP or preferring encryption, and how many of those failed. `handshakeClosed` is a
   peer that accepted the connection and closed it on the plaintext handshake, as peers requiring
   encryption do. A swarm that runs out of peers logs this at info

@@ -375,6 +375,12 @@ internal class TorrentSwarm(
       active.values.forEach { it.cancel() }
       active.values.forEach { it.join() }
       verifiers.forEach { it.join() }
+      // Peers still connected when the swarm stops count as connected too.
+      while (true) {
+        val result = results.tryReceive().getOrNull() ?: break
+        diagnostics.record(result.endpoint, result.attempt, result.failure, result.incoming,
+          result.flags)
+      }
       rechecked.close()
       results.close()
       progressEvents.close()
@@ -394,8 +400,9 @@ internal class TorrentSwarm(
     accepted: TorrentConnection?,
     onListen: (PeerEndpoint?) -> Unit,
   ) {
-    val connection = accepted ?: network.connect(endpoint)
+    val connection = accepted ?: network.connectPeer(endpoint, store.metadata.infoHash.toBytes())
     attempt.stage = PeerStage.HANDSHAKING
+    attempt.encrypted = connection.encrypted
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
         scheduler, progressEvents, pexEvents)
