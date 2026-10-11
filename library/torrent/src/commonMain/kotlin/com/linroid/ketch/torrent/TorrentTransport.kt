@@ -28,6 +28,8 @@ internal data class PeerEndpoint(val host: String, val port: Int) {
 
 internal interface TorrentConnection {
   val remote: PeerEndpoint
+  /** The bytes travel RC4-encrypted (MSE/PE). */
+  val encrypted: Boolean get() = false
   suspend fun readExactly(size: Int): ByteArray
   suspend fun write(bytes: ByteArray)
   fun close()
@@ -53,6 +55,43 @@ internal interface TorrentNetwork {
   suspend fun listen(local: PeerEndpoint): TorrentListener
   suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket
   fun close()
+}
+
+/**
+ * Opens a peer connection for the torrent with 20-byte wire tag [tag], ready for the BitTorrent
+ * handshake: [TorrentPeerEncryption] negotiates MSE/PE first, other networks just connect. Not a
+ * member, so networks that wrap another by delegation keep routing dials through their own
+ * [TorrentNetwork.connect].
+ */
+internal suspend fun TorrentNetwork.connectPeer(
+  remote: PeerEndpoint,
+  tag: ByteArray,
+  /** Bounds each TCP connect; encryption and a plaintext retry have deadlines of their own. */
+  connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
+): TorrentConnection = if (this is TorrentPeerEncryption) {
+  dial(remote, tag, connectTimeoutMs)
+} else {
+  connectWithin(remote, connectTimeoutMs)
+}
+
+internal const val DEFAULT_CONNECT_TIMEOUT_MS = 10_000L
+
+/**
+ * [TorrentNetwork.connect] within [timeoutMs]. The socket is captured inside the timeout, so a
+ * cancellation at its return boundary closes it rather than losing it.
+ */
+internal suspend fun TorrentNetwork.connectWithin(
+  remote: PeerEndpoint,
+  timeoutMs: Long,
+): TorrentConnection {
+  var connection: TorrentConnection? = null
+  try {
+    withTimeout(timeoutMs) { connection = connect(remote) }
+    return checkNotNull(connection)
+  } catch (error: Throwable) {
+    connection?.close()
+    throw error
+  }
 }
 
 /** Owns live sockets only; closing a connection removes its runtime reference immediately. */

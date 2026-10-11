@@ -73,7 +73,8 @@ class KotlinTorrentSourceTest {
               ))))
           val metadata = TorrentMetadata.fromBencode(metainfo)
           val http = Http(metainfo, listener.local)
-          val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), http)
+          val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = false), http)
           val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-source-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
           val output = root / "custom-name"
@@ -128,7 +129,8 @@ class KotlinTorrentSourceTest {
             source.close()
             server.cancelAndJoin()
             network.close()
-            val restored = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+            val restored = TorrentDownloadSource(
+              TorrentConfig(encryption = TorrentEncryption.DISABLED, dhtEnabled = false))
             try {
               val second = context(null)
               restored.resume(second, saved)

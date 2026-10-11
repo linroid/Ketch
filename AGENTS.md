@@ -137,7 +137,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
-  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`
+  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`,
+  `TorrentEncryption`
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
@@ -266,7 +267,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
-  `DOWNLOADING` records, so the next `start()` resumes them
+  `DOWNLOADING` records, so the next `start()` resumes them. It closes its thread pools only once
+  the cancelled coroutines have finished (from `Dispatchers.Default`), never under them
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
@@ -447,6 +449,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   v2 and hybrid) exchange DHT ports (BEP 5 `PORT`) while a DHT node of their family runs; the
   engine pings the nodes they name (the last 1024 once each, four at a time), so trackers' peers
   start a DHT whose routers do not answer
+- Protocol encryption (MSE/PE), `TorrentConfig.encryption` (`TorrentEncryption`): `PREFERRED`
+  (default) dials encrypted first through `TorrentPeerEncryption` (`connectPeer`, which every
+  peer and metadata dial uses) and again in plaintext when a peer refuses, remembering the last
+  1024 such peers; `dispatchIncoming` answers either kind (`MseHandshake`, `Rc4`, `MseKeyPair`
+  over a pure Kotlin `Montgomery` modular exponentiation). `REQUIRED` is RC4 only, `DISABLED`
+  plaintext only. Peers reached encrypted carry the BEP 11 encryption flag in PEX
 - Btih magnets of hybrid torrents resolve their v2 identity (`TorrentMetadata` with
   `allowHybrid`, on the magnet path only) and run as v2 owners
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
@@ -1209,8 +1217,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
 5. `library:torrent` has no browser-local engine. uTP has its protocol core (`UtpSocket`) but no
-   network runtime yet, and protocol encryption remains unimplemented; seeding runs only while
-   the process runs (no background seeding).
+   network runtime yet; seeding runs only while the process runs (no background seeding).
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

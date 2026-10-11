@@ -33,7 +33,8 @@ import kotlin.time.Duration.Companion.minutes
 /**
  * Measures why public swarms do or do not connect; set `KETCH_TORRENT_SURVEY` to magnets or
  * `.torrent` URLs separated by whitespace (`KETCH_TORRENT_SURVEY_MINUTES` per torrent, default
- * 3; `KETCH_TORRENT_SURVEY_LOG` a level such as `debug` logs to stdout). Each runs as a real download, then the peers it could not use are probed over uTP (a SYN,
+ * 3; `KETCH_TORRENT_SURVEY_LOG` a level such as `debug` logs to stdout;
+ * `KETCH_TORRENT_SURVEY_ENCRYPTION` a [TorrentEncryption], `preferred` by default). Each runs as a real download, then the peers it could not use are probed over uTP (a SYN,
  * answered by peers that speak uTP) and, for those that closed our plaintext handshake, with an
  * MSE/PE opening (96 bytes, answered by peers that speak protocol encryption). The report goes to
  * stdout and `build/reports/torrent-survey.md`. Only v1 peers are recorded.
@@ -60,7 +61,9 @@ class PeerSurveyTest {
   private suspend fun survey(target: String, minutes: Int): String {
     val reports = ConcurrentLinkedQueue<PeerOutcomeReport>()
     val directory = Files.createTempDirectory("ketch-peer-survey-").toFile()
-    val source = TorrentDownloadSource(TorrentConfig())
+    val encryption = System.getenv("KETCH_TORRENT_SURVEY_ENCRYPTION")?.takeIf { it.isNotBlank() }
+      ?.let { TorrentEncryption.valueOf(it.uppercase()) } ?: TorrentEncryption.PREFERRED
+    val source = TorrentDownloadSource(TorrentConfig(encryption = encryption))
     source.engineFactory = { KotlinTorrentEngine(it, peerOutcomes = { report -> reports += report }) }
     val level = System.getenv("KETCH_TORRENT_SURVEY_LOG")?.takeIf { it.isNotBlank() }
     val ketch = Ketch(
@@ -102,6 +105,7 @@ class PeerSurveyTest {
       reports.count { it.flags and flag != 0 }
     return buildString {
       append("\n## ${target.take(120)}\n\n")
+      append("- Encryption: $encryption\n")
       append("- Ended as ${ended::class.simpleName}")
       progressOf(ended)?.let { append(", ${it.first} of ${it.second} bytes") }
       append(" after at most $minutes min\n")
@@ -114,6 +118,8 @@ class PeerSurveyTest {
         if (outcome.failed) append(" (uTP answered $answeredUtp)")
         append("\n")
       }
+      append("- Encrypted connections: ${reports.count { !it.outcome.failed && it.encrypted }} " +
+        "of ${reports.count { !it.outcome.failed }}\n")
       append("- Incoming: ${incoming.entries.joinToString { "${it.key.label}=${it.value}" }
         .ifEmpty { "none" }}\n")
       append("- PEX flags: uTP ${count(dialed.values, PEX_FLAG_UTP)} " +

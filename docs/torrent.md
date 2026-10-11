@@ -123,6 +123,15 @@ including a development run, hands its files to the running app instead of openi
   the DHT bit in its handshake, tells peers that set it where its DHT listens, and pings the nodes
   peers name, so the DHT starts from a tracker's peers even where no bootstrap router answers.
   Private and tracker-only torrents do neither
+- Protocol encryption (MSE/PE: a 768-bit Diffie-Hellman exchange, then RC4) is
+  `TorrentConfig.encryption`. `PREFERRED`, the default, dials every peer, metadata requests
+  included, encrypted first and offers RC4 or plaintext; a peer that hangs up or does not answer
+  within 10 s is dialed again in plaintext, and in plaintext first while it is among the last 1024
+  such peers. Incoming peers may open either way. `REQUIRED` uses RC4 only, both ways, and
+  `DISABLED` plaintext only. Ketch sends no initial payload: the BitTorrent handshake follows on
+  the negotiated stream. Encryption hides BitTorrent from traffic shaping and reaches peers that
+  require it; it is obfuscation, not authentication. Peers reached encrypted are advertised with
+  the BEP 11 encryption flag
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
@@ -334,7 +343,7 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement uTP, protocol encryption, web seeds, NAT mapping, local service
+This version does not implement uTP, web seeds, NAT mapping, local service
 discovery, torrent creation, or ratio management. No automatic incoming-port mapping is
 performed. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
 connection/buffer/task budgets. Configuring many peers or large pieces increases process memory

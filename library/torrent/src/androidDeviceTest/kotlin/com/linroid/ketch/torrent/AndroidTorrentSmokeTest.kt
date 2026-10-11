@@ -43,7 +43,9 @@ class AndroidTorrentSmokeTest {
           // Completion closes the peer connection.
         } finally { connection.close() }
       }
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+      // The peer above speaks plaintext only.
+      val source = TorrentDownloadSource(
+        TorrentConfig(dhtEnabled = false, encryption = TorrentEncryption.DISABLED))
       val output = root.resolve("nested/output")
       val magnet = MagnetUri(metadata.infoHash,
         explicitPeers = listOf("127.0.0.1:${listener.local.port}")).toUri()

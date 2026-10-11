@@ -116,7 +116,7 @@ tasks.withType<Test>().configureEach {
     "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
     "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT", "KETCH_TORRENT_MEMORY",
     "KETCH_TORRENT_MEMORY_REPORT", "KETCH_TORRENT_SURVEY", "KETCH_TORRENT_SURVEY_MINUTES",
-    "KETCH_TORRENT_SURVEY_LOG")) {
+    "KETCH_TORRENT_SURVEY_LOG", "KETCH_TORRENT_SURVEY_ENCRYPTION")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())

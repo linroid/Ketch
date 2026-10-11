@@ -17,6 +17,7 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -128,6 +129,66 @@ class IndependentSeederTest {
           // The expansion reached the running swarm: no peer was dialed again.
           assertEquals(1, expansion.connects)
         } finally {
+          manager.stop()
+          root.deleteRecursively()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun encryptionOnlySeeder_downloadsOverRc4() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        NativeLibraryLoader.ensureLoaded()
+        val root = Files.createTempDirectory("ketch-interop-mse").toFile()
+        val seed = root.resolve("seed").apply { mkdirs() }
+        val payload = ByteArray(80_037) { (it * 13 + 5).toByte() }
+        seed.resolve("fixture.bin").writeBytes(payload)
+        val hashes = payload.asList().chunked(16_384)
+          .fold(ByteArray(0)) { bytes, chunk -> bytes + sha1Digest(chunk.toByteArray()) }
+        val data = Bencode.encode(mapOf("info" to mapOf(
+          "name" to "fixture.bin", "length" to payload.size.toLong(),
+          "piece length" to 16_384L, "pieces" to hashes
+        )))
+        // libtorrent refuses every connection that does not negotiate RC4.
+        val settings = seederSettings().also {
+          it.setInteger(settings_pack.int_types.in_enc_policy.swigValue(),
+            settings_pack.enc_policy.pe_forced.swigValue())
+          it.setInteger(settings_pack.int_types.out_enc_policy.swigValue(),
+            settings_pack.enc_policy.pe_forced.swigValue())
+          it.setInteger(settings_pack.int_types.allowed_enc_level.swigValue(),
+            settings_pack.enc_level.pe_rc4.swigValue())
+        }
+        val manager = SessionManager()
+        val raw = createTorrentNetwork()
+        try {
+          manager.start(SessionParams(settings))
+          val info = TorrentInfo(data)
+          manager.download(info, seed)
+          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
+            manager.swig().listen_port() == 0) {
+            delay(20)
+          }
+          val endpoint = PeerEndpoint("127.0.0.1", manager.swig().listen_port())
+          val expected = TorrentMetadata.fromBencode(data)
+          // In plaintext the seeder hangs up.
+          assertFailsWith<Exception> {
+            TorrentMetadataExchange(TorrentPeerEncryption(raw, TorrentEncryption.DISABLED))
+              .fetch(expected.infoHash, endpoint)
+          }
+          val network = TorrentPeerEncryption(raw, TorrentEncryption.REQUIRED)
+          val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash, endpoint)
+          assertContentEquals(expected.infoBytes, metadata.infoBytes)
+          val output = root.resolve("download/fixture.bin")
+          val store = TorrentPieceStore(metadata, output.absolutePath.toPath(), emptySet(), "mse")
+          val peers = Channel<PeerEndpoint>(1)
+          peers.send(endpoint)
+          peers.close()
+          TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024)).run(peers)
+          assertContentEquals(payload, output.readBytes())
+        } finally {
+          raw.close()
           manager.stop()
           root.deleteRecursively()
         }
