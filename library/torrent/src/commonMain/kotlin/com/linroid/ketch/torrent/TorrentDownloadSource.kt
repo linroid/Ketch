@@ -100,7 +100,8 @@ class TorrentDownloadSource(
 
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
-    KotlinTorrentEngine(it, http = http, portMapping = it.portMapping)
+    // May map ports; TorrentConfig.portMapping, which setPortMapping changes, decides if it does.
+    KotlinTorrentEngine(it, http = http, portMapping = true)
   }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val trackerListSubscription = TrackerLists(

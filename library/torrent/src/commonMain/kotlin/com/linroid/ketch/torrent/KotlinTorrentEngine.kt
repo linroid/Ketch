@@ -95,8 +95,9 @@ internal class KotlinTorrentEngine(
   /** Test hook: hears how each v1 peer connection of every torrent ended. */
   private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
   /**
-   * Asks the router to forward the listen port when [TorrentConfig.portMapping] allows. Off for
-   * engines built directly, as tests do, so they never talk to the local router.
+   * Whether this engine may ask the router to forward its listen port at all; whether it does is
+   * [TorrentConfig.portMapping], which [setPortMapping] changes. Off for engines built directly,
+   * as tests do, so they never talk to the local router.
    */
   private val portMapping: Boolean = false,
 ) : TorrentEngine {

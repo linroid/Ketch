@@ -483,9 +483,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seed` and into free engine slots only, each after a recheck; a task whose files changed on disk
   loses the intent, one a download or shutdown stopped keeps it. `TorrentDownloadSource(...,
   restoreSeeding = false)`, as `ketch mcp --standalone` builds it, never restores
-- Port mapping, `TorrentConfig.portMapping` (on; engines get it through `KotlinTorrentEngine`'s
-  `portMapping` argument, which `TorrentDownloadSource` passes, so engines built directly in tests
-  never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
+- Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
+  `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
+  built directly in tests never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
   `LocalIpv4Network.gatewayGuesses` of `localIpv4Networks()`, an expect/actual over
   `NetworkInterface` and `getifaddrs`), then `UpnpClient` (SSDP, the device description and SOAP
   over a minimal HTTP/1.1 client on direct TCP; only devices on one of our private networks). TCP
