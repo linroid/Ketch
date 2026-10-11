@@ -7,8 +7,8 @@ import kotlin.test.assertEquals
 
 class DhtBootstrapRouterTest {
   @Test
-  fun bootstrap_routerAtFakeIpAddress_introducesNodesWithoutJoiningTheTable() = runTest {
-    // A proxy's fake-IP DNS answers router names with 198.18.0.0/15 addresses it routes.
+  fun bootstrap_routerAtReservedAddress_introducesNodesWithoutJoiningTheTable() = runTest {
+    // Some networks resolve router names into reserved ranges such as 198.18.0.0/15.
     val router = PeerEndpoint("198.18.12.115", 6881)
     val introduced = PeerEndpoint("8.8.8.8", 6881)
     val introducedId = DhtIdentity.create(numericAddress(introduced.host)!!)
@@ -40,6 +40,38 @@ class DhtBootstrapRouterTest {
         DhtRoutingTable.restore(node.snapshot()).second.map { it.endpoint })
       assertEquals(listOf<Pair<PeerEndpoint, String?>>(router to "find_node"),
         asked.filter { it.first == router })
+    } finally {
+      node.close()
+    }
+  }
+
+  @Test
+  fun bootstrap_manyRouters_asksEveryOne() = runTest {
+    val routers = (1..20).map { PeerEndpoint("198.18.0.$it", 6881) }
+    val introduced = PeerEndpoint("8.8.8.8", 6881)
+    val introducedId = DhtIdentity.create(numericAddress(introduced.host)!!)
+    val packets = Channel<TorrentDatagram>(64)
+    val socket = object : TorrentDatagramSocket {
+      override val local = PeerEndpoint("0.0.0.0", 6881)
+      override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) {
+        val query = DhtCodec.parse(bytes)
+        // Only the last router answers.
+        val body = when (remote) {
+          routers.last() -> mapOf("id" to ByteArray(20), "nodes" to DhtCodec.compactNodes(
+            listOf(DhtContact(introducedId, introduced))))
+          introduced -> mapOf("id" to introducedId.toByteArray(), "nodes" to ByteArray(0))
+          else -> return
+        }
+        packets.send(TorrentDatagram(remote, DhtCodec.response(query.transaction, body, remote)))
+      }
+      override suspend fun receive(): TorrentDatagram = packets.receive()
+      override fun close() { packets.close() }
+    }
+    val node = DhtNode(socket, backgroundScope, queryTimeoutMs = 50)
+    node.start()
+    try {
+      node.bootstrap(emptyList(), routers = routers)
+      assertEquals(1, node.contactCount())
     } finally {
       node.close()
     }

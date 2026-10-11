@@ -441,9 +441,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
-- DHT bootstrap routers are asked whatever their address: a proxy's fake-IP DNS answers their
-  names with reserved addresses (198.18.0.0/15), so such a router only introduces nodes and never
-  joins the routing table, while addresses learned from the network stay filtered
+- DHT bootstrap routers are asked whatever address their names resolve to, reserved ranges such
+  as 198.18.0.0/15 included; such a router only introduces nodes and never joins the routing
+  table, while addresses learned from the network stay filtered
 - Btih magnets of hybrid torrents resolve their v2 identity (`TorrentMetadata` with
   `allowHybrid`, on the magnet path only) and run as v2 owners
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and

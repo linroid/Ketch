@@ -59,22 +59,23 @@ internal class DhtNode(
 
   /**
    * Pings [endpoints], nodes saved from earlier runs, and [routers]. Routers come from names we
-   * resolved ourselves, so they are asked whatever their address: a proxy's fake-IP DNS answers
-   * with reserved addresses (198.18.0.0/15) it routes. A router at such an address only
-   * introduces the nodes it names near our ID and never enters the routing table.
+   * resolved ourselves, so they are asked whatever their address, even one in a reserved range
+   * such as 198.18.0.0/15, which some networks resolve names to. A router at such an address
+   * only introduces the nodes it names near our ID and never enters the routing table.
    */
   suspend fun bootstrap(
     endpoints: List<PeerEndpoint>,
     routers: List<PeerEndpoint> = emptyList(),
   ) = bootstrapMutex.withLock {
-    val (publicRouters, reservedRouters) = routers.take(16).partition(::validEndpoint)
+    val (publicRouters, reservedRouters) = routers.take(64).partition(::validEndpoint)
     for (endpoint in (endpoints.take(64) + publicRouters)) {
       if (validEndpoint(endpoint)) bootstrapCandidates += canonical(endpoint)
     }
     while (bootstrapCandidates.size > 64) bootstrapCandidates.remove(bootstrapCandidates.first())
     coroutineScope {
-      val introduced = reservedRouters.map { router -> async { askRouter(router) } }.awaitAll()
-        .flatten().distinctBy { it.endpoint }.take(32)
+      val introduced = reservedRouters.chunked(8).flatMap { batch ->
+        batch.map { router -> async { askRouter(router) } }.awaitAll().flatten()
+      }.distinctBy { it.endpoint }.take(32)
       bootstrapCandidates.toList().chunked(3).forEach { batch ->
         batch.map { endpoint -> async { ask(endpoint, "ping", emptyMap()) } }.awaitAll()
       }
