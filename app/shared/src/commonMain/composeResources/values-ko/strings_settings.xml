@@ -542,6 +542,8 @@
   <string name="settings_torrent_utp_hint">UDP로도 피어에 연결합니다. 라우터 뒤에 있는 피어와도 더 잘 연결되며, 다른 트래픽에 대역폭이 필요하면 속도를 줄입니다.</string>
   <string name="settings_torrent_port_mapping">포트 포워딩</string>
   <string name="settings_torrent_port_mapping_hint">라우터(UPnP 또는 NAT-PMP)에 포트 포워딩을 요청해 더 많은 피어가 이 기기에 연결할 수 있게 합니다.</string>
+  <string name="settings_torrent_local_discovery">로컬 피어 검색</string>
+  <string name="settings_torrent_local_discovery_hint">같은 공개 토렌트를 다운로드하거나 공유하는 로컬 네트워크의 기기를 찾아 조각을 직접 주고받습니다.</string>
   <string name="settings_torrent_connections_footer">암호화는 트래픽의 종류를 숨길 뿐, 누구와 연결하는지는 숨기지 않습니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>

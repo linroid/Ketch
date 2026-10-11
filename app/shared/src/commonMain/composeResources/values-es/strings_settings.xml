@@ -554,6 +554,8 @@
   <string name="settings_torrent_utp_hint">También llega a los pares por UDP, lo que funciona con más pares detrás de routers y va más despacio cuando el resto de tu tráfico necesita el ancho de banda.</string>
   <string name="settings_torrent_port_mapping">Reenvío de puertos</string>
   <string name="settings_torrent_port_mapping_hint">Pide a tu router (UPnP o NAT-PMP) que reenvíe un puerto, para que más pares puedan conectarse a este dispositivo.</string>
+  <string name="settings_torrent_local_discovery">Descubrimiento de pares locales</string>
+  <string name="settings_torrent_local_discovery_hint">Encuentra dispositivos de tu red local que descargan o comparten los mismos torrents públicos, para que intercambien partes directamente.</string>
   <string name="settings_torrent_connections_footer">El cifrado oculta qué tipo de tráfico es, no con quién te conectas.</string>
   <string name="settings_torrent_trackers">Trackers adicionales</string>
   <string name="settings_torrent_no_trackers">Sin trackers adicionales</string>

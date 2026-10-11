@@ -554,6 +554,8 @@
   <string name="settings_torrent_utp_hint">Erreicht Peers auch über UDP. Das klappt mit mehr Peers hinter Routern und wird langsamer, wenn dein übriger Datenverkehr die Bandbreite braucht.</string>
   <string name="settings_torrent_port_mapping">Portweiterleitung</string>
   <string name="settings_torrent_port_mapping_hint">Bittet deinen Router (UPnP oder NAT-PMP), einen Port weiterzuleiten, damit sich mehr Peers mit diesem Gerät verbinden können.</string>
+  <string name="settings_torrent_local_discovery">Lokale Peer-Suche</string>
+  <string name="settings_torrent_local_discovery_hint">Findet Geräte in deinem lokalen Netzwerk, die dieselben öffentlichen Torrents herunterladen oder teilen, damit sie Teile direkt austauschen.</string>
   <string name="settings_torrent_connections_footer">Verschlüsselung verbirgt, welche Art von Datenverkehr es ist, nicht, mit wem du dich verbindest.</string>
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>

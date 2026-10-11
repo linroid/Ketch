@@ -542,6 +542,8 @@
   <string name="settings_torrent_utp_hint">也透過 UDP 連線至對等端，能連上更多位於路由器後方的對等端，並在其他流量需要頻寬時主動降速。</string>
   <string name="settings_torrent_port_mapping">連接埠轉送</string>
   <string name="settings_torrent_port_mapping_hint">請求路由器（UPnP 或 NAT-PMP）轉送一個連接埠，讓更多對等端能連線至此裝置。</string>
+  <string name="settings_torrent_local_discovery">本機對等端探索</string>
+  <string name="settings_torrent_local_discovery_hint">尋找區域網路中下載或分享相同公開種子的裝置，讓它們直接交換資料塊。</string>
   <string name="settings_torrent_connections_footer">加密隱藏的是流量類型，而不是連線的對象。</string>
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>

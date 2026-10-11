@@ -138,7 +138,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
   `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`,
-  `TorrentEncryption`
+  `TorrentEncryption`, `TorrentMulticastLock`; internal `TorrentLocalDiscovery` (BEP 14, with
+  `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that `openLsdMulticast()` opens)
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
@@ -505,6 +506,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentAdvertisedPort.setMapped` announces; mappings last an hour, renew every half hour and are
   removed by `stop` within 2 s; UPnP tries other ports on 718 and permanent leases on 725.
   `PortMappingTest` runs both against scripted gateways on loopback
+- Local Service Discovery (BEP 14), `TorrentConfig.localDiscovery` (on; only engines given a
+  `KotlinTorrentEngine` `localDiscovery` transport factory, as `TorrentDownloadSource` passes
+  `openLsdMulticast`, join the group, so engines built directly in tests never send multicast):
+  `TorrentLocalDiscovery` joins `239.192.152.143:6771` while a public torrent's discovery runs
+  (`participate`, from the same block as DHT, so private and tracker-only torrents never take
+  part), announcing `BT-SEARCH` datagrams (`LsdAnnounce`: our TCP listen port, never the mapped
+  one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5 minutes, at most
+  once a minute per hash, and hands the peers others announce to the torrent (v1: its discovery
+  channel, counted as `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2
+  hash in v2 mode and a hybrid's v1 hash in v1 mode). It accepts private and link-local senders
+  only, never its own cookie, 32 at once then 4 a second, each peer once a minute per torrent.
+  `openLsdMulticast` is a `MulticastSocket` with `SO_REUSEADDR` joined on each private IPv4
+  interface (jvmAndAndroidMain) and `null` on iOS (multicast needs Apple's entitlement); IPv4
+  only. `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the
+  group is joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
+  `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest`
+  real multicast (skipped where the system refuses it)
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
@@ -678,10 +696,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `uploadLimit` number is bytes per second), are applied live through
   `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. `encryption`
   (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as `preferred`,
-  mapped to `TorrentEncryption` at the four sites), `utp` and `portMapping` (all on), edited
-  under Settings → BitTorrent → Connections, apply live through `setEncryption`,
-  `setUtpEnabled` and `setPortMapping` (the engine's `TorrentPeerEncryption.policy`, a uTP
-  endpoint that refuses new connections while off, and a port mapper started or stopped)
+  mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and `localDiscovery`
+  (all on), edited under Settings → BitTorrent → Connections, apply live through
+  `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
+  `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
+  mapper started or stopped, and the LAN discovery group joined or left)
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
@@ -1227,9 +1246,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TorrentWebSeed", "TrackerList", "TorrentController", "TorrentControls",
-  "Connections", "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket",
-  "SqliteStore",
+  "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList", "TorrentController",
+  "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
+  "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "EventRoutes", "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
@@ -1255,7 +1274,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
 5. `library:torrent` has no browser-local engine. uTP is only dialed after TCP fails; seeding runs
-   only while the process runs (no background seeding).
+   only while the process runs (no background seeding). Local service discovery is IPv4 only and
+   does not run on iOS.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

@@ -542,6 +542,8 @@
   <string name="settings_torrent_utp_hint">UDP経由でもピアに接続します。ルーターの内側にいるピアともつながりやすく、ほかの通信が帯域を必要とするときは速度を落とします。</string>
   <string name="settings_torrent_port_mapping">ポート転送</string>
   <string name="settings_torrent_port_mapping_hint">ルーター（UPnPまたはNAT-PMP）にポート転送を依頼し、より多くのピアがこのデバイスに接続できるようにします。</string>
+  <string name="settings_torrent_local_discovery">ローカルピア検出</string>
+  <string name="settings_torrent_local_discovery_hint">同じ公開トレントをダウンロードまたは共有しているローカルネットワーク上のデバイスを見つけ、ピースを直接やり取りします。</string>
   <string name="settings_torrent_connections_footer">暗号化で隠れるのは通信の種類で、接続相手は隠れません。</string>
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>

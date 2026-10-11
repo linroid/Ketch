@@ -1,0 +1,205 @@
+package com.linroid.ketch.torrent
+
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
+import okio.FileSystem
+import okio.IOException
+import okio.Path
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+/** How the engine announces its public torrents on the LAN and dials the peers found there. */
+@OptIn(ExperimentalAtomicApi::class)
+class TorrentLocalDiscoveryEngineTest {
+  /** One dial: where to, and the info hash or v2 tag its handshake named. */
+  private data class Dial(val remote: PeerEndpoint, val tag: ByteString)
+
+  /** Records every dial and its handshake, then hangs up; listens like [inner]. */
+  private class Recording(private val inner: TorrentNetwork) : TorrentNetwork by inner {
+    val dials = MutableStateFlow<List<Dial>>(emptyList())
+
+    override suspend fun connect(remote: PeerEndpoint): TorrentConnection =
+      object : TorrentConnection {
+        override val remote = remote
+        override suspend fun write(bytes: ByteArray) {
+          if (bytes.size == 68) dials.update {
+            it + Dial(remote, bytes.copyOfRange(28, 48).toByteString())
+          }
+        }
+        override suspend fun readExactly(size: Int): ByteArray = throw IOException("Hung up")
+        override fun close() = Unit
+      }
+  }
+
+  /** A tracker that never answers, for private torrents, which need one. */
+  private object SilentTracker : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      error("Unused")
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) = awaitCancellation()
+
+    override fun close() = Unit
+  }
+
+  private fun root(): Path = (FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+    "ketch-lsd-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}")
+    .also { torrentFileSystem.createDirectories(it) }
+
+  private fun v1Metadata(privateTorrent: Boolean): TorrentMetadata {
+    val bytes = byteArrayOf(1, 2, 3, 4)
+    val info = buildMap<String, Any> {
+      put("name", "lan")
+      put("length", 4L)
+      put("piece length", 4L)
+      put("pieces", sha1Digest(bytes))
+      if (privateTorrent) put("private", 1L)
+    }
+    return TorrentMetadata.fromBencode(Bencode.encode(buildMap {
+      if (privateTorrent) put("announce", "http://tracker/announce")
+      put("info", info)
+    }))
+  }
+
+  /** Runs [body] against a started engine that joins [lan] instead of a multicast group. */
+  private suspend fun engine(
+    lan: FakeLsdTransport,
+    network: Recording,
+    config: TorrentConfig = TorrentConfig(dhtEnabled = false,
+      encryption = TorrentEncryption.DISABLED),
+    body: suspend (KotlinTorrentEngine, Path) -> Unit,
+  ) = withContext(Dispatchers.Default) {
+    withTimeout(30_000) {
+      val root = root()
+      val engine = KotlinTorrentEngine(config, network, TorrentHttp(SilentTracker),
+        localDiscovery = lan::open)
+      try {
+        engine.start()
+        body(engine, root)
+      } finally {
+        engine.stop()
+        network.close()
+        torrentFileSystem.deleteRecursively(root, mustExist = false)
+      }
+    }
+  }
+
+  @Test
+  fun publicV1Torrent_isAnnouncedAndDialsLanPeers() = runTest {
+    val lan = FakeLsdTransport()
+    val network = Recording(createTorrentNetwork())
+    val metadata = v1Metadata(privateTorrent = false)
+    val hash = metadata.infoHash.toBytes().toByteString()
+    engine(lan, network) { engine, root ->
+      val session = engine.addTask(TorrentTaskSpec("lan", metadata, (root / "out").toString(),
+        emptySet()))
+      session.resume()
+      val announce = lan.sent.first { it.isNotEmpty() }.single()
+      assertEquals(listOf(hash), announce.hashes)
+      assertEquals(engine.listenPort, announce.port)
+      val peer = PeerEndpoint("192.168.1.20", 7000)
+      lan.announceFrom(peer.host, peer.port, hash)
+      assertEquals(Dial(peer, hash), network.dials.first { it.isNotEmpty() }.first())
+    }
+  }
+
+  @Test
+  fun hybridTorrent_announcesBothHashesAndDialsEachSwarm() = runTest {
+    val lan = FakeLsdTransport()
+    val network = Recording(createTorrentNetwork())
+    val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)
+    val v1 = fixture.document.identity.v1!!.toBytes().toByteString()
+    val v2 = fixture.document.info.hash.wireBytes().toByteString()
+    engine(lan, network) { engine, root ->
+      val session = engine.addV2Task(TorrentV2TaskSpec("lan", fixture.document,
+        (root / "payload").toString(), privacy = TorrentDiscoveryPrivacy.PUBLIC))
+      session.resume()
+      lan.sent.first { sent -> sent.flatMap { it.hashes }.toSet() == setOf(v1, v2) }
+      val v2Peer = PeerEndpoint("192.168.1.30", 7001)
+      val v1Peer = PeerEndpoint("192.168.1.31", 7002)
+      lan.announceFrom(v2Peer.host, v2Peer.port, v2)
+      lan.announceFrom(v1Peer.host, v1Peer.port, v1)
+      val dials = network.dials.first { dials ->
+        dials.any { it.remote == v1Peer } && dials.any { it.remote == v2Peer }
+      }
+      assertEquals(Dial(v2Peer, v2), dials.first { it.remote == v2Peer })
+      assertEquals(Dial(v1Peer, v1), dials.first { it.remote == v1Peer })
+    }
+  }
+
+  @Test
+  fun privateTorrent_neverJoinsTheLan() = runTest {
+    val lan = FakeLsdTransport()
+    val network = Recording(createTorrentNetwork())
+    val metadata = v1Metadata(privateTorrent = true)
+    engine(lan, network) { engine, root ->
+      val session = engine.addTask(TorrentTaskSpec("lan", metadata, (root / "out").toString(),
+        emptySet()))
+      session.resume()
+      session.state.first { it == TorrentSessionState.DOWNLOADING }
+      lan.announceFrom("192.168.1.20", 7000, metadata.infoHash.toBytes().toByteString())
+      delay(500)
+      assertEquals(0, lan.opens.load())
+      assertEquals(emptyList(), lan.sent.value)
+      assertEquals(emptyList(), network.dials.value)
+    }
+  }
+
+  @Test
+  fun trackerOnlyTorrent_neverJoinsTheLan() = runTest {
+    val lan = FakeLsdTransport()
+    val network = Recording(createTorrentNetwork())
+    val fixture = TorrentV2Fixture.build(listOf("a" to 40_000), hybrid = true)
+    engine(lan, network) { engine, root ->
+      val session = engine.addV2Task(TorrentV2TaskSpec("lan", fixture.document,
+        (root / "payload").toString(), trackerTiers = listOf(listOf("http://tracker/announce")),
+        privacy = TorrentDiscoveryPrivacy.TRACKER_ONLY))
+      session.resume()
+      session.state.first { it == TorrentSessionState.DOWNLOADING }
+      delay(500)
+      assertEquals(0, lan.opens.load())
+      assertEquals(emptyList(), lan.sent.value)
+    }
+  }
+
+  @Test
+  fun setLocalDiscovery_offStopsAnnouncing() = runTest {
+    val lan = FakeLsdTransport()
+    val network = Recording(createTorrentNetwork())
+    val metadata = v1Metadata(privateTorrent = false)
+    engine(lan, network) { engine, root ->
+      engine.setLocalDiscovery(false)
+      val session = engine.addTask(TorrentTaskSpec("lan", metadata, (root / "out").toString(),
+        emptySet()))
+      session.resume()
+      session.state.first { it == TorrentSessionState.DOWNLOADING }
+      delay(500)
+      assertEquals(0, lan.opens.load())
+      engine.setLocalDiscovery(true)
+      lan.sent.first { it.isNotEmpty() }
+      engine.setLocalDiscovery(false)
+      lan.announceFrom("192.168.1.20", 7000, metadata.infoHash.toBytes().toByteString())
+      delay(500)
+      assertTrue(lan.closes.load() >= 1)
+      assertFalse(network.dials.value.any { it.remote.host == "192.168.1.20" })
+    }
+  }
+}

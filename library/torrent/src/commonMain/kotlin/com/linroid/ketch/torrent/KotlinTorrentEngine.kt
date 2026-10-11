@@ -103,6 +103,14 @@ internal class KotlinTorrentEngine(
    * as tests do, so they never talk to the local router.
    */
   private val portMapping: Boolean = false,
+  /**
+   * Joins the LAN's local service discovery group (BEP 14); null, as for engines built directly,
+   * never announces or listens there. Whether it does is [TorrentConfig.localDiscovery], which
+   * [setLocalDiscovery] changes.
+   */
+  localDiscovery: (suspend () -> LsdTransport?)? = null,
+  /** Held while the local service discovery group is joined. */
+  multicastLock: TorrentMulticastLock? = null,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -204,6 +212,14 @@ internal class KotlinTorrentEngine(
   private val uploadRate = TorrentRateLimiter(config.uploadRateLimit)
   private val uploadPolicy = AtomicReference(config.effectiveUploadPolicy)
   private val additionalTrackers = AtomicReference(usableTrackers(config.additionalTrackers))
+  /**
+   * LAN discovery for public torrents. Peers on the LAN dial the TCP listen port, never a port the
+   * router maps outside.
+   */
+  private val lsd = localDiscovery?.let { open ->
+    TorrentLocalDiscovery(scope, open, listenPort = { advertisedPort.listenPort },
+      enabled = config.localDiscovery, multicastLock = multicastLock)
+  }
   override val isRunning: Boolean get() = running.load()
 
   init {
@@ -969,6 +985,20 @@ internal class KotlinTorrentEngine(
           delay(60_000)
         }
       }
+      // As in DHT: the truncated v2 hash, and a hybrid's v1 hash for its v1 swarm.
+      lsd?.let { service ->
+        launch {
+          service.participate(listOfNotNull(
+            LsdTopic(document.info.hash.wireBytes().toByteString()) {
+              sink.tryOffer(it, PeerTopic.V2, PeerOrigin.LSD)
+            },
+            v1?.let { hash ->
+              LsdTopic(hash.toBytes().toByteString()) {
+                sink.tryOffer(it, PeerTopic.V1, PeerOrigin.LSD)
+              }
+            }))
+        }
+      }
     }
     // Keep the transfer open between tracker/DHT rounds and for tracker-only empty swarms.
     kotlinx.coroutines.awaitCancellation()
@@ -1050,6 +1080,13 @@ internal class KotlinTorrentEngine(
         while (isActive) {
           dhtPeers(metadata.infoHash, announce = true).forEach { output.send(it) }
           delay(60_000)
+        }
+      }
+      lsd?.let { service ->
+        launch {
+          service.participate(listOf(LsdTopic(metadata.infoHash.toBytes().toByteString()) {
+            if (output.trySend(it).isSuccess) session.localPeerFound()
+          }))
         }
       }
     }
@@ -1313,6 +1350,10 @@ internal class KotlinTorrentEngine(
       advertisedPort.setMapped(null)
     }
     log.i { "Port mapping: ${if (enabled) "on" else "off"}" }
+  }
+
+  override suspend fun setLocalDiscovery(enabled: Boolean) {
+    lsd?.setEnabled(enabled)
   }
 
   /**

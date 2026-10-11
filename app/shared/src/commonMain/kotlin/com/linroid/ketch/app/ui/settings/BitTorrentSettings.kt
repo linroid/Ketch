@@ -74,6 +74,8 @@ import ketch.app.shared.generated.resources.settings_torrent_list_trackers
 import ketch.app.shared.generated.resources.settings_torrent_list_update
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
 import ketch.app.shared.generated.resources.settings_torrent_list_url_invalid
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery_hint
 import ketch.app.shared.generated.resources.settings_torrent_no_trackers
 import ketch.app.shared.generated.resources.settings_torrent_port_mapping
 import ketch.app.shared.generated.resources.settings_torrent_port_mapping_hint
@@ -263,8 +265,9 @@ private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -
 }
 
 /**
- * How this device reaches peers: protocol encryption, uTP and asking the router to forward its
- * port. Each applies to connections opened after the change.
+ * How this device reaches peers: protocol encryption, uTP, asking the router to forward its
+ * port and finding peers on the local network. Each applies to connections opened after the
+ * change.
  */
 @Composable
 private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
@@ -296,6 +299,12 @@ private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettin
       description = stringResource(Res.string.settings_torrent_port_mapping_hint),
       checked = settings.portMapping,
       onCheckedChange = { onChange(settings.copy(portMapping = it)) },
+    )
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_local_discovery),
+      description = stringResource(Res.string.settings_torrent_local_discovery_hint),
+      checked = settings.localDiscovery,
+      onCheckedChange = { onChange(settings.copy(localDiscovery = it)) },
     )
   }
 }

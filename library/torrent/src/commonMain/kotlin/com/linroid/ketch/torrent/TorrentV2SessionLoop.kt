@@ -212,6 +212,8 @@ internal object TorrentV2SessionLoop {
       val stopping = mutableSetOf<PeerV2Pool.Peer>()
       var limit = swarm?.connectionLimit()?.coerceIn(1, maxPeers) ?: maxPeers
       var dialing = 0
+      // Peers local service discovery (BEP 14) found, for the summary.
+      var localPeers = 0
       var attached = 0L
       var discoveryOpen = swarm != null
       var failuresOpen = swarm != null
@@ -660,7 +662,7 @@ internal object TorrentV2SessionLoop {
               val legacy = members.keys.count { it.info?.mode == PeerIdentityHandshake.Mode.V1 }
               " (in=$incoming, v1=$legacy) ${uploads?.summary().orEmpty()}" +
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
-                " candidates=${book.pendingCount} dialing=$dialing"
+                " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers"
             }
             val outcomes = diagnostics?.let { "; ${it.summary()}" }.orEmpty()
             "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size}" +
@@ -750,7 +752,10 @@ internal object TorrentV2SessionLoop {
             } else if (found.generation < checkNotNull(swarm).generation()) {
               // Found before a tracker reset, it belongs to the old trackers' swarm (BEP 27).
               log.v { "V2 swarm $label: dropped a peer found before a reset" }
-            } else checkNotNull(book).offer(found.endpoint, found.topic, found.origin, found.flags)
+            } else {
+              if (found.origin == PeerOrigin.LSD) localPeers++
+              checkNotNull(book).offer(found.endpoint, found.topic, found.origin, found.flags)
+            }
           }
           is Event.DialFailed -> {
             val failure = event.value.getOrNull()

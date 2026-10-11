@@ -224,6 +224,8 @@ internal class KotlinTorrentSession(
   private val uploadRate = TorrentRateLimiter()
   private val connectionLimit = AtomicInt(connections)
   private val received = AtomicLong(checkpoint?.receivedBytes ?: 0)
+  /** Peers local service discovery found, for the swarm summary. */
+  private val localPeers = AtomicInt(0)
   private val uploaded = AtomicLong(checkpoint?.uploadedBytes ?: 0)
   private val clock = monotonicClock()
   private val speedMutex = Mutex()
@@ -260,6 +262,11 @@ internal class KotlinTorrentSession(
 
   /** Whether every file is selected; trackers hear `completed` only for a whole torrent. */
   fun selectsAllFiles(): Boolean = store.selectsAllFiles()
+
+  /** Discovery queued a peer local service discovery (BEP 14) found. */
+  internal fun localPeerFound() {
+    localPeers.addAndFetch(1)
+  }
 
   override suspend fun payloadCounters(): TorrentPayloadCounters =
     TorrentPayloadCounters(received.load(), uploaded.load(), uploadSpeed)
@@ -406,6 +413,7 @@ internal class KotlinTorrentSession(
               listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
               dhtPortFor = dhtPortFor, onDhtNode = onDhtNode, onUtpPeers = onUtpPeers,
               webSeedHttp = webSeedHttp,
+              localPeers = { localPeers.load() },
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()

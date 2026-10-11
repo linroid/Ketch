@@ -170,8 +170,11 @@ internal class PexIntroductions(private val limit: Int = MAX_PEX_INTRODUCTIONS) 
   }
 }
 
-/** Where a candidate endpoint came from. [INCOMING] is the listen port of a peer that dialed us. */
-internal enum class PeerOrigin { TRACKER, DHT, PEX, EXPLICIT, INCOMING }
+/**
+ * Where a candidate endpoint came from. [INCOMING] is the listen port of a peer that dialed us,
+ * [LSD] a peer on the LAN that announced the torrent (BEP 14).
+ */
+internal enum class PeerOrigin { TRACKER, DHT, PEX, EXPLICIT, INCOMING, LSD }
 
 /**
  * Flags peers advertised per endpoint (BEP 11 `added.f`), kept beside the endpoints rather than

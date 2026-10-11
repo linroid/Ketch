@@ -81,6 +81,8 @@ internal class TorrentSwarm(
   private val webSeedHttp: TorrentHttp? = null,
   /** The first backoff of a failed web seed; tests pass a short one. */
   private val webSeedRetryMs: Long = WEB_SEED_RETRY_MS,
+  /** Peers local service discovery (BEP 14) found so far, for the summary. */
+  private val localPeers: () -> Int = { 0 },
 ) {
   /** What peer exchange may tell others about a connection: where it listens, and its flags. */
   private data class PexContact(val listen: PeerEndpoint?, val flags: Int)
@@ -223,7 +225,8 @@ internal class TorrentSwarm(
         }
         "Swarm $logLabel: pieces $verified/${store.pieceCount}, peers connected=$handshaken " +
           "active=${active.size}/${connections()}, queued=${pending.size}, " +
-          "known=${attempts.size}, discovered=$discovered, failed=$connectFailures, " +
+          "known=${attempts.size}, discovered=$discovered, lsd=${localPeers()}, " +
+          "failed=$connectFailures, " +
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
           "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}" +
           if (webSeeds.isEmpty()) "" else

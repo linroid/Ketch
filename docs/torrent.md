@@ -209,15 +209,36 @@ including a development run, hands its files to the running app instead of openi
   device holding the port moves UPnP to another. Without a gateway the engine logs that incoming
   peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
   interface map ports
-- The apps and the CLI read encryption, uTP and port mapping from `[torrent] encryption`
-  (`preferred`, `required` or `off`; an unknown value loads as `preferred`), `utp` and
-  `portMapping`, all on by default. The apps edit them under Settings → BitTorrent → Connections
-  and apply them at once through `TorrentDownloadSource.setEncryption`, `setUtpEnabled` and
-  `setPortMapping`, which never start the engine: encryption and uTP apply to connections opened
-  after the change (open ones keep running, and a uTP port stays bound for DHT), and port mapping
-  starts, or stops and removes its mapping
-- Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
-  working tracker until failover, and disconnects its old peers before switching. Public-mode
+- Local Service Discovery (BEP 14, `TorrentConfig.localDiscovery`, on by default for engines a
+  `TorrentDownloadSource` creates; engines built directly never join the group) finds peers on
+  the LAN without trackers or the internet. While a public torrent runs, the engine joins
+  `239.192.152.143:6771` on every interface with a private or link-local IPv4 address (the port
+  shared with other clients, `SO_REUSEADDR`), sends `BT-SEARCH * HTTP/1.1` announces with its
+  TCP listen port (never a router-mapped one: LAN peers dial us directly), a random `cookie` and
+  up to 20 `Infohash` headers per datagram, when each torrent starts and every 5 minutes, never
+  more than once a minute per torrent, and leaves the group when the last one stops. A v1
+  torrent announces its info hash; a v2 torrent the first 20 bytes of its SHA-256 hash, its
+  wire tag, as DHT does; a hybrid both, and peers found under each are dialed in that swarm's
+  mode. Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or
+  link-local senders, with a valid `Port` and at most 20 hashes in 1400 bytes, never our own
+  cookie, at most 32 at once then 4 a second, and each peer once a minute per torrent. LAN peers
+  are never shared through peer exchange. Private (BEP 27) and tracker-only torrents never
+  announce or accept them. IPv6 (`[ff15::efc0:988f]`) is not used. On Android the app holds a
+  Wi-Fi `MulticastLock` (`TorrentDownloadSource(multicastLock = ...)`) only while the group is
+  joined, and Android 17 may block it until the local network permission is granted; iOS does not
+  run it, as multicast there needs Apple's multicast networking entitlement
+- The apps and the CLI read encryption, uTP, port mapping and local service discovery from
+  `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
+  `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
+  under Settings → BitTorrent → Connections and apply them at once through
+  `TorrentDownloadSource.setEncryption`, `setUtpEnabled`, `setPortMapping` and
+  `setLocalDiscovery`, which never start the engine: encryption and uTP apply to connections
+  opened after the change (open ones keep running, and a uTP port stays bound for DHT), port
+  mapping starts, or stops and removes its mapping, and local service discovery joins or leaves
+  the LAN group (peers it found stay connected)
+- Private metainfo disables DHT, local service discovery and peer exchange, does not offer
+  `ut_metadata`, keeps one working tracker until failover, and disconnects its old peers before
+  switching. Public-mode
   magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
   metainfo. Trackers hear `completed` only once every file is selected and complete, so a partial
   selection never announces it.

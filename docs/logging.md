@@ -72,10 +72,13 @@ val ketch = Ketch(
 - Each segment's start and completion
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
+- Local service discovery (`TorrentLsd`): joining and leaving the LAN group and which torrents
+  were announced there, by short hash
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
   newly discovered and failed peers, corrupt pieces, upload slots, interested peers and
   uploaded bytes; v2 and hybrid swarms also count incoming peers, a hybrid's v1 peers, hash
-  requests served and rejected, and candidates being dialed. Every swarm's summary (v1, v2 and
+  requests served and rejected, and candidates being dialed; every swarm counts the peers local
+  service discovery found on the LAN (`lsd`). Every swarm's summary (v1, v2 and
   hybrid) ends with how its peer connections ended, each dialed endpoint counted once by the
   furthest it got
   (`refused`, `connectTimeout`, `unreachable`, `connectFailed`, then `handshakeRejected`,
@@ -94,6 +97,7 @@ val ketch = Ketch(
 - Speed limiter waits
 - FTP protocol commands and replies
 - Individual torrent peer disconnects, failed metadata requests and rejected incoming connections
+- Each LAN peer local service discovery hands a torrent, and announces dropped by its rate limit
 - Progress events received from a remote instance
 
 ## Log Format
@@ -135,14 +139,14 @@ A magnet download (dates omitted, task IDs shortened):
 [INFO] [TorrentEngine] Fetched metadata for magnet 0123456789ab in 4.2s
 [INFO] [TorrentSource] Resolved torrent from magnet: 0123456789ab "ubuntu.iso", v1, files=1, totalBytes=6114656256
 [INFO] [TorrentSession] Downloading taskId=9c1e (0123456789ab) with up to 100 peer(s), upload=DISABLED, privacy=PUBLIC
-[DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, failed=31, corrupt=0, uploadSlots=0/4 interestedPeers=3 uploaded=0, discovery=open
+[DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, lsd=1, failed=31, corrupt=0, uploadSlots=0/4 interestedPeers=3 uploaded=0, discovery=open
 ```
 
 A torrent with web seeds (BEP 19) ends its summary with them: seeds still running of all, those
 dropped after repeated failures, pieces they delivered, their payload and failed requests:
 
 ```
-[DEBUG] [TorrentSwarm] Swarm taskId=4f2a (89abcdef0123): pieces 300/512, peers connected=0 active=0/100, queued=0, known=0, discovered=0, failed=0, corrupt=0, uploadSlots=0/4 interestedPeers=0 uploaded=0, discovery=open; ...; webSeeds=1/2 (dropped=1), webSeedPieces=300, webSeedPayload=314572800, webSeedFailures=5
+[DEBUG] [TorrentSwarm] Swarm taskId=4f2a (89abcdef0123): pieces 300/512, peers connected=0 active=0/100, queued=0, known=0, discovered=0, lsd=0, failed=0, corrupt=0, uploadSlots=0/4 interestedPeers=0 uploaded=0, discovery=open; ...; webSeeds=1/2 (dropped=1), webSeedPieces=300, webSeedPayload=314572800, webSeedFailures=5
 ```
 
 A hybrid torrent seeding to two peers, one of them from its v1 swarm (`in` counts peers that
@@ -150,7 +154,7 @@ dialed in, `v1` peers on the v1 protocol, which get no hashes):
 
 ```
 [INFO] [TorrentSession] Seeding taskId=51d0 (v2 3991fc2074c5): upload=SEED_AFTER_COMPLETION
-[DEBUG] [TorrentSwarm] V2 swarm taskId=51d0 (3991fc2074c5): pieces 524/524, peers=2 (in=1, v1=1) uploadSlots=2/4 interestedPeers=2 uploaded=7340032 hashServed=3 hashRejected=0 candidates=4 dialing=0 unchoked=0, pendingCommits=0; dialed 9 [refused=3 connectTimeout=4 connected=1 received=1], incoming [connected=1], encrypted 1, utp 0, pex flags utp=2 (failed 2) encryption=3 (failed 3)
+[DEBUG] [TorrentSwarm] V2 swarm taskId=51d0 (3991fc2074c5): pieces 524/524, peers=2 (in=1, v1=1) uploadSlots=2/4 interestedPeers=2 uploaded=7340032 hashServed=3 hashRejected=0 candidates=4 dialing=0 lsd=0 unchoked=0, pendingCommits=0; dialed 9 [refused=3 connectTimeout=4 connected=1 received=1], incoming [connected=1], encrypted 1, utp 0, pex flags utp=2 (failed 2) encryption=3 (failed 3)
 ```
 
 ## Troubleshooting
@@ -161,7 +165,7 @@ dialed in, `v1` peers on the v1 protocol, which get no hashes):
 | A resume restarts from zero | `ETag mismatch`, `Last-Modified mismatch` or `Local file integrity check failed` |
 | A task stays queued | `[DownloadQueue]` lines showing the concurrency and per-host limits |
 | A magnet never resolves | `Metadata for magnet ... not found within`, tracker announce failures, DHT contacts |
-| A torrent stays at 0% | The swarm summary: `discovered=0` points at trackers or DHT, `connected=0` at reachability, `corrupt>0` at bad peers, `webSeedFailures` at mirrors |
+| A torrent stays at 0% | The swarm summary: `discovered=0` points at trackers or DHT (`lsd=0` while a device on the LAN shares it: local discovery is off or multicast is blocked), `connected=0` at reachability, `corrupt>0` at bad peers, `webSeedFailures` at mirrors |
 | A remote instance is offline | `[RemoteKetch] Connection to ... failed (attempt n)` or `rejected the API token` |
 
 The apps choose their level as follows:

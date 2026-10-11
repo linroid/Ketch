@@ -732,6 +732,8 @@
   <string name="settings_torrent_utp_hint">Also reaches peers over UDP, which works with more peers behind routers and slows down while your other traffic needs the bandwidth.</string>
   <string name="settings_torrent_port_mapping">Port forwarding</string>
   <string name="settings_torrent_port_mapping_hint">Asks your router (UPnP or NAT-PMP) to forward a port, so more peers can connect to this device.</string>
+  <string name="settings_torrent_local_discovery">Local peer discovery</string>
+  <string name="settings_torrent_local_discovery_hint">Finds devices on your local network that download or share the same public torrents, so they exchange pieces directly.</string>
   <string name="settings_torrent_connections_footer">Encryption hides what the traffic is, not who you connect to.</string>
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>

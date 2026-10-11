@@ -1259,6 +1259,7 @@ private fun torrentSource(
     encryption = torrentEncryption(settings.encryption),
     utpEnabled = settings.utp,
     portMapping = settings.portMapping,
+    localDiscovery = settings.localDiscovery,
   ),
   restoreSeeding = restoreSeeding,
 )

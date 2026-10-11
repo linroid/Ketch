@@ -78,12 +78,16 @@ import kotlin.io.encoding.Base64
  * @param restoreSeeding whether [com.linroid.ketch.core.Ketch.start] shares again the completed
  *   tasks that were sharing; false for processes that share a task store with the apps, such as
  *   `ketch mcp`
+ * @param multicastLock held while the engine listens for peers on the LAN
+ *   ([TorrentConfig.localDiscovery]), on hosts that filter multicast without one, such as Android
+ *   on Wi-Fi
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentDownloadSource(
   private val config: TorrentConfig = TorrentConfig(),
   httpEngine: HttpEngine? = null,
   private val restoreSeeding: Boolean = true,
+  private val multicastLock: TorrentMulticastLock? = null,
 ) : DownloadSource {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
@@ -94,14 +98,17 @@ class TorrentDownloadSource(
   private val encryption = AtomicReference(config.encryption)
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMapping = AtomicBoolean(config.portMapping)
+  private val localDiscovery = AtomicBoolean(config.localDiscovery)
 
   /** The upload policy of running and later torrents: the configured one or the last set. */
   internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
 
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
-    // May map ports; TorrentConfig.portMapping, which setPortMapping changes, decides if it does.
-    KotlinTorrentEngine(it, http = http, portMapping = true)
+    // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
+    // localDiscovery, which their setters change, decide if it does.
+    KotlinTorrentEngine(it, http = http, portMapping = true,
+      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock)
   }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val trackerListSubscription = TrackerLists(
@@ -248,7 +255,7 @@ class TorrentDownloadSource(
   private fun engineConfig(): TorrentConfig = config.copy(additionalTrackers = extraTrackers(),
     uploadPolicy = uploadPolicy.load(), uploadRateLimit = uploadRateLimit.load(),
     encryption = encryption.load(), utpEnabled = utpEnabled.load(),
-    portMapping = portMapping.load())
+    portMapping = portMapping.load(), localDiscovery = localDiscovery.load())
 
   /**
    * Replaces [TorrentConfig.encryption] for connections opened from now on; open ones keep
@@ -280,6 +287,17 @@ class TorrentDownloadSource(
     engineMutex.withLock {
       portMapping.store(enabled)
       engine.load()?.setPortMapping(enabled)
+    }
+  }
+
+  /**
+   * Replaces [TorrentConfig.localDiscovery]: a running engine starts or stops announcing public
+   * torrents on the LAN and dialing the peers announced there. Never starts the engine.
+   */
+  suspend fun setLocalDiscovery(enabled: Boolean) {
+    engineMutex.withLock {
+      localDiscovery.store(enabled)
+      engine.load()?.setLocalDiscovery(enabled)
     }
   }
 

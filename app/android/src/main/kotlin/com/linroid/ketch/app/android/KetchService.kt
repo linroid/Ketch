@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.IBinder
 import androidx.compose.runtime.snapshotFlow
@@ -177,7 +178,17 @@ class KetchService : Service() {
         encryption = config.torrent.encryption.toEncryption(),
         utpEnabled = config.torrent.utp,
         portMapping = config.torrent.portMapping,
+        localDiscovery = config.torrent.localDiscovery,
       ),
+      // Wi-Fi drivers drop multicast to save power unless an app holds a lock; LAN discovery
+      // holds it only while a public torrent runs.
+      multicastLock = {
+        val lock = applicationContext.getSystemService(WifiManager::class.java)
+          .createMulticastLock("ketch-lsd")
+        lock.setReferenceCounted(false)
+        lock.acquire()
+        AutoCloseable { lock.release() }
+      },
     )
     instanceManager = InstanceManager(
       factory = InstanceFactory(
@@ -244,6 +255,7 @@ class KetchService : Service() {
           torrentSource.setEncryption(it.encryption.toEncryption())
           torrentSource.setUtpEnabled(it.utp)
           torrentSource.setPortMapping(it.portMapping)
+          torrentSource.setLocalDiscovery(it.localDiscovery)
         },
         trackerList = torrentSource.trackerLists.map { lists ->
           lists.map {
