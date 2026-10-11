@@ -217,16 +217,21 @@ internal class EventStream(
     for ((id, planned) in nextPlan.interests) {
       if (topics[id]?.interest != planned.interest) topics[id] = SentTopic(planned.interest)
     }
-    // Rules may have moved tasks between intervals; tasks they newly name are sent at once.
+    // Rules may have moved tasks between intervals; tasks they newly name are sent at once, and
+    // their step then waits its interval, as after any flush.
     pendingProgress.clear()
     pendingSegments.clear()
+    val now = timeSource.markNow()
     for ((taskId, known) in sent) {
       val frame = tracker.frame(taskId) ?: continue
       if (hasNewProgress(frame, known)) {
         val step = plan.progress.step(taskId)
         when {
           step == null -> {}
-          previous.progress.step(taskId) == null -> sendProgress(frame, known, send)
+          previous.progress.step(taskId) == null -> {
+            sendProgress(frame, known, send)
+            if (known.progressVersion == frame.progressVersion) progressFlushed[step] = now
+          }
           else -> pendingProgress.getOrPut(step) { LinkedHashSet() } += taskId
         }
       }
@@ -234,7 +239,10 @@ internal class EventStream(
         val step = plan.segments.step(taskId)
         when {
           step == null -> {}
-          previous.segments.step(taskId) == null -> sendSegments(frame, known, send)
+          previous.segments.step(taskId) == null -> {
+            sendSegments(frame, known, send)
+            segmentsFlushed[step] = now
+          }
           else -> pendingSegments.getOrPut(step) { LinkedHashSet() } += taskId
         }
       }

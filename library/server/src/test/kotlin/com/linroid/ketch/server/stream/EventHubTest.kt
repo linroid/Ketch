@@ -225,6 +225,34 @@ class EventHubTest {
   }
 
   @Test
+  fun newlyAsked_changesRightAfterwardWaitTheirStep() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val hub = hub(FakeKetch(task))
+    val client = connect(hub)
+    task.state.value = downloading(1)
+    task.segments.value = listOf(Segment(0, 0, 99, 1))
+    runCurrent()
+
+    hub.subscribe(
+      client.stream.id,
+      null,
+      subscription(progressMs = 1_000, segments = listOf(StreamSegments(setOf("a"), 1_000))),
+    )
+    runCurrent()
+    client.clear()
+    // The values sent with the subscription count as this interval's.
+    task.state.value = downloading(2)
+    task.segments.value = listOf(Segment(0, 0, 99, 2))
+    advanceTimeBy(999)
+    assertEquals(emptyList(), client.names())
+
+    advanceTimeBy(1)
+    runCurrent()
+    assertEquals(listOf(2L), client.progress())
+    assertEquals(2, client.decode<TaskSegmentsUpdate>(1).segments.single().downloadedBytes)
+  }
+
+  @Test
   fun slowClient_skipsIntermediateProgress() = runTest {
     val task = FakeTask("a", downloading(0))
     val hub = hub(FakeKetch(task))
