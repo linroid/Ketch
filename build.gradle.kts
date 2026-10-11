@@ -84,3 +84,23 @@ subprojects {
     outputs.cacheIf { true }
   }
 }
+
+// Engines built without a download folder save to `~/Downloads` on the JVM, so tests that build
+// one that way would fill the developer's own folder with `file`, `file (1)`, ... Each JVM test
+// task gets a home of its own under build/ instead, with an empty Downloads folder in it.
+subprojects {
+  tasks.withType<Test>().configureEach {
+    val home = layout.buildDirectory.dir("test-home/$name")
+    jvmArgumentProviders.add(TestHome(home))
+    doFirst {
+      val downloads = home.get().asFile.resolve("Downloads")
+      downloads.deleteRecursively()
+      downloads.mkdirs()
+    }
+  }
+}
+
+/** Points `user.home` at [home], which is not an input: it only moves where tests write. */
+class TestHome(@get:Internal val home: Provider<Directory>) : CommandLineArgumentProvider {
+  override fun asArguments(): List<String> = listOf("-Duser.home=${home.get().asFile.absolutePath}")
+}
