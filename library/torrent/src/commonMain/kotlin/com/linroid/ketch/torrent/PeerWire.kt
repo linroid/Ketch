@@ -13,6 +13,14 @@ internal sealed interface PeerMessage {
   data class Piece(val index: Int, val begin: Int, val bytes: ByteArray) : PeerMessage
   data class Cancel(val index: Int, val begin: Int, val length: Int) : PeerMessage
   data class Reject(val index: Int, val begin: Int, val length: Int) : PeerMessage
+  /** Fast extension (BEP 6): a hint to download [index] next. */
+  data class Suggest(val index: Int) : PeerMessage
+  /** Fast extension (BEP 6): the peer has every piece, in place of a bitfield. */
+  data object HaveAll : PeerMessage
+  /** Fast extension (BEP 6): the peer has no piece yet, in place of a bitfield. */
+  data object HaveNone : PeerMessage
+  /** Fast extension (BEP 6): the peer serves [index] to us even while it chokes us. */
+  data class AllowedFast(val index: Int) : PeerMessage
   data class Port(val port: Int) : PeerMessage
   data class Extended(val id: Int, val payload: ByteArray) : PeerMessage
   data class Unknown(val id: Int, val payload: ByteArray) : PeerMessage
@@ -23,6 +31,8 @@ internal data class PeerHandshake(
   val peerId: ByteArray,
   val extensions: Boolean,
   val dht: Boolean,
+  /** The Fast extension (BEP 6), reserved byte 7 bit 0x04. */
+  val fast: Boolean = false,
 )
 
 /** Wire codec with bounded allocations; sessions enforce message ordering and request ownership. */
@@ -55,6 +65,8 @@ internal class PeerWire(
   companion object {
     const val BLOCK_SIZE: Int = 16 * 1024
     const val MAX_FRAME_SIZE: Int = 64 * 1024
+    /** The Fast extension's bit (BEP 6) in the last reserved handshake byte. */
+    const val FAST_BIT: Int = 0x04
     private val protocol = "BitTorrent protocol".encodeToByteArray()
 
     fun encodeHandshake(handshake: PeerHandshake): ByteArray {
@@ -62,6 +74,7 @@ internal class PeerWire(
       val reserved = ByteArray(8)
       if (handshake.extensions) reserved[5] = 0x10
       if (handshake.dht) reserved[7] = 1
+      if (handshake.fast) reserved[7] = (reserved[7].toInt() or FAST_BIT).toByte()
       return Buffer().writeByte(19).write(protocol).write(reserved)
         .write(handshake.infoHash.toBytes()).write(handshake.peerId).readByteArray()
     }
@@ -76,6 +89,7 @@ internal class PeerWire(
         peerId = bytes.copyOfRange(48, 68),
         extensions = bytes[25].toInt() and 0x10 != 0,
         dht = bytes[27].toInt() and 1 != 0,
+        fast = bytes[27].toInt() and FAST_BIT != 0,
       )
     }
 
@@ -118,6 +132,15 @@ internal class PeerWire(
           exact(2)
           PeerMessage.Port(input.readShort().toInt() and 65535)
         }
+        13, 17 -> {
+          exact(4)
+          val index = input.readInt()
+          if (id == 13) PeerMessage.Suggest(index) else PeerMessage.AllowedFast(index)
+        }
+        14, 15 -> {
+          exact(0)
+          if (id == 14) PeerMessage.HaveAll else PeerMessage.HaveNone
+        }
         20 -> {
           require(input.size >= 1)
           PeerMessage.Extended(input.readByte().toInt() and 255, input.readByteArray())
@@ -134,7 +157,8 @@ internal class PeerWire(
       val body = when (message) {
         PeerMessage.KeepAlive -> 0
         is PeerMessage.Control -> 1
-        is PeerMessage.Have -> 5
+        is PeerMessage.Have, is PeerMessage.Suggest, is PeerMessage.AllowedFast -> 5
+        PeerMessage.HaveAll, PeerMessage.HaveNone -> 1
         is PeerMessage.Bitfield -> 1 + message.bytes.size
         is PeerMessage.Request, is PeerMessage.Cancel, is PeerMessage.Reject -> 13
         is PeerMessage.Piece -> 9 + message.bytes.size
@@ -167,6 +191,10 @@ internal class PeerWire(
         is PeerMessage.Reject -> out.writeByte(16).writeInt(message.index)
           .writeInt(message.begin).writeInt(message.length)
         is PeerMessage.Port -> out.writeByte(9).writeShort(message.port)
+        is PeerMessage.Suggest -> out.writeByte(13).writeInt(message.index)
+        PeerMessage.HaveAll -> out.writeByte(14)
+        PeerMessage.HaveNone -> out.writeByte(15)
+        is PeerMessage.AllowedFast -> out.writeByte(17).writeInt(message.index)
         is PeerMessage.Extended -> out.writeByte(20).writeByte(message.id).write(message.payload)
         is PeerMessage.Unknown -> out.writeByte(message.id).write(message.payload)
       }
@@ -183,11 +211,15 @@ internal class PeerWire(
         is PeerMessage.Cancel -> message.index
         is PeerMessage.Piece -> message.index
         is PeerMessage.Reject -> message.index
+        is PeerMessage.Suggest -> message.index
+        is PeerMessage.AllowedFast -> message.index
         else -> null
       }
       if (index != null && pieceCount != null) require(index in 0 until pieceCount)
       when (message) {
         is PeerMessage.Have -> validateIndex(message.index, metadata)
+        is PeerMessage.Suggest -> validateIndex(message.index, metadata)
+        is PeerMessage.AllowedFast -> validateIndex(message.index, metadata)
         is PeerMessage.Request ->
           validateBlock(message.index, message.begin, message.length, metadata)
         is PeerMessage.Cancel ->

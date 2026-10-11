@@ -558,7 +558,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it is stopped or the task removed, until `upload` leaves `seed`, until a download waiting for
   one of the `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its
   intent), or until Ketch closes; a torrent that finishes while a download waits does not seed.
-  Seeding runs only while the process runs. The Fast extension (BEP 6) is not negotiated
+  Seeding runs only while the process runs
+- Fast extension (BEP 6) on v1 connections (`TorrentSwarm`'s `PeerWorker`; v2 and hybrid routes
+  do not offer it yet): the handshake sets reserved byte 7 bit 0x04 (`PeerHandshake.fast`), and
+  with both bits set `PeerProtocolState(fast = true)` takes Have All / Have None in place of a
+  bitfield (we send them when we hold every piece or none), Suggest Piece (ignored), Allowed
+  Fast (at most 32, requested while choked through `TorrentPieceScheduler.claim`'s `eligible`)
+  and Reject Request. A CHOKE keeps our requests until the peer rejects them; requests left
+  unanswered for `FAST_REJECT_GRACE_MS` (5 s) are canceled. A reject while choked hands the piece
+  back to the scheduler at once; unchoked, the block is asked for again until the piece has had
+  as many rejects as blocks, then other peers fetch it (`refused` until the peer unchokes us
+  anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
+  full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
+  (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
+  Fast messages on a connection that did not negotiate it close the peer. The v1 pipeline also
+  stays within the peer's BEP 10 `reqq`. The summary counts `fast` peers
 - See [support and migration](docs/torrent.md) and
   [verification](docs/development/torrent-verification.md)
 
