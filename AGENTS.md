@@ -254,10 +254,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `remove(deleteFiles = true)` delete it, never a file at the final name the task did not write.
   A name too long for the suffix (over 249 bytes), a resume given a new destination and tasks
   saved before partial files (no `partialPath`) write to the output path itself. In an Android
-  `content://` folder the partial document is created up front and renamed with
-  `DocumentsContract.renameDocument` (the provider picks a free name), reporting its URI as the
-  output path until then; a provider without `FLAG_SUPPORTS_RENAME` gets the final name directly,
-  and a rename that fails leaves the finished document under its partial name
+  `content://` folder the document is created up front under the final name its provider picks,
+  then renamed (`DocumentsContract.renameDocument`) to exactly that name plus `.ketch`, and back
+  once finished, reporting its URI as the output path until then; a provider without
+  `FLAG_SUPPORTS_RENAME`, or one that changes the partial name, keeps the final name throughout,
+  and a final rename that fails leaves the finished document under its partial name
 - Category folders: a request whose destination is `null` or a bare name is saved in the folder,
   inside the default directory, of the first of `DownloadConfig.categories` it matches
   (`DownloadCategory`: `extensions` or `mimeTypes`, either enough, and `hosts` with subdomains

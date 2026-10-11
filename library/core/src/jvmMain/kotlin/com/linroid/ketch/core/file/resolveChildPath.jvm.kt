@@ -14,6 +14,9 @@ internal actual fun resolveChildFolder(
 
 internal actual fun isContentUri(directory: String): Boolean = false
 
-internal actual fun createPartialDocument(directory: String, fileName: String): String? = null
+internal actual fun createPartialDocument(
+  directory: String,
+  fileName: String,
+): CreatedDocument? = null
 
 internal actual fun finishPartialDocument(partial: String): String? = null

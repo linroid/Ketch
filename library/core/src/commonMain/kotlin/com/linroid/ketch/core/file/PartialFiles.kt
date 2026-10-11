@@ -56,14 +56,17 @@ internal fun movePartialToFinal(
   return target
 }
 
+/** A document a download writes to: under its [partial] name until it finishes, or not. */
+internal class CreatedDocument(val uri: String, val partial: Boolean)
+
 /**
  * Creates the document a download of [fileName] writes to in [directory], an Android
- * `content://` folder, under its partial name ([partialFileName]), and returns its URI. `null`
- * when the platform has no such folders, or the name or the provider does not allow it (a
- * provider that cannot rename documents): the download then creates its document under the final
- * name with [resolveChildPath].
+ * `content://` folder: under the final name its provider picks, then renamed to that name plus
+ * [PARTIAL_FILE_SUFFIX] when the provider can rename documents and keeps that exact name, so
+ * [finishPartialDocument] recovers the final name from it. Otherwise the download writes to it
+ * under its final name. `null` when the platform has no such folders.
  */
-internal expect fun createPartialDocument(directory: String, fileName: String): String?
+internal expect fun createPartialDocument(directory: String, fileName: String): CreatedDocument?
 
 /**
  * Renames [partial], a document [createPartialDocument] created, to its final name, the provider

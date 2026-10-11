@@ -59,27 +59,39 @@ internal actual fun resolveChildFolder(
 internal actual fun isContentUri(directory: String): Boolean =
   directory.startsWith("content://")
 
-internal actual fun createPartialDocument(directory: String, fileName: String): String? {
+internal actual fun createPartialDocument(directory: String, fileName: String): CreatedDocument? {
   if (!isContentUri(directory)) return null
-  val partialName = partialFileName(fileName) ?: return null
   val resolver = AndroidContext.get().contentResolver
+  // The final name first, which the provider makes unique; the partial name is that plus a suffix.
   val document = DocumentsContract.createDocument(
     resolver,
     parentDocument(Uri.parse(directory)),
     "application/octet-stream",
-    partialName,
-  ) ?: throw IllegalStateException("Failed to create document '$partialName' in $directory")
-  if ((flags(resolver, document) and Document.FLAG_SUPPORTS_RENAME) != 0) {
-    return document.toString()
+    fileName,
+  ) ?: throw IllegalStateException("Failed to create document '$fileName' in $directory")
+  val finalName = displayName(resolver, document)
+  val partialName = finalName?.let(::partialFileName)
+  if (partialName == null || (flags(resolver, document) and Document.FLAG_SUPPORTS_RENAME) == 0) {
+    log.d { "Writing under the final name: the provider cannot rename documents in $directory" }
+    return CreatedDocument(document.toString(), partial = false)
   }
-  // It could never get its final name, so the download writes to a document under that name.
-  log.d { "Provider cannot rename documents, writing under the final name: $directory" }
-  try {
-    DocumentsContract.deleteDocument(resolver, document)
+  val renamed = try {
+    DocumentsContract.renameDocument(resolver, document, partialName) ?: document
   } catch (e: Exception) {
-    log.w { "Failed to delete an unused partial document: ${e.describeCauses()}" }
+    log.w { "Failed to give a document its partial name: ${e.describeCauses()}" }
+    return CreatedDocument(document.toString(), partial = false)
   }
-  return null
+  if (displayName(resolver, renamed) == partialName) {
+    return CreatedDocument(renamed.toString(), partial = true)
+  }
+  // The provider changed the partial name, which would lose the final one: it goes back.
+  val restored = try {
+    DocumentsContract.renameDocument(resolver, renamed, finalName) ?: renamed
+  } catch (e: Exception) {
+    log.w { "Failed to restore a document's final name: ${e.describeCauses()}" }
+    renamed
+  }
+  return CreatedDocument(restored.toString(), partial = false)
 }
 
 internal actual fun finishPartialDocument(partial: String): String? {
@@ -87,6 +99,7 @@ internal actual fun finishPartialDocument(partial: String): String? {
   val resolver = AndroidContext.get().contentResolver
   return try {
     val name = displayName(resolver, uri) ?: return null
+    // The partial name is exactly the final name the provider gave plus the suffix.
     val finalName = name.removeSuffix(PARTIAL_FILE_SUFFIX)
     if (finalName == name || finalName.isEmpty()) return null
     // Providers pick a free name when it is taken; a null result keeps the document's URI.

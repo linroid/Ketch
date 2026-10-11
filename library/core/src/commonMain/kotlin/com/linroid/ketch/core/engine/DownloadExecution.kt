@@ -929,7 +929,9 @@ internal class DownloadExecution(
     if (directory.contains("://")) {
       // A content:// document is created now, under a name its provider makes unique.
       val document = if (partial) createPartialDocument(directory, fileName) else null
-      if (document != null) return OutputTarget(document, document, replace = false)
+      if (document != null) {
+        return OutputTarget(document.uri, document.uri.takeIf { document.partial }, replace = false)
+      }
       return OutputTarget(resolveChildPath(directory, fileName), partial = null, replace = false)
     }
     val outputPath = resolveChildPath(directory, fileName)
