@@ -57,6 +57,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
@@ -101,7 +102,7 @@ class MainActivity : ComponentActivity() {
         notificationOffer?.cancel()
         localNetworkOffer?.cancel()
         if (connected == null) return@collect
-        offerLocalNetwork(connected.instanceManager)
+        offerLocalNetwork(connected)
         connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
         // The controller is set before the service.
         offerNotifications(connected.instanceManager, model.controller?.state?.aiDiscover)
@@ -225,21 +226,34 @@ class MainActivity : ComponentActivity() {
    * Asks for the local network from Android 17, which blocks it until granted, once this device
    * has a remote device to reach or is shared: those would otherwise just time out. Searching
    * the network and adding a device ask for themselves. Asked once per activity; the system
-   * stops showing it after two denials.
+   * stops showing it after two denials. Local peer discovery asks too, the first time it wants
+   * the LAN (on, while a public torrent runs), and only once: it works without the permission
+   * on the internet, so a denial is not asked again.
    */
-  private fun offerLocalNetwork(manager: InstanceManager) {
+  private fun offerLocalNetwork(service: KetchService) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return
     val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
     if (localNetworkAsked || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
       return
     }
+    val manager = service.instanceManager
     val remote = manager.instances.map { list -> list.any { it is RemoteInstance } }
     val shared = manager.serverState.map { it is ServerState.Running }
+    val peers = if (permissionPrefs.getBoolean(KEY_LOCAL_PEERS_OFFERED, false)) {
+      flowOf(false)
+    } else {
+      service.lanPeerSearchStarted
+    }
     localNetworkOffer = lifecycleScope.launch {
-      combine(remote, shared) { hasRemote, isShared -> hasRemote || isShared }.first { it }
+      combine(remote, shared, peers) { hasRemote, isShared, searching ->
+        hasRemote || isShared || searching
+      }.first { it }
       withStarted {
         if (localNetworkAsked) return@withStarted
         localNetworkAsked = true
+        if (service.lanPeerSearchStarted.value) {
+          permissionPrefs.edit { putBoolean(KEY_LOCAL_PEERS_OFFERED, true) }
+        }
         requestLocalNetworkPermission.launch(permission)
       }
     }
@@ -297,6 +311,7 @@ class MainActivity : ComponentActivity() {
     const val PERMISSION_PREFS = "permissions"
     const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
     const val KEY_NOTIFICATIONS_DUE = "notifications_due"
+    const val KEY_LOCAL_PEERS_OFFERED = "local_peers_offered"
   }
 }
 
