@@ -27,6 +27,13 @@ class PortMappingTest {
   private val loopback = byteArrayOf(127, 0, 0, 1)
   private val loopbackNetwork = LocalIpv4Network(loopback, 8)
 
+  /**
+   * One reply window, long enough for a loaded test machine: a request sent again would be
+   * recorded twice, and a gateway missed on the first pass is only asked again after minutes.
+   * It stays well under the 5 s waits, as the silent gateway guess takes the whole window.
+   */
+  private val replyMs = 2_000L
+
   private fun ip(value: String): ByteArray = assertNotNull(numericAddress(value))
 
   private fun gateways(test: suspend CoroutineScope.(TorrentNetwork, CoroutineScope) -> Unit) =
@@ -263,7 +270,7 @@ class PortMappingTest {
       val mapped = MutableStateFlow<Int?>(-1)
       val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
         onMapped = { mapped.value = it },
-        natPmp = NatPmpClient(network, port, retryMs = listOf(200)),
+        natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
         upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
         // The gateway guesses for 127.0.0.2 include 127.0.0.1, where the gateway answers.
         networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
@@ -305,7 +312,7 @@ class PortMappingTest {
     val mapped = MutableStateFlow<Int?>(-1)
     val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
       onMapped = { mapped.value = it },
-      natPmp = NatPmpClient(network, port, retryMs = listOf(200)),
+      natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
       upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
       networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
     mapper.start()
@@ -322,7 +329,7 @@ class PortMappingTest {
     var udp: Int? = null
     val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { udp },
       onMapped = {},
-      natPmp = NatPmpClient(network, port, retryMs = listOf(200)),
+      natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
       upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
       networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) },
       udpCheckMs = 100)
