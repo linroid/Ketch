@@ -15,6 +15,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -95,18 +96,37 @@ class KetchDispatchersTest {
   }
 
   @Test
+  fun threadPool_startsThreadsOnlyForWorkRunningAtOnce() = runBlocking {
+    val pool = ketchThreadPool("ketch-demand", threads = 16)
+    repeat(500) { withContext(pool) {} }
+    val started = Thread.getAllStackTraces().keys.count { it.name.startsWith("ketch-demand-") }
+    assertTrue(started <= 4, "Started $started threads for work that ran one task at a time")
+  }
+
+  @Test
   fun threadPool_threadEndsOnceIdle() = runBlocking {
     val pool = ketchThreadPool("ketch-test", threads = 2, keepAlive = 50.milliseconds)
-    try {
-      val thread = withContext(pool) { Thread.currentThread() }
-      assertEquals("ketch-test-1", thread.name)
-      assertTrue(thread.isDaemon)
-      withTimeout(5.seconds) {
-        while (thread.isAlive) delay(10)
-      }
-    } finally {
-      pool.close()
+    val thread = withContext(pool) { Thread.currentThread() }
+    assertEquals("ketch-test-1", thread.name)
+    assertTrue(thread.isDaemon)
+    withTimeout(5.seconds) {
+      while (thread.isAlive) delay(10)
     }
+  }
+
+  @Test
+  fun threadPool_runsAtMostItsThreadsAtOnce(): Unit = runBlocking {
+    val pool = ketchThreadPool("ketch-cap", threads = 3)
+    val running = AtomicInteger()
+    val most = AtomicInteger()
+    List(12) {
+      async(pool) {
+        most.accumulateAndGet(running.incrementAndGet(), ::maxOf)
+        Thread.sleep(50)
+        running.decrementAndGet()
+      }
+    }.awaitAll()
+    assertEquals(3, most.get())
   }
 
   @Test

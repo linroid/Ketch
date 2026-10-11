@@ -1474,19 +1474,20 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   self-managed sources. Accessors serialize I/O with `limitedParallelism(1)`
 - `platformFileSystem`: okio `FileSystem.SYSTEM` on Android/JVM/iOS, `NodeJsFileSystem` on JS,
   `WasiFileSystem` on WasmWasi; the `config` module's copy throws on WasmJs
-- `KetchDispatchers.Default` (`createDefaultDispatchers()`), created once per process and shared
-  by every `Ketch` given no dispatchers: Ketch's own daemon threads, apart from the app's
+- `KetchDispatchers.Default` (`createDefaultDispatchers()`), created once per process and shared by
+  every `Ketch` given no dispatchers: Ketch's own daemon threads, apart from the app's
   `Dispatchers.IO`/`Default`. On Android/JVM (`jvmAndAndroidMain`, `ketchThreadPool`) at most 8
-  `ketch-network-N` and 8 `ketch-disk-N` threads, started as work arrives and ended after 30 s
-  idle; on iOS two pools of 8; `Dispatchers.Default` on JS/WasmWasi. `main` is `network` itself,
-  so there is no coordination thread, and each `Ketch` takes a serial view of its own
+  `ketch-network-N` and 8 `ketch-disk-N` threads, started only when every thread is busy and ended
+  after 30 s idle; on iOS two pools of 8; `Dispatchers.Default` on JS/WasmWasi. `main` is `network`
+  itself, so there is no coordination thread, and each `Ketch` takes a serial view of its own
 - Torrent threads (`TorrentDispatchers`): the engine, peers and hashing run on
   `KetchDispatchers.Default.network`, file I/O on its `disk`, DNS and interface lookups on a
-  slice of `disk` (2 at once) and local discovery's blocking multicast socket on another (1).
-  Peer sockets on JVM/Android are `NioTorrentNetwork`'s: one `ketch-torrent-selector` thread
-  waits for readiness and the caller's dispatcher reads and writes. Not ktor-network, which runs
-  every socket's loops on `Dispatchers.IO` (hardcoded), so hundreds of peers grew that pool to
-  its 64 threads; HTTP (CIO) and FTP sockets still do, with few connections
+  slice of `disk` (2 at once) and local discovery's blocking receive on another (1), which its
+  sends never wait for. Peer sockets on JVM/Android are `NioTorrentNetwork`'s: one
+  `ketch-torrent-selector` thread waits for readiness and the caller's dispatcher reads and
+  writes. Not ktor-network, which runs every socket's loops on `Dispatchers.IO` (hardcoded), so
+  hundreds of peers grew that pool to its 64 threads; HTTP (CIO) and FTP sockets still do, with
+  few connections
 - Console logger: platform-specific implementations
 
 ### Coroutine-Based Concurrency

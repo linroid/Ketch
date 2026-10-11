@@ -44,8 +44,8 @@ class KetchDispatchers(
      * The dispatchers every [Ketch] in the process shares unless given others, created on first
      * use. On the JVM and Android they run on Ketch's own daemon threads, apart from the
      * application's `Dispatchers.IO` and `Dispatchers.Default`: at most 8 for [network]
-     * (`ketch-network-N`) and 8 for [disk] (`ketch-disk-N`), started as work arrives and ended
-     * once idle for 30 seconds. iOS keeps two pools of 8 threads; JS and WasmWasi use
+     * (`ketch-network-N`) and 8 for [disk] (`ketch-disk-N`), started only when every thread is
+     * busy and ended once idle for 30 seconds. iOS keeps two pools of 8 threads; JS and WasmWasi use
      * `Dispatchers.Default`. [main] is [network] itself: each [Ketch] coordinates on a serial
      * view of its own, so instances never wait for each other.
      */
