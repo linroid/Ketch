@@ -83,21 +83,21 @@ class DownloadCoordinatorFailureTest {
     ): SourceResumeState = SourceResumeState(type, "")
   }
 
-  private fun createHandle(name: String): TaskHandle {
+  private fun createHandle(name: String, taskId: String = name): TaskHandle {
     val now = Clock.System.now()
     val request = DownloadRequest(
       url = "https://example.com/$name",
       destination = Destination("/tmp/ketch-failure-test/"),
     )
     val record = TaskRecord(
-      taskId = name,
+      taskId = taskId,
       request = request,
       state = TaskState.QUEUED,
       createdAt = now,
       updatedAt = now,
     )
     return object : TaskHandle {
-      override val taskId = name
+      override val taskId = taskId
       override val request = request
       override val createdAt = now
       override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
@@ -141,8 +141,9 @@ class DownloadCoordinatorFailureTest {
         running.mutableState.value !is DownloadState.Canceled,
         "The other download was cancelled: ${running.mutableState.value}",
       )
-      // The scope still runs new downloads.
-      val next = createHandle("error")
+      // The scope still runs new downloads. Under another ID: the failed task may not have left
+      // the active downloads yet, and starting the same ID again would be skipped.
+      val next = createHandle("error", taskId = "next")
       coordinator.start(next)
       withTimeout(5.seconds) { next.mutableState.first { it is DownloadState.Failed } }
     } finally {
