@@ -620,12 +620,15 @@ internal class TorrentSwarm(
       wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
     }
 
-    /** Tells an IPv4 peer the canonical allowed-fast pieces we have (BEP 6). */
+    /**
+     * Tells an IPv4 peer the canonical allowed-fast pieces (BEP 6), held or not: the set stays the
+     * same for the connection, and a piece we verify later is served once its HAVE goes out.
+     */
     private suspend fun offerAllowedFast() {
       val address = allowedFastAddress(connection.remote.host) ?: return
       val pieces = allowedFastSet(address, store.metadata.infoHash.toBytes(), store.pieceCount)
       allowedFast = pieces.toSet()
-      for (index in pieces) if (advertised[index]) wire.send(PeerMessage.AllowedFast(index))
+      for (index in pieces) wire.send(PeerMessage.AllowedFast(index))
     }
 
     /** Whether we serve allowed-fast pieces now: only while the policy uploads at all. */
@@ -650,6 +653,7 @@ internal class TorrentSwarm(
         lastUsefulPayload += nowMs() - throttledAt
       }
       require(fast || !message.isFastExtension()) { "Fast extension message without BEP 6" }
+      val wasChoking = state.choking
       val accepted = state.received(message)
       when (message) {
         // Only the one-time bitfield rebuilds availability; HAVE stays incremental so a
@@ -659,9 +663,12 @@ internal class TorrentSwarm(
         is PeerMessage.Have -> scheduler.announce(id, message.index)
         is PeerMessage.Control -> when (message.signal) {
           PeerMessage.Signal.CHOKE -> if (fast) {
-            // Our requests stand until the peer rejects them; the block deadline restarts.
-            chokedAt = nowMs()
-            lastBlock = TimeSource.Monotonic.markNow()
+            // Our requests stand until the peer rejects them; the block deadline restarts. A
+            // repeated CHOKE keeps both clocks, or a peer repeating it would hold the piece.
+            if (!wasChoking) {
+              chokedAt = nowMs()
+              lastBlock = TimeSource.Monotonic.markNow()
+            }
           } else {
             scheduler.release(id)
             claim = null

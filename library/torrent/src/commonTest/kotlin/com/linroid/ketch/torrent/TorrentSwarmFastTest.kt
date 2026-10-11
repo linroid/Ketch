@@ -8,6 +8,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -236,6 +237,44 @@ class TorrentSwarmFastTest {
         .run(peers)
       assertTrue(fixture.store.completed())
       assertEquals(0, fixture.budget.allocated)
+    } finally {
+      server.cancelAndJoin()
+      fixture.close()
+    }
+  }
+
+  @Test
+  fun repeatedChokes_doNotHoldTheRequestsPastTheGrace() = fastTest {
+    val fixture = Fixture(pieces = 1)
+    val peers = Channel<PeerEndpoint>(1)
+    val server = peer(fixture, peers) { wire, _ ->
+      wire.send(PeerMessage.HaveAll)
+      wire.send(unchoke)
+      var held = 0
+      while (held < 4) if (wire.read() is PeerMessage.Request) held++
+      coroutineScope {
+        // CHOKE again and again, each well within the grace, never rejecting.
+        val choking = launch {
+          while (true) {
+            wire.send(choke)
+            delay(100)
+          }
+        }
+        var canceled = 0
+        while (canceled < 4) if (wire.read() is PeerMessage.Cancel) canceled++
+        choking.cancel()
+      }
+      wire.send(unchoke)
+      while (true) {
+        val message = wire.read()
+        if (message is PeerMessage.Request) wire.send(fixture.block(message))
+      }
+    }
+    peers.close()
+    try {
+      TorrentSwarm(fixture.store, fixture.network, fixture.budget, fastRejectGraceMs = 300)
+        .run(peers)
+      assertTrue(fixture.store.completed())
     } finally {
       server.cancelAndJoin()
       fixture.close()
