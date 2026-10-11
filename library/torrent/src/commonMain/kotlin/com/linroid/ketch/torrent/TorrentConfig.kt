@@ -24,6 +24,11 @@ import kotlin.time.Duration.Companion.seconds
 data class TorrentConfig(
   val dhtEnabled: Boolean = true,
   /**
+   * Whether the engine asks the home router (NAT-PMP, then UPnP) to forward the listen port, TCP
+   * and UDP, so peers behind other NATs can connect; the external port it gets is announced.
+   */
+  val portMapping: Boolean = true,
+  /**
    * Protocol encryption (MSE/PE) for peer connections. [TorrentEncryption.PREFERRED] dials
    * encrypted first and plaintext when a peer refuses, and accepts both.
    */

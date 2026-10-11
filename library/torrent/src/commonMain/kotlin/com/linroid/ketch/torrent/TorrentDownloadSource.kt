@@ -97,7 +97,7 @@ class TorrentDownloadSource(
 
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
-    KotlinTorrentEngine(it, http = http)
+    KotlinTorrentEngine(it, http = http, portMapping = it.portMapping)
   }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val trackerListSubscription = TrackerLists(

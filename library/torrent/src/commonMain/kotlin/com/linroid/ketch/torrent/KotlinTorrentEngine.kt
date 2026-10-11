@@ -94,6 +94,11 @@ internal class KotlinTorrentEngine(
   private val listenHost: String = WILDCARD_IPV4,
   /** Test hook: hears how each v1 peer connection of every torrent ended. */
   private val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
+  /**
+   * Asks the router to forward the listen port when [TorrentConfig.portMapping] allows. Off for
+   * engines built directly, as tests do, so they never talk to the local router.
+   */
+  private val portMapping: Boolean = false,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -105,6 +110,9 @@ internal class KotlinTorrentEngine(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext +
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
+  /** Sockets to the local router, outside the peer budget and encryption. */
+  private val directNetwork = rawNetwork
+  private var portMapper: TorrentPortMapper? = null
   private val connectionBudget = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
@@ -188,6 +196,15 @@ internal class KotlinTorrentEngine(
     advertisedPort.setListen(listener.local.port)
     running.store(true)
     acceptIncoming(listener)
+    if (portMapping && config.portMapping && listenHost == WILDCARD_IPV4) {
+      portMapper = TorrentPortMapper(scope, listener.local.port,
+        udpPort = {
+          dhtNodes.load().firstOrNull { it.isRunning && ':' !in it.local.host }?.local?.port
+        },
+        onMapped = advertisedPort::setMapped,
+        natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
+      ).also { it.start() }
+    }
     if (config.dhtEnabled) scope.launch { pingIntroducedNodes() }
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
     val ipv6 = listenHost == WILDCARD_IPV4 && try {
@@ -325,6 +342,8 @@ internal class KotlinTorrentEngine(
           }
         }
         nodes?.forEach { it.close() }
+        // The router forgets our ports rather than forward them to whoever gets this address.
+        portMapper?.stop()
       } finally {
         scope.cancel()
         try { network.close() } finally {
