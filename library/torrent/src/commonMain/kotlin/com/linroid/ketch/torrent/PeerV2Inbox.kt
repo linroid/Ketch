@@ -22,6 +22,12 @@ internal class PeerV2Inbox private constructor(
     /** The actor must close the frame after dispatch, including when dispatch throws. */
     data class Frame(val value: PeerHashTransport.Frame) : Event<Nothing>
     data class HashTimeout(val tickets: List<PeerHashExchange.Ticket>) : Event<Nothing>
+
+    /**
+     * A Fast peer that choked us left requests unanswered past its grace; the block exchange
+     * dropped them, and the actor hands them back ([PeerBlockExchange.takeDropped]).
+     */
+    data object Released : Event<Nothing>
     data class Command<C>(val value: C) : Event<C>
   }
 
@@ -37,9 +43,10 @@ internal class PeerV2Inbox private constructor(
       check(!blocks.expire()) { "Peer block response deadline expired" }
       val expired = transport.expire()
       if (expired.isNotEmpty()) return Event.HashTimeout(expired)
+      if (blocks.releaseChoked()) return Event.Released
       val keepAlive = transport.keepAliveDelayMs()
-      val delay = listOfNotNull(blocks.nextDeadlineMs(), transport.nextDeadlineMs(), keepAlive)
-        .min()
+      val delay = listOfNotNull(blocks.nextDeadlineMs(), transport.nextDeadlineMs(),
+        blocks.nextReleaseMs(), keepAlive).min()
       // Channel cancellation owns any undelivered frame. Avoid a withTimeout return boundary
       // that could discard a successfully received frame without releasing its reservation.
       val event = select<Event<C>?> {

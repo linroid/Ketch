@@ -571,20 +571,30 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   one of the `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its
   intent), or until Ketch closes; a torrent that finishes while a download waits does not seed.
   Seeding runs only while the process runs
-- Fast extension (BEP 6) on v1 connections (`TorrentSwarm`'s `PeerWorker`; v2 and hybrid routes
-  do not offer it yet): the handshake sets reserved byte 7 bit 0x04 (`PeerHandshake.fast`), and
-  with both bits set `PeerProtocolState(fast = true)` takes Have All / Have None in place of a
-  bitfield (we send them when we hold every piece or none), Suggest Piece (ignored), Allowed
-  Fast (at most 32, requested while choked through `TorrentPieceScheduler.claim`'s `eligible`)
-  and Reject Request. A CHOKE keeps our requests until the peer rejects them; requests left
-  unanswered for `FAST_REJECT_GRACE_MS` (5 s) are canceled. A reject while choked hands the piece
-  back to the scheduler at once; unchoked, the block is asked for again until the piece has had
-  as many rejects as blocks, then other peers fetch it (`refused` until the peer unchokes us
-  anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
+- Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
+  hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
+  0x04 (`PeerHandshake.fast`), and with both bits set `PeerProtocolState(fast = true)` takes
+  Have All / Have None in place of a bitfield (we send them when we hold every piece or none),
+  Suggest Piece (ignored), Allowed Fast (at most 32, requested while choked through
+  `TorrentPieceScheduler.claim`'s `eligible`) and Reject Request. A CHOKE keeps our requests
+  until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
+  canceled. A reject while choked hands the piece back to the scheduler at once; unchoked, the
+  block is asked for again until the piece has had as many rejects as blocks, then other peers
+  fetch it (`refused` until the peer unchokes us anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
   Fast messages on a connection that did not negotiate it close the peer. The v1 pipeline also
   stays within the peer's BEP 10 `reqq`. The summary counts `fast` peers
+- On v2 and hybrid connections `PeerV2Connector` sets the bit (`PeerIdentityHandshake`'s `fast`,
+  `PeerInfo.fast`) and `PeerBlockExchange(fast = true)` runs the same `PeerProtocolState`: a CHOKE
+  keeps requests, `releaseChoked` cancels those still unanswered after `FAST_REJECT_GRACE_MS`
+  (the inbox's `Released` event; the actor hands them back like dropped ones), allowed-fast
+  requests stay. The session loop follows Have All, Allowed Fast and rejects per peer
+  (`TorrentV2PeerView`'s `allowedFast`, `rejects`, `refused`) when it plans requests, and
+  `TorrentV2Uploader` sends Have All / Have None, rejects what it will not serve (batched as
+  `Command.Reject`, also after its CHOKE), offers `allowedFastOffer` for the connection's wire
+  tag (`Command.AllowFast`, only while uploading) and serves those pieces while it chokes the
+  peer. BEP 52 hash rejects are separate messages. The v2 summary counts `fast` peers too
 - See [support and migration](docs/torrent.md) and
   [verification](docs/development/torrent-verification.md)
 

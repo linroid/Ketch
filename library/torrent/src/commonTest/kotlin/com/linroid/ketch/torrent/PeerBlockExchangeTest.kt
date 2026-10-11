@@ -25,7 +25,7 @@ class PeerBlockExchangeTest {
     override fun close() { closed = true }
   }
 
-  private class Fixture(capacity: Int = 4096, pipeline: Int = 2) {
+  private class Fixture(capacity: Int = 4096, pipeline: Int = 2, fast: Boolean = false) {
     val connection = Connection()
     val frames = TorrentBufferBudget(100_000)
     val blocks = TorrentBufferBudget(capacity)
@@ -37,7 +37,8 @@ class PeerBlockExchangeTest {
     val transport = PeerHashTransport(connection, PeerHashExchange(frames, { null }), frames,
       pieceCount = 2)
     val exchange = PeerBlockExchange(TorrentContentLayout.from(info), transport, blocks,
-      maxPending = pipeline, timeoutMs = 10, clock = { now })
+      maxPending = pipeline, timeoutMs = 10, clock = { now }, fast = fast,
+      fastRejectGraceMs = 5)
     suspend fun receive(message: PeerMessage): PeerBlockExchange.Response? {
       connection.incoming.write(PeerWire.encode(message, pieceCount = 2))
       val frame = transport.read()
@@ -99,13 +100,72 @@ class PeerBlockExchangeTest {
     assertTrue(f.exchange.cancel(replacement))
     assertSame(replacement, assertIs<PeerBlockExchange.Response.Canceled>(
       f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))).ticket)
-    val tail = PeerMessage.Request(1, 0, 5)
-    val rejectedTicket = assertNotNull(f.exchange.request(tail))
-    val rejected = assertIs<PeerBlockExchange.Response.Rejected>(
-      f.receive(PeerMessage.Reject(1, 0, 5)))
-    assertSame(rejectedTicket, rejected.ticket)
     f.exchange.close()
     assertEquals(0, f.blocks.allocated)
+  }
+
+  @Test
+  fun fastChoke_keepsRequestsUntilRejectedThenReleasesTheRestAfterGrace() = runTest {
+    val f = Fixture(fast = true)
+    f.ready()
+    val head = assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+    val tail = assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+    f.now = 1
+    // A Fast peer rejects what it will not serve; nothing is dropped by the CHOKE itself.
+    assertNull(f.receive(PeerMessage.Control(PeerMessage.Signal.CHOKE)))
+    assertTrue(f.exchange.takeDropped().isEmpty())
+    assertEquals(2, f.exchange.pendingCount)
+    assertSame(tail, assertIs<PeerBlockExchange.Response.Rejected>(
+      f.receive(PeerMessage.Reject(1, 0, 5))).ticket)
+    f.now = 3
+    // Repeating the CHOKE keeps the grace clock running from the first one.
+    assertNull(f.receive(PeerMessage.Control(PeerMessage.Signal.CHOKE)))
+    assertEquals(3L, f.exchange.nextReleaseMs())
+    assertFalse(f.exchange.releaseChoked())
+    f.now = 6
+    val sent = f.connection.outgoing.size
+    assertTrue(f.exchange.releaseChoked())
+    assertSame(head, f.exchange.takeDropped().single().ticket)
+    assertEquals(0, f.exchange.pendingCount)
+    assertNull(f.exchange.nextReleaseMs())
+    // The unanswered request is canceled on the wire.
+    f.connection.outgoing.skip(sent)
+    assertEquals(PeerMessage.Cancel(0, 0, 3), PeerWire.decode(
+      f.connection.outgoing.readByteArray(f.connection.outgoing.readInt().toLong()),
+      pieceCount = 2))
+    // A late block or reject for it is ignored, not a protocol violation.
+    assertNull(f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
+    assertNull(f.receive(PeerMessage.Reject(0, 0, 3)))
+    assertFalse(f.connection.closed)
+    f.exchange.close()
+    assertEquals(0, f.blocks.allocated)
+  }
+
+  @Test
+  fun fastPeer_servesAllowedFastPiecesWhileChoking() = runTest {
+    val f = Fixture(fast = true)
+    try {
+      f.receive(PeerMessage.HaveAll)
+      f.receive(PeerMessage.AllowedFast(1))
+      assertFalse(f.exchange.canRequest(0))
+      assertTrue(f.exchange.canRequest(1))
+      assertNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+      assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+      // Allowed fast, the request is not released when the peer chokes us again.
+      f.receive(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+      f.receive(PeerMessage.Control(PeerMessage.Signal.CHOKE))
+      assertNull(f.exchange.nextReleaseMs())
+      f.now = 8
+      assertFalse(f.exchange.releaseChoked())
+      assertEquals(1, f.exchange.pendingCount)
+    } finally { f.exchange.close() }
+  }
+
+  @Test
+  fun fastMessageWithoutNegotiation_failsThePeer() = runTest {
+    val f = Fixture()
+    assertFailsWith<IllegalArgumentException> { f.receive(PeerMessage.HaveAll) }
+    assertTrue(f.connection.closed)
   }
 
   @Test

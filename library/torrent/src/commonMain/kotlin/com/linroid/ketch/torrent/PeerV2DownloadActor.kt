@@ -29,18 +29,29 @@ internal class PeerV2DownloadActor private constructor(
     data class RejectHashes(val selector: PeerHashSelector) : Command
 
     /**
-     * A message the session sends of its own accord: CHOKE or UNCHOKE, Have, Bitfield, our DHT
-     * port or an extension message. Interest, requests and payload have commands of their own.
+     * A message the session sends of its own accord: CHOKE or UNCHOKE, Have, Bitfield (or Have
+     * All and Have None with the Fast extension), our DHT port or an extension message.
+     * Interest, requests and payload have commands of their own.
      */
     data class Send(val message: PeerMessage) : Command {
       init {
         require(message is PeerMessage.Have || message is PeerMessage.Bitfield ||
+          message == PeerMessage.HaveAll || message == PeerMessage.HaveNone ||
           message is PeerMessage.Port ||
           message is PeerMessage.Extended || message is PeerMessage.Control &&
           (message.signal == PeerMessage.Signal.CHOKE ||
             message.signal == PeerMessage.Signal.UNCHOKE)) { "Not a session message" }
       }
     }
+
+    /**
+     * Requests of a Fast peer (BEP 6) we will not serve, rejected in order; those without frame
+     * credit go unsent, and the peer gives up on them itself.
+     */
+    data class Reject(val requests: List<PeerMessage.Request>) : Command
+
+    /** The pieces a Fast peer (BEP 6) may download while we choke it, told best effort. */
+    data class AllowFast(val pieces: List<Int>) : Command
 
     /** One block we upload; [lease] covers its copied bytes until written or dropped. */
     class Upload(
@@ -171,6 +182,13 @@ internal class PeerV2DownloadActor private constructor(
                           publish(Event.Sent(command.message, sent))
                         }
                       }
+                      is Command.Reject -> for (request in command.requests) {
+                        transport.trySend(PeerMessage.Reject(request.index, request.begin,
+                          request.length))
+                      }
+                      is Command.AllowFast -> for (index in command.pieces) {
+                        transport.trySend(PeerMessage.AllowedFast(index))
+                      }
                       is Command.Upload -> {
                         val piece = command.piece
                         val sent = transport.trySend(piece)
@@ -185,6 +203,9 @@ internal class PeerV2DownloadActor private constructor(
                   next.value.close()
                 }
                 is PeerV2Inbox.Event.HashTimeout -> publish(Event.HashTimeout(next.tickets))
+                // A Fast peer choked us and left requests unanswered: they go back.
+                PeerV2Inbox.Event.Released ->
+                  for (rejected in blocks.takeDropped()) publish(Event.Response(rejected))
                 is PeerV2Inbox.Event.Frame -> {
                   val frame = next.value
                   var retainFrame = false

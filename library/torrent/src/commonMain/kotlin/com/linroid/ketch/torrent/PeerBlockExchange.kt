@@ -7,8 +7,12 @@ import kotlinx.coroutines.withTimeout
  * state before construction; pending/delivered blocks retain their own buffer reservations.
  * A separate reader hands frames to receive. The actor must schedule expire at nextDeadlineMs.
  *
- * The Fast extension (BEP 6) is not negotiated, so a CHOKE silently discards every outstanding
- * request (BEP 3). The actor collects those with [takeDropped] and returns them to the scheduler.
+ * Without the Fast extension (BEP 6) a CHOKE silently discards every outstanding request (BEP 3).
+ * The actor collects those with [takeDropped] and returns them to the scheduler. With it ([fast])
+ * a CHOKE keeps our requests: the peer rejects those it will not serve, and may serve its
+ * allowed-fast pieces while it chokes us. Requests it leaves unanswered for [fastRejectGraceMs]
+ * after choking us are canceled by [releaseChoked] and dropped the same way, allowed-fast ones
+ * excepted. Fast messages on a connection that did not negotiate it fail the peer.
  *
  * On a hybrid's v1 route ([mode] V1) the peer only knows v1 pieces, which run on through the
  * zero padding after a file's tail. A request that ends a file tail inside such a piece goes on
@@ -23,6 +27,9 @@ internal class PeerBlockExchange(
   private val timeoutMs: Long = 30_000,
   private val clock: () -> Long = monotonicClock(),
   private val mode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
+  /** Both sides set the Fast extension bit (BEP 6). */
+  val fast: Boolean = false,
+  private val fastRejectGraceMs: Long = FAST_REJECT_GRACE_MS,
 ) {
   class Ticket internal constructor(
     /** The scheduler's block, within the piece's v2 extent. */
@@ -52,22 +59,25 @@ internal class PeerBlockExchange(
 
   init {
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
-    require(maxPending in 1..256 && timeoutMs in 1..180_000)
+    require(maxPending in 1..256 && timeoutMs in 1..180_000 && fastRejectGraceMs > 0)
   }
   private var protocol: PeerProtocolState? = PeerProtocolState(
-    layout.pieceCount.toInt(), maxPending)
+    layout.pieceCount.toInt(), maxPending, fast = fast)
   private val state: PeerProtocolState get() = checkNotNull(protocol)
   // Keyed by the wire block, which is what the peer's pieces, rejects and our cancels name.
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
   private val dropped = mutableListOf<Response.Rejected>()
   private val identity = Any()
   private var closed = false
+  /** When a Fast peer last choked us, on [clock]; null while it unchokes us. */
+  private var chokedAt: Long? = null
   var localInterested: Boolean = false
     private set
   val pendingCount: Int get() = pending.size
 
-  fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
-    state.hasPiece(index)
+  /** Unchoked, or choked by a Fast peer that allows [index] fast (BEP 6). */
+  fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending &&
+    state.canRequest(index)
 
   fun owns(ticket: Ticket): Boolean = ticket.owner === identity
 
@@ -122,8 +132,9 @@ internal class PeerBlockExchange(
     val length = layout.v2Piece(request.index.toLong()).length
     require(request.begin.toLong() + request.length <= length) { "Block crosses v2 file tail" }
     val wire = wire(request, length)
-    if (state.choking || !state.hasPiece(request.index) || wire in pending ||
-      pending.size == maxPending) return null
+    if (!state.canRequest(request.index) || wire in pending || pending.size == maxPending) {
+      return null
+    }
     val lease = budget.reserve(wire.length * 2 + 256) ?: return null
     try {
       val value = Pending(Ticket(request, identity, wire), clock(), lease)
@@ -195,21 +206,30 @@ internal class PeerBlockExchange(
     try {
       checkLive()
       val message = frame.message
+      require(fast || !message.isFastExtension()) { "Fast extension message without BEP 6" }
+      val wasChoking = state.choking
       val request = when (message) {
         is PeerMessage.Piece ->
           PeerMessage.Request(message.index, message.begin, message.bytes.size)
         is PeerMessage.Reject -> PeerMessage.Request(message.index, message.begin, message.length)
         else -> null
       }
-      // Tolerate a Reject for a live request even though Fast was never negotiated.
-      if (message is PeerMessage.Reject && request in pending) state.cancel(checkNotNull(request))
       val accepted = state.received(message)
       if (message is PeerMessage.Control && message.signal == PeerMessage.Signal.CHOKE) {
-        for (value in pending.values) {
-          value.lease.close()
-          dropped += Response.Rejected(value.ticket)
+        if (fast) {
+          // The requests stand until the peer rejects them; a repeated CHOKE keeps the clock,
+          // or a peer repeating it would hold them forever.
+          if (!wasChoking) chokedAt = clock()
+        } else {
+          for (value in pending.values) {
+            value.lease.close()
+            dropped += Response.Rejected(value.ticket)
+          }
+          pending.clear()
         }
-        pending.clear()
+      }
+      if (message is PeerMessage.Control && message.signal == PeerMessage.Signal.UNCHOKE) {
+        chokedAt = null
       }
       if (request == null) return null
       val value = pending.remove(request) ?: run {
@@ -236,6 +256,49 @@ internal class PeerBlockExchange(
       close()
       throw error
     }
+  }
+
+  /**
+   * Milliseconds until requests a Fast peer that choked us left unanswered are due for
+   * [releaseChoked]; null when there are none. Unlike [nextDeadlineMs], this bounds no write.
+   */
+  fun nextReleaseMs(): Long? {
+    val since = chokedAt ?: return null
+    if (closed || !state.choking || choked().isEmpty()) return null
+    val now = clock()
+    val elapsed = now - since
+    return if (now < since || elapsed < 0) 0 else maxOf(0, fastRejectGraceMs - elapsed)
+  }
+
+  /** Live requests a choking peer does not allow fast: those it should reject (BEP 6). */
+  private fun choked(): List<Pending> = pending.values.filter {
+    !it.canceled && !state.allowsFast(it.ticket.wire.index)
+  }
+
+  /**
+   * Cancels the requests a Fast peer that choked us neither served nor rejected within
+   * [fastRejectGraceMs], forgetting them at once: [takeDropped] returns them to the scheduler,
+   * without holding them against the peer, and a late block or reject for them is ignored.
+   * Allowed-fast requests keep waiting. True when any were dropped.
+   */
+  suspend fun releaseChoked(): Boolean {
+    if (nextReleaseMs() != 0L) return false
+    val released = choked()
+    try {
+      for (value in released) {
+        val wire = value.ticket.wire
+        pending.remove(wire)
+        state.cancel(wire)
+        value.lease.close()
+        dropped += Response.Rejected(value.ticket)
+        // Best effort: without frame credit the peer just keeps a request we no longer await.
+        transport.trySend(PeerMessage.Cancel(wire.index, wire.begin, wire.length))
+      }
+    } catch (error: Throwable) {
+      close()
+      throw error
+    }
+    return released.isNotEmpty()
   }
 
   /** Requests the peer discarded by choking us; each must be returned to the scheduler. */

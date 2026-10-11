@@ -8,6 +8,9 @@ internal const val PEER_VIEW_BYTES = 16 * 1024
 /** Requests a peer may queue with us; more are ignored and count against it. */
 internal const val MAX_QUEUED_UPLOADS = 64
 
+/** Rejects waiting to go to a Fast peer (BEP 6); more are dropped and the peer gives up itself. */
+internal const val MAX_QUEUED_REJECTS = 256
+
 /** Uploaded blocks a peer may have in its actor's queue at once. */
 internal const val MAX_UPLOADS_IN_FLIGHT = 4
 
@@ -69,6 +72,31 @@ internal class TorrentV2PeerView(
 
   /** Requests that were never valid to ask for; too many stop the peer. */
   var strikes = 0
+
+  // Fast extension (BEP 6), only for peers that negotiated it
+  /** Both sides set the Fast extension bit. */
+  val fast: Boolean get() = info?.fast == true
+
+  /**
+   * Pieces the peer lets us request while it chokes us, the first
+   * [PeerProtocolState.MAX_ALLOWED_FAST] it named, as its block exchange counts them.
+   */
+  val allowedFast = mutableSetOf<Int>()
+
+  /** Rejects per piece of blocks we asked for, since the peer last unchoked us. */
+  val rejects = mutableMapOf<Int, Int>()
+
+  /**
+   * Pieces the peer rejected as many times as they have blocks, which other peers fetch until
+   * it unchokes us anew.
+   */
+  val refused = mutableSetOf<Int>()
+
+  /** Pieces we let the peer download while we choke it, offered only while we upload. */
+  var offeredFast: Set<Int> = emptySet()
+
+  /** Requests we will not serve, to reject, oldest first, at most [MAX_QUEUED_REJECTS]. */
+  val rejectQueue = ArrayDeque<PeerMessage.Request>()
 
   // Availability
   /** How many entries of the session's Have log this peer was told. */
