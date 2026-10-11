@@ -918,6 +918,25 @@ server, like the other download settings changed there, they last until it resta
 | `upload` | string | `"off"` | What torrents upload to peers: `off`, `while-downloading` (verified pieces, until each torrent finishes) or `seed` (finished torrents too, also after `ketch server` restarts). `ketch server` and `ketch mcp --standalone` seed while they run; the download command exits when its downloads finish. Unknown values, and values that are not strings, load as `off` |
 | `uploadLimit` | string | `"unlimited"` | Upload cap shared by all torrents, in the [speed limit format](#speed-limit-format); a bare number is bytes per second, and a value that can't be read loads as unlimited |
 
+#### `[[hooks]]`
+
+Each `[[hooks]]` table runs a command or posts a webhook on download events. `ketch server` and
+`ketch mcp --standalone` run them, read at start; the other commands never do, and no API can
+change them. See [automation hooks](../docs/hooks.md).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `events` | string[] | `[]` | `added`, `started`, `completed`, `failed`, `canceled` and/or `removed` |
+| `command` | string[] | `[]` | Program and arguments, never run through a shell; gets the event as JSON on stdin and in `KETCH_*` variables |
+| `workingDirectory` | string | *(none)* | Directory the command runs in |
+| `webhook` | string | *(none)* | `http` or `https` URL the JSON is posted to, when there is no `command` |
+| `headers` | table | `{}` | Extra webhook headers, such as `{ Authorization = "Bearer …" }` |
+| `secret` | string | *(none)* | Signs the webhook body: `X-Ketch-Signature: sha256=<HMAC-SHA256>` |
+| `timeoutSeconds` | int | `30` | Time a command or webhook request may take |
+| `origins`, `categories`, `hosts` | string[] | `[]` | Only downloads added from these origins, in these category folders or from these hosts |
+| `name` | string | *(none)* | Label for the logs |
+| `enabled` | bool | `true` | `false` keeps the hook without running it |
+
 The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps
 also keep `[[remotes]]`, `[appearance]` and `server.autoStart` in this file; the CLI ignores them.
 

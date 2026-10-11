@@ -147,6 +147,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Depuis le terminal** — `ketch add`, `list`, `pause`, `resume` et `watch` pilotent les
   téléchargements de l'application Ketch ou d'un serveur depuis un terminal ou un script ; `watch`
   produit des lignes JSON ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automatisation** — Exécute une commande ou appelle un webhook signé quand un téléchargement
+  est ajouté, se termine ou échoue, depuis `ketch server` ou l'application de bureau
+  ([hooks](docs/hooks.md)).
 
 ### Maîtrisez votre bande passante
 
@@ -267,8 +270,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   définitif une fois le téléchargement terminé
 - **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
   au choix, une fois la file d'attente vide
-- **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un
-  téléchargement
 - **Transferts entre appareils** — Envoyer vers et Déplacer vers transmettent les données déjà
   téléchargées pour que l'autre appareil reprenne au lieu de recommencer
   ([plan](docs/plans/task-transfer.md))
@@ -304,6 +305,7 @@ Les documents détaillés ci-dessous sont en anglais.
   réseau
 - [Découverte par IA](docs/ai-discovery.md) — Fournisseurs, clés, recherche web, accès aux pages,
   conversations et historique
+- [Automatisation](docs/hooks.md) — Commandes et webhooks lors des événements de téléchargement
 - [Journalisation](docs/logging.md) — Emplacement des journaux et pièces à joindre à un rapport de
   bug
 

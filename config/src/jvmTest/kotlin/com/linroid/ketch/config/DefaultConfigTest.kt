@@ -20,6 +20,7 @@ class DefaultConfigTest {
     assertEquals(DownloadConfig.Default, decoded.download)
     assertEquals(TorrentSettings(), decoded.torrent)
     assertEquals(8642, decoded.server.port)
+    assertEquals(emptyList(), decoded.hooks)
   }
 
   @Test
@@ -65,6 +66,10 @@ class DefaultConfigTest {
       assertEquals(6881, config.torrent.listenPort)
       assertEquals(TorrentUploadMode.Off, config.torrent.upload)
       assertEquals(SpeedLimit.Unlimited, config.torrent.uploadLimit)
+      val (command, webhook) = config.hooks
+      assertEquals(listOf("/usr/local/bin/ketch-done"), command.command)
+      assertEquals(setOf(HookEvent.Completed, HookEvent.Failed), webhook.eventSet)
+      assertEquals("https://hooks.example.com/ketch", webhook.webhook)
     } finally {
       dir.deleteRecursively()
     }

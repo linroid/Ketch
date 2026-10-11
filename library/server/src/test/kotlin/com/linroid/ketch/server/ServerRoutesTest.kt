@@ -279,6 +279,28 @@ class ServerRoutesTest {
   }
 
   @Test
+  fun `PUT config cannot set hooks`() = testApplication {
+    val ketch = createTestKetch()
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // Hooks run programs on the server's machine: only its own config.toml names them.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(
+        """{"maxConcurrentDownloads": 2,
+          |"hooks": [{"events": ["completed"], "command": ["sh", "-c", "id"]}]}""".trimMargin()
+      )
+    }
+
+    assertTrue(response.status == HttpStatusCode.OK || response.status == HttpStatusCode.BadRequest)
+    assertFalse("hooks" in response.bodyAsText())
+    assertFalse("hooks" in json.encodeToString(DownloadConfig.serializer(), ketch.status().config))
+    assertFalse("hooks" in client.get("/api/status").bodyAsText())
+  }
+
+  @Test
   fun `PUT config with categories replaces them`() = testApplication {
     val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
     val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))

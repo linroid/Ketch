@@ -148,6 +148,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Aus dem Terminal** — `ketch add`, `list`, `pause`, `resume` und `watch` steuern die Downloads
   der Ketch-App oder eines Servers aus dem Terminal oder einem Skript; `watch` gibt JSON-Zeilen aus
   ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automatisierung** — Führt einen Befehl aus oder ruft einen signierten Webhook auf, wenn ein
+  Download hinzugefügt wird, fertig ist oder fehlschlägt, aus `ketch server` oder der Desktop-App
+  ([Hooks](docs/hooks.md)).
 
 ### Deine Bandbreite im Griff
 
@@ -266,7 +269,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   Abschluss den endgültigen Namen vergeben
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
   herunterfahren, sobald die Warteschlange leer ist
-- **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen
 - **Übertragung zwischen Geräten** — Senden an und Verschieben nach übertragen bereits geladene
   Daten, damit das andere Gerät fortsetzen kann, statt von vorn zu beginnen
   ([Plan](docs/plans/task-transfer.md))
@@ -298,6 +300,7 @@ Die folgenden ausführlichen Dokumente sind auf Englisch.
 - [BitTorrent](docs/torrent.md) — Unterstützung und Grenzen von Torrents und Magnet-Links
 - [Mehrere Netzwerke](docs/multiple-networks.md) — Downloads auf Netzwerkschnittstellen verteilen
 - [KI-Suche](docs/ai-discovery.md) — Anbieter, Schlüssel, Websuche, Seitenzugriff, Chats und Verlauf
+- [Automatisierung](docs/hooks.md) — Befehle und Webhooks bei Download-Ereignissen
 - [Logging](docs/logging.md) — Speicherorte der Logs und Anhänge für Fehlerberichte
 
 ## Mitwirken

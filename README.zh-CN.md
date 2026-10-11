@@ -133,6 +133,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   运行同一个引擎，内置 REST API 和网页应用，其他 Ketch 应用可在局域网中发现它。
 - **在终端中操作** — `ketch add`、`list`、`pause`、`resume` 和 `watch` 可在终端或脚本中管理 Ketch
   应用或服务器的下载任务；`watch` 输出 JSON 行（[CLI](cli/README.md#work-on-a-running-ketch)）。
+- **自动化钩子** — 下载添加、完成或失败时，`ketch server` 或桌面应用可执行命令或调用带签名的
+  webhook（[钩子](docs/hooks.md)）。
 
 ### 掌控带宽
 
@@ -232,7 +234,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **更快的分段下载** — 先完成的连接接手较慢连接剩余的部分，避免等待最慢的连接
 - **让未完成文件一目了然** — 下载时使用临时文件名，完成后再改为正式名称
 - **下载完成后** — 队列清空后可选择退出 Ketch、让电脑睡眠或关机
-- **自动化钩子** — 下载完成或失败时执行命令或调用 webhook
 - **设备间传输** — 「发送到」和「移动到」携带已下载的数据，让另一台设备继续下载，
   无需从头开始（[计划](docs/plans/task-transfer.md)）
 - **辅助设备** — 让其他设备使用各自的网络连接下载同一文件的部分内容，运行中可随时加入或退出
@@ -260,6 +261,7 @@ Node.js 和 WASI 可使用 `core` 搭配自定义 HTTP 引擎。
 - [BitTorrent](docs/torrent.md) — 种子和磁力链接的支持范围与限制
 - [多个网络](docs/multiple-networks.md) — 跨网络接口分配下载任务
 - [AI 搜索](docs/ai-discovery.md) — 服务商、密钥、网页搜索、网页访问、对话和历史记录
+- [自动化钩子](docs/hooks.md) — 在下载事件时执行的命令和 webhook
 - [日志](docs/logging.md) — 日志位置及问题报告所需的附件
 
 ## 参与贡献

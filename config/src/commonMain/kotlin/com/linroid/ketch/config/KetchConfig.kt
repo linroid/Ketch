@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
  * @property notifications which activity the apps report.
  * @property integration operating system integration of the desktop app.
  * @property power whether the apps keep the system awake while downloading.
+ * @property hooks commands and webhooks run on download events, only ever read from this file.
  */
 @Serializable
 data class KetchConfig(
@@ -37,4 +38,5 @@ data class KetchConfig(
   val notifications: NotificationSettings = NotificationSettings(),
   val integration: IntegrationSettings = IntegrationSettings(),
   val power: PowerSettings = PowerSettings(),
+  val hooks: List<HookConfig> = emptyList(),
 )

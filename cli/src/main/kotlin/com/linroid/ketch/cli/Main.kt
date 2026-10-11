@@ -39,6 +39,7 @@ import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
@@ -544,11 +545,14 @@ private fun runServer(args: Array<String>): Int {
     // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
     ready = false,
   )
+  // This process runs the downloads of the config directory, so it runs their hooks.
+  val hooks = HookRunner.start(ketch, mergedConfig.hooks)
 
   Runtime.getRuntime().addShutdownHook(Thread {
     println("Shutting down Ketch server...")
     server.stop()
     ketch.close()
+    hooks?.close()
     instance.close()
   })
 
@@ -565,6 +569,7 @@ private fun runServer(args: Array<String>): Int {
   }
   val torrentPort = mergedConfig.torrent.listenPort
   println("  Torrent port:  " + if (torrentPort == 0) "any free one" else "$torrentPort (TCP, UDP)")
+  if (hooks != null) println("  Hooks:         ${hooks.size} from the config file")
   when (token) {
     is ServerToken.Given -> println("  Auth:          token from ${token.source}")
     is ServerToken.Saved -> println("  Auth:          token from ${token.file}")
@@ -1118,10 +1123,12 @@ private fun runStandaloneMcp(
     apiToken = apiToken,
     mdnsEnabled = false,
   )
+  val hooks = HookRunner.start(ketch, fileConfig.hooks)
 
   Runtime.getRuntime().addShutdownHook(Thread {
     apiServer.stop()
     ketch.close()
+    hooks?.close()
     instance.close()
   })
 
