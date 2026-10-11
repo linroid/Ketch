@@ -483,6 +483,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seed` and into free engine slots only, each after a recheck; a task whose files changed on disk
   loses the intent, one a download or shutdown stopped keeps it. `TorrentDownloadSource(...,
   restoreSeeding = false)`, as `ketch mcp --standalone` builds it, never restores
+- Port mapping, `TorrentConfig.portMapping` (on; engines get it through `KotlinTorrentEngine`'s
+  `portMapping` argument, which `TorrentDownloadSource` passes, so engines built directly in tests
+  never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
+  `LocalIpv4Network.gatewayGuesses` of `localIpv4Networks()`, an expect/actual over
+  `NetworkInterface` and `getifaddrs`), then `UpnpClient` (SSDP, the device description and SOAP
+  over a minimal HTTP/1.1 client on direct TCP; only devices on one of our private networks). TCP
+  and the UDP port DHT and uTP share map to one external port, which
+  `TorrentAdvertisedPort.setMapped` announces; mappings last an hour, renew every half hour and are
+  removed by `stop` within 2 s; UPnP tries other ports on 718 and permanent leases on 725.
+  `PortMappingTest` runs both against scripted gateways on loopback
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,

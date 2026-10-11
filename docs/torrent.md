@@ -183,6 +183,16 @@ including a development run, hands its files to the running app instead of openi
   listenPort`, `KETCH_TORRENT_PORT` or `--torrent-port`, and the [Docker image](docker.md) sets
   16881; the apps and the CLI's other commands always let the system pick. A port in use fails
   the torrents that start with `KetchError.Network`, retried like other transient failures.
+- Port mapping (`TorrentConfig.portMapping`, on by default for engines a `TorrentDownloadSource`
+  creates) asks the home router to forward the listen port, so peers behind other NATs can connect
+  to us: NAT-PMP first (to the first and last host of each private /24 this device is on), then UPnP
+  IGD (an SSDP search, then SOAP on its WANIPConnection or WANPPPConnection service, only on a
+  device on one of our private networks and never through a proxy). TCP and the UDP port DHT and uTP
+  share map to one external port, which trackers, DHT and peers are told instead of the listen port.
+  Mappings last an hour, are renewed every half hour and removed when the engine stops; another
+  device holding the port moves UPnP to another. Without a gateway the engine logs that incoming
+  peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
+  interface map ports
 - Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
   working tracker until failover, and disconnects its old peers before switching. Public-mode
   magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
@@ -349,9 +359,8 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement web seeds, NAT mapping, local service
-discovery, torrent creation, or ratio management. No automatic incoming-port mapping is
-performed. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
+This version does not implement web seeds, local service discovery, torrent creation, or ratio
+management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB pieces, and configured
 connection/buffer/task budgets. Configuring many peers or large pieces increases process memory
 beyond the piece-buffer budget.
 
