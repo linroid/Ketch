@@ -6,6 +6,11 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.engine.TorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentSession
+import com.linroid.ketch.torrent.engine.TorrentTaskSpec
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json

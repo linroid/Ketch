@@ -1,0 +1,95 @@
+package com.linroid.ketch.torrent.v1
+
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerProtocolState
+import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.peer.pieceBitfield
+import com.linroid.ketch.torrent.storage.CommitOutcome
+import com.linroid.ketch.torrent.storage.TorrentPieceStore
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeout
+import okio.IOException
+import kotlin.time.TimeSource
+
+/** First peer-to-storage transfer path. Swarm scheduling composes this protocol in layer 08. */
+internal class TorrentPeerDownloader(
+  private val store: TorrentPieceStore,
+  private val network: TorrentNetwork,
+  private val consumePayload: suspend (Int) -> Unit = {},
+  private val onProgress: suspend (Long) -> Unit = {},
+  private val timeSource: TimeSource = TimeSource.Monotonic,
+) {
+  suspend fun download(endpoint: PeerEndpoint) {
+    store.initialize()
+    if (store.completed()) {
+      store.finish()
+      return
+    }
+    val metadata = store.metadata
+    val verified = store.verifiedPieces()
+    val connection = network.connect(endpoint)
+    try {
+      val wire = PeerWire(connection, metadata, idleTimeoutMs = 30_000)
+      val peerId = torrentRandomBytes(20)
+      val handshake = wire.handshake(PeerHandshake(metadata.infoHash, peerId, false, false))
+      require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      val state = PeerProtocolState(store.pieceCount, maxPending = 1)
+      wire.send(PeerMessage.Bitfield(pieceBitfield(verified)))
+      wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+      var piece = -1
+      var assembled = ByteArray(0)
+      var offset = 0
+      var lastProgress = timeSource.markNow()
+      while (!store.completed()) {
+        currentCoroutineContext().ensureActive()
+        val remaining = 30_000 - lastProgress.elapsedNow().inWholeMilliseconds
+        if (remaining <= 0) throw IOException("Peer made no payload progress")
+        val message = withTimeout(remaining) { wire.read() }
+        if (message is PeerMessage.Piece) consumePayload(message.bytes.size)
+        val accepted = state.received(message)
+        if (message is PeerMessage.Piece && accepted) {
+          lastProgress = timeSource.markNow()
+          check(message.index == piece && message.begin == offset)
+          message.bytes.copyInto(assembled, offset)
+          offset += message.bytes.size
+          if (offset == assembled.size) {
+            require(store.commit(piece, assembled) == CommitOutcome.VERIFIED) {
+              "Peer sent a corrupt piece"
+            }
+            verified[piece] = true
+            if (!store.completed()) wire.send(PeerMessage.Have(piece))
+            onProgress(store.progress().sum())
+            piece = -1
+            assembled = ByteArray(0)
+            offset = 0
+          }
+        }
+        if (!state.choking && state.requests.isEmpty()) {
+          if (piece == -1) {
+            piece = verified.indices.firstOrNull {
+              store.needed(it) && !verified[it] && state.hasPiece(it)
+            } ?: -1
+            if (piece != -1) assembled = ByteArray(store.pieceSize(piece))
+          }
+          if (piece != -1) {
+            val request = PeerMessage.Request(
+              index = piece,
+              begin = offset,
+              length = minOf(PeerWire.BLOCK_SIZE, assembled.size - offset),
+            )
+            state.requested(request)
+            wire.send(request)
+          }
+        }
+      }
+      store.finish()
+    } finally {
+      connection.close()
+    }
+  }
+}

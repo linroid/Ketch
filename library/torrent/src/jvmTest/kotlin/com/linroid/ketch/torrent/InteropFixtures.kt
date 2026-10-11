@@ -9,6 +9,7 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.concurrent.atomics.ExperimentalAtomicApi

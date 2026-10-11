@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.tracker.TRACKER_SCRAPE_WORKSPACE_BYTES
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

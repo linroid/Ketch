@@ -4,6 +4,11 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.sha256Digest
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
