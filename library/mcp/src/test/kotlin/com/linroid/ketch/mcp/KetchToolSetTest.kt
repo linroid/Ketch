@@ -1,6 +1,8 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolException
+import com.linroid.ketch.api.Checksum
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
@@ -109,6 +111,26 @@ class KetchToolSetTest {
     )
 
     assertEquals("6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a", ketch.requests.single().requestId)
+  }
+
+  @Test
+  fun startDownload_checksum_isParsedIntoTheRequest() = runTest {
+    val ketch = RecordingKetchApi()
+    val hex = "ab".repeat(32)
+
+    KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso", checksum = "SHA-256:$hex")
+
+    assertEquals(Checksum(ChecksumAlgorithm.SHA_256, hex), ketch.requests.single().checksum)
+  }
+
+  @Test
+  fun startDownload_malformedChecksum_isRejected() = runTest {
+    val ketch = RecordingKetchApi()
+
+    assertFailsWith<IllegalArgumentException> {
+      KetchToolSet(ketch).startDownload(url = "https://example.com/a.iso", checksum = "sha256:12")
+    }
+    assertTrue(ketch.requests.isEmpty())
   }
 
   @Test

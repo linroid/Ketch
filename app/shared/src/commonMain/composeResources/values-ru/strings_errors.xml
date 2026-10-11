@@ -37,6 +37,11 @@
   <string name="error_corrupt_resume">Сохранённый прогресс повреждён</string>
   <string name="error_corrupt_resume_hint">Скачанную часть нельзя использовать повторно.</string>
   <string name="error_corrupt_resume_hint_short">скачанную часть нельзя использовать повторно</string>
+  <string name="error_checksum_mismatch">Файл не совпадает с контрольной суммой</string>
+  <string name="error_checksum_mismatch_hint">Его %1$s не совпадает с введённой контрольной суммой, поэтому файл удалён. Скачайте его снова или проверьте контрольную сумму.</string>
+  <string name="error_checksum_mismatch_hint_short">его %1$s не совпадает с введённой контрольной суммой</string>
+  <string name="error_checksum_mismatch_published_hint">Его %1$s не совпадает с суммой, опубликованной сервером, поэтому файл удалён. Возможно, он повредился при передаче; скачайте его снова.</string>
+  <string name="error_checksum_mismatch_published_hint_short">его %1$s не совпадает с суммой сервера</string>
   <string name="error_canceled">Отменено</string>
   <string name="error_wrong_credentials">Неверное имя пользователя или пароль</string>
   <string name="error_wrong_credentials_hint">Сервер %1$s отклонил вход.</string>

@@ -165,6 +165,7 @@ class Ketch(
     add(KetchFeatures.CATEGORY_FOLDERS)
     add(KetchFeatures.TRANSFER_TIMEOUTS)
     add(KetchFeatures.ACTIVE_CONNECTIONS)
+    add(KetchFeatures.CHECKSUM)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)
@@ -234,6 +235,7 @@ class Ketch(
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
     requireProxySupport(request.proxy)
+    requireChecksumSupport(request)
     require(
       request.resolvedSource?.selectionMode != FileSelectionMode.SINGLE ||
         request.selectedFileIds.size <= 1
@@ -937,6 +939,8 @@ class Ketch(
         downloadTime = record.downloadTime,
         completedAt = record.completedAt,
         sharing = false,
+        // Only a matching file completes; a published digest is not saved.
+        checksum = record.request.checksum,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -1029,6 +1033,24 @@ class Ketch(
   private fun requireProxySupport(proxy: ProxyConfig?) {
     if (proxy == null || proxy.mode == ProxyMode.SYSTEM || KetchFeatures.PROXY in features) return
     throw UnsupportedOperationException("The HTTP engine cannot use a proxy")
+  }
+
+  /**
+   * Refuses a [DownloadRequest.checksum] for a source that writes its own files, such as a
+   * torrent's several files, which Ketch cannot hash as one. A URL no source takes fails later,
+   * as it does without a checksum.
+   */
+  private fun requireChecksumSupport(request: DownloadRequest) {
+    if (request.checksum == null) return
+    val source = try {
+      request.resolvedSource?.let { sourceResolver.resolveByType(it.sourceType, request.url) }
+        ?: sourceResolver.resolve(request.url)
+    } catch (_: KetchError) {
+      return
+    }
+    require(!source.managesOwnFileIo) {
+      "A checksum applies to downloads saved as one file, not to ${source.type} downloads"
+    }
   }
 
   override suspend fun networkInterfaces(): NetworkInterfaces =

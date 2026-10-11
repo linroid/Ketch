@@ -46,6 +46,13 @@
   <string name="error_corrupt_resume">Saved progress is damaged</string>
   <string name="error_corrupt_resume_hint">The downloaded part can't be reused.</string>
   <string name="error_corrupt_resume_hint_short">the downloaded part can't be reused</string>
+  <!-- A downloaded file whose digest differs from the expected one, which was deleted. %1$s is the hash algorithm, such as "SHA-256". -->
+  <string name="error_checksum_mismatch">File doesn't match its checksum</string>
+  <string name="error_checksum_mismatch_hint">Its %1$s doesn't match the checksum you entered, so it was deleted. Download it again, or check the checksum.</string>
+  <string name="error_checksum_mismatch_hint_short">its %1$s doesn't match the checksum you entered</string>
+  <!-- The same when the expected digest came from the server rather than the user. -->
+  <string name="error_checksum_mismatch_published_hint">Its %1$s doesn't match the one the server published, so it was deleted. It may have been damaged on the way; download it again.</string>
+  <string name="error_checksum_mismatch_published_hint_short">its %1$s doesn't match the server's checksum</string>
   <string name="error_canceled">Canceled</string>
   <string name="error_wrong_credentials">Wrong user name or password</string>
   <!-- %1$s is a protocol, such as FTP. -->

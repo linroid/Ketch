@@ -46,6 +46,7 @@ internal fun JsonObjectBuilder.putTask(task: DownloadTask) {
       state.totalBytes?.let { put("totalBytes", it) }
       state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
       state.completedAt?.let { put("completedAt", it.toString()) }
+      state.checksum?.let { put("verifiedChecksum", it.toString()) }
     }
     is DownloadState.Failed -> put("error", state.error.message ?: "Unknown error")
     else -> Unit
@@ -54,6 +55,7 @@ internal fun JsonObjectBuilder.putTask(task: DownloadTask) {
   if (request.priority != DownloadPriority.NORMAL) put("priority", request.priority.name)
   if (!request.speedLimit.isUnlimited) put("speedLimit", request.speedLimit.bytesPerSecond)
   request.requestId?.let { put("requestId", it) }
+  request.checksum?.let { put("checksum", it.toString()) }
 }
 
 private fun JsonObjectBuilder.putProgress(progress: DownloadProgress) {

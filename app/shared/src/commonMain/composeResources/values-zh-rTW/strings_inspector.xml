@@ -97,6 +97,9 @@
   <string name="inspector_detail_connections">連線數</string>
   <string name="inspector_detail_device">裝置</string>
   <string name="inspector_detail_captured">擷取來源</string>
+  <string name="inspector_detail_checksum">校驗碼</string>
+  <string name="inspector_checksum_verified">%1$s · 已校驗</string>
+  <string name="inspector_checksum_pending">%1$s · 完成後校驗</string>
   <string name="inspector_section_advanced">進階</string>
   <string name="inspector_detail_task_id">任務 ID</string>
   <string name="inspector_detail_headers">標頭</string>
@@ -114,6 +117,7 @@
   <string name="inspector_copy_failed_connections">無法複製連線數</string>
   <string name="inspector_copy_failed_device">無法複製裝置</string>
   <string name="inspector_copy_failed_captured">無法複製擷取來源</string>
+  <string name="inspector_copy_failed_checksum">無法複製校驗碼</string>
   <string name="inspector_copy_failed_task_id">無法複製任務 ID</string>
   <string name="inspector_copy_failed_headers">無法複製標頭</string>
   <string name="inspector_copy_failed_property">無法複製屬性</string>

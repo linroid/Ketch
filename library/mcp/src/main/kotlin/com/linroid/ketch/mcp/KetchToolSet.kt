@@ -2,6 +2,7 @@ package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.ToolException
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -117,6 +118,13 @@ class KetchToolSet(
             "file, or the first variant of a SINGLE choice.",
           required = false,
         ),
+        stringParameter(
+          "checksum",
+          "The digest the file must have, as 'sha256:<hex>' (also md5, sha1 or sha512), or a " +
+            "bare hex digest. The download fails with a checksum mismatch, and the file is " +
+            "deleted, when it differs. Omit to check only a digest the server publishes.",
+          required = false,
+        ),
       ),
     ) {
       startDownload(
@@ -128,6 +136,7 @@ class KetchToolSet(
         headers = string("headers", ""),
         requestId = string("requestId", ""),
         fileIds = string("fileIds", ""),
+        checksum = string("checksum", ""),
       )
     },
     TextTool(
@@ -317,8 +326,10 @@ class KetchToolSet(
     headers: String = "",
     requestId: String = "",
     fileIds: String = "",
+    checksum: String = "",
   ): String {
     val selected = if (fileIds.isBlank()) emptySet() else parseFileIds(fileIds)
+    val expected = checksum.ifBlank { null }?.let(Checksum::parse)
     val request = DownloadRequest(
       url = url,
       destination = destination.ifEmpty { null }?.let { Destination(it) },
@@ -329,6 +340,7 @@ class KetchToolSet(
       properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
       requestId = requestId.ifEmpty { null },
       selectedFileIds = selected,
+      checksum = expected,
     )
     val ketch = connect()
     // An instance without request IDs would drop it and add the download again on a retry.
@@ -648,6 +660,7 @@ class KetchToolSet(
           state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
           state.completedAt?.let { put("completedAt", it.toString()) }
           put("sharing", state.sharing)
+          state.checksum?.let { put("verifiedChecksum", it.toString()) }
         }
         is DownloadState.Failed -> {
           put("error", state.error.message ?: "Unknown error")
@@ -655,6 +668,7 @@ class KetchToolSet(
         else -> {}
       }
       task.queuePosition.value?.let { put("queuePosition", it) }
+      task.request.checksum?.let { put("checksum", it.toString()) }
       val files = task.request.resolvedSource?.files.orEmpty()
       val selectedFiles = when {
         (state as? DownloadState.Paused)?.reason == PauseReason.AwaitingFileSelection -> 0

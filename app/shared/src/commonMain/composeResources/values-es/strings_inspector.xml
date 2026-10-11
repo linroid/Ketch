@@ -102,6 +102,9 @@
   <string name="inspector_detail_connections">Conexiones</string>
   <string name="inspector_detail_device">Dispositivo</string>
   <string name="inspector_detail_captured">Procedencia</string>
+  <string name="inspector_detail_checksum">Suma de verificación</string>
+  <string name="inspector_checksum_verified">%1$s · verificada</string>
+  <string name="inspector_checksum_pending">%1$s · se comprueba al terminar</string>
   <string name="inspector_section_advanced">Avanzado</string>
   <string name="inspector_detail_task_id">ID de tarea</string>
   <string name="inspector_detail_headers">Encabezados</string>
@@ -119,6 +122,7 @@
   <string name="inspector_copy_failed_connections">No se pudieron copiar las conexiones</string>
   <string name="inspector_copy_failed_device">No se pudo copiar el dispositivo</string>
   <string name="inspector_copy_failed_captured">No se pudo copiar la procedencia</string>
+  <string name="inspector_copy_failed_checksum">No se pudo copiar la suma de verificación</string>
   <string name="inspector_copy_failed_task_id">No se pudo copiar el ID de tarea</string>
   <string name="inspector_copy_failed_headers">No se pudieron copiar los encabezados</string>
   <string name="inspector_copy_failed_property">No se pudo copiar la propiedad</string>

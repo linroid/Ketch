@@ -1,5 +1,6 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
@@ -33,6 +34,8 @@ internal sealed interface InstanceCommand {
     val json: Boolean = false,
     /** `--proxy` or `--no-proxy`, in place of the instance's proxy; `null` for that one. */
     val proxy: ProxyConfig? = null,
+    /** `--checksum`: the digest the file must have; `null` checks only a published one. */
+    val checksum: Checksum? = null,
   ) : InstanceCommand
 
   /** `ketch list`: prints the tasks. */
@@ -79,7 +82,7 @@ private val targetOptions = setOf("--server", "--token")
 
 private val addValueOptions =
   targetOptions + HEADER_OPTIONS + PROXY_OPTIONS +
-    setOf("--speed-limit", "--priority", "--connections", "--idempotency-key")
+    setOf("--speed-limit", "--priority", "--connections", "--idempotency-key", CHECKSUM_OPTION)
 
 /**
  * Parses the arguments of [command], one of [INSTANCE_COMMANDS], given after its name and
@@ -94,6 +97,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   var priority = DownloadPriority.NORMAL
   var connections = 0
   var requestId: String? = null
+  var checksum: Checksum? = null
   val headers = HeaderOptions()
   val proxy = ProxyOptions()
   val positional = mutableListOf<String>()
@@ -135,6 +139,9 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
             ?: return InstanceArgs.Invalid("--connections must be 0 (automatic) or more")
           "--idempotency-key" -> requestId = value.takeIf { it.isNotBlank() }?.let(::requestIdFor)
             ?: return InstanceArgs.Invalid("--idempotency-key must not be empty")
+          CHECKSUM_OPTION -> checksum = parseChecksumOption(value).getOrElse {
+            return InstanceArgs.Invalid(it.message ?: "invalid checksum")
+          }
           "--interval" -> interval = parseInterval(value)
             ?: return InstanceArgs.Invalid("invalid interval '$value' (e.g. 500ms, 2s)")
           in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
@@ -174,6 +181,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
         proxy = proxy.build().getOrElse {
           return InstanceArgs.Invalid(it.message ?: "invalid proxy")
         },
+        checksum = checksum,
       )
     }
     "list" -> {

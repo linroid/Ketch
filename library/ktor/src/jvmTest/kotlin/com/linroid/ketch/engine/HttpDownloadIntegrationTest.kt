@@ -1,5 +1,7 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.Checksum
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
@@ -16,6 +18,8 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.Base64
 import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -29,6 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -279,6 +284,47 @@ class HttpDownloadIntegrationTest {
     }
   }
 
+  @Test
+  fun download_reprDigest_verifiesTheFile() = runTest(timeout = 20.seconds) {
+    withFixture(65539) { fixture ->
+      fixture.extraHeaders["Repr-Digest"] = "sha-256=:${fixture.sha256Base64()}:"
+      val state = assertIs<DownloadState.Completed>(fixture.download(connections = 4))
+      assertEquals(ChecksumAlgorithm.SHA_256, state.checksum?.algorithm)
+      assertContentEquals(fixture.content, File(state.outputPath).readBytes())
+    }
+  }
+
+  @Test
+  fun download_wrongLegacyDigest_failsAndDeletesTheFile() = runTest(timeout = 20.seconds) {
+    withFixture(65539) { fixture ->
+      fixture.extraHeaders["Digest"] = "SHA-256=$ZERO_SHA256"
+      val state = assertIs<DownloadState.Failed>(fixture.download(connections = 4))
+      assertTrue(assertIs<KetchError.ChecksumMismatch>(state.error).published)
+      assertFalse(fixture.output.exists())
+    }
+  }
+
+  @Test
+  fun download_encodedResponse_ignoresItsDigest() = runTest(timeout = 20.seconds) {
+    withFixture(4096) { fixture ->
+      // A digest of encoded bytes says nothing about the file saved.
+      fixture.extraHeaders["Content-Encoding"] = "br"
+      fixture.extraHeaders["Repr-Digest"] = "sha-256=:$ZERO_SHA256:"
+      val state = assertIs<DownloadState.Completed>(fixture.download(connections = 2))
+      assertEquals(null, state.checksum)
+    }
+  }
+
+  @Test
+  fun download_requestChecksum_verifiesTheFile() = runTest(timeout = 20.seconds) {
+    withFixture(65539) { fixture ->
+      val expected = Checksum.parse("sha256:${fixture.sha256Base64()}")
+      val task = fixture.start(connections = 4, checksum = expected)
+      val state = assertIs<DownloadState.Completed>(task.state.first { it.isTerminal })
+      assertEquals(expected, state.checksum)
+    }
+  }
+
   private suspend fun withFixture(
     size: Int,
     mode: Mode = Mode.NORMAL,
@@ -309,6 +355,12 @@ class HttpDownloadIntegrationTest {
     val firstChunk = CompletableDeferred<Unit>()
     val etag = AtomicReference("fixture-v1")
     val headAttempts = AtomicInteger()
+
+    /** Headers every response carries, such as a published digest. */
+    val extraHeaders: MutableMap<String, String> = Collections.synchronizedMap(mutableMapOf())
+
+    fun sha256Base64(): String =
+      Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(content))
     private val attempts = AtomicInteger()
     private val streamed = mode == Mode.STREAMED || mode == Mode.STREAMED_PAUSE_FIRST
     private val supportsRanges =
@@ -366,6 +418,7 @@ class HttpDownloadIntegrationTest {
           exchange.use {
             if (supportsRanges) it.responseHeaders.add("Accept-Ranges", "bytes")
             it.responseHeaders.add("ETag", etag.get())
+            extraHeaders.forEach { (name, value) -> it.responseHeaders.add(name, value) }
             if (mode == Mode.UNICODE_NAME) {
               it.responseHeaders.add("Content-Disposition",
                 "attachment; filename*=UTF-8''%E4%B8%AD%E6%96%87.txt; size=17")
@@ -439,12 +492,14 @@ class HttpDownloadIntegrationTest {
     suspend fun start(
       connections: Int,
       serverFileName: Boolean = false,
+      checksum: Checksum? = null,
     ): DownloadTask = ketch.download(
       DownloadRequest(
         url = "http://127.0.0.1:${server.address.port}/file",
         destination = Destination(if (serverFileName) "${directory.absolutePath}/" else
           output.absolutePath),
         connections = connections,
+        checksum = checksum,
       )
     )
 
@@ -455,5 +510,10 @@ class HttpDownloadIntegrationTest {
       driver.close()
       directory.deleteRecursively()
     }
+  }
+
+  private companion object {
+    /** A SHA-256 digest of 32 zero bytes, in base64, which no fixture content has. */
+    val ZERO_SHA256: String = Base64.getEncoder().encodeToString(ByteArray(32))
   }
 }

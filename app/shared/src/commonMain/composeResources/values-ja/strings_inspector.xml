@@ -97,6 +97,9 @@
   <string name="inspector_detail_connections">接続数</string>
   <string name="inspector_detail_device">デバイス</string>
   <string name="inspector_detail_captured">取り込み元</string>
+  <string name="inspector_detail_checksum">チェックサム</string>
+  <string name="inspector_checksum_verified">%1$s · 検証済み</string>
+  <string name="inspector_checksum_pending">%1$s · 完了時に検証</string>
   <string name="inspector_section_advanced">高度な情報</string>
   <string name="inspector_detail_task_id">タスクID</string>
   <string name="inspector_detail_headers">ヘッダー</string>
@@ -114,6 +117,7 @@
   <string name="inspector_copy_failed_connections">接続数をコピーできませんでした</string>
   <string name="inspector_copy_failed_device">デバイスをコピーできませんでした</string>
   <string name="inspector_copy_failed_captured">取り込み元をコピーできませんでした</string>
+  <string name="inspector_copy_failed_checksum">チェックサムをコピーできませんでした</string>
   <string name="inspector_copy_failed_task_id">タスクIDをコピーできませんでした</string>
   <string name="inspector_copy_failed_headers">ヘッダーをコピーできませんでした</string>
   <string name="inspector_copy_failed_property">プロパティをコピーできませんでした</string>

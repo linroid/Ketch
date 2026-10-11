@@ -58,6 +58,7 @@ include(":config")
 
 // Self-update of the apps and the CLI
 include(":updater")
+include(":hooks")
 
 // App modules
 include(":app:shared")

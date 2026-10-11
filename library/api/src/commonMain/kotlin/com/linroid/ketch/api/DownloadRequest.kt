@@ -65,7 +65,7 @@ import kotlinx.serialization.Serializable
  * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
  *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
  *   is retained, including after restart. Reusing an ID with different source, destination,
- *   headers, properties or proxy is rejected. Mutable task controls (connections,
+ *   headers, properties, proxy or checksum is rejected. Mutable task controls (connections,
  *   speed limit, priority, schedule, the file selection and [awaitFileSelection]) and transient
  *   metadata/conditions are not compared; a repeated submission leaves the existing task's
  *   current settings unchanged.
@@ -76,6 +76,14 @@ import kotlinx.serialization.Serializable
  *   [default][ResolvedSource.defaultSelection] (every file, or the first variant of a single
  *   choice). Ignored when files are selected or the content has one file. Servers that do not
  *   list [KetchFeatures.AWAIT_FILE_SELECTION] ignore it.
+ * @property checksum the digest the downloaded file must have. Once the last byte is saved, Ketch
+ *   hashes the file and fails the task with [KetchError.ChecksumMismatch] when it differs; the
+ *   task completes only with a matching file. Without one, an HTTP download is checked against
+ *   the digest its server publishes (`Repr-Digest`, or a legacy `Digest`), when it publishes one
+ *   for the whole, unencoded file. Applies to downloads Ketch writes as one file (HTTP, FTP, HLS
+ *   and DASH); [KetchApi.download] refuses it for sources that write their own files, such as
+ *   torrents. Servers that do not list [KetchFeatures.CHECKSUM] would ignore it, so
+ *   `RemoteKetch` refuses to send it to them.
  */
 @Serializable
 data class DownloadRequest(
@@ -93,6 +101,7 @@ data class DownloadRequest(
   val requestId: String? = null,
   val proxy: ProxyConfig? = null,
   val awaitFileSelection: Boolean = false,
+  val checksum: Checksum? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

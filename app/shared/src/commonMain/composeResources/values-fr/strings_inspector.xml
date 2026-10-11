@@ -102,6 +102,9 @@
   <string name="inspector_detail_connections">Connexions</string>
   <string name="inspector_detail_device">Appareil</string>
   <string name="inspector_detail_captured">Provenance</string>
+  <string name="inspector_detail_checksum">Somme de contrôle</string>
+  <string name="inspector_checksum_verified">%1$s · vérifiée</string>
+  <string name="inspector_checksum_pending">%1$s · vérifiée à la fin</string>
   <string name="inspector_section_advanced">Avancé</string>
   <string name="inspector_detail_task_id">ID de la tâche</string>
   <string name="inspector_detail_headers">En-têtes</string>
@@ -119,6 +122,7 @@
   <string name="inspector_copy_failed_connections">Impossible de copier les connexions</string>
   <string name="inspector_copy_failed_device">Impossible de copier l'appareil</string>
   <string name="inspector_copy_failed_captured">Impossible de copier la provenance</string>
+  <string name="inspector_copy_failed_checksum">Impossible de copier la somme de contrôle</string>
   <string name="inspector_copy_failed_task_id">Impossible de copier l'ID de la tâche</string>
   <string name="inspector_copy_failed_headers">Impossible de copier les en-têtes</string>
   <string name="inspector_copy_failed_property">Impossible de copier la propriété</string>

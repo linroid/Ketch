@@ -146,6 +146,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Desde la terminal** — `ketch add`, `list`, `pause`, `resume` y `watch` gestionan las descargas
   de la aplicación o de un servidor desde una terminal o un script; `watch` emite líneas JSON
   ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automatización** — Ejecuta un comando o llama a un webhook firmado cuando una descarga se
+  añade, termina o falla, desde `ketch server` o la aplicación de escritorio
+  ([hooks](docs/hooks.md)).
 
 ### Controla tu ancho de banda
 
@@ -178,6 +181,8 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
   ([traducciones](docs/development/localization.md)).
+- **Descargas verificadas** — Añade a una descarga una suma de comprobación SHA-256, SHA-512, SHA-1
+  o MD5 y Ketch comprueba con ella el archivo terminado, o con la que publica el servidor.
 
 ### Encuentra descargas con IA (versión preliminar)
 
@@ -254,13 +259,10 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   admitir cifrado HLS AES-128; ya se admiten descargas de un único flujo finito sin cifrar
 - **Extracción multimedia** — Guardar contenido multimedia de páginas web
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
-- **Sumas de comprobación** — Verificar una descarga con un hash que proporciones o publique el
-  servidor
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
   la cola quede vacía
-- **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle
 - **Transferencias entre dispositivos** — Enviar a y Mover a transfieren los datos ya descargados
   para que el otro dispositivo continúe en lugar de empezar de cero
   ([plan](docs/plans/task-transfer.md))
@@ -295,6 +297,7 @@ La documentación detallada enlazada a continuación está en inglés.
 - [Descubrimiento con IA](docs/ai-discovery.md) — Proveedores, claves, búsqueda web, acceso a
   páginas,
   chats e historial
+- [Automatización](docs/hooks.md) — Comandos y webhooks en eventos de descarga
 - [Registros](docs/logging.md) — Dónde encontrarlos y qué adjuntar a un informe de error
 
 ## Contribuir

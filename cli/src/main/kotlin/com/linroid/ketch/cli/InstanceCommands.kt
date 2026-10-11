@@ -94,6 +94,9 @@ private suspend fun add(
   if (command.proxy != null && KetchFeatures.PROXY !in attachment.status.features) {
     throw CliFailure("${endpoint.label} doesn't support --proxy or --no-proxy; update it.")
   }
+  if (command.checksum != null && KetchFeatures.CHECKSUM !in attachment.status.features) {
+    throw CliFailure("${endpoint.label} doesn't support $CHECKSUM_OPTION; update it.")
+  }
   val request = try {
     DownloadRequest(
       url = command.url,
@@ -106,6 +109,7 @@ private suspend fun add(
       // Lets a submission whose reply was lost be sent again without adding it twice.
       requestId = command.requestId ?: Uuid.random().toString().takeIf { supportsRequestIds },
       proxy = command.proxy,
+      checksum = command.checksum,
     )
   } catch (e: IllegalArgumentException) {
     throw CliFailure(e.message ?: "Invalid download")

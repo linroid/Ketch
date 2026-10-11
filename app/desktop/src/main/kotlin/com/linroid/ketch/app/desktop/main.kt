@@ -103,6 +103,7 @@ import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -666,7 +667,12 @@ private fun createInstanceManager(
             FtpDownloadSource(), torrentSource,
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
           ),
-        ).also(launch.localApiServer::attach)
+        ).also { ketch ->
+          launch.localApiServer.attach(ketch)
+          // The app runs this computer's downloads, so it runs the hooks of config.toml; for the
+          // life of the process, as the engine.
+          HookRunner.start(ketch, config.hooks)
+        }
       },
       localServerFactory = { ketchApi, pairingRequests ->
         // Reloaded here so a restart from Settings picks up the

@@ -576,7 +576,7 @@ plan that waits for it. H PR1 #5 and #6 are H's alone.
 | F10b | Server `Json` gains `coerceInputValues` (§4.2); constant-time bearer compare; a blank token is none (H PR1 #8) | `KetchServer.kt:272-275, 338`; `:176` vs `:283` | M1, H PR5 | H's defaulted enums (H§9.8); timing-safe auth; a blank token is half-applied today (pairing checks `isNullOrBlank` at `:176`, auth `== null` at `:283`). |
 | F11 | Credential detection covers userinfo, `isSensitiveHeader` and query keys (§5.5); `sendConfirmation` becomes a queue | `AppState.kt:1976-1988`; `:366, 1322-1332` | M1, H PR9 | FTP passwords go without asking; a second send overwrites the first. |
 | F13 | Writes after `close()` throw instead of recreating the file (H PR1 #4) | `PathFileAccessor.kt:28-38` | M1, H PR3 | A late write would recreate a released file, or an import file `abortImport` discarded (I4). |
-| F14 | Core `Sha256`, one positional-read path, core `fileIdentity`, `@KetchInternalApi` (§7.4) | `torrent/crypto/Sha256.kt`, `torrent/storage/TorrentCheckpoint.kt:126` | M1, H PR3 | One implementation for both plans. |
+| F14 | Core `Sha256`, one positional-read path, core `fileIdentity`, `@KetchInternalApi` (§7.4) | `torrent/Sha256.kt`, `torrent/storage/TorrentCheckpoint.kt:126` | M1, H PR3 | One implementation for both plans. |
 
 **Hardening**, any time: F5b skip undecodable rows, insert `created_at`
 (`SqliteTaskStore.kt:95-117`, `sqlite/.../TaskRecords.sq:17-22`); F9 `forDevice()` keeps
@@ -713,11 +713,10 @@ one creates a missing file (`PathFileAccessor.kt:28-38`) and needs a rw SAF gran
 `limitedParallelism(1)` queues reads behind the writer. `fileIdentity` replaces torrent's
 `torrentFileIdentity` (`torrent/storage/TorrentCheckpoint.kt:126`); js and wasmWasi return null.
 
-Every transfer hash uses `core.hash.Sha256`, moved from `torrent/crypto/Sha256.kt` (H§9.6); if it
-limits LAN throughput in the end-to-end test, JVM and Android get a `MessageDigest` actual. F14,
-among the shared prerequisites, adds `Sha256`, `fileIdentity`, the read code and
-`@KetchInternalApi` (beside `@KetchTransferProtocol` in `library:api`, both at ERROR level) before
-either plan.
+Every transfer hash uses `core.hash.Sha256`, moved from `torrent/Sha256.kt` (H§9.6); if it limits
+LAN throughput in the end-to-end test, JVM and Android get a `MessageDigest` actual. F14, among
+the shared prerequisites, adds `Sha256`, `fileIdentity`, the read code and `@KetchInternalApi`
+(beside `@KetchTransferProtocol` in `library:api`, both at ERROR level) before either plan.
 
 ### 7.5 Import staging and commit (destination)
 

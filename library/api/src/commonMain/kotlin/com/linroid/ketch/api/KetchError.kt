@@ -130,6 +130,32 @@ sealed class KetchError(
     "Authentication failed for '$sourceType'", cause,
   )
 
+  /**
+   * The finished file's digest differs from the one it was checked against: the request's
+   * [DownloadRequest.checksum], or else a digest the server published for the file (an HTTP
+   * `Repr-Digest` or `Digest` header). Not retryable: the same bytes would fail again. The
+   * download's progress is discarded, so a resume downloads the file again.
+   *
+   * @property algorithm the hash function both digests use
+   * @property expected the digest the file should have, as lowercase hex
+   * @property actual the digest the file has, as lowercase hex
+   * @property published `true` when [expected] is the digest the server published rather than
+   *   the request's checksum
+   */
+  @Serializable
+  @SerialName("checksum_mismatch")
+  data class ChecksumMismatch(
+    val algorithm: ChecksumAlgorithm,
+    val expected: String,
+    val actual: String,
+    val published: Boolean = false,
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError(
+    "${algorithm.label} checksum mismatch: expected $expected, got $actual" +
+      if (published) " (digest published by the server)" else "",
+    cause,
+  )
+
   /** Catch-all for unexpected errors. Not retryable. */
   @Serializable
   @SerialName("unknown")
@@ -154,6 +180,7 @@ sealed class KetchError(
       is Canceled -> false
       is SourceError -> false
       is AuthenticationFailed -> false
+      is ChecksumMismatch -> false
       is Unknown -> false
     }
 }

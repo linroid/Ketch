@@ -35,6 +35,11 @@
   <string name="error_corrupt_resume">Gespeicherter Fortschritt ist beschädigt</string>
   <string name="error_corrupt_resume_hint">Der heruntergeladene Teil kann nicht weiterverwendet werden.</string>
   <string name="error_corrupt_resume_hint_short">der heruntergeladene Teil ist nicht verwendbar</string>
+  <string name="error_checksum_mismatch">Datei passt nicht zu ihrer Prüfsumme</string>
+  <string name="error_checksum_mismatch_hint">Der %1$s-Wert der Datei stimmt nicht mit der eingegebenen Prüfsumme überein, daher wurde sie gelöscht. Lade sie erneut herunter oder prüfe die Prüfsumme.</string>
+  <string name="error_checksum_mismatch_hint_short">der %1$s-Wert stimmt nicht mit der eingegebenen Prüfsumme überein</string>
+  <string name="error_checksum_mismatch_published_hint">Der %1$s-Wert der Datei stimmt nicht mit der vom Server veröffentlichten Prüfsumme überein, daher wurde sie gelöscht. Sie wurde vielleicht unterwegs beschädigt; lade sie erneut herunter.</string>
+  <string name="error_checksum_mismatch_published_hint_short">der %1$s-Wert stimmt nicht mit der Prüfsumme des Servers überein</string>
   <string name="error_canceled">Abgebrochen</string>
   <string name="error_wrong_credentials">Falscher Benutzername oder falsches Passwort</string>
   <string name="error_wrong_credentials_hint">Der %1$s-Server hat die Anmeldung abgelehnt.</string>

@@ -274,6 +274,10 @@ class RemoteKetch internal constructor(
     ) {
       throw UnsupportedOperationException("This device cannot wait for a choice of files")
     }
+    // An older server would ignore the checksum and complete a file it never checked.
+    if (request.checksum != null && KetchFeatures.CHECKSUM !in features()) {
+      throw UnsupportedOperationException("This device cannot verify checksums")
+    }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)

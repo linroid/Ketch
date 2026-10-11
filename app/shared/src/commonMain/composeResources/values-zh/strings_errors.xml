@@ -34,6 +34,11 @@
   <string name="error_corrupt_resume">保存的进度已损坏</string>
   <string name="error_corrupt_resume_hint">已下载的部分无法再使用。</string>
   <string name="error_corrupt_resume_hint_short">已下载的部分无法再使用</string>
+  <string name="error_checksum_mismatch">文件与校验和不符</string>
+  <string name="error_checksum_mismatch_hint">文件的 %1$s 与输入的校验和不符，已被删除。请重新下载，或检查校验和。</string>
+  <string name="error_checksum_mismatch_hint_short">%1$s 与输入的校验和不符</string>
+  <string name="error_checksum_mismatch_published_hint">文件的 %1$s 与服务器公布的校验和不符，已被删除。文件可能在传输中损坏，请重新下载。</string>
+  <string name="error_checksum_mismatch_published_hint_short">%1$s 与服务器公布的校验和不符</string>
   <string name="error_canceled">已取消</string>
   <string name="error_wrong_credentials">用户名或密码错误</string>
   <string name="error_wrong_credentials_hint">%1$s 服务器拒绝了登录。</string>

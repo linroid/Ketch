@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.ui.text.input.TextFieldValue
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
@@ -809,6 +810,93 @@ class IntakeStateTest {
   }
 
   @Test
+  fun checksum_singleLinkOnCapableDevice_goesWithTheRequest() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    assertTrue(session.offersChecksum)
+    session.checksumText = "  SHA256:${SHA256.uppercase()} "
+    assertNull(session.checksumError)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(Checksum.parse("sha256:$SHA256"), api.base.requests.single().checksum)
+  }
+
+  @Test
+  fun checksum_notAChecksum_blocksTheAdd() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    session.checksumText = "sha256:abc"
+
+    assertEquals(
+      "Not a checksum. Use sha256:… or the hex digest of an MD5, SHA-1, SHA-256 or SHA-512.",
+      session.checksumError?.load(),
+    )
+    assertFalse(session.canSubmit)
+    session.checksumText = ""
+    assertNull(session.checksumError)
+    assertTrue(session.canSubmit)
+  }
+
+  @Test
+  fun checksum_deviceWithoutChecksums_isNotOfferedOrSent() = runTest {
+    val api = IntakeTestApi()
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+    session.checksumText = "not a checksum"
+
+    assertFalse(session.offersChecksum)
+    assertNull(session.checksumError)
+    session.submit {}
+    runCurrent()
+
+    assertNull(api.base.requests.single().checksum)
+  }
+
+  @Test
+  fun checksum_severalLinksOrATorrent_isNotOffered() = runTest {
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val api = IntakeTestApi(
+      check = { url, _ -> if (url == magnet) torrent(url) else ready(url) },
+      features = KetchFeatures.ALL,
+    )
+
+    assertFalse(session(api, IntakeRequest(links.take(2).joinToString("\n"))).offersChecksum)
+    assertFalse(session(api, IntakeRequest(magnet)).offersChecksum)
+  }
+
+  @Test
+  fun retry_checksumChanged_startsOverWithTheNewOne() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val wrong = Checksum.parse("md5:0123456789abcdef0123456789abcdef")
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.ChecksumMismatch(wrong.algorithm, wrong.value, "00")),
+      DownloadRequest(links.first(), checksum = wrong),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(links.first())),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+
+    assertEquals(wrong.toString(), session.checksumText)
+    assertTrue(session.advancedOpen)
+    assertFalse(session.startsOver)
+    session.checksumText = "sha256:$SHA256"
+    assertTrue(session.startsOver)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("remove deleteFiles=true"), failed.calls)
+    assertEquals(Checksum.parse("sha256:$SHA256"), api.base.requests.single().checksum)
+  }
+
+  @Test
   fun remove_linkInTheText_takesItsLineOut() = runTest {
     val session = session(IntakeTestApi(), IntakeRequest(links.take(3).joinToString("\n")))
 
@@ -996,6 +1084,7 @@ class IntakeStateTest {
 
   private companion object {
     val NOW: Instant = Instant.parse("2026-10-01T12:00:00Z")
+    const val SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   }
 }
 

@@ -162,6 +162,7 @@ dependencies {
   implementation(projects.library.torrent)
   implementation(projects.library.torrentApi)
   implementation(projects.updater)
+  implementation(projects.hooks)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktor.client.cio)
