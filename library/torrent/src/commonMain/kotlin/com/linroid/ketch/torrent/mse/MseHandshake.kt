@@ -27,11 +27,13 @@ internal class MseHandshakeException(
  * BitTorrent handshake follows on the negotiated stream, so every handshake above it is unchanged.
  *
  * The shared secret S is always its 96 big-endian bytes. libtorrent before 2.0.13 and 2.1.0
- * hashed the `req3` mask over S without its leading zero bytes, left-aligned in 96 bytes, while
- * its sync hash and RC4 keys use S as specified: about one handshake in 256 with such a peer
- * fails. Answering, Ketch accepts either mask; dialing, it sends the specified one and reports a
+ * hashed the `req3` mask over S without its leading zero bytes, left-aligned in a 96-byte buffer
+ * whose tail it never initialized, while its sync hash and RC4 keys use S as specified: about one
+ * handshake in 256 with such a peer fails. Dialing, Ketch sends the specified mask and reports a
  * failure after such a secret as [MseHandshakeException.leadingZeroSecret], so the dial can try
- * again with new keys.
+ * again with new keys. Answering, it also accepts the mask with that tail zero, which matches
+ * only when the peer's buffer happened to hold zeros; otherwise the peer's own retry gets a new
+ * secret.
  */
 internal object MseHandshake {
   /** RC4 for the rest of the stream; plaintext leaves it in the clear after the handshake. */
@@ -114,7 +116,8 @@ internal object MseHandshake {
     connection.write(keys.publicKey + torrentRandomBytes(randomPad()))
     scan(connection, hash("req1", secret), MAX_PAD + 20)
     val mixed = connection.readExactly(20)
-    // An older libtorrent masks with S left-aligned when S starts with zero bytes.
+    // An older libtorrent masks with S left-aligned when S starts with zero bytes; its tail is
+    // whatever its buffer held, so the zero-filled guess is best effort.
     val masks = listOfNotNull(hash("req3", secret), legacyMask(secret))
     val skey = skeys.firstOrNull { candidate ->
       val req2 = hash("req2", candidate)
@@ -165,9 +168,9 @@ internal object MseHandshake {
   }
 
   /**
-   * The `req3` mask libtorrent before 2.0.13 and 2.1.0 computes for [secret]: over its
-   * significant bytes, left-aligned and zero-filled to 96; `null` when [secret] has no leading
-   * zero byte.
+   * The `req3` mask libtorrent before 2.0.13 and 2.1.0 computes for [secret] when its buffer's
+   * tail held zeros: over its significant bytes, left-aligned and zero-filled to 96; `null` when
+   * [secret] has no leading zero byte.
    */
   internal fun legacyMask(secret: ByteArray): ByteArray? {
     if (secret[0] != 0.toByte()) return null
