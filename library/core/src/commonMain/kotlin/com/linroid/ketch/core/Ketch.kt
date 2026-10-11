@@ -70,10 +70,7 @@ import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -90,8 +87,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.job
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -119,10 +114,10 @@ import kotlin.uuid.Uuid
  *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
  *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param logger logging backend
- * @param dispatchers dedicated dispatchers for task management,
- *   network operations, and file I/O. The default pools have a fixed
- *   size: network transfers suspend instead of blocking a thread, so the
- *   pool size does not limit how many connections a download can use.
+ * @param dispatchers dispatchers for task management, network operations and file I/O; by
+ *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
+ *   are bounded, but network transfers suspend instead of blocking a thread, so their size does
+ *   not limit how many connections a download can use. [close] never closes them.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class Ketch(
@@ -133,7 +128,7 @@ class Ketch(
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
-  private val dispatchers: KetchDispatchers = KetchDispatchers(),
+  internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -1099,27 +1094,14 @@ class Ketch(
     }
   }.distinctUntilChanged()
 
+  /** Stops every task and releases the engine. It never closes [dispatchers]. */
   override fun close() {
     log.i { "Closing Ketch" }
-    val executions = coordinator.close()
+    coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()
     sourceResolver.close()
     httpEngine.close()
-    closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
-  }
-
-  /**
-   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
-   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
-   * Native pool cannot close from one of its own threads.
-   */
-  @OptIn(DelicateCoroutinesApi::class)
-  private fun closeDispatchersAfter(jobs: List<Job>) {
-    GlobalScope.launch(Dispatchers.Default) {
-      jobs.joinAll()
-      dispatchers.close()
-    }
   }
 }
 

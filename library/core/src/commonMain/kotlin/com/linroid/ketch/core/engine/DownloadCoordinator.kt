@@ -31,7 +31,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -462,13 +461,10 @@ internal class DownloadCoordinator(
   /**
    * Stops every execution. Running tasks pause for [PauseReason.Shutdown] and keep their
    * partial files and DOWNLOADING records.
-   *
-   * @return the job that completes once every execution has finished
    */
-  fun close(): Job {
+  fun close() {
     closing = true
     scope.cancel()
-    return scope.coroutineContext.job
   }
 
   private companion object {

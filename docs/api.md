@@ -263,7 +263,9 @@ The built-in HTTP(S) source is the fallback. `additionalSources` adds other prot
 `library:dash` add [finite media downloads](media.md), sharing `Ketch`'s HTTP engine.
 `FtpDownloadSource` from `library:ftp` and `TorrentDownloadSource` from `library:torrent` (see
 [BitTorrent downloads](torrent.md)), or your own `DownloadSource`. The first source whose
-`canHandle(url)` matches is used. `fileNameResolver` and `dispatchers` can also be replaced.
+`canHandle(url)` matches is used. `fileNameResolver` and `dispatchers` can also be replaced;
+`dispatchers` defaults to `KetchDispatchers.Default`, which every instance in the process shares
+(see [architecture](architecture.md#expectactual)).
 
 ### `library:ktor`
 

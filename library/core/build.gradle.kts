@@ -51,7 +51,15 @@ kotlin {
     nodejs()
   }
 
+  // Intermediate source set shared between JVM and Android
+  applyDefaultHierarchyTemplate()
   sourceSets {
+    val jvmAndAndroidMain by creating {
+      dependsOn(commonMain.get())
+    }
+    androidMain.get().dependsOn(jvmAndAndroidMain)
+    jvmMain.get().dependsOn(jvmAndAndroidMain)
+
     commonMain.dependencies {
       api(projects.library.api)
       implementation(libs.kotlinx.coroutines.core)
