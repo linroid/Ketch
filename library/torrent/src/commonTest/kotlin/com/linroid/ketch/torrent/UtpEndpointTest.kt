@@ -17,6 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** uTP endpoints over real loopback UDP ports. */
@@ -223,14 +224,10 @@ class UtpEndpointTest {
     assertFailsWith<IOException> { fallback.connect(b.address) }
     assertEquals(1, tcp)
     first.close()
-    // Once there is room, the peer is still dialed over uTP first.
-    withTimeout(5_000) {
-      while (true) {
-        val connection = try { fallback.connect(b.address) } catch (_: IOException) { null }
-        if (connection != null) { connection.close(); break }
-        delay(100)
-      }
-    }
+    // Once there is room, the peer is still dialed over uTP first: no TCP connect this time.
+    withTimeout(5_000) { while (assertNotNull(endpoint).connectionCount > 0) delay(50) }
+    fallback.connect(b.address).close()
+    assertEquals(1, tcp)
   }
 
   @Test
