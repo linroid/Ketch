@@ -41,6 +41,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param bufferSize read buffer size for data transfers
  * @param secureSocket wraps a connection in TLS, or returns null
  *   where TLS is unavailable
+ * @param selector selects for this client's sockets; every client shares
+ *   [sharedSelector] by default, so connections need no thread of their own
  */
 internal class RealFtpClient(
   private val host: String,
@@ -51,6 +53,7 @@ internal class RealFtpClient(
     serverName: String,
     context: CoroutineContext,
   ) -> Socket? = ::tlsUpgrade,
+  private val selector: SelectorManager = sharedSelector,
 ) : FtpClient {
   private val log = KetchLogger("FtpClient")
 
@@ -61,7 +64,6 @@ internal class RealFtpClient(
     log.d { "TLS session ended: ${e.describeCauses()}" }
   }
 
-  private var selectorManager: SelectorManager? = null
   private var controlSocket: Socket? = null
   private var reader: ByteReadChannel? = null
   private var writer: ByteWriteChannel? = null
@@ -75,9 +77,7 @@ internal class RealFtpClient(
 
   override suspend fun connect() {
     try {
-      val sm = SelectorManager(Dispatchers.IO)
-      selectorManager = sm
-      val socket = connectWithin(sm, host, port)
+      val socket = connectWithin(host, port)
       controlSocket = socket
       reader = socket.openReadChannel()
       writer = socket.openWriteChannel(autoFlush = true)
@@ -289,12 +289,10 @@ internal class RealFtpClient(
     } finally {
       withContext(Dispatchers.IO) {
         try { controlSocket?.close() } catch (_: Exception) {}
-        try { selectorManager?.close() } catch (_: Exception) {}
       }
       controlSocket = null
       reader = null
       writer = null
-      selectorManager = null
       protectData = false
     }
   }
@@ -367,11 +365,9 @@ internal class RealFtpClient(
     dataHost: String,
     dataPort: Int,
   ): Socket {
-    val sm = selectorManager ?: throw KetchError.Network(
-      Exception("Not connected")
-    )
+    if (!isConnected) throw KetchError.Network(Exception("Not connected"))
     return try {
-      connectWithin(sm, dataHost, dataPort)
+      connectWithin(dataHost, dataPort)
     } catch (e: Exception) {
       if (e is CancellationException) throw e
       throw KetchError.Network(e)
@@ -480,8 +476,8 @@ internal class RealFtpClient(
    * Connects to [host] and [port], failing with [KetchError.Network] after [CONNECT_TIMEOUT].
    * Transfers have no read timeout: the download's transfer watchdog drops stalled ones.
    */
-  private suspend fun connectWithin(sm: SelectorManager, host: String, port: Int): Socket =
-    withWallClockTimeout(CONNECT_TIMEOUT) { aSocket(sm).tcp().connect(host, port) }
+  private suspend fun connectWithin(host: String, port: Int): Socket =
+    withWallClockTimeout(CONNECT_TIMEOUT) { aSocket(selector).tcp().connect(host, port) }
       ?: throw KetchError.Network(Exception("Connection timed out after $CONNECT_TIMEOUT"))
 
   /**
@@ -492,6 +488,13 @@ internal class RealFtpClient(
     withContext(Dispatchers.IO) { withTimeoutOrNull(timeout) { block() } }
 
   companion object {
+    /**
+     * The selector every client shares by default, created on first use and never closed: it
+     * waits for every client's sockets on one thread, where a selector per client took one each.
+     * Idle, the JVM's suspends; the native (iOS) one keeps an IO thread waiting in `pselect`.
+     */
+    internal val sharedSelector: SelectorManager by lazy { SelectorManager(Dispatchers.IO) }
+
     /** How long a control or data connection may take to open. */
     internal val CONNECT_TIMEOUT: Duration = 30.seconds
 

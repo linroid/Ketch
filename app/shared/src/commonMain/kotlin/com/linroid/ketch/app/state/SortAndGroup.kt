@@ -208,9 +208,9 @@ fun arrangeRows(
 /**
  * Keeps the Downloads list from shuffling under the pointer: rows are re-sorted at most every
  * [interval], and not at all while [arrange] is told the list is frozen (the pointer is over
- * it, a row has focus or a menu is open). Between re-sorts, rows keep their group and place,
- * rows that left disappear and new rows are placed where a full sort would put them among the
- * others.
+ * it, a row has focus or a menu is open). Between re-sorts, rows keep their place, rows that
+ * left disappear, and new rows and rows whose group changed (a download that finished) are placed
+ * where a full sort would put them among the others.
  *
  * Not thread-safe: call it from one coroutine.
  *
@@ -276,10 +276,15 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
     now: Instant,
     timeZone: TimeZone,
   ): List<Pair<Slot, List<TaskKey>>>? {
-    val present = rows.mapTo(HashSet()) { it.key }
+    val rowsByKey = rows.associateBy { it.key }
     val groups = LinkedHashMap<Slot, MutableList<TaskKey>>()
     for ((slot, keys) in layout) {
-      val kept = keys.filterTo(ArrayList()) { it in present }
+      // A row whose group changed, such as a download that finished, moves at once: holding it
+      // would show it under a group it no longer belongs to.
+      val kept = keys.filterTo(ArrayList()) { key ->
+        val row = rowsByKey[key]
+        row != null && slotOf(row, arrangement.group, now, timeZone) == slot
+      }
       if (kept.isNotEmpty()) groups[slot] = kept
     }
     if (groups.isEmpty()) return null
@@ -287,7 +292,6 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
     val fresh = rows.filter { it.key !in placed }
     if (fresh.isNotEmpty()) {
       val order = rowOrder(arrangement)
-      val rowsByKey = rows.associateBy { it.key }
       for (row in fresh.sortedWith(order)) {
         val keys = groups.getOrPut(slotOf(row, arrangement.group, now, timeZone)) { ArrayList() }
         val index = keys.indexOfFirst { order.compare(rowsByKey.getValue(it), row) > 0 }

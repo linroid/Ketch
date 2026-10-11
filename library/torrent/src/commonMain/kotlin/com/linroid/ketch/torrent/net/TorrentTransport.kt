@@ -140,9 +140,16 @@ internal class TorrentResources {
   }
 }
 
-/** TCP/UDP adapter. Higher layers own protocol deadlines and datagram validation. */
-internal class KtorTorrentNetwork(private val connectTimeoutMs: Long = 10_000) : TorrentNetwork {
-  private val selector = SelectorManager(Dispatchers.IO)
+/**
+ * TCP/UDP adapter. Higher layers own protocol deadlines and datagram validation.
+ *
+ * Every network selects on [sharedSelector] by default, so engines share one selector thread;
+ * [close] closes the network's sockets, never the selector.
+ */
+internal class KtorTorrentNetwork(
+  private val connectTimeoutMs: Long = 10_000,
+  private val selector: SelectorManager = sharedSelector,
+) : TorrentNetwork {
   private val resources = TorrentResources()
 
   override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
@@ -216,11 +223,18 @@ internal class KtorTorrentNetwork(private val connectTimeoutMs: Long = 10_000) :
 
   override fun close() {
     resources.close()
-    selector.close()
   }
 
   private fun endpoint(address: InetSocketAddress): PeerEndpoint {
     val bytes = checkNotNull(address.resolveAddress()) { "Unresolved socket address" }
     return PeerEndpoint(numericHost(bytes), address.port)
+  }
+
+  companion object {
+    /**
+     * The selector every network shares by default, created on first use and never closed: it
+     * waits for every engine's sockets on one thread, where a selector per engine took one each.
+     */
+    val sharedSelector: SelectorManager by lazy { SelectorManager(Dispatchers.IO) }
   }
 }

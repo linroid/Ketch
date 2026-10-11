@@ -476,18 +476,26 @@ class SortAndGroupTest {
   }
 
   @Test
-  fun arrange_whileHeld_finishedRowStaysInItsGroup() = runTest {
+  fun arrange_whileHeld_finishedRowMovesToItsGroupAtOnce() = runTest {
     val stable = StableArrangement()
-    val running = listOf(row("a", downloading(10)), row("b", completed()))
+    val running = listOf(
+      row("a", downloading(10, speed = 900)),
+      row("b", downloading(10, speed = 100)),
+      row("c", completed()),
+    )
     stable.arrange(running, ListArrangement(), START, utc)
-    val finished = listOf(row("a", completed()), row("b", completed()))
+    // a finishes, and b would now sort first among the downloads.
+    val finished = listOf(
+      row("a", completed()),
+      row("b", downloading(10, speed = 100)),
+      row("c", completed()),
+    )
 
-    val held = stable.arrange(finished, ListArrangement(), START + 1.seconds, utc)
-    val resorted = stable.arrange(finished, ListArrangement(), START + 2.seconds, utc)
+    val held = stable.arrange(finished, ListArrangement(), START + 1.seconds, utc, frozen = true)
 
     assertEquals(listOf("Downloading", "Added today"), held.map { it.title }.load())
-    assertEquals(listOf("1", "0 B/s"), held[0].details.load())
-    assertEquals(listOf("Added today"), resorted.map { it.title }.load())
+    assertEquals(listOf("b"), held[0].ids())
+    assertEquals(setOf("a", "c"), held[1].ids().toSet())
   }
 
   private fun List<RowGroup>.ids(): List<String> = flatMap { it.ids() }
