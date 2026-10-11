@@ -1,6 +1,5 @@
 package com.linroid.ketch.torrent
 
-import kotlinx.coroutines.withTimeout
 import okio.ByteString
 
 /** Negotiates an authorized endpoint outside the session actor, admitting availability first. */
@@ -58,8 +57,8 @@ internal object PeerV2Connector {
     allowUpgrade: Boolean = false,
     expectedPeerId: ByteString? = null,
     maxPending: Int = 32,
-    /** Covers a TCP connect (10 s) and the uTP dial that follows when TCP fails (7 s). */
-    connectTimeoutMs: Long = 20_000,
+    /** Bounds each connect: TCP, then uTP when TCP fails ([DEFAULT_CONNECT_TIMEOUT_MS]). */
+    connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
     extensions: Boolean = false,
     generation: Long = 0,
     /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
@@ -72,8 +71,10 @@ internal object PeerV2Connector {
     val admission = state.reserve(availabilityBytes(layout)) ?: return null
     var connection: TorrentConnection? = null
     try {
-      // Capture inside the timeout: cancellation at its return boundary must not lose a socket.
-      withTimeout(connectTimeoutMs) { connection = network.connect(remote) }
+      // The timeout bounds each TCP connect only: an encrypted opening a peer ignores still
+      // leaves its plaintext retry time to connect. connectWithin keeps a socket returned as a
+      // timeout fires.
+      connection = network.connectPeer(remote, document.identity.wireTag(mode), connectTimeoutMs)
       val socket = checkNotNull(connection)
       val route = PeerIdentityHandshake(document.identity, extensions, dht).initiate(
         socket, mode, peerId, handshakes,

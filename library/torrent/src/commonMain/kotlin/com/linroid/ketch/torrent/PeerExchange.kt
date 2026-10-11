@@ -26,6 +26,7 @@ internal fun pexFlags(
   link: TorrentConnection,
   extensions: PeerExtensions,
 ): Int = (if (reachedOutgoing) PEX_FLAG_REACHABLE else 0) or
+  (if (link.encrypted) PEX_FLAG_ENCRYPTION else 0) or
   (if (link.utp) PEX_FLAG_UTP else 0)
 
 /**

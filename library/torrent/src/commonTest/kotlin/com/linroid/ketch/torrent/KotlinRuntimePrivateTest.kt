@@ -105,7 +105,8 @@ class KotlinRuntimePrivateTest {
               // Failover/completion closes the corresponding peer.
             } finally { connection.close() }
           } }
-          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = true,
+          val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = true,
             uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING), network,
             TorrentHttp(http), nowMs = { clock.load() })
           try {
@@ -185,7 +186,8 @@ class KotlinRuntimePrivateTest {
               // The engine stopped.
             } finally { connection.close() }
           }
-          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = true,
+          val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = true,
             uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), network, TorrentHttp(http))
           try {
             engine.start()
@@ -269,7 +271,8 @@ class KotlinRuntimePrivateTest {
           createdAt = now, updatedAt = now, completedAt = now,
           control = TaskControl(sharing = true)))
         var created = 0
-        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = true,
+        val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = true,
           uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING), http).also {
           it.engineFactory = { config ->
             created++

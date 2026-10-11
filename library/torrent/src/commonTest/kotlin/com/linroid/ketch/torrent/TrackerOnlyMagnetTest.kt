@@ -73,7 +73,8 @@ class TrackerOnlyMagnetTest {
       val network = Network()
       val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
       val requests = MutableStateFlow<List<String>>(emptyList())
-      val engine = KotlinTorrentEngine(TorrentConfig(), rawNetwork = network,
+      val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED),
+        rawNetwork = network,
         http = http { url ->
           requests.value += url
           if (url.startsWith("https://unavailable/")) {
@@ -141,7 +142,8 @@ class TrackerOnlyMagnetTest {
   @Test
   fun missingTrackersRejectBeforeExplicitPeerOrDhtDiscovery() = runTest {
     val network = Network()
-    val engine = KotlinTorrentEngine(TorrentConfig(), rawNetwork = network,
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED),
+      rawNetwork = network,
       http = http { error("Unexpected tracker") })
     try {
       engine.start()
@@ -162,7 +164,8 @@ class TrackerOnlyMagnetTest {
       withTimeout(10_000) {
         val network = Network()
         val announced = CompletableDeferred<Unit>()
-        val engine = KotlinTorrentEngine(TorrentConfig(), rawNetwork = network,
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED),
+          rawNetwork = network,
           http = http {
             announced.complete(Unit)
             Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0)))
@@ -194,6 +197,7 @@ class TrackerOnlyMagnetTest {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val metadata = metadata(false)
         val engine = KotlinTorrentEngine(TorrentConfig(
+          encryption = TorrentEncryption.DISABLED,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), rawNetwork = network,
           http = http {
             Bencode.encode(mapOf("interval" to 3600L, "peers" to byteArrayOf(127, 0, 0, 1,
@@ -251,6 +255,7 @@ class TrackerOnlyMagnetTest {
       withTimeout(10_000) {
         val network = Network()
         val engine = KotlinTorrentEngine(TorrentConfig(
+          encryption = TorrentEncryption.DISABLED,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), rawNetwork = network,
           http = http { Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0))) })
         val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /

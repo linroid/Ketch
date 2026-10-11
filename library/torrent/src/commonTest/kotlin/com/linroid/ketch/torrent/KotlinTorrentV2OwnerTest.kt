@@ -57,7 +57,8 @@ class KotlinTorrentV2OwnerTest {
         val document = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
           "name" to "large-checkpoint", "meta version" to 2L, "piece length" to 16_384L,
           "file tree" to tree), "piece layers" to emptyMap<String, Any>())))
-        val config = TorrentConfig(dhtEnabled = false, maxMetadataBytes = 96 * 1024,
+        val config = TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false, maxMetadataBytes = 96 * 1024,
           maxSessionStateBytes = 16 * 1024 * 1024)
         val first = KotlinTorrentEngine(config)
         val second = KotlinTorrentEngine(config)
@@ -107,7 +108,8 @@ class KotlinTorrentV2OwnerTest {
         val buffers = TorrentBufferBudget(1024 * 1024)
         val original = TorrentV2PieceStore(document, destination, emptySet(), "restart",
           buffers, Semaphore(1))
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false))
         try {
           original.initialize()
           assertEquals(CommitOutcome.VERIFIED, original.commit(0, bytes))
@@ -119,7 +121,7 @@ class KotlinTorrentV2OwnerTest {
             TorrentContentCatalog(root / "catalog")).load())
           val checkpoint = loaded.checkpoint
           val admission = TorrentBufferBudget(4 * 1024 * 1024)
-          val config = TorrentConfig(dhtEnabled = false)
+          val config = TorrentConfig(encryption = TorrentEncryption.DISABLED, dhtEnabled = false)
           val fresh = admitV2Session(document, 0, destination.toString().length, config, admission)
           val freshBytes = admission.allocated
           fresh.close()
@@ -171,7 +173,8 @@ class KotlinTorrentV2OwnerTest {
     val buffers = TorrentBufferBudget(1024 * 1024)
     val original = TorrentV2PieceStore(document, destination, emptySet(), "restart",
       buffers, Semaphore(1))
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false))
     try {
       original.initialize()
       assertEquals(CommitOutcome.VERIFIED, original.commit(0, bytes))
@@ -225,7 +228,8 @@ class KotlinTorrentV2OwnerTest {
         val remote = createTorrentNetwork()
         val listener = remote.listen(PeerEndpoint("127.0.0.1", 0))
         val buffers = TorrentBufferBudget(1024 * 1024)
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false))
         val server = async {
           val connection = listener.accept()
           try {
@@ -271,7 +275,8 @@ class KotlinTorrentV2OwnerTest {
   fun engineShutdownJoinsV2DiscoveryBeforeReturningAdmission() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
-        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+          dhtEnabled = false))
         val output = output()
         val entered = CompletableDeferred<Unit>()
         val cleaning = CompletableDeferred<Unit>()
@@ -310,7 +315,8 @@ class KotlinTorrentV2OwnerTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         for (fromDiscovery in listOf(false, true)) {
-          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+          val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = false))
           val output = output()
           val returned = CompletableDeferred<Unit>()
           engine.start()
@@ -347,7 +353,8 @@ class KotlinTorrentV2OwnerTest {
 
   @Test
   fun duplicateIdentityAndOverlappingOutputsRejectBeforeDiscovery() = runTest {
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false))
     val output = output()
     try {
       engine.start()
@@ -371,7 +378,8 @@ class KotlinTorrentV2OwnerTest {
 
   @Test
   fun hybridIdentityCannotHaveIndependentV1AndV2Owners() = runTest {
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false))
     val hybrid = document(hybrid = true)
     // The engine accepts trusted metadata adapters; model a v1 adapter for the same raw info.
     val legacy = TorrentMetadata(checkNotNull(hybrid.identity.v1), "a", 16_384, 4,
@@ -398,7 +406,8 @@ class KotlinTorrentV2OwnerTest {
 
   @Test
   fun activeTaskLimitIsSharedAcrossV1AndV2() = runTest {
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, maxActiveTorrents = 1))
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false, maxActiveTorrents = 1))
     val legacy = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
       "name" to "legacy", "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes)
     ))))
@@ -420,7 +429,8 @@ class KotlinTorrentV2OwnerTest {
 
   @Test
   fun metadataAdmissionFailsBeforeStorageAndDoesNotLeakOwnership() = runTest {
-    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, maxSessionStateBytes = 1))
+    val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false, maxSessionStateBytes = 1))
     val output = output()
     try {
       engine.start()

@@ -83,7 +83,8 @@ class AdditionalTrackersTest {
         }
         val seeder = seed(listener, metadata)
         val engine = KotlinTorrentEngine(
-          TorrentConfig(dhtEnabled = false, additionalTrackers = listOf(EXTRA)),
+          TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = false, additionalTrackers = listOf(EXTRA)),
           createTorrentNetwork(), TorrentHttp(http),
         )
         // Private and tracker-only runs also need the extra configured to prove it is skipped.

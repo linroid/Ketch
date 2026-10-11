@@ -73,7 +73,8 @@ class TorrentPublicV2WorkflowTest {
     fixture(false, payloadLength = 131_075) { peer ->
       peer.remaining.complete(Unit)
       val root = temporaryDirectory()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val ketch = Ketch(peer.http, additionalSources = listOf(source))
       try {
         ketch.start()
@@ -97,7 +98,8 @@ class TorrentPublicV2WorkflowTest {
       peer.remaining.complete(Unit)
       peer.corruptPayload = true
       val root = temporaryDirectory()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val ketch = Ketch(peer.http, additionalSources = listOf(source))
       try {
         ketch.start()
@@ -117,7 +119,8 @@ class TorrentPublicV2WorkflowTest {
   @Test fun magnetDoesNotResolveWhenPieceLayerProofIsCorrupt() = runTest {
     fixture(false) { peer ->
       peer.corruptProof = true
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false,
         metadataTimeoutSeconds = 1), peer.http)
       try {
         val uri = MagnetUri(peer.document.identity,
@@ -133,7 +136,8 @@ class TorrentPublicV2WorkflowTest {
   @Test fun closingSourceJoinsOutstandingV2MetadataResolution() = runTest {
     fixture(false) { peer -> coroutineScope {
       peer.corruptProof = true
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val uri = MagnetUri(peer.document.identity,
         trackers = listOf("http://fixture/announce")).toUri()
       val resolving = async { source.resolve(uri, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
@@ -163,7 +167,8 @@ class TorrentPublicV2WorkflowTest {
             })))
         }
       }
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false,
         connectionsPerTorrent = 1), http)
       val ketch = Ketch(http, additionalSources = listOf(source))
       try {
@@ -187,7 +192,8 @@ class TorrentPublicV2WorkflowTest {
     fixture(false) { peer ->
       val root = temporaryDirectory()
       val recordPath = root / "tasks.json"
-      fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val firstSource = source()
       val first = Ketch(peer.http, taskStore = Records(recordPath),
         additionalSources = listOf(firstSource))
@@ -232,7 +238,8 @@ class TorrentPublicV2WorkflowTest {
   @Test fun hybridSelectionChange_completesAndRemovesOwnedFiles() = runTest {
     fixture(true) { peer ->
       val root = temporaryDirectory()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val ketch = Ketch(peer.http, additionalSources = listOf(source))
       try {
         ketch.start()
@@ -267,7 +274,8 @@ class TorrentPublicV2WorkflowTest {
     fixture(false) { peer ->
       val root = temporaryDirectory()
       val recordPath = root / "tasks.json"
-      fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val firstSource = source()
       val first = Ketch(peer.http, taskStore = Records(recordPath),
         additionalSources = listOf(firstSource))
@@ -316,7 +324,8 @@ class TorrentPublicV2WorkflowTest {
     selectLast: Boolean = false,
   ) = fixture(hybrid) { peer ->
     peer.remaining.complete(Unit)
-    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+    val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), peer.http)
     val ketch = Ketch(peer.http, additionalSources = listOf(source))
     val root = temporaryDirectory()
     try {
@@ -347,7 +356,8 @@ class TorrentPublicV2WorkflowTest {
     val root = temporaryDirectory()
     val recordPath = root / "tasks.json"
     val records = Records(recordPath)
-    fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+    fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), peer.http)
     val firstSource = source()
     val first = Ketch(peer.http, taskStore = records, additionalSources = listOf(firstSource))
     var second: Ketch? = null

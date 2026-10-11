@@ -105,7 +105,8 @@ internal class KotlinTorrentEngine(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext +
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
-  private val network = TorrentConnectionBudget(
+  // Encryption over the connection budget over TCP, falling back to uTP.
+  private val connectionBudget = TorrentConnectionBudget(
     TorrentUtpFallback(rawNetwork) { remote ->
       if (!config.utpEnabled || !running.load()) return@TorrentUtpFallback null
       val host = udpHostFor(remote)
@@ -115,6 +116,7 @@ internal class KotlinTorrentEngine(
     },
     config.maxConnections,
   )
+  private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
   private val udpMutex = Mutex()
   // Guarded by udpMutex.
   private val udpPorts = mutableMapOf<String, TorrentUdpPort>()
@@ -257,19 +259,24 @@ internal class KotlinTorrentEngine(
   }
 
   /**
-   * Reads one BitTorrent handshake within 10 s and hands [connection], with the handshake still
-   * to read, to the owner of its wire tag. Transport-agnostic; closes unless handed off.
+   * Negotiates MSE/PE when the peer opens with it and reads one BitTorrent handshake, within
+   * 15 s, then hands the stream, with the handshake still to read, to the owner of its wire tag.
+   * Transport-agnostic; closes unless handed off.
    */
   internal suspend fun dispatchIncoming(connection: TorrentConnection) {
     var handedOff = false
     try {
-      val header = withTimeout(10_000) { connection.readExactly(68) }
+      // MSE/PE first when the peer opens with it, then the BitTorrent handshake.
+      val (stream, header) = withTimeout(15_000) {
+        val stream = network.accept(connection, incomingTags())
+        stream to stream.readExactly(68)
+      }
       val tag = header.copyOfRange(28, 48)
       PeerWire.decodeHandshake(header, InfoHash.fromBytes(tag))
-      handedOff = route(tag.toByteString(), PrefixedConnection(connection, header))
+      handedOff = route(tag.toByteString(), PrefixedConnection(stream, header))
       if (!handedOff) log.v { "Refused incoming peer ${connection.remote}: no accepting owner" }
     } catch (_: TimeoutCancellationException) {
-      log.v { "Refused incoming peer ${connection.remote}: no handshake within 10s" }
+      log.v { "Refused incoming peer ${connection.remote}: no handshake within 15s" }
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
@@ -1057,7 +1064,7 @@ internal class KotlinTorrentEngine(
     })
     if (config.utpEnabled) {
       endpoint = UtpEndpoint(scope, send = udp::send, onIncoming = { connection ->
-        val admitted = network.admit(connection)
+        val admitted = connectionBudget.admit(connection)
         admitted?.let(::launchIncoming)
         admitted != null
       })
@@ -1256,7 +1263,7 @@ internal class KotlinTorrentEngine(
     owners.forEach { it.uploadPolicyChanged() }
     log.d { "Engine upload policy: $policy" }
   }
-  fun setConnections(value: Int) = network.set(value)
+  fun setConnections(value: Int) = connectionBudget.set(value)
 
   /** Replaces the extra public trackers; sessions and lookups started afterwards use them. */
   fun setAdditionalTrackers(urls: List<String>) {

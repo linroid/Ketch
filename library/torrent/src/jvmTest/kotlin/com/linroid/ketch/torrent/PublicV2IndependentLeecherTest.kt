@@ -42,9 +42,22 @@ class PublicV2IndependentLeecherTest {
   }
 
   @Test
+  fun libtorrentRequiringEncryption_downloadsOverRc4() = runTest {
+    // libtorrent dials in with MSE/PE and its handshake as the initial payload.
+    upload(TorrentV2Fixture.build(files, hybrid = true), encrypted = true) { it.identity }
+  }
+
+  @Test
   fun libtorrentOverUtpOnly_downloadsFromKetch() = runTest {
     // libtorrent dials our listen port over UDP; TCP is off on its side.
     upload(TorrentV2Fixture.build(files, hybrid = true), utpOnly = true) { it.identity }
+  }
+
+  @Test
+  fun libtorrentOverEncryptedUtp_downloadsFromKetch() = runTest {
+    upload(TorrentV2Fixture.build(files, hybrid = true), encrypted = true, utpOnly = true) {
+      it.identity
+    }
   }
 
   @Test
@@ -59,9 +72,11 @@ class PublicV2IndependentLeecherTest {
   /**
    * Seeds [fixture] from a Ketch engine, has libtorrent download it from a magnet of the topics
    * [topics] picks with Ketch as its only peer, and returns the seeding owner once removed.
+   * With [encrypted], libtorrent only connects over RC4; with [utpOnly], only over uTP.
    */
   private suspend fun upload(
     fixture: TorrentV2Fixture,
+    encrypted: Boolean = false,
     utpOnly: Boolean = false,
     topics: (TorrentV2Document) -> TorrentIdentity,
   ): TorrentV2DownloadSession = withContext(Dispatchers.Default) {
@@ -89,7 +104,7 @@ class PublicV2IndependentLeecherTest {
 
         // The memory-mapped back end guards its writes with SIGSEGV and SIGBUS handlers that take
         // the JVM's implicit null checks down with them; plain file I/O installs none.
-        manager.start(SessionParams(leecherSettings(utpOnly)).apply { setPosixDiskIO() })
+        manager.start(SessionParams(leecherSettings(encrypted, utpOnly)).apply { setPosixDiskIO() })
         // libtorrent reads x.pe without unescaping it, so the peer goes in as written.
         val identity = topics(fixture.document)
         val magnet = MagnetUri(identity).toUri() + "&x.pe=127.0.0.1:${engine.listenPort}"
@@ -135,10 +150,10 @@ class PublicV2IndependentLeecherTest {
   }
 
   /**
-   * Loopback only, no DHT, local discovery or port mapping, and plaintext, since Ketch speaks no
-   * protocol encryption yet; TCP, or uTP only when [utpOnly].
+   * Loopback only, no DHT, local discovery or port mapping; TCP, or uTP only when [utpOnly];
+   * plaintext unless [encrypted], then RC4 only.
    */
-  private fun leecherSettings(utpOnly: Boolean): SettingsPack {
+  private fun leecherSettings(encrypted: Boolean, utpOnly: Boolean): SettingsPack {
     val settings = SettingsPack()
     settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
     val off = listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
@@ -151,8 +166,14 @@ class PublicV2IndependentLeecherTest {
           settings_pack.bool_types.enable_incoming_utp)
       }
     for (flag in off) settings.setBoolean(flag.swigValue(), false)
-    settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(),
-      settings_pack.enc_policy.pe_disabled.swigValue())
+    val policy = if (encrypted) settings_pack.enc_policy.pe_forced
+      else settings_pack.enc_policy.pe_disabled
+    settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(), policy.swigValue())
+    settings.setInteger(settings_pack.int_types.in_enc_policy.swigValue(), policy.swigValue())
+    if (encrypted) {
+      settings.setInteger(settings_pack.int_types.allowed_enc_level.swigValue(),
+        settings_pack.enc_level.pe_rc4.swigValue())
+    }
     return settings
   }
 }
