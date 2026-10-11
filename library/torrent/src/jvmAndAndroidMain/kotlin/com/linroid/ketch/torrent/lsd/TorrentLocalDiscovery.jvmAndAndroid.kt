@@ -86,7 +86,8 @@ internal class JvmLsdTransport private constructor(
 
   private val buffer = ByteArray(LsdAnnounce.MAX_BYTES + 1)
 
-  override suspend fun send(announce: LsdAnnounce) = withContext(TorrentDispatchers.multicast) {
+  // Not on the receiving slice, which a quiet LAN's receive keeps between its timeouts.
+  override suspend fun send(announce: LsdAnnounce) = withContext(TorrentDispatchers.disk) {
     var sent = 0
     var failure: Exception? = null
     // The interface option and the send go together.

@@ -20,8 +20,9 @@ internal object TorrentDispatchers {
   val lookup: CoroutineDispatcher by lazy { disk.limitedParallelism(LOOKUPS) }
 
   /**
-   * Local service discovery's multicast socket, which blocks up to half a second per receive:
-   * one thread at most.
+   * Local service discovery's blocking receive, which keeps its thread while the LAN is quiet,
+   * waking every half second: one thread at most. Its sends, which never wait, run on [disk], so
+   * they never queue behind it.
    */
   val multicast: CoroutineDispatcher by lazy { disk.limitedParallelism(1) }
 

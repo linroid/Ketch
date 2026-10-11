@@ -1,6 +1,10 @@
 package com.linroid.ketch.torrent.lsd
 
 import com.linroid.ketch.torrent.net.TorrentDatagram
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
@@ -8,6 +12,7 @@ import java.net.DatagramSocket
 import java.net.NetworkInterface
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -31,6 +36,34 @@ class JvmLsdTransportTest {
     assertTrue(':' in heard.remote.host, heard.remote.host)
     assertTrue('%' !in heard.remote.host, heard.remote.host)
     assertTrue(heard.bytes.decodeToString().contains("\r\nHost: $LSD_HOST_IPV6\r\n"))
+  }
+
+  @Test
+  fun send_doesNotWaitForAReceiveInProgress(): Unit = runBlocking {
+    val ipv4 = lsdInterfaces()
+    val ipv6 = lsdIpv6Interfaces()
+    if (ipv4.isEmpty() && ipv6.isEmpty()) return@runBlocking skip("no LAN interface")
+    val port = DatagramSocket(0).use { it.localPort }
+    val transport = try {
+      JvmLsdTransport.open(ipv4, ipv6, port)
+    } catch (e: Exception) {
+      return@runBlocking skip("the system refused to join the group: $e")
+    }
+    try {
+      // On a group nobody else uses, the receive keeps waiting between its timeouts.
+      val receiving = launch(Dispatchers.Default) { runCatching { transport.receive() } }
+      delay(200)
+      val announce = LsdAnnounce(7000, listOf(ByteArray(20) { 7 }.toByteString()), "first")
+      val sending = async(Dispatchers.Default) { runCatching { transport.send(announce) } }
+      // Awaiting the result needs no thread of the transport's: a send stuck behind the receive
+      // fails the test rather than hanging it.
+      val sent = withTimeoutOrNull(3_000) { sending.await() }
+      receiving.cancel()
+      sending.cancel()
+      assertNotNull(sent, "The announce waited for the receive")
+    } finally {
+      transport.close()
+    }
   }
 
   /** Sends an announce from one transport and returns what the other heard, or null if skipped. */
