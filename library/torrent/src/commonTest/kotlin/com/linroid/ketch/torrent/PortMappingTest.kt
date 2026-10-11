@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -52,6 +53,8 @@ class PortMappingTest {
     network: TorrentNetwork,
     scope: CoroutineScope,
     offset: Int = 0,
+    /** Added to UDP mappings only, as a gateway that gives UDP another port. */
+    udpOffset: Int = 0,
     refuse: Int = 0,
     requests: MutableList<Pair<Int, Int>> = mutableListOf(),
   ): Int {
@@ -73,8 +76,11 @@ class PortMappingTest {
             val lifetime = input.readInt()
             requests += opcode to lifetime
             reply.writeShort(internal)
-              .writeShort(if (lifetime == 0) 0 else (external.takeIf { it != 0 } ?: internal) +
-                offset)
+              .writeShort(if (lifetime == 0) 0 else {
+                // A port asked for that is not the internal one is granted, as a free port is.
+                (external.takeIf { it != 0 && it != internal } ?: (internal + offset)) +
+                  if (opcode == 1) udpOffset else 0
+              })
               .writeInt(lifetime)
           }
           socket.send(datagram.remote, reply.readByteArray())
@@ -121,6 +127,8 @@ class PortMappingTest {
     val actions = MutableStateFlow(emptyList<String>())
     /** External ports another device holds: AddPortMapping answers 718 for them. */
     val taken = mutableSetOf<Int>()
+    /** External ports held for UDP only. */
+    val takenUdp = mutableSetOf<Int>()
   }
 
   /** An SSDP responder pointing at an HTTP server with an IGD description and SOAP control. */
@@ -145,7 +153,9 @@ class PortMappingTest {
                 val action = Regex("#(\\w+)\"").find(head)?.groupValues?.get(1) ?: "?"
                 val port = UpnpClient.tag(body, "NewExternalPort")?.toInt()
                 igd.actions.update { it + "$action ${UpnpClient.tag(body, "NewProtocol")} $port" }
-                if (action == "AddPortMapping" && port in igd.taken) {
+                val udp = UpnpClient.tag(body, "NewProtocol") == "UDP"
+                val taken = port in igd.taken || udp && port in igd.takenUdp
+                if (action == "AddPortMapping" && taken) {
                   500 to "<s:Envelope><s:Body><s:Fault><detail><UPnPError>" +
                     "<errorCode>718</errorCode><errorDescription>ConflictInMappingEntry" +
                     "</errorDescription></UPnPError></detail></s:Fault></s:Body></s:Envelope>"
@@ -263,6 +273,67 @@ class PortMappingTest {
       mapper.stop()
       assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests)
     }
+
+  @Test
+  fun mapper_upnpRefusingUdp_removesTheTcpMappingBeforeTheNextPort() =
+    gateways { network, scope ->
+      val igd = Igd().apply { takenUdp += 6881 }
+      val ssdp = upnpGateway(network, scope, igd)
+      val silent = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      val mapped = MutableStateFlow<Int?>(-1)
+      val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
+        onMapped = { mapped.value = it },
+        natPmp = NatPmpClient(network, silent.local.port, retryMs = listOf(50)),
+        upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", ssdp), searchMs = 300),
+        networks = { listOf(loopbackNetwork) })
+      try {
+        mapper.start()
+        assertEquals(6888, mapped.first { it != -1 })
+        mapper.stop()
+        assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping UDP 6881",
+          "DeletePortMapping TCP 6881", "AddPortMapping TCP 6888", "AddPortMapping UDP 6888",
+          "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"), igd.actions.value)
+      } finally {
+        silent.close()
+      }
+    }
+
+  @Test
+  fun mapper_natPmpUdpOnAnotherPort_isRemoved() = gateways { network, scope ->
+    val requests = mutableListOf<Pair<Int, Int>>()
+    val port = natPmpGateway(network, scope, udpOffset = 5, requests = requests)
+    val mapped = MutableStateFlow<Int?>(-1)
+    val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
+      onMapped = { mapped.value = it },
+      natPmp = NatPmpClient(network, port, retryMs = listOf(200)),
+      upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+      networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
+    mapper.start()
+    assertEquals(6881, mapped.first { it != -1 })
+    mapper.stop()
+    // TCP, UDP on 6886 then removed; at stop only TCP is left to remove.
+    assertEquals(listOf(2 to 3600, 1 to 3600, 1 to 0, 2 to 0), requests)
+  }
+
+  @Test
+  fun mapper_udpBoundLater_isMappedWithoutWaitingForRenewal() = gateways { network, scope ->
+    val requests = mutableListOf<Pair<Int, Int>>()
+    val port = natPmpGateway(network, scope, requests = requests)
+    var udp: Int? = null
+    val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { udp },
+      onMapped = {},
+      natPmp = NatPmpClient(network, port, retryMs = listOf(200)),
+      upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+      networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) },
+      udpCheckMs = 100)
+    mapper.start()
+    withTimeout(5_000) { while (requests.isEmpty()) delay(20) }
+    assertEquals(listOf(2 to 3600), requests.toList())
+    // DHT binds its socket after the first pass.
+    udp = 6881
+    withTimeout(5_000) { while (requests.none { it.first == 1 }) delay(20) }
+    mapper.stop()
+  }
 
   @Test
   fun mapper_withoutAGateway_reportsNone() = gateways { network, scope ->

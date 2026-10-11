@@ -29,6 +29,8 @@ internal class TorrentPortMapper(
   private val upnp: UpnpClient,
   private val networks: suspend () -> List<LocalIpv4Network> = ::localIpv4Networks,
   private val retryMs: Long = 10 * 60_000,
+  /** How often a mapped port checks whether the UDP port appeared or changed. */
+  private val udpCheckMs: Long = 60_000,
 ) {
   /** Where the mappings live, to renew and remove them. */
   private sealed interface Gateway {
@@ -60,10 +62,24 @@ internal class TorrentPortMapper(
           onMapped(null)
           delay(retryMs)
         } else {
-          // Renew at half the lifetime, at least every minute and at most every 30.
-          delay((mapped.lifetime * 500).coerceIn(60_000, 30 * 60_000))
+          awaitRenewal(mapped)
         }
       }
+    }
+  }
+
+  /**
+   * Waits until [mapped] is due for renewal, at half its lifetime (between one and 30 minutes),
+   * or until the UDP port changes, as when DHT binds its socket after the first pass.
+   */
+  private suspend fun awaitRenewal(mapped: Mapped) {
+    val mappedUdp = mapped.mappings.firstOrNull { it.protocol == MappedProtocol.UDP }?.internalPort
+    var remaining = (mapped.lifetime * 500).coerceIn(60_000, 30 * 60_000)
+    while (remaining > 0) {
+      val step = minOf(remaining, udpCheckMs)
+      delay(step)
+      remaining -= step
+      if (udpPort() != mappedUdp) return
     }
   }
 
@@ -124,10 +140,18 @@ internal class TorrentPortMapper(
     val previous = renewing?.mappings?.firstOrNull { it.protocol == MappedProtocol.TCP }
     val tcp = natPmp.map(gateway, MappedProtocol.TCP, tcpPort,
       previous?.externalPort ?: tcpPort, LIFETIME_SECONDS) ?: return null
-    // UDP asks for the external port TCP got, so one port reaches all three.
-    val mappings = listOfNotNull(tcp, udp?.let {
+    // UDP asks for the external port TCP got, so one port reaches all three. A UDP mapping on
+    // another port is removed rather than kept: peers are told TCP's port.
+    val udpMapping = udp?.let {
       natPmp.map(gateway, MappedProtocol.UDP, it, tcp.externalPort, LIFETIME_SECONDS)
-    })
+    }?.let { mapping ->
+      if (mapping.externalPort == tcp.externalPort) mapping else {
+        log.d { "NAT-PMP mapped UDP to ${mapping.externalPort}, not ${tcp.externalPort}" }
+        natPmp.map(gateway, MappedProtocol.UDP, mapping.internalPort, 0, 0)
+        null
+      }
+    }
+    val mappings = listOfNotNull(tcp, udpMapping)
     return Mapped(Gateway.NatPmp(gateway), mappings, mappings.minOf { it.lifetimeSeconds })
   }
 
@@ -164,6 +188,15 @@ internal class TorrentPortMapper(
         return Mapped(Gateway.Upnp(gateway, client), mappings,
           if (lease == 0L) LIFETIME_SECONDS else lease)
       } catch (e: UpnpException) {
+        // What this port got mapped already is removed before trying another or giving up.
+        for (added in mappings) {
+          try {
+            upnp.deletePortMapping(gateway, added.protocol, added.externalPort)
+          } catch (cleanup: Exception) {
+            if (cleanup is CancellationException) throw cleanup
+            log.d { "Removing a partial UPnP mapping failed: ${cleanup.describeWithoutUrls()}" }
+          }
+        }
         if (e.code != 718) {
           log.d { "UPnP port mapping refused: ${e.message}" }
           return null

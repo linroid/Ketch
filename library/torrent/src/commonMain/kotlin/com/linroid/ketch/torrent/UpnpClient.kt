@@ -257,13 +257,13 @@ internal class UpnpClient(
     )
     private val URL = Regex("""http://(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?(/[^\s]*)?""",
       RegexOption.IGNORE_CASE)
-    private val SERVICE = Regex("<service>.*?</service>",
-      setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+    // [\s\S] spans lines on every target; DOT_MATCHES_ALL is not common Kotlin.
+    private val SERVICE = Regex("<service>[\\s\\S]*?</service>", RegexOption.IGNORE_CASE)
 
     /** The text of the first element named [name] in [xml], namespace prefixes ignored. */
     fun tag(xml: String, name: String): String? =
-      Regex("<(?:\\w+:)?$name(?:\\s[^>]*)?>(.*?)</(?:\\w+:)?$name>",
-        setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+      Regex("<(?:\\w+:)?$name(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?$name>",
+        RegexOption.IGNORE_CASE)
         .find(xml)?.groupValues?.get(1)
 
     /** An HTTP header's value in [message], case-insensitively. */
