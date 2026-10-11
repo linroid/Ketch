@@ -34,6 +34,9 @@ class PortMappingTest {
    */
   private val replyMs = 2_000L
 
+  /** Room for every removal to wait out its whole [replyMs] window. */
+  private val stopMs = 10_000L
+
   private fun ip(value: String): ByteArray = assertNotNull(numericAddress(value))
 
   private fun gateways(test: suspend CoroutineScope.(TorrentNetwork, CoroutineScope) -> Unit) =
@@ -252,7 +255,7 @@ class PortMappingTest {
       mapper.start()
       // 6881 is taken, so the next candidate, for TCP and UDP alike.
       assertEquals(6888, mapped.first { it != -1 })
-      mapper.stop()
+      mapper.stop(timeoutMs = stopMs)
       val actions = igd.actions.value
       assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping TCP 6888",
         "AddPortMapping UDP 6888", "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"),
@@ -277,7 +280,7 @@ class PortMappingTest {
       mapper.start()
       // The gateway gave TCP another port; UDP asked for that same port.
       assertEquals(6981, mapped.first { it != -1 })
-      mapper.stop()
+      mapper.stop(timeoutMs = stopMs)
       assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests)
     }
 
@@ -296,7 +299,7 @@ class PortMappingTest {
       try {
         mapper.start()
         assertEquals(6888, mapped.first { it != -1 })
-        mapper.stop()
+        mapper.stop(timeoutMs = stopMs)
         assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping UDP 6881",
           "DeletePortMapping TCP 6881", "AddPortMapping TCP 6888", "AddPortMapping UDP 6888",
           "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"), igd.actions.value)
@@ -317,7 +320,7 @@ class PortMappingTest {
       networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
     mapper.start()
     assertEquals(6881, mapped.first { it != -1 })
-    mapper.stop()
+    mapper.stop(timeoutMs = stopMs)
     // TCP, UDP on 6886 then removed; at stop only TCP is left to remove.
     assertEquals(listOf(2 to 3600, 1 to 3600, 1 to 0, 2 to 0), requests)
   }
@@ -339,7 +342,7 @@ class PortMappingTest {
     // DHT binds its socket after the first pass.
     udp = 6881
     withTimeout(5_000) { while (requests.none { it.first == 1 }) delay(20) }
-    mapper.stop()
+    mapper.stop(timeoutMs = stopMs)
   }
 
   @Test
@@ -355,7 +358,7 @@ class PortMappingTest {
     try {
       mapper.start()
       assertNull(reported.await())
-      mapper.stop()
+      mapper.stop(timeoutMs = stopMs)
     } finally {
       silent.close()
     }
