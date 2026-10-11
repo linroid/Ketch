@@ -117,7 +117,7 @@ class DownloadCoordinatorCancelTest {
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
         network = Dispatchers.Default,
-        io = Dispatchers.Default,
+        disk = Dispatchers.Default,
       ),
     )
 

@@ -12,9 +12,9 @@ import kotlin.time.Duration.Companion.seconds
 internal actual fun createDefaultDispatchers(): KetchDispatchers {
   val network = ketchThreadPool("ketch-network", DEFAULT_NETWORK_THREADS)
   return KetchDispatchers(
-    main = network.limitedParallelism(1),
+    main = network,
     network = network,
-    io = ketchThreadPool("ketch-io", DEFAULT_IO_THREADS),
+    disk = ketchThreadPool("ketch-disk", DEFAULT_DISK_THREADS),
   )
 }
 

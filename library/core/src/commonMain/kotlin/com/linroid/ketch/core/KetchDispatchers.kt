@@ -6,12 +6,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 /**
  * Dispatchers used by the Ketch download engine:
  * - [main]: task coordination (scheduling, queue operations, state transitions). Each [Ketch]
- *   runs its coordination on a serial view of it, so it needs no thread of its own.
+ *   runs its coordination on a serial view of its own, so it needs no thread of its own.
  * - [network]: network operations (HTTP requests, segment downloads).
- * - [io]: blocking file I/O (writes, reads, preallocation).
+ * - [disk]: blocking file I/O (writes, reads, preallocation).
  *
- * Every [Ketch] uses [Default] unless given others. The caller owns the dispatchers it passes:
- * [Ketch.close] never closes them.
+ * Every [Ketch] uses [Default] unless given others. [Ketch.close] closes the dispatchers it was
+ * given once its coroutines have finished, never [Default].
  */
 class KetchDispatchers(
   /** Dispatcher for task coordination; each [Ketch] runs one coroutine on it at a time. */
@@ -19,7 +19,7 @@ class KetchDispatchers(
   /** Dispatcher for network operations. */
   val network: CoroutineDispatcher,
   /** Dispatcher for blocking file I/O. */
-  val io: CoroutineDispatcher,
+  val disk: CoroutineDispatcher,
 ) {
   /**
    * Closes the dispatchers that implement [CloseableCoroutineDispatcher], such as thread pools
@@ -27,11 +27,15 @@ class KetchDispatchers(
    * [Default], which every [Ketch] in the process shares.
    */
   fun close() {
-    if (isDefault(this)) return
+    if (isDefault) return
     (main as? CloseableCoroutineDispatcher)?.close()
     (network as? CloseableCoroutineDispatcher)?.close()
-    (io as? CloseableCoroutineDispatcher)?.close()
+    (disk as? CloseableCoroutineDispatcher)?.close()
   }
+
+  /** Whether this is [Default], which nothing may close. */
+  internal val isDefault: Boolean
+    get() = default.isInitialized() && default.value === this
 
   companion object {
     private val default = lazy { createDefaultDispatchers() }
@@ -40,14 +44,12 @@ class KetchDispatchers(
      * The dispatchers every [Ketch] in the process shares unless given others, created on first
      * use. On the JVM and Android they run on Ketch's own daemon threads, apart from the
      * application's `Dispatchers.IO` and `Dispatchers.Default`: at most 8 for [network]
-     * (`ketch-network-N`) and 8 for [io] (`ketch-io-N`), started as work arrives and ended once
-     * idle for 30 seconds. iOS keeps two pools of 8 threads; JS and WasmWasi use
-     * `Dispatchers.Default`. [main] is a serial view of [network].
+     * (`ketch-network-N`) and 8 for [disk] (`ketch-disk-N`), started as work arrives and ended
+     * once idle for 30 seconds. iOS keeps two pools of 8 threads; JS and WasmWasi use
+     * `Dispatchers.Default`. [main] is [network] itself: each [Ketch] coordinates on a serial
+     * view of its own, so instances never wait for each other.
      */
     val Default: KetchDispatchers
       get() = default.value
-
-    private fun isDefault(dispatchers: KetchDispatchers): Boolean =
-      default.isInitialized() && default.value === dispatchers
   }
 }

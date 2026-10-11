@@ -539,7 +539,7 @@ internal class DownloadExecution(
         val accessor = if (selfManagedIo) {
           NoOpFileAccessor
         } else {
-          openFile(prepared.target.writePath, dispatchers.io)
+          openFile(prepared.target.writePath, dispatchers.disk)
         }
         opened = accessor
         fileAccessor = accessor
@@ -710,7 +710,7 @@ internal class DownloadExecution(
     val origin = if (expected != null) "requested" else "published"
     log.i { "Verifying taskId=$taskId against the $origin ${target.algorithm.label} checksum" }
     val actual = try {
-      withContext(dispatchers.io) { fileDigest(fa, target.algorithm, size) }
+      withContext(dispatchers.disk) { fileDigest(fa, target.algorithm, size) }
     } catch (e: CancellationException) {
       throw e
     } catch (e: UnsupportedOperationException) {
@@ -769,7 +769,7 @@ internal class DownloadExecution(
       log.w { "Checksum mismatch for empty taskId=$taskId: ${wanted.algorithm.label}" }
       throw mismatch(wanted, empty, published = expected == null)
     }
-    val fa = openFile(target.writePath, dispatchers.io)
+    val fa = openFile(target.writePath, dispatchers.disk)
     try {
       // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
       fa.preallocate(0)
@@ -1049,7 +1049,7 @@ internal class DownloadExecution(
    */
   private suspend fun moveToFinal(target: OutputTarget): String {
     val partial = target.partial ?: return target.path
-    return withContext(dispatchers.io) {
+    return withContext(dispatchers.disk) {
       try {
         when {
           partial.contains("://") -> finishPartialDocument(partial) ?: partial.also {

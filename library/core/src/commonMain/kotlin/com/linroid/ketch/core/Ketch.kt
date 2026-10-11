@@ -70,7 +70,10 @@ import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -87,6 +90,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -117,7 +122,8 @@ import kotlin.uuid.Uuid
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
  *   are bounded, but network transfers suspend instead of blocking a thread, so their size does
- *   not limit how many connections a download can use. [close] never closes them.
+ *   not limit how many connections a download can use. [close] closes dispatchers passed here
+ *   once its coroutines have finished, never [KetchDispatchers.Default].
  */
 @OptIn(ExperimentalAtomicApi::class)
 class Ketch(
@@ -1094,14 +1100,33 @@ class Ketch(
     }
   }.distinctUntilChanged()
 
-  /** Stops every task and releases the engine. It never closes [dispatchers]. */
+  /**
+   * Stops every task and releases the engine, then closes [dispatchers] once its coroutines have
+   * finished; [KetchDispatchers.Default] stays open for every other instance.
+   */
   override fun close() {
     log.i { "Closing Ketch" }
-    coordinator.close()
+    val executions = coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()
     sourceResolver.close()
     httpEngine.close()
+    if (!dispatchers.isDefault) {
+      closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
+    }
+  }
+
+  /**
+   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
+   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
+   * Native pool cannot close from one of its own threads.
+   */
+  @OptIn(DelicateCoroutinesApi::class)
+  private fun closeDispatchersAfter(jobs: List<Job>) {
+    GlobalScope.launch(Dispatchers.Default) {
+      jobs.joinAll()
+      dispatchers.close()
+    }
   }
 }
 

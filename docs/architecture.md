@@ -107,13 +107,14 @@ Platform-specific code is minimized to a few expect/actual declarations:
 | `KetchDispatchers.Default` | Idle-exiting thread pools | Idle-exiting pools (JVM) / fixed pools (iOS) | `Dispatchers.Default` |
 
 `KetchDispatchers` separates task coordination (`main`), network transfers (`network`) and file
-I/O (`io`). Every `Ketch` uses `KetchDispatchers.Default` unless given others, created once per
+I/O (`disk`). Every `Ketch` uses `KetchDispatchers.Default` unless given others, created once per
 process and shared by every instance. On Android and the JVM it runs on Ketch's own daemon
 threads, never the application's `Dispatchers.IO` or `Dispatchers.Default`: at most 8
-`ketch-network-N` and 8 `ketch-io-N` threads, started as work arrives and ended once idle for 30
-seconds, so an idle process holds none. iOS keeps two pools of 8 threads. `main` is a serial view
-of `network`, and each `Ketch` coordinates its tasks one at a time on a view of it. Pass your own
-dispatchers with `Ketch(dispatchers = ...)`; `Ketch.close()` never closes them.
+`ketch-network-N` and 8 `ketch-disk-N` threads, started as work arrives and ended once idle for 30
+seconds, so an idle process holds none. iOS keeps two pools of 8 threads. `main` is `network`
+itself, and each `Ketch` coordinates its tasks one at a time on a serial view of its own, so
+instances never wait for each other. Pass your own dispatchers with `Ketch(dispatchers = ...)`;
+`Ketch.close()` closes them once its coroutines have finished, never `KetchDispatchers.Default`.
 
 ## Download Pipeline
 

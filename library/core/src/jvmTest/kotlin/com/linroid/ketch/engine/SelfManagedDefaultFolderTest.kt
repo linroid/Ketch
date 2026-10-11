@@ -67,7 +67,7 @@ class SelfManagedDefaultFolderTest {
     val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
       DefaultFileNameResolver(), config, SpeedLimiter.Unlimited,
       KetchDispatchers(main = Dispatchers.Default, network = Dispatchers.Default,
-        io = Dispatchers.Default))
+        disk = Dispatchers.Default))
 
     execution.execute()
 

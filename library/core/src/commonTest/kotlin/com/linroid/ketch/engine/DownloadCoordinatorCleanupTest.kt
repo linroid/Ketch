@@ -73,7 +73,7 @@ class DownloadCoordinatorCleanupTest {
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
         network = Dispatchers.Default,
-        io = Dispatchers.Default,
+        disk = Dispatchers.Default,
       ),
     )
 

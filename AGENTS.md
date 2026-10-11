@@ -372,8 +372,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
-  `DOWNLOADING` records, so the next `start()` resumes them. It never closes its dispatchers
-  (`KetchDispatchers.close()` is the caller's, and does nothing for `KetchDispatchers.Default`)
+  `DOWNLOADING` records, so the next `start()` resumes them. It closes dispatchers it was given
+  only once the cancelled coroutines have finished (from `Dispatchers.Default`), never under
+  them, and never `KetchDispatchers.Default`, whose `close()` does nothing
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
@@ -1474,14 +1475,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `KetchDispatchers.Default` (`createDefaultDispatchers()`), created once per process and shared
   by every `Ketch` given no dispatchers: Ketch's own daemon threads, apart from the app's
   `Dispatchers.IO`/`Default`. On Android/JVM (`jvmAndAndroidMain`, `ketchThreadPool`) at most 8
-  `ketch-network-N` and 8 `ketch-io-N` threads, started as work arrives and ended after 30 s
-  idle; on iOS two pools of 8; `Dispatchers.Default` on JS/WasmWasi. `main` is a serial view of
-  `network`, so there is no coordination thread
+  `ketch-network-N` and 8 `ketch-disk-N` threads, started as work arrives and ended after 30 s
+  idle; on iOS two pools of 8; `Dispatchers.Default` on JS/WasmWasi. `main` is `network` itself,
+  so there is no coordination thread, and each `Ketch` takes a serial view of its own
 - Console logger: platform-specific implementations
 
 ### Coroutine-Based Concurrency
 - Each `Ketch` serializes task coordination on a `limitedParallelism(1)` view of
-  `KetchDispatchers.main`; `network` runs transfers and `io` blocking file I/O
+  `KetchDispatchers.main`; `network` runs transfers and `disk` blocking file I/O
 - Segments run as `async` children of one `coroutineScope`: a failed segment cancels the batch
   and the retry continues from saved segment progress; a connection change cancels and
   resegments it

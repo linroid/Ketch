@@ -91,7 +91,7 @@ class SelfManagedExecutionTest {
     val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
       DefaultFileNameResolver(), DownloadConfig(saveIntervalMs = 60_000), SpeedLimiter.Unlimited,
       KetchDispatchers(main = Dispatchers.Default, network = Dispatchers.Default,
-        io = Dispatchers.Default))
+        disk = Dispatchers.Default))
     val job = launch { execution.execute() }
     started.await()
     assertEquals(0L, execution.totalBytes)
@@ -133,7 +133,7 @@ class SelfManagedExecutionTest {
     val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
       DefaultFileNameResolver(), DownloadConfig.Default, SpeedLimiter.Unlimited,
       KetchDispatchers(main = Dispatchers.Default, network = Dispatchers.Default,
-        io = Dispatchers.Default))
+        disk = Dispatchers.Default))
 
     assertFailsWith<KetchError.SourceError> { execution.execute() }
     assertEquals(0, downloads)

@@ -4,7 +4,8 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.engine.FakeHttpEngine
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -12,11 +13,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.nio.file.Files
-import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -42,6 +43,28 @@ class KetchDispatchersTest {
       first.close()
       second.close()
     }
+    // Closing an instance leaves the shared dispatchers to the others.
+    runBlocking {
+      assertEquals(1, withContext(KetchDispatchers.Default.network) { 1 })
+      assertEquals(1, withContext(KetchDispatchers.Default.disk) { 1 })
+    }
+  }
+
+  @Test
+  fun default_serialViewsOfMainRunAtTheSameTime(): Unit = runBlocking {
+    // Each Ketch coordinates on main.limitedParallelism(1): one instance's view must never wait
+    // for another's, as it would if main were itself a serial view shared by the process.
+    val first = KetchDispatchers.Default.main.limitedParallelism(1)
+    val second = KetchDispatchers.Default.main.limitedParallelism(1)
+    val bothRunning = CountDownLatch(2)
+    withTimeout(5.seconds) {
+      listOf(first, second).map { view ->
+        async(view) {
+          bothRunning.countDown()
+          check(bothRunning.await(3, TimeUnit.SECONDS)) { "The views ran one after the other" }
+        }
+      }.awaitAll()
+    }
   }
 
   @Test
@@ -64,11 +87,11 @@ class KetchDispatchersTest {
     val threads = Thread.getAllStackTraces().keys
     assertTrue(threads.none { it.name.startsWith("ketch-main") })
     val network = threads.filter { it.name.startsWith("ketch-network-") }
-    val io = threads.filter { it.name.startsWith("ketch-io-") }
-    assertTrue(network.isNotEmpty() && io.isNotEmpty())
-    assertTrue((network + io).all { it.isDaemon })
+    val disk = threads.filter { it.name.startsWith("ketch-disk-") }
+    assertTrue(network.isNotEmpty() && disk.isNotEmpty())
+    assertTrue((network + disk).all { it.isDaemon })
     assertTrue(network.size <= DEFAULT_NETWORK_THREADS)
-    assertTrue(io.size <= DEFAULT_IO_THREADS)
+    assertTrue(disk.size <= DEFAULT_DISK_THREADS)
   }
 
   @Test
@@ -87,26 +110,9 @@ class KetchDispatchersTest {
   }
 
   @Test
-  fun close_leavesCallerDispatchersOpen() = runBlocking {
-    val executor = Executors.newSingleThreadExecutor()
-    val dispatcher = executor.asCoroutineDispatcher()
-    val ketch = Ketch(
-      httpEngine = FakeHttpEngine(),
-      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
-    )
-    try {
-      ketch.close()
-      assertEquals(1, withContext(dispatcher) { 1 })
-      assertFalse(executor.isShutdown)
-    } finally {
-      executor.shutdown()
-    }
-  }
-
-  @Test
   fun close_onDefault_leavesItRunning() = runBlocking {
     KetchDispatchers.Default.close()
     assertEquals(1, withContext(KetchDispatchers.Default.network) { 1 })
-    assertEquals(1, withContext(KetchDispatchers.Default.io) { 1 })
+    assertEquals(1, withContext(KetchDispatchers.Default.disk) { 1 })
   }
 }
