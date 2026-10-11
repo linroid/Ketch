@@ -210,6 +210,24 @@ class TorrentLocalDiscoveryTest {
   }
 
   @Test
+  fun accept_deliversAPeerToEveryParticipantOfItsHash() = runTest {
+    val transport = FakeLsdTransport()
+    val service = service(transport)
+    // A task and a magnet lookup of the same torrent.
+    val task = mutableListOf<Pair<ByteString, PeerEndpoint>>()
+    val lookup = mutableListOf<Pair<ByteString, PeerEndpoint>>()
+    join(service, task, hashA)
+    join(service, lookup, hashA)
+    runCurrent()
+    transport.announceFrom("192.168.1.20", 7000, hashA)
+    transport.announceFrom("192.168.1.20", 7000, hashA)
+    runCurrent()
+    val peer = hashA to PeerEndpoint("192.168.1.20", 7000)
+    assertEquals(listOf(peer), task)
+    assertEquals(listOf(peer), lookup)
+  }
+
+  @Test
   fun accept_deliversPeersOfOurTorrentsOncePerMinute() = runTest {
     val transport = FakeLsdTransport()
     val service = service(transport)

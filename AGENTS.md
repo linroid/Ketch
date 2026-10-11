@@ -524,7 +524,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5 minutes, at most
   once a minute per hash, and hands the peers others announce to the torrent (v1: its discovery
   channel, counted as `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2
-  hash in v2 mode and a hybrid's v1 hash in v1 mode). It accepts private and link-local senders
+  hash in v2 mode and a hybrid's v1 hash in v1 mode). A public magnet's metadata lookup
+  (`discoverMagnet`, not tracker-only ones) participates too, under its btih or the truncated
+  btmh hash, until the metadata is found or the lookup stops, and asks the LAN peers announced
+  for it for the metadata like DHT and tracker peers. It accepts private and link-local senders
   only, never its own cookie, 32 at once then 4 a second, each peer once a minute per torrent.
   `openLsdMulticast` is a `MulticastSocket` with `SO_REUSEADDR` joined on each private IPv4
   interface (jvmAndAndroidMain) and `null` on iOS (multicast needs Apple's entitlement); IPv4
@@ -786,7 +789,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
 - Android 17 blocks the local network until `ACCESS_LOCAL_NETWORK` is granted: `NearbyAccess`
   asks before searching for or connecting to a device (13 to 16 ask `NEARBY_WIFI_DEVICES` only to
-  search), and `MainActivity` asks once a remote device is saved or this device is shared
+  search), and `MainActivity` asks once a remote device is saved or this device is shared, and
+  once ever (`local_peers_offered`) when local peer discovery first wants the LAN
+  (`KetchService.lanPeerSearchStarted`, set as the engine takes its multicast lock); switching
+  Settings → BitTorrent → Local peer discovery on asks through `NearbyAccess`. The engine knows
+  nothing of it: without the permission it fails to join the group and retries
 - Every keyboard command lives in `KetchCommands`, each in a `CommandScope` (Global, List,
   Intake, Palette, Discover): `ShortcutHost` runs the global chords, and the list, the add
   sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`

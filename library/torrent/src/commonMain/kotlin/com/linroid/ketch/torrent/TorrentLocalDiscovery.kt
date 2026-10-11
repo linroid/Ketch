@@ -338,15 +338,16 @@ internal class TorrentLocalDiscovery(
         members.flatMap { member -> member.filter { it.hash == hash } }
       }
     }
-    for (topic in targets) {
-      val key = topic.hash to peer
+    // Every participant of a hash hears the peer, as a task and a magnet lookup may share it.
+    for ((hash, topics) in targets.groupBy { it.hash }) {
+      val key = hash to peer
       val last = delivered[key]
       if (last != null && now - last < MIN_INTERVAL_MS) continue
       delivered.remove(key)
       delivered[key] = now
       if (delivered.size > MAX_REMEMBERED) delivered.remove(delivered.keys.first())
-      log.v { "LAN peer $peer for ${logHash(topic.hash.hex())}" }
-      topic.deliver(peer)
+      log.v { "LAN peer $peer for ${logHash(hash.hex())}" }
+      for (topic in topics) topic.deliver(peer)
     }
   }
 

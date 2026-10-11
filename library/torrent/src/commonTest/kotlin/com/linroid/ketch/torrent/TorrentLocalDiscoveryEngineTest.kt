@@ -3,6 +3,8 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,8 +20,10 @@ import okio.IOException
 import okio.Path
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** How the engine announces its public torrents on the LAN and dials the peers found there. */
@@ -82,7 +86,7 @@ class TorrentLocalDiscoveryEngineTest {
   /** Runs [body] against a started engine that joins [lan] instead of a multicast group. */
   private suspend fun engine(
     lan: FakeLsdTransport,
-    network: Recording,
+    network: TorrentNetwork,
     config: TorrentConfig = TorrentConfig(dhtEnabled = false,
       encryption = TorrentEncryption.DISABLED),
     body: suspend (KotlinTorrentEngine, Path) -> Unit,
@@ -200,6 +204,51 @@ class TorrentLocalDiscoveryEngineTest {
       delay(500)
       assertTrue(lan.closes.load() >= 1)
       assertFalse(network.dials.value.any { it.remote.host == "192.168.1.20" })
+    }
+  }
+
+  @Test
+  fun magnet_fetchesMetadataFromALanPeer() = runTest {
+    val lan = FakeLsdTransport()
+    val loopback = createTorrentNetwork()
+    val listener = loopback.listen(PeerEndpoint("127.0.0.1", 0))
+    val lanPeer = PeerEndpoint("192.168.1.20", 7000)
+    // The LAN address reaches the peer listening on loopback; nothing else is dialed.
+    val network = object : TorrentNetwork by loopback {
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        if (remote != lanPeer) throw IOException("Unexpected peer")
+        return loopback.connect(listener.local)
+      }
+    }
+    val metadata = v1Metadata(privateTorrent = false)
+    val hash = metadata.infoHash.toBytes().toByteString()
+    val server = async(Dispatchers.Default) {
+      val connection = listener.accept()
+      try {
+        val wire = PeerWire(connection)
+        wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
+        wire.read() as PeerMessage.Extended
+        wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+          "m" to mapOf("ut_metadata" to 7L), "metadata_size" to metadata.infoBytes.size.toLong()
+        ))))
+        assertEquals(7, (wire.read() as PeerMessage.Extended).id)
+        wire.send(TorrentMetadataExchange.response(1, 0, metadata))
+      } finally { connection.close() }
+    }
+    try {
+      engine(lan, network) { engine, _ ->
+        val resolved = async {
+          engine.fetchMetadata("magnet:?xt=urn:btih:${metadata.infoHash.hex}")
+        }
+        assertEquals(listOf(hash), lan.sent.first { it.isNotEmpty() }.single().hashes)
+        lan.announceFrom(lanPeer.host, lanPeer.port, hash)
+        assertContentEquals(metadata.infoBytes, assertNotNull(resolved.await()).infoBytes)
+        // Found: the resolve leaves the group.
+        while (lan.closes.load() < 1) delay(10)
+      }
+    } finally {
+      server.cancelAndJoin()
+      listener.close()
     }
   }
 }

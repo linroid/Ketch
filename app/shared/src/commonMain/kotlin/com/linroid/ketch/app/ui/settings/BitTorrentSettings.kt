@@ -42,6 +42,7 @@ import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.rememberNearbyAccess
 import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
@@ -268,10 +269,12 @@ private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -
 /**
  * How this device reaches peers: protocol encryption, uTP, asking the router to forward its
  * port and finding peers on the local network. Each applies to connections opened after the
- * change.
+ * change. Switching local peer discovery on asks for the local network where the system blocks
+ * it (Android 17), as joining the LAN group would otherwise fail silently.
  */
 @Composable
 private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  val nearby = rememberNearbyAccess()
   SettingsGroup(
     title = stringResource(Res.string.settings_torrent_connections),
     footer = stringResource(Res.string.settings_torrent_connections_footer),
@@ -307,7 +310,10 @@ private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettin
         title = stringResource(Res.string.settings_torrent_local_discovery),
         description = stringResource(Res.string.settings_torrent_local_discovery_hint),
         checked = settings.localDiscovery,
-        onCheckedChange = { onChange(settings.copy(localDiscovery = it)) },
+        onCheckedChange = { on ->
+          onChange(settings.copy(localDiscovery = on))
+          if (on) nearby.request(search = false) {}
+        },
       )
     }
   }
