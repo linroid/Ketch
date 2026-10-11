@@ -580,4 +580,34 @@ class TorrentV2PieceSchedulerTest {
     assertFalse(scheduler.isVerified(1))
     assertTrue(scheduler.isNeeded(1))
   }
+
+  @Test
+  fun claimWebSeed_takesFreePiecesThenDuplicatesAssembledOnesInTheEndgame() {
+    val buffers = TorrentBufferBudget(1024 * 1024)
+    val state = TorrentBufferBudget(1024 * 1024)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state, maxActive = 4))
+    // A peer assembles piece 0, so a web seed starts with the free piece 1.
+    assertTrue(scheduler.begin(0))
+    val first = assertNotNull(scheduler.claimWebSeed())
+    assertEquals(1, first.index)
+    assertEquals(layout.v2Piece(1).length.toInt(), first.bytes.size)
+    // Nothing is free: the piece the peer assembles is fetched too, but by one seed only.
+    val second = assertNotNull(scheduler.claimWebSeed())
+    assertEquals(0, second.index)
+    assertNull(scheduler.claimWebSeed())
+    scheduler.webSeedDone(0, verified = true)
+    second.lease.close()
+    assertTrue(scheduler.isVerified(0))
+    // The peer's assembly of a piece the seed stored goes.
+    assertEquals(1, scheduler.evictUnwanted())
+    scheduler.webSeedDone(1, verified = false)
+    first.lease.close()
+    assertFalse(scheduler.completed())
+    val again = assertNotNull(scheduler.claimWebSeed())
+    assertEquals(1, again.index)
+    again.lease.close()
+    scheduler.close()
+    assertEquals(0, buffers.allocated)
+  }
 }

@@ -9,3 +9,5 @@ actual val isMobilePlatform: Boolean = true
 internal actual val HorizontalResizePointerIcon: PointerIcon = PointerIcon.Default
 
 internal actual val keepAwakeSupported: Boolean = false
+
+internal actual val localPeerDiscoverySupported: Boolean = false

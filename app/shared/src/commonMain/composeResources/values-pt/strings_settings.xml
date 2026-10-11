@@ -554,6 +554,8 @@
   <string name="settings_torrent_utp_hint">Também alcança peers por UDP, o que funciona com mais peers atrás de roteadores e desacelera quando o resto do seu tráfego precisa da banda.</string>
   <string name="settings_torrent_port_mapping">Redirecionamento de porta</string>
   <string name="settings_torrent_port_mapping_hint">Pede ao seu roteador (UPnP ou NAT-PMP) para redirecionar uma porta, para que mais peers possam se conectar a este dispositivo.</string>
+  <string name="settings_torrent_local_discovery">Descoberta de peers locais</string>
+  <string name="settings_torrent_local_discovery_hint">Encontra dispositivos na sua rede local que baixam ou compartilham os mesmos torrents públicos, para que troquem partes diretamente.</string>
   <string name="settings_torrent_connections_footer">A criptografia esconde que tipo de tráfego é, não com quem você se conecta.</string>
   <string name="settings_torrent_trackers">Trackers extras</string>
   <string name="settings_torrent_no_trackers">Nenhum tracker extra</string>

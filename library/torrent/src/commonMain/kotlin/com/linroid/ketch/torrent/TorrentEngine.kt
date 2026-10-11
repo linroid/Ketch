@@ -98,6 +98,9 @@ internal interface TorrentEngine {
 
   /** Starts or stops asking the router to forward the listen port. */
   suspend fun setPortMapping(enabled: Boolean) {}
+
+  /** Starts or stops announcing public torrents on the LAN and hearing peers there (BEP 14). */
+  suspend fun setLocalDiscovery(enabled: Boolean) {}
 }
 
 internal data class TorrentTaskSpec(

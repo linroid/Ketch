@@ -542,6 +542,8 @@
   <string name="settings_torrent_utp_hint">也通过 UDP 连接节点，能连上更多位于路由器后的节点，并在其他流量需要带宽时主动降速。</string>
   <string name="settings_torrent_port_mapping">端口转发</string>
   <string name="settings_torrent_port_mapping_hint">请求路由器（UPnP 或 NAT-PMP）转发一个端口，让更多节点能连接到此设备。</string>
+  <string name="settings_torrent_local_discovery">本地节点发现</string>
+  <string name="settings_torrent_local_discovery_hint">查找本地网络中下载或分享相同公开种子的设备，让它们直接交换数据块。</string>
   <string name="settings_torrent_connections_footer">加密隐藏的是流量类型，而不是连接的对象。</string>
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>

@@ -215,6 +215,7 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
       encryption = config.torrent.encryption.toEncryption(),
       utpEnabled = config.torrent.utp,
       portMapping = config.torrent.portMapping,
+      localDiscovery = config.torrent.localDiscovery,
     ),
   )
   return InstanceManager(
@@ -242,6 +243,7 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
         torrentSource.setEncryption(it.encryption.toEncryption())
         torrentSource.setUtpEnabled(it.utp)
         torrentSource.setPortMapping(it.portMapping)
+        torrentSource.setLocalDiscovery(it.localDiscovery)
       },
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {

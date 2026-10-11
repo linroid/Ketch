@@ -29,6 +29,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.platform.localPeerDiscoverySupported
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
@@ -41,6 +42,7 @@ import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.rememberNearbyAccess
 import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
@@ -74,6 +76,8 @@ import ketch.app.shared.generated.resources.settings_torrent_list_trackers
 import ketch.app.shared.generated.resources.settings_torrent_list_update
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
 import ketch.app.shared.generated.resources.settings_torrent_list_url_invalid
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery_hint
 import ketch.app.shared.generated.resources.settings_torrent_no_trackers
 import ketch.app.shared.generated.resources.settings_torrent_port_mapping
 import ketch.app.shared.generated.resources.settings_torrent_port_mapping_hint
@@ -263,11 +267,14 @@ private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -
 }
 
 /**
- * How this device reaches peers: protocol encryption, uTP and asking the router to forward its
- * port. Each applies to connections opened after the change.
+ * How this device reaches peers: protocol encryption, uTP, asking the router to forward its
+ * port and finding peers on the local network. Each applies to connections opened after the
+ * change. Switching local peer discovery on asks for the local network where the system blocks
+ * it (Android 17), as joining the LAN group would otherwise fail silently.
  */
 @Composable
 private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  val nearby = rememberNearbyAccess()
   SettingsGroup(
     title = stringResource(Res.string.settings_torrent_connections),
     footer = stringResource(Res.string.settings_torrent_connections_footer),
@@ -297,6 +304,18 @@ private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettin
       checked = settings.portMapping,
       onCheckedChange = { onChange(settings.copy(portMapping = it)) },
     )
+    // Only the embedded device's settings show here, so its platform decides.
+    if (localPeerDiscoverySupported) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_local_discovery),
+        description = stringResource(Res.string.settings_torrent_local_discovery_hint),
+        checked = settings.localDiscovery,
+        onCheckedChange = { on ->
+          onChange(settings.copy(localDiscovery = on))
+          if (on) nearby.request(search = false) {}
+        },
+      )
+    }
   }
 }
 

@@ -67,6 +67,8 @@ internal class TorrentV2Runtime(
   val onDhtNode: (PeerEndpoint) -> Unit = {},
   /** Test hook: hears how each peer connection of the session ended, for diagnostics. */
   val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
+  /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
+  val webSeedHttp: TorrentHttp? = null,
 )
 
 /** Per-owner limits and the discovery it runs while transferring. */
@@ -93,6 +95,8 @@ internal class TorrentV2SessionOptions(
    * seeding included.
    */
   val connections: ConnectionReporter = ConnectionReporter.None,
+  /** The first backoff of a failed web seed; tests pass a short one. */
+  val webSeedRetryMs: Long = WEB_SEED_RETRY_MS,
 )
 
 /** Discovery's only view of a session, valid for one transfer. */
@@ -160,6 +164,7 @@ internal class TorrentV2DownloadSession private constructor(
   private val waitForPeers = options.waitForPeers
   private val seedOnly = options.seedOnly
   private val reporter = options.connections
+  private val webSeedRetryMs = options.webSeedRetryMs
   private val fileIds: Set<String> = TorrentOutputMapping.from(document).files.mapTo(HashSet()) {
     it.id
   }
@@ -571,6 +576,15 @@ internal class TorrentV2DownloadSession private constructor(
     val selecting = launch {
       for (done in selections) loopControls.send(TorrentV2SessionLoop.Control.Select(done))
     }
+    // Mirrors pay the same limits as peers: the engine's, this owner's, then the task's.
+    val webSeeds = TorrentV2WebSeeds.of(document, layout, store, runtime.webSeedHttp, reporter,
+      label, webSeedRetryMs) { bytes ->
+      globalRate.acquire(bytes)
+      downloadRate.acquire(bytes)
+      throttle(bytes)
+      store.recordReceived(bytes)
+    }
+    val mirrors = webSeeds?.let { launch { it.run() } }
     try {
       PeerV2Pool.run(memory, maxPeers = maxPeers) { pool ->
         PeerV2Dialer.run(dial, memory, parallelism = DIAL_WORKERS,
@@ -630,7 +644,7 @@ internal class TorrentV2DownloadSession private constructor(
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
                   onRoom = room::store, onIncomplete = ::incomplete,
-                  incomingFailures = incomingFailures))
+                  incomingFailures = incomingFailures, webSeeds = webSeeds))
             }
           }
         }
@@ -640,6 +654,8 @@ internal class TorrentV2DownloadSession private constructor(
       withContext(NonCancellable) {
         try {
           charging?.cancelAndJoin()
+          mirrors?.cancelAndJoin()
+          webSeeds?.close()
           discovery.cancelAndJoin()
           limits.cancelAndJoin()
           selecting.cancelAndJoin()

@@ -538,7 +538,10 @@ class TorrentV2UploadTest {
   @Test
   fun haveReachesEveryPeerAfterCommit() = upload {
     run { coroutineScope {
-      val leechers = listOf(connect(1), connect(2))
+      // Peers that become ready after a commit learn of that piece from their bitfield instead,
+      // so the seed connects once the leechers are ready: each saw our extension handshake.
+      val leechers = listOf(connect(1, extensions = true), connect(2, extensions = true))
+      for (leecher in leechers) assertIs<PeerMessage.Extended>(leecher.next())
       val seed = connect(3)
       seed.send(PeerMessage.Bitfield(all(pieceCount)))
       seed.send(unchoke)

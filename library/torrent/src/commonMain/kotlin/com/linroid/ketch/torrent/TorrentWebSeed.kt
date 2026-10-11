@@ -77,8 +77,12 @@ internal class WebSeedLayout(private val metadata: TorrentMetadata, base: String
 }
 
 /** Percent-encodes one path segment as UTF-8, keeping only unreserved characters. */
-internal fun encodeWebSeedSegment(segment: String): String = buildString {
-  for (byte in segment.encodeToByteArray()) {
+internal fun encodeWebSeedSegment(segment: String): String =
+  encodeWebSeedSegment(segment.encodeToByteArray())
+
+/** Percent-encodes the raw bytes of one path segment, keeping only unreserved characters. */
+internal fun encodeWebSeedSegment(segment: ByteArray): String = buildString {
+  for (byte in segment) {
     val code = byte.toInt() and 0xFF
     val char = code.toChar()
     if (char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9' || char in "-._~") append(char)
@@ -105,19 +109,47 @@ internal class WebSeedStats {
       "webSeedPayload=${payload.load()}, webSeedFailures=${failures.load()}"
 }
 
+/** A piece one web seed fetches into [bytes], which it owns until it releases the piece. */
+internal interface WebSeedPiece {
+  val index: Int
+  val bytes: ByteArray
+}
+
+/**
+ * Where a [WebSeedWorker]'s pieces come from and go: a v1 swarm's scheduler and store, or a v2
+ * session loop and its store. Called from the worker's coroutine only.
+ */
+internal interface WebSeedPieces<P : WebSeedPiece> {
+  /** The next piece to fetch, or null when there is none to fetch now. */
+  suspend fun claim(): P?
+
+  /** Waits, the seed's connection closed, until [claim] may have a piece again. */
+  suspend fun idle()
+
+  /** The requests that fetch [piece], in the order of its bytes. */
+  fun spans(piece: P): List<WebSeedSpan>
+
+  /** Verifies [piece] and writes it once it does; an [IOException] is a storage failure. */
+  suspend fun commit(piece: P): CommitOutcome
+
+  /** Gives [piece] back, stored or not; runs once for every claimed piece, never cancelled. */
+  suspend fun release(piece: P)
+
+  /** The seed stopped: dropped, or its transfer ended. Never cancelled. */
+  suspend fun stop()
+}
+
 /**
  * Downloads whole pieces from one web seed, one HTTP range request per file a piece spans, and
- * verifies each like a peer's. To the [scheduler] it is a peer with every piece that claims them
- * in order, so it never fetches what a peer or another seed fetches, except in the endgame.
- * A failed request or piece backs it off, doubling from [retryMs]; [MAX_FAILURES] failures in a
- * row drop it for the rest of the run. Only [TorrentStorageException] escapes [run].
+ * verifies each like a peer's. [pieces] hands it pieces nobody else fetches, except in the
+ * endgame. A failed request or piece backs it off, doubling from [retryMs]; [MAX_FAILURES]
+ * failures in a row drop it for the rest of the run. Only [TorrentStorageException] escapes
+ * [run].
  */
 @OptIn(ExperimentalAtomicApi::class)
-internal class WebSeedWorker(
-  private val id: Int,
+internal class WebSeedWorker<P : WebSeedPiece>(
   private val url: String,
-  private val store: TorrentPieceStore,
-  private val scheduler: TorrentPieceScheduler,
+  private val pieces: WebSeedPieces<P>,
   private val http: TorrentHttp,
   private val stats: WebSeedStats,
   private val logLabel: String,
@@ -126,23 +158,20 @@ internal class WebSeedWorker(
   private val idleTimeoutMs: Long = WEB_SEED_IDLE_MS,
   /** Counts and rate-limits payload, as for peers. */
   private val downloadPayload: suspend (Int) -> Unit = {},
-  private val onVerified: () -> Unit = {},
 ) {
   private val log = KetchLogger("TorrentWebSeed")
-  private val layout = WebSeedLayout(store.metadata, url)
   private val label = redactUrl(url)
   private var connection: ConnectionHandle? = null
 
   suspend fun run() {
     var failures = 0
     try {
-      scheduler.availability(id, BooleanArray(store.pieceCount) { true })
       while (true) {
-        val claim = scheduler.claim(id, sequential = true)
+        val claim = pieces.claim()
         if (claim == null) {
           // Nothing left to fetch, or no buffer free: the selection may still grow.
           disconnect()
-          delay(WEB_SEED_IDLE_POLL_MS)
+          pieces.idle()
           continue
         }
         val failure = try {
@@ -155,7 +184,7 @@ internal class WebSeedWorker(
         } catch (e: Exception) {
           e
         } finally {
-          withContext(NonCancellable) { scheduler.release(id) }
+          withContext(NonCancellable) { pieces.release(claim) }
         }
         if (failure == null) {
           failures = 0
@@ -181,13 +210,13 @@ internal class WebSeedWorker(
       }
     } finally {
       disconnect()
-      withContext(NonCancellable) { scheduler.remove(id) }
+      withContext(NonCancellable) { pieces.stop() }
     }
   }
 
-  private suspend fun fetch(claim: TorrentPieceScheduler.Claim) {
+  private suspend fun fetch(claim: P) {
     val handle = connection ?: open().also { connection = it }
-    for (span in layout.spans(claim.index, claim.bytes.size)) {
+    for (span in pieces.spans(claim)) {
       var position = span.offset
       val end = span.offset + (span.range.last - span.range.first + 1).toInt()
       observe(handle) {
@@ -202,12 +231,8 @@ internal class WebSeedWorker(
       }
       if (position != end) throw IOException("Web seed response ended early")
     }
-    when (webSeedStorage { store.commit(claim.index, claim.bytes) }) {
-      CommitOutcome.VERIFIED -> {
-        scheduler.verified(claim.index)
-        stats.pieces.incrementAndFetch()
-        onVerified()
-      }
+    when (webSeedStorage { pieces.commit(claim) }) {
+      CommitOutcome.VERIFIED -> stats.pieces.incrementAndFetch()
       // The selection dropped the piece while it arrived.
       CommitOutcome.NOT_WANTED -> Unit
       CommitOutcome.CORRUPT -> {
@@ -260,6 +285,51 @@ internal class WebSeedWorker(
 
     private const val SOURCE = "torrent"
     private const val PROTOCOL = "HTTP"
+  }
+}
+
+/**
+ * A v1 swarm's pieces for one web seed: to the [scheduler] it is a peer with every piece that
+ * claims them in order, so it never fetches what a peer or another seed fetches, except in the
+ * endgame.
+ */
+internal class SwarmWebSeedPieces(
+  private val id: Int,
+  url: String,
+  private val store: TorrentPieceStore,
+  private val scheduler: TorrentPieceScheduler,
+  private val onVerified: () -> Unit = {},
+) : WebSeedPieces<TorrentPieceScheduler.Claim> {
+  private val layout = WebSeedLayout(store.metadata, url)
+  private var joined = false
+
+  override suspend fun claim(): TorrentPieceScheduler.Claim? {
+    if (!joined) {
+      scheduler.availability(id, BooleanArray(store.pieceCount) { true })
+      joined = true
+    }
+    return scheduler.claim(id, sequential = true)
+  }
+
+  override suspend fun idle() = delay(WEB_SEED_IDLE_POLL_MS)
+
+  override fun spans(piece: TorrentPieceScheduler.Claim): List<WebSeedSpan> =
+    layout.spans(piece.index, piece.bytes.size)
+
+  override suspend fun commit(piece: TorrentPieceScheduler.Claim): CommitOutcome =
+    store.commit(piece.index, piece.bytes).also { outcome ->
+      if (outcome == CommitOutcome.VERIFIED) {
+        scheduler.verified(piece.index)
+        onVerified()
+      }
+    }
+
+  override suspend fun release(piece: TorrentPieceScheduler.Claim) {
+    scheduler.release(id)
+  }
+
+  override suspend fun stop() {
+    scheduler.remove(id)
   }
 }
 

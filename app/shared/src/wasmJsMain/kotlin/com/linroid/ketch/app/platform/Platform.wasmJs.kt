@@ -12,3 +12,5 @@ actual val isMobilePlatform: Boolean = false
 internal actual val HorizontalResizePointerIcon: PointerIcon = PointerIcon.fromKeyword("ew-resize")
 
 internal actual val keepAwakeSupported: Boolean = false
+
+internal actual val localPeerDiscoverySupported: Boolean = false

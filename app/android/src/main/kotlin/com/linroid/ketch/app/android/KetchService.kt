@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.IBinder
 import androidx.compose.runtime.snapshotFlow
@@ -72,6 +73,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -138,6 +141,15 @@ class KetchService : Service() {
    */
   val activityEvents: Flow<ActivityEvent> = toasts.receiveAsFlow()
 
+  private val lanPeerSearch = MutableStateFlow(false)
+
+  /**
+   * Whether local peer discovery has wanted the LAN since the service started: it is on and a
+   * public torrent ran or a magnet looked for its metadata. Android 17 blocks the multicast
+   * group until the local network permission is granted, so the activity offers it then.
+   */
+  val lanPeerSearchStarted: StateFlow<Boolean> = lanPeerSearch.asStateFlow()
+
   override fun onCreate() {
     super.onCreate()
     notifier = AndroidNotifier(
@@ -177,7 +189,18 @@ class KetchService : Service() {
         encryption = config.torrent.encryption.toEncryption(),
         utpEnabled = config.torrent.utp,
         portMapping = config.torrent.portMapping,
+        localDiscovery = config.torrent.localDiscovery,
       ),
+      // Wi-Fi drivers drop multicast to save power unless an app holds a lock; LAN discovery
+      // holds it only while a public torrent runs.
+      multicastLock = {
+        lanPeerSearch.value = true
+        val lock = applicationContext.getSystemService(WifiManager::class.java)
+          .createMulticastLock("ketch-lsd")
+        lock.setReferenceCounted(false)
+        lock.acquire()
+        AutoCloseable { lock.release() }
+      },
     )
     instanceManager = InstanceManager(
       factory = InstanceFactory(
@@ -244,6 +267,7 @@ class KetchService : Service() {
           torrentSource.setEncryption(it.encryption.toEncryption())
           torrentSource.setUtpEnabled(it.utp)
           torrentSource.setPortMapping(it.portMapping)
+          torrentSource.setLocalDiscovery(it.localDiscovery)
         },
         trackerList = torrentSource.trackerLists.map { lists ->
           lists.map {

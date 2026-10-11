@@ -113,9 +113,10 @@ including a development run, hands its files to the running app instead of openi
 ## Discovery and upload
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
-- Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange for v1, v2 and hybrid torrents; Ketch advertises its listen port (BEP 10
-  `p`) and never dials an incoming peer's source port, only the listen port it announced.
+- Public magnets use BEP 9 metadata exchange, DHT, trackers, local service discovery, and
+  explicit peers. Public swarms support peer exchange for v1, v2 and hybrid torrents; Ketch
+  advertises its listen port (BEP 10 `p`) and never dials an incoming peer's source port, only
+  the listen port it announced.
   Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
@@ -138,21 +139,24 @@ including a development run, hands its files to the running app instead of openi
   over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
   control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
   use it too: BEP 27 only rules out DHT and peer exchange
-- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1
-  torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable peer still
-  completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A single-file
-  torrent's URL names the file (or, ending in `/`, the folder holding it); a multi-file torrent's
-  URL names the folder holding the torrent's folder, and each file is fetched from the URL, the
-  torrent name and the file's path, each segment percent-encoded. Each web seed fetches whole
-  pieces in order, one range request per file a piece spans, pieces no peer or other seed is
-  fetching, and only pieces the selection wants; every piece passes the same SHA-1 check as a
-  peer's. A failed request or a corrupt piece backs that seed off (2 s, doubling up to a minute);
-  five failures in a row drop it until the task runs again. Requests go through the source's HTTP
+- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1, v2
+  and hybrid torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable
+  peer still completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A
+  single-file torrent's URL names the file (or, ending in `/`, the folder holding it); a
+  multi-file torrent's URL names the folder holding the torrent's folder, and each file is
+  fetched from the URL, the torrent name and the file's path, each segment percent-encoded. Each
+  web seed fetches whole pieces in order, one range request per file a piece spans, pieces no
+  peer or other seed is fetching, and only pieces the selection wants; every piece passes the
+  same check as a peer's: SHA-1 for v1, the file's piece layer (BEP 52) for v2 and hybrid
+  torrents. A v2 or hybrid piece lies in one file, so it is a single range request, and BEP 47
+  padding files are never requested. When every piece left is being fetched, a seed may also
+  fetch one a peer is fetching, and whichever arrives verified first is kept. A failed request or
+  a corrupt piece backs that seed off (2 s, doubling up to a minute); five failures in a row drop
+  it until the task runs again. Requests go through the source's HTTP
   engine, with its system proxy settings like HTTP metainfo, count against the download limits,
   fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
   URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its
-  metadata, which still comes from peers. V2 and hybrid torrents (which run as v2 owners) do not
-  use web seeds yet
+  metadata, which still comes from peers
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
@@ -209,15 +213,45 @@ including a development run, hands its files to the running app instead of openi
   device holding the port moves UPnP to another. Without a gateway the engine logs that incoming
   peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
   interface map ports
-- The apps and the CLI read encryption, uTP and port mapping from `[torrent] encryption`
-  (`preferred`, `required` or `off`; an unknown value loads as `preferred`), `utp` and
-  `portMapping`, all on by default. The apps edit them under Settings → BitTorrent → Connections
-  and apply them at once through `TorrentDownloadSource.setEncryption`, `setUtpEnabled` and
-  `setPortMapping`, which never start the engine: encryption and uTP apply to connections opened
-  after the change (open ones keep running, and a uTP port stays bound for DHT), and port mapping
-  starts, or stops and removes its mapping
-- Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
-  working tracker until failover, and disconnects its old peers before switching. Public-mode
+- Local Service Discovery (BEP 14, `TorrentConfig.localDiscovery`, on by default for engines a
+  `TorrentDownloadSource` creates; engines built directly never join the group) finds peers on
+  the LAN without trackers or the internet. While a public torrent runs, the engine joins
+  `239.192.152.143:6771` on every interface with a private or link-local IPv4 address (the port
+  shared with other clients, `SO_REUSEADDR`), sends `BT-SEARCH * HTTP/1.1` announces with its
+  TCP listen port (never a router-mapped one: LAN peers dial us directly), a random `cookie` and
+  up to 20 `Infohash` headers per datagram, when each torrent starts and every 5 minutes, never
+  more than once a minute per torrent, and leaves the group when the last one stops. A v1
+  torrent announces its info hash; a v2 torrent the first 20 bytes of its SHA-256 hash, its
+  wire tag, as DHT does; a hybrid both, and peers found under each are dialed in that swarm's
+  mode. Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or
+  link-local senders, with a valid `Port` and at most 20 hashes in 1400 bytes, never our own
+  cookie, at most 32 at once then 4 a second, and each peer once a minute per torrent. LAN peers
+  are never shared through peer exchange. Private (BEP 27) and tracker-only torrents never
+  announce or accept them. IPv6 (`[ff15::efc0:988f]`) is not used. On Android the app holds a
+  Wi-Fi `MulticastLock` (`TorrentDownloadSource(multicastLock = ...)`) only while the group is
+  joined, and Android 17 blocks it until the local network permission is granted: the app asks
+  for it once, the first time discovery wants the LAN, and again whenever the setting is switched
+  on (the system stops asking after two denials); without it the engine retries joining every
+  minute. iOS does not run it, as multicast there needs Apple's multicast networking entitlement
+- While a public magnet looks for its metadata, it takes part in local service discovery under
+  its info hash (a btmh magnet under the first 20 bytes of its SHA-256 hash), and LAN peers that
+  announce it are asked for the metadata like DHT and tracker peers, so a magnet resolves from
+  another device at home without trackers or the internet. It leaves the group once the metadata
+  is found or the lookup stops. LAN peers announce every 5 minutes, so one may take that long to
+  be heard; tracker-only magnets never take part
+- The apps and the CLI read encryption, uTP, port mapping and local service discovery from
+  `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
+  `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
+  under Settings → BitTorrent → Connections (local service discovery only on desktop and
+  Android, as iOS cannot join the group) and apply them at once through
+  `TorrentDownloadSource.setEncryption`, `setUtpEnabled`, `setPortMapping` and
+  `setLocalDiscovery`, which never start the engine: encryption and uTP apply to connections
+  opened after the change (open ones keep running, and a uTP port stays bound for DHT), port
+  mapping starts, or stops and removes its mapping, and local service discovery joins or leaves
+  the LAN group (peers it found stay connected)
+- Private metainfo disables DHT, local service discovery and peer exchange, does not offer
+  `ut_metadata`, keeps one working tracker until failover, and disconnects its old peers before
+  switching. Public-mode
   magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
   metainfo. Trackers hear `completed` only once every file is selected and complete, so a partial
   selection never announces it.
@@ -366,7 +400,13 @@ limits once it was read, like uploading it: a limit owes at most a tenth of a se
 of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
 starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
 so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
-answering their handshake, v2 and hybrid like v1. The Fast extension (BEP 6) is not negotiated.
+answering their handshake, v2 and hybrid like v1. v1 connections negotiate the Fast extension
+(BEP 6): availability as Have All or Have None, requests the other side will not serve rejected
+rather than dropped, a choke that leaves requests to be rejected (those still unanswered after
+5 seconds are canceled), and each side's allowed-fast pieces requested and served while choked;
+Ketch offers IPv4 peers BEP 6's canonical set of 10 pieces only while it uploads, within the
+upload limits. A rejected piece goes to other peers without counting against the peer. v2 and
+hybrid routes, including a hybrid's v1 peers, do not negotiate it yet.
 Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
 when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
 when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;
@@ -382,9 +422,8 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement web seeds for v2 and hybrid torrents, local service discovery,
-torrent creation, or ratio management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB
-pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
+This version does not implement torrent creation or ratio management. Bounds include 4 MiB
+metainfo, 10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
 increases process memory beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the

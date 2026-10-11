@@ -134,6 +134,8 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  * @property utp whether peers are also reached over uTP; on by default.
  * @property portMapping whether the home router is asked (NAT-PMP, then UPnP) to forward the
  *   listen port, so peers behind other routers can connect; on by default.
+ * @property localDiscovery whether public torrents are announced on the local network, and
+ *   devices there that announce them are used as peers (BEP 14); on by default.
  */
 @Serializable
 data class TorrentSettings(
@@ -148,6 +150,7 @@ data class TorrentSettings(
   val encryption: TorrentEncryptionMode = TorrentEncryptionMode.Preferred,
   val utp: Boolean = true,
   val portMapping: Boolean = true,
+  val localDiscovery: Boolean = true,
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }

@@ -144,7 +144,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
   `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`,
-  `TorrentEncryption`
+  `TorrentEncryption`, `TorrentMulticastLock`; internal `TorrentLocalDiscovery` (BEP 14, with
+  `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that `openLsdMulticast()` opens)
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
@@ -482,7 +483,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (multi-file: URL + name + path, segments percent-encoded). Pieces are SHA-1 checked like peers';
   a failure backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row drop it.
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
-  with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners use none
+  with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
+  `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`
+  builds) and run the same worker through `TorrentV2WebSeeds` (`WebSeedPieces` is the worker's
+  view: `SwarmWebSeedPieces` for v1, the hub's for v2): an idle seed tells the session loop, which
+  claims a whole piece from `TorrentV2PieceScheduler.claimWebSeed` (the next free wanted piece
+  from a cursor, in the endgame one peers assemble that no seed fetches) and assigns it; the seed
+  fetches it with one range request (`WebSeedV2Layout`: a v2 piece lies in one file, padding is
+  never requested), `TorrentV2PieceStore.commitOwned` checks it against the piece layers, and
+  `webSeedDone` returns it. Mirrors pay the engine's, owner's and task's limits, keep a transfer
+  without peers alive while one runs, and add `WebSeedStats` to the v2 swarm summary
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
@@ -519,6 +529,26 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentAdvertisedPort.setMapped` announces; mappings last an hour, renew every half hour and are
   removed by `stop` within 2 s; UPnP tries other ports on 718 and permanent leases on 725.
   `PortMappingTest` runs both against scripted gateways on loopback
+- Local Service Discovery (BEP 14), `TorrentConfig.localDiscovery` (on; only engines given a
+  `KotlinTorrentEngine` `localDiscovery` transport factory, as `TorrentDownloadSource` passes
+  `openLsdMulticast`, join the group, so engines built directly in tests never send multicast):
+  `TorrentLocalDiscovery` joins `239.192.152.143:6771` while a public torrent's discovery runs
+  (`participate`, from the same block as DHT, so private and tracker-only torrents never take
+  part), announcing `BT-SEARCH` datagrams (`LsdAnnounce`: our TCP listen port, never the mapped
+  one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5 minutes, at most
+  once a minute per hash, and hands the peers others announce to the torrent (v1: its discovery
+  channel, counted as `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2
+  hash in v2 mode and a hybrid's v1 hash in v1 mode). A public magnet's metadata lookup
+  (`discoverMagnet`, not tracker-only ones) participates too, under its btih or the truncated
+  btmh hash, until the metadata is found or the lookup stops, and asks the LAN peers announced
+  for it for the metadata like DHT and tracker peers. It accepts private and link-local senders
+  only, never its own cookie, 32 at once then 4 a second, each peer once a minute per torrent.
+  `openLsdMulticast` is a `MulticastSocket` with `SO_REUSEADDR` joined on each private IPv4
+  interface (jvmAndAndroidMain) and `null` on iOS (multicast needs Apple's entitlement); IPv4
+  only. `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the
+  group is joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
+  `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest`
+  real multicast (skipped where the system refuses it)
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
@@ -554,7 +584,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it is stopped or the task removed, until `upload` leaves `seed`, until a download waiting for
   one of the `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its
   intent), or until Ketch closes; a torrent that finishes while a download waits does not seed.
-  Seeding runs only while the process runs. The Fast extension (BEP 6) is not negotiated
+  Seeding runs only while the process runs
+- Fast extension (BEP 6) on v1 connections (`TorrentSwarm`'s `PeerWorker`; v2 and hybrid routes
+  do not offer it yet): the handshake sets reserved byte 7 bit 0x04 (`PeerHandshake.fast`), and
+  with both bits set `PeerProtocolState(fast = true)` takes Have All / Have None in place of a
+  bitfield (we send them when we hold every piece or none), Suggest Piece (ignored), Allowed
+  Fast (at most 32, requested while choked through `TorrentPieceScheduler.claim`'s `eligible`)
+  and Reject Request. A CHOKE keeps our requests until the peer rejects them; requests left
+  unanswered for `FAST_REJECT_GRACE_MS` (5 s) are canceled. A reject while choked hands the piece
+  back to the scheduler at once; unchoked, the block is asked for again until the piece has had
+  as many rejects as blocks, then other peers fetch it (`refused` until the peer unchokes us
+  anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
+  full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
+  (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
+  Fast messages on a connection that did not negotiate it close the peer. The v1 pipeline also
+  stays within the peer's BEP 10 `reqq`. The summary counts `fast` peers
 - See [support and migration](docs/torrent.md) and
   [verification](docs/development/torrent-verification.md)
 
@@ -692,10 +736,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `uploadLimit` number is bytes per second), are applied live through
   `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. `encryption`
   (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as `preferred`,
-  mapped to `TorrentEncryption` at the four sites), `utp` and `portMapping` (all on), edited
-  under Settings → BitTorrent → Connections, apply live through `setEncryption`,
-  `setUtpEnabled` and `setPortMapping` (the engine's `TorrentPeerEncryption.policy`, a uTP
-  endpoint that refuses new connections while off, and a port mapper started or stopped)
+  mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and `localDiscovery`
+  (all on), edited under Settings → BitTorrent → Connections (local discovery only on desktop
+  and Android, `localPeerDiscoverySupported`), apply live through
+  `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
+  `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
+  mapper started or stopped, and the LAN discovery group joined or left)
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
@@ -757,7 +803,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
 - Android 17 blocks the local network until `ACCESS_LOCAL_NETWORK` is granted: `NearbyAccess`
   asks before searching for or connecting to a device (13 to 16 ask `NEARBY_WIFI_DEVICES` only to
-  search), and `MainActivity` asks once a remote device is saved or this device is shared
+  search), and `MainActivity` asks once a remote device is saved or this device is shared, and
+  once ever (`local_peers_offered`) when local peer discovery first wants the LAN
+  (`KetchService.lanPeerSearchStarted`, set as the engine takes its multicast lock); switching
+  Settings → BitTorrent → Local peer discovery on asks through `NearbyAccess`. The engine knows
+  nothing of it: without the permission it fails to join the group and retries
 - Every keyboard command lives in `KetchCommands`, each in a `CommandScope` (Global, List,
   Intake, Palette, Discover): `ShortcutHost` runs the global chords, and the list, the add
   sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`
@@ -1271,9 +1321,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TorrentWebSeed", "TrackerList", "TorrentController", "TorrentControls",
-  "Connections", "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket",
-  "SqliteStore",
+  "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList", "TorrentController",
+  "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
+  "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
   "GitHubReleases";
@@ -1300,7 +1350,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
 5. `library:torrent` has no browser-local engine. uTP is only dialed after TCP fails; seeding runs
-   only while the process runs (no background seeding).
+   only while the process runs (no background seeding). Local service discovery is IPv4 only and
+   does not run on iOS.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

@@ -175,10 +175,11 @@ class TorrentSettingsTest {
   ).torrent
 
   @Test
-  fun `connection settings decode and default to encryption uTP and port mapping on`() {
+  fun `connection settings decode and default to encryption uTP port mapping and LSD on`() {
     assertEquals(TorrentEncryptionMode.Preferred, TorrentSettings().encryption)
     assertEquals(true, TorrentSettings().utp)
     assertEquals(true, TorrentSettings().portMapping)
+    assertEquals(true, TorrentSettings().localDiscovery)
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),
       """
@@ -186,11 +187,13 @@ class TorrentSettingsTest {
       |encryption = "required"
       |utp = false
       |portMapping = false
+      |localDiscovery = false
       """.trimMargin(),
     )
     assertEquals(TorrentEncryptionMode.Required, decoded.torrent.encryption)
     assertEquals(false, decoded.torrent.utp)
     assertEquals(false, decoded.torrent.portMapping)
+    assertEquals(false, decoded.torrent.localDiscovery)
   }
 
   @Test

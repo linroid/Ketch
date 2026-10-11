@@ -10,6 +10,8 @@ internal class TorrentHybridLayout private constructor(
   val padding: List<Padding>,
   val totalV1Bytes: Long,
   val pieceHashes: ByteString,
+  /** The v1 view is a single file (a `length` key), which a web seed URL names directly. */
+  val singleFile: Boolean,
 ) {
   data class File(val v1Index: Int, val v2Index: Int, val offset: Long, val length: Long)
   data class Padding(val offset: Long, val length: Long)
@@ -65,7 +67,8 @@ internal class TorrentHybridLayout private constructor(
       }
       return TorrentHybridLayout(TorrentIdentity(
         InfoHash.fromBytes(sha1Digest(v2.rawInfo.toByteArray())), v2.hash),
-        files.toList(), padding.toList(), offset, hashes.toByteString())
+        files.toList(), padding.toList(), offset, hashes.toByteString(),
+        singleFile = listed == null)
     }
   }
 }
