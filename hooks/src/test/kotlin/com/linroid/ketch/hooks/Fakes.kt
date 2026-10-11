@@ -8,13 +8,16 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
@@ -34,6 +37,8 @@ internal class FakeKetch : KetchApi {
     tasks.value -= task
   }
 
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    flow { throw UnsupportedOperationException("unused") }
   override suspend fun download(request: DownloadRequest): DownloadTask = error("unused")
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
     error("unused")
