@@ -48,6 +48,7 @@ internal fun okHttpClient(
 ): HttpClient = HttpClient(OkHttp) {
   followRedirects = false
   engine {
+    dispatcher = httpDispatcher
     config {
       connectionPool(ConnectionPool())
       if (http1Only) protocols(listOf(Protocol.HTTP_1_1))

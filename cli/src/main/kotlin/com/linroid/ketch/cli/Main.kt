@@ -55,10 +55,28 @@ import java.io.PrintStream
 import java.util.Locale
 import kotlin.system.exitProcess
 
+/**
+ * Caps kotlinx.coroutines' shared pool before anything uses it, unless `-D` already set these:
+ * `Dispatchers.IO` at 16 threads rather than 64, and idle workers end after 10 s rather than 60.
+ * Ketch's own blocking work runs on pools of its own; what is left there, such as ktor-network's
+ * socket loops and the server's, never blocks for long.
+ */
+private fun capCoroutineThreads() {
+  for ((key, value) in COROUTINE_THREAD_LIMITS) {
+    if (System.getProperty(key) == null) System.setProperty(key, value)
+  }
+}
+
+private val COROUTINE_THREAD_LIMITS = mapOf(
+  "kotlinx.coroutines.io.parallelism" to "16",
+  "kotlinx.coroutines.scheduler.keep.alive.sec" to "10",
+)
+
 /** Ketch library log level, derived from CLI flags. */
 private var ketchLogLevel = LogLevel.INFO
 
 fun main(args: Array<String>) {
+  capCoroutineThreads()
   // Windows cannot replace a running program, so `ketch update` renamed the old binary aside.
   if (File.separatorChar == '\\') CliInstallation.current()?.removeReplaced()
 

@@ -267,6 +267,13 @@ compose.desktop {
     // Downloads following the system's proxy (ProxyMode.SYSTEM) ask the JVM's default
     // ProxySelector, which only reads the operating system's proxies with this set at startup.
     jvmArgs += "-Djava.net.useSystemProxies=true"
+    // kotlinx.coroutines' shared pool: Dispatchers.IO at 16 threads rather than 64, and idle
+    // workers end after 10 s rather than 60. Ketch's own blocking work runs on pools of its own;
+    // what is left there, such as ktor-network's socket loops, never blocks for long.
+    jvmArgs += listOf(
+      "-Dkotlinx.coroutines.io.parallelism=16",
+      "-Dkotlinx.coroutines.scheduler.keep.alive.sec=10",
+    )
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {
