@@ -128,7 +128,7 @@ paused, and a failed download has an `error`:
 ```
 
 `kind` is one of `network`, `http`, `disk`, `unsupported`, `file_changed`,
-`corrupt_resume_state`, `canceled`, `source`, `auth_failed` and `unknown`.
+`corrupt_resume_state`, `canceled`, `source`, `auth_failed`, `checksum_mismatch` and `unknown`.
 
 ## Commands
 

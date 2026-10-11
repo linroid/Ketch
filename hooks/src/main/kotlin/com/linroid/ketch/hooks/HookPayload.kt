@@ -182,6 +182,7 @@ data class HookError(
         is KetchError.Canceled -> "canceled"
         is KetchError.SourceError -> "source"
         is KetchError.AuthenticationFailed -> "auth_failed"
+        is KetchError.ChecksumMismatch -> "checksum_mismatch"
         is KetchError.Unknown -> "unknown"
       },
       code = (error as? KetchError.Http)?.code,
