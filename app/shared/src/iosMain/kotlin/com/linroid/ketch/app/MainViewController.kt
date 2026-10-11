@@ -29,6 +29,7 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -39,6 +40,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -210,6 +212,9 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
       trackerListUrls = config.torrent.subscribedTrackerLists,
       uploadPolicy = config.torrent.upload.toUploadPolicy(),
       uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
+      encryption = config.torrent.encryption.toEncryption(),
+      utpEnabled = config.torrent.utp,
+      portMapping = config.torrent.portMapping,
     ),
   )
   return InstanceManager(
@@ -234,6 +239,9 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
         torrentSource.setTrackerLists(it.subscribedTrackerLists)
         torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
         torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
+        torrentSource.setEncryption(it.encryption.toEncryption())
+        torrentSource.setUtpEnabled(it.utp)
+        torrentSource.setPortMapping(it.portMapping)
       },
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
@@ -294,4 +302,10 @@ private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this
   TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
   TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
   TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
+
+private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
+  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
+  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
+  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
 }

@@ -193,6 +193,13 @@ including a development run, hands its files to the running app instead of openi
   device holding the port moves UPnP to another. Without a gateway the engine logs that incoming
   peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
   interface map ports
+- The apps and the CLI read encryption, uTP and port mapping from `[torrent] encryption`
+  (`preferred`, `required` or `off`; an unknown value loads as `preferred`), `utp` and
+  `portMapping`, all on by default. The apps edit them under Settings → BitTorrent → Connections
+  and apply them at once through `TorrentDownloadSource.setEncryption`, `setUtpEnabled` and
+  `setPortMapping`, which never start the engine: encryption and uTP apply to connections opened
+  after the change (open ones keep running, and a uTP port stays bound for DHT), and port mapping
+  starts, or stops and removes its mapping
 - Private metainfo disables DHT and peer exchange, does not offer `ut_metadata`, keeps one
   working tracker until failover, and disconnects its old peers before switching. Public-mode
   magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated

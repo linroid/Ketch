@@ -177,6 +177,23 @@ class UtpEndpointTest {
     }
 
   @Test
+  fun engine_utpSwitchedOff_refusesNewUtpConnections() = endpoints { network, scope ->
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false), rawNetwork = network,
+      listenHost = "127.0.0.1")
+    try {
+      engine.start()
+      val a = side(network, scope, dialOptions = UtpOptions(synRetries = 1))
+      val target = PeerEndpoint("127.0.0.1", engine.listenPort)
+      // On: the engine answers uTP on its listen port.
+      a.endpoint.dial(target).close()
+      engine.setUtpEnabled(false)
+      assertFailsWith<IOException> { a.endpoint.dial(target).readExactly(1) }
+    } finally {
+      engine.stop()
+    }
+  }
+
+  @Test
   fun udpPort_givesDhtEverythingButUtp() = endpoints { network, scope ->
     val b = side(network, scope)
     val dht = b.port.openDht()

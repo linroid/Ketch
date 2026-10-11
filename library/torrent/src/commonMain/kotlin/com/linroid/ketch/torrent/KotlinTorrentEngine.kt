@@ -113,10 +113,14 @@ internal class KotlinTorrentEngine(
   /** Sockets to the local router, outside the peer budget and encryption. */
   private val directNetwork = rawNetwork
   private var portMapper: TorrentPortMapper? = null
+  // Guards portMapper while it starts or stops.
+  private val mapperMutex = Mutex()
+  private val utpEnabled = AtomicBoolean(config.utpEnabled)
+  private val portMappingEnabled = AtomicBoolean(config.portMapping)
   // Encryption over the connection budget over TCP, falling back to uTP.
   private val connectionBudget = TorrentConnectionBudget(
     TorrentUtpFallback(rawNetwork) { remote ->
-      if (!config.utpEnabled || !running.load()) return@TorrentUtpFallback null
+      if (!utpEnabled.load() || !running.load()) return@TorrentUtpFallback null
       val host = udpHostFor(remote)
       // A port whose socket failed is bound again, so dials never use a dead endpoint.
       attempt("Binding the uTP port on $host") { udpPort(host) }
@@ -212,19 +216,10 @@ internal class KotlinTorrentEngine(
     running.store(true)
     acceptIncoming(listener)
     // uTP peers dial the port we announce, over UDP; DHT shares the socket.
-    if (config.utpEnabled) {
+    if (utpEnabled.load()) {
       for (host in UDP_HOSTS) attempt("Binding the uTP port on $host") { udpPort(host) }
     }
-    if (portMapping && config.portMapping && listenHost == WILDCARD_IPV4) {
-      portMapper = TorrentPortMapper(scope, listener.local.port,
-        // The socket DHT and uTP share on IPv4, once bound.
-        udpPort = {
-          udpMutex.withLock { udpPorts[WILDCARD_IPV4]?.takeIf { it.isRunning }?.local?.port }
-        },
-        onMapped = advertisedPort::setMapped,
-        natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
-      ).also { it.start() }
-    }
+    if (portMappingEnabled.load()) startPortMapping()
     if (config.dhtEnabled) scope.launch { pingIntroducedNodes() }
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
     val ipv6 = listenHost == WILDCARD_IPV4 && try {
@@ -363,7 +358,10 @@ internal class KotlinTorrentEngine(
         }
         nodes?.forEach { it.close() }
         // The router forgets our ports rather than forward them to whoever gets this address.
-        portMapper?.stop()
+        mapperMutex.withLock {
+          portMapper?.stop()
+          portMapper = null
+        }
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
           udpPorts.clear()
@@ -1073,25 +1071,23 @@ internal class KotlinTorrentEngine(
     } else null
     val bound = socket ?: network.bindUdp(PeerEndpoint(host, 0))
     var endpoint: UtpEndpoint? = null
-    val udp = TorrentUdpPort(bound, scope, utp = if (config.utpEnabled) {
-      { datagram -> endpoint?.receive(datagram) }
-    } else null, onStopped = {
+    // The endpoint exists whether or not uTP is on: switched off, it refuses new connections.
+    val udp = TorrentUdpPort(bound, scope, utp = { datagram -> endpoint?.receive(datagram) },
+      onStopped = {
       // Its connections fail rather than wait on a dead socket, and incoming uTP needs the
       // port back without waiting for a dial or a DHT lookup.
-      if (config.utpEnabled && running.load()) scope.launch {
+      if (utpEnabled.load() && running.load()) scope.launch {
         endpoint?.close()
         delay(1_000)
         attempt("Binding the uTP port on $host again") { udpPort(host) }
       }
     })
-    if (config.utpEnabled) {
-      endpoint = UtpEndpoint(scope, send = udp::send, onIncoming = { connection ->
-        val admitted = connectionBudget.admit(connection)
-        admitted?.let(::launchIncoming)
-        admitted != null
-      })
-      utpEndpoints.store(utpEndpoints.load() + (host to endpoint))
-    }
+    endpoint = UtpEndpoint(scope, send = udp::send, onIncoming = { connection ->
+      val admitted = if (utpEnabled.load()) connectionBudget.admit(connection) else null
+      admitted?.let(::launchIncoming)
+      admitted != null
+    })
+    utpEndpoints.store(utpEndpoints.load() + (host to endpoint))
     udpPorts[host] = udp
     udp
   }
@@ -1271,6 +1267,50 @@ internal class KotlinTorrentEngine(
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
+
+  override suspend fun setEncryption(encryption: TorrentEncryption) {
+    network.policy = encryption
+    log.i { "Encryption: $encryption" }
+  }
+
+  override suspend fun setUtpEnabled(enabled: Boolean) {
+    utpEnabled.store(enabled)
+    // Peers reach uTP on the listen port, so the ports are bound as soon as it is on.
+    if (enabled && running.load()) {
+      for (host in UDP_HOSTS) attempt("Binding the uTP port on $host") { udpPort(host) }
+    }
+    log.i { "uTP: ${if (enabled) "on" else "off"}" }
+  }
+
+  override suspend fun setPortMapping(enabled: Boolean) {
+    portMappingEnabled.store(enabled)
+    if (enabled) {
+      if (running.load()) startPortMapping()
+    } else {
+      mapperMutex.withLock {
+        portMapper?.stop()
+        portMapper = null
+      }
+      advertisedPort.setMapped(null)
+    }
+    log.i { "Port mapping: ${if (enabled) "on" else "off"}" }
+  }
+
+  /**
+   * Starts asking the router to forward the listen port, unless it already does or this engine
+   * may not ([portMapping], [listenHost] other than every interface).
+   */
+  private suspend fun startPortMapping() = mapperMutex.withLock {
+    if (!portMapping || listenHost != WILDCARD_IPV4 || portMapper != null) return@withLock
+    portMapper = TorrentPortMapper(scope, advertisedPort.listenPort,
+      // The socket DHT and uTP share on IPv4, once bound.
+      udpPort = {
+        udpMutex.withLock { udpPorts[WILDCARD_IPV4]?.takeIf { it.isRunning }?.local?.port }
+      },
+      onMapped = advertisedPort::setMapped,
+      natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
+    ).also { it.start() }
+  }
 
   /**
    * Replaces the upload policy of running and later torrents. Every owner chokes or unchokes its

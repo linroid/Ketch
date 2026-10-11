@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +41,7 @@ import com.linroid.ketch.app.state.trackerListName
 import com.linroid.ketch.app.state.trackerListStatusText
 import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
 import ketch.app.shared.generated.resources.Res
@@ -49,6 +50,15 @@ import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.settings_torrent_add
 import ketch.app.shared.generated.resources.settings_torrent_add_hint
+import ketch.app.shared.generated.resources.settings_torrent_connections
+import ketch.app.shared.generated.resources.settings_torrent_connections_footer
+import ketch.app.shared.generated.resources.settings_torrent_encryption
+import ketch.app.shared.generated.resources.settings_torrent_encryption_off
+import ketch.app.shared.generated.resources.settings_torrent_encryption_off_hint
+import ketch.app.shared.generated.resources.settings_torrent_encryption_preferred
+import ketch.app.shared.generated.resources.settings_torrent_encryption_preferred_hint
+import ketch.app.shared.generated.resources.settings_torrent_encryption_required
+import ketch.app.shared.generated.resources.settings_torrent_encryption_required_hint
 import ketch.app.shared.generated.resources.settings_torrent_footer
 import ketch.app.shared.generated.resources.settings_torrent_footer_first_only
 import ketch.app.shared.generated.resources.settings_torrent_list
@@ -65,6 +75,8 @@ import ketch.app.shared.generated.resources.settings_torrent_list_update
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
 import ketch.app.shared.generated.resources.settings_torrent_list_url_invalid
 import ketch.app.shared.generated.resources.settings_torrent_no_trackers
+import ketch.app.shared.generated.resources.settings_torrent_port_mapping
+import ketch.app.shared.generated.resources.settings_torrent_port_mapping_hint
 import ketch.app.shared.generated.resources.settings_torrent_rejected
 import ketch.app.shared.generated.resources.settings_torrent_rejected_line
 import ketch.app.shared.generated.resources.settings_torrent_rejected_many
@@ -86,6 +98,8 @@ import ketch.app.shared.generated.resources.settings_torrent_upload_seed
 import ketch.app.shared.generated.resources.settings_torrent_upload_seed_hint
 import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading
 import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading_hint
+import ketch.app.shared.generated.resources.settings_torrent_utp
+import ketch.app.shared.generated.resources.settings_torrent_utp_hint
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -117,6 +131,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
   }
   UploadGroup(settings = torrent, onChange = controller::updateTorrent)
+  ConnectionsGroup(settings = torrent, onChange = controller::updateTorrent)
   if (removed.isNotEmpty()) {
     SettingsNotice(
       text = pluralStringResource(
@@ -246,6 +261,58 @@ private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -
     }
   }
 }
+
+/**
+ * How this device reaches peers: protocol encryption, uTP and asking the router to forward its
+ * port. Each applies to connections opened after the change.
+ */
+@Composable
+private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_connections),
+    footer = stringResource(Res.string.settings_torrent_connections_footer),
+  ) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_encryption),
+      description = stringResource(settings.encryption.hint),
+    ) {
+      KetchSegmented(
+        options = TorrentEncryptionMode.entries,
+        selected = settings.encryption,
+        onSelect = { onChange(settings.copy(encryption = it)) },
+        label = { stringResource(it.label) },
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        revealInitialSelection = true,
+      )
+    }
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_utp),
+      description = stringResource(Res.string.settings_torrent_utp_hint),
+      checked = settings.utp,
+      onCheckedChange = { onChange(settings.copy(utp = it)) },
+    )
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_port_mapping),
+      description = stringResource(Res.string.settings_torrent_port_mapping_hint),
+      checked = settings.portMapping,
+      onCheckedChange = { onChange(settings.copy(portMapping = it)) },
+    )
+  }
+}
+
+private val TorrentEncryptionMode.label: StringResource
+  get() = when (this) {
+    TorrentEncryptionMode.Preferred -> Res.string.settings_torrent_encryption_preferred
+    TorrentEncryptionMode.Required -> Res.string.settings_torrent_encryption_required
+    TorrentEncryptionMode.Off -> Res.string.settings_torrent_encryption_off
+  }
+
+private val TorrentEncryptionMode.hint: StringResource
+  get() = when (this) {
+    TorrentEncryptionMode.Preferred -> Res.string.settings_torrent_encryption_preferred_hint
+    TorrentEncryptionMode.Required -> Res.string.settings_torrent_encryption_required_hint
+    TorrentEncryptionMode.Off -> Res.string.settings_torrent_encryption_off_hint
+  }
 
 private val TorrentUploadMode.label: StringResource
   get() = when (this) {

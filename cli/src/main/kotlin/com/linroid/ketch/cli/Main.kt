@@ -25,6 +25,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
@@ -35,6 +36,7 @@ import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
@@ -1254,6 +1256,9 @@ private fun torrentSource(
     trackerListUrls = settings.subscribedTrackerLists,
     uploadPolicy = torrentUploadPolicy(settings.upload),
     uploadRateLimit = settings.uploadLimit.bytesPerSecond,
+    encryption = torrentEncryption(settings.encryption),
+    utpEnabled = settings.utp,
+    portMapping = settings.portMapping,
   ),
   restoreSeeding = restoreSeeding,
 )
@@ -1263,6 +1268,12 @@ internal fun torrentUploadPolicy(mode: TorrentUploadMode): TorrentUploadPolicy =
   TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
   TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
   TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
+
+internal fun torrentEncryption(mode: TorrentEncryptionMode): TorrentEncryption = when (mode) {
+  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
+  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
+  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
 }
 
 /**

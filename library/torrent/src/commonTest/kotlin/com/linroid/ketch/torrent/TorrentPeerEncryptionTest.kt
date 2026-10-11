@@ -104,6 +104,17 @@ class TorrentPeerEncryptionTest {
   }
 
   @Test
+  fun policy_changedLive_appliesToTheNextDial() = runTest {
+    val peers = PlaintextPeers(backgroundScope)
+    val network = TorrentPeerEncryption(peers, TorrentEncryption.REQUIRED)
+    assertFailsWith<MseHandshakeException> { network.connectPeer(peer, tag) }
+    network.policy = TorrentEncryption.DISABLED
+    assertFalse(network.connectPeer(peer, tag).encrypted)
+    // One MSE attempt, then one plaintext connect.
+    assertEquals(2, peers.connects)
+  }
+
+  @Test
   fun required_peerWithoutEncryption_fails() = runTest {
     val peers = PlaintextPeers(backgroundScope)
     val network = TorrentPeerEncryption(peers, TorrentEncryption.REQUIRED)

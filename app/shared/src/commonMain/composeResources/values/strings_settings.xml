@@ -720,6 +720,19 @@
   <!-- Under Upload limit: one cap for all torrents together, not one per torrent. -->
   <string name="settings_torrent_upload_limit_hint">Shared by all torrents.</string>
   <string name="settings_torrent_upload_footer">Peers you upload to see this device's IP address. Private torrents only share with their tracker's peers.</string>
+  <string name="settings_torrent_connections">Connections</string>
+  <string name="settings_torrent_encryption">Encryption</string>
+  <string name="settings_torrent_encryption_preferred">Preferred</string>
+  <string name="settings_torrent_encryption_required">Required</string>
+  <string name="settings_torrent_encryption_off">Off</string>
+  <string name="settings_torrent_encryption_preferred_hint">Connects encrypted when peers support it, and unencrypted otherwise.</string>
+  <string name="settings_torrent_encryption_required_hint">Only connects to peers that encrypt. Fewer peers, but harder for networks to recognize or slow down.</string>
+  <string name="settings_torrent_encryption_off_hint">Never encrypts. Peers that require encryption can't connect.</string>
+  <string name="settings_torrent_utp">uTP</string>
+  <string name="settings_torrent_utp_hint">Also reaches peers over UDP, which works with more peers behind routers and slows down while your other traffic needs the bandwidth.</string>
+  <string name="settings_torrent_port_mapping">Port forwarding</string>
+  <string name="settings_torrent_port_mapping_hint">Asks your router (UPnP or NAT-PMP) to forward a port, so more peers can connect to this device.</string>
+  <string name="settings_torrent_connections_footer">Encryption hides what the traffic is, not who you connect to.</string>
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->

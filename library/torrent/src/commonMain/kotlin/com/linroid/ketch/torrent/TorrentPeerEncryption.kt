@@ -6,6 +6,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Applies the engine's [TorrentEncryption] policy to peer connections: dials negotiate MSE/PE
@@ -13,12 +15,19 @@ import okio.IOException
  * [TorrentEncryption.PREFERRED] a peer that will not encrypt is dialed again in plaintext, and
  * dialed in plaintext first while it is among the last 1024 such peers.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TorrentPeerEncryption(
   private val delegate: TorrentNetwork,
-  private val policy: TorrentEncryption,
+  policy: TorrentEncryption,
   private val handshakeTimeoutMs: Long = 10_000,
 ) : TorrentNetwork by delegate {
   private val log = KetchLogger("TorrentEngine")
+  private val current = AtomicReference(policy)
+
+  /** The policy dials and incoming connections follow; each reads it once, as it starts. */
+  var policy: TorrentEncryption
+    get() = current.load()
+    set(value) = current.store(value)
   private val mutex = Mutex()
   private val plaintextPeers = LinkedHashSet<PeerEndpoint>()
 
@@ -30,6 +39,7 @@ internal class TorrentPeerEncryption(
   ): TorrentConnection {
     // Each connect has its own deadline, so a plaintext retry still has time after MSE failed.
     suspend fun connect() = delegate.connectWithin(remote, connectTimeoutMs)
+    val policy = policy
     if (policy == TorrentEncryption.DISABLED) return connect()
     if (policy == TorrentEncryption.PREFERRED && mutex.withLock { remote in plaintextPeers }) {
       return connect()
@@ -66,6 +76,7 @@ internal class TorrentPeerEncryption(
    * with the BitTorrent handshake next; throws when the policy refuses it or MSE fails.
    */
   suspend fun accept(connection: TorrentConnection, tags: Collection<ByteString>): TorrentConnection {
+    val policy = policy
     val opening = connection.readExactly(MseHandshake.plaintextHeader.size)
     if (opening.contentEquals(MseHandshake.plaintextHeader)) {
       if (policy == TorrentEncryption.REQUIRED) throw IOException("Plaintext peer refused")

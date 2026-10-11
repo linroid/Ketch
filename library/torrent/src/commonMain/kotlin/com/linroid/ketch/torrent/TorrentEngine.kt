@@ -89,6 +89,15 @@ internal interface TorrentEngine {
 
   /** Replaces the upload policy for running and later torrents, as far as each supports it. */
   suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {}
+
+  /** Replaces the encryption policy for connections opened from now on. */
+  suspend fun setEncryption(encryption: TorrentEncryption) {}
+
+  /** Switches uTP for connections opened from now on; open ones keep running. */
+  suspend fun setUtpEnabled(enabled: Boolean) {}
+
+  /** Starts or stops asking the router to forward the listen port. */
+  suspend fun setPortMapping(enabled: Boolean) {}
 }
 
 internal data class TorrentTaskSpec(

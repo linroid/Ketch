@@ -662,7 +662,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the four `TorrentConfig` sites) and `uploadLimit` (`TorrentConfig.uploadRateLimit`), both read
   leniently (a value of any type that cannot be read loads as off or unlimited, and a bare
   `uploadLimit` number is bytes per second), are applied live through
-  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`
+  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. `encryption`
+  (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as `preferred`,
+  mapped to `TorrentEncryption` at the four sites), `utp` and `portMapping` (all on), edited
+  under Settings → BitTorrent → Connections, apply live through `setEncryption`,
+  `setUtpEnabled` and `setPortMapping` (the engine's `TorrentPeerEncryption.policy`, a uTP
+  endpoint that refuses new connections while off, and a port mapper started or stopped)
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
   `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
