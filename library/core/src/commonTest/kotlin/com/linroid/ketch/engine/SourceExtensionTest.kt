@@ -111,13 +111,13 @@ class SourceExtensionTest {
   private fun command(
     key: String,
     digest: Char = 'a',
-    beforeSave: suspend () -> Unit = {},
+    afterSave: suspend () -> Unit = {},
   ) = ControlCommand(
     key = key,
     digest = digest.toString().repeat(64),
     precondition = {},
     reserve = { generation, _ -> ControlRevision("epoch", generation + 10) },
-    beforeSave = beforeSave,
+    afterSave = afterSave,
   )
 
   @Test
@@ -210,27 +210,27 @@ class SourceExtensionTest {
   }
 
   @Test
-  fun setSharing_beforeSave_runsOnceBeforeTheIntentIsSaved() = runTest {
+  fun setSharing_afterSave_runsOnceTheIntentIsSaved() = runTest {
     val source = ExtendedSource()
     val ketch = ketch(source)
     try {
       val task = completedTask(ketch, source)
       val host = assertNotNull(source.host)
       val seen = mutableListOf<Boolean?>()
-      val stop = command("k", beforeSave = { seen += host.record(task)?.control?.sharing })
+      val share = command("k", afterSave = { seen += host.record(task)?.control?.sharing })
 
-      host.setSharing(task, true, stop)
-      host.setSharing(task, true, stop)
+      host.setSharing(task, true, share)
+      host.setSharing(task, true, share)
 
       // An exact retry answers from the ledger without running it again.
-      assertEquals(listOf<Boolean?>(null), seen)
-      assertEquals(true, host.record(task)?.control?.sharing)
-      val refused = assertFailsWith<IllegalStateException> {
-        host.setSharing(task, false, command("j", beforeSave = { error("refused") }))
+      assertEquals(listOf<Boolean?>(true), seen)
+      val failed = assertFailsWith<IllegalStateException> {
+        host.setSharing(task, false, command("j", afterSave = { error("failed") }))
       }
-      assertEquals("refused", refused.message)
-      assertEquals(true, host.record(task)?.control?.sharing)
-      assertEquals(1, host.record(task)?.control?.commands?.size)
+      assertEquals("failed", failed.message)
+      // The change stays saved.
+      assertEquals(false, host.record(task)?.control?.sharing)
+      assertEquals(2, host.record(task)?.control?.commands?.size)
     } finally {
       ketch.close()
     }

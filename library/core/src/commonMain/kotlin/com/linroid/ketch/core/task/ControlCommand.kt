@@ -9,19 +9,18 @@ package com.linroid.ketch.core.task
  *   retry has the same [key] and digest
  * @property precondition throws when the command must not run, such as for a stale revision; it
  *   runs after an exact retry was answered from the ledger, under the task's control lock
- * @property beforeSave runs under the task's control lock once Ketch accepted the command, just
- *   before [reserve] and the saved change, so a change it makes (such as stopping a seeding
- *   session) cannot interleave with other writes of the task's control; what it throws refuses
- *   the command
  * @property reserve reserves the revision the outcome is published at, given the selection
  *   generation and the sharing intent the command leaves the task at
+ * @property afterSave runs once the command's change is saved, still under the task's control
+ *   lock, so what it does (such as stopping a seeding session) happens before any later write of
+ *   the task's control; what it throws fails the command, but the change stays saved
  */
 class ControlCommand(
   val key: String,
   val digest: String,
   val precondition: suspend () -> Unit,
   val reserve: suspend (generation: Long, sharing: Boolean) -> ControlRevision,
-  val beforeSave: suspend () -> Unit = {},
+  val afterSave: suspend () -> Unit = {},
 )
 
 /**

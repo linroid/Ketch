@@ -19,6 +19,8 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -31,6 +33,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -205,11 +208,11 @@ class SeedingWatcherTest {
         controller.setSeeding("done", false, TorrentCommandContext("stop", revision))
       }
       runCurrent()
-      // Seeding starts while the stop holds the task's control lock: the watcher's save of the
-      // intent queues behind it.
+      // Seeding starts while the stop, its intent saved, still holds the task's control lock:
+      // the watcher's save of the intent queues behind it.
       source.ids.value = setOf("done")
       runCurrent()
-      assertEquals(null, store.load("done")?.control?.sharing)
+      assertEquals(false, store.load("done")?.control?.sharing)
 
       gate.complete(Unit)
       runCurrent()
@@ -248,6 +251,37 @@ class SeedingWatcherTest {
 
       assertEquals(false, stopped.seeding)
       assertEquals(false, store.load("done")?.control?.sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun stopCommand_saveFails_keepsSeeding() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("done", 1_000, seeding = true))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      source.ids.value = setOf("done")
+      runCurrent()
+      val task = ketch.tasks.value.single()
+      val controller = assertNotNull(ketch.control(TorrentController))
+      val revision = assertNotNull(controller.snapshot("done")).revision
+      store.failSaves = true
+
+      val error = assertFailsWith<TorrentCommandException> {
+        controller.setSeeding("done", false, TorrentCommandContext("stop", revision))
+      }
+
+      // Nothing changed: the task seeds, and seeds again after a restart, as it says.
+      assertEquals(TorrentCommandError.STORAGE_FAILURE, error.error)
+      assertEquals(setOf("done"), source.ids.value)
+      assertTrue(assertIs<DownloadState.Completed>(task.state.value).sharing)
+      store.failSaves = false
+      assertEquals(true, store.load("done")?.control?.sharing)
     } finally {
       ketch.close()
     }

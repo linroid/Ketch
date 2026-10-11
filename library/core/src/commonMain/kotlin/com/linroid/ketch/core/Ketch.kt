@@ -457,7 +457,6 @@ class Ketch(
         throw IllegalStateException("Only completed downloads can be shared")
       }
       val generation = record.control?.selectionGeneration ?: 0
-      command.beforeSave()
       val revision = command.reserve(generation, sharing)
       val entry = ledger.entry(command, revision, generation, sharing)
       handle.record.update {
@@ -469,6 +468,7 @@ class Ketch(
           updatedAt = Clock.System.now(),
         )
       }
+      command.afterSave()
       log.i { "Sharing intent of taskId=$taskId: $sharing" }
       ControlOutcome(generation, sharing, revision, replayed = false)
     }
@@ -618,7 +618,6 @@ class Ketch(
       if (command == null || ledger == null) {
         return ControlOutcome(control.selectionGeneration, control.sharing, null, replayed = false)
       }
-      command.beforeSave()
       val revision = command.reserve(control.selectionGeneration, control.sharing)
       val entry = ledger.entry(command, revision, control.selectionGeneration, sharing = null)
       handle.record.update {
@@ -627,6 +626,7 @@ class Ketch(
           updatedAt = Clock.System.now(),
         )
       }
+      command.afterSave()
       return ControlOutcome(
         control.selectionGeneration, control.sharing, revision, replayed = false,
       )
@@ -634,7 +634,6 @@ class Ketch(
     val running = coordinator.isActive(taskId)
     val reopen = !running && state is DownloadState.Completed && plan.expands
     val generation = control.selectionGeneration + if (plan.changed) 1 else 0
-    command?.beforeSave()
     val revision = command?.reserve(generation, control.sharing)
     val entry = if (command != null && ledger != null && revision != null) {
       ledger.entry(command, revision, generation, sharing = null)
@@ -664,6 +663,7 @@ class Ketch(
         updatedAt = now,
       )
     }
+    command?.afterSave()
     val delivery = if (running) {
       coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
     } else {

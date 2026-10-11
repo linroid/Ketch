@@ -64,8 +64,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param sourceType the [com.linroid.ketch.core.engine.DownloadSource.type] of [source]
  * @param handlesUrl whether [source] downloads a URL, for tasks that have not resolved yet
  * @param seed starts seeding a completed task in the background
- * @param seedingStopped runs once a Stop command stopped a task's seeding, under the task's
- *   control lock and before the command saves its intent
+ * @param seedingStopped runs once a Stop command saved its intent and stopped the task's
+ *   seeding, still under the task's control lock
  */
 internal class KetchTorrentController(
   private val source: TorrentControlSource,
@@ -253,9 +253,9 @@ internal class KetchTorrentController(
       host.setSharing(
         task,
         seeding,
-        // Stopped before the intent is saved, under the same lock as the watcher's saves, so
+        // Stopped once the intent is saved, still under the lock the watcher's saves take, so
         // none that saw the task seeding before the stop can save the intent again.
-        command(task, context, digest, beforeSave = {
+        command(task, context, digest, afterSave = {
           if (!seeding) {
             source.stopSeeding(taskId)
             seedingStopped(taskId)
@@ -292,13 +292,13 @@ internal class KetchTorrentController(
 
   /**
    * The command [context] asks for, which checks the revision and then [check], and runs
-   * [beforeSave] once accepted.
+   * [afterSave] once its change is saved.
    */
   private fun command(
     task: DownloadTask,
     context: TorrentCommandContext,
     digest: String,
-    beforeSave: suspend () -> Unit = {},
+    afterSave: suspend () -> Unit = {},
     check: suspend () -> Unit,
   ) = ControlCommand(
     key = context.idempotencyKey,
@@ -313,7 +313,7 @@ internal class KetchTorrentController(
       val revision = revisions.markControl(task.taskId, control)
       ControlRevision(revision.epoch, revision.sequence)
     },
-    beforeSave = beforeSave,
+    afterSave = afterSave,
   )
 
   private fun result(taskId: String, outcome: ControlOutcome, seeding: Boolean?) =
