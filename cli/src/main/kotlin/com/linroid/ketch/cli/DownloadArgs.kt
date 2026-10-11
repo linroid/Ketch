@@ -1,5 +1,6 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -42,7 +43,24 @@ internal sealed interface DownloadArgs {
     val fileOrder: FileOrder = FileOrder.SOURCE,
     /** `--reverse` of `--list-files`. */
     val reverse: Boolean = false,
+    /** `--checksum`: the digest the file must have; `null` checks only a published one. */
+    val checksum: Checksum? = null,
   ) : DownloadArgs
+}
+
+/** The option that sets [DownloadRequest.checksum]. */
+internal const val CHECKSUM_OPTION = "--checksum"
+
+/** The checksum a `--checksum` [value] names, or why it cannot be used. */
+internal fun parseChecksumOption(value: String): Result<Checksum> = try {
+  Result.success(Checksum.parse(value))
+} catch (e: IllegalArgumentException) {
+  Result.failure(
+    IllegalArgumentException(
+      "$CHECKSUM_OPTION expects <algorithm>:<digest>, such as sha256:<hex>; ${e.message}",
+      e,
+    ),
+  )
 }
 
 /**
@@ -151,7 +169,7 @@ internal class ProxyOptions {
 }
 
 private val valueOptions =
-  setOf("--speed-limit", "--priority", "--max-concurrent", "--files", "--sort") +
+  setOf("--speed-limit", "--priority", "--max-concurrent", "--files", "--sort", CHECKSUM_OPTION) +
     HEADER_OPTIONS + PROXY_OPTIONS
 
 /** The orders `--sort` names: `type` sorts by file extension. */
@@ -181,6 +199,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var listFiles = false
   var fileOrder: FileOrder? = null
   var reverse = false
+  var checksum: Checksum? = null
 
   var i = 0
   while (i < args.size) {
@@ -213,6 +232,9 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
             )
           "--sort" -> fileOrder = FILE_ORDERS[value.trim().lowercase()]
             ?: return DownloadArgs.Invalid("invalid sort '$value' (valid values: name, size, type)")
+          CHECKSUM_OPTION -> checksum = parseChecksumOption(value).getOrElse {
+            return DownloadArgs.Invalid(it.message ?: "invalid checksum")
+          }
           in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
           else -> headers.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
         }
@@ -233,6 +255,9 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   if (!listFiles && (fileOrder != null || reverse)) {
     return DownloadArgs.Invalid("--sort and --reverse require --list-files")
   }
+  if (listFiles && checksum != null) {
+    return DownloadArgs.Invalid("--list-files and $CHECKSUM_OPTION cannot be used together")
+  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
@@ -249,6 +274,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     listFiles = listFiles,
     fileOrder = fileOrder ?: FileOrder.SOURCE,
     reverse = reverse,
+    checksum = checksum,
   )
 }
 
@@ -263,6 +289,7 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
     proxy = proxy,
     selectedFileIds = fileIds,
+    checksum = checksum,
   )
 
 /**

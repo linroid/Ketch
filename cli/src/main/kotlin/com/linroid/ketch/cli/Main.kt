@@ -188,8 +188,10 @@ private fun runDownload(args: DownloadArgs.Download) {
           }
           is DownloadState.Paused ->
             println("\n[Paused] Download paused.")
-          is DownloadState.Completed ->
+          is DownloadState.Completed -> {
             println("\n[Completed] Saved to ${state.outputPath}")
+            state.checksum?.let { println("[Verified] ${it.algorithm.label} matches") }
+          }
           is DownloadState.Failed ->
             println("\n[Failed] ${state.error.message}")
           is DownloadState.Canceled ->
@@ -1361,6 +1363,10 @@ private fun printUsage() {
   println("                           type (by extension); default: the")
   println("                           download's own order")
   println("  --reverse                Reverse the order of --list-files")
+  println("  --checksum <digest>      Fail unless the file has this digest:")
+  println("                           sha256:<hex>, also md5, sha1, sha512;")
+  println("                           without it, a digest the server")
+  println("                           publishes is checked")
   println()
   println("Running Ketch (the app, or `ketch server`):")
   println("  add <url> [destination]  Add a download; prints its task ID")
@@ -1480,6 +1486,8 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
     out.println("  --no-proxy               Connect directly, without a proxy")
     out.println("  --idempotency-key <key>  Running the command again with the")
     out.println("                           same key adds the download once")
+    out.println("  --checksum <digest>      Fail unless the file has this digest,")
+    out.println("                           such as sha256:<hex>")
   }
   if (name == "add" || name == "list") {
     out.println("  --json                   Print JSON instead")

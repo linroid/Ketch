@@ -1,5 +1,7 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.Checksum
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -24,6 +26,29 @@ class DownloadArgsTest {
     assertEquals(
       DownloadConfig.Default.maxConcurrentDownloads,
       assertIs<DownloadArgs.Download>(parsed).maxConcurrent,
+    )
+  }
+
+  @Test
+  fun `checksum is parsed into the request`() {
+    val md5 = "d41d8cd98f00b204e9800998ecf8427e"
+    val parsed = parseDownloadArgs(listOf("--checksum", md5, "https://example.com/a.zip"))
+
+    val download = assertIs<DownloadArgs.Download>(parsed)
+    val expected = Checksum(ChecksumAlgorithm.MD5, md5)
+    assertEquals(expected, download.checksum)
+    assertEquals(expected, download.toRequest(Destination("a.zip")).checksum)
+  }
+
+  @Test
+  fun `malformed checksum or one with list-files is invalid`() {
+    assertIs<DownloadArgs.Invalid>(
+      parseDownloadArgs(listOf("--checksum", "crc32:1234", "https://example.com/a.zip")),
+    )
+    assertIs<DownloadArgs.Invalid>(
+      parseDownloadArgs(
+        listOf("--list-files", "--checksum", "d41d8cd98f00b204e9800998ecf8427e", "magnet:?x"),
+      ),
     )
   }
 

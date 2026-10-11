@@ -1,5 +1,7 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.Checksum
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -134,6 +136,46 @@ class DownloadRoutesTest {
         setBody(
           """{"url":"https://example.com/file.zip","priority":"INVALID"}"""
         )
+      }
+      assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+  @Test
+  fun `POST with checksum keeps it on the task`() =
+    testApplication {
+      application {
+        val server = createTestServer(ketch = createKetch())
+        with(server) { configureServer() }
+      }
+      val client = createClient {
+        install(ContentNegotiation) { json(json) }
+      }
+      val hex = "ab".repeat(32)
+      val response = client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          """{"url":"https://example.com/file.zip","destination":"/tmp/downloads/",""" +
+            """"checksum":"SHA-256:${hex.uppercase()}"}"""
+        )
+      }
+      assertEquals(HttpStatusCode.Created, response.status)
+      val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(Checksum(ChecksumAlgorithm.SHA_256, hex), task.request.checksum)
+    }
+
+  @Test
+  fun `POST with malformed checksum returns 400`() =
+    testApplication {
+      application {
+        val server = createTestServer()
+        with(server) { configureServer() }
+      }
+      val client = createClient {
+        install(ContentNegotiation) { json(json) }
+      }
+      val response = client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody("""{"url":"https://example.com/file.zip","checksum":"sha256:abcd"}""")
       }
       assertEquals(HttpStatusCode.BadRequest, response.status)
     }
