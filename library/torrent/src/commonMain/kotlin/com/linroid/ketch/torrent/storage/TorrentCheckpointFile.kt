@@ -1,11 +1,10 @@
 package com.linroid.ketch.torrent.storage
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -94,7 +93,7 @@ internal class TorrentCheckpointFile(
   }
 
   private suspend fun <T> operation(block: () -> T): T =
-    slots.withPermit { withContext(Dispatchers.IO) { block() } }
+    slots.withPermit { withContext(TorrentDispatchers.disk) { block() } }
 
   private fun target(): Path {
     val parent = checkNotNull(path.parent)

@@ -58,8 +58,6 @@ import io.ktor.http.decodeURLPart
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -138,7 +136,7 @@ class TorrentDownloadSource(
     KotlinTorrentEngine(it, http = http, portMapping = true,
       localDiscovery = ::openLsdMulticast, multicastLock = multicastLock)
   }
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.disk)
   private val trackerListSubscription = TrackerLists(
     http = { http },
     stateDirectory = config.stateDirectory?.toPath(),
@@ -420,7 +418,7 @@ class TorrentDownloadSource(
 
   /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
   override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    withContext(Dispatchers.Default) {
+    withContext(TorrentDispatchers.engine) {
       try {
         resolveMetainfo(content)
       } catch (e: CancellationException) { throw e
@@ -447,7 +445,7 @@ class TorrentDownloadSource(
   override suspend fun resolveStored(resumeState: SourceResumeState): ResolvedSource? {
     val state = decodeResumeState(resumeState.data)
     if (state.metainfo.isEmpty()) return null
-    val resolved = withContext(Dispatchers.Default) {
+    val resolved = withContext(TorrentDispatchers.engine) {
       parseMetainfo(decodeBase64(state.metainfo), state.privacy ?: config.discoveryPrivacy)
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Saved torrent changed" }
@@ -503,7 +501,7 @@ class TorrentDownloadSource(
         ?.let { TorrentV2Checkpoint.decode(decodeBase64(it)) }
     val owned = checkpoint?.owned.orEmpty().mapTo(HashSet()) { it.components }
     val root = output.toPath()
-    withContext(Dispatchers.IO) {
+    withContext(TorrentDispatchers.disk) {
       for (id in added) {
         val file = checkNotNull(table[id])
         if (file.components in owned) continue
@@ -529,7 +527,7 @@ class TorrentDownloadSource(
       ?: state?.takeIf { it.version != 3 && it.resumeData.isNotEmpty() }
         ?.let { TorrentCheckpoint.decode(decodeBase64(it.resumeData))?.metadata?.metainfoBytes }
       ?: return null
-    return withContext(Dispatchers.Default) {
+    return withContext(TorrentDispatchers.engine) {
       fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     }
   }
@@ -677,7 +675,7 @@ class TorrentDownloadSource(
     val privacy = state.privacy ?: config.discoveryPrivacy
     val output = state.savePath.ifEmpty { task.outputPath }
     require(output.isNotEmpty() && "://" !in output) { "Torrent output requires a filesystem path" }
-    val table = withContext(Dispatchers.Default) {
+    val table = withContext(TorrentDispatchers.engine) {
       fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     }
     val selected = selectionOf(table, task.selectedFileIds, state)
@@ -806,7 +804,7 @@ class TorrentDownloadSource(
           }
           url
         }
-        withContext(Dispatchers.IO) {
+        withContext(TorrentDispatchers.disk) {
           torrentSystemFileSystem.read(path.toPath()) {
             val result = readByteArray(minOf(config.maxMetadataBytes.toLong(),
               torrentSystemFileSystem.metadata(path.toPath()).size ?: 0L))

@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.net
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -10,8 +11,6 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.value
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import platform.posix.AF_INET
 import platform.posix.AF_INET6
@@ -25,7 +24,7 @@ import platform.posix.sockaddr_in6
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual suspend fun resolveTorrentHost(host: String): List<ByteArray> =
-  withContext(Dispatchers.IO) {
+  withContext(TorrentDispatchers.lookup) {
     require(host.isNotEmpty() && host.length <= 253)
     memScoped {
       val hints = alloc<addrinfo>()

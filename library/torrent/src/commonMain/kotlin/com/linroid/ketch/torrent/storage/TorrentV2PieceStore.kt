@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.storage
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
@@ -9,8 +10,6 @@ import com.linroid.ketch.torrent.metainfo.TorrentIdentity
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.peer.pieceBitfield
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -602,7 +601,7 @@ internal class TorrentV2PieceStore(
   }
 
   private suspend fun <T> storageOperation(block: () -> T): T =
-    storageSlots.withPermit { withContext(Dispatchers.IO) { block() } }
+    storageSlots.withPermit { withContext(TorrentDispatchers.disk) { block() } }
 
   private fun destination(file: TorrentOutputMapping.File): Path =
     file.components.fold(checkNotNull(root)) { path, component -> path / component }

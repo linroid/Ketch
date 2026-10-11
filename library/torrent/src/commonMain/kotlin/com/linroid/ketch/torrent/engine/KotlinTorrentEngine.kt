@@ -5,6 +5,7 @@ import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.MAX_V2_PEERS
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentMulticastLock
 import com.linroid.ketch.torrent.TorrentUploadPolicy
@@ -82,7 +83,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -194,7 +194,7 @@ internal class KotlinTorrentEngine(
   private val runtimeContext = RuntimeContext()
   private val log = KetchLogger("TorrentEngine")
   // Background work must never take down the host process; failures are contained per task.
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext +
+  private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.engine + runtimeContext +
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
   /** Sockets to the local router, outside the peer budget and encryption. */
@@ -426,7 +426,7 @@ internal class KotlinTorrentEngine(
   private fun requestShutdown(): Deferred<Unit> {
     shutdown.load()?.let { return it }
     // This job cannot be a descendant of the engine it must cancel and join.
-    val candidate = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
+    val candidate = CoroutineScope(TorrentDispatchers.engine).async(start = CoroutineStart.LAZY) {
       stopRuntime()
     }
     if (shutdown.compareAndSet(null, candidate)) {

@@ -1,12 +1,12 @@
 package com.linroid.ketch.torrent.net
 
-import kotlinx.coroutines.Dispatchers
+import com.linroid.ketch.torrent.TorrentDispatchers
 import kotlinx.coroutines.withContext
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
 internal actual suspend fun localIpv4Networks(): List<LocalIpv4Network> =
-  withContext(Dispatchers.IO) {
+  withContext(TorrentDispatchers.lookup) {
     NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
       .filter { runCatching { it.isUp && !it.isLoopback }.getOrDefault(false) }
       .flatMap { it.interfaceAddresses }

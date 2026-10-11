@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.net
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -10,8 +11,6 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.value
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import platform.darwin.freeifaddrs
 import platform.darwin.getifaddrs
@@ -23,7 +22,7 @@ import platform.posix.sockaddr_in
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual suspend fun localIpv4Networks(): List<LocalIpv4Network> =
-  withContext(Dispatchers.IO) {
+  withContext(TorrentDispatchers.lookup) {
     memScoped {
       val list = alloc<CPointerVar<ifaddrs>>()
       if (getifaddrs(list.ptr) != 0) return@memScoped emptyList()

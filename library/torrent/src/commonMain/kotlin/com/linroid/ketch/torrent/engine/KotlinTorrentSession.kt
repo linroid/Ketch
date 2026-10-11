@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.engine
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.describeWithoutUrls
@@ -23,7 +24,6 @@ import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.v1.TorrentSwarm
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -100,7 +100,7 @@ internal class KotlinTorrentSession(
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (${logHash(store.metadata.infoHash.hex)})"
   private val scope = CoroutineScope(parent.coroutineContext +
-    SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.Default)
+    SupervisorJob(parent.coroutineContext[Job]) + TorrentDispatchers.engine)
   private val lifecycle = Mutex()
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)

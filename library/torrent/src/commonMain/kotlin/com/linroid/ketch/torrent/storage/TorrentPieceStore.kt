@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.storage
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.crypto.Sha1
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -12,8 +13,6 @@ import com.linroid.ketch.torrent.tracker.TrackerConfiguration
 import com.linroid.ketch.torrent.tracker.TrackerConfigurationSnapshot
 import com.linroid.ketch.torrent.tracker.TrackerRevisionConflict
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -812,7 +811,7 @@ internal class TorrentPieceStore(
   // retain the slot until that I/O actually returns, including cancellation and provider failures.
   // Journals/checkpoints may open extra non-payload handles and are outside this payload ceiling.
   private suspend fun <T> storageOperation(block: suspend CoroutineScope.() -> T): T =
-    storageSlots.withPermit { withContext(Dispatchers.IO, block) }
+    storageSlots.withPermit { withContext(TorrentDispatchers.disk, block) }
 
   private fun snapshot(): TorrentCheckpoint = TorrentCheckpoint(taskId, metadata,
     output.toString(), selected, verified.copyOf(),

@@ -1,10 +1,10 @@
 package com.linroid.ketch.torrent.v2
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.storage.CommitOutcome
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -50,7 +50,7 @@ internal class TorrentV2CommitWorker private constructor(
     suspend fun <T> run(
       store: TorrentV2PieceStore,
       capacity: Int = 1,
-      dispatcher: CoroutineDispatcher = Dispatchers.Default,
+      dispatcher: CoroutineDispatcher = TorrentDispatchers.engine,
       body: suspend (TorrentV2CommitWorker) -> T,
     ): T = coroutineScope {
       require(capacity in 1..16)

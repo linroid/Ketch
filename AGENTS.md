@@ -154,7 +154,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadSource`), `TorrentConfig`, `TorrentEncryption`, `TorrentUploadPolicy`,
   `TorrentDiscoveryPrivacy`, `TorrentMulticastLock` and `TrackerListState`; internal
   `TorrentResumeState`, `TorrentSourceMetainfo` and the helpers every package uses
-  (`TorrentLog`, `monotonicClock()`). Everything else is internal, in sub-packages by concern:
+  (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`). Everything else is internal, in
+  sub-packages by concern:
 - `com.linroid.ketch.torrent.engine` -- `TorrentEngine`, `KotlinTorrentEngine`,
   `TorrentSession`, `KotlinTorrentSession`, session admission and registry, `TorrentActiveSlots`,
   `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets and
@@ -169,8 +170,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Digests`), the BEP 52 Merkle tree (`TorrentMerkleRoot`, `TorrentMerkleProof`,
   `TorrentMerkleFrontier`, `merkleZeroHash()`) and `torrentRandomBytes()`
 - `com.linroid.ketch.torrent.net` -- `TorrentNetwork`, `TorrentConnection` and `PeerEndpoint`
-  (`TorrentTransport`), DNS, `TorrentHttp`, `TorrentUdpPort`, `LocalIpv4Network` and the address
-  helpers (`TorrentAddresses`)
+  (`TorrentTransport`), `NioTorrentNetwork` and `NioSelector` (JVM/Android) and
+  `PosixTorrentNetwork` (iOS), DNS, `TorrentHttp`, `TorrentUdpPort`, `LocalIpv4Network` and the
+  address helpers (`TorrentAddresses`)
 - `com.linroid.ketch.torrent.mse` (MSE/PE: `MseHandshake`, `Rc4`, `TorrentPeerEncryption`),
   `.utp` (`UtpSocket`, `UtpPacket`, `UtpEndpoint`), `.portmap` (`NatPmpClient`, `UpnpClient`,
   `TorrentPortMapper`), `.dht` (`DhtNode`, `DhtRpc`, `DhtRoutingTable`), `.tracker`
@@ -1478,6 +1480,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ketch-network-N` and 8 `ketch-disk-N` threads, started as work arrives and ended after 30 s
   idle; on iOS two pools of 8; `Dispatchers.Default` on JS/WasmWasi. `main` is `network` itself,
   so there is no coordination thread, and each `Ketch` takes a serial view of its own
+- Torrent threads (`TorrentDispatchers`): the engine, peers and hashing run on
+  `KetchDispatchers.Default.network`, file I/O on its `disk`, DNS and interface lookups on a
+  slice of `disk` (2 at once) and local discovery's blocking multicast socket on another (1).
+  Peer sockets on JVM/Android are `NioTorrentNetwork`'s: one `ketch-torrent-selector` thread
+  waits for readiness and the caller's dispatcher reads and writes. Not ktor-network, which runs
+  every socket's loops on `Dispatchers.IO` (hardcoded), so hundreds of peers grew that pool to
+  its 64 threads; HTTP (CIO) and FTP sockets still do, with few connections
 - Console logger: platform-specific implementations
 
 ### Coroutine-Based Concurrency

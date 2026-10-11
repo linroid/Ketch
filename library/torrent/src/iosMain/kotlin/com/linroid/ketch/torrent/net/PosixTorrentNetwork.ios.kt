@@ -2,6 +2,7 @@
 
 package com.linroid.ketch.torrent.net
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
@@ -16,8 +17,6 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -111,7 +110,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
   }
 
   private suspend fun resolveAll(endpoint: PeerEndpoint, type: Int): List<Address> =
-    withContext(Dispatchers.IO) {
+    withContext(TorrentDispatchers.lookup) {
       memScoped {
         val hints = alloc<addrinfo>()
         hints.ai_family = AF_UNSPEC

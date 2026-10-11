@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.tracker
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.torrent.TorrentConfig
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TrackerListState
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -11,9 +12,7 @@ import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.storage.torrentSystemFileSystem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -150,7 +149,7 @@ internal class TrackerListSubscription(
 
   private suspend fun readCache(url: String): Cached? {
     val file = cacheFile ?: return null
-    return withContext(Dispatchers.IO) {
+    return withContext(TorrentDispatchers.disk) {
       try {
         if (!torrentSystemFileSystem.exists(file)) return@withContext null
         val size = torrentSystemFileSystem.metadata(file).size ?: Long.MAX_VALUE
@@ -172,7 +171,7 @@ internal class TrackerListSubscription(
   private suspend fun writeCache(url: String, trackers: List<String>, updatedAt: Instant) {
     val file = cacheFile ?: return
     val parent = file.parent ?: return
-    withContext(Dispatchers.IO) {
+    withContext(TorrentDispatchers.disk) {
       val temporary = parent / "${file.name}.${torrentRandomBytes(4).toByteString().hex()}.tmp"
       try {
         torrentSystemFileSystem.createDirectories(parent)

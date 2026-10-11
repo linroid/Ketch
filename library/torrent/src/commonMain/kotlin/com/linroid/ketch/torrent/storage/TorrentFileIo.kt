@@ -1,7 +1,6 @@
 package com.linroid.ketch.torrent.storage
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import com.linroid.ketch.torrent.TorrentDispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,7 +39,7 @@ internal class TorrentFileIo(private val handle: FileHandle) {
   suspend fun size(): Long = operation { handle.size() }
   suspend fun flush() = operation { handle.flush() }
 
-  suspend fun close() = withContext(NonCancellable + Dispatchers.IO) {
+  suspend fun close() = withContext(NonCancellable + TorrentDispatchers.disk) {
     mutex.withLock {
       if (!closed) {
         closed = true
@@ -51,14 +50,14 @@ internal class TorrentFileIo(private val handle: FileHandle) {
 
   private suspend fun <T> operation(block: () -> T): T = mutex.withLock {
     check(!closed) { "Torrent file is closed" }
-    withContext(Dispatchers.IO) { block() }
+    withContext(TorrentDispatchers.disk) { block() }
   }
 
   companion object {
     suspend fun open(path: Path, fileSystem: FileSystem = torrentFileSystem): TorrentFileIo {
       var handle: FileHandle? = null
       try {
-        withContext(Dispatchers.IO) { handle = fileSystem.openReadWrite(path) }
+        withContext(TorrentDispatchers.disk) { handle = fileSystem.openReadWrite(path) }
         return TorrentFileIo(checkNotNull(handle))
       } catch (e: Throwable) {
         handle?.close()

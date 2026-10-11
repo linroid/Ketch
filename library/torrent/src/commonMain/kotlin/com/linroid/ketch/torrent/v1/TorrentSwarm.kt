@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.v1
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.describeWithoutUrls
@@ -56,7 +57,6 @@ import com.linroid.ketch.torrent.webseed.WebSeedWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
@@ -257,7 +257,7 @@ internal class TorrentSwarm(
       val pieces = webSeedPieces[number]
       val worker = WebSeedWorker(url, pieces, checkNotNull(webSeedHttp), webSeedStats, logLabel,
         reporter, webSeedRetryMs, downloadPayload = downloadPayload)
-      launch(Dispatchers.Default) {
+      launch(TorrentDispatchers.engine) {
         try {
           worker.run()
         } catch (e: TorrentStorageException) {
@@ -317,7 +317,7 @@ internal class TorrentSwarm(
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
       val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
-      active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
+      active[endpoint] = launch(TorrentDispatchers.engine, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         var listen: PeerEndpoint? = if (incoming) null else endpoint
         try {

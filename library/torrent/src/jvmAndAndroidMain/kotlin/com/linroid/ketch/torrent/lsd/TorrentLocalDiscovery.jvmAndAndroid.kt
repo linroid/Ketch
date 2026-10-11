@@ -1,8 +1,8 @@
 package com.linroid.ketch.torrent.lsd
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentDatagram
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
@@ -14,11 +14,12 @@ import java.net.MulticastSocket
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 
-internal actual suspend fun openLsdMulticast(): LsdTransport? = withContext(Dispatchers.IO) {
-  val ipv4 = lsdInterfaces()
-  val ipv6 = lsdIpv6Interfaces()
-  if (ipv4.isEmpty() && ipv6.isEmpty()) null else JvmLsdTransport.open(ipv4, ipv6, LSD_PORT)
-}
+internal actual suspend fun openLsdMulticast(): LsdTransport? =
+  withContext(TorrentDispatchers.lookup) {
+    val ipv4 = lsdInterfaces()
+    val ipv6 = lsdIpv6Interfaces()
+    if (ipv4.isEmpty() && ipv6.isEmpty()) null else JvmLsdTransport.open(ipv4, ipv6, LSD_PORT)
+  }
 
 /**
  * What identifies the interfaces offered for noticing a network change: names with their IPv4
@@ -85,7 +86,7 @@ internal class JvmLsdTransport private constructor(
 
   private val buffer = ByteArray(LsdAnnounce.MAX_BYTES + 1)
 
-  override suspend fun send(announce: LsdAnnounce) = withContext(Dispatchers.IO) {
+  override suspend fun send(announce: LsdAnnounce) = withContext(TorrentDispatchers.multicast) {
     var sent = 0
     var failure: Exception? = null
     // The interface option and the send go together.
@@ -106,7 +107,7 @@ internal class JvmLsdTransport private constructor(
     if (sent == 0) failure?.let { throw it }
   }
 
-  override suspend fun receive(): TorrentDatagram = withContext(Dispatchers.IO) {
+  override suspend fun receive(): TorrentDatagram = withContext(TorrentDispatchers.multicast) {
     var datagram: TorrentDatagram? = null
     while (datagram == null) {
       ensureActive()
@@ -124,7 +125,7 @@ internal class JvmLsdTransport private constructor(
     datagram
   }
 
-  override suspend fun isCurrent(): Boolean = withContext(Dispatchers.IO) {
+  override suspend fun isCurrent(): Boolean = withContext(TorrentDispatchers.lookup) {
     signature(lsdInterfaces(), lsdIpv6Interfaces()) == offered
   }
 

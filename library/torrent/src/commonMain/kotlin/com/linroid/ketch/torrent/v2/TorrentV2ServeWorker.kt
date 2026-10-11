@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.v2
 
+import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.v2.peer.HashServeBounds
@@ -9,7 +10,6 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
 import com.linroid.ketch.torrent.v2.peer.TorrentV2HashServer
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -92,7 +92,7 @@ internal class TorrentV2ServeWorker private constructor(
       server: TorrentV2HashServer? = null,
       uploads: TorrentBufferBudget? = null,
       capacity: Int = 8,
-      dispatcher: CoroutineDispatcher = Dispatchers.Default,
+      dispatcher: CoroutineDispatcher = TorrentDispatchers.engine,
       body: suspend (TorrentV2ServeWorker) -> T,
     ): T = coroutineScope {
       require(capacity in 1..64)
