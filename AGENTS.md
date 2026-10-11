@@ -48,6 +48,7 @@ library/
   mcp/        # MCP server exposing KetchApi as tools for AI agents (JVM only)
 config/       # Multiplatform TOML-based configuration (server, download, remotes, AI, ...)
 updater/      # GitHub release updates for desktop, direct Android and CLI (JVM module)
+hooks/        # Commands and webhooks run on download events (JVM module: server, desktop)
 ai/
   discover/   # LLM agent-driven resource discovery (JVM only, Koog framework)
 app/
@@ -179,6 +180,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ReleasePlatform`, `ReleaseFeed`, `GitHubReleases`, `ReleaseDownloader`, `UpdateException`,
   `extractArchive()`
 
+### `hooks` (JVM module)
+- `com.linroid.ketch.hooks` -- `HookRunner`, `HookPayload`, `HookError`, `ProcessLauncher`,
+  `HookProcess`; internal `CommandRunner`, `WebhookSender`, `Hook`, `transition()`
+
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
   `UnreadableConfig`, `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`,
@@ -186,7 +191,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
   `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
-  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`
+  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`, `HookConfig`, `HookEvent`
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
@@ -830,6 +835,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   checks; `NotificationSettings`,
   `IntegrationSettings` (magnet and `.torrent` handlers) and `PowerSettings` (`[power]`:
   `keepAwake`, on by default)
+- `[[hooks]]` tables hold `KetchConfig.hooks` (`HookConfig`), outside `DownloadConfig`, so
+  `PUT /api/config` and `updateConfig` never see them; no UI edits them. Event, origin, category
+  and host names are kept as strings (`HookConfig.eventSet` drops unknown events) and a
+  `timeoutSeconds` that is not a number loads as the default; see
+  [Automation hooks](#automation-hooks-hooks)
 - `[[download.categories]]` tables hold `DownloadConfig.categories` (`folder`, `extensions`,
   `mimeTypes`, `hosts`), edited in Settings → Downloads (`ui/settings/CategorySettings.kt`, with
   `SuggestedCategory` presets named in the app's language and the field parsing in
@@ -1231,6 +1241,38 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `docker/compose.yaml`, `truenas.yaml` and `fnos.yaml` are the templates
   [Docker](docs/docker.md) ([中文](docs/docker.zh-CN.md)) walks through
 
+### Automation hooks (`hooks`)
+- `[[hooks]]` in `config.toml` (`HookConfig`): `events` (`added`, `started`, `completed`,
+  `failed`, `canceled`, `removed`; `HookEvent`), then `command` (an argv list, never a shell
+  line, with `workingDirectory`) or else `webhook` (`http(s)` URL, `headers`, `secret`), plus
+  `timeoutSeconds` (30), filters `origins` (`ketch.origin`), `categories` (folder of the
+  `DownloadConfig.categoryFor` match) and `hosts` (subdomains included), `name` and `enabled`.
+  `Hook.of` leaves out, with a warning, hooks without a usable action or known event
+- `HookRunner.attach(ketch)` collects `KetchApi.tasks` and each task's `state`: a task created
+  after attaching is `added` (restored ones never are) and starts from no state; others start
+  from the state first seen. `transition(previous, current)` names the event: `started` on
+  entering `Downloading`, `completed` when not completed before or `completedAt` changed (once
+  per completion; `sharing` changes are none), `failed`, `canceled`; leaving the list is
+  `removed`. Deliveries go through a 256-slot channel to 4 workers (dropped with a warning when
+  full), so downloads never wait
+- `HookPayload` (JSON; `environment()` gives the `KETCH_*` variables): event, timestamp,
+  `deliveryId`, task ID, state, `redactUrl`-ed URL, host, file name, output path, sizes,
+  download time, origin, category, source type and `HookError` (kind, HTTP code, message through
+  `redactUrlsIn`). Commands (`CommandRunner` over `ProcessLauncher.System`, a `ProcessBuilder`
+  discarding output) get it on stdin and in the environment, never in argv, and are killed with
+  their descendants after the timeout; cancelling leaves them running. Webhooks
+  (`WebhookSender`, a CIO client without redirects) `POST` it with `X-Ketch-Event`,
+  `X-Ketch-Delivery` and, with a secret, `X-Ketch-Signature: sha256=<HMAC-SHA256 hex>`, retried
+  after 2 s and 10 s on transport errors, timeouts, 408, 429 and 5xx
+- Logs (tag "Hooks") name a hook by `name`, its program's file name or its webhook's host; never
+  the URL, headers, secret, arguments or exception messages (which quote URLs)
+- Only the process holding `instance.lock` runs hooks: `ketch server` and
+  `ketch mcp --standalone` (`HookRunner.start` before `start()`, closed by the shutdown hook),
+  and the desktop app's embedded engine (`InstanceFactory.embeddedFactory`, never when the claim
+  is `Taken`). `ketch <url>` and the attaching commands run none; Android, iOS and the web run
+  none (webhooks on Android are a possible follow-up). Hooks are read at launch only. See
+  [hooks](docs/hooks.md)
+
 ### Self-update (`updater`)
 - Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest (or a tagged)
   release, or a page of them with their notes (`ReleaseFeed.releases`, `releasesBetween`), from
@@ -1426,7 +1468,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
-  "GitHubReleases";
+  "GitHubReleases", "Hooks";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
@@ -1478,11 +1520,9 @@ Planned features not yet implemented:
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
 7. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-8. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
-   command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-9. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+8. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-10. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
-    own network and IP, joining or leaving mid-download without pausing it; see the
-    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6
+9. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+   own network and IP, joining or leaving mid-download without pausing it; see the
+   [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6

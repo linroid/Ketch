@@ -146,6 +146,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Desde la terminal** — `ketch add`, `list`, `pause`, `resume` y `watch` gestionan las descargas
   de la aplicación o de un servidor desde una terminal o un script; `watch` emite líneas JSON
   ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automatización** — Ejecuta un comando o llama a un webhook firmado cuando una descarga se
+  añade, termina o falla, desde `ketch server` o la aplicación de escritorio
+  ([hooks](docs/hooks.md)).
 
 ### Controla tu ancho de banda
 
@@ -260,7 +263,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   a las más lentas para no esperar a la conexión más lenta
 - **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
   la cola quede vacía
-- **Automatización** — Ejecutar un comando o llamar a un webhook cuando una descarga termine o falle
 - **Transferencias entre dispositivos** — Enviar a y Mover a transfieren los datos ya descargados
   para que el otro dispositivo continúe en lugar de empezar de cero
   ([plan](docs/plans/task-transfer.md))
@@ -295,6 +297,7 @@ La documentación detallada enlazada a continuación está en inglés.
 - [Descubrimiento con IA](docs/ai-discovery.md) — Proveedores, claves, búsqueda web, acceso a
   páginas,
   chats e historial
+- [Automatización](docs/hooks.md) — Comandos y webhooks en eventos de descarga
 - [Registros](docs/logging.md) — Dónde encontrarlos y qué adjuntar a un informe de error
 
 ## Contribuir

@@ -106,6 +106,24 @@ maxConnectionsPerHost = 16
 # secure = false
 # name = "NAS"
 # watch = true
+
+# Hooks: run a command or post a webhook when downloads are added, start,
+# complete, fail, are canceled or removed. Only `ketch server`, `ketch mcp
+# --standalone` and the desktop app run them, read from this file at launch;
+# no API can change them. A command is a program and its arguments, never a
+# shell line: it reads the event as JSON on stdin and in KETCH_* variables
+# (KETCH_EVENT, KETCH_TASK_ID, KETCH_OUTPUT_PATH, ...). A webhook gets the
+# JSON as a POST, signed in X-Ketch-Signature when `secret` is set. See
+# docs/hooks.md.
+# [[hooks]]
+# events = ["completed"]
+# command = ["/usr/local/bin/ketch-done"]
+# timeoutSeconds = 60
+# [[hooks]]
+# events = ["completed", "failed"]
+# webhook = "https://hooks.example.com/ketch"
+# secret = "change-me"
+# origins = ["browser"]
 """
 
 /** Writes a default config file to [path]. */

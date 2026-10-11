@@ -142,6 +142,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 - **ターミナルから操作** — `ketch add`・`list`・`pause`・`resume`・`watch` で、Ketch アプリや
   サーバーのダウンロードをターミナルやスクリプトから操作できます。`watch` は JSON Lines を出力します
   （[CLI](cli/README.md#work-on-a-running-ketch)）。
+- **自動化フック** — ダウンロードの追加・完了・失敗時に、`ketch server` やデスクトップアプリが
+  コマンドを実行したり署名付き webhook を呼び出したりします（[フック](docs/hooks.md)）。
 
 ### 帯域幅をコントロール
 
@@ -249,7 +251,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **リソース検出** — Web ページ内のダウンロード可能なファイルを検出
 - **分割ダウンロードの高速化** — 先に完了した接続が遅い接続の残りを引き継ぎ、待ち時間を短縮
 - **ダウンロード完了後の動作** — キューが空になったら Ketch の終了、スリープ、シャットダウンを選択可能に
-- **自動化フック** — 完了時や失敗時にコマンド実行や webhook 呼び出し
 - **デバイス間転送** — 送信・移動時にダウンロード済みデータも渡し、別のデバイスで最初からやり直さずに再開
   （[計画](docs/plans/task-transfer.md)）
 - **補助デバイス** — 他のデバイスがそれぞれの回線で同じファイルの一部をダウンロード。
@@ -279,6 +280,7 @@ Ketch サーバーを操作できます。
 - [BitTorrent](docs/torrent.md) — トレントとマグネットリンクの対応範囲と制限
 - [複数ネットワーク](docs/multiple-networks.md) — 複数のネットワークインターフェースへの分散
 - [AI 検索](docs/ai-discovery.md) — プロバイダー、キー、Web 検索、ページへのアクセス、チャット、履歴
+- [自動化フック](docs/hooks.md) — ダウンロードのイベントで実行するコマンドと webhook
 - [ログ](docs/logging.md) — 保存先と不具合報告に添付する情報
 
 ## 貢献する

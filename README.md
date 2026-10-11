@@ -133,6 +133,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **From a terminal** — `ketch add`, `list`, `pause`, `resume` and `watch` control the downloads
   of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
   ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automation hooks** — Run a command or call a signed webhook when a download is added,
+  finishes or fails, from `ketch server` or the desktop app ([hooks](docs/hooks.md)).
 
 ### In control of your bandwidth
 
@@ -239,7 +241,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   ones, so a download no longer waits on its slowest connection
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
   once the queue is empty
-- **Automation hooks** — Run a command or call a webhook when a download finishes or fails
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own
@@ -267,6 +268,7 @@ iOS, the JVM or the browser through the same `KetchApi`.
 - [BitTorrent](docs/torrent.md) — Torrent and magnet support and its limits
 - [Multiple networks](docs/multiple-networks.md) — Spreading downloads across network interfaces
 - [AI discovery](docs/ai-discovery.md) — Providers, keys, web search, page access, chats and history
+- [Automation hooks](docs/hooks.md) — Commands and webhooks run on download events
 - [Logging](docs/logging.md) — Where the logs are, and what to attach to a bug report
 
 ## Contributing
