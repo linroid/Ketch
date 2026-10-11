@@ -72,7 +72,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `ControlKey` (`KetchApi.control(key)` looks up optional typed controllers that other modules
-  define; `null` by default), and `FileOrder`, `NaturalOrder`, `fileExtension()` and
+  define; `null` by default), `Checksum`, `ChecksumAlgorithm`, and `FileOrder`, `NaturalOrder`, `fileExtension()` and
   `sortedByFileOrder()`, the file orders the apps, the CLI, MCP and the torrent controller share
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
   `redactUrl()`, `describeCauses()`
@@ -110,6 +110,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
   `sanitizeFileName()`, `OutputPathReservations`, `DestinationPathPolicy`,
   `PathRejectedException`
+- `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512`,
+  `ChecksumAlgorithm.newDigest()`: pure Kotlin hashes on every engine target, shared by checksum
+  verification and `library:torrent`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`, `TaskControl` (selection
   generation, sharing intent and the command retry ledger; SQLite `control_json`, `5.sqm`),
@@ -137,7 +140,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- `TorrentDownloadSource` (implements `DownloadSource`),
   `TorrentEngine`, `TorrentSession`, `TorrentConfig`, `TrackerListState`, `TorrentMetadata`,
-  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `Sha1`, `PeerTraffic`,
+  `TorrentResumeState`, `MagnetUri`, `InfoHash`, `Bencode`, `PeerTraffic`,
   `TorrentEncryption`, `TorrentMulticastLock`; internal `TorrentLocalDiscovery` (BEP 14, with
   `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that `openLsdMulticast()` opens)
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
@@ -252,6 +255,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `KetchFeatures.CATEGORY_FOLDERS`; `DownloadConfig.categoryFor` is the matcher the apps preview
   with
 - File integrity check on resume (validates local file size vs. claimed progress)
+- Checksums: `DownloadRequest.checksum` (`Checksum`: `ChecksumAlgorithm` MD5, SHA-1, SHA-256 or
+  SHA-512 and lowercase hex; `Checksum.parse` reads `sha256:<hex>`, base64 digest-header values
+  and bare hex, and JSON carries it as that text) is checked once the last byte is flushed:
+  `DownloadExecution.verify` reads the file back through `FileAccessor.readAt` on the io
+  dispatcher (`fileDigest`, yielding every 256 KiB, so pause and cancel stop it) while the task
+  still reports `Downloading`. A match completes with `Completed.checksum`; a difference fails
+  with `KetchError.ChecksumMismatch` (not retryable), deletes the file and discards its
+  progress, so a resume downloads it again. Without one, HTTP downloads check the digest the
+  server publishes (`ServerInfo.checksum` / `ResolvedSource.checksum`, from
+  `ServerInfo.publishedChecksum`: the strongest `Repr-Digest` entry, else a legacy `Digest` of a
+  `HEAD` or `200` response, nothing when `Content-Encoding` is set), refreshed by a resume's
+  `HEAD` (`DownloadContext.publishedChecksum`), and fail with `published = true`. A restored
+  completed task reports only the request's checksum (published ones are not saved). Applies to
+  sources Ketch writes one file for (HTTP, FTP, HLS, DASH); `download` refuses it for sources
+  that manage their own files. Listed as `KetchFeatures.CHECKSUM` (`download.checksum`). Hashes
+  are core's pure Kotlin `digest` package, which `library:torrent` uses too; `updater` verifies
+  release assets through `DownloadRequest.checksum`
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
   a failed final flush resets their progress. For files the engine writes (not torrents), an empty
@@ -974,6 +994,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   when it names the same place (`DestinationPathPolicy.confinesTo`), as the task's own file would
   otherwise give it a new name. With a token and no list, callers may save anywhere, as the apps
   let owners type any folder on a remote device
+- `POST /api/tasks` takes `checksum` as text (`"sha256:<hex>"`; a malformed one is 400), and
+  task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
+  `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without
+  `KetchFeatures.CHECKSUM`
 - `PUT /api/config` keeps the server's `categories` when the body has no `categories` field, as
   clients older than category folders send it
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
@@ -1053,6 +1077,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   instance's setting; `--proxy <url>`, `--proxy-bypass <hosts>` and `--no-proxy` (`ProxyOptions`)
   set `DownloadRequest.proxy` instead, which `ketch add` refuses for an instance without
   `KetchFeatures.PROXY`
+- `ketch <url>` and `ketch add` take `--checksum <digest>` (`sha256:<hex>`, also `md5`, `sha1`,
+  `sha512`, base64 or bare hex; `parseChecksumOption`), a malformed one exiting 2; `ketch add`
+  refuses it for an instance without `KetchFeatures.CHECKSUM`, and task JSON carries `checksum`
+  and `verifiedChecksum`
 - `ketch <url> --files <ids>` downloads only those files of a torrent
   (`DownloadRequest.selectedFileIds`); `ketch --list-files <url>` resolves the URL and prints
   `ID  SIZE  PATH` rows instead (`fileListRows`), in the order of `--sort name|size|type` (`type`
@@ -1094,8 +1122,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   release, or a page of them with their notes (`ReleaseFeed.releases`, `releasesBetween`), from
   the GitHub API, `Release.asset` / `androidAsset` pick the file by the workflow's
   names, and
-  `ReleaseDownloader` downloads it with a private Ketch engine and checks the SHA-256 digest
-  GitHub publishes per asset (files without one are refused). Pass it the process's logger:
+  `ReleaseDownloader` downloads it with a private Ketch engine, which checks the SHA-256 digest
+  GitHub publishes per asset (`DownloadRequest.checksum`; files without one are refused). Pass it the process's logger:
   every `Ketch` installs its logger globally
 - `ReleaseVersion` orders `rc9` before `rc15` and pre-releases before their release
 - `ketch update [--check] [--version <v>]` replaces the native binary (`CliInstallation`): renamed
@@ -1108,8 +1136,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `resolveUrl` (without the metainfo), `listDownloadFiles` (`cursor`, `limit` up to 1000, `sort`
   and `descending`, from `control(TorrentController)`, else the request's resolved files),
   `selectDownloadFiles` (comma-separated IDs), `getStatus`, `setSpeedLimit`, `setPriority`,
-  `updateConfig`; `startDownload` takes `fileIds`, and task JSON has `selectedFiles`,
-  `totalFiles` and a completed task's `sharing`. There is no seeding tool. Downloads it starts
+  `updateConfig`; `startDownload` takes `fileIds` and `checksum` (`sha256:<hex>` or the like),
+  and task JSON has `selectedFiles`, `totalFiles`, the request's `checksum` and a completed
+  task's `sharing` and `verifiedChecksum`. There is no seeding tool. Downloads it starts
   carry `DownloadRequest.properties["ketch.origin"] = "agent"`
 - Agent tools are `TextTool`s (`library:mcp` and `ai:discover` each have a copy): a name, a
   description and string or integer parameters (also boolean ones in `library:mcp`), required
@@ -1195,7 +1224,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### Error Handling (sealed `KetchError`)
 - `Network` (retryable), `Http(code)` (5xx/429 retryable), `Disk`, `Unsupported`,
   `FileChanged`, `CorruptResumeState`, `Canceled`, `SourceError`,
-  `AuthenticationFailed`, `Unknown`
+  `AuthenticationFailed`, `ChecksumMismatch(algorithm, expected, actual, published)`, `Unknown`
 - I/O exceptions from `FileAccessor` classified as `KetchError.Disk`
 
 ### App Size
@@ -1327,31 +1356,26 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Checksums** - `DownloadRequest` carries an expected hash, checked once an HTTP or FTP
-   download completes, with a server-published `Digest` / `Repr-Digest` as the fallback; a
-   mismatch fails the task with a typed error. Pure Kotlin on every target, settable from the
-   apps, the CLI (`--checksum`), REST and MCP. Today only `library:torrent` and `updater` hash
-   content; Metalink and mirrors build on this
-7. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
+6. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-8. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
+7. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
    speed, unlimited retries and a capped, jittered backoff that resets once bytes are saved; a
    watchdog around HTTP segments and FTP transfers raises a retryable `KetchError.Network`.
    Today socket and request timeouts are `Long.MAX_VALUE`, so a stalled connection hangs until
    the task is paused, and the backoff (`retryDelayMs * (1 shl n)`) has no cap
-9. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
+8. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
    renamed to the final, deduplicated name after the last flush, never replacing a file that
    appeared meanwhile. Today they write to the final name, preallocated to full size, so an
    unfinished file looks complete
-10. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
-    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-11. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+9. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+   the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
+10. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-12. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+11. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-13. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+12. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
-    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 7
+    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6

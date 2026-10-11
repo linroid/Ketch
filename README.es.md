@@ -176,6 +176,8 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
   ([traducciones](docs/development/localization.md)).
+- **Descargas verificadas** — Añade a una descarga una suma de comprobación SHA-256, SHA-512, SHA-1
+  o MD5 y Ketch comprueba con ella el archivo terminado, o con la que publica el servidor.
 
 ### Encuentra descargas con IA (versión preliminar)
 
@@ -252,8 +254,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   admitir cifrado HLS AES-128; ya se admiten descargas de un único flujo finito sin cifrar
 - **Extracción multimedia** — Guardar contenido multimedia de páginas web
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
-- **Sumas de comprobación** — Verificar una descarga con un hash que proporciones o publique el
-  servidor
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
 - **Detección de bloqueos y ajustes de reintento** — Reconectar si una conexión deja de enviar datos

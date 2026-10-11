@@ -181,6 +181,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Votre style, votre langue** — Thèmes clair et sombre avec sept couleurs d'accent, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch et Français
   ([traductions](docs/development/localization.md)).
+- **Téléchargements vérifiés** — Indiquez une somme de contrôle SHA-256, SHA-512, SHA-1 ou MD5 pour
+  un téléchargement et Ketch vérifie le fichier terminé avec elle, ou avec celle que publie le
+  serveur.
 
 ### Trouvez des téléchargements avec l'IA (aperçu)
 
@@ -259,8 +262,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   durée finie non chiffré sont déjà pris en charge
 - **Extraction multimédia** — Enregistrer les médias des pages web
 - **Détection de ressources** — Trouver les fichiers téléchargeables d'une page web
-- **Sommes de contrôle** — Vérifier un téléchargement avec une empreinte fournie par vous ou
-  publiée par le serveur
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
   aux plus lentes pour ne plus attendre la connexion la plus lente
 - **Détection des blocages et réglages de reprise** — Reconnecter lorsqu'une connexion n'envoie

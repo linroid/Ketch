@@ -107,6 +107,7 @@ instead, use [`ketch add`](#add-a-download).
 | `--list-files` | List the files or variants of a URL, such as a torrent or magnet, with their IDs and sizes, instead of downloading it |
 | `--sort <order>` | Order of `--list-files`: `name` (natural order, so 2 comes before 10), `size` or `type` (by file extension); default: the download's own order |
 | `--reverse` | Reverse the order of `--list-files` |
+| `--checksum <digest>` | Fail unless the finished file has this digest: `sha256:<hex>`, or `md5`, `sha1`, `sha512`; base64 and bare hex digests work too |
 | `--help`, `-h` | Show help message |
 
 Headers go with every request of the download. A redirect to another scheme, host or port keeps
@@ -118,6 +119,11 @@ cookies, `Authorization` and other headers stay with the site they were given fo
 files to choose. When the source offers variants, of which one downloads, it says so on stderr,
 and `--files` then takes one ID. `--files` cannot be combined with it. Invalid options exit with
 status 2.
+
+With `--checksum`, Ketch hashes the file once the last byte is saved: a match prints
+`[Verified]`, a difference fails the download, deletes the file and exits 1. Without it, an HTTP
+download is checked against a digest the server publishes in a `Repr-Digest` or `Digest` header
+for the whole, unencoded file. Torrents check their own pieces and refuse `--checksum`.
 
 Without `--proxy` or `--no-proxy`, HTTP(S) downloads use `[download.proxy]` of the
 [config file](#downloadproxy), which by default follows the `https_proxy`, `http_proxy`,
@@ -149,6 +155,10 @@ ketch --proxy socks5://127.0.0.1:1080 --proxy-bypass '*.lan' https://example.com
 # FTP with credentials, and a magnet link into a directory, with debug logs
 ketch ftp://user:secret@ftp.example.com/pub/file.iso
 ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
+
+# Fail unless the file has the published SHA-256
+ketch --checksum sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 \
+  https://example.com/file.iso
 
 # The files of a torrent, largest first, then only two of them
 ketch --list-files --sort size --reverse ./pack.torrent
@@ -224,6 +234,7 @@ downloads to [its folders](#save-folders).
 | `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated |
 | `--no-proxy` | Connect directly, whatever the instance's proxy |
 | `--idempotency-key <key>` | Running the command again with the same key adds the download once |
+| `--checksum <digest>` | Fail unless the finished file has this digest, such as `sha256:<hex>`; refused by a Ketch that cannot verify checksums |
 | `--json` | Print the task as JSON (see [Task JSON](#task-json)) instead of its ID |
 
 `ketch add` sends each download with a request ID, so when the connection fails before Ketch
@@ -292,8 +303,9 @@ use: `taskId`, `name`, `url`, `destination`, `state` (`scheduled`, `queued`, `do
 `paused`, `completed`, `failed` or `canceled`) and `createdAt`, and, as they apply,
 `downloadedBytes`, `totalBytes`, `bytesPerSecond`, `percent` (0 to 1), `pauseReason`,
 `preemptedBy`, `outputPath`, `completedAt`, `downloadTimeMs`, `error`, `queuePosition`,
-`priority`, `speedLimit` (bytes per second) and `requestId`. Request headers are left out, as
-they can hold credentials.
+`priority`, `speedLimit` (bytes per second), `requestId`, `checksum` (the one asked for) and
+`verifiedChecksum` (the one a completed file matched, which may be the server's). Request headers
+are left out, as they can hold credentials.
 
 ### Server
 
@@ -540,7 +552,9 @@ Each tool returns a JSON document as the text of its result. Parameters that hav
 such as everything but `url` in `startDownload`, are optional in the tool's input schema.
 `startDownload` takes a `requestId`, a UUID the agent makes up: calling it again with the same
 `requestId` and arguments, such as after a timeout, returns the download it started instead of
-adding another. An older Ketch without request IDs refuses it.
+adding another. An older Ketch without request IDs refuses it. It also takes a `checksum`, such as
+`sha256:<hex>`: the download fails, and its file is deleted, when the finished file differs. Task
+JSON then has `checksum`, and a completed task the `verifiedChecksum` it matched.
 
 The 14 tools are `listDownloads`, `getDownload`, `startDownload`, `pauseDownload`,
 `resumeDownload`, `cancelDownload`, `removeDownload`, `resolveUrl`, `listDownloadFiles`,

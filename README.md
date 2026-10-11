@@ -163,6 +163,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **Your look, your language** — Light and dark themes with seven accent colors, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch and Français
   ([translating](docs/development/localization.md)).
+- **Verified downloads** — Give a download a SHA-256, SHA-512, SHA-1 or MD5 checksum, and Ketch
+  checks the finished file against it, or against the checksum the server publishes.
 
 ### Find downloads with AI (preview)
 
@@ -232,7 +234,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
-- **Checksums** — Check a download against a hash you provide, or one the server publishes
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
 - **Stall detection and retry settings** — Reconnect when a connection stops sending data, and

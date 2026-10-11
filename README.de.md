@@ -180,6 +180,8 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit sieben Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
   ([Übersetzungen](docs/development/localization.md)).
+- **Geprüfte Downloads** — Gib einem Download eine Prüfsumme (SHA-256, SHA-512, SHA-1 oder MD5) mit,
+  und Ketch prüft die fertige Datei damit oder mit der Prüfsumme, die der Server veröffentlicht.
 
 ### Downloads mit KI finden (Vorschau)
 
@@ -259,7 +261,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   einem einzelnen Stream werden bereits unterstützt
 - **Medienextraktion** — Medien von Webseiten speichern
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
-- **Prüfsummen** — Downloads gegen einen angegebenen oder vom Server veröffentlichten Hash prüfen
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer
   Verbindungen, damit der Download nicht auf die langsamste warten muss
 - **Stillstand erkennen und Wiederholungen einstellen** — Neu verbinden, wenn keine Daten mehr
