@@ -51,6 +51,41 @@ internal object TorrentUploadModeSerializer : KSerializer<TorrentUploadMode> {
 }
 
 /**
+ * Whether peer connections use protocol encryption (MSE/PE).
+ *
+ * Saved as [id]. An id this version does not know, or a value that is not a string at all, loads
+ * as [Preferred] rather than failing the whole config file.
+ *
+ * @property id value stored in `config.toml`.
+ */
+@Serializable(with = TorrentEncryptionModeSerializer::class)
+enum class TorrentEncryptionMode(val id: String) {
+  /** Dials encrypted first and in plaintext when a peer refuses; accepts both. */
+  Preferred(id = "preferred"),
+
+  /** Encrypted connections only, both ways: peers that cannot encrypt are not used. */
+  Required(id = "required"),
+
+  /** Plaintext only: encrypted incoming connections are refused. */
+  Off(id = "off"),
+}
+
+internal object TorrentEncryptionModeSerializer : KSerializer<TorrentEncryptionMode> {
+  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(
+    "com.linroid.ketch.config.TorrentEncryptionMode", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: TorrentEncryptionMode) {
+    encoder.encodeString(value.id)
+  }
+
+  override fun deserialize(decoder: Decoder): TorrentEncryptionMode {
+    val id = try { decoder.decodeString() } catch (_: SerializationException) { null }
+    return TorrentEncryptionMode.entries.firstOrNull { it.id == id }
+      ?: TorrentEncryptionMode.Preferred
+  }
+}
+
+/**
  * Reads a speed limit as [SpeedLimit] does (`"unlimited"`, `"1m"`, `"500k"` or bytes), also
  * bytes written as a bare number, but loads a value it cannot read, of any type, as unlimited
  * rather than failing the whole config file.
@@ -95,6 +130,10 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  * @property upload what this device uploads to peers: nothing by default. Peers it uploads to
  *   see its IP address.
  * @property uploadLimit cap on the upload speed of all torrents together; unlimited by default.
+ * @property encryption protocol encryption for peer connections: encrypted first by default.
+ * @property utp whether peers are also reached over uTP; on by default.
+ * @property portMapping whether the home router is asked (NAT-PMP, then UPnP) to forward the
+ *   listen port, so peers behind other routers can connect; on by default.
  */
 @Serializable
 data class TorrentSettings(
@@ -106,6 +145,9 @@ data class TorrentSettings(
   val upload: TorrentUploadMode = TorrentUploadMode.Off,
   @Serializable(with = LenientSpeedLimitSerializer::class)
   val uploadLimit: SpeedLimit = SpeedLimit.Unlimited,
+  val encryption: TorrentEncryptionMode = TorrentEncryptionMode.Preferred,
+  val utp: Boolean = true,
+  val portMapping: Boolean = true,
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }

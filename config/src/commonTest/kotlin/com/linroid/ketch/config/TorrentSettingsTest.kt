@@ -173,4 +173,35 @@ class TorrentSettingsTest {
     |$line
     """.trimMargin(),
   ).torrent
+
+  @Test
+  fun `connection settings decode and default to encryption uTP and port mapping on`() {
+    assertEquals(TorrentEncryptionMode.Preferred, TorrentSettings().encryption)
+    assertEquals(true, TorrentSettings().utp)
+    assertEquals(true, TorrentSettings().portMapping)
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[torrent]
+      |encryption = "required"
+      |utp = false
+      |portMapping = false
+      """.trimMargin(),
+    )
+    assertEquals(TorrentEncryptionMode.Required, decoded.torrent.encryption)
+    assertEquals(false, decoded.torrent.utp)
+    assertEquals(false, decoded.torrent.portMapping)
+  }
+
+  @Test
+  fun `an unknown encryption mode loads as preferred`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[torrent]
+      |encryption = "always"
+      """.trimMargin(),
+    )
+    assertEquals(TorrentEncryptionMode.Preferred, decoded.torrent.encryption)
+  }
 }
