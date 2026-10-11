@@ -155,6 +155,15 @@ class UtpSocketTest {
   }
 
   @Test
+  fun burstLoss_isRecoveredQuickly() {
+    // 150 packets in a row lost mid-transfer, as a receiver's full UDP buffer drops them, while
+    // later packets still arrive and keep acks coming.
+    val network = Network(delay = 1_000, drop = (300 until 450).toSet())
+    transfer(network, 1_500_000)
+    assertTrue(network.now < 5_000_000, "Took ${network.now / 1000} ms")
+  }
+
+  @Test
   fun bothDirections_atOnce() {
     val network = Network(loss = 0.02, jitter = 5_000, seed = 5)
     val up = Transfer(Random(1).nextBytes(200_000))

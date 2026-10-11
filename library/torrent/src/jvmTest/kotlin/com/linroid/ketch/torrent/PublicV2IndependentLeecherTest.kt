@@ -1,5 +1,8 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -48,6 +51,19 @@ class PublicV2IndependentLeecherTest {
   }
 
   @Test
+  fun libtorrentOverUtpOnly_downloadsFromKetch() = runTest {
+    // libtorrent dials our listen port over UDP; TCP is off on its side.
+    upload(TorrentV2Fixture.build(files, hybrid = true), utpOnly = true) { it.identity }
+  }
+
+  @Test
+  fun libtorrentOverEncryptedUtp_downloadsFromKetch() = runTest {
+    upload(TorrentV2Fixture.build(files, hybrid = true), encrypted = true, utpOnly = true) {
+      it.identity
+    }
+  }
+
+  @Test
   fun libtorrentJoinsHybridThroughTheV1Topic() = runTest {
     val session = upload(TorrentV2Fixture.build(files, hybrid = true)) {
       TorrentIdentity(v1 = it.identity.v1)
@@ -59,11 +75,12 @@ class PublicV2IndependentLeecherTest {
   /**
    * Seeds [fixture] from a Ketch engine, has libtorrent download it from a magnet of the topics
    * [topics] picks with Ketch as its only peer, and returns the seeding owner once removed.
-   * With [encrypted], libtorrent only connects over RC4.
+   * With [encrypted], libtorrent only connects over RC4; with [utpOnly], only over uTP.
    */
   private suspend fun upload(
     fixture: TorrentV2Fixture,
     encrypted: Boolean = false,
+    utpOnly: Boolean = false,
     topics: (TorrentV2Document) -> TorrentIdentity,
   ): TorrentV2DownloadSession = withContext(Dispatchers.Default) {
     withTimeout(60_000) {
@@ -73,6 +90,8 @@ class PublicV2IndependentLeecherTest {
         "libtorrent4j ${LibTorrent.libtorrent4jVersion()}")
       val root = Files.createTempDirectory("ketch-public-v2-leecher").toFile()
       val leech = root.resolve("leech").apply { mkdirs() }
+      // uTP runs log at debug, so a stalled run shows what the connection was doing.
+      if (utpOnly) KetchLogger.setLogger(Logger.console(LogLevel.DEBUG))
       val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
         uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
       val manager = SessionManager()
@@ -90,7 +109,7 @@ class PublicV2IndependentLeecherTest {
 
         // The memory-mapped back end guards its writes with SIGSEGV and SIGBUS handlers that take
         // the JVM's implicit null checks down with them; plain file I/O installs none.
-        manager.start(SessionParams(leecherSettings(encrypted)).apply { setPosixDiskIO() })
+        manager.start(SessionParams(leecherSettings(encrypted, utpOnly)).apply { setPosixDiskIO() })
         // libtorrent reads x.pe without unescaping it, so the peer goes in as written.
         val identity = topics(fixture.document)
         val magnet = MagnetUri(identity).toUri() + "&x.pe=127.0.0.1:${engine.listenPort}"
@@ -109,6 +128,7 @@ class PublicV2IndependentLeecherTest {
         assertEquals(0, engine.admittedSessionBytes)
         session
       } finally {
+        KetchLogger.setLogger(Logger.None)
         manager.stop()
         engine.stop()
         assertEquals(0, engine.admittedSessionBytes)
@@ -136,17 +156,22 @@ class PublicV2IndependentLeecherTest {
   }
 
   /**
-   * Loopback only, no DHT, local discovery or port mapping, and TCP, since Ketch speaks no uTP
-   * yet; plaintext unless [encrypted], then RC4 only.
+   * Loopback only, no DHT, local discovery or port mapping; TCP, or uTP only when [utpOnly];
+   * plaintext unless [encrypted], then RC4 only.
    */
-  private fun leecherSettings(encrypted: Boolean): SettingsPack {
+  private fun leecherSettings(encrypted: Boolean, utpOnly: Boolean): SettingsPack {
     val settings = SettingsPack()
     settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
-    for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
-      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp,
-      settings_pack.bool_types.enable_outgoing_utp, settings_pack.bool_types.enable_incoming_utp)) {
-      settings.setBoolean(flag.swigValue(), false)
-    }
+    val off = listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
+      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp) +
+      if (utpOnly) {
+        listOf(settings_pack.bool_types.enable_outgoing_tcp,
+          settings_pack.bool_types.enable_incoming_tcp)
+      } else {
+        listOf(settings_pack.bool_types.enable_outgoing_utp,
+          settings_pack.bool_types.enable_incoming_utp)
+      }
+    for (flag in off) settings.setBoolean(flag.swigValue(), false)
     val policy = if (encrypted) settings_pack.enc_policy.pe_forced
       else settings_pack.enc_policy.pe_disabled
     settings.setInteger(settings_pack.int_types.out_enc_policy.swigValue(), policy.swigValue())

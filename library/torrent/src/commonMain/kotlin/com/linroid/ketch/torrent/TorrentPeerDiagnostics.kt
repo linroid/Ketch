@@ -17,6 +17,8 @@ internal class PeerAttempt(incoming: Boolean) {
   var payload: Long = 0
   /** The connection negotiated protocol encryption. */
   var encrypted: Boolean = false
+  /** The connection runs over uTP. */
+  var utp: Boolean = false
 }
 
 /**
@@ -49,6 +51,8 @@ internal data class PeerOutcomeReport(
   val flags: Int,
   /** The connection negotiated protocol encryption. */
   val encrypted: Boolean = false,
+  /** The connection ran over uTP. */
+  val utp: Boolean = false,
 )
 
 /**
@@ -97,12 +101,16 @@ internal class PeerDiagnostics(
   private val incoming = IntArray(PeerOutcome.entries.size)
   /** Connections, either way, that completed the BitTorrent handshake encrypted. */
   private var encrypted = 0
+  /** Connections, either way, that completed the BitTorrent handshake over uTP. */
+  private var overUtp = 0
 
   fun record(endpoint: PeerEndpoint, attempt: PeerAttempt, failure: Throwable?, incoming: Boolean,
     flags: Int) {
     val outcome = classifyPeerOutcome(attempt, failure) ?: return
-    listener(PeerOutcomeReport(endpoint, outcome, incoming, flags, attempt.encrypted))
+    listener(PeerOutcomeReport(endpoint, outcome, incoming, flags, attempt.encrypted,
+      attempt.utp))
     if (!outcome.failed && attempt.encrypted) encrypted++
+    if (!outcome.failed && attempt.utp) overUtp++
     if (incoming) {
       this.incoming[outcome.ordinal]++
       return
@@ -133,6 +141,7 @@ internal class PeerDiagnostics(
       .joinToString(" ") { "${it.label}=${values[it.ordinal]}" }.ifEmpty { "none" }
     return "dialed ${dialed.size} [${table(counts)}], incoming [${table(incoming)}], " +
       "encrypted $encrypted, " +
+      "utp $overUtp, " +
       "pex flags utp=$utp (failed $failedUtp) encryption=$encryption (failed $failedEncryption)"
   }
 }

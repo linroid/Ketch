@@ -1,11 +1,14 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import okio.IOException
 import okio.Path.Companion.toPath
 import org.libtorrent4j.LibTorrent
 import org.libtorrent4j.SessionManager
@@ -188,6 +191,68 @@ class IndependentSeederTest {
           TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024)).run(peers)
           assertContentEquals(payload, output.readBytes())
         } finally {
+          raw.close()
+          manager.stop()
+          root.deleteRecursively()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun utpOnlySeeder_downloadsOverUtp() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        NativeLibraryLoader.ensureLoaded()
+        val root = Files.createTempDirectory("ketch-interop-utp").toFile()
+        val seed = root.resolve("seed").apply { mkdirs() }
+        val payload = ByteArray(600_037) { (it * 7 + 3).toByte() }
+        seed.resolve("fixture.bin").writeBytes(payload)
+        val hashes = payload.asList().chunked(16_384)
+          .fold(ByteArray(0)) { bytes, chunk -> bytes + sha1Digest(chunk.toByteArray()) }
+        val data = Bencode.encode(mapOf("info" to mapOf(
+          "name" to "fixture.bin", "length" to payload.size.toLong(),
+          "piece length" to 16_384L, "pieces" to hashes
+        )))
+        // libtorrent speaks uTP only.
+        val settings = seederSettings().also {
+          it.setBoolean(settings_pack.bool_types.enable_incoming_tcp.swigValue(), false)
+          it.setBoolean(settings_pack.bool_types.enable_outgoing_tcp.swigValue(), false)
+        }
+        val manager = SessionManager()
+        val raw = createTorrentNetwork()
+        val scope = CoroutineScope(Dispatchers.Default)
+        try {
+          manager.start(SessionParams(settings))
+          val info = TorrentInfo(data)
+          manager.download(info, seed)
+          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
+            manager.swig().listen_port() == 0) {
+            delay(20)
+          }
+          val endpoint = PeerEndpoint("127.0.0.1", manager.swig().listen_port())
+          var utp: UtpEndpoint? = null
+          val port = TorrentUdpPort(raw.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
+            utp = { utp?.receive(it) })
+          utp = UtpEndpoint(scope, port::send, onIncoming = { false })
+          // TCP is refused, as by a peer behind NAT; the dial falls back to uTP.
+          val tcpRefused = object : TorrentNetwork by raw {
+            override suspend fun connect(remote: PeerEndpoint): TorrentConnection =
+              throw IOException("Connection refused")
+          }
+          val network = TorrentUtpFallback(tcpRefused) { utp }
+          val expected = TorrentMetadata.fromBencode(data)
+          val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash, endpoint)
+          assertContentEquals(expected.infoBytes, metadata.infoBytes)
+          val output = root.resolve("download/fixture.bin")
+          val store = TorrentPieceStore(metadata, output.absolutePath.toPath(), emptySet(), "utp")
+          val peers = Channel<PeerEndpoint>(1)
+          peers.send(endpoint)
+          peers.close()
+          TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024)).run(peers)
+          assertContentEquals(payload, output.readBytes())
+        } finally {
+          scope.cancel()
           raw.close()
           manager.stop()
           root.deleteRecursively()

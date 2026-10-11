@@ -86,10 +86,8 @@ class KotlinTorrentV2DiscoveryTest {
         override fun close() = Unit
       }
 
-    override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
-      udp.fetchAndAdd(1)
-      return inner.bindUdp(local)
-    }
+    override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket =
+      inner.bindUdp(local).countingPublicDiscovery(udp)
   }
 
   /** A peer arriving at the owner from [host]; it never completes a handshake. */

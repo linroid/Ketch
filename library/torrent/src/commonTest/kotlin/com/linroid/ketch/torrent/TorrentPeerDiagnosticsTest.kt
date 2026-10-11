@@ -69,7 +69,7 @@ class TorrentPeerDiagnosticsTest {
 
     assertEquals(
       "dialed 2 [handshakeClosed=1 received=1], incoming [handshakeClosed=1], encrypted 1, " +
-        "pex flags utp=2 (failed 1) encryption=1 (failed 1)",
+        "utp 0, pex flags utp=2 (failed 1) encryption=1 (failed 1)",
       diagnostics.summary(),
     )
     assertEquals(5, reports.size)
@@ -82,7 +82,7 @@ class TorrentPeerDiagnosticsTest {
       diagnostics.record(PeerEndpoint("10.0.0.1", port), attempt(PeerStage.DIALING),
         IOException("refused"), false, 0)
     }
-    assertEquals("dialed 2 [refused=2], incoming [none], encrypted 0, " +
+    assertEquals("dialed 2 [refused=2], incoming [none], encrypted 0, utp 0, " +
       "pex flags utp=0 (failed 0) encryption=0 (failed 0)", diagnostics.summary())
   }
 }

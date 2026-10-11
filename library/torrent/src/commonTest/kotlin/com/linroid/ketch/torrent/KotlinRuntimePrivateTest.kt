@@ -51,15 +51,13 @@ class KotlinRuntimePrivateTest {
             "ketch-private-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
           val clock = AtomicLong(0)
           val oldClosed = AtomicBoolean(false)
-          val udpSockets = AtomicInt(0)
+          val publicDiscovery = AtomicInt(0)
           val transport = createTorrentNetwork()
           val first = transport.listen(PeerEndpoint("127.0.0.1", 0))
           val second = transport.listen(PeerEndpoint("127.0.0.1", 0))
           val network = object : TorrentNetwork by transport {
-            override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
-              udpSockets.fetchAndAdd(1)
-              return transport.bindUdp(local)
-            }
+            override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket =
+              transport.bindUdp(local).countingPublicDiscovery(publicDiscovery)
             override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
               if (remote == second.local) assertTrue(oldClosed.load())
               val connection = transport.connect(remote)
@@ -120,7 +118,7 @@ class KotlinRuntimePrivateTest {
               it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
             }, session.failure.value?.stackTraceToString())
             assertTrue(oldClosed.load())
-            assertEquals(0, udpSockets.load())
+            assertEquals(0, publicDiscovery.load())
           } finally {
             engine.stop()
             servers.forEach { it.cancelAndJoin() }
@@ -133,7 +131,7 @@ class KotlinRuntimePrivateTest {
   }
 
   @Test
-  fun selectionChange_privateTorrent_bindsNoUdp() = runTest {
+  fun selectionChange_privateTorrent_sendsNoDhtOrUdpTrackerTraffic() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         coroutineScope {
@@ -148,15 +146,13 @@ class KotlinRuntimePrivateTest {
           )))
           val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-private-selection-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
-          val udpSockets = AtomicInt(0)
+          val publicDiscovery = AtomicInt(0)
           val connects = AtomicInt(0)
           val transport = createTorrentNetwork()
           val seeder = transport.listen(PeerEndpoint("127.0.0.1", 0))
           val network = object : TorrentNetwork by transport {
-            override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
-              udpSockets.fetchAndAdd(1)
-              return transport.bindUdp(local)
-            }
+            override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket =
+              transport.bindUdp(local).countingPublicDiscovery(publicDiscovery)
             override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
               connects.fetchAndAdd(1)
               return transport.connect(remote)
@@ -206,7 +202,7 @@ class KotlinRuntimePrivateTest {
             assertEquals(TorrentSessionState.SEEDING, session.state.first {
               it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
             }, session.failure.value?.stackTraceToString())
-            assertEquals(0, udpSockets.load())
+            assertEquals(0, publicDiscovery.load())
             assertEquals(1, connects.load())
           } finally {
             engine.stop()

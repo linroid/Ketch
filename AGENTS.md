@@ -488,11 +488,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
   `LocalIpv4Network.gatewayGuesses` of `localIpv4Networks()`, an expect/actual over
   `NetworkInterface` and `getifaddrs`), then `UpnpClient` (SSDP, the device description and SOAP
-  over a minimal HTTP/1.1 client on direct TCP; only devices on one of our private networks).
-  TCP and the DHT's UDP port map to one external port, which `TorrentAdvertisedPort.setMapped`
-  announces; mappings last an hour, renew every half hour and are removed by `stop` within 2 s;
-  UPnP tries other ports on 718 and permanent leases on 725. `PortMappingTest` runs both against
-  scripted gateways on loopback
+  over a minimal HTTP/1.1 client on direct TCP; only devices on one of our private networks). TCP
+  and the UDP port DHT and uTP share map to one external port, which
+  `TorrentAdvertisedPort.setMapped` announces; mappings last an hour, renew every half hour and are
+  removed by `stop` within 2 s; UPnP tries other ports on 718 and permanent leases on 725.
+  `PortMappingTest` runs both against scripted gateways on loopback
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
@@ -500,14 +500,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
   app) and resolve them through `KetchApi.resolveContent`, like dropped files
 - Native torrent engine dependencies exist only in interoperability tests
-- uTP (BEP 29) protocol core, not yet used by peers: `UtpPacket` (codec, selective-ack and
-  unknown extensions, `looksLikeUtp` to tell uTP from DHT on a shared socket) and `UtpSocket`, a
-  deterministic state machine without I/O or clock (`receive`, `write`, `read`, `close`,
-  `abort`, `tick`): SYN/STATE handshake, 16-bit sequence wrap, reordering up to 2048 packets,
-  selective acks, fast retransmit after three duplicate or overtaking acks, timeouts with
-  backoff, LEDBAT congestion control (100 ms target, slow start until half of it), the receive
-  window with zero-window probes, FIN and RESET. `UtpSocketTest` drives two sockets over a
-  simulated lossy, reordering and bottlenecked path
+- uTP (BEP 29), `TorrentConfig.utpEnabled` (on by default): `UtpPacket` (codec, selective-ack
+  and unknown extensions, `looksLikeUtp`) and `UtpSocket`, a deterministic state machine without
+  I/O or clock (`receive`, `write`, `read`, `close`, `abort`, `tick`): SYN/STATE handshake,
+  16-bit sequence wrap, reordering up to 2048 packets, selective acks, fast retransmit after
+  three duplicate or overtaking acks, timeouts with backoff, LEDBAT congestion control (100 ms
+  target, slow start until half of it), the receive window with zero-window probes, FIN and
+  RESET. `TorrentUdpPort` shares one UDP socket per address family between DHT (`openDht`) and
+  uTP, bound at the TCP listen port (any port when taken) when the engine starts, and again
+  when it stops working; `UtpEndpoint` runs its sockets under one lock (dial, SYN answers through
+  `TorrentConnectionBudget.admit` into `dispatchIncoming`, RESETs for unknown connections at
+  most 64 a second, a 50 ms tick) and exposes each as a `TorrentConnection` (`utp`).
+  `TorrentUtpFallback`, below the budget, dials TCP first and uTP (two SYN retries, 7 s) when
+  TCP fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the swarm summary
+  counts uTP connections. Private and tracker-only torrents use uTP too: tests count DHT and
+  UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
   V2/hybrid incoming routing through one engine route table keyed by 20-byte wire tags
   (`TorrentRouteTable`, `launchIncoming`/`dispatchIncoming`), upload and seeding with 4-slot
@@ -1226,8 +1233,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
-5. `library:torrent` has no browser-local engine. uTP has its protocol core (`UtpSocket`) but no
-   network runtime yet; seeding runs only while the process runs (no background seeding).
+5. `library:torrent` has no browser-local engine. uTP is only dialed after TCP fails; seeding runs
+   only while the process runs (no background seeding).
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

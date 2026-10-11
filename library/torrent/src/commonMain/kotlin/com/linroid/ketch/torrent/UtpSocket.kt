@@ -109,6 +109,12 @@ internal class UtpSocket private constructor(
 
   val roundTripMicros: Long get() = rtt
 
+  /** One line of internal state, for logs explaining a stalled connection. */
+  fun describe(): String = "state=$state inFlight=$flightBytes packets=${outgoing.size} " +
+    "window=${window.toInt()} peerWindow=$peerWindow pending=${pending.size} " +
+    "available=${received.size} held=${reorder.size} rtt=${rtt / 1000}ms " +
+    "timeout=${timeout / 1000}ms timeouts=$timeouts ack=$ackNr seq=$seqNr"
+
   /** No more traffic: closed, failed, or every byte acknowledged after both sides finished. */
   val isFinished: Boolean get() = state == State.CLOSED || state == State.FAILED
 
@@ -200,8 +206,26 @@ internal class UtpSocket private constructor(
       lastProgress = now
       retransmit(outgoing.first(), now)
     }
+    if (state != State.SYN_SENT) resendExpired(now)
     if (state == State.CONNECTED && now - lastSent >= options.keepAliveUs) sendState(now)
     flush(now)
+  }
+
+  /**
+   * Sends again, oldest first and at most [MAX_RESENDS_PER_TICK] a tick, the packets still
+   * unacknowledged a timeout after they last went out. Acks for later packets keep the
+   * connection's own timeout from firing when a burst is lost, and fast retransmit repairs one
+   * packet at a time, so without this a lost burst, or a lost retransmission, crawls.
+   */
+  private fun resendExpired(now: Long) {
+    var resent = 0
+    for (packet in outgoing) {
+      if (resent == MAX_RESENDS_PER_TICK) break
+      if (now - packet.sentAt < timeout) continue
+      if (resent == 0) onLoss(packet.seq)
+      retransmit(packet, now)
+      resent++
+    }
   }
 
   /** Sends what the windows allow: queued data, then the FIN once nothing is queued. */
@@ -436,6 +460,7 @@ internal class UtpSocket private constructor(
     /** Packets held past a gap, at most. */
     private const val MAX_REORDER = 2048
     private const val MAX_SACK_BYTES = 252
+    private const val MAX_RESENDS_PER_TICK = 16
     private val EMPTY = ByteArray(0)
 
     /** Starts connecting: [receiveId] is ours, the peer sends to it. The SYN goes out now. */

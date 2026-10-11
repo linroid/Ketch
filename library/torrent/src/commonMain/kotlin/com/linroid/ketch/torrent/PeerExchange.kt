@@ -26,7 +26,8 @@ internal fun pexFlags(
   link: TorrentConnection,
   extensions: PeerExtensions,
 ): Int = (if (reachedOutgoing) PEX_FLAG_REACHABLE else 0) or
-  (if (link.encrypted) PEX_FLAG_ENCRYPTION else 0)
+  (if (link.encrypted) PEX_FLAG_ENCRYPTION else 0) or
+  (if (link.utp) PEX_FLAG_UTP else 0)
 
 /**
  * Per-peer BEP 11 policy in both directions. Exchange data is a bounded, untrusted discovery hint.

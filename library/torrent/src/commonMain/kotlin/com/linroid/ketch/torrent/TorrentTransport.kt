@@ -30,6 +30,8 @@ internal interface TorrentConnection {
   val remote: PeerEndpoint
   /** The bytes travel RC4-encrypted (MSE/PE). */
   val encrypted: Boolean get() = false
+  /** The connection runs over uTP rather than TCP. */
+  val utp: Boolean get() = false
   suspend fun readExactly(size: Int): ByteArray
   suspend fun write(bytes: ByteArray)
   fun close()
@@ -74,7 +76,11 @@ internal suspend fun TorrentNetwork.connectPeer(
   connectWithin(remote, connectTimeoutMs)
 }
 
-internal const val DEFAULT_CONNECT_TIMEOUT_MS = 10_000L
+/**
+ * How long one connect may take: a TCP connect (10 s on its own) and, when TCP fails, the uTP
+ * dial after it (7 s). Encryption and a plaintext retry run outside it.
+ */
+internal const val DEFAULT_CONNECT_TIMEOUT_MS = 20_000L
 
 /**
  * [TorrentNetwork.connect] within [timeoutMs]. The socket is captured inside the timeout, so a

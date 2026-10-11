@@ -57,7 +57,8 @@ internal object PeerV2Connector {
     allowUpgrade: Boolean = false,
     expectedPeerId: ByteString? = null,
     maxPending: Int = 32,
-    connectTimeoutMs: Long = 10_000,
+    /** Bounds each connect: TCP, then uTP when TCP fails ([DEFAULT_CONNECT_TIMEOUT_MS]). */
+    connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
     extensions: Boolean = false,
     generation: Long = 0,
     /** Set the BEP 5 DHT bit: we tell DHT ports to peers that set it too. */
