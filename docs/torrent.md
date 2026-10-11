@@ -233,7 +233,8 @@ including a development run, hands its files to the running app instead of openi
 - The apps and the CLI read encryption, uTP, port mapping and local service discovery from
   `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
   `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
-  under Settings → BitTorrent → Connections and apply them at once through
+  under Settings → BitTorrent → Connections (local service discovery only on desktop and
+  Android, as iOS cannot join the group) and apply them at once through
   `TorrentDownloadSource.setEncryption`, `setUtpEnabled`, `setPortMapping` and
   `setLocalDiscovery`, which never start the engine: encryption and uTP apply to connections
   opened after the change (open ones keep running, and a uTP port stays bound for DHT), port
@@ -390,7 +391,13 @@ limits once it was read, like uploading it: a limit owes at most a tenth of a se
 of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
 starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
 so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
-answering their handshake, v2 and hybrid like v1. The Fast extension (BEP 6) is not negotiated.
+answering their handshake, v2 and hybrid like v1. v1 connections negotiate the Fast extension
+(BEP 6): availability as Have All or Have None, requests the other side will not serve rejected
+rather than dropped, a choke that leaves requests to be rejected (those still unanswered after
+5 seconds are canceled), and each side's allowed-fast pieces requested and served while choked;
+Ketch offers IPv4 peers BEP 6's canonical set of 10 pieces only while it uploads, within the
+upload limits. A rejected piece goes to other peers without counting against the peer. v2 and
+hybrid routes, including a hybrid's v1 peers, do not negotiate it yet.
 Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
 when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
 when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;

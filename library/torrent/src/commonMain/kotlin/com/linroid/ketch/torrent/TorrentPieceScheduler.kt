@@ -58,12 +58,20 @@ internal class TorrentPieceScheduler(
 
   /**
    * Claims a piece [peer] has: the rarest one nobody else fetches, or, with [sequential] (web
-   * seeds, which have every piece), the first one, so their HTTP reads follow the files.
+   * seeds, which have every piece), the first one, so their HTTP reads follow the files. Only
+   * pieces [eligible] accepts are claimed: those a choking peer allows fast (BEP 6), never those
+   * it rejected.
    */
-  suspend fun claim(peer: Int, sequential: Boolean = false): Claim? = mutex.withLock {
+  suspend fun claim(
+    peer: Int,
+    sequential: Boolean = false,
+    eligible: (Int) -> Boolean = { true },
+  ): Claim? = mutex.withLock {
     check(peer !in claims)
     val available = availability[peer] ?: return@withLock null
-    val candidates = wanted.indices.filter { wanted[it] && !verified[it] && available[it] }
+    val candidates = wanted.indices.filter {
+      wanted[it] && !verified[it] && available[it] && eligible(it)
+    }
     val unclaimed = candidates.filter { owners[it].isNullOrEmpty() }
     // Duplicate at most twice, only when remaining work is already assigned (endgame).
     val choices = unclaimed.ifEmpty {

@@ -33,3 +33,10 @@ internal expect val successFeedbackSupport: SuccessFeedbackSupport
  * downloads of its own.
  */
 internal expect val keepAwakeSupported: Boolean
+
+/**
+ * Whether this platform's torrent engine finds peers on the local network (BEP 14): the desktop
+ * and Android apps. iOS needs a multicast entitlement the app does not have, and the web app has
+ * no engine of its own.
+ */
+internal expect val localPeerDiscoverySupported: Boolean
