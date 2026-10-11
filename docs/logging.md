@@ -74,8 +74,8 @@ val ketch = Ketch(
 - Tracker announces per tracker, DHT bootstrap and lookups
 - Local service discovery (`TorrentLsd`): joining and leaving the LAN group and which torrents
   were announced there, by short hash
-- A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers (v1
-  swarms also count those that negotiated the Fast extension, `fast`),
+- A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers (and
+  those that negotiated the Fast extension, `fast`, in every swarm),
   newly discovered and failed peers, corrupt pieces, upload slots, interested peers and
   uploaded bytes; v2 and hybrid swarms also count incoming peers, a hybrid's v1 peers, hash
   requests served and rejected, and candidates being dialed; every swarm counts the peers local

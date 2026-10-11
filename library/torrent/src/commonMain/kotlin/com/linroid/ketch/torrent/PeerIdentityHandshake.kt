@@ -19,6 +19,8 @@ internal class PeerIdentityHandshake(
   private val identity: TorrentIdentity,
   private val extensions: Boolean = false,
   private val dht: Boolean = false,
+  /** Set the Fast extension bit (BEP 6). */
+  private val fast: Boolean = false,
 ) {
   enum class Mode { V1, V2 }
   data class Result(
@@ -27,6 +29,8 @@ internal class PeerIdentityHandshake(
     val peerId: ByteString,
     val extensions: Boolean,
     val dht: Boolean,
+    /** Both sides set the Fast extension bit (BEP 6). */
+    val fast: Boolean = false,
   )
 
   private data class Envelope(
@@ -35,6 +39,7 @@ internal class PeerIdentityHandshake(
     val extensions: Boolean,
     val dht: Boolean,
     val upgrade: Boolean,
+    val fast: Boolean,
   )
   private val v1 = identity.v1?.toBytes()?.toByteString()
   private val v2 = identity.v2?.wireBytes()?.toByteString()
@@ -90,7 +95,8 @@ internal class PeerIdentityHandshake(
   ): Result {
     require(remote.peerId != localPeerId) { "Self peer connection" }
     require(expectedPeerId == null || remote.peerId == expectedPeerId) { "Unexpected peer ID" }
-    return Result(identity, mode, remote.peerId, remote.extensions, remote.dht)
+    return Result(identity, mode, remote.peerId, remote.extensions, remote.dht,
+      fast = fast && remote.fast)
   }
 
   private fun tag(mode: Mode): ByteString = requireNotNull(if (mode == Mode.V1) v1 else v2) {
@@ -101,6 +107,7 @@ internal class PeerIdentityHandshake(
     val reserved = ByteArray(8)
     if (extensions) reserved[5] = 0x10
     if (dht) reserved[7] = 1
+    if (fast) reserved[7] = (reserved[7].toInt() or PeerWire.FAST_BIT).toByte()
     if (upgrade) reserved[7] = (reserved[7].toInt() or 0x10).toByte()
     return Buffer().writeByte(19).write(PROTOCOL).write(reserved).write(tag(mode))
       .write(peerId).readByteArray()
@@ -112,7 +119,7 @@ internal class PeerIdentityHandshake(
     return Envelope(bytes.copyOfRange(28, 48).toByteString(),
       bytes.copyOfRange(48, 68).toByteString(),
       bytes[25].toInt() and 0x10 != 0, bytes[27].toInt() and 1 != 0,
-      bytes[27].toInt() and 0x10 != 0)
+      bytes[27].toInt() and 0x10 != 0, bytes[27].toInt() and PeerWire.FAST_BIT != 0)
   }
 
   private suspend fun admitted(

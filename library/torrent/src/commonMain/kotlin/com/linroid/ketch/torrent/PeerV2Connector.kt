@@ -65,6 +65,8 @@ internal object PeerV2Connector {
     dht: Boolean = false,
     /** Learns how far the dial got and how it was carried, for diagnostics. */
     attempt: PeerAttempt? = null,
+    /** Set the Fast extension bit (BEP 6); with the peer's, the connection runs in fast mode. */
+    fast: Boolean = true,
   ): Connected? {
     require(layout.infoHash == document.info.hash) { "Layout belongs to another torrent" }
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
@@ -79,7 +81,7 @@ internal object PeerV2Connector {
       connection = network.connectPeer(remote, document.identity.wireTag(mode), connectTimeoutMs)
       val socket = checkNotNull(connection)
       attempt?.handshaking(socket)
-      val route = PeerIdentityHandshake(document.identity, extensions, dht).initiate(
+      val route = PeerIdentityHandshake(document.identity, extensions, dht, fast).initiate(
         socket, mode, peerId, handshakes,
         allowUpgrade = allowUpgrade, expectedPeerId = expectedPeerId)
       return negotiated(socket, route, PeerV2Origin.Outgoing(remote), document, layout, buffers,
@@ -112,6 +114,8 @@ internal object PeerV2Connector {
     dht: Boolean = false,
     /** Learns how the connection was carried, for diagnostics. */
     attempt: PeerAttempt? = null,
+    /** Set the Fast extension bit (BEP 6); with the peer's, the connection runs in fast mode. */
+    fast: Boolean = true,
   ): Connected? {
     var admission: TorrentBufferBudget.Lease? = null
     try {
@@ -124,8 +128,8 @@ internal object PeerV2Connector {
         return null
       }
       attempt?.handshaking(connection)
-      val route = PeerIdentityHandshake(document.identity, extensions, dht).respond(connection,
-        peerId, handshakes, allowUpgrade = document.hybrid != null)
+      val route = PeerIdentityHandshake(document.identity, extensions, dht, fast)
+        .respond(connection, peerId, handshakes, allowUpgrade = document.hybrid != null)
       return negotiated(connection, route, PeerV2Origin.Incoming(connection.remote), document,
         layout, buffers, admission, extensions, dht, maxPending, generation)
     } catch (error: Throwable) {
@@ -166,9 +170,9 @@ internal object PeerV2Connector {
     val transport = PeerHashTransport(socket, hashes, buffers,
       pieceCount = layout.pieceCount.toInt(), hashMessages = v2)
     val blocks = PeerBlockExchange(layout, transport, buffers, maxPending = maxPending,
-      mode = route.mode)
+      mode = route.mode, fast = route.fast)
     val info = PeerInfo(route.peerId, route.mode, origin, extensions && route.extensions, socket,
-      dht = dht && route.dht)
+      dht = dht && route.dht, fast = route.fast)
     return Connected(route, info, transport, blocks, admission, generation)
   }
 }

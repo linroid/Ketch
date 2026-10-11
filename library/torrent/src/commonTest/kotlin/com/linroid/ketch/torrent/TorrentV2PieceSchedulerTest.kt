@@ -45,7 +45,9 @@ class TorrentV2PieceSchedulerTest {
     }
     val transport = PeerHashTransport(connection, PeerHashExchange(budget, { null }), budget,
       pieceCount = 2)
-    val exchange = PeerBlockExchange(layout, transport, budget, maxPending = maxPending)
+    // Fast (BEP 6), so the peer may reject a request.
+    val exchange = PeerBlockExchange(layout, transport, budget, maxPending = maxPending,
+      fast = true)
     suspend fun receive(message: PeerMessage): PeerBlockExchange.Response? {
       input.write(PeerWire.encode(message, pieceCount = 2))
       val frame = transport.read()

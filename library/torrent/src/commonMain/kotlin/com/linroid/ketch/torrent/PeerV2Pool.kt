@@ -36,6 +36,8 @@ internal class PeerInfo(
   val link: TorrentConnection,
   /** Both sides set the BEP 5 DHT bit, so they exchange DHT ports. */
   val dht: Boolean = false,
+  /** Both sides set the Fast extension bit (BEP 6). */
+  val fast: Boolean = false,
 ) {
   /** The peer's address: where we dialed it, or where it dialed us from. */
   val host: String get() = when (origin) {
