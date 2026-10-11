@@ -111,6 +111,46 @@ class TorrentPeerEncryptionTest {
   }
 
   @Test
+  fun required_peerRefusingALeadingZeroSecret_isDialedWithNewKeys() = runTest {
+    // Older libtorrent hangs up on a secret with a leading zero byte; new keys make another one.
+    val responderKeys = MseKeyPair(ByteArray(20) { 1 })
+    val peers = object : TorrentNetwork {
+      var connects = 0
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        val toPeer = Pipe()
+        val toUs = Pipe()
+        val theirs = End(remote, toPeer, toUs)
+        val refuse = connects++ == 0
+        backgroundScope.launch {
+          runCatching {
+            val opening = theirs.readExactly(20)
+            if (refuse) {
+              theirs.readExactly(76)
+              toUs.write(responderKeys.publicKey)
+              toUs.close()
+            } else {
+              MseHandshake.respond(theirs, opening, listOf(tag), MseHandshake.CRYPTO_RC4)
+                .first.write("hello".encodeToByteArray())
+            }
+          }
+        }
+        return End(remote, toUs, toPeer)
+      }
+      override suspend fun listen(local: PeerEndpoint): TorrentListener = error("Unused")
+      override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket = error("Unused")
+      override fun close() = Unit
+    }
+    val keys = ArrayDeque(listOf(leadingZeroPairWith(responderKeys), MseKeyPair()))
+    val network = TorrentPeerEncryption(peers, TorrentEncryption.REQUIRED,
+      keyPairs = { keys.removeFirst() })
+
+    val connection = network.connectPeer(peer, tag)
+    assertTrue(connection.encrypted)
+    assertEquals("hello", connection.readExactly(5).decodeToString())
+    assertEquals(2, peers.connects)
+  }
+
+  @Test
   fun policy_changedLive_appliesToTheNextDial() = runTest {
     val peers = PlaintextPeers(backgroundScope)
     val network = TorrentPeerEncryption(peers, TorrentEncryption.REQUIRED)

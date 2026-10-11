@@ -10,16 +10,12 @@ import com.linroid.ketch.torrent.magnet.MagnetUri
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.ByteString.Companion.toByteString
 import org.libtorrent4j.SessionManager
-import org.libtorrent4j.SessionParams
-import org.libtorrent4j.SettingsPack
 import org.libtorrent4j.TorrentInfo
-import org.libtorrent4j.swig.settings_pack
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -43,29 +39,11 @@ class PublicV2IndependentSeederTest {
         fixture.names.forEachIndexed { index, name ->
           seed.resolve("pack/$name").writeBytes(fixture.payloads[index])
         }
-        val settings = SettingsPack()
-        settings.setString(settings_pack.string_types.listen_interfaces.swigValue(),
-          "127.0.0.1:0")
-        for (flag in listOf(settings_pack.bool_types.enable_dht,
-          settings_pack.bool_types.enable_lsd, settings_pack.bool_types.enable_upnp,
-          settings_pack.bool_types.enable_natpmp)) {
-          settings.setBoolean(flag.swigValue(), false)
-        }
         val manager = SessionManager()
         try {
-          manager.start(SessionParams(settings))
-          val torrent = TorrentInfo(fixture.metainfo)
-          manager.download(torrent, seed)
-          while (true) {
-            val status = manager.find(torrent.infoHash())?.status()
-            check(status == null || !status.errorCode().isError) {
-              "Independent v2 seeder failed: ${status?.errorCode()?.message}"
-            }
-            if (status?.isSeeding() == true && manager.swig().listen_port() != 0) break
-            delay(20)
-          }
+          val port = manager.startSeeding(TorrentInfo(fixture.metainfo), seed)
           val magnet = MagnetUri(fixture.document.identity,
-            explicitPeers = listOf("127.0.0.1:${manager.swig().listen_port()}")).toUri()
+            explicitPeers = listOf("127.0.0.1:$port")).toUri()
           val output = root.resolve("out")
           val expansion = downloadExpandingLive(magnet, fixture.metainfo, output.absolutePath,
             first = setOf("0"), expanded = setOf("0", "1"))
@@ -102,41 +80,19 @@ class PublicV2IndependentSeederTest {
       val data = Bencode.encode(mapOf("info" to info, "piece layers" to mapOf(
         merkle.toByteString() to hashes.fold(ByteArray(0)) { a, b -> a + b })))
       val expected = TorrentV2Document.parse(data)
-      val settings = SettingsPack()
-      settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
-      for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
-        settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp)) {
-        settings.setBoolean(flag.swigValue(), false)
-      }
       val manager = SessionManager()
       val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
         metadataTimeoutSeconds = 10))
       val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(source))
       try {
-        manager.start(SessionParams(settings))
         val torrent = TorrentInfo(data)
         for (index in 0 until torrent.files().numFiles()) {
           val path = torrent.files().filePath(index)
           println("Independent v2 seed file: $path exists=${seed.resolve(path).exists()}")
         }
-        manager.download(torrent, seed)
-        var lastState: String? = null
-        while (true) {
-          val status = manager.find(torrent.infoHash())?.status()
-          val state = "state=${status?.state()} progress=${status?.progress()} " +
-            "error=${status?.errorCode()?.message} port=${manager.swig().listen_port()}"
-          if (state != lastState) {
-            println("Independent v2 seeder: $state")
-            lastState = state
-          }
-          check(status == null || !status.errorCode().isError) {
-            "Independent v2 seeder failed: $state"
-          }
-          if (status?.isSeeding() == true && manager.swig().listen_port() != 0) break
-          delay(20)
-        }
+        val port = manager.startSeeding(torrent, seed)
         val magnet = MagnetUri(expected.identity,
-          explicitPeers = listOf("127.0.0.1:${manager.swig().listen_port()}")).toUri()
+          explicitPeers = listOf("127.0.0.1:$port")).toUri()
         val resolved = source.resolve(magnet, emptyMap())
         assertEquals(expected.info.hash.hex, resolved.metadata["infoHash"])
         ketch.start()

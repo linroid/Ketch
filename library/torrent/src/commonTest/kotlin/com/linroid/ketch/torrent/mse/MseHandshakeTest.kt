@@ -153,6 +153,48 @@ class MseHandshakeTest {
   }
 
   @Test
+  fun responder_acceptsTheMaskOlderLibtorrentSends() = runTest {
+    // libtorrent before 2.0.13 masks the torrent with a secret whose leading zeros it dropped.
+    val responderKeys = MseKeyPair(ByteArray(20) { 1 })
+    val keys = leadingZeroPairWith(responderKeys)
+    val link = Link()
+    coroutineScope {
+      val responder = async {
+        MseHandshake.respond(link.b, link.b.readExactly(20), listOf(skey), 3, responderKeys).first
+      }
+      link.a.write(keys.publicKey)
+      val secret = keys.agree(link.a.readExactly(96))
+      val encrypt = Rc4(MseHandshake.hash("keyA", secret, skey), 1024)
+      val req2 = MseHandshake.hash("req2", skey)
+      val req3 = checkNotNull(MseHandshake.legacyMask(secret))
+      val offer = okio.Buffer().write(ByteArray(8)).writeInt(2).writeShort(0).writeShort(0)
+        .readByteArray()
+      link.a.write(MseHandshake.hash("req1", secret) + ByteArray(20) { (req2[it].toInt() xor
+        req3[it].toInt()).toByte() } + encrypt.process(offer))
+      link.a.write(encrypt.process("stream".encodeToByteArray()))
+      assertEquals("stream", responder.await().readExactly(6).decodeToString())
+    }
+  }
+
+  @Test
+  fun initiate_failingAfterALeadingZeroSecret_saysSo() = runTest {
+    val responderKeys = MseKeyPair(ByteArray(20) { 1 })
+    suspend fun refusedWith(keys: MseKeyPair): MseHandshakeException {
+      val link = Link()
+      // A peer that answers the key exchange, then hangs up as libtorrent does on a wrong mask.
+      link.b.write(responderKeys.publicKey)
+      link.toA.close()
+      return assertFailsWith<MseHandshakeException> {
+        MseHandshake.initiate(link.a, skey, 3, keys)
+      }
+    }
+    assertTrue(refusedWith(leadingZeroPairWith(responderKeys)).leadingZeroSecret)
+    val other = generateSequence(1) { it + 1 }.map { n -> MseKeyPair(ByteArray(20) { n.toByte() }) }
+      .first { it.agree(responderKeys.publicKey)[0] != 0.toByte() }
+    assertFalse(refusedWith(other).leadingZeroSecret)
+  }
+
+  @Test
   fun rc4_knownVector() {
     val out = Rc4("Key".encodeToByteArray()).process("Plaintext".encodeToByteArray())
     assertEquals("bbf316e8d940af0ad3", out.toByteString().hex())
@@ -166,3 +208,9 @@ class MseHandshakeTest {
     assertFailsWith<IllegalArgumentException> { a.agree(ByteArray(96).also { it[95] = 1 }) }
   }
 }
+
+/** A key pair whose shared secret with [responder] starts with a zero byte. */
+internal fun leadingZeroPairWith(responder: MseKeyPair): MseKeyPair =
+  generateSequence(1) { it + 1 }
+    .map { n -> MseKeyPair(ByteArray(20) { if (it < 18) 0 else (n shr (8 * (19 - it))).toByte() }) }
+    .first { it.agree(responder.publicKey)[0] == 0.toByte() }

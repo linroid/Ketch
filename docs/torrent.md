@@ -132,7 +132,10 @@ including a development run, hands its files to the running app instead of openi
   `DISABLED` plaintext only. Ketch sends no initial payload: the BitTorrent handshake follows on
   the negotiated stream. Encryption hides BitTorrent from traffic shaping and reaches peers that
   require it; it is obfuscation, not authentication. Peers reached encrypted are advertised with
-  the BEP 11 encryption flag
+  the BEP 11 encryption flag. libtorrent before 2.0.13 and 2.1.0 hashes the torrent's `req3` mask
+  over a shared secret that starts with a zero byte (one exchange in 256) without its leading
+  zeros: Ketch accepts either mask from incoming peers, and a dial that such a peer refuses after
+  that secret is tried once more with new keys before any plaintext retry
 - uTP (BEP 29, `TorrentConfig.utpEnabled`, on by default) reaches peers TCP cannot, often ones
   behind NAT: a dial that fails over TCP tries uTP next, peers that peer exchange flags as uTP
   or that answered uTP before are dialed over uTP first, and peers may connect to the listen port

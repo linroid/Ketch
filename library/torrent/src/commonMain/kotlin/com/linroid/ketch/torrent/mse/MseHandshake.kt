@@ -7,15 +7,31 @@ import com.linroid.ketch.torrent.net.TorrentConnection
 import okio.Buffer
 import okio.IOException
 
-/** The peer did not complete an MSE/PE handshake: it hung up, stalled or sent something else. */
-internal class MseHandshakeException(message: String, cause: Throwable? = null) :
-  IOException(message, cause)
+/**
+ * The peer did not complete an MSE/PE handshake: it hung up, stalled or sent something else.
+ *
+ * @property leadingZeroSecret the exchange agreed on a shared secret whose first byte is zero,
+ *   which older libtorrent hashes differently (see [MseHandshake]): the same peer may well accept
+ *   a handshake with new keys
+ */
+internal class MseHandshakeException(
+  message: String,
+  cause: Throwable? = null,
+  val leadingZeroSecret: Boolean = false,
+) : IOException(message, cause)
 
 /**
  * Message Stream Encryption / Protocol Encryption, the obfuscation BitTorrent clients negotiate
  * before the BitTorrent handshake: a Diffie-Hellman exchange, then RC4 keyed by the shared
  * secret and the torrent's 20-byte wire tag (SKEY). Ketch sends no initial payload (IA): the
  * BitTorrent handshake follows on the negotiated stream, so every handshake above it is unchanged.
+ *
+ * The shared secret S is always its 96 big-endian bytes. libtorrent before 2.0.13 and 2.1.0
+ * hashed the `req3` mask over S without its leading zero bytes, left-aligned in 96 bytes, while
+ * its sync hash and RC4 keys use S as specified: about one handshake in 256 with such a peer
+ * fails. Answering, Ketch accepts either mask; dialing, it sends the specified one and reports a
+ * failure after such a secret as [MseHandshakeException.leadingZeroSecret], so the dial can try
+ * again with new keys.
  */
 internal object MseHandshake {
   /** RC4 for the rest of the stream; plaintext leaves it in the clear after the handshake. */
@@ -37,10 +53,27 @@ internal object MseHandshake {
     skey: ByteArray,
     provide: Int,
     keys: MseKeyPair = MseKeyPair(),
-  ): TorrentConnection = failing {
+  ): TorrentConnection {
+    var secret: ByteArray? = null
+    try {
+      return failing { negotiate(connection, skey, provide, keys) { secret = it } }
+    } catch (e: MseHandshakeException) {
+      if (secret?.get(0) != 0.toByte() || e.leadingZeroSecret) throw e
+      throw MseHandshakeException(e.message ?: "MSE handshake failed", e, leadingZeroSecret = true)
+    }
+  }
+
+  private suspend fun negotiate(
+    connection: TorrentConnection,
+    skey: ByteArray,
+    provide: Int,
+    keys: MseKeyPair,
+    onSecret: (ByteArray) -> Unit,
+  ): TorrentConnection {
     require(skey.size == 20 && provide in 1..3)
     connection.write(keys.publicKey + torrentRandomBytes(randomPad()))
     val secret = keys.agree(connection.readExactly(MseKeyPair.KEY_BYTES))
+    onSecret(secret)
     val encrypt = Rc4(hash("keyA", secret, skey), DISCARD)
     val decrypt = Rc4(hash("keyB", secret, skey), DISCARD)
     val req2 = hash("req2", skey)
@@ -59,7 +92,7 @@ internal object MseHandshake {
     }
     if (padLength > MAX_PAD) throw MseHandshakeException("MSE pad too long")
     if (padLength > 0) decrypt.process(connection.readExactly(padLength))
-    if (selected == CRYPTO_RC4) Rc4Connection(connection, encrypt, decrypt) else connection
+    return if (selected == CRYPTO_RC4) Rc4Connection(connection, encrypt, decrypt) else connection
   }
 
   /**
@@ -81,10 +114,13 @@ internal object MseHandshake {
     connection.write(keys.publicKey + torrentRandomBytes(randomPad()))
     scan(connection, hash("req1", secret), MAX_PAD + 20)
     val mixed = connection.readExactly(20)
-    val req3 = hash("req3", secret)
+    // An older libtorrent masks with S left-aligned when S starts with zero bytes.
+    val masks = listOfNotNull(hash("req3", secret), legacyMask(secret))
     val skey = skeys.firstOrNull { candidate ->
       val req2 = hash("req2", candidate)
-      (0 until 20).all { (req2[it].toInt() xor req3[it].toInt()).toByte() == mixed[it] }
+      masks.any { req3 ->
+        (0 until 20).all { (req2[it].toInt() xor req3[it].toInt()).toByte() == mixed[it] }
+      }
     } ?: throw MseHandshakeException("Peer asked for a torrent we do not serve")
     val decrypt = Rc4(hash("keyA", secret, skey), DISCARD)
     val encrypt = Rc4(hash("keyB", secret, skey), DISCARD)
@@ -128,7 +164,18 @@ internal object MseHandshake {
     throw MseHandshakeException("MSE synchronization not found")
   }
 
-  private fun hash(label: String, vararg parts: ByteArray): ByteArray {
+  /**
+   * The `req3` mask libtorrent before 2.0.13 and 2.1.0 computes for [secret]: over its
+   * significant bytes, left-aligned and zero-filled to 96; `null` when [secret] has no leading
+   * zero byte.
+   */
+  internal fun legacyMask(secret: ByteArray): ByteArray? {
+    if (secret[0] != 0.toByte()) return null
+    val significant = secret.dropWhile { it == 0.toByte() }.toByteArray()
+    return hash("req3", significant.copyOf(secret.size))
+  }
+
+  internal fun hash(label: String, vararg parts: ByteArray): ByteArray {
     val digest = Sha1().update(label.encodeToByteArray())
     parts.forEach { digest.update(it) }
     return digest.digest()

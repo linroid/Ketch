@@ -22,10 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -33,8 +31,6 @@ import okio.IOException
 import okio.Path.Companion.toPath
 import org.libtorrent4j.LibTorrent
 import org.libtorrent4j.SessionManager
-import org.libtorrent4j.SessionParams
-import org.libtorrent4j.SettingsPack
 import org.libtorrent4j.TorrentInfo
 import org.libtorrent4j.swig.settings_pack
 import java.nio.file.Files
@@ -65,23 +61,11 @@ class IndependentSeederTest {
           "name" to "fixture.bin", "length" to payload.size.toLong(),
           "piece length" to 16_384L, "pieces" to hashes
         )))
-        val settings = SettingsPack()
-        settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
-        for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
-          settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp)) {
-          settings.setBoolean(flag.swigValue(), false)
-        }
         val manager = SessionManager()
         val network = createTorrentNetwork()
         val dhtNodes = mutableListOf<DhtNode>()
         try {
-          manager.start(SessionParams(settings))
-          val info = TorrentInfo(data)
-          manager.download(info, seed)
-          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
-            manager.swig().listen_port() == 0) {
-            delay(20)
-          }
+          val seederPort = manager.startSeeding(TorrentInfo(data), seed)
           val output = root.resolve("download/fixture.bin")
           val expected = TorrentMetadata.fromBencode(data)
           suspend fun dhtNode(): DhtNode = DhtNode(
@@ -92,7 +76,7 @@ class IndependentSeederTest {
           val announcing = dhtNode()
           val seeking = dhtNode()
           announcing.bootstrap(listOf(router.local))
-          announcing.peers(expected.infoHash, announcePort = manager.swig().listen_port())
+          announcing.peers(expected.infoHash, announcePort = seederPort)
           seeking.bootstrap(listOf(router.local))
           val endpoint = seeking.peers(expected.infoHash).single()
           val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash, endpoint)
@@ -135,23 +119,18 @@ class IndependentSeederTest {
         torrent.writeTo(seed.absolutePath.toPath() / "pack")
         val manager = SessionManager()
         try {
-          manager.start(SessionParams(seederSettings()))
-          val info = TorrentInfo(torrent.metainfo)
-          manager.download(info, seed)
-          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
-            manager.swig().listen_port() == 0) {
-            delay(20)
-          }
+          val port = manager.startSeeding(TorrentInfo(torrent.metainfo), seed)
           val magnet = MagnetUri(torrent.metadata.infoHash,
-            explicitPeers = listOf("127.0.0.1:${manager.swig().listen_port()}")).toUri()
+            explicitPeers = listOf("127.0.0.1:$port")).toUri()
           val output = root.resolve("out")
           val expansion = downloadExpandingLive(magnet, torrent.metainfo, output.absolutePath,
             first = setOf("0"), expanded = setOf("0", "1"))
           assertContentEquals(torrent.payloads[0], output.resolve("f0").readBytes())
           assertContentEquals(torrent.payloads[1], output.resolve("f1").readBytes())
           assertFalse(output.resolve("f2").exists())
-          // The expansion reached the running swarm: no peer was dialed again.
-          assertEquals(1, expansion.connects)
+          // The expansion reached the running swarm: no peer was dialed again for it. The first
+          // dial may take two connections, when an older libtorrent refuses the MSE secret.
+          assertEquals(expansion.connectsAtChange, expansion.connects)
         } finally {
           manager.stop()
           root.deleteRecursively()
@@ -176,7 +155,7 @@ class IndependentSeederTest {
           "piece length" to 16_384L, "pieces" to hashes
         )))
         // libtorrent refuses every connection that does not negotiate RC4.
-        val settings = seederSettings().also {
+        val settings = loopbackSettings().also {
           it.setInteger(settings_pack.int_types.in_enc_policy.swigValue(),
             settings_pack.enc_policy.pe_forced.swigValue())
           it.setInteger(settings_pack.int_types.out_enc_policy.swigValue(),
@@ -187,14 +166,8 @@ class IndependentSeederTest {
         val manager = SessionManager()
         val raw = createTorrentNetwork()
         try {
-          manager.start(SessionParams(settings))
-          val info = TorrentInfo(data)
-          manager.download(info, seed)
-          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
-            manager.swig().listen_port() == 0) {
-            delay(20)
-          }
-          val endpoint = PeerEndpoint("127.0.0.1", manager.swig().listen_port())
+          val endpoint = PeerEndpoint("127.0.0.1", manager.startSeeding(TorrentInfo(data), seed,
+            settings))
           val expected = TorrentMetadata.fromBencode(data)
           // In plaintext the seeder hangs up.
           assertFailsWith<Exception> {
@@ -236,7 +209,7 @@ class IndependentSeederTest {
           "piece length" to 16_384L, "pieces" to hashes
         )))
         // libtorrent speaks uTP only.
-        val settings = seederSettings().also {
+        val settings = loopbackSettings().also {
           it.setBoolean(settings_pack.bool_types.enable_incoming_tcp.swigValue(), false)
           it.setBoolean(settings_pack.bool_types.enable_outgoing_tcp.swigValue(), false)
         }
@@ -244,14 +217,8 @@ class IndependentSeederTest {
         val raw = createTorrentNetwork()
         val scope = CoroutineScope(Dispatchers.Default)
         try {
-          manager.start(SessionParams(settings))
-          val info = TorrentInfo(data)
-          manager.download(info, seed)
-          while (manager.find(info.infoHash())?.status()?.isSeeding() != true ||
-            manager.swig().listen_port() == 0) {
-            delay(20)
-          }
-          val endpoint = PeerEndpoint("127.0.0.1", manager.swig().listen_port())
+          val endpoint = PeerEndpoint("127.0.0.1", manager.startSeeding(TorrentInfo(data), seed,
+            settings))
           var utp: UtpEndpoint? = null
           val port = TorrentUdpPort(raw.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
             utp = { utp?.receive(it) })
@@ -283,11 +250,4 @@ class IndependentSeederTest {
     }
   }
 
-  private fun seederSettings() = SettingsPack().also { settings ->
-    settings.setString(settings_pack.string_types.listen_interfaces.swigValue(), "127.0.0.1:0")
-    for (flag in listOf(settings_pack.bool_types.enable_dht, settings_pack.bool_types.enable_lsd,
-      settings_pack.bool_types.enable_upnp, settings_pack.bool_types.enable_natpmp)) {
-      settings.setBoolean(flag.swigValue(), false)
-    }
-  }
 }

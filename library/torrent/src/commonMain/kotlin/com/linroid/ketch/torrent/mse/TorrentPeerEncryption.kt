@@ -20,13 +20,16 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * Applies the engine's [TorrentEncryption] policy to peer connections: dials negotiate MSE/PE
  * before the BitTorrent handshake, and incoming connections are answered either way. Under
  * [TorrentEncryption.PREFERRED] a peer that will not encrypt is dialed again in plaintext, and
- * dialed in plaintext first while it is among the last 1024 such peers.
+ * dialed in plaintext first while it is among the last 1024 such peers. A handshake that failed
+ * after agreeing on a secret older libtorrent hashes differently is tried once more with new
+ * keys first ([MseHandshakeException.leadingZeroSecret]).
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentPeerEncryption(
   private val delegate: TorrentNetwork,
   policy: TorrentEncryption,
   private val handshakeTimeoutMs: Long = 10_000,
+  private val keyPairs: () -> MseKeyPair = ::MseKeyPair,
 ) : TorrentNetwork by delegate {
   private val log = KetchLogger("TorrentEngine")
   private val current = AtomicReference(policy)
@@ -53,20 +56,34 @@ internal class TorrentPeerEncryption(
     }
     val provide = if (policy == TorrentEncryption.REQUIRED) MseHandshake.CRYPTO_RC4
       else MseHandshake.CRYPTO_RC4 or MseHandshake.CRYPTO_PLAINTEXT
-    val connection = connect()
-    val failure: Throwable = try {
-      val stream = withTimeoutOrNull(handshakeTimeoutMs) {
-        MseHandshake.initiate(connection, tag, provide)
+    // A new connection negotiated; throws MseHandshakeException when the peer would not.
+    suspend fun negotiate(): TorrentConnection {
+      val connection = connect()
+      try {
+        withTimeoutOrNull(handshakeTimeoutMs) {
+          MseHandshake.initiate(connection, tag, provide, keyPairs())
+        }?.let { return it }
+      } catch (e: Throwable) {
+        connection.close()
+        throw e
       }
-      if (stream != null) return stream
-      MseHandshakeException("No MSE answer within ${handshakeTimeoutMs / 1000}s")
-    } catch (e: MseHandshakeException) {
-      e
-    } catch (e: Throwable) {
       connection.close()
-      throw e
+      throw MseHandshakeException("No MSE answer within ${handshakeTimeoutMs / 1000}s")
     }
-    connection.close()
+    val failure = try {
+      return negotiate()
+    } catch (e: MseHandshakeException) {
+      if (!e.leadingZeroSecret) {
+        e
+      } else {
+        log.v { "Peer $remote refused a secret with a leading zero byte, trying new keys" }
+        try {
+          return negotiate()
+        } catch (retry: MseHandshakeException) {
+          retry
+        }
+      }
+    }
     if (policy == TorrentEncryption.REQUIRED) throw failure
     log.v { "Peer $remote did not encrypt, dialing in plaintext: ${failure.message}" }
     mutex.withLock {
