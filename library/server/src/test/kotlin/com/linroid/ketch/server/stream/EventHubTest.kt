@@ -1,0 +1,617 @@
+package com.linroid.ketch.server.stream
+
+import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.StreamError
+import com.linroid.ketch.endpoints.stream.StreamEvents
+import com.linroid.ketch.endpoints.stream.StreamHello
+import com.linroid.ketch.endpoints.stream.StreamStats
+import com.linroid.ketch.endpoints.stream.StreamSubscribed
+import com.linroid.ketch.endpoints.stream.StreamSubscription
+import com.linroid.ketch.endpoints.stream.StreamTaskRef
+import com.linroid.ketch.endpoints.stream.TaskInterval
+import com.linroid.ketch.endpoints.stream.TaskProgressUpdate
+import com.linroid.ketch.endpoints.stream.TaskSegmentsUpdate
+import com.linroid.ketch.endpoints.stream.TaskStateUpdate
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentCommandResult
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFileOrder
+import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlin.time.Instant
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class EventHubTest {
+  private val json = Json { ignoreUnknownKeys = true }
+
+  // -- Snapshot and lifecycle --
+
+  @Test
+  fun open_sendsHelloSubscribedAndSnapshot() = runTest {
+    val ketch = FakeKetch(FakeTask("a"))
+    val client = connect(hub(ketch))
+
+    assertEquals(
+      listOf(StreamEvents.HELLO, StreamEvents.SUBSCRIBED, StreamEvents.TASKS),
+      client.names(),
+    )
+    assertEquals(client.stream.id, client.decode<StreamHello>(0).streamId)
+    assertEquals(0, client.decode<StreamSubscribed>(1).revision)
+    assertEquals(listOf("a"), client.decode<TasksResponse>(2).tasks.map { it.taskId })
+  }
+
+  @Test
+  fun tasksAddedAndRemoved_followTheSnapshot() = runTest {
+    val ketch = FakeKetch(FakeTask("a"))
+    val client = connect(hub(ketch))
+    client.clear()
+
+    ketch.tasks.value = listOf(ketch.task("a"), FakeTask("b"))
+    runCurrent()
+    ketch.tasks.value = listOf(ketch.task("b"))
+    runCurrent()
+
+    assertEquals(listOf(StreamEvents.TASK_ADDED, StreamEvents.TASK_REMOVED), client.names())
+    assertEquals("a", client.decode<StreamTaskRef>(1).taskId)
+  }
+
+  @Test
+  fun progress_withoutRule_isOnlySentWithStateChanges() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val ketch = FakeKetch(task)
+    val client = connect(hub(ketch))
+    client.clear()
+
+    task.state.value = downloading(10)
+    advanceTimeBy(5_000)
+    runCurrent()
+    assertEquals(emptyList(), client.names())
+
+    task.state.value = DownloadState.Paused(DownloadProgress(20, 100))
+    runCurrent()
+    val update = client.decode<TaskStateUpdate>(0)
+    assertEquals(DownloadState.Paused(DownloadProgress(20, 100)), update.state)
+  }
+
+  @Test
+  fun stateUpdate_carriesRequestOnlyWhenItChanged() = runTest {
+    val task = FakeTask("a")
+    val client = connect(hub(FakeKetch(task)))
+    client.clear()
+
+    task.queuePosition.value = 2
+    runCurrent()
+    task.requestState.value = task.request.copy(speedLimit = SpeedLimit.of(1024))
+    runCurrent()
+
+    val position = client.decode<TaskStateUpdate>(0)
+    assertEquals(2, position.queuePosition)
+    assertNull(position.request)
+    assertEquals(task.request, client.decode<TaskStateUpdate>(1).request)
+  }
+
+  // -- Progress intervals --
+
+  @Test
+  fun progress_firstChangeAtOnce_thenLatestOncePerStep() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val hub = hub(FakeKetch(task))
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(400))))
+    runCurrent()
+    client.clear()
+
+    task.state.value = downloading(1)
+    runCurrent()
+    assertEquals(listOf(1L), client.progress())
+
+    advanceTimeBy(100)
+    task.state.value = downloading(2)
+    advanceTimeBy(100)
+    task.state.value = downloading(3)
+    runCurrent()
+    assertEquals(listOf(1L), client.progress())
+
+    // 400 ms rounds up to the 500 ms step.
+    advanceTimeBy(300)
+    runCurrent()
+    assertEquals(listOf(1L, 3L), client.progress())
+  }
+
+  @Test
+  fun stateChange_isNotHeldByPendingProgress() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val hub = hub(FakeKetch(task))
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(5_000))))
+    runCurrent()
+    task.state.value = downloading(1)
+    runCurrent()
+    client.clear()
+
+    task.state.value = downloading(2)
+    runCurrent()
+    task.state.value = DownloadState.Paused(DownloadProgress(2, 100))
+    runCurrent()
+    assertEquals(listOf(StreamEvents.TASK_STATE), client.names())
+
+    // The state carried the progress, so none is left to send.
+    advanceTimeBy(5_000)
+    runCurrent()
+    assertEquals(listOf(StreamEvents.TASK_STATE), client.names())
+  }
+
+  @Test
+  fun shortestRuleWins_andTasksNewlyNamedGetProgressAtOnce() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val other = FakeTask("b", downloading(0))
+    val hub = hub(FakeKetch(task, other))
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(progress = listOf(TaskInterval(10_000))))
+    runCurrent()
+    task.state.value = downloading(1)
+    other.state.value = downloading(1)
+    runCurrent()
+    task.state.value = downloading(2)
+    runCurrent()
+    client.clear()
+
+    hub.subscribe(
+      client.stream.id,
+      null,
+      subscription(
+        revision = 2,
+        progress = listOf(TaskInterval(10_000), TaskInterval(500, listOf("a"))),
+      ),
+    )
+    runCurrent()
+    // Still under the 10 s rule's quiet interval, "a" is sent at once.
+    assertEquals(listOf(StreamEvents.SUBSCRIBED, StreamEvents.TASK_PROGRESS), client.names())
+    assertEquals(2, client.decode<TaskProgressUpdate>(1).progress.downloadedBytes)
+
+    task.state.value = downloading(3)
+    other.state.value = downloading(3)
+    advanceTimeBy(600)
+    runCurrent()
+    assertEquals(listOf(2L, 3L), client.progress("a"))
+    assertEquals(emptyList(), client.progress("b"))
+  }
+
+  @Test
+  fun slowClient_skipsIntermediateProgress() = runTest {
+    val task = FakeTask("a", downloading(0))
+    val hub = hub(FakeKetch(task))
+    val stream = assertNotNull(hub.open(null))
+    val gate = CompletableDeferred<Unit>()
+    val events = mutableListOf<OutgoingEvent>()
+    backgroundScope.launch {
+      stream.run { event ->
+        if (event.event == StreamEvents.TASK_PROGRESS) gate.await()
+        events += event
+      }
+    }
+    hub.subscribe(stream.id, null, subscription(progress = listOf(TaskInterval(200))))
+    runCurrent()
+    task.state.value = downloading(1)
+    runCurrent()
+
+    // The writer is blocked on the first progress event meanwhile.
+    for (bytes in 2L..20L) {
+      task.state.value = downloading(bytes)
+      advanceTimeBy(200)
+    }
+    gate.complete(Unit)
+    advanceTimeBy(200)
+    runCurrent()
+
+    val sent = events.filter { it.event == StreamEvents.TASK_PROGRESS }
+      .map { json.decodeFromString<TaskProgressUpdate>(it.data).progress.downloadedBytes }
+    assertEquals(listOf(1L, 20L), sent)
+  }
+
+  @Test
+  fun segments_onlyForNamedTasks() = runTest {
+    val task = FakeTask("a")
+    val other = FakeTask("b")
+    val hub = hub(FakeKetch(task, other))
+    val client = connect(hub)
+    hub.subscribe(
+      client.stream.id,
+      null,
+      subscription(segments = listOf(TaskInterval(1_000, listOf("a")))),
+    )
+    runCurrent()
+    client.clear()
+
+    task.segments.value = listOf(Segment(0, 0, 99, 10))
+    other.segments.value = listOf(Segment(0, 0, 99, 10))
+    runCurrent()
+
+    assertEquals(listOf(StreamEvents.TASK_SEGMENTS), client.names())
+    assertEquals("a", client.decode<TaskSegmentsUpdate>(0).taskId)
+  }
+
+  @Test
+  fun stats_sentEachIntervalOnlyWhenChanged() = runTest {
+    val task = FakeTask("a", downloading(0, bps = 100))
+    val hub = hub(FakeKetch(task))
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(statsIntervalMs = 1_000))
+    runCurrent()
+    assertEquals(100, client.decode<StreamStats>(client.names().lastIndex).downloadBps)
+    client.clear()
+
+    advanceTimeBy(3_000)
+    runCurrent()
+    assertEquals(emptyList(), client.names())
+
+    task.state.value = downloading(50, bps = 300)
+    advanceTimeBy(1_000)
+    runCurrent()
+    val stats = client.decode<StreamStats>(0)
+    assertEquals(300, stats.downloadBps)
+    assertEquals(50, stats.remainingBytes)
+  }
+
+  @Test
+  fun streams_shareEncodedPayloads() = runTest {
+    val task = FakeTask("a")
+    val hub = hub(FakeKetch(task))
+    val first = connect(hub)
+    val second = connect(hub)
+    first.clear()
+    second.clear()
+
+    task.state.value = DownloadState.Paused(DownloadProgress(0, 100))
+    runCurrent()
+
+    assertSame(first.events.single().data, second.events.single().data)
+  }
+
+  // -- Subscriptions --
+
+  @Test
+  fun subscribe_staleRevision_changesNothing() = runTest {
+    val hub = hub(FakeKetch())
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(revision = 2, statsIntervalMs = 700))
+    runCurrent()
+    client.clear()
+
+    val answer = hub.subscribe(client.stream.id, null, subscription(revision = 1))
+    runCurrent()
+
+    assertEquals(2, answer.revision)
+    assertEquals(1_000, answer.subscription.statsIntervalMs)
+    assertEquals(emptyList(), client.names())
+  }
+
+  @Test
+  fun subscribe_otherOwnerOrClosedStream_isUnknown() = runTest {
+    val hub = hub(FakeKetch())
+    val client = connect(hub, owner = "token-a")
+
+    assertFailsWith<UnknownStreamException> {
+      hub.subscribe(client.stream.id, "token-b", subscription())
+    }
+    client.stream.close()
+    assertFailsWith<UnknownStreamException> {
+      hub.subscribe(client.stream.id, "token-a", subscription())
+    }
+  }
+
+  @Test
+  fun normalized_roundsIntervalsAndRejectsLimits() {
+    val applied = subscription(
+      progress = listOf(TaskInterval(1, listOf("a", "a"))),
+      statsIntervalMs = 90_000,
+      torrents = listOf("t", "t"),
+    ).normalized()
+    assertEquals(TaskInterval(200, listOf("a")), applied.progress.single())
+    assertEquals(60_000, applied.statsIntervalMs)
+    assertEquals(listOf("t"), applied.torrents)
+
+    assertFailsWith<IllegalArgumentException> {
+      subscription(progress = listOf(TaskInterval(0))).normalized()
+    }
+    assertFailsWith<IllegalArgumentException> {
+      subscription(progress = List(StreamEvents.MAX_RULES + 1) { TaskInterval(500) }).normalized()
+    }
+    assertFailsWith<IllegalArgumentException> {
+      val ids = List(StreamEvents.MAX_TASK_IDS + 1) { "t$it" }
+      subscription(segments = listOf(TaskInterval(500, ids))).normalized()
+    }
+    assertFailsWith<IllegalArgumentException> {
+      subscription(torrents = List(StreamEvents.MAX_TORRENTS + 1) { "t$it" }).normalized()
+    }
+    assertFailsWith<IllegalArgumentException> {
+      subscription(connectionsLimit = ActiveConnections.MAX_LIMIT + 1).normalized()
+    }
+  }
+
+  @Test
+  fun tasksTurnedBackOn_sendsSnapshotAgain() = runTest {
+    val ketch = FakeKetch(FakeTask("a"))
+    val hub = hub(ketch)
+    val client = connect(hub)
+    hub.subscribe(client.stream.id, null, subscription(tasks = false))
+    runCurrent()
+    ketch.tasks.value = listOf(ketch.task("a"), FakeTask("b"))
+    runCurrent()
+    client.clear()
+
+    hub.subscribe(client.stream.id, null, subscription(revision = 2))
+    runCurrent()
+
+    assertEquals(listOf(StreamEvents.SUBSCRIBED, StreamEvents.TASKS), client.names())
+    assertEquals(listOf("a", "b"), client.decode<TasksResponse>(1).tasks.map { it.taskId })
+  }
+
+  // -- Streams and shared sources --
+
+  @Test
+  fun open_refusesBeyondMaxStreams_andTracksOnlyWhileOpen() = runTest {
+    val hub = hub(FakeKetch(), maxStreams = 1)
+    assertFalse(hub.isTracking)
+
+    val client = connect(hub)
+    assertTrue(hub.isTracking)
+    assertNull(hub.open(null))
+
+    client.stream.close()
+    assertFalse(hub.isTracking)
+    assertEquals(0, hub.openStreams)
+  }
+
+  @Test
+  fun torrents_sharedBetweenStreams_andStoppedWhenUnfollowed() = runTest {
+    val controller = ScriptedController()
+    val hub = hub(FakeKetch(torrents = controller))
+    val first = connect(hub)
+    val second = connect(hub)
+
+    hub.subscribe(first.stream.id, null, subscription(torrents = listOf("t1")))
+    hub.subscribe(second.stream.id, null, subscription(torrents = listOf("t1")))
+    runCurrent()
+    assertEquals(1, controller.observers)
+    assertEquals("t1", first.decode<TorrentSnapshot>(first.names().lastIndex).taskId)
+    assertEquals(StreamEvents.TORRENT, second.names().last())
+
+    hub.subscribe(first.stream.id, null, subscription(revision = 2))
+    second.stream.close()
+    runCurrent()
+    assertEquals(emptySet(), hub.followedTorrents)
+    assertEquals(0, controller.observers)
+  }
+
+  @Test
+  fun torrents_removalAndFailures_areTopicEvents() = runTest {
+    val hub = hub(FakeKetch(torrents = ScriptedController()))
+    val client = connect(hub)
+    client.clear()
+
+    hub.subscribe(client.stream.id, null, subscription(torrents = listOf("gone", "busy")))
+    runCurrent()
+
+    assertTrue(StreamEvents.TORRENT_REMOVED in client.names())
+    val failure = client.decode<StreamError>(client.names().indexOf(StreamEvents.ERROR))
+    assertEquals(TorrentCommandError.RESOURCE_EXHAUSTED.wireName, failure.error)
+    assertEquals(StreamEvents.TOPIC_TORRENTS, failure.topic)
+    assertEquals("busy", failure.taskId)
+  }
+
+  @Test
+  fun topicsWithoutSupport_failWithoutEndingTheStream() = runTest {
+    val task = FakeTask("a")
+    val hub = hub(FakeKetch(task))
+    val client = connect(hub)
+    client.clear()
+
+    hub.subscribe(
+      client.stream.id,
+      null,
+      subscription(torrents = listOf("t1"), connectionsLimit = 10),
+    )
+    runCurrent()
+    val errors = client.events.filter { it.event == StreamEvents.ERROR }
+      .map { json.decodeFromString<StreamError>(it.data) }
+    assertEquals(
+      setOf(StreamEvents.TOPIC_TORRENTS, StreamEvents.TOPIC_CONNECTIONS),
+      errors.map { it.topic }.toSet(),
+    )
+    assertTrue(errors.all { it.error == StreamEvents.UNSUPPORTED })
+
+    task.queuePosition.value = 1
+    runCurrent()
+    assertEquals(StreamEvents.TASK_STATE, client.names().last())
+  }
+
+  // -- Harness --
+
+  private fun TestScope.hub(ketch: KetchApi, maxStreams: Int = MAX_EVENT_STREAMS) =
+    EventHub(ketch, backgroundScope, testScheduler.timeSource, maxStreams)
+
+  private fun TestScope.connect(hub: EventHub, owner: String? = null): Client {
+    val client = Client(assertNotNull(hub.open(owner)))
+    backgroundScope.launch { client.stream.run { client.events += it } }
+    runCurrent()
+    return client
+  }
+
+  private inner class Client(val stream: EventStream) {
+    val events = mutableListOf<OutgoingEvent>()
+
+    fun names() = events.map { it.event }
+
+    fun clear() = events.clear()
+
+    inline fun <reified T> decode(index: Int): T =
+      json.decodeFromString<T>(events[index].data)
+
+    fun progress(taskId: String = "a"): List<Long> =
+      events.filter { it.event == StreamEvents.TASK_PROGRESS }
+        .map { json.decodeFromString<TaskProgressUpdate>(it.data) }
+        .filter { it.taskId == taskId }
+        .map { it.progress.downloadedBytes }
+  }
+
+  private fun subscription(
+    revision: Long = 1,
+    tasks: Boolean = true,
+    progress: List<TaskInterval> = emptyList(),
+    segments: List<TaskInterval> = emptyList(),
+    statsIntervalMs: Long? = null,
+    torrents: List<String> = emptyList(),
+    connectionsLimit: Int? = null,
+  ) = StreamSubscription(
+    revision = revision,
+    tasks = tasks,
+    progress = progress,
+    segments = segments,
+    statsIntervalMs = statsIntervalMs,
+    torrents = torrents,
+    connectionsLimit = connectionsLimit,
+  )
+
+  private fun downloading(bytes: Long, bps: Long = 0) =
+    DownloadState.Downloading(DownloadProgress(bytes, 100, bps))
+
+  private class FakeTask(
+    override val taskId: String,
+    state: DownloadState = DownloadState.Queued,
+  ) : DownloadTask {
+    override val requestState = MutableStateFlow(DownloadRequest("https://example.com/$taskId"))
+    override val request get() = requestState.value
+    override val createdAt = Instant.fromEpochMilliseconds(0)
+    override val state = MutableStateFlow(state)
+    override val segments = MutableStateFlow<List<Segment>>(emptyList())
+    override val queuePosition = MutableStateFlow<Int?>(null)
+    override suspend fun pause() = error("Unexpected call")
+    override suspend fun resume(destination: Destination?) = error("Unexpected call")
+    override suspend fun cancel() = error("Unexpected call")
+    override suspend fun remove(deleteFiles: Boolean) = error("Unexpected call")
+    override suspend fun setSpeedLimit(limit: SpeedLimit) = error("Unexpected call")
+    override suspend fun setPriority(priority: DownloadPriority) = error("Unexpected call")
+    override suspend fun setConnections(connections: Int) = error("Unexpected call")
+    override suspend fun reschedule(
+      schedule: DownloadSchedule,
+      conditions: List<DownloadCondition>,
+    ) = error("Unexpected call")
+  }
+
+  /** An engine with [initial] tasks, the torrent controls given, and no live connections. */
+  private class FakeKetch(
+    vararg initial: DownloadTask,
+    private val torrents: TorrentController? = null,
+  ) : KetchApi {
+    override val backendLabel = "Fake"
+    override val tasks = MutableStateFlow(initial.toList())
+
+    fun task(taskId: String) = tasks.value.first { it.taskId == taskId }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> control(key: ControlKey<T>): T? =
+      if (key === TorrentController.Key) torrents as T? else null
+
+    override suspend fun download(request: DownloadRequest) = error("Unexpected call")
+    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+      error("Unexpected call")
+    override suspend fun start() = error("Unexpected call")
+    override suspend fun status(): KetchStatus = error("Unexpected call")
+    override suspend fun updateConfig(config: DownloadConfig) = error("Unexpected call")
+    override fun close() {}
+  }
+
+  /** One torrent, `t1`; `gone` is removed after a snapshot and `busy` refuses observers. */
+  private class ScriptedController : TorrentController {
+    var observers = 0
+
+    override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+      when (taskId) {
+        "busy" -> throw TorrentCommandException(
+          TorrentCommandError.RESOURCE_EXHAUSTED,
+          "Too many torrent subscriptions",
+        )
+        "gone" -> {
+          emit(snapshotOf(taskId))
+          emit(null)
+        }
+        else -> {
+          emit(snapshotOf(taskId))
+          awaitCancellation()
+        }
+      }
+    }.onStart { observers++ }.onCompletion { observers-- }
+
+    override suspend fun capabilities(): TorrentCapabilities = error("Unexpected call")
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = error("Unexpected call")
+    override suspend fun files(
+      taskId: String,
+      page: TorrentPageRequest,
+      order: TorrentFileOrder,
+      descending: Boolean,
+    ): TorrentFilePage? = error("Unexpected call")
+    override suspend fun select(
+      taskId: String,
+      fileIds: Set<String>,
+      context: TorrentCommandContext,
+    ): TorrentCommandResult = error("Unexpected call")
+    override suspend fun setSeeding(
+      taskId: String,
+      seeding: Boolean,
+      context: TorrentCommandContext,
+    ): TorrentCommandResult = error("Unexpected call")
+
+    private fun snapshotOf(taskId: String) = TorrentSnapshot(
+      taskId = taskId,
+      revision = TorrentRevision("epoch", 1),
+      activity = TorrentActivity.DOWNLOADING,
+      selectionGeneration = 1,
+      selectionComplete = false,
+    )
+  }
+}

@@ -152,6 +152,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `PairingTicket`, `PairingStatus`, `PairingState`, `HealthResponse`, `HealthStatus`
 - `com.linroid.ketch.endpoints.torrent` -- `Torrents` (the `/api/torrents` resources),
   `TorrentSelectionRequest`, `TorrentSeedingRequest`
+- `com.linroid.ketch.endpoints.stream` -- the subscribed event stream's wire format (see the
+  [plan](docs/plans/event-stream.md); not served yet): `StreamEvents` (event names, error codes,
+  limits, `intervalStep`), `StreamSubscription`, `TaskInterval`, `StreamHello`,
+  `StreamSubscribed`, `TaskStateUpdate`, `TaskProgressUpdate`, `TaskSegmentsUpdate`,
+  `StreamStats`, `StreamTaskRef`, `StreamError`
 
 ### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -188,8 +193,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:server`, `library:mcp` (JVM only)
 - `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`,
-  `DestinationGuard`, `AuthThrottle`; `server.api` holds the routes and `receiveJson`, and
-  `server.mdns` the `MdnsRegistrar` implementations
+  `DestinationGuard`, `AuthThrottle`; `server.api` holds the routes and `receiveJson`,
+  `server.mdns` the `MdnsRegistrar` implementations, and `server.stream` the subscribed event
+  stream's `EventHub` (`EventStream`, `TaskTracker`, `TaskFrame`, `SharedSource`), not routed
+  yet
 - `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `TextTool`
 
 ### `ai:discover` (JVM/Android only)
@@ -1231,8 +1238,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "Connections", "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket",
   "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
-  "ConnectionRoutes", "EventRoutes", "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
-  and app code tag by component name (e.g. "DiscoveryService", "KetchService")
+  "ConnectionRoutes", "EventRoutes", "EventHub", "Pairing", "McpStdio", "GitHubReleases";
+  `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
   problems), error (fatal)
