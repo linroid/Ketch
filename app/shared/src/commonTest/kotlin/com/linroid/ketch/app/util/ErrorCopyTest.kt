@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.util
 
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
@@ -39,6 +40,8 @@ class ErrorCopyTest {
       KetchError.SourceError("torrent") to ("The torrent stopped" to RowAction.Retry),
       KetchError.AuthenticationFailed("ftp") to
         ("Wrong user name or password" to RowAction.EnterCredentials),
+      KetchError.ChecksumMismatch(ChecksumAlgorithm.SHA_256, "aa", "bb") to
+        ("File doesn't match its checksum" to RowAction.Retry),
       KetchError.Unknown(errorMessage = "boom") to ("Something went wrong" to RowAction.Retry)
     )
 
@@ -47,6 +50,35 @@ class ErrorCopyTest {
       assertEquals(copy.first, actual.title.load(), "title of $error")
       assertEquals(copy.second, actual.primary, "primary of $error")
     }
+  }
+
+  @Test
+  fun toCopy_checksumTheUserEntered_offersToCorrectIt() = runTest {
+    val error = KetchError.ChecksumMismatch(ChecksumAlgorithm.SHA_256, "aa", "bb")
+
+    val copy = error.toCopy(request, retryCount = 3, device = local)
+
+    assertEquals(
+      "Its SHA-256 doesn't match the checksum you entered, so it was deleted. " +
+        "Download it again, or check the checksum.",
+      copy.hint?.load(),
+    )
+    assertEquals("its SHA-256 doesn't match the checksum you entered", copy.shortHint?.load())
+    assertEquals(RowAction.Retry, copy.primary)
+    assertEquals(listOf(RowAction.RetryWithOptions), copy.secondary)
+  }
+
+  @Test
+  fun toCopy_checksumTheServerPublished_blamesTheTransfer() = runTest {
+    val error = KetchError.ChecksumMismatch(ChecksumAlgorithm.MD5, "aa", "bb", published = true)
+
+    val copy = error.toCopy(request, retryCount = 3, device = local)
+
+    assertTrue(copy.hint!!.load().startsWith("Its MD5 doesn't match the one the server published"))
+    assertEquals("its MD5 doesn't match the server's checksum", copy.shortHint?.load())
+    assertEquals(RowAction.Retry, copy.primary)
+    assertEquals(emptyList(), copy.secondary)
+    assertTrue("expected aa, got bb" in errorDetails(error, request))
   }
 
   @Test

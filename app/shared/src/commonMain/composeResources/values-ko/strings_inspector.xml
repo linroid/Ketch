@@ -97,6 +97,9 @@
   <string name="inspector_detail_connections">연결</string>
   <string name="inspector_detail_device">기기</string>
   <string name="inspector_detail_captured">출처</string>
+  <string name="inspector_detail_checksum">체크섬</string>
+  <string name="inspector_checksum_verified">%1$s · 확인됨</string>
+  <string name="inspector_checksum_pending">%1$s · 완료 시 확인</string>
   <string name="inspector_section_advanced">고급</string>
   <string name="inspector_detail_task_id">작업 ID</string>
   <string name="inspector_detail_headers">헤더</string>
@@ -114,6 +117,7 @@
   <string name="inspector_copy_failed_connections">연결을 복사할 수 없음</string>
   <string name="inspector_copy_failed_device">기기를 복사할 수 없음</string>
   <string name="inspector_copy_failed_captured">출처를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_checksum">체크섬을 복사할 수 없음</string>
   <string name="inspector_copy_failed_task_id">작업 ID를 복사할 수 없음</string>
   <string name="inspector_copy_failed_headers">헤더를 복사할 수 없음</string>
   <string name="inspector_copy_failed_property">속성을 복사할 수 없음</string>

@@ -34,6 +34,11 @@
   <string name="error_corrupt_resume">저장된 진행 상황이 손상됨</string>
   <string name="error_corrupt_resume_hint">다운로드한 부분을 다시 사용할 수 없습니다.</string>
   <string name="error_corrupt_resume_hint_short">다운로드한 부분을 다시 사용할 수 없음</string>
+  <string name="error_checksum_mismatch">파일이 체크섬과 일치하지 않음</string>
+  <string name="error_checksum_mismatch_hint">파일의 %1$s 값이 입력한 체크섬과 일치하지 않아 삭제했습니다. 다시 다운로드하거나 체크섬을 확인하세요.</string>
+  <string name="error_checksum_mismatch_hint_short">%1$s 값이 입력한 체크섬과 일치하지 않음</string>
+  <string name="error_checksum_mismatch_published_hint">파일의 %1$s 값이 서버가 게시한 체크섬과 일치하지 않아 삭제했습니다. 전송 중 손상되었을 수 있으니 다시 다운로드하세요.</string>
+  <string name="error_checksum_mismatch_published_hint_short">%1$s 값이 서버의 체크섬과 일치하지 않음</string>
   <string name="error_canceled">취소됨</string>
   <string name="error_wrong_credentials">사용자 이름 또는 비밀번호가 잘못됨</string>
   <string name="error_wrong_credentials_hint">%1$s 서버가 로그인을 거부했습니다.</string>

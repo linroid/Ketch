@@ -162,13 +162,15 @@ for `selectFiles`, and `WaitingForCondition`. A reason the client does not know 
 `User`. `DownloadState.Completed.completedAt` is when the task last finished, in whole
 milliseconds; it is `null` for tasks that finished before Ketch recorded it.
 `DownloadState.Completed.sharing` is `true` while its source shares the finished content with
-others, as a seeding torrent does.
+others, as a seeding torrent does. `DownloadState.Completed.checksum` is the checksum the file was
+verified against (see [checksums](#checksums)), or `null`.
 `queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`)
 in the order the queue starts them, priority first, then age.
 
 `KetchStatus.features` lists the optional behaviors an instance supports, from
 `KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`), `QUEUE_POSITION`, `REQUEST_ID`,
-`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, the media sources' `FINITE_HLS` and
+`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, `CHECKSUM` (`download.checksum`), the media
+sources' `FINITE_HLS` and
 `FINITE_DASH`, `FILE_SELECTION`
 (`download.fileSelection`, `selectFiles`) and `AWAIT_FILE_SELECTION`
 (`download.awaitFileSelection`, `awaitFileSelection`), listed by the sources that choose files
@@ -440,6 +442,46 @@ ketch.download(
 )
 ```
 
+### Checksums
+
+```kotlin
+ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.iso",
+    checksum = Checksum.parse("sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"),
+  )
+)
+```
+
+`DownloadRequest.checksum` is the digest the file must have: `Checksum(algorithm, hex)` with
+`ChecksumAlgorithm.MD5`, `SHA_1`, `SHA_256` or `SHA_512`. `Checksum.parse` reads
+`<algorithm>:<hex>` (`sha256:…`, `SHA-256:…`), base64 values (`sha-256=:…:`, as HTTP digest
+headers write them) and bare hex digests, whose length names the algorithm; JSON carries it as
+the text `"sha256:<hex>"`. The hash functions are pure Kotlin (`com.linroid.ketch.core.digest`),
+so every engine target verifies.
+
+Once the last byte is flushed, Ketch reads the file back and hashes it before the task completes;
+the task keeps reporting `Downloading` with every byte downloaded meanwhile, and pausing or
+cancelling stops the hashing. A match completes the task with `Completed.checksum`; a difference
+fails it with `KetchError.ChecksumMismatch(algorithm, expected, actual, published)`, which is not
+retried. The mismatching file is deleted and the task's progress discarded, so it never stays
+where it looks complete and `resume()` downloads it again. A completed task is never hashed
+again.
+
+Without a checksum of its own, an HTTP download is checked against the digest its server
+publishes for the whole file: the strongest supported entry of `Repr-Digest` (RFC 9530), else of
+a legacy `Digest` (RFC 3230) from a `HEAD` or `200` response, never from a ranged one. A response
+with a `Content-Encoding` other than `identity` publishes nothing, as its digest covers the
+encoded bytes, and `Content-Digest` is never used. A mismatch against it fails the same way, with
+`published = true`. `ResolvedSource.checksum` and `ServerInfo.checksum` hold the published digest
+(`ServerInfo.publishedChecksum` reads the headers for custom `HttpEngine`s).
+
+Checksums apply to downloads Ketch writes as one file: HTTP, FTP, HLS and DASH. `download`
+refuses one for sources that write their own files, such as torrents, which verify their pieces
+themselves. Instances list `KetchFeatures.CHECKSUM`; `RemoteKetch` refuses a checksum for servers
+without it, which would ignore it. `FileAccessor.readAt` reads the file back; accessors without
+it skip published digests and fail a requested checksum with `KetchError.Unsupported`.
+
 A per-task limit applies in addition to the global one, so a task never exceeds the lower of
 the two. `setSpeedLimit`, `setConnections` and `setPriority` are persisted for queued, scheduled,
 paused and failed tasks and take effect when the task starts or resumes; `reschedule` is
@@ -460,6 +502,7 @@ All errors are modeled as a sealed class `KetchError`:
 | `CorruptResumeState` | No | Persisted resume state cannot be read |
 | `SourceError` | No | Error from a pluggable download source |
 | `AuthenticationFailed` | No | Credentials rejected, e.g. FTP 530 |
+| `ChecksumMismatch` | No | The finished file's digest differs from the expected or published one |
 | `Canceled` | No | Download was canceled |
 | `Unknown` | No | Unexpected errors |
 

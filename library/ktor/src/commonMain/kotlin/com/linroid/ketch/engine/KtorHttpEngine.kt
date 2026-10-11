@@ -105,6 +105,7 @@ class KtorHttpEngine private constructor(
           contentLength = response.contentLength(),
           acceptRanges = response.headers[HttpHeaders.AcceptRanges]
             ?.contains("bytes", ignoreCase = true) == true,
+          whole = true,
         )
       }
     }
@@ -125,16 +126,26 @@ class KtorHttpEngine private constructor(
               ?: throw KetchError.Unsupported(
                 IllegalStateException("Server returned a different range"),
               )
-            serverInfo(response, contentLength = contentRange.total, acceptRanges = true)
+            serverInfo(
+              response,
+              contentLength = contentRange.total,
+              acceptRanges = true,
+              whole = false,
+            )
           }
           // An empty resource has no first byte to send.
           status == HttpStatusCode.RequestedRangeNotSatisfiable &&
             response.headers[HttpHeaders.ContentRange]?.trim()
               .equals("bytes */0", ignoreCase = true) ->
-            serverInfo(response, contentLength = 0, acceptRanges = false)
+            serverInfo(response, contentLength = 0, acceptRanges = false, whole = false)
           // The server ignored the range and started sending the whole resource.
           status.isSuccess() ->
-            serverInfo(response, contentLength = response.contentLength(), acceptRanges = false)
+            serverInfo(
+              response,
+              contentLength = response.contentLength(),
+              acceptRanges = false,
+              whole = true,
+            )
           else -> throw httpError("GET", response)
         }
       }
@@ -443,6 +454,12 @@ class KtorHttpEngine private constructor(
         version.toString()
       }
 
+    /** RFC 9530: the digest of the whole representation, whatever range a response carries. */
+    private const val REPR_DIGEST = "Repr-Digest"
+
+    /** RFC 3230's instance digest, which `Repr-Digest` replaces. */
+    private const val DIGEST = "Digest"
+
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
 
     /** [headers] for a debug log line, with the values of [SENSITIVE_HEADERS] masked. */
@@ -467,10 +484,15 @@ class KtorHttpEngine private constructor(
       return contentRange.first == range.first && contentRange.last == range.last
     }
 
+    /**
+     * The metadata of [response]. [whole] says it describes the whole file, as a `HEAD` or a
+     * `200` does: only such a response's legacy `Digest` is used.
+     */
     private fun serverInfo(
       response: HttpResponse,
       contentLength: Long?,
       acceptRanges: Boolean,
+      whole: Boolean,
     ): ServerInfo = ServerInfo(
       contentLength = contentLength,
       acceptRanges = acceptRanges,
@@ -480,6 +502,11 @@ class KtorHttpEngine private constructor(
       rateLimitRemaining = findRateLimitRemaining(response.headers),
       rateLimitReset = findRateLimitReset(response.headers),
       contentType = response.headers[HttpHeaders.ContentType],
+      checksum = ServerInfo.publishedChecksum(
+        reprDigest = response.headers[REPR_DIGEST],
+        digest = response.headers[DIGEST].takeIf { whole },
+        contentEncoding = response.headers[HttpHeaders.ContentEncoding],
+      ),
     )
 
     private fun redirectOf(response: HttpResponse): Hop.Redirect? {

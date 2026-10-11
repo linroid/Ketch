@@ -161,7 +161,7 @@
   </plurals>
   <string name="intake_advanced_hide">隱藏進階選項</string>
   <string name="intake_advanced_show">進階選項…</string>
-  <string name="intake_advanced_caption">檔案名稱、Referer、Cookie 和其他標頭</string>
+  <string name="intake_advanced_caption">檔案名稱、校驗碼、Referer、Cookie 和其他標頭</string>
   <string name="intake_speed_limit">速度限制</string>
   <string name="intake_priority">優先順序</string>
   <string name="intake_start">開始時間</string>
@@ -203,6 +203,9 @@
   <string name="intake_also_sent">此連結還會一併傳送：%1$s</string>
   <string name="intake_file_name">檔案名稱</string>
   <string name="intake_server_file_name">使用伺服器提供的檔案名稱</string>
+  <string name="intake_checksum">校驗碼</string>
+  <string name="intake_checksum_caption">下載完成後校驗：支援 MD5、SHA-1、SHA-256 或 SHA-512，十六進位或 Base64 格式。</string>
+  <string name="intake_checksum_invalid">不是有效的校驗碼。請使用 sha256:… 或 MD5、SHA-1、SHA-256、SHA-512 的十六進位摘要。</string>
   <string name="intake_user_agent_custom">自訂</string>
   <string name="intake_add_header">新增標頭</string>
   <string name="intake_paste_curl">貼上 cURL</string>

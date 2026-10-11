@@ -1,5 +1,7 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.Checksum
+import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.SpeedLimit
@@ -76,6 +78,18 @@ class InstanceArgsTest {
 
     val invalid = assertIs<InstanceArgs.Invalid>(parsed)
     assertEquals(false, "a\u0007b" in invalid.message)
+  }
+
+  @Test
+  fun `add takes a checksum and refuses a malformed one`() {
+    val hex = "ab".repeat(32)
+    val command = run("add", "--checksum", "SHA-256:$hex", "https://example.com/a.iso")
+
+    assertIs<InstanceCommand.Add>(command)
+    assertEquals(Checksum(ChecksumAlgorithm.SHA_256, hex), command.checksum)
+    assertIs<InstanceArgs.Invalid>(
+      parseInstanceArgs("add", listOf("--checksum", "sha256:12", "https://example.com/a.iso")),
+    )
   }
 
   @Test

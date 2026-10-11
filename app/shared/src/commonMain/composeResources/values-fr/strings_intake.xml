@@ -179,7 +179,7 @@
   </plurals>
   <string name="intake_advanced_hide">Masquer les options avancées</string>
   <string name="intake_advanced_show">Options avancées…</string>
-  <string name="intake_advanced_caption">Nom du fichier, référent, cookies et autres en-têtes</string>
+  <string name="intake_advanced_caption">Nom du fichier, somme de contrôle, référent, cookies et autres en-têtes</string>
   <string name="intake_speed_limit">Limite de vitesse</string>
   <string name="intake_priority">Priorité</string>
   <string name="intake_start">Démarrage</string>
@@ -223,6 +223,9 @@
   <string name="intake_also_sent">Également envoyés avec ce lien : %1$s</string>
   <string name="intake_file_name">Nom du fichier</string>
   <string name="intake_server_file_name">Utilise le nom de fichier du serveur</string>
+  <string name="intake_checksum">Somme de contrôle</string>
+  <string name="intake_checksum_caption">Vérifiée à la fin du téléchargement : MD5, SHA-1, SHA-256 ou SHA-512, en hexadécimal ou en base64.</string>
+  <string name="intake_checksum_invalid">Somme de contrôle non valide. Utilisez sha256:… ou le condensat hexadécimal d'un MD5, SHA-1, SHA-256 ou SHA-512.</string>
   <string name="intake_user_agent_custom">Personnalisé</string>
   <string name="intake_add_header">Ajouter un en-tête</string>
   <string name="intake_paste_curl">Coller une commande cURL</string>

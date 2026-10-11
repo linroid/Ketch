@@ -80,12 +80,14 @@ internal class HttpDownloadSource(
         }
       },
       contentType = serverInfo.contentType,
+      checksum = serverInfo.checksum,
     )
   }
 
   override suspend fun download(context: DownloadContext) {
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
+        .also { context.publishedChecksum = it.checksum }
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) {
       downloadUnknownSize(context)
@@ -164,6 +166,7 @@ internal class HttpDownloadSource(
 
     val detector = RangeSupportDetector(httpEngine.through(context.config.proxy))
     val serverInfo = detector.detect(context.url, context.headers)
+    context.publishedChecksum = serverInfo.checksum
 
     if (state.etag != null && serverInfo.etag != state.etag) {
       log.w {

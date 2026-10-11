@@ -1,5 +1,7 @@
-package com.linroid.ketch.torrent
+package com.linroid.ketch.digest
 
+import com.linroid.ketch.core.digest.Sha256
+import com.linroid.ketch.core.digest.sha256Digest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

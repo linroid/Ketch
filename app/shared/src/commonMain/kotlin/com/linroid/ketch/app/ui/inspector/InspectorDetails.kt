@@ -76,6 +76,7 @@ import ketch.app.shared.generated.resources.inspector_copy_detail
 import ketch.app.shared.generated.resources.inspector_copy_failed_added
 import ketch.app.shared.generated.resources.inspector_copy_failed_average
 import ketch.app.shared.generated.resources.inspector_copy_failed_captured
+import ketch.app.shared.generated.resources.inspector_copy_failed_checksum
 import ketch.app.shared.generated.resources.inspector_copy_failed_connections
 import ketch.app.shared.generated.resources.inspector_copy_failed_device
 import ketch.app.shared.generated.resources.inspector_copy_failed_finished
@@ -90,6 +91,7 @@ import ketch.app.shared.generated.resources.inspector_copy_failed_time
 import ketch.app.shared.generated.resources.inspector_detail_added
 import ketch.app.shared.generated.resources.inspector_detail_average
 import ketch.app.shared.generated.resources.inspector_detail_captured
+import ketch.app.shared.generated.resources.inspector_detail_checksum
 import ketch.app.shared.generated.resources.inspector_detail_connections
 import ketch.app.shared.generated.resources.inspector_detail_device
 import ketch.app.shared.generated.resources.inspector_detail_finished
@@ -151,7 +153,8 @@ internal fun rememberCopier(state: AppState): Copier {
 /**
  * The DETAILS of [row], each row copying its value when clicked (long-pressed on touch), which
  * then reads "Copied" for a moment: Source, Link (the query behind "Show full link"), Saved to,
- * Size, Added, Finished, Time spent and Avg speed once completed, Connections, Device, Captured,
+ * Size, Added, Finished, Time spent and Avg speed once completed, the Checksum (copied as
+ * `sha256:<hex>`), Connections, Device, Captured,
  * and under Advanced the task id, the names of its headers and its properties.
  */
 @Composable
@@ -205,6 +208,15 @@ internal fun TaskDetails(
       val total = completed.totalBytes
       val average = total?.let { averageSpeed(it, time) }
       if (average != null) DetailRow(Detail.AverageSpeed, copier, speedText(average).resolve())
+    }
+    checksumDetail(row.state, request)?.let { (checksum, text) ->
+      DetailRow(Detail.Checksum, copier, copy = checksum.toString()) {
+        Text(
+          text = text.resolve(),
+          style = KetchTheme.typography.bodyS,
+          color = KetchTheme.colors.textPrimary,
+        )
+      }
     }
     // While the Controls show, they show the connections too.
     if (!row.state.hasControls && !row.isTorrent) {
@@ -312,6 +324,7 @@ private enum class Detail(val label: StringResource, val copyFailed: StringResou
   ),
   Device(Res.string.inspector_detail_device, Res.string.inspector_copy_failed_device),
   Captured(Res.string.inspector_detail_captured, Res.string.inspector_copy_failed_captured),
+  Checksum(Res.string.inspector_detail_checksum, Res.string.inspector_copy_failed_checksum),
   TaskId(Res.string.inspector_detail_task_id, Res.string.inspector_copy_failed_task_id),
   Headers(Res.string.inspector_detail_headers, Res.string.inspector_copy_failed_headers),
   Property(Res.string.inspector_detail_property, Res.string.inspector_copy_failed_property),

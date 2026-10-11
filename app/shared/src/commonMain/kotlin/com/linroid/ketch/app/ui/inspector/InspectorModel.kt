@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.inspector
 
 import androidx.compose.runtime.Immutable
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -30,6 +31,8 @@ import com.linroid.ketch.app.util.urlHost
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_at_time
 import ketch.app.shared.generated.resources.inspector_captured
+import ketch.app.shared.generated.resources.inspector_checksum_pending
+import ketch.app.shared.generated.resources.inspector_checksum_verified
 import ketch.app.shared.generated.resources.inspector_file_missing
 import ketch.app.shared.generated.resources.inspector_metric_done_at
 import ketch.app.shared.generated.resources.inspector_metric_left
@@ -249,6 +252,25 @@ internal fun finishedDetail(row: TaskRow, now: Instant, zone: TimeZone): UiText?
   val today = now.toLocalDateTime(zone).date
   if (finishedAt.toLocalDateTime(zone).date == today) return row.content.finished
   return Res.string.date_at_time.text(row.content.finished, clockTime(finishedAt, zone))
+}
+
+/**
+ * The checksum of a task in [state] downloading [request], for the Checksum detail, and the text
+ * it reads as: "SHA-256 · verified" once the finished file was checked against it, "SHA-256 ·
+ * checked when done" while the request's checksum waits for the file. `null` when there is none,
+ * as for a file that finished unverified or a canceled task.
+ */
+internal fun checksumDetail(
+  state: DownloadState,
+  request: DownloadRequest,
+): Pair<Checksum, UiText>? = when (state) {
+  is DownloadState.Completed -> state.checksum?.let { checksum ->
+    checksum to Res.string.inspector_checksum_verified.text(checksum.algorithm.label)
+  }
+  is DownloadState.Canceled -> null
+  else -> request.checksum?.let { checksum ->
+    checksum to Res.string.inspector_checksum_pending.text(checksum.algorithm.label)
+  }
 }
 
 /**

@@ -25,6 +25,7 @@ dependencies {
   implementation(projects.library.server)
   implementation(projects.library.sqlite)
   implementation(projects.updater)
+  implementation(projects.hooks)
   implementation(compose.desktop.currentOs)
   // The menu bar, tray and dialog strings in src/main/composeResources.
   implementation(libs.compose.components.resources)

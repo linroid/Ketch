@@ -239,7 +239,7 @@
   </plurals>
   <string name="intake_advanced_hide">Hide advanced options</string>
   <string name="intake_advanced_show">Advanced options…</string>
-  <string name="intake_advanced_caption">File name, referer, cookies and other headers</string>
+  <string name="intake_advanced_caption">File name, checksum, referer, cookies and other headers</string>
   <string name="intake_speed_limit">Speed limit</string>
   <string name="intake_priority">Priority</string>
   <string name="intake_start">Start</string>
@@ -296,6 +296,11 @@
   <string name="intake_also_sent">Also sent with this link: %1$s</string>
   <string name="intake_file_name">File name</string>
   <string name="intake_server_file_name">Uses the server's file name</string>
+  <!-- An optional checksum the downloaded file is checked against, such as "sha256:…". -->
+  <string name="intake_checksum">Checksum</string>
+  <string name="intake_checksum_caption">Checked once the download finishes: MD5, SHA-1, SHA-256 or SHA-512, in hex or base64.</string>
+  <!-- Under the checksum field when what was typed is not a checksum. -->
+  <string name="intake_checksum_invalid">Not a checksum. Use sha256:… or the hex digest of an MD5, SHA-1, SHA-256 or SHA-512.</string>
   <!-- The user agent typed by hand, next to Ketch, Chrome, Firefox and Safari. -->
   <string name="intake_user_agent_custom">Custom</string>
   <string name="intake_add_header">Add header</string>

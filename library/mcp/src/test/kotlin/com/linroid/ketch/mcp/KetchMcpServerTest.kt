@@ -260,7 +260,7 @@ class KetchMcpServerTest {
       assertEquals(
         setOf(
           "url", "destination", "connections", "priority", "speedLimit", "headers", "requestId",
-          "fileIds",
+          "fileIds", "checksum",
         ),
         schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
       )

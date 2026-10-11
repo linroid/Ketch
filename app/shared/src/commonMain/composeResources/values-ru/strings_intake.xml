@@ -215,7 +215,7 @@
   </plurals>
   <string name="intake_advanced_hide">Скрыть дополнительные параметры</string>
   <string name="intake_advanced_show">Дополнительные параметры…</string>
-  <string name="intake_advanced_caption">Имя файла, реферер, cookie и другие заголовки</string>
+  <string name="intake_advanced_caption">Имя файла, контрольная сумма, реферер, cookie и другие заголовки</string>
   <string name="intake_speed_limit">Ограничение скорости</string>
   <string name="intake_priority">Приоритет</string>
   <string name="intake_start">Запуск</string>
@@ -263,6 +263,9 @@
   <string name="intake_also_sent">С этой ссылкой также отправляются: %1$s</string>
   <string name="intake_file_name">Имя файла</string>
   <string name="intake_server_file_name">Используется имя файла с сервера</string>
+  <string name="intake_checksum">Контрольная сумма</string>
+  <string name="intake_checksum_caption">Проверяется после загрузки: MD5, SHA-1, SHA-256 или SHA-512, в hex или base64.</string>
+  <string name="intake_checksum_invalid">Это не контрольная сумма. Используйте sha256:… или шестнадцатеричный хеш MD5, SHA-1, SHA-256 или SHA-512.</string>
   <string name="intake_user_agent_custom">Свой</string>
   <string name="intake_add_header">Добавить заголовок</string>
   <string name="intake_paste_curl">Вставить cURL</string>

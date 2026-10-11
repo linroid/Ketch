@@ -133,6 +133,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
   运行同一个引擎，内置 REST API 和网页应用，其他 Ketch 应用可在局域网中发现它。
 - **在终端中操作** — `ketch add`、`list`、`pause`、`resume` 和 `watch` 可在终端或脚本中管理 Ketch
   应用或服务器的下载任务；`watch` 输出 JSON 行（[CLI](cli/README.md#work-on-a-running-ketch)）。
+- **自动化钩子** — 下载添加、完成或失败时，`ketch server` 或桌面应用可执行命令或调用带签名的
+  webhook（[钩子](docs/hooks.md)）。
 
 ### 掌控带宽
 
@@ -160,6 +162,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 - **外观与语言随心选择** — 浅色与深色主题、七种强调色，支持 English、简体中文、繁體中文、
   日本語、한국어、Español、Português (Brasil)、Deutsch 和 Français
   （[参与翻译](docs/development/localization.md)）。
+- **校验下载** — 添加下载时可填写 SHA-256、SHA-512、SHA-1 或 MD5 校验和，Ketch 会用它
+  校验下载完成的文件；未填写时则使用服务器发布的校验和。
 
 ### 用 AI 查找下载资源（预览）
 
@@ -228,10 +232,8 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   目前已支持有限时长、未加密的单流下载
 - **媒体提取** — 保存网页中的媒体内容
 - **资源嗅探** — 查找网页上可下载的文件
-- **校验和** — 根据用户提供或服务器发布的哈希值校验下载文件
 - **更快的分段下载** — 先完成的连接接手较慢连接剩余的部分，避免等待最慢的连接
 - **下载完成后** — 队列清空后可选择退出 Ketch、让电脑睡眠或关机
-- **自动化钩子** — 下载完成或失败时执行命令或调用 webhook
 - **设备间传输** — 「发送到」和「移动到」携带已下载的数据，让另一台设备继续下载，
   无需从头开始（[计划](docs/plans/task-transfer.md)）
 - **辅助设备** — 让其他设备使用各自的网络连接下载同一文件的部分内容，运行中可随时加入或退出
@@ -259,6 +261,7 @@ Node.js 和 WASI 可使用 `core` 搭配自定义 HTTP 引擎。
 - [BitTorrent](docs/torrent.md) — 种子和磁力链接的支持范围与限制
 - [多个网络](docs/multiple-networks.md) — 跨网络接口分配下载任务
 - [AI 搜索](docs/ai-discovery.md) — 服务商、密钥、网页搜索、网页访问、对话和历史记录
+- [自动化钩子](docs/hooks.md) — 在下载事件时执行的命令和 webhook
 - [日志](docs/logging.md) — 日志位置及问题报告所需的附件
 
 ## 参与贡献

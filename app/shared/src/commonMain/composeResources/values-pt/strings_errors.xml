@@ -35,6 +35,11 @@
   <string name="error_corrupt_resume">O progresso salvo está danificado</string>
   <string name="error_corrupt_resume_hint">A parte baixada não pode ser reaproveitada.</string>
   <string name="error_corrupt_resume_hint_short">a parte baixada não pode ser reaproveitada</string>
+  <string name="error_checksum_mismatch">O arquivo não corresponde à soma de verificação</string>
+  <string name="error_checksum_mismatch_hint">O %1$s dele não corresponde à soma de verificação que você digitou, então ele foi apagado. Baixe de novo ou confira a soma de verificação.</string>
+  <string name="error_checksum_mismatch_hint_short">o %1$s não corresponde à soma de verificação que você digitou</string>
+  <string name="error_checksum_mismatch_published_hint">O %1$s dele não corresponde ao que o servidor publicou, então ele foi apagado. Ele pode ter sido danificado no caminho; baixe de novo.</string>
+  <string name="error_checksum_mismatch_published_hint_short">o %1$s não corresponde ao do servidor</string>
   <string name="error_canceled">Cancelado</string>
   <string name="error_wrong_credentials">Nome de usuário ou senha incorretos</string>
   <string name="error_wrong_credentials_hint">O servidor %1$s recusou o login.</string>

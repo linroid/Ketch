@@ -35,6 +35,11 @@
   <string name="error_corrupt_resume">La progression enregistrée est endommagée</string>
   <string name="error_corrupt_resume_hint">La partie téléchargée ne peut pas être réutilisée.</string>
   <string name="error_corrupt_resume_hint_short">la partie téléchargée ne peut pas être réutilisée</string>
+  <string name="error_checksum_mismatch">Le fichier ne correspond pas à sa somme de contrôle</string>
+  <string name="error_checksum_mismatch_hint">Son %1$s ne correspond pas à la somme de contrôle saisie, il a donc été supprimé. Téléchargez-le à nouveau ou vérifiez la somme de contrôle.</string>
+  <string name="error_checksum_mismatch_hint_short">son %1$s ne correspond pas à la somme de contrôle saisie</string>
+  <string name="error_checksum_mismatch_published_hint">Son %1$s ne correspond pas à celle publiée par le serveur, il a donc été supprimé. Il a peut-être été endommagé en route ; téléchargez-le à nouveau.</string>
+  <string name="error_checksum_mismatch_published_hint_short">son %1$s ne correspond pas à celle du serveur</string>
   <string name="error_canceled">Annulé</string>
   <string name="error_wrong_credentials">Nom d'utilisateur ou mot de passe incorrect</string>
   <string name="error_wrong_credentials_hint">Le serveur %1$s a refusé l'identification.</string>
