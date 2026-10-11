@@ -172,7 +172,7 @@ internal class UtpEndpoint(
   /** Connects to [remote] over uTP, or throws once its SYN retries go unanswered. */
   suspend fun dial(remote: PeerEndpoint): TorrentConnection {
     val entry = step {
-      if (entries.size >= maxConnections) throw IOException("Too many uTP connections")
+      if (entries.size >= maxConnections) throw UtpEndpointFullException()
       var id: Int
       do {
         id = torrentRandomBytes(2).let { ((it[0].toInt() and 255) shl 8) or (it[1].toInt() and 255) }
@@ -327,6 +327,8 @@ internal class TorrentUtpFallback(
         forget(remote)
       } catch (e: CancellationException) {
         throw e
+      } catch (_: UtpEndpointFullException) {
+        // Our side is full: nothing was learned about the peer, so it stays preferred.
       } catch (e: Exception) {
         // It no longer answers uTP; TCP may still work.
         forget(remote)
@@ -359,3 +361,6 @@ internal class TorrentUtpFallback(
     }
   }
 }
+
+/** The endpoint already runs as many uTP connections as it may; the peer was not contacted. */
+internal class UtpEndpointFullException : IOException("Too many uTP connections")

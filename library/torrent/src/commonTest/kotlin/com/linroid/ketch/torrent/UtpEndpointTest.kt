@@ -200,6 +200,40 @@ class UtpEndpointTest {
   }
 
   @Test
+  fun fallback_fullEndpoint_keepsThePeerPreferred() = endpoints { network, scope ->
+    val b = side(network, scope)
+    val incoming = Channel<TorrentConnection>(Channel.UNLIMITED)
+    var endpoint: UtpEndpoint? = null
+    val port = TorrentUdpPort(network.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
+      utp = { endpoint?.receive(it) })
+    // Room for one connection only.
+    endpoint = UtpEndpoint(scope, port::send, onIncoming = { incoming.trySend(it).isSuccess },
+      maxConnections = 1)
+    var tcp = 0
+    val refused = object : TorrentNetwork by network {
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        tcp++
+        throw IOException("Connection refused")
+      }
+    }
+    val fallback = TorrentUtpFallback(refused) { endpoint }
+    fallback.preferUtp(listOf(b.address))
+    val first = fallback.connect(b.address)
+    // Full: the second dial cannot use uTP and falls through to TCP, which is refused.
+    assertFailsWith<IOException> { fallback.connect(b.address) }
+    assertEquals(1, tcp)
+    first.close()
+    // Once there is room, the peer is still dialed over uTP first.
+    withTimeout(5_000) {
+      while (true) {
+        val connection = try { fallback.connect(b.address) } catch (_: IOException) { null }
+        if (connection != null) { connection.close(); break }
+        delay(100)
+      }
+    }
+  }
+
+  @Test
   fun fallback_peerNoLongerOnUtp_usesTcpAndIsForgotten() = endpoints { network, scope ->
     val a = side(network, scope, dialOptions = UtpOptions(synRetries = 0))
     // TCP works; nothing answers uTP there.
