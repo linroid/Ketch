@@ -1,11 +1,11 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.core.Ketch
@@ -21,7 +21,6 @@ import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -44,7 +43,7 @@ class KetchConnectionsTest {
     withKetch(engine) { ketch, folder ->
       val task = ketch.download(request(folder, connections = 4))
 
-      val open = ketch.activeConnections().first { it.total == 4 }
+      val open = ketch.subscribe(Interest.Connections()).first { it.total == 4 }
 
       assertEquals(4, open.connections.map { it.id }.toSet().size)
       for (connection in open.connections) {
@@ -57,7 +56,7 @@ class KetchConnectionsTest {
       }
       gate.complete(Unit)
       assertIs<DownloadState.Completed>(task.state.first { it.isTerminal })
-      assertEquals(0, ketch.activeConnections().first().total)
+      assertEquals(0, ketch.subscribe(Interest.Connections()).first().total)
     }
   }
 
@@ -65,16 +64,16 @@ class KetchConnectionsTest {
   fun pauseAndCancel_closeEveryConnection() = runTest {
     withKetch(FakeHttpEngine(stallAfterBytes = 50)) { ketch, folder ->
       val task = ketch.download(request(folder, connections = 4))
-      val open = ketch.activeConnections().first { it.total == 4 }
+      val open = ketch.subscribe(Interest.Connections()).first { it.total == 4 }
       assertTrue(open.connections.all { it.downloadedBytes == 100L })
 
       task.pause()
-      assertEquals(0, ketch.activeConnections().first().total)
+      assertEquals(0, ketch.subscribe(Interest.Connections()).first().total)
 
       task.resume()
-      ketch.activeConnections().first { it.total == 4 }
+      ketch.subscribe(Interest.Connections()).first { it.total == 4 }
       task.cancel()
-      assertEquals(0, ketch.activeConnections().first { it.total == 0 }.total)
+      assertEquals(0, ketch.subscribe(Interest.Connections()).first { it.total == 0 }.total)
     }
   }
 
@@ -82,12 +81,12 @@ class KetchConnectionsTest {
   fun setConnections_resegment_replacesConnections() = runTest {
     withKetch(FakeHttpEngine(stallAfterBytes = 50)) { ketch, folder ->
       val task = ketch.download(request(folder, connections = 4))
-      val before = ketch.activeConnections().first { it.total == 4 }.connections.map { it.id }
+      val before = ketch.subscribe(Interest.Connections()).first { it.total == 4 }.connections.map { it.id }
 
       task.setConnections(2)
 
       // The stopped batch's connections close and the next batch's open.
-      val after = ketch.activeConnections()
+      val after = ketch.subscribe(Interest.Connections())
         .first { snapshot -> snapshot.total > 0 && snapshot.connections.none { it.id in before } }
       assertTrue(after.connections.all { it.downloadedBytes == 100L })
     }
@@ -105,7 +104,7 @@ class KetchConnectionsTest {
     withKetch(FakeHttpEngine(stallAfterBytes = 50, exchange = exchange)) { ketch, folder ->
       ketch.download(request(folder, connections = 2))
 
-      val open = ketch.activeConnections().first { it.total == 2 }
+      val open = ketch.subscribe(Interest.Connections()).first { it.total == 2 }
 
       for (connection in open.connections) {
         assertEquals("mirror.example.net", connection.host)
@@ -117,12 +116,8 @@ class KetchConnectionsTest {
   }
 
   @Test
-  fun activeConnections_limitOutOfRange_throws() = runTest {
+  fun status_listsActiveConnections() = runTest {
     withKetch(FakeHttpEngine()) { ketch, _ ->
-      assertFailsWith<IllegalArgumentException> { ketch.activeConnections(0) }
-      assertFailsWith<IllegalArgumentException> {
-        ketch.activeConnections(ActiveConnections.MAX_LIMIT + 1)
-      }
       assertTrue(KetchFeatures.ACTIVE_CONNECTIONS in ketch.status().features)
     }
   }

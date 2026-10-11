@@ -270,17 +270,27 @@ resources in `library:endpoints` (`Api`) and shared with the client:
 - **Torrents**: on servers listing `torrent.control`, `/api/torrents` (resources in
   `endpoints.torrent`) serves the instance's `control(TorrentController)`: capabilities, a task's
   snapshot, sorted pages of its files, the `selection` and `seeding` commands, guarded by a
-  revision and an idempotency key, and an `events` stream of snapshots. A server whose instance
-  has no torrent controller installs none of these routes. `RemoteKetch.control(TorrentController)`
-  calls them and fails closed against servers without them
-- **Live connections**: `GET /api/connections` and the SSE stream `/api/connections/events`
-  (`snapshot` events, an `error` event before it closes; `?limit=1..1024`) serve
-  `KetchApi.activeConnections`, at most 16 streams at once. Hosts and peer addresses go only
-  there, never on `/api/events`. `RemoteKetch.activeConnections` fails closed for servers without
-  `net.activeConnections`
-- **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
-  `task_removed`, `state_changed` and `progress` events. A `progress` event leaves out a request
-  that did not change, and task views and events never carry a torrent's metainfo
+  revision and an idempotency key, and a deprecated `events` stream of snapshots. A server whose
+  instance has no torrent controller installs none of these routes.
+  `RemoteKetch.control(TorrentController)` calls them and fails closed against servers without
+  them
+- **Live connections**: `GET /api/connections` and the deprecated SSE stream
+  `/api/connections/events` (`snapshot` events, an `error` event before it closes;
+  `?limit=1..1024`) serve `Interest.Connections`, at most 16 streams at once. Hosts and peer
+  addresses never go on the task events. `RemoteKetch` fails it closed for servers without
+  `net.activeConnections`, or that answer `unsupported` on the event stream
+- **Event stream**: `GET /api/stream` (servers listing `events.stream`) is one SSE stream per
+  client: `hello`, `subscribed`, a `tasks` snapshot, then each task's lifecycle and state changes
+  at once, and what `PUT /api/stream/{id}/subscription` asks for: every downloading task's
+  progress at one interval, the segments of the tasks it names, and per interest (`Interest`,
+  serializable, under an ID the client gives it) `interest` values at its interval, then
+  `interest.end` or `interest.error`. One frame per task and one upstream per interest are
+  encoded once for every stream, and a slow stream skips values rather than queueing them. See
+  the [plan](plans/event-stream.md)
+- **SSE (deprecated)**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
+  `task_removed`, `state_changed` and `progress` events for older clients. A `progress` event
+  leaves out a request that did not change, and task views and events never carry a torrent's
+  metainfo
 - **Auth**: Bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
   `config.toml`) required on every API route except pairing and health, compared in constant
   time; ten wrong tokens from an address within a minute get `429` until the minute ends.
@@ -313,7 +323,8 @@ resources in `library:endpoints` (`Api`) and shared with the client:
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
 
 `RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`
-by calling the REST API and subscribing to SSE events. Auto-reconnects with exponential
+by calling the REST API and reading the event stream (`/api/events` on older servers), to which
+it sends the interests its callers hold. Auto-reconnects with exponential
 backoff on disconnection, and stops retrying when the server rejects the API token.
 `RemotePairing` asks a server's owner for the token and waits for the answer. The
 [browser extension](../app/browser-extension/README.md) is another REST client: it sends

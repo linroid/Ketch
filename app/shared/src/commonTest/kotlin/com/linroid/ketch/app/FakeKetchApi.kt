@@ -3,15 +3,21 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlin.time.Duration
 
 /** A [KetchApi] without tasks that resolves dropped content to [resolveContentResult]. */
 class FakeKetchApi(override val backendLabel: String = "Fake") : KetchApi {
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
   override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 

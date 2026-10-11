@@ -3,6 +3,7 @@ package com.linroid.ketch.app.instance
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
@@ -18,6 +19,7 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.RemoteKetch
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_server_start_failed
 import kotlinx.coroutines.CancellationException
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -44,6 +47,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
+import kotlin.time.Duration
 
 /**
  * Manages the list of configured instances, the currently active
@@ -207,6 +211,13 @@ class InstanceManager(
       }
     }
     scope.launch { appForegroundChanges().collect { setInForeground(it) } }
+    scope.launch {
+      inForeground.collect { front ->
+        connectionLock.withLock {
+          started.values.filterIsInstance<RemoteKetch>().forEach { it.foreground = front }
+        }
+      }
+    }
   }
 
   /**
@@ -240,9 +251,11 @@ class InstanceManager(
   }
 
   /**
-   * Tells the manager whether the app is in front. [KeepAlivePolicy.backgroundGrace] after it
-   * leaves, the remote devices other than the active one disconnect; they connect again when
-   * it returns. The mobile hosts call it; iOS also reports it on its own.
+   * Tells the manager whether the app is in front. While it is not, remote devices send only
+   * their tasks' lifecycle and state changes ([RemoteKetch.foreground]), and
+   * [KeepAlivePolicy.backgroundGrace] after it leaves, the remote devices other than the active
+   * one disconnect; they connect again when it returns. The mobile hosts call it; iOS also
+   * reports it on its own.
    */
   fun setInForeground(inForeground: Boolean) {
     this.inForeground.value = inForeground
@@ -483,6 +496,7 @@ class InstanceManager(
     val deviceId = entry.deviceId
     log.i { "Connecting to $deviceId" }
     started[deviceId] = entry.instance
+    (entry.instance as? RemoteKetch)?.foreground = inForeground.value
     try {
       entry.instance.start()
     } catch (e: CancellationException) {
@@ -560,6 +574,9 @@ private object DisconnectedApi : KetchApi {
   override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
+
+  // Nothing to follow before a device is connected.
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
 
   private fun notConnected(): Nothing =
     throw IllegalStateException("No instance connected. Add a remote server first.")

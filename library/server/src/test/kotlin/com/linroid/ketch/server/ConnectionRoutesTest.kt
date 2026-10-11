@@ -2,6 +2,7 @@ package com.linroid.ketch.server
 
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.server.api.ConnectionStreams
@@ -43,6 +44,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
@@ -67,23 +69,29 @@ class ConnectionRoutesTest {
     downloadBps = 1_000L * total,
   )
 
-  /** Answers [KetchApi.activeConnections] with [connections], recording each limit asked. */
+  /** Answers [Interest.Connections] with [connections], recording each limit asked. */
   private class ScriptedKetch(
-    delegate: KetchApi,
+    private val delegate: KetchApi,
     private val connections: () -> Flow<ActiveConnections>,
   ) : KetchApi by delegate {
     val limits = mutableListOf<Int>()
 
-    override fun activeConnections(limit: Int): Flow<ActiveConnections> {
-      limits += limit
-      return connections()
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+      if (interest !is Interest.Connections) return delegate.subscribe(interest, interval)
+      limits += interest.limit
+      return connections() as Flow<T>
     }
   }
 
   /** A [KetchApi] whose engine reports no connections, as the interface's default does. */
-  private class Unsupported(delegate: KetchApi) : KetchApi by delegate {
-    override fun activeConnections(limit: Int): Flow<ActiveConnections> =
-      flow { throw UnsupportedOperationException("Active connections are not supported") }
+  private class Unsupported(private val delegate: KetchApi) : KetchApi by delegate {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      if (interest is Interest.Connections) {
+        flow { throw UnsupportedOperationException("Active connections are not supported") }
+      } else {
+        delegate.subscribe(interest, interval)
+      }
   }
 
   private fun scripted(connections: () -> Flow<ActiveConnections>) =

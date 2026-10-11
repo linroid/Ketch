@@ -50,7 +50,7 @@ object KetchFeatures {
    */
   const val CHECKSUM: String = "download.checksum"
 
-  /** [KetchApi.activeConnections] reports live connections. */
+  /** [Interest.Connections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
   /**

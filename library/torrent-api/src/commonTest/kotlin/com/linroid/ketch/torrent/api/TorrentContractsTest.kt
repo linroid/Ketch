@@ -1,7 +1,6 @@
 package com.linroid.ketch.torrent.api
 
 import com.linroid.ketch.api.FileOrder
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -128,7 +127,6 @@ class TorrentContractsTest {
     val controller = object : TorrentController {
       override suspend fun capabilities() = TorrentCapabilities()
       override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
-      override fun observe(taskId: String) = flowOf<TorrentSnapshot?>(null)
     }
     val context = TorrentCommandContext("key", TorrentRevision("a", 0))
     val errors = listOf(

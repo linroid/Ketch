@@ -252,7 +252,7 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
   without credentials, and `ProxyConfig` prints its password as `***`, as in `Config updated`
 - Torrent peer addresses appear only in verbose per-peer lines and a few warnings about a
   peer's own failures, never in swarm summaries. The live connections Ketch reports
-  (`KetchApi.activeConnections`) list each peer's IP and port and each HTTP host, but nothing
+  (`Interest.Connections`) list each peer's IP and port and each HTTP host, but nothing
   logs them: their registry logs only counts
 
 Logs still name the files you downloaded, the hosts and paths they came from and what you asked

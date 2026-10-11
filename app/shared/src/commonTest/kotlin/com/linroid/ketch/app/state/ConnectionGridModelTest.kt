@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.verbatim
@@ -11,6 +12,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -23,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -357,14 +360,19 @@ class ConnectionGridModelTest {
     var active = 0
       private set
 
-    override fun activeConnections(limit: Int): Flow<ActiveConnections> = flow {
-      limits += limit
-      active++
-      try {
-        emitAll(stream(limit))
-      } finally {
-        active--
-      }
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+      if (interest !is Interest.Connections) return emptyFlow()
+      val limit = interest.limit
+      return flow {
+        limits += limit
+        active++
+        try {
+          emitAll(stream(limit))
+        } finally {
+          active--
+        }
+      } as Flow<T>
     }
   }
 

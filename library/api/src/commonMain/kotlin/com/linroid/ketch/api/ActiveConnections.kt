@@ -123,7 +123,7 @@ data class ActiveConnections(
   val dropped: Long = 0,
 ) {
   companion object {
-    /** The number of connections [KetchApi.activeConnections] returns unless asked otherwise. */
+    /** The number of connections [Interest.Connections] reports unless asked otherwise. */
     const val DEFAULT_LIMIT: Int = 256
 
     /** The most connections one snapshot can hold. */
