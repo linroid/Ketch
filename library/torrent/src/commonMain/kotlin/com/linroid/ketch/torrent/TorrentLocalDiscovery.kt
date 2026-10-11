@@ -40,6 +40,12 @@ internal interface LsdTransport {
   /** The next datagram any member sent the group, ours included. */
   suspend fun receive(): TorrentDatagram
 
+  /**
+   * Whether the interfaces it joined the group on are still this device's; once the network
+   * changes, the group is joined again on the current ones.
+   */
+  suspend fun isCurrent(): Boolean = true
+
   fun close()
 }
 
@@ -243,9 +249,12 @@ internal class TorrentLocalDiscovery(
         } else {
           log.d { "Joined the local service discovery group" }
           coroutineScope {
-            launch { receive(transport) }
+            val receiving = launch { receive(transport) }
             announce(transport)
+            receiving.cancel()
           }
+          log.d { "The network changed: joining the local service discovery group again" }
+          continue
         }
       } catch (e: CancellationException) {
         throw e
@@ -261,8 +270,17 @@ internal class TorrentLocalDiscovery(
     }
   }
 
-  private suspend fun announce(transport: LsdTransport): Nothing {
+  /**
+   * Announces the hashes as they fall due until the network changes, then returns so [run] joins
+   * the group on the current interfaces. A send that fails on every interface throws.
+   */
+  private suspend fun announce(transport: LsdTransport) {
+    var checkedAt = nowMs()
     while (true) {
+      if (nowMs() - checkedAt >= NETWORK_CHECK_MS) {
+        checkedAt = nowMs()
+        if (!transport.isCurrent()) return
+      }
       val port = listenPort()
       val now = nowMs()
       val hashes = mutableListOf<ByteString>()
@@ -283,8 +301,9 @@ internal class TorrentLocalDiscovery(
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
-          // Interfaces come and go; the next round tries again.
-          log.d { "Local service discovery announce failed: ${e.describeWithoutUrls()}" }
+          // The group is joined again; what was not announced goes out then.
+          mutex.withLock { for (hash in batch) if (hash in due) due[hash] = now }
+          throw e
         }
       }
       if (hashes.isNotEmpty()) {
@@ -349,6 +368,9 @@ internal class TorrentLocalDiscovery(
 
     /** BEP 14's limit of one announce per torrent a minute; a peer is redelivered after it too. */
     const val MIN_INTERVAL_MS = 60_000L
+
+    /** How often a joined group checks whether the device's interfaces changed. */
+    const val NETWORK_CHECK_MS = 60_000L
 
     /** Announces accepted at once, then [ACCEPT_PER_SECOND]. */
     const val ACCEPT_BURST = 32

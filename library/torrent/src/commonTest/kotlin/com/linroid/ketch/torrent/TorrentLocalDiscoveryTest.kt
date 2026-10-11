@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.ByteString
+import okio.IOException
 import okio.ByteString.Companion.toByteString
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -26,19 +27,27 @@ internal class FakeLsdTransport : LsdTransport {
   val incoming = Channel<TorrentDatagram>(Channel.UNLIMITED)
   val opens = AtomicInt(0)
   val closes = AtomicInt(0)
+  /** False once the device's interfaces changed; opening again joins the current ones. */
+  var current = true
+  /** Sends fail while set, as when no interface reaches the group any more. */
+  var failSends = false
 
   /** Opens this transport, as the engine's factory would open the group. */
   suspend fun open(): LsdTransport {
     opens.addAndFetch(1)
+    current = true
     return this
   }
 
   override suspend fun send(bytes: ByteArray) {
+    if (failSends) throw IOException("Network is unreachable")
     val announce = assertNotNull(LsdAnnounce.parse(bytes))
     sent.update { it + announce }
   }
 
   override suspend fun receive(): TorrentDatagram = incoming.receive()
+
+  override suspend fun isCurrent(): Boolean = current
 
   override fun close() {
     closes.addAndFetch(1)
@@ -126,6 +135,34 @@ class TorrentLocalDiscoveryTest {
     assertEquals(1, transport.sent.value.size)
     advanceTimeBy(2)
     assertEquals(listOf(hashA, hashA), transport.announcedHashes())
+  }
+
+  @Test
+  fun networkChange_joinsTheGroupAgain() = runTest {
+    val transport = FakeLsdTransport()
+    val service = service(transport)
+    join(service, mutableListOf(), hashA)
+    runCurrent()
+    assertEquals(1, transport.opens.load())
+    transport.current = false
+    advanceTimeBy(TorrentLocalDiscovery.NETWORK_CHECK_MS + 1_000)
+    assertEquals(2, transport.opens.load())
+    assertEquals(1, transport.closes.load())
+  }
+
+  @Test
+  fun failedAnnounce_isSentAgainOnceTheGroupIsJoinedAgain() = runTest {
+    val transport = FakeLsdTransport()
+    transport.failSends = true
+    val service = service(transport)
+    join(service, mutableListOf(), hashA)
+    runCurrent()
+    assertEquals(1, transport.closes.load())
+    transport.failSends = false
+    // The default retry is a minute, far short of the five-minute announce interval.
+    advanceTimeBy(60_000 + 1)
+    assertEquals(2, transport.opens.load())
+    assertEquals(listOf(hashA), transport.announcedHashes())
   }
 
   @Test

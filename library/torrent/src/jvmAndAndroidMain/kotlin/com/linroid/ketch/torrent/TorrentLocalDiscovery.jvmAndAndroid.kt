@@ -16,6 +16,13 @@ internal actual suspend fun openLsdMulticast(): LsdTransport? = withContext(Disp
   if (interfaces.isEmpty()) null else JvmLsdTransport.open(interfaces, LSD_PORT)
 }
 
+/** What identifies [interfaces] for noticing a network change: names and IPv4 addresses. */
+private fun signature(interfaces: List<NetworkInterface>): Set<String> =
+  interfaces.flatMapTo(mutableSetOf()) { nif ->
+    nif.inetAddresses.toList().filterIsInstance<Inet4Address>()
+      .map { "${nif.name} ${it.hostAddress}" }
+  }
+
 /** The interfaces up with multicast and a private or link-local IPv4 address. */
 internal fun lsdInterfaces(): List<NetworkInterface> =
   NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { nif ->
@@ -33,6 +40,8 @@ internal class JvmLsdTransport private constructor(
   private val socket: MulticastSocket,
   private val interfaces: List<NetworkInterface>,
   private val group: InetSocketAddress,
+  /** The signature of the interfaces offered when it opened, joined or not. */
+  private val offered: Set<String>,
 ) : LsdTransport {
   private val buffer = ByteArray(LsdAnnounce.MAX_BYTES + 1)
 
@@ -71,6 +80,10 @@ internal class JvmLsdTransport private constructor(
     datagram
   }
 
+  override suspend fun isCurrent(): Boolean = withContext(Dispatchers.IO) {
+    signature(lsdInterfaces()) == offered
+  }
+
   override fun close() {
     socket.close()
   }
@@ -94,7 +107,7 @@ internal class JvmLsdTransport private constructor(
           runCatching { socket.joinGroup(group, nif) }.isSuccess
         }
         check(joined.isNotEmpty()) { "No interface joined the local service discovery group" }
-        return JvmLsdTransport(socket, joined, group)
+        return JvmLsdTransport(socket, joined, group, signature(interfaces))
       } catch (e: Throwable) {
         socket.close()
         throw e
