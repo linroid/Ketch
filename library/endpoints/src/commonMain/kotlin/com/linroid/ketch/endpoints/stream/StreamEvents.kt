@@ -3,7 +3,8 @@ package com.linroid.ketch.endpoints.stream
 /**
  * The server-sent events, error codes and limits of the subscribed event stream, `GET
  * /api/stream`. The stream starts with [HELLO] and carries the task lifecycle; everything else
- * is sent once the client asks for it with a [StreamSubscription] of interests.
+ * is sent once the client asks for it with a [StreamSubscription]: task progress and segments as
+ * task events, and each interest as [INTEREST] events under the ID the client gave it.
  */
 object StreamEvents {
   /**
@@ -19,8 +20,8 @@ object StreamEvents {
   const val HELLO: String = "hello"
 
   /**
-   * A [StreamSubscribed], once a subscription applies. Snapshots of the topics it adds follow
-   * it, then their changes.
+   * A [StreamSubscribed], once a subscription applies. Events of the interests it adds follow it;
+   * none follow for those it drops.
    */
   const val SUBSCRIBED: String = "subscribed"
 
@@ -42,26 +43,20 @@ object StreamEvents {
   /** A [TaskSegmentsUpdate]. */
   const val TASK_SEGMENTS: String = "task.segments"
 
-  /** A `KetchStats`. */
-  const val STATS: String = "stats"
+  /** An [InterestUpdate]: the latest value of an interest the subscription names. */
+  const val INTEREST: String = "interest"
 
-  /** A `TorrentSnapshot`. */
-  const val TORRENT: String = "torrent"
+  /**
+   * An [InterestRef]: what an interest follows is gone, such as a removed torrent; nothing more
+   * comes for it.
+   */
+  const val INTEREST_END: String = "interest.end"
 
-  /** A [StreamTaskRef] of a torrent that is gone; no more `torrent` events follow for it. */
-  const val TORRENT_REMOVED: String = "torrent.removed"
+  /** An [InterestError]: the interest cannot be served or failed; nothing more comes for it. */
+  const val INTEREST_ERROR: String = "interest.error"
 
-  /** An `ActiveConnections` snapshot. */
-  const val CONNECTIONS: String = "connections"
-
-  /** A [StreamError]; the stream closes after one without a [StreamError.topic]. */
+  /** A [StreamError]; the stream closes after it. */
   const val ERROR: String = "error"
-
-  /** [StreamError.topic] of the torrent topic. */
-  const val TOPIC_TORRENTS: String = "torrents"
-
-  /** [StreamError.topic] of the connections topic. */
-  const val TOPIC_CONNECTIONS: String = "connections"
 
   /** Error code of a subscription for a stream that is closed or not the caller's (`404`). */
   const val UNKNOWN_STREAM: String = "unknown_stream"
@@ -72,20 +67,20 @@ object StreamEvents {
   /** Error code of a server already streaming to as many clients as it allows (`429`). */
   const val TOO_MANY_STREAMS: String = "too_many_streams"
 
-  /** Error code of a topic the server cannot serve, such as torrents without a torrent source. */
+  /**
+   * Error code of an interest the server cannot serve: one it does not know, or torrents without
+   * a torrent source.
+   */
   const val UNSUPPORTED: String = "unsupported"
 
-  /** Error code of a topic that failed on the server. */
+  /** Error code of an interest that failed on the server. */
   const val INTERNAL_ERROR: String = "internal_error"
 
-  /** Most interests in a subscription. */
+  /** Most interests in a subscription, and most entries in its segments. */
   const val MAX_INTERESTS: Int = 64
 
-  /** Most task IDs the `Interest.Segments` of a subscription name together. */
+  /** Most task IDs the segments of a subscription name together. */
   const val MAX_TASK_IDS: Int = 1024
-
-  /** Most torrents a subscription follows. */
-  const val MAX_TORRENTS: Int = 16
 
   /**
    * The intervals the server sends at, in milliseconds. A requested interval is rounded up to

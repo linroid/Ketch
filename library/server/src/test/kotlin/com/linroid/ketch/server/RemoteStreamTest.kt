@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -169,6 +170,14 @@ class RemoteStreamTest {
     }
   }
 
+  @Test
+  fun remote_torrentThatIsGone_endsWithItsTombstone() = runTest {
+    val ketch = ControlledKetch(Ketch(httpEngine = TrickleEngine()), OneTorrent())
+    withServer(ketch) { client, _ ->
+      assertEquals(listOf(null), client.subscribe(TorrentInterest("gone")).toList())
+    }
+  }
+
   private class ControlledKetch(
     private val delegate: KetchApi,
     private val torrents: OneTorrent,
@@ -186,7 +195,7 @@ class RemoteStreamTest {
       }
   }
 
-  /** One torrent, `t1`, whose snapshot never changes. */
+  /** One torrent, `t1`, whose snapshot never changes; any other is gone. */
   private class OneTorrent : TorrentController {
     override suspend fun capabilities() =
       TorrentCapabilities(names = setOf("inspect"), maxPageSize = 1000)
@@ -194,6 +203,10 @@ class RemoteStreamTest {
     override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
 
     fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
+      if (taskId != "t1") {
+        emit(null)
+        return@flow
+      }
       emit(
         TorrentSnapshot(
           taskId = taskId,

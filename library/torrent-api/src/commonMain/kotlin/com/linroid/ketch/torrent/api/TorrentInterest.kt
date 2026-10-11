@@ -1,8 +1,10 @@
 package com.linroid.ketch.torrent.api
 
 import com.linroid.ketch.api.Interest
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.nullable
 
 /**
  * Full snapshots of the torrent task with [taskId], followed with
@@ -22,4 +24,7 @@ data class TorrentInterest(val taskId: String) : Interest<TorrentSnapshot?> {
   init {
     require(taskId.isNotBlank() && taskId.length <= 128) { "Invalid torrent task ID" }
   }
+
+  override val valueSerializer: KSerializer<TorrentSnapshot?>
+    get() = TorrentSnapshot.serializer().nullable
 }

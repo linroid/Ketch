@@ -194,9 +194,13 @@ at most, the shortest of the callers' winning. The built-in ones are nested in `
   feature, collecting it throws `UnsupportedOperationException`.
 
 Modules define their own, such as `TorrentInterest` in `library:torrent-api`; an instance fails
-the interests it does not know with `UnsupportedOperationException` when collected. A remote
-instance's connections and torrent flows end with the failure when the connection drops, so
-collect them again to resume.
+the interests it does not know with `UnsupportedOperationException` when collected. A flow ends
+when what it follows is gone, as a removed torrent's does after its `null`.
+
+Each interest names its `valueSerializer`, which a server encodes what it reports with, so any
+interest whose type `StreamSerializers` (`library:endpoints`) names reaches a remote instance
+without code of its own on either side. A remote instance's interests other than segments and
+stats end with the failure when the connection drops, so collect them again to resume.
 
 `RemoteKetch(progressInterval = 1.seconds)` sets how often every downloading task's progress
 comes; set `foreground = false` while nothing is shown, and the server sends only state changes.

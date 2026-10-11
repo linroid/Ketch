@@ -1,27 +1,21 @@
 package com.linroid.ketch.server.stream
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
+import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.server.api.toErrorResponse
 import com.linroid.ketch.torrent.api.TorrentCommandException
-import com.linroid.ketch.torrent.api.TorrentInterest
-import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.transformWhile
 import java.util.UUID
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -31,15 +25,15 @@ private val log = KetchLogger("EventHub")
 internal const val MAX_EVENT_STREAMS = 32
 
 /**
- * The interval the hub asks the engine for torrents and connections at: as often as it reports
- * them; each stream sends them as often as its own subscription asks.
+ * The interval the hub asks the engine for interests at: as often as it reports them; each
+ * stream sends them as often as its own subscription asks.
  */
 private val INTERNAL_INTERVAL = StreamEvents.INTERVALS_MS.first().milliseconds
 
 /**
  * The event streams of a server: every stream reads the same [TaskFrame]s, kept by one
- * [TaskTracker] while any stream is open, and the same torrent and connection producers, run
- * while any stream subscribes to them. See [EventStream] for what one stream sends.
+ * [TaskTracker] while any stream is open, and one [KetchApi.subscribe] per interest, run while
+ * any stream follows it, each value encoded once. See [EventStream] for what one stream sends.
  */
 internal class EventHub(
   private val ketch: KetchApi,
@@ -50,8 +44,7 @@ internal class EventHub(
   private val lock = Any()
   private val streams = HashMap<String, EventStream>()
   private var tracker: TaskTracker? = null
-  private val torrents = SharedSource(scope, ::torrentItems)
-  private val connections = SharedSource(scope, ::connectionItems)
+  private val sources = SharedSource(scope, ::valuesOf, ::failureOf)
 
   /** Streams that are open. */
   val openStreams: Int get() = synchronized(lock) { streams.size }
@@ -59,8 +52,8 @@ internal class EventHub(
   /** Whether the tasks are followed, which they are while a stream is open; for tests. */
   internal val isTracking: Boolean get() = synchronized(lock) { tracker != null }
 
-  /** Torrent task IDs whose snapshots are followed; for tests. */
-  internal val followedTorrents: Set<String> get() = torrents.activeKeys
+  /** Interests the engine reports to the streams; for tests. */
+  internal val followedInterests: Set<Interest<*>> get() = sources.activeKeys
 
   /**
    * Opens a stream for the caller with [owner] (what identifies its credentials, or `null`
@@ -77,8 +70,7 @@ internal class EventHub(
       id = id,
       owner = owner,
       tracker = tracker,
-      torrents = torrents,
-      connections = connections,
+      sources = sources,
       timeSource = timeSource,
       scope = streamScope,
       onClose = ::closed,
@@ -116,57 +108,26 @@ internal class EventHub(
     }
   }
 
-  private fun torrentItems(taskId: String): Flow<SourceItem<TorrentSnapshot>> =
-    ketch.subscribe(TorrentInterest(taskId), INTERNAL_INTERVAL)
-      .transformWhile { snapshot ->
-        emit(if (snapshot == null) SourceItem.Removed else SourceItem.Value(snapshot))
-        snapshot != null
-      }
-      .catch { error ->
-        if (error is CancellationException) throw error
-        val failure = when (error) {
-          is TorrentCommandException -> {
-            val response = error.toErrorResponse()
-            StreamError(response.error, response.message, StreamEvents.TOPIC_TORRENTS, taskId)
-          }
-          is UnsupportedOperationException -> StreamError(
-            StreamEvents.UNSUPPORTED,
-            "This server has no torrent controls",
-            StreamEvents.TOPIC_TORRENTS,
-            taskId,
-          )
-          else -> {
-            log.w { "Torrent events of taskId=$taskId failed: ${error.describeCauses()}" }
-            StreamError(
-              StreamEvents.INTERNAL_ERROR,
-              "Torrent events are unavailable",
-              StreamEvents.TOPIC_TORRENTS,
-              taskId,
-            )
-          }
-        }
-        emit(SourceItem.Failed(failure))
-      }
+  /** The values the engine reports for [interest], each encoded as clients decode it. */
+  private fun valuesOf(interest: Interest<*>): Flow<String> {
+    @Suppress("UNCHECKED_CAST")
+    val typed = interest as Interest<Any?>
+    return ketch.subscribe(typed, INTERNAL_INTERVAL)
+      .map { ServerJson.encodeToString(typed.valueSerializer, it) }
+  }
 
-  private fun connectionItems(limit: Int): Flow<SourceItem<ActiveConnections>> =
-    ketch.subscribe(Interest.Connections(limit), INTERNAL_INTERVAL)
-      .map<ActiveConnections, SourceItem<ActiveConnections>> { SourceItem.Value(it) }
-      .catch { error ->
-        if (error is CancellationException) throw error
-        val failure = if (error is UnsupportedOperationException) {
-          StreamError(
-            StreamEvents.UNSUPPORTED,
-            error.message ?: "This server does not report its connections",
-            StreamEvents.TOPIC_CONNECTIONS,
-          )
-        } else {
-          log.w { "Connections stream failed: ${error.describeCauses()}" }
-          StreamError(
-            StreamEvents.INTERNAL_ERROR,
-            "Live connections are unavailable",
-            StreamEvents.TOPIC_CONNECTIONS,
-          )
-        }
-        emit(SourceItem.Failed(failure))
-      }
+  private fun failureOf(interest: Interest<*>, error: Throwable): TopicEnd.Failed = when (error) {
+    is TorrentCommandException -> {
+      val response = error.toErrorResponse()
+      TopicEnd.Failed(response.error, response.message)
+    }
+    is UnsupportedOperationException -> TopicEnd.Failed(
+      StreamEvents.UNSUPPORTED,
+      error.message ?: "This server does not report the interest",
+    )
+    else -> {
+      log.w { "Following $interest failed: ${error.describeCauses()}" }
+      TopicEnd.Failed(StreamEvents.INTERNAL_ERROR, "The interest is unavailable")
+    }
+  }
 }

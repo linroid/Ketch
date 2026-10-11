@@ -2,12 +2,15 @@ package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.Interest
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.InterestError
+import com.linroid.ketch.endpoints.stream.InterestUpdate
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
-import com.linroid.ketch.endpoints.stream.StreamInterest
+import com.linroid.ketch.endpoints.stream.StreamSegments
 import com.linroid.ketch.endpoints.stream.StreamSerializers
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
@@ -22,8 +25,10 @@ import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -31,6 +36,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -91,48 +97,18 @@ class RemoteEventStreamTest {
   fun start_streamServer_sendsTheSubscriptionAndFollowsItsChanges() = runTest {
     val subscriptions = Channel<StreamSubscription>(Channel.UNLIMITED)
     val events = ByteChannel()
-    val remote = RemoteKetch(
-      "remote.example",
-      8642,
-      null,
-      false,
-      MockEngine { request ->
-        when {
-          request.url.encodedPath == "/api/status" -> respond(
-            json.encodeToString(status(setOf(StreamEvents.FEATURE))),
-            headers = jsonHeaders,
-          )
-          request.url.encodedPath == "/api/stream" ->
-            respond(events, HttpStatusCode.OK, eventHeaders)
-          request.method == HttpMethod.Put -> {
-            assertEquals("/api/stream/s1/subscription", request.url.encodedPath)
-            val subscription = request.subscription()
-            subscriptions.send(subscription)
-            respond(
-              json.encodeToString(StreamSubscribed(subscription.revision, subscription)),
-              headers = jsonHeaders,
-            )
-          }
-          else -> error("Unexpected request ${request.url.encodedPath}")
-        }
-      },
-      progressInterval = 10.seconds,
-    )
+    val remote = streamRemote(subscriptions, events)
     try {
       withContext(Dispatchers.Default) {
         withTimeout(10.seconds) {
           remote.start()
-          events.writeStringUtf8(
-            event(
-              StreamEvents.HELLO,
-              json.encodeToString(StreamHello("s1", StreamEvents.PROTOCOL, emptyList())),
-            ) + event(StreamEvents.TASKS, json.encodeToString(TasksResponse(emptyList()))),
-          )
+          events.writeStringUtf8(opening())
           events.flush()
 
           val first = subscriptions.receive()
           assertEquals(1, first.revision)
           assertEquals(10_000, first.progressIntervalMs)
+          assertEquals(emptyList(), first.segments)
           assertEquals(emptyList(), first.interests)
 
           val following = launch {
@@ -140,13 +116,11 @@ class RemoteEventStreamTest {
           }
           val second = subscriptions.receive()
           assertEquals(2, second.revision)
-          assertEquals(
-            listOf(StreamInterest(Interest.Segments(setOf("a")), 500)),
-            second.interests,
-          )
+          assertEquals(listOf(StreamSegments(setOf("a"), 500)), second.segments)
+          assertEquals(emptyList(), second.interests)
 
           following.cancel()
-          assertEquals(emptyList(), subscriptions.receive().interests)
+          assertEquals(emptyList(), subscriptions.receive().segments)
 
           // In the background only the task lifecycle and state changes come.
           remote.foreground = false
@@ -160,6 +134,113 @@ class RemoteEventStreamTest {
       }
     } finally {
       remote.close()
+    }
+  }
+
+  @Test
+  fun subscribe_streamServer_readsInterestEventsOnceTheStreamAppliesThem() = runTest {
+    val subscriptions = Channel<StreamSubscription>(Channel.UNLIMITED)
+    val events = ByteChannel()
+    val remote = streamRemote(subscriptions, events)
+    try {
+      withContext(Dispatchers.Default) {
+        withTimeout(10.seconds) {
+          remote.start()
+          events.writeStringUtf8(opening())
+          events.flush()
+          subscriptions.receive()
+
+          val stats = async { remote.subscribe(Interest.Stats).first() }
+          val withStats = subscriptions.receiveUntil { it.interests.isNotEmpty() }
+          val id = withStats.interests.single().id
+          events.writeStringUtf8(
+            // Not applied yet: ignored.
+            event(StreamEvents.INTEREST, update(id, KetchStats(downloadBps = 1))) +
+              event(
+                StreamEvents.SUBSCRIBED,
+                json.encodeToString(StreamSubscribed(withStats.revision, withStats)),
+              ) +
+              event(StreamEvents.INTEREST, update(id, KetchStats(downloadBps = 2))),
+          )
+          events.flush()
+          assertEquals(2, stats.await().downloadBps)
+
+          val connections = async {
+            runCatching { remote.subscribe(Interest.Connections(4)).first() }
+          }
+          val withConnections = subscriptions.receiveUntil { subscription ->
+            subscription.interests.any { it.interest is Interest.Connections }
+          }
+          val connectionsId = withConnections.interests.single().id
+          events.writeStringUtf8(
+            event(
+              StreamEvents.SUBSCRIBED,
+              json.encodeToString(StreamSubscribed(withConnections.revision, withConnections)),
+            ) + event(
+              StreamEvents.INTEREST_ERROR,
+              json.encodeToString(
+                InterestError(connectionsId, StreamEvents.UNSUPPORTED, "No connections here"),
+              ),
+            ),
+          )
+          events.flush()
+          val failure = connections.await().exceptionOrNull()
+          assertIs<UnsupportedOperationException>(failure)
+          assertEquals("No connections here", failure.message)
+        }
+      }
+    } finally {
+      remote.close()
+    }
+  }
+
+  /** A client of a server with the event stream, whose subscriptions go to [subscriptions]. */
+  private fun streamRemote(
+    subscriptions: Channel<StreamSubscription>,
+    events: ByteChannel,
+  ) = RemoteKetch(
+    "remote.example",
+    8642,
+    null,
+    false,
+    MockEngine { request ->
+      when {
+        request.url.encodedPath == "/api/status" -> respond(
+          json.encodeToString(status(setOf(StreamEvents.FEATURE))),
+          headers = jsonHeaders,
+        )
+        request.url.encodedPath == "/api/stream" ->
+          respond(events, HttpStatusCode.OK, eventHeaders)
+        request.method == HttpMethod.Put -> {
+          assertEquals("/api/stream/s1/subscription", request.url.encodedPath)
+          val subscription = request.subscription()
+          subscriptions.send(subscription)
+          respond(
+            json.encodeToString(StreamSubscribed(subscription.revision, subscription)),
+            headers = jsonHeaders,
+          )
+        }
+        else -> error("Unexpected request ${request.url.encodedPath}")
+      }
+    },
+    progressInterval = 10.seconds,
+  )
+
+  private fun opening() = event(
+    StreamEvents.HELLO,
+    json.encodeToString(StreamHello("s1", StreamEvents.PROTOCOL, emptyList())),
+  ) + event(StreamEvents.TASKS, json.encodeToString(TasksResponse(emptyList())))
+
+  private fun update(id: Long, stats: KetchStats) = json.encodeToString(
+    InterestUpdate(id, json.encodeToJsonElement(Interest.Stats.valueSerializer, stats)),
+  )
+
+  private suspend fun Channel<StreamSubscription>.receiveUntil(
+    predicate: (StreamSubscription) -> Boolean,
+  ): StreamSubscription {
+    while (true) {
+      val subscription = receive()
+      if (predicate(subscription)) return subscription
     }
   }
 

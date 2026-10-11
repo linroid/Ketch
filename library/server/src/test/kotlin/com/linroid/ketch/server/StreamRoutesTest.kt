@@ -6,6 +6,7 @@ import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.InterestUpdate
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
 import com.linroid.ketch.endpoints.stream.StreamInterest
@@ -110,18 +111,24 @@ class StreamRoutesTest {
       assertEquals(StreamEvents.TASKS, tasksName)
       assertEquals(emptyList(), ServerJson.decodeFromString<TasksResponse>(tasksData).tasks)
 
+      val stats = StreamInterest(7, Interest.Stats, 300)
       val answer = client.subscribe(
         hello.streamId,
-        StreamSubscription(revision = 1, interests = listOf(StreamInterest(Interest.Stats, 300))),
+        StreamSubscription(revision = 1, interests = listOf(stats)),
       )
       assertEquals(HttpStatusCode.OK, answer.status)
       val applied = ServerJson.decodeFromString<StreamSubscribed>(answer.bodyAsText())
-      assertEquals(listOf(StreamInterest(Interest.Stats, 300)), applied.subscription.interests)
+      assertEquals(listOf(stats), applied.subscription.interests)
 
       assertEquals(StreamEvents.SUBSCRIBED, channel.nextEvent().first)
       val (statsName, statsData) = channel.nextEvent()
-      assertEquals(StreamEvents.STATS, statsName)
-      assertEquals(KetchStats(), ServerJson.decodeFromString<KetchStats>(statsData))
+      assertEquals(StreamEvents.INTEREST, statsName)
+      val update = ServerJson.decodeFromString<InterestUpdate>(statsData)
+      assertEquals(7, update.id)
+      assertEquals(
+        KetchStats(),
+        ServerJson.decodeFromJsonElement(Interest.Stats.valueSerializer, update.value),
+      )
     }
   }
 

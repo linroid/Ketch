@@ -26,6 +26,9 @@ import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.InterestError
+import com.linroid.ketch.endpoints.stream.InterestRef
+import com.linroid.ketch.endpoints.stream.InterestUpdate
 import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
@@ -37,7 +40,6 @@ import com.linroid.ketch.endpoints.stream.TaskSegmentsUpdate
 import com.linroid.ketch.endpoints.stream.TaskStateUpdate
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentInterest
-import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
@@ -76,6 +78,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -86,12 +89,14 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -247,7 +252,7 @@ class RemoteKetch internal constructor(
     generation = connectionGeneration.asStateFlow(),
     json = json,
     streamed = streamed,
-    streamTorrent = ::streamTorrent,
+    streamTorrent = { interest, interval -> streamInterest(interest, interval) },
   )
 
   /**
@@ -389,17 +394,19 @@ class RemoteKetch internal constructor(
   }
 
   /**
-   * Follows [interest] on the server, about every [interval]: [Interest.Segments],
-   * [Interest.Stats], [Interest.Connections] and `TorrentInterest` come on the event stream
-   * while [start] keeps it open, on a server that serves it, and from their own endpoints or
-   * from [tasks] otherwise. Other interests fail with [UnsupportedOperationException] when
-   * collected.
+   * Follows [interest] on the server, about every [interval]. While [start] keeps the event
+   * stream of a server that serves it open, every interest comes on that stream: segments as
+   * updates of [tasks], others as values the server encodes with [Interest.valueSerializer]; an
+   * interest the server cannot serve fails with [UnsupportedOperationException]. Otherwise
+   * [Interest.Segments], [Interest.Stats], [Interest.Connections] and `TorrentInterest` come from
+   * their own endpoints or from [tasks], and others fail with [UnsupportedOperationException]
+   * when collected, as do interests whose type `StreamSerializers` does not name.
    *
-   * Live connections fail with [UnsupportedOperationException] on a server whose
-   * [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], such as an older one, before
-   * anything is asked for. Their flow, like a torrent's, ends with the failure when the
-   * connection to the server drops or the server ends the stream; it does not reconnect, so
-   * collect it again to resume. Stats keep their last value while the server is unreachable.
+   * On older servers, live connections fail with [UnsupportedOperationException] when the
+   * server's [KetchStatus.features] lack [KetchFeatures.ACTIVE_CONNECTIONS], before anything is
+   * asked for. Interests other than segments and stats end with a failure when the connection to
+   * the server drops or the server ends the stream; they do not reconnect, so collect them again
+   * to resume. Stats keep their last value while the server is unreachable.
    */
   @Suppress("UNCHECKED_CAST")
   override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
@@ -409,9 +416,7 @@ class RemoteKetch internal constructor(
       Interest.Stats -> followStats(interval)
       is Interest.Connections -> followConnections(interest, interval)
       is TorrentInterest -> torrents.observe(interest.taskId, interval)
-      else -> flow<T> {
-        throw UnsupportedOperationException("This client does not follow $interest")
-      }
+      else -> followInterest(interest, interval)
     } as Flow<T>
   }
 
@@ -445,11 +450,10 @@ class RemoteKetch internal constructor(
       if (!streamed) {
         computed
       } else {
-        flow {
-          interests.holding(Interest.Stats, interval) {
-            topics.stats.filterNotNull().collect { emit(it) }
-          }
-        }
+        // The last stats stay until a new stream sends some.
+        streamInterest(Interest.Stats, interval)
+          .retryWhen { cause, _ -> cause is StreamLostException }
+          .mapInterestFailures()
       }
     }.distinctUntilChanged()
   }
@@ -458,14 +462,30 @@ class RemoteKetch internal constructor(
     interest: Interest.Connections,
     interval: Duration,
   ): Flow<ActiveConnections> = flow {
+    if (streamed.value) {
+      emitAll(streamInterest(interest, interval).distinctUntilChanged().mapInterestFailures())
+      return@flow
+    }
     if (KetchFeatures.ACTIVE_CONNECTIONS !in features()) {
       throw UnsupportedOperationException("This device does not report its connections")
     }
-    if (streamed.value) {
-      emitAll(streamConnections(interest, interval))
-    } else {
-      emitAll(httpClient.activeConnectionEvents(interest.limit, json))
+    emitAll(httpClient.activeConnectionEvents(interest.limit, json))
+  }
+
+  /** An interest only the event stream serves. */
+  private fun <T> followInterest(interest: Interest<T>, interval: Duration): Flow<T> = flow {
+    // The subscription could not be sent with an interest it cannot encode.
+    @OptIn(ExperimentalSerializationApi::class)
+    val encodable = json.serializersModule.getPolymorphic(Interest::class, interest) != null
+    if (!streamed.value || !encodable) {
+      throw UnsupportedOperationException("This client does not follow $interest")
     }
+    emitAll(streamInterest(interest, interval).mapInterestFailures())
+  }
+
+  /** Fails with what callers of [subscribe] expect when the server fails the interest. */
+  private fun <T> Flow<T>.mapInterestFailures(): Flow<T> = catch { error ->
+    throw if (error is InterestFailedException) error.error.toException() else error
   }
 
   override fun close() {
@@ -580,10 +600,7 @@ class RemoteKetch internal constructor(
               }
               StreamEvents.ERROR -> {
                 val error = json.decodeFromString<StreamError>(data)
-                if (error.topic == null) {
-                  throw IllegalStateException("The server ended the event stream: ${error.error}")
-                }
-                handleTopicError(error)
+                throw IllegalStateException("The server ended the event stream: ${error.error}")
               }
               else -> try {
                 handleStreamEvent(name, data)
@@ -617,10 +634,9 @@ class RemoteKetch internal constructor(
             contentType(ContentType.Application.Json)
             setBody(wanted.copy(revision = revision))
           }
-          if (response.status.isSuccess()) {
-            topics.applied(response.body<StreamSubscribed>().subscription)
-          } else {
-            // A stream that closed is reconnected by the stream loop.
+          // The stream applies it with its `subscribed` event; one that closed is reconnected
+          // by the stream loop.
+          if (!response.status.isSuccess()) {
             log.w { "Event stream refused a subscription (HTTP ${response.status.value})" }
           }
         } catch (error: CancellationException) {
@@ -657,27 +673,23 @@ class RemoteKetch internal constructor(
         val update = json.decodeFromString<TaskSegmentsUpdate>(data)
         taskMutex.withLock { taskMap[update.taskId]?.applySegments(update.segments) }
       }
-      StreamEvents.STATS -> topics.stats.value = json.decodeFromString<KetchStats>(data)
-      StreamEvents.TORRENT -> {
-        val snapshot = json.decodeFromString<TorrentSnapshot>(data)
-        topics.torrent(snapshot.taskId, TopicItem.Value(snapshot))
+      StreamEvents.INTEREST -> {
+        val update = json.decodeFromString<InterestUpdate>(data)
+        topics.value(update.id, update.value)
       }
-      StreamEvents.TORRENT_REMOVED -> {
-        topics.torrent(json.decodeFromString<StreamTaskRef>(data).taskId, TopicItem.Removed)
+      StreamEvents.INTEREST_END -> {
+        topics.ended(json.decodeFromString<InterestRef>(data).id, TopicEnd.Completed)
       }
-      StreamEvents.CONNECTIONS -> {
-        topics.connections.value = TopicItem.Value(json.decodeFromString<ActiveConnections>(data))
+      StreamEvents.INTEREST_ERROR -> {
+        val error = json.decodeFromString<InterestError>(data)
+        log.d { "Event stream interest ${error.id} failed: ${error.error}" }
+        topics.ended(error.id, TopicEnd.Failed(error))
       }
-      StreamEvents.SUBSCRIBED -> log.d { "Event stream subscription applied" }
+      StreamEvents.SUBSCRIBED -> {
+        topics.applied(json.decodeFromString<StreamSubscribed>(data).subscription)
+        log.d { "Event stream subscription applied" }
+      }
       else -> log.v { "Ignoring stream event $name" }
-    }
-  }
-
-  private fun handleTopicError(error: StreamError) {
-    log.d { "Event stream topic ${error.topic} failed: ${error.error}" }
-    when (error.topic) {
-      StreamEvents.TOPIC_TORRENTS -> error.taskId?.let { topics.torrent(it, TopicItem.Failed(error)) }
-      StreamEvents.TOPIC_CONNECTIONS -> topics.connections.value = TopicItem.Failed(error)
     }
   }
 
@@ -716,41 +728,29 @@ class RemoteKetch internal constructor(
     }
   }
 
-  /** The live connections the event stream sends, cut to the limit; fails when it closes. */
-  private fun streamConnections(
-    interest: Interest.Connections,
-    interval: Duration,
-  ): Flow<ActiveConnections> = flow {
-    val limit = interest.limit
-    val generation = topics.live.filterNotNull().first()
-    interests.holding(interest, interval) {
-      combine(topics.live, topics.connections, ::Pair).collect { (live, item) ->
-        if (live != generation) throw StreamLostException()
-        when (item) {
-          null, TopicItem.Removed -> {}
-          is TopicItem.Value -> emit(item.value.limitedTo(limit))
-          is TopicItem.Failed -> throw item.error.toConnectionsFailure()
-        }
-      }
-    }
-  }.distinctUntilChanged()
-
   /**
-   * The items the event stream sends for the torrent of [taskId], ending with its removal or
-   * failure; fails with [StreamLostException] when the stream closes.
+   * The values the event stream sends for [interest], ending when the server ends it; fails with
+   * [InterestFailedException] when the server fails it, and with [StreamLostException] when the
+   * stream closes.
    */
-  private fun streamTorrent(
-    taskId: String,
-    interval: Duration,
-  ): Flow<TopicItem<TorrentSnapshot>> = flow {
+  private fun <T> streamInterest(interest: Interest<T>, interval: Duration): Flow<T> = flow {
     val generation = topics.live.filterNotNull().first()
-    interests.holding(TorrentInterest(taskId), interval) {
-      combine(topics.live, topics.torrents.map { it[taskId] }, ::Pair)
+    interests.holding(interest, interval) { id ->
+      var emitted = 0L
+      combine(topics.live, topics.states.map { it[id] }, ::Pair)
         .distinctUntilChanged()
-        .transformWhile { (live, item) ->
+        .transformWhile { (live, state) ->
           if (live != generation) throw StreamLostException()
-          if (item != null) emit(item)
-          item == null || item is TopicItem.Value
+          val value = state?.value
+          if (value != null && state.sequence > emitted) {
+            emitted = state.sequence
+            emit(json.decodeFromJsonElement(interest.valueSerializer, value))
+          }
+          when (val end = state?.end) {
+            null -> true
+            TopicEnd.Completed -> false
+            is TopicEnd.Failed -> throw InterestFailedException(end.error)
+          }
         }
         .collect { emit(it) }
     }

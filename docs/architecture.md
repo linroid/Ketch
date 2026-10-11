@@ -259,14 +259,15 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   `/api/connections/events` (`snapshot` events, an `error` event before it closes;
   `?limit=1..1024`) serve `Interest.Connections`, at most 16 streams at once. Hosts and peer
   addresses never go on the task events. `RemoteKetch` fails it closed for servers without
-  `net.activeConnections`
+  `net.activeConnections`, or that answer `unsupported` on the event stream
 - **Event stream**: `GET /api/stream` (servers listing `events.stream`) is one SSE stream per
   client: `hello`, `subscribed`, a `tasks` snapshot, then each task's lifecycle and state changes
   at once, and what `PUT /api/stream/{id}/subscription` asks for: every downloading task's
-  progress at one interval, and per interest (`Interest`, serializable) segments, stats, live
-  connections or torrent snapshots at theirs. One frame per task is encoded once for every
-  stream, and a slow stream skips progress rather than queueing it. See the
-  [plan](plans/event-stream.md)
+  progress at one interval, the segments of the tasks it names, and per interest (`Interest`,
+  serializable, under an ID the client gives it) `interest` values at its interval, then
+  `interest.end` or `interest.error`. One frame per task and one upstream per interest are
+  encoded once for every stream, and a slow stream skips values rather than queueing them. See
+  the [plan](plans/event-stream.md)
 - **SSE (deprecated)**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events for older clients. A `progress` event
   leaves out a request that did not change, and task views and events never carry a torrent's

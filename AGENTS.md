@@ -74,8 +74,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ControlKey` (`KetchApi.control(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
   follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`) and
-  `Interest.Connections(limit)`; other modules define their own, all serializable, and an instance
-  fails those it does not know with `UnsupportedOperationException` when collected), and
+  `Interest.Connections(limit)`; other modules define their own, all serializable, each naming the
+  `valueSerializer` servers encode what it reports with; a flow ends when what it follows is gone,
+  and an instance fails those it does not know with `UnsupportedOperationException` when
+  collected), and
   `FileOrder`, `NaturalOrder`, `fileExtension()` and `sortedByFileOrder()`, the file orders the
   apps, the CLI, MCP and the torrent controller share
 - `com.linroid.ketch.api.log` -- `Logger`, `LogLevel`, `KetchLogger`, `FormattedConsoleLogger`,
@@ -161,10 +163,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentSelectionRequest`, `TorrentSeedingRequest`
 - `com.linroid.ketch.endpoints.stream` -- the event stream's wire format (see the
   [plan](docs/plans/event-stream.md)): `StreamEvents` (`FEATURE` = `events.stream`, event names,
-  error codes, limits, `intervalStep`), `StreamSubscription` (`progressIntervalMs` and
-  `StreamInterest`s: an `Interest` and its `intervalMs`), `StreamSerializers` (the interests'
-  `type`s; unknown ones decode as `UnknownInterest`), `StreamHello`, `StreamSubscribed`,
-  `TaskStateUpdate`, `TaskProgressUpdate`, `TaskSegmentsUpdate`, `StreamTaskRef`, `StreamError`
+  error codes, limits, `intervalStep`), `StreamSubscription` (`progressIntervalMs`,
+  `StreamSegments` and `StreamInterest`s: an ID, an `Interest` and its `intervalMs`),
+  `StreamSerializers` (the interests' `type`s; unknown ones decode as `UnknownInterest`),
+  `StreamHello`, `StreamSubscribed`, `TaskStateUpdate`, `TaskProgressUpdate`,
+  `TaskSegmentsUpdate`, `StreamTaskRef`, `InterestUpdate`, `InterestRef`, `InterestError`,
+  `StreamError`
 
 ### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -198,7 +202,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`; `progressInterval` and
   `foreground` shape its event stream), `RemoteDownloadTask`, `RemoteTorrentController`,
   `ConnectionState`, `RemotePairing`, `PairingResult`, `RemoteApiException`; internal
-  `StreamInterests` (the callers' interests merged into one subscription) and `StreamTopics`
+  `StreamInterests` (the callers' interests merged into one subscription, an ID per interest) and
+  `StreamTopics` (each interest's latest value and end, by ID)
 
 ### `library:server`, `library:mcp` (JVM only)
 - `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`,
@@ -958,13 +963,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   stream ID), `subscribed`, `tasks` (every task), then each task's lifecycle and state changes
   at once (`task.added`, `task.removed`, `task.state` with the queue position, and the request
   when it changed), and what `PUT /api/stream/{id}/subscription` asks for: every downloading
-  task's progress every `progressIntervalMs`, and per `StreamInterest` the named tasks' segments,
-  stats, live connections or torrent snapshots, each at most once per interval step (200 ms to
-  60 s; the first at once, a torrent's removal and a topic's `error` never wait). One `TaskFrame`
-  per task, versioned and encoded once, is shared by every stream; each stream sends the
-  difference to what it sent, so a slow client skips progress instead of queueing it. A
-  revision not above the applied one changes nothing; 404 `unknown_stream`, 400
-  `invalid_subscription`. Task views and events never carry a torrent's metainfo
+  task's progress every `progressIntervalMs`, the `segments` of the tasks it names as
+  `task.segments`, and per `StreamInterest` (stats, live connections, torrent snapshots or any
+  interest `StreamSerializers` names) `interest` events with its ID and values encoded with its
+  `valueSerializer` from `KetchApi.subscribe`, then `interest.end` when what it follows is gone or
+  `interest.error` (`unsupported`, also for interests the server does not know). Each at most once
+  per interval step (200 ms to 60 s; the first at once, an end or error at once after the value
+  it held back). One `TaskFrame` per task and one upstream per interest, each value encoded once,
+  are shared by every stream; each stream sends the difference to what it sent, so a slow client
+  skips values instead of queueing them. `subscribed` comes before any event of the interests it
+  adds and none follow for those it drops. A revision not above the applied one changes nothing;
+  404 `unknown_stream`, 400 `invalid_subscription`. Task views and events never carry a torrent's
+  metainfo
   (`ResolvedSource.withoutBulkMetadata()`)
 - `/api/events` (deprecated, for older clients): every change of every task; `TaskSnapshot` and
   `state_changed` carry the task's `queuePosition` (a queue change sends `state_changed` for every
@@ -985,11 +995,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `unsupported` (or that `error` event), and past 16 open streams (`ConnectionStreams`) 429
   `too_many_streams`. Behind the token and startup gate like every route; hosts and peer
   addresses never go on `/api/events`. Event names and codes: `ConnectionEvents` in endpoints.
-  `RemoteKetch` follows `Interest.Connections` after asking `features()`, failing with
-  `UnsupportedOperationException` for servers lacking `net.activeConnections` (and, on the old
-  stream, for a 404/405 without a body, 501 or `unsupported`); it reads streams as text in a
-  `channelFlow` (Darwin runs `execute` elsewhere), drops repeats, and ends with the failure when
-  the stream drops or closes, never reconnecting
+  `RemoteKetch` follows `Interest.Connections` on the event stream, failing with
+  `UnsupportedOperationException` when the server answers `unsupported`; against older servers
+  it asks `features()` first, failing the same way for servers lacking `net.activeConnections`
+  (and, on the old stream, for a 404/405 without a body, 501 or `unsupported`), and reads the
+  stream as text in a `channelFlow` (Darwin runs `execute` elsewhere). It drops repeats and ends
+  with the failure when the stream drops or closes, never reconnecting
 - Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
   `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
   without a token. Tokens are compared in constant time (SHA-256 digests,
@@ -1031,11 +1042,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `events.stream` it reads `/api/stream`, whose task snapshot replaces `GET /api/tasks`: every
   task's lifecycle and state at once, progress every `progressInterval` (1 s by default, `null`
   for none), and the interests its callers `subscribe` to, merged into one subscription
-  (`StreamInterests`: segments by interval step, the shortest stats interval, the largest
-  connection limit, at most 16 torrents) and sent again on every connection. `foreground =
-  false` drops to lifecycle and state only. Segments, stats, connections and torrents come from
-  that stream while it runs and from their own endpoints otherwise; older servers get
-  `/api/events`. Calls the server refuses throw
+  (`StreamInterests`: segments by interval step, each other interest once at its shortest
+  interval, under an ID it keeps while held) and sent again on every connection; it applies each
+  subscription when the stream's `subscribed` event arrives, ignoring events of interests it does
+  not name. `foreground = false` drops to lifecycle and state only. Every interest comes from that
+  stream while it runs (`interest.error` `unsupported` becomes `UnsupportedOperationException`);
+  otherwise segments, stats, connections and torrents come from their own endpoints and others
+  are unsupported. Older servers get `/api/events`. Calls the server refuses throw
   `RemoteApiException` with the status, the `ErrorResponse` code and message (the HTTP status
   without one) and `Retry-After`, unless `KetchApi` names another exception for the case. The
   apps show the server's message, except for `path_rejected`, which their own text explains

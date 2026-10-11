@@ -18,10 +18,13 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.model.TasksResponse
-import com.linroid.ketch.endpoints.stream.StreamError
+import com.linroid.ketch.endpoints.stream.InterestError
+import com.linroid.ketch.endpoints.stream.InterestRef
+import com.linroid.ketch.endpoints.stream.InterestUpdate
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
 import com.linroid.ketch.endpoints.stream.StreamInterest
+import com.linroid.ketch.endpoints.stream.StreamSegments
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
@@ -45,17 +48,22 @@ import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -204,10 +212,7 @@ class EventHubTest {
     hub.subscribe(
       client.stream.id,
       null,
-      subscription(
-        progressMs = 10_000,
-        interests = listOf(follow(Interest.Segments(setOf("a")), 10_000)),
-      ),
+      subscription(progressMs = 10_000, segments = listOf(StreamSegments(setOf("a"), 10_000))),
     )
     runCurrent()
 
@@ -260,7 +265,7 @@ class EventHubTest {
     hub.subscribe(
       client.stream.id,
       null,
-      subscription(interests = listOf(follow(Interest.Segments(setOf("a")), 1_000))),
+      subscription(segments = listOf(StreamSegments(setOf("a"), 1_000))),
     )
     runCurrent()
     client.clear()
@@ -281,7 +286,7 @@ class EventHubTest {
     val subscription = subscription(interests = listOf(follow(Interest.Stats, 1_000)))
     hub.subscribe(client.stream.id, null, subscription)
     runCurrent()
-    assertEquals(100, client.decode<KetchStats>(client.names().lastIndex).downloadBps)
+    assertEquals(100, client.value(Interest.Stats, client.names().lastIndex).downloadBps)
     client.clear()
 
     advanceTimeBy(3_000)
@@ -291,7 +296,7 @@ class EventHubTest {
     task.state.value = downloading(50, bps = 300)
     advanceTimeBy(1_000)
     runCurrent()
-    val stats = client.decode<KetchStats>(0)
+    val stats = client.value(Interest.Stats, 0)
     assertEquals(300, stats.downloadBps)
     assertEquals(50, stats.remainingBytes)
   }
@@ -345,20 +350,18 @@ class EventHubTest {
   }
 
   @Test
-  fun planOf_roundsIntervalsMergesInterestsAndRejectsLimits() {
+  fun planOf_roundsIntervalsMergesSegmentsAndRejectsLimits() {
     val plan = planOf(
       subscription(
         progressMs = 1,
+        segments = listOf(
+          StreamSegments(setOf("a"), 400),
+          StreamSegments(setOf("a", "b"), 2_000),
+        ),
         interests = listOf(
-          follow(Interest.Segments(setOf("a")), 400),
-          follow(Interest.Segments(setOf("a", "b")), 2_000),
-          follow(Interest.Stats, 90_000),
-          follow(Interest.Stats, 5_000),
-          follow(Interest.Connections(36), 2_000),
-          follow(Interest.Connections(512), 500),
-          follow(TorrentInterest("t"), 1_000),
-          follow(TorrentInterest("t"), 300),
-          follow(UnknownInterest, 1_000),
+          follow(Interest.Stats, 90_000, id = 1),
+          follow(Interest.Connections(36), 300, id = 2),
+          follow(UnknownInterest, 1_000, id = 3),
         ),
       ),
     )
@@ -366,23 +369,26 @@ class EventHubTest {
     assertEquals(500, plan.segments.step("a"))
     assertEquals(2_000, plan.segments.step("b"))
     assertNull(plan.segments.step("c"))
-    assertEquals(5_000, plan.statsIntervalMs)
-    assertEquals(512, plan.connectionsLimit)
-    assertEquals(500, plan.connectionsIntervalMs)
-    assertEquals(mapOf("t" to 500L), plan.torrents)
+    assertEquals(
+      mapOf(
+        1L to PlannedInterest(Interest.Stats, 60_000),
+        2L to PlannedInterest(Interest.Connections(36), 500),
+        3L to PlannedInterest(UnknownInterest, 1_000),
+      ),
+      plan.interests,
+    )
 
     assertFailsWith<IllegalArgumentException> { planOf(subscription(progressMs = 0)) }
     assertFailsWith<IllegalArgumentException> {
-      val interests = List(StreamEvents.MAX_INTERESTS + 1) { follow(Interest.Stats, 1_000) }
+      val interests = List(StreamEvents.MAX_INTERESTS + 1) { follow(Interest.Stats, id = it + 1L) }
       planOf(subscription(interests = interests))
     }
     assertFailsWith<IllegalArgumentException> {
       val ids = List(StreamEvents.MAX_TASK_IDS + 1) { "t$it" }.toSet()
-      planOf(subscription(interests = listOf(follow(Interest.Segments(ids), 1_000))))
+      planOf(subscription(segments = listOf(StreamSegments(ids, 1_000))))
     }
     assertFailsWith<IllegalArgumentException> {
-      val torrents = List(StreamEvents.MAX_TORRENTS + 1) { follow(TorrentInterest("t$it"), 1_000) }
-      planOf(subscription(interests = torrents))
+      planOf(subscription(interests = listOf(follow(Interest.Stats), follow(TorrentInterest("t")))))
     }
   }
 
@@ -403,7 +409,7 @@ class EventHubTest {
   }
 
   @Test
-  fun torrents_sharedBetweenStreams_andStoppedWhenUnfollowed() = runTest {
+  fun interests_sharedBetweenStreams_andStoppedWhenUnfollowed() = runTest {
     val controller = ScriptedController()
     val hub = hub(FakeKetch(torrents = controller))
     val first = connect(hub)
@@ -414,59 +420,111 @@ class EventHubTest {
     hub.subscribe(second.stream.id, null, torrent)
     runCurrent()
     assertEquals(1, controller.observers)
-    assertEquals("t1", first.decode<TorrentSnapshot>(first.names().lastIndex).taskId)
-    assertEquals(StreamEvents.TORRENT, second.names().last())
+    val interest = TorrentInterest("t1")
+    assertEquals("t1", first.value(interest, first.names().lastIndex)?.taskId)
+    // Each value is encoded once; the envelope carries each stream's own ID.
+    assertEquals(first.events.last().data, second.events.last().data)
 
     hub.subscribe(first.stream.id, null, subscription(revision = 2))
     second.stream.close()
     runCurrent()
-    assertEquals(emptySet(), hub.followedTorrents)
+    assertEquals(emptySet(), hub.followedInterests)
     assertEquals(0, controller.observers)
   }
 
   @Test
-  fun torrents_removalAndFailures_areTopicEvents() = runTest {
+  fun interest_latestValueOncePerStep_andItsEndNeverWaits() = runTest {
+    val controller = ScriptedController()
+    val hub = hub(FakeKetch(torrents = controller))
+    val client = connect(hub)
+    val interest = TorrentInterest("live")
+    hub.subscribe(client.stream.id, null, subscription(interests = listOf(follow(interest, 1_000))))
+    runCurrent()
+    assertEquals(listOf(1L), client.revisions(interest))
+
+    controller.live.value = controller.snapshotOf("live", 2)
+    advanceTimeBy(100)
+    controller.live.value = controller.snapshotOf("live", 3)
+    runCurrent()
+    assertEquals(listOf(1L), client.revisions(interest))
+
+    advanceTimeBy(900)
+    runCurrent()
+    assertEquals(listOf(1L, 3L), client.revisions(interest))
+
+    // Held back by the interval, the last value still goes out with the end, at once.
+    controller.live.value = controller.snapshotOf("live", 4)
+    runCurrent()
+    controller.live.value = null
+    runCurrent()
+    val tail = client.events.takeLast(2)
+    assertEquals(listOf(StreamEvents.INTEREST, StreamEvents.INTEREST_END), tail.map { it.event })
+    assertEquals(JsonNull, json.decodeFromString<InterestUpdate>(tail[0].data).value)
+    assertEquals(1, json.decodeFromString<InterestRef>(tail[1].data).id)
+  }
+
+  @Test
+  fun interest_endsAndFailures_areInterestEvents() = runTest {
     val hub = hub(FakeKetch(torrents = ScriptedController()))
     val client = connect(hub)
     client.clear()
 
-    val torrents = listOf(follow(TorrentInterest("gone")), follow(TorrentInterest("busy")))
+    val torrents = listOf(
+      follow(TorrentInterest("gone"), id = 1),
+      follow(TorrentInterest("busy"), id = 2),
+    )
     hub.subscribe(client.stream.id, null, subscription(interests = torrents))
     runCurrent()
 
-    assertTrue(StreamEvents.TORRENT_REMOVED in client.names())
-    val failure = client.decode<StreamError>(client.names().indexOf(StreamEvents.ERROR))
+    val update = client.decode<InterestUpdate>(client.names().indexOf(StreamEvents.INTEREST))
+    assertEquals(1, update.id)
+    assertEquals(JsonNull, update.value)
+    val end = client.decode<InterestRef>(client.names().indexOf(StreamEvents.INTEREST_END))
+    assertEquals(1, end.id)
+    val failure = client.decode<InterestError>(client.names().indexOf(StreamEvents.INTEREST_ERROR))
+    assertEquals(2, failure.id)
     assertEquals(TorrentCommandError.RESOURCE_EXHAUSTED.wireName, failure.error)
-    assertEquals(StreamEvents.TOPIC_TORRENTS, failure.topic)
-    assertEquals("busy", failure.taskId)
   }
 
   @Test
-  fun topicsWithoutSupport_failWithoutEndingTheStream() = runTest {
+  fun interestsWithoutSupport_failWithoutEndingTheStream() = runTest {
     val task = FakeTask("a")
     val hub = hub(FakeKetch(task))
     val client = connect(hub)
     client.clear()
 
-    hub.subscribe(
-      client.stream.id,
-      null,
-      subscription(
-        interests = listOf(follow(TorrentInterest("t1")), follow(Interest.Connections(10))),
-      ),
+    val interests = listOf(
+      follow(TorrentInterest("t1"), id = 1),
+      follow(Interest.Connections(10), id = 2),
+      follow(UnknownInterest, id = 3),
     )
+    hub.subscribe(client.stream.id, null, subscription(interests = interests))
     runCurrent()
-    val errors = client.events.filter { it.event == StreamEvents.ERROR }
-      .map { json.decodeFromString<StreamError>(it.data) }
-    assertEquals(
-      setOf(StreamEvents.TOPIC_TORRENTS, StreamEvents.TOPIC_CONNECTIONS),
-      errors.map { it.topic }.toSet(),
-    )
+    val errors = client.events.filter { it.event == StreamEvents.INTEREST_ERROR }
+      .map { json.decodeFromString<InterestError>(it.data) }
+    assertEquals(setOf(1L, 2L, 3L), errors.map { it.id }.toSet())
     assertTrue(errors.all { it.error == StreamEvents.UNSUPPORTED })
 
     task.queuePosition.value = 1
     runCurrent()
     assertEquals(StreamEvents.TASK_STATE, client.names().last())
+  }
+
+  @Test
+  fun droppedInterest_sendsNothingAfterSubscribed() = runTest {
+    val controller = ScriptedController()
+    val hub = hub(FakeKetch(torrents = controller))
+    val client = connect(hub)
+    val interest = TorrentInterest("live")
+    hub.subscribe(client.stream.id, null, subscription(interests = listOf(follow(interest))))
+    runCurrent()
+
+    hub.subscribe(client.stream.id, null, subscription(revision = 2))
+    controller.live.value = controller.snapshotOf("live", 2)
+    runCurrent()
+
+    assertEquals(StreamEvents.SUBSCRIBED, client.names().last())
+    assertEquals(listOf(1L), client.revisions(interest))
   }
 
   // -- Harness --
@@ -491,6 +549,15 @@ class EventHubTest {
     inline fun <reified T> decode(index: Int): T =
       json.decodeFromString<T>(events[index].data)
 
+    /** The value of [interest] the `interest` event at [index] carries. */
+    fun <T> value(interest: Interest<T>, index: Int): T =
+      json.decodeFromJsonElement(interest.valueSerializer, decode<InterestUpdate>(index).value)
+
+    /** The revisions of the torrent snapshots sent for [interest]. */
+    fun revisions(interest: TorrentInterest): List<Long> =
+      events.indices.filter { events[it].event == StreamEvents.INTEREST }
+        .mapNotNull { value(interest, it)?.revision?.sequence }
+
     fun progress(taskId: String = "a"): List<Long> =
       events.filter { it.event == StreamEvents.TASK_PROGRESS }
         .map { json.decodeFromString<TaskProgressUpdate>(it.data) }
@@ -501,11 +568,12 @@ class EventHubTest {
   private fun subscription(
     revision: Long = 1,
     progressMs: Long? = null,
+    segments: List<StreamSegments> = emptyList(),
     interests: List<StreamInterest> = emptyList(),
-  ) = StreamSubscription(revision, progressMs, interests)
+  ) = StreamSubscription(revision, progressMs, segments, interests)
 
-  private fun follow(interest: Interest<*>, intervalMs: Long = 200) =
-    StreamInterest(interest, intervalMs)
+  private fun follow(interest: Interest<*>, intervalMs: Long = 200, id: Long = 1) =
+    StreamInterest(id, interest, intervalMs)
 
   private fun downloading(bytes: Long, bps: Long = 0) =
     DownloadState.Downloading(DownloadProgress(bytes, 100, bps))
@@ -533,7 +601,10 @@ class EventHubTest {
     ) = error("Unexpected call")
   }
 
-  /** An engine with [initial] tasks, the torrent controls given, and no live connections. */
+  /**
+   * An engine with [initial] tasks, their stats, the torrent controls given, and no live
+   * connections.
+   */
   private class FakeKetch(
     vararg initial: DownloadTask,
     private val torrents: ScriptedController? = null,
@@ -548,12 +619,17 @@ class EventHubTest {
       if (key === TorrentController.Key) torrents as T? else null
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
-      if (interest is TorrentInterest && torrents != null) {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = when {
+      interest == Interest.Stats -> flow {
+        while (true) {
+          emit(KetchStats.of(tasks.value.map { it.state.value }))
+          delay(interval)
+        }
+      }.distinctUntilChanged() as Flow<T>
+      interest is TorrentInterest && torrents != null ->
         torrents.observe(interest.taskId) as Flow<T>
-      } else {
-        flow { throw UnsupportedOperationException("Not followed in tests") }
-      }
+      else -> flow { throw UnsupportedOperationException("Not followed in tests") }
+    }
 
     override suspend fun download(request: DownloadRequest) = error("Unexpected call")
     override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
@@ -564,9 +640,13 @@ class EventHubTest {
     override fun close() {}
   }
 
-  /** One torrent, `t1`; `gone` is removed after a snapshot and `busy` refuses observers. */
+  /**
+   * One torrent, `t1`; `live` reports [live] until it is `null`, `gone` is removed after a
+   * snapshot and `busy` refuses observers.
+   */
   private class ScriptedController : TorrentController {
     var observers = 0
+    val live = MutableStateFlow<TorrentSnapshot?>(snapshotOf("live", 1))
 
     fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
       when (taskId) {
@@ -578,6 +658,7 @@ class EventHubTest {
           emit(snapshotOf(taskId))
           emit(null)
         }
+        "live" -> emitAll(live.transformWhile { emit(it); it != null })
         else -> {
           emit(snapshotOf(taskId))
           awaitCancellation()
@@ -604,9 +685,9 @@ class EventHubTest {
       context: TorrentCommandContext,
     ): TorrentCommandResult = error("Unexpected call")
 
-    private fun snapshotOf(taskId: String) = TorrentSnapshot(
+    fun snapshotOf(taskId: String, revision: Long = 1) = TorrentSnapshot(
       taskId = taskId,
-      revision = TorrentRevision("epoch", 1),
+      revision = TorrentRevision("epoch", revision),
       activity = TorrentActivity.DOWNLOADING,
       selectionGeneration = 1,
       selectionComplete = false,

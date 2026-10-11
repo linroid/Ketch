@@ -1,16 +1,17 @@
 package com.linroid.ketch.server.stream
 
-import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchStats
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.endpoints.stream.InterestError
+import com.linroid.ketch.endpoints.stream.InterestRef
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
+import com.linroid.ketch.endpoints.stream.UnknownInterest
 import com.linroid.ketch.server.api.ServerJson
-import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -30,25 +31,24 @@ internal class UnknownStreamException : Exception("No such event stream")
 
 /**
  * One client's event stream. Changes arrive in an inbox (task IDs, the latest subscription, the
- * latest torrent and connection items); a single writer, [run], turns them into events, so the
- * order of events is the order the writer chose:
+ * latest state of each interest); a single writer, [run], turns them into events, so the order of
+ * events is the order the writer chose:
  *
  * 1. `subscribed`, then the snapshot of every task after the first, and the current progress
  *    and segments of tasks it newly asks for;
  * 2. task lifecycle and state changes, at once;
- * 3. progress, segments, torrent and connection items whose interval is due, then stats; a
- *    torrent's removal and a topic's failure never wait.
+ * 3. progress, segments and interest values whose interval is due; an interest's end or failure
+ *    never waits, and sends the value it held back first.
  *
- * The writer remembers the versions it sent of each task and sends the difference to the
- * current [TaskFrame], so a client that reads slowly skips intermediate progress rather than
- * queueing it.
+ * The writer remembers the versions it sent of each task and interest and sends the difference
+ * to the current [TaskFrame] or [TopicState], so a client that reads slowly skips intermediate
+ * values rather than queueing them.
  */
 internal class EventStream(
   val id: String,
   val owner: String?,
   private val tracker: TaskTracker,
-  private val torrents: SharedSource<String, TorrentSnapshot>,
-  private val connections: SharedSource<Int, ActiveConnections>,
+  private val sources: SharedSource<Interest<*>>,
   private val timeSource: TimeSource.WithComparableMarks,
   private val scope: CoroutineScope,
   private val onClose: (EventStream) -> Unit,
@@ -61,10 +61,8 @@ internal class EventStream(
   private var appliedPlan = StreamPlan()
   private var newSubscription: Pair<StreamSubscription, StreamPlan>? = applied to appliedPlan
   private val dirty = LinkedHashSet<String>()
-  private val torrentJobs = HashMap<String, Job>()
-  private val torrentInbox = LinkedHashMap<String, SourceItem<TorrentSnapshot>>()
-  private var connectionsJob: Job? = null
-  private var connectionsInbox: SourceItem<ActiveConnections>? = null
+  private val follows = HashMap<Long, Follow>()
+  private val topicInbox = LinkedHashMap<Long, TopicState>()
   private var closed = false
 
   // The writer's own state.
@@ -75,12 +73,7 @@ internal class EventStream(
   private val pendingSegments = HashMap<Long, LinkedHashSet<String>>()
   private val progressFlushed = HashMap<Long, ComparableTimeMark>()
   private val segmentsFlushed = HashMap<Long, ComparableTimeMark>()
-  private val pendingTorrents = LinkedHashMap<String, SourceItem<TorrentSnapshot>>()
-  private val torrentsSent = HashMap<String, ComparableTimeMark>()
-  private var pendingConnections: SourceItem<ActiveConnections>? = null
-  private var connectionsSentAt: ComparableTimeMark? = null
-  private var statsSentAt: ComparableTimeMark? = null
-  private var lastStats: KetchStats? = null
+  private val topics = HashMap<Long, SentTopic>()
   private var sequence = 0L
 
   private val listener: (String) -> Unit = ::taskChanged
@@ -97,14 +90,10 @@ internal class EventStream(
     synchronized(lock) {
       if (closed) throw UnknownStreamException()
       if (next.revision > applied.revision) {
-        val previousLimit = appliedPlan.connectionsLimit
         applied = next
         appliedPlan = nextPlan
         newSubscription = next to nextPlan
-        followTorrents(nextPlan.torrents.keys)
-        if (nextPlan.connectionsLimit != previousLimit) {
-          followConnections(nextPlan.connectionsLimit)
-        }
+        followInterests(nextPlan.interests)
         wake.trySend(Unit)
       }
       StreamSubscribed(applied.revision, applied)
@@ -150,35 +139,32 @@ internal class EventStream(
     wake.trySend(Unit)
   }
 
-  private fun followTorrents(taskIds: Set<String>) {
-    for (taskId in torrentJobs.keys - taskIds) {
-      torrentJobs.remove(taskId)?.cancel()
-      torrentInbox.remove(taskId)
+  /** Follows the [planned] interests, under [lock]: new ones start, dropped ones stop. */
+  private fun followInterests(planned: Map<Long, PlannedInterest>) {
+    for (id in follows.keys - planned.keys) {
+      follows.remove(id)?.job?.cancel()
+      topicInbox.remove(id)
     }
-    for (taskId in taskIds - torrentJobs.keys) {
-      torrentJobs[taskId] = scope.launch {
-        torrents.subscribe(taskId).collect { item ->
+    for ((id, next) in planned) {
+      val current = follows[id]
+      if (current?.interest == next.interest) continue
+      // An ID given to another interest starts over.
+      current?.job?.cancel()
+      topicInbox.remove(id)
+      val follow = Follow(next.interest)
+      follows[id] = follow
+      if (next.interest is UnknownInterest) {
+        val message = "This server does not know the interest"
+        topicInbox[id] = TopicState(end = TopicEnd.Failed(StreamEvents.UNSUPPORTED, message))
+        continue
+      }
+      follow.job = scope.launch {
+        sources.subscribe(next.interest).collect { state ->
           synchronized(lock) {
-            if (taskId in torrentJobs) torrentInbox[taskId] = item
+            if (follows[id] === follow) topicInbox[id] = state
           }
           wake.trySend(Unit)
         }
-      }
-    }
-  }
-
-  private fun followConnections(limit: Int?) {
-    connectionsJob?.cancel()
-    connectionsJob = null
-    connectionsInbox = null
-    if (limit == null) return
-    connectionsJob = scope.launch {
-      connections.subscribe(limit).collect { item ->
-        synchronized(lock) {
-          // Items of a limit no longer asked for are dropped.
-          if (appliedPlan.connectionsLimit == limit) connectionsInbox = item
-        }
-        wake.trySend(Unit)
       }
     }
   }
@@ -187,34 +173,31 @@ internal class EventStream(
     val inbox = Inbox(
       subscription = newSubscription,
       taskIds = dirty.toList(),
-      torrents = torrentInbox.toList(),
-      connections = connectionsInbox,
+      topics = topicInbox.toList(),
     )
     newSubscription = null
     dirty.clear()
-    torrentInbox.clear()
-    connectionsInbox = null
+    topicInbox.clear()
     inbox
   }
 
   private class Inbox(
     val subscription: Pair<StreamSubscription, StreamPlan>?,
     val taskIds: List<String>,
-    val torrents: List<Pair<String, SourceItem<TorrentSnapshot>>>,
-    val connections: SourceItem<ActiveConnections>?,
+    val topics: List<Pair<Long, TopicState>>,
   )
+
+  /** An interest the inbox follows; [job] collects its states, none for an unknown interest. */
+  private class Follow(val interest: Interest<*>) {
+    var job: Job? = null
+  }
 
   // -- Writer --
 
   private suspend fun process(inbox: Inbox, send: suspend (OutgoingEvent) -> Unit) {
     inbox.subscription?.let { (next, nextPlan) -> subscribe(next, nextPlan, send) }
     for (taskId in inbox.taskIds) processTask(taskId, send)
-    for ((taskId, item) in inbox.torrents) {
-      if (taskId in plan.torrents) pendingTorrents[taskId] = item
-    }
-    inbox.connections?.let { item ->
-      if (plan.connectionsLimit != null) pendingConnections = item
-    }
+    for ((id, state) in inbox.topics) topics[id]?.state = state
     flushDue(send)
   }
 
@@ -229,16 +212,10 @@ internal class EventStream(
     plan = nextPlan
     send(event(StreamEvents.SUBSCRIBED, encode(StreamSubscribed(next.revision, next))))
     if (first) sendTasks(send)
-    // A torrent followed again, or a new connection limit, sends its first item at once.
-    pendingTorrents.keys.retainAll(nextPlan.torrents.keys)
-    torrentsSent.keys.retainAll(nextPlan.torrents.keys)
-    if (nextPlan.connectionsLimit != previous.connectionsLimit) {
-      pendingConnections = null
-      connectionsSentAt = null
-    }
-    if (nextPlan.statsIntervalMs != previous.statsIntervalMs) {
-      statsSentAt = null
-      lastStats = null
+    // Nothing more goes out for dropped interests; new ones send their first value at once.
+    topics.keys.retainAll(nextPlan.interests.keys)
+    for ((id, planned) in nextPlan.interests) {
+      if (topics[id]?.interest != planned.interest) topics[id] = SentTopic(planned.interest)
     }
     // Rules may have moved tasks between intervals; tasks they newly name are sent at once.
     pendingProgress.clear()
@@ -338,17 +315,7 @@ internal class EventStream(
     flush(pendingSegments, segmentsFlushed, now) { frame, known ->
       sendSegments(frame, known, send)
     }
-    flushTorrents(now, send)
-    flushConnections(now, send)
-    val interval = plan.statsIntervalMs ?: return
-    val sentAt = statsSentAt
-    if (sentAt != null && now - sentAt < interval.milliseconds) return
-    statsSentAt = now
-    val stats = KetchStats.of(tracker.frames().map { it.state })
-    if (stats != lastStats) {
-      lastStats = stats
-      send(event(StreamEvents.STATS, encode(stats)))
-    }
+    flushTopics(now, send)
   }
 
   /**
@@ -376,33 +343,37 @@ internal class EventStream(
     }
   }
 
-  private suspend fun flushTorrents(
+  /**
+   * Sends each interest's new value once its interval passed since the last, and its end or
+   * failure at once, after the value it held back.
+   */
+  private suspend fun flushTopics(
     now: ComparableTimeMark,
     send: suspend (OutgoingEvent) -> Unit,
   ) {
-    val due = pendingTorrents.entries.filter { (taskId, item) ->
-      val last = torrentsSent[taskId]
-      val step = plan.torrents[taskId] ?: return@filter false
-      item !is SourceItem.Value || last == null || now - last >= step.milliseconds
+    for ((id, topic) in topics) {
+      val state = topic.state ?: continue
+      if (topic.ended) continue
+      val step = plan.interests[id]?.step ?: continue
+      val end = state.end
+      if (state.version > topic.sentVersion) {
+        val last = topic.sentAt
+        if (end == null && last != null && now - last < step.milliseconds) continue
+        val json = checkNotNull(state.json)
+        send(event(StreamEvents.INTEREST, """{"id":$id,"value":$json}"""))
+        topic.sentVersion = state.version
+        topic.sentAt = now
+      }
+      when (end) {
+        null -> {}
+        TopicEnd.Completed -> send(event(StreamEvents.INTEREST_END, encode(InterestRef(id))))
+        is TopicEnd.Failed -> {
+          val error = InterestError(id, end.error, end.message)
+          send(event(StreamEvents.INTEREST_ERROR, encode(error)))
+        }
+      }
+      if (end != null) topic.ended = true
     }
-    for ((taskId, item) in due) {
-      pendingTorrents.remove(taskId)
-      torrentsSent[taskId] = now
-      send(torrentEvent(taskId, item))
-    }
-  }
-
-  private suspend fun flushConnections(
-    now: ComparableTimeMark,
-    send: suspend (OutgoingEvent) -> Unit,
-  ) {
-    val item = pendingConnections ?: return
-    val last = connectionsSentAt
-    val interval = plan.connectionsIntervalMs.milliseconds
-    if (item is SourceItem.Value && last != null && now - last < interval) return
-    pendingConnections = null
-    connectionsSentAt = now
-    connectionsEvent(item)?.let { send(it) }
   }
 
   /** How long the writer may wait for the inbox before an interval is due; `null` for ever. */
@@ -417,33 +388,28 @@ internal class EventStream(
     for ((step, taskIds) in pendingSegments) {
       if (taskIds.isNotEmpty()) consider(dueIn(segmentsFlushed[step], step))
     }
-    for (taskId in pendingTorrents.keys) {
-      plan.torrents[taskId]?.let { consider(dueIn(torrentsSent[taskId], it)) }
+    for ((id, topic) in topics) {
+      val state = topic.state ?: continue
+      if (topic.ended || state.version <= topic.sentVersion) continue
+      plan.interests[id]?.let { consider(dueIn(topic.sentAt, it.step)) }
     }
-    if (pendingConnections != null) consider(dueIn(connectionsSentAt, plan.connectionsIntervalMs))
-    plan.statsIntervalMs?.let { consider(dueIn(statsSentAt, it)) }
     return wait
   }
 
   private fun dueIn(last: ComparableTimeMark?, intervalMs: Long): Duration =
     if (last == null) Duration.ZERO else intervalMs.milliseconds - last.elapsedNow()
 
-  private fun torrentEvent(taskId: String, item: SourceItem<TorrentSnapshot>) = when (item) {
-    is SourceItem.Value -> event(StreamEvents.TORRENT, encode(item.value))
-    SourceItem.Removed -> event(StreamEvents.TORRENT_REMOVED, encode(StreamTaskRef(taskId)))
-    is SourceItem.Failed -> event(StreamEvents.ERROR, encode(item.error))
-  }
-
-  private fun connectionsEvent(item: SourceItem<ActiveConnections>) = when (item) {
-    is SourceItem.Value -> event(StreamEvents.CONNECTIONS, encode(item.value))
-    // Live connections have no subject that could go away.
-    SourceItem.Removed -> null
-    is SourceItem.Failed -> event(StreamEvents.ERROR, encode(item.error))
-  }
-
   private fun event(name: String, data: String) = OutgoingEvent(name, data, (++sequence).toString())
 
   private inline fun <reified T> encode(value: T): String = ServerJson.encodeToString(value)
+
+  /** What this stream sent of an [interest]: the latest state it has, and the version it sent. */
+  private class SentTopic(val interest: Interest<*>) {
+    var state: TopicState? = null
+    var sentVersion = 0L
+    var sentAt: ComparableTimeMark? = null
+    var ended = false
+  }
 
   /** The versions of a task this stream sent. */
   private class SentTask(

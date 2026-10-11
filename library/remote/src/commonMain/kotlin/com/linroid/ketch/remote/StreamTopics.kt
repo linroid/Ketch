@@ -1,48 +1,62 @@
 package com.linroid.ketch.remote
 
-import com.linroid.ketch.api.ActiveConnection
-import com.linroid.ketch.api.ActiveConnections
-import com.linroid.ketch.api.Interest
-import com.linroid.ketch.api.KetchStats
-import com.linroid.ketch.endpoints.stream.StreamError
+import com.linroid.ketch.endpoints.stream.InterestError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.torrent.api.TorrentInterest
-import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-
-/** An item of a topic the event stream sends: a value, the end of its subject, or a failure. */
-internal sealed interface TopicItem<out T> {
-  data class Value<T>(val value: T) : TopicItem<T>
-
-  /** The subject is gone, such as a removed torrent; nothing follows. */
-  data object Removed : TopicItem<Nothing>
-
-  /** The topic failed on the server; nothing follows. */
-  data class Failed(val error: StreamError) : TopicItem<Nothing>
-}
-
-/** Thrown to a topic's collector when the event stream it was reading closed. */
-internal class StreamLostException : IllegalStateException("The connection to the server was lost")
+import kotlinx.serialization.json.JsonElement
 
 /**
- * The latest item of each topic beyond the tasks that the event stream of a [RemoteKetch]
- * sends, for the callers that asked for it.
+ * What the event stream sent last for an interest: its latest value and how it ended. A reader
+ * that skips states still sees the last value before the end.
+ *
+ * @property sequence orders every value the stream sent, so a reader tells a new one from the one
+ *   it emitted, also after the interest was dropped and followed again
+ * @property value the latest value, or `null` before the first
+ * @property end how the interest ended, or `null` while it runs
+ */
+internal data class TopicState(
+  val sequence: Long = 0,
+  val value: JsonElement? = null,
+  val end: TopicEnd? = null,
+)
+
+/** How an interest ended on the event stream. */
+internal sealed interface TopicEnd {
+  /** What it follows is gone, such as a removed torrent. */
+  data object Completed : TopicEnd
+
+  /** The server cannot serve it, or it failed. */
+  data class Failed(val error: InterestError) : TopicEnd
+}
+
+/** Thrown to an interest's collector when the event stream it was reading closed. */
+internal class StreamLostException : IllegalStateException("The connection to the server was lost")
+
+/** Thrown to an interest's collector when the server cannot serve it, or it failed. */
+internal class InterestFailedException(val error: InterestError) :
+  IllegalStateException("The server failed the interest: ${error.error}")
+
+/**
+ * The latest state of each interest the event stream of a [RemoteKetch] sends, by the ID its
+ * subscription gave it. Called only by the reader of the stream.
  */
 internal class StreamTopics {
   /** Counts the streams; the one that is open, or `null` while none is. */
   val live = MutableStateFlow<Long?>(null)
-  val stats = MutableStateFlow<KetchStats?>(null)
-  val torrents = MutableStateFlow<Map<String, TopicItem<TorrentSnapshot>>>(emptyMap())
-  val connections = MutableStateFlow<TopicItem<ActiveConnections>?>(null)
+
+  /** The interests of the applied subscription, by ID; those without a value yet are left out. */
+  val states = MutableStateFlow<Map<Long, TopicState>>(emptyMap())
+
+  private var applied: Set<Long> = emptySet()
+  private var sequence = 0L
 
   /** A stream with [generation] opened: what the previous one sent is no longer current. */
   fun opened(generation: Long) {
-    stats.value = null
-    torrents.value = emptyMap()
-    connections.value = null
+    applied = emptySet()
+    states.value = emptyMap()
     live.value = generation
   }
 
@@ -51,35 +65,31 @@ internal class StreamTopics {
   }
 
   /**
-   * The stream applies [subscription]: items of topics it no longer sends are forgotten, so a
-   * caller asking for them again waits for current ones.
+   * The stream applies [subscription]: the states of interests it no longer names are forgotten,
+   * and events for them are ignored, so a caller following them again waits for current ones.
    */
   fun applied(subscription: StreamSubscription) {
-    val interests = subscription.interests.map { it.interest }
-    if (interests.none { it == Interest.Stats }) stats.value = null
-    if (interests.none { it is Interest.Connections }) connections.value = null
-    val followed = interests.mapNotNullTo(HashSet()) { (it as? TorrentInterest)?.taskId }
-    torrents.update { items -> items.filterKeys { it in followed } }
+    applied = subscription.interests.mapTo(HashSet()) { it.id }
+    states.update { current -> current.filterKeys { it in applied } }
   }
 
-  fun torrent(taskId: String, item: TopicItem<TorrentSnapshot>) {
-    torrents.update { it + (taskId to item) }
+  fun value(id: Long, value: JsonElement) {
+    if (id !in applied) return
+    val next = ++sequence
+    states.update { it + (id to TopicState(next, value)) }
+  }
+
+  fun ended(id: Long, end: TopicEnd) {
+    if (id !in applied) return
+    states.update { it + (id to (it[id] ?: TopicState()).copy(end = end)) }
   }
 }
 
 /**
- * At most [limit] of these connections, the fastest by combined rate, ordered by when they
- * opened, as a server would have chosen them with that limit; the totals stay.
+ * The exception callers of an interest get when the server cannot serve it
+ * ([UnsupportedOperationException]) or it failed ([RemoteApiException]).
  */
-internal fun ActiveConnections.limitedTo(limit: Int): ActiveConnections {
-  if (connections.size <= limit) return this
-  val byAge = compareBy<ActiveConnection>({ it.openedAt }, { it.id })
-  val byRate = compareByDescending<ActiveConnection> { it.downloadBps + it.uploadBps }.then(byAge)
-  return copy(connections = connections.sortedWith(byRate).take(limit).sortedWith(byAge))
-}
-
-/** The failure of the connections topic, as `activeConnections` reports it. */
-internal fun StreamError.toConnectionsFailure(): Exception = when (error) {
+internal fun InterestError.toException(): Exception = when (error) {
   StreamEvents.UNSUPPORTED -> UnsupportedOperationException(message)
   else -> RemoteApiException(HttpStatusCode.InternalServerError.value, error, message)
 }

@@ -3,42 +3,37 @@ package com.linroid.ketch.server.stream
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamSubscription
-import com.linroid.ketch.endpoints.stream.UnknownInterest
-import com.linroid.ketch.torrent.api.TorrentInterest
 
 /**
- * What a stream sends beyond the task lifecycle, merged from the interests of a
- * [StreamSubscription] by [planOf].
+ * What a stream sends beyond the task lifecycle, from a [StreamSubscription] by [planOf].
  *
  * @property progress the interval step of each task's progress
  * @property segments the interval step of each named task's segments
- * @property statsIntervalMs how often stats are sent, or `null` for never
- * @property torrents the interval step of the snapshots of each torrent task followed
- * @property connectionsLimit the limit of the live connections sent, or `null` for none
- * @property connectionsIntervalMs the interval step of the live connections
+ * @property interests the interests followed, by the ID the client gave each
  */
 internal class StreamPlan(
   val progress: IntervalRules = IntervalRules.NONE,
   val segments: IntervalRules = IntervalRules.NONE,
-  val statsIntervalMs: Long? = null,
-  val torrents: Map<String, Long> = emptyMap(),
-  val connectionsLimit: Int? = null,
-  val connectionsIntervalMs: Long = StreamEvents.INTERVALS_MS.first(),
+  val interests: Map<Long, PlannedInterest> = emptyMap(),
 )
+
+/** An [interest] a stream follows, sent at most once per [step] milliseconds. */
+internal data class PlannedInterest(val interest: Interest<*>, val step: Long)
 
 /**
  * The plan [subscription] asks for: intervals are rounded up to the server's steps, and where
- * several interests name a task, the shortest interval wins; the largest connection limit and
- * the shortest stats interval win. Interests this server does not know, which decode as
- * [UnknownInterest], are left out.
+ * several segment entries name a task, the shortest interval wins.
  *
  * @throws IllegalArgumentException when [subscription] goes beyond the limits of [StreamEvents]
+ *   or names an interest ID twice
  */
 internal fun planOf(subscription: StreamSubscription): StreamPlan {
   require(subscription.revision >= 0) { "revision must not be negative" }
-  val interests = subscription.interests
-  require(interests.size <= StreamEvents.MAX_INTERESTS) {
+  require(subscription.interests.size <= StreamEvents.MAX_INTERESTS) {
     "At most ${StreamEvents.MAX_INTERESTS} interests are allowed"
+  }
+  require(subscription.segments.size <= StreamEvents.MAX_INTERESTS) {
+    "At most ${StreamEvents.MAX_INTERESTS} segment entries are allowed"
   }
   val progress = subscription.progressIntervalMs?.let { interval ->
     require(interval > 0) { "progressIntervalMs must be positive" }
@@ -46,39 +41,23 @@ internal fun planOf(subscription: StreamSubscription): StreamPlan {
   }
   val segments = HashMap<String, Long>()
   var segmentIds = 0
-  var stats: Long? = null
-  val torrents = LinkedHashMap<String, Long>()
-  var connectionsLimit: Int? = null
-  var connectionsInterval: Long? = null
-  for ((interest, intervalMs) in interests) {
+  for ((taskIds, intervalMs) in subscription.segments) {
     val step = StreamEvents.intervalStep(intervalMs)
-    when (interest) {
-      is Interest.Segments -> {
-        segmentIds += interest.taskIds.size
-        for (taskId in interest.taskIds) segments.merge(taskId, step, ::minOf)
-      }
-      Interest.Stats -> stats = minOf(stats ?: step, step)
-      is Interest.Connections -> {
-        connectionsLimit = maxOf(connectionsLimit ?: interest.limit, interest.limit)
-        connectionsInterval = minOf(connectionsInterval ?: step, step)
-      }
-      is TorrentInterest -> torrents.merge(interest.taskId, step, ::minOf)
-      else -> {}
-    }
+    segmentIds += taskIds.size
+    for (taskId in taskIds) segments.merge(taskId, step, ::minOf)
   }
   require(segmentIds <= StreamEvents.MAX_TASK_IDS) {
     "At most ${StreamEvents.MAX_TASK_IDS} task IDs are allowed"
   }
-  require(torrents.size <= StreamEvents.MAX_TORRENTS) {
-    "At most ${StreamEvents.MAX_TORRENTS} torrents can be followed"
+  val interests = LinkedHashMap<Long, PlannedInterest>()
+  for ((id, interest, intervalMs) in subscription.interests) {
+    val planned = PlannedInterest(interest, StreamEvents.intervalStep(intervalMs))
+    require(interests.put(id, planned) == null) { "Interest ID $id is used twice" }
   }
   return StreamPlan(
     progress = IntervalRules.everyTask(progress),
     segments = IntervalRules.byTask(segments),
-    statsIntervalMs = stats,
-    torrents = torrents,
-    connectionsLimit = connectionsLimit,
-    connectionsIntervalMs = connectionsInterval ?: StreamEvents.INTERVALS_MS.first(),
+    interests = interests,
   )
 }
 

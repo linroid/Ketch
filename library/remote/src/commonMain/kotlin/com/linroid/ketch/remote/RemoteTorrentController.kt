@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
+import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentRevisionDecision
@@ -61,13 +62,15 @@ import kotlin.time.Duration
  * @param generation counts the connections to the server; it changes on every reconnect
  * @param streamed whether the client reads the server's event stream: snapshots then come from
  *   [streamTorrent] rather than a stream of their own
+ * @param streamTorrent the snapshots the event stream sends for an interest, ending when the
+ *   server ends it; it fails with [InterestFailedException] or [StreamLostException]
  */
 internal class RemoteTorrentController(
   private val httpClient: HttpClient,
   private val generation: StateFlow<Long>,
   private val json: Json,
   private val streamed: StateFlow<Boolean> = MutableStateFlow(false),
-  private val streamTorrent: (String, Duration) -> Flow<TopicItem<TorrentSnapshot>> =
+  private val streamTorrent: (TorrentInterest, Duration) -> Flow<TorrentSnapshot?> =
     { _, _ -> emptyFlow() },
 ) : TorrentController {
   private val log = KetchLogger("RemoteTorrents")
@@ -125,25 +128,30 @@ internal class RemoteTorrentController(
   /** The snapshots of [taskId] the event stream sends, under the same rules as its own stream. */
   private fun observeOnStream(taskId: String, interval: Duration): Flow<TorrentSnapshot?> = flow {
     var current: TorrentRevision? = null
+    var gone = false
     try {
-      streamTorrent(taskId, interval).collect { item ->
-        when (item) {
-          is TopicItem.Value -> when (current?.compareIncoming(item.value.revision)) {
-            null, TorrentRevisionDecision.APPLY -> {
-              current = item.value.revision
-              emit(item.value)
-            }
-            TorrentRevisionDecision.IGNORE -> {}
-            TorrentRevisionDecision.RESYNC -> throw connectionChanged()
+      streamTorrent(TorrentInterest(taskId), interval).collect { snapshot ->
+        if (snapshot == null) {
+          gone = true
+          emit(null)
+          return@collect
+        }
+        when (current?.compareIncoming(snapshot.revision)) {
+          null, TorrentRevisionDecision.APPLY -> {
+            current = snapshot.revision
+            emit(snapshot)
           }
-          TopicItem.Removed -> emit(null)
-          is TopicItem.Failed -> throw TorrentCommandException(
-            error = TorrentCommandError.fromWire(item.error.error)
-              ?: TorrentCommandError.UNSUPPORTED,
-            message = item.error.message,
-          )
+          TorrentRevisionDecision.IGNORE -> {}
+          TorrentRevisionDecision.RESYNC -> throw connectionChanged()
         }
       }
+      // The server ends the interest once the torrent is gone.
+      if (!gone) emit(null)
+    } catch (e: InterestFailedException) {
+      throw TorrentCommandException(
+        error = TorrentCommandError.fromWire(e.error.error) ?: TorrentCommandError.UNSUPPORTED,
+        message = e.error.message,
+      )
     } catch (_: StreamLostException) {
       throw connectionChanged()
     }

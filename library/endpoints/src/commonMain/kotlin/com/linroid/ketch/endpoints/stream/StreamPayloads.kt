@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /** A task named by an event, such as [StreamEvents.TASK_REMOVED]. */
 @Serializable
@@ -40,18 +41,42 @@ data class TaskSegmentsUpdate(
 )
 
 /**
- * A failure on the stream.
+ * The latest value of the interest with [id], encoded with its `Interest.valueSerializer`.
+ * Values come at most once per the interest's interval; a client that reads slowly gets the
+ * latest, not each one.
+ */
+@Serializable
+data class InterestUpdate(
+  val id: Long,
+  val value: JsonElement,
+)
+
+/** The interest with [id], named by [StreamEvents.INTEREST_END]. */
+@Serializable
+data class InterestRef(val id: Long)
+
+/**
+ * The interest with [id] cannot be served or failed; the stream goes on.
  *
- * @property error a stable code from [StreamEvents], or a torrent command error's wire name
+ * @property error [StreamEvents.UNSUPPORTED], [StreamEvents.INTERNAL_ERROR], or a torrent command
+ *   error's wire name
  * @property message a description in English
- * @property topic the topic that failed, such as [StreamEvents.TOPIC_TORRENTS], or `null` when
- *   the whole stream ends
- * @property taskId the task the failed topic was about, if any
+ */
+@Serializable
+data class InterestError(
+  val id: Long,
+  val error: String,
+  val message: String,
+)
+
+/**
+ * A failure that ends the stream.
+ *
+ * @property error a stable code from [StreamEvents]
+ * @property message a description in English
  */
 @Serializable
 data class StreamError(
   val error: String,
   val message: String,
-  val topic: String? = null,
-  val taskId: String? = null,
 )
