@@ -321,6 +321,8 @@ internal class TorrentSwarm(
         }
         if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null &&
           webSeeds.none { it.isActive }) {
+          // A web seed that stopped on a disk error queued it before going inactive.
+          webSeedFailures.tryReceive().getOrNull()?.let { throw it }
           if (!complete) logSummary()
           if (!complete) log.i { "Swarm $logLabel ran out of peers: ${diagnostics.summary()}" }
           check(complete) { "No peer could complete the torrent" }
