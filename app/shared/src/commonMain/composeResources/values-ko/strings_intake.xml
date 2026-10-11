@@ -161,7 +161,7 @@
   </plurals>
   <string name="intake_advanced_hide">고급 옵션 숨기기</string>
   <string name="intake_advanced_show">고급 옵션…</string>
-  <string name="intake_advanced_caption">파일 이름, 리퍼러, 쿠키 및 기타 헤더</string>
+  <string name="intake_advanced_caption">파일 이름, 체크섬, 리퍼러, 쿠키 및 기타 헤더</string>
   <string name="intake_speed_limit">속도 제한</string>
   <string name="intake_priority">우선순위</string>
   <string name="intake_start">시작</string>
@@ -203,6 +203,9 @@
   <string name="intake_also_sent">이 링크와 함께 전송됨: %1$s</string>
   <string name="intake_file_name">파일 이름</string>
   <string name="intake_server_file_name">서버의 파일 이름 사용</string>
+  <string name="intake_checksum">체크섬</string>
+  <string name="intake_checksum_caption">다운로드가 끝나면 확인합니다: MD5, SHA-1, SHA-256 또는 SHA-512(16진수 또는 Base64).</string>
+  <string name="intake_checksum_invalid">올바른 체크섬이 아닙니다. sha256:… 형식이나 MD5, SHA-1, SHA-256, SHA-512의 16진수 다이제스트를 입력하세요.</string>
   <string name="intake_user_agent_custom">사용자 지정</string>
   <string name="intake_add_header">헤더 추가</string>
   <string name="intake_paste_curl">cURL 붙여넣기</string>

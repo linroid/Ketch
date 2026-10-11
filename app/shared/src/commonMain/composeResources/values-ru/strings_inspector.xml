@@ -112,6 +112,9 @@
   <string name="inspector_detail_connections">Подключения</string>
   <string name="inspector_detail_device">Устройство</string>
   <string name="inspector_detail_captured">Откуда</string>
+  <string name="inspector_detail_checksum">Контрольная сумма</string>
+  <string name="inspector_checksum_verified">%1$s · проверена</string>
+  <string name="inspector_checksum_pending">%1$s · проверка после загрузки</string>
   <string name="inspector_section_advanced">Дополнительно</string>
   <string name="inspector_detail_task_id">ID задачи</string>
   <string name="inspector_detail_headers">Заголовки</string>
@@ -129,6 +132,7 @@
   <string name="inspector_copy_failed_connections">Не удалось скопировать поле «Подключения»</string>
   <string name="inspector_copy_failed_device">Не удалось скопировать поле «Устройство»</string>
   <string name="inspector_copy_failed_captured">Не удалось скопировать поле «Откуда»</string>
+  <string name="inspector_copy_failed_checksum">Не удалось скопировать контрольную сумму</string>
   <string name="inspector_copy_failed_task_id">Не удалось скопировать поле «ID задачи»</string>
   <string name="inspector_copy_failed_headers">Не удалось скопировать поле «Заголовки»</string>
   <string name="inspector_copy_failed_property">Не удалось скопировать поле «Свойство»</string>

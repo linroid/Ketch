@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.inspector
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
@@ -207,6 +208,24 @@ class InspectorModelTest {
       finishedDetail(row("y", yesterday), start, TimeZone.UTC)?.load()
     )
     assertNull(finishedDetail(row("u", unknown), start, TimeZone.UTC))
+  }
+
+  @Test
+  fun checksumDetail_verifiedOrWaiting_namesTheAlgorithm() = runTest {
+    val checksum = Checksum.parse("sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709")
+    val request = DownloadRequest("https://example.com/a.iso", checksum = checksum)
+    val verified = DownloadState.Completed("/d/a.iso", 10, checksum = checksum)
+
+    val (copied, text) = checksumDetail(verified, request)!!
+    assertEquals(checksum, copied)
+    assertEquals("SHA-1 · verified", text.load())
+    assertEquals(
+      "SHA-1 · checked when done",
+      checksumDetail(DownloadState.Queued, request)?.second?.load(),
+    )
+    assertNull(checksumDetail(DownloadState.Completed("/d/a.iso", 10), request))
+    assertNull(checksumDetail(DownloadState.Canceled, request))
+    assertNull(checksumDetail(DownloadState.Queued, DownloadRequest("https://example.com/b")))
   }
 
   @Test

@@ -161,7 +161,7 @@
   </plurals>
   <string name="intake_advanced_hide">詳細オプションを隠す</string>
   <string name="intake_advanced_show">詳細オプション…</string>
-  <string name="intake_advanced_caption">ファイル名、リファラー、Cookie、その他のヘッダー</string>
+  <string name="intake_advanced_caption">ファイル名、チェックサム、リファラー、Cookie、その他のヘッダー</string>
   <string name="intake_speed_limit">速度制限</string>
   <string name="intake_priority">優先度</string>
   <string name="intake_start">開始</string>
@@ -203,6 +203,9 @@
   <string name="intake_also_sent">このリンクと一緒に送信：%1$s</string>
   <string name="intake_file_name">ファイル名</string>
   <string name="intake_server_file_name">サーバーのファイル名を使用</string>
+  <string name="intake_checksum">チェックサム</string>
+  <string name="intake_checksum_caption">ダウンロード完了後に検証します：MD5、SHA-1、SHA-256、SHA-512（16進数または Base64）。</string>
+  <string name="intake_checksum_invalid">チェックサムではありません。sha256:… の形式か、MD5、SHA-1、SHA-256、SHA-512 の16進数ダイジェストを入力してください。</string>
   <string name="intake_user_agent_custom">カスタム</string>
   <string name="intake_add_header">ヘッダーを追加</string>
   <string name="intake_paste_curl">cURLを貼り付け</string>

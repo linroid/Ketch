@@ -34,6 +34,11 @@
   <string name="error_corrupt_resume">保存された進捗が破損しています</string>
   <string name="error_corrupt_resume_hint">ダウンロード済みの部分は再利用できません。</string>
   <string name="error_corrupt_resume_hint_short">ダウンロード済みの部分は再利用できません</string>
+  <string name="error_checksum_mismatch">ファイルがチェックサムと一致しません</string>
+  <string name="error_checksum_mismatch_hint">ファイルの %1$s が入力したチェックサムと一致しないため、削除しました。もう一度ダウンロードするか、チェックサムを確認してください。</string>
+  <string name="error_checksum_mismatch_hint_short">%1$s が入力したチェックサムと一致しません</string>
+  <string name="error_checksum_mismatch_published_hint">ファイルの %1$s がサーバーの公開したチェックサムと一致しないため、削除しました。転送中に破損した可能性があります。もう一度ダウンロードしてください。</string>
+  <string name="error_checksum_mismatch_published_hint_short">%1$s がサーバーのチェックサムと一致しません</string>
   <string name="error_canceled">キャンセル済み</string>
   <string name="error_wrong_credentials">ユーザー名またはパスワードが正しくありません</string>
   <string name="error_wrong_credentials_hint">%1$sサーバーがサインインを拒否しました。</string>

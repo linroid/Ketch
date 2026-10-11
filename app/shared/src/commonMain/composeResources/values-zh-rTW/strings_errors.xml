@@ -34,6 +34,11 @@
   <string name="error_corrupt_resume">儲存的進度已損壞</string>
   <string name="error_corrupt_resume_hint">已下載的部分無法再使用。</string>
   <string name="error_corrupt_resume_hint_short">已下載的部分無法再使用</string>
+  <string name="error_checksum_mismatch">檔案與校驗碼不符</string>
+  <string name="error_checksum_mismatch_hint">檔案的 %1$s 與輸入的校驗碼不符，已被刪除。請重新下載，或檢查校驗碼。</string>
+  <string name="error_checksum_mismatch_hint_short">%1$s 與輸入的校驗碼不符</string>
+  <string name="error_checksum_mismatch_published_hint">檔案的 %1$s 與伺服器公布的校驗碼不符，已被刪除。檔案可能在傳輸中損毀，請重新下載。</string>
+  <string name="error_checksum_mismatch_published_hint_short">%1$s 與伺服器公布的校驗碼不符</string>
   <string name="error_canceled">已取消</string>
   <string name="error_wrong_credentials">使用者名稱或密碼錯誤</string>
   <string name="error_wrong_credentials_hint">%1$s 伺服器拒絕登入。</string>

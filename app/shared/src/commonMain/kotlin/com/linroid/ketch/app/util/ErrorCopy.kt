@@ -18,6 +18,11 @@ import ketch.app.shared.generated.resources.error_browser_yours
 import ketch.app.shared.generated.resources.error_canceled
 import ketch.app.shared.generated.resources.error_check_connection
 import ketch.app.shared.generated.resources.error_check_connection_short
+import ketch.app.shared.generated.resources.error_checksum_mismatch
+import ketch.app.shared.generated.resources.error_checksum_mismatch_hint
+import ketch.app.shared.generated.resources.error_checksum_mismatch_hint_short
+import ketch.app.shared.generated.resources.error_checksum_mismatch_published_hint
+import ketch.app.shared.generated.resources.error_checksum_mismatch_published_hint_short
 import ketch.app.shared.generated.resources.error_connection_lost
 import ketch.app.shared.generated.resources.error_corrupt_resume
 import ketch.app.shared.generated.resources.error_corrupt_resume_hint
@@ -268,6 +273,7 @@ private fun copyOf(
       shortHint = Res.string.error_wrong_credentials_hint_short.text(sourceLabel(error.sourceType)),
       primary = RowAction.EnterCredentials,
     )
+    is KetchError.ChecksumMismatch -> checksumCopy(error)
     is KetchError.Unknown -> ErrorCopy(
       title = Res.string.error_something_went_wrong.text(),
       primary = RowAction.Retry,
@@ -351,6 +357,31 @@ private fun httpCopy(
       hint = error.statusMessage?.trim()?.ifEmpty { null },
       primary = RowAction.Retry,
       secondary = listOf(RowAction.CopyDetails),
+    )
+  }
+}
+
+/**
+ * The file's digest differed from the expected one, and the engine deleted it, so Retry
+ * downloads it again from the start. A checksum the user entered may itself be wrong, which
+ * Retry with options lets them correct.
+ */
+private fun checksumCopy(error: KetchError.ChecksumMismatch): ErrorCopy {
+  val algorithm = error.algorithm.label
+  return if (error.published) {
+    ErrorCopy(
+      title = Res.string.error_checksum_mismatch.text(),
+      hint = Res.string.error_checksum_mismatch_published_hint.text(algorithm),
+      shortHint = Res.string.error_checksum_mismatch_published_hint_short.text(algorithm),
+      primary = RowAction.Retry,
+    )
+  } else {
+    ErrorCopy(
+      title = Res.string.error_checksum_mismatch.text(),
+      hint = Res.string.error_checksum_mismatch_hint.text(algorithm),
+      shortHint = Res.string.error_checksum_mismatch_hint_short.text(algorithm),
+      primary = RowAction.Retry,
+      secondary = listOf(RowAction.RetryWithOptions),
     )
   }
 }

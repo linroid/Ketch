@@ -35,6 +35,11 @@
   <string name="error_corrupt_resume">El progreso guardado está dañado</string>
   <string name="error_corrupt_resume_hint">La parte descargada no se puede reutilizar.</string>
   <string name="error_corrupt_resume_hint_short">la parte descargada no se puede reutilizar</string>
+  <string name="error_checksum_mismatch">El archivo no coincide con su suma de verificación</string>
+  <string name="error_checksum_mismatch_hint">Su %1$s no coincide con la suma de verificación que escribiste, así que se eliminó. Descárgalo de nuevo o revisa la suma de verificación.</string>
+  <string name="error_checksum_mismatch_hint_short">su %1$s no coincide con la suma de verificación que escribiste</string>
+  <string name="error_checksum_mismatch_published_hint">Su %1$s no coincide con la que publicó el servidor, así que se eliminó. Pudo dañarse por el camino; descárgalo de nuevo.</string>
+  <string name="error_checksum_mismatch_published_hint_short">su %1$s no coincide con la del servidor</string>
   <string name="error_canceled">Cancelada</string>
   <string name="error_wrong_credentials">Usuario o contraseña incorrectos</string>
   <string name="error_wrong_credentials_hint">El servidor %1$s rechazó el inicio de sesión.</string>

@@ -102,6 +102,9 @@
   <string name="inspector_detail_connections">Verbindungen</string>
   <string name="inspector_detail_device">Gerät</string>
   <string name="inspector_detail_captured">Herkunft</string>
+  <string name="inspector_detail_checksum">Prüfsumme</string>
+  <string name="inspector_checksum_verified">%1$s · geprüft</string>
+  <string name="inspector_checksum_pending">%1$s · wird am Ende geprüft</string>
   <string name="inspector_section_advanced">Erweitert</string>
   <string name="inspector_detail_task_id">Aufgaben-ID</string>
   <string name="inspector_detail_headers">Header</string>
@@ -119,6 +122,7 @@
   <string name="inspector_copy_failed_connections">Die Verbindungen konnten nicht kopiert werden</string>
   <string name="inspector_copy_failed_device">Das Gerät konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_captured">Die Herkunft konnte nicht kopiert werden</string>
+  <string name="inspector_copy_failed_checksum">Die Prüfsumme konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_task_id">Die Aufgaben-ID konnte nicht kopiert werden</string>
   <string name="inspector_copy_failed_headers">Die Header konnten nicht kopiert werden</string>
   <string name="inspector_copy_failed_property">Die Eigenschaft konnte nicht kopiert werden</string>

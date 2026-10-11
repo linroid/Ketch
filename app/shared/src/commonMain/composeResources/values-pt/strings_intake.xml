@@ -179,7 +179,7 @@
   </plurals>
   <string name="intake_advanced_hide">Ocultar opções avançadas</string>
   <string name="intake_advanced_show">Opções avançadas…</string>
-  <string name="intake_advanced_caption">Nome do arquivo, Referer, cookies e outros cabeçalhos</string>
+  <string name="intake_advanced_caption">Nome do arquivo, soma de verificação, Referer, cookies e outros cabeçalhos</string>
   <string name="intake_speed_limit">Limite de velocidade</string>
   <string name="intake_priority">Prioridade</string>
   <string name="intake_start">Início</string>
@@ -223,6 +223,9 @@
   <string name="intake_also_sent">Também enviado com este link: %1$s</string>
   <string name="intake_file_name">Nome do arquivo</string>
   <string name="intake_server_file_name">Usa o nome de arquivo do servidor</string>
+  <string name="intake_checksum">Soma de verificação</string>
+  <string name="intake_checksum_caption">Conferida quando o download termina: MD5, SHA-1, SHA-256 ou SHA-512, em hexadecimal ou base64.</string>
+  <string name="intake_checksum_invalid">Não é uma soma de verificação. Use sha256:… ou o resumo hexadecimal de um MD5, SHA-1, SHA-256 ou SHA-512.</string>
   <string name="intake_user_agent_custom">Personalizado</string>
   <string name="intake_add_header">Adicionar cabeçalho</string>
   <string name="intake_paste_curl">Colar cURL</string>

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -69,6 +70,7 @@ import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.duration_minutes
 import ketch.app.shared.generated.resources.intake_add_failed
 import ketch.app.shared.generated.resources.intake_apply_failed
+import ketch.app.shared.generated.resources.intake_checksum_invalid
 import ketch.app.shared.generated.resources.intake_choose_files
 import ketch.app.shared.generated.resources.intake_file_list_failed
 import ketch.app.shared.generated.resources.intake_file_list_failed_unnamed
@@ -638,6 +640,9 @@ class IntakeSession internal constructor(
   // The retried task's headers as the Advanced fields give them back, to tell a real change.
   private var boundHeaders: Map<String, String> = emptyMap()
 
+  // The retried task's checksum, to tell a real change.
+  private var boundChecksum: Checksum? = null
+
   /** Typed or pasted text. */
   var text: TextFieldValue by mutableStateOf(TextFieldValue())
     private set
@@ -705,6 +710,12 @@ class IntakeSession internal constructor(
   /** Headers of the Advanced section. */
   val headers: IntakeHeaders = IntakeHeaders()
 
+  /**
+   * Checksum typed in the Advanced section, such as `sha256:…`, a base64 digest or a bare hex
+   * digest; blank checks nothing. Only used while [offersChecksum].
+   */
+  var checksumText: String by mutableStateOf("")
+
   /** Whether the Advanced section is open; remembered between sheets. */
   var advancedOpen: Boolean by mutableStateOf(state.appSettings.ui.intakeAdvancedOpen)
     private set
@@ -758,6 +769,30 @@ class IntakeSession internal constructor(
   /** What [target] reports it supports, as its status says, else as the app last heard. */
   private fun targetFeatures(): Set<String> =
     targetStatus?.features ?: target?.let { state.featuresOf(it.deviceId) }.orEmpty()
+
+  /**
+   * Whether the Advanced section offers a checksum: for a single link that is not a torrent,
+   * added or retried on a device that verifies checksums ([KetchFeatures.CHECKSUM]).
+   */
+  val offersChecksum: Boolean
+    get() {
+      if (mode == IntakeMode.Edit) return false
+      val entry = single ?: return false
+      return entry.source is IntakeSource.Link && !entry.isTorrent &&
+        KetchFeatures.CHECKSUM in targetFeatures()
+    }
+
+  /** The checksum the download is verified against: [checksumText] once it reads as one. */
+  val checksum: Checksum?
+    get() = if (offersChecksum) Checksum.parseOrNull(checksumText) else null
+
+  /** Why [checksumText] is not a checksum, which keeps the sheet from submitting; else `null`. */
+  val checksumError: UiText?
+    get() {
+      if (!offersChecksum || checksumText.isBlank()) return null
+      if (Checksum.parseOrNull(checksumText) != null) return null
+      return Res.string.intake_checksum_invalid.text()
+    }
 
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
@@ -878,7 +913,8 @@ class IntakeSession internal constructor(
     get() {
       val current = boundRequest ?: return false
       val entry = entries.singleOrNull() ?: return false
-      return entry.url != current.url || effectiveHeaders(entry) != boundHeaders
+      return entry.url != current.url || effectiveHeaders(entry) != boundHeaders ||
+        offersChecksum && checksum != boundChecksum
     }
 
   /**
@@ -990,7 +1026,7 @@ class IntakeSession internal constructor(
 
   /** Whether the main button can be pressed. */
   val canSubmit: Boolean
-    get() = !submitting && when (mode) {
+    get() = !submitting && checksumError == null && when (mode) {
       IntakeMode.Edit -> task != null
       IntakeMode.Retry -> task != null && entries.size == 1
       IntakeMode.Add -> allFailed || addableLinks > 0
@@ -1427,6 +1463,7 @@ class IntakeSession internal constructor(
           selectedFileIds = selectedIds,
           resolvedSource = resolved.takeIf { index == 0 },
           awaitFileSelection = awaitsFiles,
+          checksum = checksum.takeIf { entry == single },
         )
       } catch (e: IllegalArgumentException) {
         log.w { "Couldn't build a request for ${redactUrl(url)}: ${e.describeCauses()}" }
@@ -1628,6 +1665,10 @@ class IntakeSession internal constructor(
       headers.fill(current.headers)
       boundHeaders = headers.toMap()
       if (current.headers.isNotEmpty()) advancedOpen = true
+      // So does its checksum, which may be what failed.
+      boundChecksum = current.checksum
+      checksumText = current.checksum?.toString().orEmpty()
+      if (current.checksum != null) advancedOpen = true
       request.seeds.forEach { seedsByUrl[it.url] = it.copy(headers = emptyMap()) }
     }
   }

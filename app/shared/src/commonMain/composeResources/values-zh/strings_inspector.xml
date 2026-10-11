@@ -97,6 +97,9 @@
   <string name="inspector_detail_connections">连接数</string>
   <string name="inspector_detail_device">设备</string>
   <string name="inspector_detail_captured">添加方式</string>
+  <string name="inspector_detail_checksum">校验和</string>
+  <string name="inspector_checksum_verified">%1$s · 已校验</string>
+  <string name="inspector_checksum_pending">%1$s · 完成后校验</string>
   <string name="inspector_section_advanced">高级</string>
   <string name="inspector_detail_task_id">任务 ID</string>
   <string name="inspector_detail_headers">请求头</string>
@@ -114,6 +117,7 @@
   <string name="inspector_copy_failed_connections">无法复制连接数</string>
   <string name="inspector_copy_failed_device">无法复制设备</string>
   <string name="inspector_copy_failed_captured">无法复制添加方式</string>
+  <string name="inspector_copy_failed_checksum">无法复制校验和</string>
   <string name="inspector_copy_failed_task_id">无法复制任务 ID</string>
   <string name="inspector_copy_failed_headers">无法复制请求头</string>
   <string name="inspector_copy_failed_property">无法复制属性</string>
