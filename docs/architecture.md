@@ -141,6 +141,8 @@ DownloadRequest
   |           255 bytes) and must stay inside the folder; a file Destination is
   |           used as it is. OutputPathReservations keeps the path of every
   |           running download, so two started together never share a file.
+  |           The download writes `<name>.ketch` beside that path until it
+  |           completes; a name whose partial file exists is taken too.
   |
   v
 [4. Plan]  SegmentCalculator splits the file into N segments, N being the task's
@@ -161,7 +163,10 @@ DownloadRequest
   |           (saveIntervalMs) for crash recovery.
   |
   v
-[7. Complete]  All segments finished -> Completed state with file path, size and
+[7. Complete]  All segments finished -> the partial file is flushed, closed and
+               moved to its final name (an existing file there is kept and the
+               download takes `name (n).ext`; a file Destination is replaced) ->
+               Completed state with file path, size and
                download time (summed over runs, excluding queued and paused time).
                On a retryable error -> retry with exponential backoff, keeping
                segment progress (from byte zero without range support).
@@ -183,6 +188,8 @@ DownloadRequest
   byte zero on one connection. Otherwise the remaining bytes are resegmented to the current
   connection count and the local file is checked (file size vs. claimed progress); if the
   check fails, the segments restart from zero. The download continues from the saved offsets.
+  The local file is the partial file (`TaskRecord.partialPath`); a task saved before partial
+  files existed has none and keeps writing to its final name.
 
 ### Concurrency Model
 

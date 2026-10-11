@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class KetchCloseTest {
@@ -52,7 +53,8 @@ class KetchCloseTest {
       val paused = assertIs<DownloadState.Paused>(task.state.value)
       assertEquals(PauseReason.Shutdown, paused.reason)
       assertEquals(4L, paused.progress.downloadedBytes)
-      assertEquals(4L, platformFileSystem.metadataOrNull(output)?.size)
+      assertEquals(4L, platformFileSystem.metadataOrNull(folder / "partial.bin.ketch")?.size)
+      assertFalse(platformFileSystem.exists(output))
       // The next start() resumes it.
       assertEquals(TaskState.DOWNLOADING, store.load(task.taskId)?.state)
     } finally {

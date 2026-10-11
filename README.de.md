@@ -111,7 +111,8 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   einzelnen Download ([Details](docs/proxy.md)).
 - **Pausieren und fortsetzen, auch nach einem Neustart** — Ketch prüft vor dem Fortsetzen, ob sich
   die Datei auf dem Server geändert hat, und versucht fehlgeschlagene Verbindungen automatisch
-  erneut.
+  erneut. Bis ein Download fertig ist, heißt die Datei `Name.ketch`, damit eine unfertige Datei
+  nie vollständig aussieht.
 
 ### Alle Arten von Links
 
@@ -264,8 +265,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   Verbindungen, damit der Download nicht auf die langsamste warten muss
 - **Stillstand erkennen und Wiederholungen einstellen** — Neu verbinden, wenn keine Daten mehr
   ankommen; Zeitlimits und Wiederholungszahlen wählen, auch unbegrenzt
-- **Unfertige Dateien erkennbar machen** — Unter einem temporären Namen speichern und erst nach
-  Abschluss den endgültigen Namen vergeben
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
   herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen

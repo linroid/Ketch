@@ -125,6 +125,7 @@ class DownloadExecutionCleanupTest {
 
       assertEquals(DownloadState.Canceled, task.state.value)
       assertFalse(platformFileSystem.exists(output))
+      assertFalse(platformFileSystem.exists(partialOf(output)))
     }
   }
 
@@ -182,11 +183,17 @@ class DownloadExecutionCleanupTest {
     assertFalse(deleted)
   }
 
-  /** Asserts that [output] exists with its first [bytes] bytes downloaded from [engine]. */
+  /**
+   * Asserts that the partial file of [output] exists with its first [bytes] bytes downloaded from
+   * [engine], and that nothing was written at [output] itself yet.
+   */
   private fun assertWritten(engine: FakeHttpEngine, output: Path, bytes: Int) {
-    val written = platformFileSystem.read(output) { readByteArray() }
+    val written = platformFileSystem.read(partialOf(output)) { readByteArray() }
     assertContentEquals(engine.content.copyOf(bytes), written.copyOf(bytes))
+    assertFalse(platformFileSystem.exists(output))
   }
+
+  private fun partialOf(output: Path): Path = output.parent!! / "${output.name}.ketch"
 
   private suspend fun TestScope.withKetch(
     block: suspend (Ketch, FakeHttpEngine, InMemoryTaskStore, Path) -> Unit,

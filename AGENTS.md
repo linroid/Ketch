@@ -108,8 +108,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
   `PathFileAccessor`, `ContentUriFileAccessor` (Android), `NoOpFileAccessor`,
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
-  `sanitizeFileName()`, `OutputPathReservations`, `DestinationPathPolicy`,
-  `PathRejectedException`
+  `sanitizeFileName()`, `OutputPathReservations`, `partialPathFor()` and
+  `movePartialToFinal()` (`PartialFiles.kt`), `DestinationPathPolicy`, `PathRejectedException`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`, `TaskControl` (selection
   generation, sharing intent and the command retry ledger; SQLite `control_json`, `5.sqm`),
@@ -241,6 +241,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   deduplication also avoids files other downloads have not created yet
 - `DownloadTask.outputPath` reports where a task saves once the download chose it (core tasks;
   `null` from remote ones)
+- Partial files: downloads the engine writes (HTTP, FTP, HLS, DASH; not torrents) write
+  `<final name>.ketch` beside their output path (`PARTIAL_FILE_SUFFIX`, `partialPathFor`), saved
+  as `TaskRecord.partialPath` (SQLite `partial_path`, `6.sqm`), so an unfinished file never looks
+  complete. The final name is still chosen and reserved when the download starts, and
+  `OutputPathReservations` holds both names and counts a name whose partial file exists as taken.
+  After the last flush the file is closed and moved with okio `atomicMove`; a file that appeared
+  at the final name meanwhile is kept, and the download takes the next free `name (n).ext` and
+  records it as its output path (a file created in the instant between the check and the move
+  would still be replaced). A file `Destination` is replaced, as it was written in place before.
+  Pause, failure, `close()` and `remove(deleteFiles = false)` keep the partial file; cancel and
+  `remove(deleteFiles = true)` delete it, never a file at the final name the task did not write.
+  A name too long for the suffix (over 249 bytes), a resume given a new destination and tasks
+  saved before partial files (no `partialPath`) write to the output path itself. In an Android
+  `content://` folder the partial document is created up front and renamed with
+  `DocumentsContract.renameDocument` (the provider picks a free name), reporting its URI as the
+  output path until then; a provider without `FLAG_SUPPORTS_RENAME` gets the final name directly,
+  and a rename that fails leaves the finished document under its partial name
 - Category folders: a request whose destination is `null` or a bare name is saved in the folder,
   inside the default directory, of the first of `DownloadConfig.categories` it matches
   (`DownloadCategory`: `extensions` or `mimeTypes`, either enough, and `hosts` with subdomains
@@ -1332,17 +1349,13 @@ Planned features not yet implemented:
    watchdog around HTTP segments and FTP transfers raises a retryable `KetchError.Network`.
    Today socket and request timeouts are `Long.MAX_VALUE`, so a stalled connection hangs until
    the task is paused, and the backoff (`retryDelayMs * (1 shl n)`) has no cap
-9. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
-   renamed to the final, deduplicated name after the last flush, never replacing a file that
-   appeared meanwhile. Today they write to the final name, preallocated to full size, so an
-   unfinished file looks complete
-10. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
-    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-11. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+9. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+   the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
+10. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
     command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
-12. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+11. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
     bytes, segment progress, resume state, finished files) between instances, so the destination
     continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-13. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+12. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
     own network and IP, joining or leaving mid-download without pausing it; see the
     [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 7

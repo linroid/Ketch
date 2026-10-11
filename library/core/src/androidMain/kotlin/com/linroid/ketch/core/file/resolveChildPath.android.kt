@@ -6,6 +6,8 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.AndroidContext
 import okio.Path.Companion.toPath
 
@@ -56,6 +58,56 @@ internal actual fun resolveChildFolder(
 
 internal actual fun isContentUri(directory: String): Boolean =
   directory.startsWith("content://")
+
+internal actual fun createPartialDocument(directory: String, fileName: String): String? {
+  if (!isContentUri(directory)) return null
+  val partialName = partialFileName(fileName) ?: return null
+  val resolver = AndroidContext.get().contentResolver
+  val document = DocumentsContract.createDocument(
+    resolver,
+    parentDocument(Uri.parse(directory)),
+    "application/octet-stream",
+    partialName,
+  ) ?: throw IllegalStateException("Failed to create document '$partialName' in $directory")
+  if ((flags(resolver, document) and Document.FLAG_SUPPORTS_RENAME) != 0) {
+    return document.toString()
+  }
+  // It could never get its final name, so the download writes to a document under that name.
+  log.d { "Provider cannot rename documents, writing under the final name: $directory" }
+  try {
+    DocumentsContract.deleteDocument(resolver, document)
+  } catch (e: Exception) {
+    log.w { "Failed to delete an unused partial document: ${e.describeCauses()}" }
+  }
+  return null
+}
+
+internal actual fun finishPartialDocument(partial: String): String? {
+  val uri = Uri.parse(partial)
+  val resolver = AndroidContext.get().contentResolver
+  return try {
+    val name = displayName(resolver, uri) ?: return null
+    val finalName = name.removeSuffix(PARTIAL_FILE_SUFFIX)
+    if (finalName == name || finalName.isEmpty()) return null
+    // Providers pick a free name when it is taken; a null result keeps the document's URI.
+    (DocumentsContract.renameDocument(resolver, uri, finalName) ?: uri).toString()
+  } catch (e: Exception) {
+    log.w { "Failed to rename a finished document: ${e.describeCauses()}" }
+    null
+  }
+}
+
+private val log = KetchLogger("FileAccessor")
+
+private fun flags(resolver: ContentResolver, document: Uri): Int =
+  resolver.query(document, arrayOf(Document.COLUMN_FLAGS), null, null, null)?.use { cursor ->
+    if (cursor.moveToFirst()) cursor.getInt(0) else 0
+  } ?: 0
+
+private fun displayName(resolver: ContentResolver, document: Uri): String? =
+  resolver.query(document, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use {
+    if (it.moveToFirst()) it.getString(0) else null
+  }
 
 /**
  * The document that [uri] creates files in: the document itself, such as a folder inside a

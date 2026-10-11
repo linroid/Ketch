@@ -218,14 +218,11 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.DOWNLOADING,
         updatedAt = Clock.System.now(),
-        outputPath = destination?.value ?: it.outputPath,
-      )
+      ).withDestination(destination)
     }
 
     val resumeInfo = DownloadExecution.ResumeInfo(
-      record = taskRecord.copy(
-        outputPath = destination?.value ?: taskRecord.outputPath,
-      ),
+      record = taskRecord.withDestination(destination),
       segments = segments,
     )
 
@@ -418,7 +415,8 @@ internal class DownloadCoordinator(
   suspend fun cleanup(handle: TaskHandle) {
     val record = handle.record.value
     val sourceType = record.sourceType
-    val outputPath = record.outputPath
+    // An unfinished download is only its partial file: a file at its output path is not its own.
+    val outputPath = record.partialPath ?: record.outputPath
     if (sourceType == null || outputPath == null) {
       log.d {
         "Skipping cleanup for taskId=${handle.taskId} " +
@@ -488,6 +486,20 @@ internal enum class SelectionDelivery {
 
   /** The running execution is finishing and takes no more selections. */
   FINISHING
+}
+
+/**
+ * This record resumed with [destination], the file it continues in, as when an Android document
+ * URI changed: the download writes there itself. A partial document stands for its own output
+ * path, so its new URI stays the partial file, renamed when the download completes.
+ */
+internal fun TaskRecord.withDestination(destination: Destination?): TaskRecord {
+  if (destination == null) return this
+  val partialDocument = partialPath != null && partialPath == outputPath
+  return copy(
+    outputPath = destination.value,
+    partialPath = destination.value.takeIf { partialDocument },
+  )
 }
 
 /** This configuration as [request] downloads with it: with its own proxy, if it has one. */
