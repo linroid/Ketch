@@ -27,8 +27,8 @@ internal class TorrentPieceScheduler(
   private val owners = mutableMapOf<Int, MutableSet<Int>>()
   private val claims = mutableMapOf<Int, Claim>()
 
-  class Claim(val index: Int, val lease: TorrentBufferBudget.Lease) {
-    val bytes: ByteArray = ByteArray(lease.bytes)
+  class Claim(override val index: Int, val lease: TorrentBufferBudget.Lease) : WebSeedPiece {
+    override val bytes: ByteArray = ByteArray(lease.bytes)
   }
 
   init { require(wanted.size == verified.size) }

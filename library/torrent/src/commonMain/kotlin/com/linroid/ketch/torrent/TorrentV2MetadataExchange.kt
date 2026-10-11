@@ -20,6 +20,8 @@ internal class TorrentV2MetadataExchange(
     endpoint: PeerEndpoint,
     trackerTiers: List<List<String>> = emptyList(),
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+    /** A magnet's web seeds (`ws`), kept in the metainfo as its `url-list`. */
+    webSeeds: List<String> = emptyList(),
   ): ByteArray = TorrentMetadataExchange(network, maxBytes, timeoutMs, budget)
     .fetchContent(identity, endpoint, trackerTiers, privacy) { connection, raw, workspace ->
       val info = TorrentV2Info.parse(raw, expectedIdentity = identity)
@@ -28,7 +30,10 @@ internal class TorrentV2MetadataExchange(
       }
       val layers = fetchLayers(connection, info, workspace)
       val envelope = Bencode.encode(mapOf("announce-list" to trackerTiers))
-      val suffix = Bencode.encode(mapOf("piece layers" to layers))
+      val suffix = Bencode.encode(buildMap {
+        put("piece layers", layers)
+        if (webSeeds.isNotEmpty()) put("url-list", webSeeds)
+      })
       val metainfo = Buffer().write(envelope, 0, envelope.size - 1)
         .writeUtf8("4:info").write(raw).write(suffix, 1, suffix.size - 1).readByteArray()
       require(metainfo.size <= maxBytes) { "Resolved metainfo exceeds limit" }

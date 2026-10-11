@@ -190,9 +190,10 @@ internal class TorrentSwarm(
     val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
     val webSeeds = webSeedUrls.mapIndexed { number, url ->
       // Negative IDs never collide with peer workers'.
-      val worker = WebSeedWorker(-1 - number, url, store, scheduler, checkNotNull(webSeedHttp),
-        webSeedStats, logLabel, reporter, webSeedRetryMs, downloadPayload = downloadPayload,
+      val pieces = SwarmWebSeedPieces(-1 - number, url, store, scheduler,
         onVerified = { progressEvents.trySend(Unit) })
+      val worker = WebSeedWorker(url, pieces, checkNotNull(webSeedHttp), webSeedStats, logLabel,
+        reporter, webSeedRetryMs, downloadPayload = downloadPayload)
       launch(Dispatchers.Default) {
         try {
           worker.run()

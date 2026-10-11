@@ -1,9 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.ConnectionDirection
-import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
@@ -11,8 +9,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
 import okio.Path
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -20,42 +16,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalAtomicApi::class)
 class TorrentWebSeedTest {
-  /** Serves [files] by URL with Range support; [corrupt] flips bytes, [missing] answers 404. */
-  private class MirrorEngine(
-    private val files: Map<String, ByteArray>,
-    private val corrupt: Boolean = false,
-    private val missing: Set<String> = emptySet(),
-  ) : HttpEngine {
-    private val log = AtomicReference<List<Pair<String, LongRange?>>>(emptyList())
-    val requests: List<Pair<String, LongRange?>> get() = log.load()
-
-    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
-      error("unused")
-
-    override suspend fun download(
-      url: String,
-      range: LongRange?,
-      headers: Map<String, String>,
-      onData: suspend (ByteArray) -> Unit,
-    ) {
-      while (true) {
-        val current = log.load()
-        if (log.compareAndSet(current, current + (url to range))) break
-      }
-      if (url in missing) throw KetchError.Http(404)
-      val file = files[url] ?: throw KetchError.Http(404)
-      val bytes = if (range == null) file else file.copyOfRange(range.first.toInt(),
-        range.last.toInt() + 1)
-      if (corrupt) bytes.indices.forEach { bytes[it] = (bytes[it].toInt() xor 0x5A).toByte() }
-      // Odd chunks, so pieces arrive split across callbacks.
-      bytes.asList().chunked(7_001).forEach { onData(it.toByteArray()) }
-    }
-
-    override fun close() = Unit
-  }
-
   private fun hashes(payload: ByteArray, pieceLength: Int): ByteArray =
     payload.asList().chunked(pieceLength).fold(ByteArray(0)) { result, chunk ->
       result + sha1Digest(chunk.toByteArray())
@@ -123,23 +84,8 @@ class TorrentWebSeedTest {
     val budget = TorrentBufferBudget(4 * 1024 * 1024)
     try {
       // One engine per seed: each worker gets the one its URL's host names.
-      val engine = object : HttpEngine {
-        override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
-          error("unused")
-        override suspend fun download(
-          url: String,
-          range: LongRange?,
-          headers: Map<String, String>,
-          onData: suspend (ByteArray) -> Unit,
-        ) {
-          val index = url.substringAfter("://").substringBefore('.').removePrefix("mirror")
-            .toIntOrNull() ?: 0
-          engines[index].download(url.replace("mirror$index.", "mirror."), range, headers, onData)
-        }
-        override fun close() = Unit
-      }
       TorrentSwarm(store, network, budget, reporter = connections,
-        webSeedHttp = TorrentHttp(engine), webSeedRetryMs = 5).run(peers)
+        webSeedHttp = TorrentHttp(mirrorHosts(*engines)), webSeedRetryMs = 5).run(peers)
       assertEquals(0, budget.allocated)
     } finally {
       network.close()

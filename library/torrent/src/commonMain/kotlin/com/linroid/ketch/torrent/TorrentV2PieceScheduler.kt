@@ -3,7 +3,8 @@ package com.linroid.ketch.torrent
 /**
  * One session actor owns assignments; peers and the commit worker retain their separate leases.
  * The wanted pieces follow the selection through [retarget]; unwanted pieces are never begun,
- * requested or committed, and their assemblies go once no request is out for them.
+ * requested or committed, and their assemblies go once no request is out for them. Web seeds
+ * fetch whole pieces it hands out with [claimWebSeed], kept from peers until [webSeedDone].
  */
 internal class TorrentV2PieceScheduler private constructor(
   private val layout: TorrentContentLayout,
@@ -24,8 +25,15 @@ internal class TorrentV2PieceScheduler private constructor(
   private var busy = ByteArray((verified.size + 7) / 8)
   private var closed = false
   private var remaining = wanted.indices.count { wanted[it] && !verified[it] }
+  // Pieces web seeds fetch, with how many fetch each; more than one only in the endgame.
+  private val webSeeds = mutableMapOf<Int, Int>()
+  private var webSeedCursor = 0
   val pendingCommitCount: Int get() = commits.size
-  val activeCount: Int get() = assemblies.size + commits.size
+  val activeCount: Int get() = assemblies.size + commits.size + webSeeds.values.sum()
+
+  /** Raised whenever a piece may have become free to fetch, or stopped being. */
+  var version: Long = 0
+    private set
 
   /** What [retarget] changed. */
   class Retarget internal constructor(
@@ -72,6 +80,7 @@ internal class TorrentV2PieceScheduler private constructor(
       if (after && !before) gained += index else if (before && !after) lost += index
     }
     remaining = wanted.indices.count { wanted[it] && !verified[it] }
+    version++
     return Retarget(evictUnwanted(), gained.toIntArray(), lost.toIntArray(),
       newlyVerified.toIntArray())
   }
@@ -82,21 +91,26 @@ internal class TorrentV2PieceScheduler private constructor(
     if (!verified[index]) return
     verified[index] = false
     if (wanted[index]) remaining++
+    version++
   }
 
-  /** Closes unwanted assemblies no request is out for; returns how many. */
+  /**
+   * Closes the assemblies of unwanted pieces, and of pieces a web seed verified meanwhile, that no
+   * request is out for; returns how many.
+   */
   fun evictUnwanted(): Int {
     check(!closed)
-    val unwanted = assemblies.keys.filter { !wanted[it] }
+    val unwanted = assemblies.keys.filter { !wanted[it] || verified[it] }
     if (unwanted.isEmpty()) return 0
     val requested = assignments.keys.mapTo(HashSet()) { it.index }
     var count = 0
     for (index in unwanted) {
       if (index in requested) continue
       checkNotNull(assemblies.remove(index)).close()
-      markBusy(index, false)
+      refreshBusy(index)
       count++
     }
+    if (count > 0) version++
     return count
   }
 
@@ -123,7 +137,7 @@ internal class TorrentV2PieceScheduler private constructor(
   ): Boolean {
     check(!closed)
     require(picker.pieceCount == verified.size)
-    if (activeCount == maxActive) return false
+    if (activeCount >= maxActive) return false
     val index = picker.pick(peer) { canBegin(it) && peer.canRequest(it) } ?: return false
     return begin(index)
   }
@@ -136,8 +150,66 @@ internal class TorrentV2PieceScheduler private constructor(
     val assembly = TorrentV2PieceAssembly.create(layout, index, buffers) ?: return false
     assemblies[index] = assembly
     markBusy(index, true)
+    version++
     return true
   }
+
+  /**
+   * A whole piece for a web seed, with its buffer reserved: the first wanted piece nobody fetches,
+   * from where the last claim was, so its HTTP reads follow the files. In the endgame, when every
+   * piece left is being fetched, a piece peers assemble that no web seed fetches yet; whichever
+   * verifies it first stores it. Null when there is none, or no buffer is free.
+   */
+  fun claimWebSeed(): WebSeedClaim? {
+    check(!closed)
+    var free = -1
+    var anyFree = false
+    var duplicate = -1
+    val count = verified.size
+    for (step in 0 until count) {
+      val index = (webSeedCursor + step) % count
+      if (!wanted[index] || verified[index]) continue
+      if (!isBusy(index)) {
+        anyFree = true
+        if (activeCount < maxActive) free = index
+        break
+      }
+      if (duplicate < 0 && index in assemblies && index !in webSeeds) duplicate = index
+    }
+    val index = if (free >= 0) free else if (!anyFree && duplicate >= 0) duplicate else
+      return null
+    val length = layout.v2Piece(index.toLong()).length.toInt()
+    val lease = buffers.reserve(length + 512) ?: return null
+    val claim = try { WebSeedClaim(index, ByteArray(length), lease) } catch (error: Throwable) {
+      lease.close()
+      throw error
+    }
+    webSeeds[index] = (webSeeds[index] ?: 0) + 1
+    markBusy(index, true)
+    webSeedCursor = index
+    version++
+    return claim
+  }
+
+  /** A web seed gave back [index]: [verified] when the store holds it now. */
+  fun webSeedDone(index: Int, verified: Boolean) {
+    if (closed) return
+    val held = checkNotNull(webSeeds[index]) { "No web seed fetches piece $index" }
+    if (held == 1) webSeeds.remove(index) else webSeeds[index] = held - 1
+    if (verified && !this.verified[index]) {
+      this.verified[index] = true
+      if (wanted[index]) remaining--
+    }
+    refreshBusy(index)
+    version++
+  }
+
+  /** A web seed's piece: its buffer stays reserved until the seed closes [lease]. */
+  class WebSeedClaim internal constructor(
+    override val index: Int,
+    override val bytes: ByteArray,
+    val lease: TorrentBufferBudget.Lease,
+  ) : WebSeedPiece
 
   /** Interest ignores choke/pipeline state so an available choked peer can choose to unchoke us. */
   fun needsPeer(peer: PeerBlockExchange): Boolean {
@@ -175,7 +247,8 @@ internal class TorrentV2PieceScheduler private constructor(
   fun planNext(peer: PeerBlockExchange, available: (Int) -> Boolean): RequestPlan? {
     check(!closed)
     for (assembly in assemblies.values) {
-      if (!wanted[assembly.index] || !available(assembly.index)) continue
+      val index = assembly.index
+      if (!wanted[index] || verified[index] || !available(index)) continue
       for (slot in assembly.missingBlocks()) {
         val request = assembly.request(slot)
         if (request !in assignments) return reserve(peer, request)
@@ -273,8 +346,9 @@ internal class TorrentV2PieceScheduler private constructor(
     for (request in assignments.keys) discarded.remove(request.index)
     for (index in discarded) {
       checkNotNull(assemblies.remove(index)).close()
-      markBusy(index, false)
+      refreshBusy(index)
     }
+    if (discarded.isNotEmpty()) version++
     return discarded.size
   }
 
@@ -288,7 +362,9 @@ internal class TorrentV2PieceScheduler private constructor(
     check(!closed)
     var count = 0
     // An unwanted piece is not written; its assembly waits to be evicted.
-    val ready = assemblies.filter { (index, assembly) -> assembly.complete && wanted[index] }.keys
+    val ready = assemblies.filter { (index, assembly) ->
+      assembly.complete && wanted[index] && !verified[index]
+    }.keys
     for (index in ready) {
       val ticket = worker.trySubmit(assemblies.getValue(index)) ?: break
       assemblies.remove(index)
@@ -305,7 +381,8 @@ internal class TorrentV2PieceScheduler private constructor(
   fun completed(completion: TorrentV2CommitWorker.Completion): Boolean {
     if (closed) return false
     val index = commits.remove(completion.ticket) ?: return false
-    markBusy(index, false)
+    refreshBusy(index)
+    version++
     if (completion is TorrentV2CommitWorker.Completion.Committed && completion.verified &&
       !verified[index]) {
       verified[index] = true
@@ -315,6 +392,11 @@ internal class TorrentV2PieceScheduler private constructor(
   }
 
   private fun isBusy(index: Int): Boolean = busy[index / 8].toInt() and (128 ushr (index % 8)) != 0
+
+  /** A piece stays busy while it is assembled, committed or fetched by a web seed. */
+  private fun refreshBusy(index: Int) {
+    markBusy(index, index in assemblies || index in webSeeds || commits.containsValue(index))
+  }
 
   private fun markBusy(index: Int, value: Boolean) {
     val byte = index / 8
@@ -332,6 +414,7 @@ internal class TorrentV2PieceScheduler private constructor(
     assignments.clear()
     commits.clear()
     busy = ByteArray(0)
+    webSeeds.clear()
     wanted = BooleanArray(0)
     verified = BooleanArray(0)
     lease.close()

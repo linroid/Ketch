@@ -469,7 +469,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (multi-file: URL + name + path, segments percent-encoded). Pieces are SHA-1 checked like peers';
   a failure backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row drop it.
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
-  with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners use none
+  with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
+  `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`
+  builds) and run the same worker through `TorrentV2WebSeeds` (`WebSeedPieces` is the worker's
+  view: `SwarmWebSeedPieces` for v1, the hub's for v2): an idle seed tells the session loop, which
+  claims a whole piece from `TorrentV2PieceScheduler.claimWebSeed` (the next free wanted piece
+  from a cursor, in the endgame one peers assemble that no seed fetches) and assigns it; the seed
+  fetches it with one range request (`WebSeedV2Layout`: a v2 piece lies in one file, padding is
+  never requested), `TorrentV2PieceStore.commitOwned` checks it against the piece layers, and
+  `webSeedDone` returns it. Mirrors pay the engine's, owner's and task's limits, keep a transfer
+  without peers alive while one runs, and add `WebSeedStats` to the v2 swarm summary
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents

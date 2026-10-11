@@ -78,6 +78,8 @@ internal class TorrentV2Fixture(
       privateTorrent: Boolean = false,
       seed: Int = 1,
       name: String = "pack",
+      /** The `url-list` (BEP 19), outside the info dictionary. */
+      webSeeds: List<String> = emptyList(),
     ): TorrentV2Fixture {
       require(files.map { it.first } == files.map { it.first }.sorted())
       require(files.all { it.second > 0 })
@@ -113,7 +115,9 @@ internal class TorrentV2Fixture(
       val layers = payloads.withIndex().filter { it.value.size > pieceLength }.associate {
         roots[it.index].toByteString() to pieceLayer(it.value, pieceLength)
       }
-      val metainfo = Bencode.encode(mapOf("info" to info, "piece layers" to layers))
+      val root = mutableMapOf<String, Any>("info" to info, "piece layers" to layers)
+      if (webSeeds.isNotEmpty()) root["url-list"] = webSeeds
+      val metainfo = Bencode.encode(root)
       return TorrentV2Fixture(TorrentV2Document.parse(metainfo), metainfo,
         files.map { it.first }, payloads, pieceLength)
     }
