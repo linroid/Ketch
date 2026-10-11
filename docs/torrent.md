@@ -219,25 +219,29 @@ including a development run, hands its files to the running app instead of openi
   peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
   interface map ports
 - Local Service Discovery (BEP 14, `TorrentConfig.localDiscovery`, on by default for engines a
-  `TorrentDownloadSource` creates; engines built directly never join the group) finds peers on
-  the LAN without trackers or the internet. While a public torrent runs, the engine joins
-  `239.192.152.143:6771` on every interface with a private or link-local IPv4 address (the port
-  shared with other clients, `SO_REUSEADDR`), sends `BT-SEARCH * HTTP/1.1` announces with its
-  TCP listen port (never a router-mapped one: LAN peers dial us directly), a random `cookie` and
-  up to 20 `Infohash` headers per datagram, when each torrent starts and every 5 minutes, never
-  more than once a minute per torrent, and leaves the group when the last one stops. A v1
-  torrent announces its info hash; a v2 torrent the first 20 bytes of its SHA-256 hash, its
-  wire tag, as DHT does; a hybrid both, and peers found under each are dialed in that swarm's
-  mode. Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or
-  link-local senders, with a valid `Port` and at most 20 hashes in 1400 bytes, never our own
-  cookie, at most 32 at once then 4 a second, and each peer once a minute per torrent. LAN peers
-  are never shared through peer exchange. Private (BEP 27) and tracker-only torrents never
-  announce or accept them. IPv6 (`[ff15::efc0:988f]`) is not used. On Android the app holds a
-  Wi-Fi `MulticastLock` (`TorrentDownloadSource(multicastLock = ...)`) only while the group is
-  joined, and Android 17 blocks it until the local network permission is granted: the app asks
-  for it once, the first time discovery wants the LAN, and again whenever the setting is switched
-  on (the system stops asking after two denials); without it the engine retries joining every
-  minute. iOS does not run it, as multicast there needs Apple's multicast networking entitlement
+  `TorrentDownloadSource` creates; engines built directly never join the group) finds peers on the
+  LAN without trackers or the internet. While a public torrent runs, the engine joins
+  `239.192.152.143:6771` on every interface with a private or link-local IPv4 address and
+  `[ff15::efc0:988f]:6771` on every interface with a link-local or unique local IPv6 address (not
+  VPN tunnels; one socket and port, shared with other clients, `SO_REUSEADDR`), sends `BT-SEARCH *
+  HTTP/1.1` announces with its TCP listen port (never a router-mapped one: LAN peers dial us
+  directly), a random `cookie` and up to 20 `Infohash` headers per datagram to both groups (each
+  with its own `Host`), when each torrent starts and every 5 minutes, never more than once a minute
+  per torrent, and leaves the group when the last one stops. A v1 torrent announces its info hash; a
+  v2 torrent the first 20 bytes of its SHA-256 hash, its wire tag, as DHT does; a hybrid both, and
+  peers found under each are dialed in that swarm's mode. Announces are accepted only from private
+  (10/8, 172.16/12, 192.168/16, 100.64/10) or link-local IPv4 senders and unique local IPv6 ones
+  (fc00::/7; an IPv6 link-local sender is heard but not dialed, as reaching it needs the interface
+  it spoke on, which peer addresses do not carry), with a valid `Port` and at most 20 hashes in 1400
+  bytes, never our own cookie, at most 32 at once then 4 a second, and each peer once a minute per
+  torrent. LAN peers are never shared through peer exchange. Private (BEP 27) and tracker-only
+  torrents never announce or accept them. The groups are joined again on the current interfaces when
+  either family's addresses change. On Android the app holds a Wi-Fi `MulticastLock`
+  (`TorrentDownloadSource(multicastLock = ...)`) only while the group is joined, and Android 17
+  blocks it until the local network permission is granted: the app asks for it once, the first time
+  discovery wants the LAN, and again whenever the setting is switched on (the system stops asking
+  after two denials); without it the engine retries joining every minute. iOS does not run it, as
+  multicast there needs Apple's multicast networking entitlement
 - While a public magnet looks for its metadata, it takes part in local service discovery under
   its info hash (a btmh magnet under the first 20 bytes of its SHA-256 hash), and LAN peers that
   announce it are asked for the metadata like DHT and tracker peers, so a magnet resolves from

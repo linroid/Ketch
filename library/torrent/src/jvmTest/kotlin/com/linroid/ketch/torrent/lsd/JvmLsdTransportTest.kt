@@ -1,39 +1,67 @@
 package com.linroid.ketch.torrent.lsd
 
+import com.linroid.ketch.torrent.net.TorrentDatagram
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import java.net.DatagramSocket
+import java.net.NetworkInterface
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
- * Two transports sharing one port on this machine's private interfaces hear each other's
- * announces, as two clients on one device do. Skipped where the system refuses multicast.
+ * Two transports sharing one port on this machine's LAN interfaces hear each other's announces,
+ * as two clients on one device do, in each family. Skipped where the system refuses multicast.
  */
 class JvmLsdTransportTest {
   @Test
-  fun twoTransportsOnOnePort_hearEachOther() = runBlocking {
+  fun ipv4_twoTransportsOnOnePort_hearEachOther() = runBlocking {
     val interfaces = lsdInterfaces()
-    if (interfaces.isEmpty()) return@runBlocking skip("no private interface carries multicast")
+    if (interfaces.isEmpty()) return@runBlocking skip("no private IPv4 interface")
+    val heard = exchange(interfaces, emptyList()) ?: return@runBlocking
+    assertTrue(heard.bytes.decodeToString().contains("\r\nHost: $LSD_HOST_IPV4\r\n"))
+  }
+
+  @Test
+  fun ipv6_twoTransportsOnOnePort_hearEachOther() = runBlocking {
+    val interfaces = lsdIpv6Interfaces()
+    if (interfaces.isEmpty()) return@runBlocking skip("no link-local or unique local interface")
+    val heard = exchange(emptyList(), interfaces) ?: return@runBlocking
+    assertTrue(':' in heard.remote.host, heard.remote.host)
+    assertTrue('%' !in heard.remote.host, heard.remote.host)
+    assertTrue(heard.bytes.decodeToString().contains("\r\nHost: $LSD_HOST_IPV6\r\n"))
+  }
+
+  /** Sends an announce from one transport and returns what the other heard, or null if skipped. */
+  private suspend fun exchange(
+    ipv4: List<NetworkInterface>,
+    ipv6: List<NetworkInterface>,
+  ): TorrentDatagram? {
     // Not the BEP 14 port, so clients running here never see the test's announces.
     val port = DatagramSocket(0).use { it.localPort }
     val first = try {
-      JvmLsdTransport.open(interfaces, port)
+      JvmLsdTransport.open(ipv4, ipv6, port)
     } catch (e: Exception) {
-      return@runBlocking skip("the system refused to join the group: $e")
+      skip("the system refused to join the group: $e")
+      return null
     }
-    val second = JvmLsdTransport.open(interfaces, port)
+    val second = JvmLsdTransport.open(ipv4, ipv6, port)
     try {
       val announce = LsdAnnounce(7000, listOf(ByteArray(20) { 7 }.toByteString()), "first")
       try {
-        first.send(announce.encode())
+        first.send(announce)
       } catch (e: Exception) {
-        return@runBlocking skip("the system refused to send to the group: $e")
+        skip("the system refused to send to the group: $e")
+        return null
       }
       val heard = withTimeoutOrNull(5_000) { second.receive() }
-        ?: return@runBlocking skip("the group delivered nothing")
+      if (heard == null) {
+        skip("the group delivered nothing")
+        return null
+      }
       assertEquals(announce, LsdAnnounce.parse(heard.bytes))
+      return heard
     } finally {
       first.close()
       second.close()

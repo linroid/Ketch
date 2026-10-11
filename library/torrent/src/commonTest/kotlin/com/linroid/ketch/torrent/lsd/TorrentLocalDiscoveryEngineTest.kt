@@ -145,6 +145,11 @@ class TorrentLocalDiscoveryEngineTest {
       val peer = PeerEndpoint("192.168.1.20", 7000)
       lan.announceFrom(peer.host, peer.port, hash)
       assertEquals(Dial(peer, hash), network.dials.first { it.isNotEmpty() }.first())
+      // From the IPv6 group: a unique local sender is dialed like an IPv4 one.
+      val ipv6Peer = PeerEndpoint("fd12:3456:0:0:0:0:0:7", 7001)
+      lan.announceFrom(ipv6Peer.host, ipv6Peer.port, hash)
+      val dials = network.dials.first { dials -> dials.any { it.remote == ipv6Peer } }
+      assertEquals(Dial(ipv6Peer, hash), dials.first { it.remote == ipv6Peer })
     }
   }
 
@@ -160,7 +165,7 @@ class TorrentLocalDiscoveryEngineTest {
         (root / "payload").toString(), privacy = TorrentDiscoveryPrivacy.PUBLIC))
       session.resume()
       lan.sent.first { sent -> sent.flatMap { it.hashes }.toSet() == setOf(v1, v2) }
-      val v2Peer = PeerEndpoint("192.168.1.30", 7001)
+      val v2Peer = PeerEndpoint("fd12:3456:0:0:0:0:0:30", 7001)
       val v1Peer = PeerEndpoint("192.168.1.31", 7002)
       lan.announceFrom(v2Peer.host, v2Peer.port, v2)
       lan.announceFrom(v1Peer.host, v1Peer.port, v1)

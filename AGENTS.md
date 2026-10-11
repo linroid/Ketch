@@ -647,23 +647,29 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Local Service Discovery (BEP 14), `TorrentConfig.localDiscovery` (on; only engines given a
   `KotlinTorrentEngine` `localDiscovery` transport factory, as `TorrentDownloadSource` passes
   `openLsdMulticast`, join the group, so engines built directly in tests never send multicast):
-  `TorrentLocalDiscovery` joins `239.192.152.143:6771` while a public torrent's discovery runs
-  (`participate`, from the same block as DHT, so private and tracker-only torrents never take
-  part), announcing `BT-SEARCH` datagrams (`LsdAnnounce`: our TCP listen port, never the mapped
-  one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5 minutes, at most
-  once a minute per hash, and hands the peers others announce to the torrent (v1: its discovery
-  channel, counted as `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2
-  hash in v2 mode and a hybrid's v1 hash in v1 mode). A public magnet's metadata lookup
-  (`discoverMagnet`, not tracker-only ones) participates too, under its btih or the truncated
-  btmh hash, until the metadata is found or the lookup stops, and asks the LAN peers announced
-  for it for the metadata like DHT and tracker peers. It accepts private and link-local senders
-  only, never its own cookie, 32 at once then 4 a second, each peer once a minute per torrent.
-  `openLsdMulticast` is a `MulticastSocket` with `SO_REUSEADDR` joined on each private IPv4
-  interface (jvmAndAndroidMain) and `null` on iOS (multicast needs Apple's entitlement); IPv4
-  only. `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the
-  group is joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
-  `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest`
-  real multicast (skipped where the system refuses it)
+  `TorrentLocalDiscovery` joins `239.192.152.143:6771` and `[ff15::efc0:988f]:6771` while a public
+  torrent's discovery runs (`participate`, from the same block as DHT, so private and tracker-only
+  torrents never take part), announcing `BT-SEARCH` datagrams (`LsdAnnounce`: our TCP listen port,
+  never the mapped one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5
+  minutes, at most once a minute per hash, to both groups (`LsdTransport.send` writes each group's
+  `Host`), and hands the peers others announce to the torrent (v1: its discovery channel, counted as
+  `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2 hash in v2 mode and a
+  hybrid's v1 hash in v1 mode). A public magnet's metadata lookup (`discoverMagnet`, not
+  tracker-only ones) participates too, under its btih or the truncated btmh hash, until the metadata
+  is found or the lookup stops, and asks the LAN peers announced for it for the metadata like DHT
+  and tracker peers. It accepts private and link-local IPv4 and unique local IPv6 senders only
+  (`lsdSenderAllowed`, `lsdPeerDialable`: IPv6 link-local senders are dropped, as `PeerEndpoint`
+  carries no zone to dial them), never its own cookie, 32 at once then 4 a second, each peer once a
+  minute per torrent. `openLsdMulticast` is one dual-stack `MulticastSocket` with `SO_REUSEADDR`
+  (`JvmLsdTransport`, jvmAndAndroidMain) that joins the IPv4 group on each private IPv4 interface
+  (`lsdInterfaces`) and the IPv6 group on each non-point-to-point interface with a link-local or
+  unique local IPv6 address (`lsdIpv6Interfaces`), sending IPv6 announces to the group scoped to
+  each interface (macOS finds no route to `ff15::` otherwise); its `isCurrent` compares both
+  families' interfaces and addresses. It is `null` on iOS (multicast needs Apple's entitlement).
+  `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the group is
+  joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
+  `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest` real
+  multicast (skipped where the system refuses it)
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
@@ -1532,8 +1538,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 3. `library:sqlite` supports Android, iOS and JVM only -- use `InMemoryTaskStore` elsewhere
 4. `library:ftp` does not support JS/Wasm (requires raw TCP sockets)
 5. `library:torrent` has no browser-local engine. uTP is only dialed after TCP fails; seeding runs
-   only while the process runs (no background seeding). Local service discovery is IPv4 only and
-   does not run on iOS.
+   only while the process runs (no background seeding). Local service discovery does not run on
+   iOS, and over IPv6 only finds peers with a unique local address.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and

@@ -31,17 +31,20 @@ import okio.ByteString.Companion.toByteString
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-/** The BEP 14 multicast group, as a socket joins it, or null where it cannot. */
+/** The BEP 14 multicast groups, as a socket joins them, or null where it cannot. */
 internal interface LsdTransport {
-  /** Sends [bytes] to the group on every interface the transport joined it on. */
-  suspend fun send(bytes: ByteArray)
+  /**
+   * Sends [announce] to each group the transport joined (IPv4, IPv6 or both), on every interface
+   * it joined that group on, with that group's `Host` header. Throws only when none went out.
+   */
+  suspend fun send(announce: LsdAnnounce)
 
   /** The next datagram any member sent the group, ours included. */
   suspend fun receive(): TorrentDatagram
 
   /**
-   * Whether the interfaces it joined the group on are still this device's; once the network
-   * changes, the group is joined again on the current ones.
+   * Whether the interfaces it joined either group on are still this device's; once the network
+   * changes, both groups are joined again on the current ones.
    */
   suspend fun isCurrent(): Boolean = true
 
@@ -49,14 +52,22 @@ internal interface LsdTransport {
 }
 
 /**
- * Joins the BEP 14 group on every private IPv4 interface, sharing the port with other clients,
+ * Joins the BEP 14 IPv4 group on every private IPv4 interface and the IPv6 group on every
+ * interface with a link-local or unique local IPv6 address, sharing the port with other clients,
  * or null where this platform cannot (iOS, where multicast needs an entitlement).
  */
 internal expect suspend fun openLsdMulticast(): LsdTransport?
 
-/** BEP 14's IPv4 group and port. */
+/** BEP 14's IPv4 and IPv6 groups and their port. */
 internal const val LSD_GROUP_IPV4 = "239.192.152.143"
+internal const val LSD_GROUP_IPV6 = "ff15::efc0:988f"
 internal const val LSD_PORT = 6771
+
+/** The `Host` header of an announce sent to the IPv4 group. */
+internal const val LSD_HOST_IPV4 = "$LSD_GROUP_IPV4:$LSD_PORT"
+
+/** The `Host` header of an announce sent to the IPv6 group. */
+internal const val LSD_HOST_IPV6 = "[$LSD_GROUP_IPV6]:$LSD_PORT"
 
 /**
  * One BEP 14 announce: an HTTP-like `BT-SEARCH` request naming the TCP [port] peers reach the
@@ -72,9 +83,10 @@ internal data class LsdAnnounce(
     require(port in 1..65535 && hashes.isNotEmpty() && hashes.all { it.size == 20 })
   }
 
-  fun encode(): ByteArray = buildString {
+  /** The datagram for the group whose `Host` header is [host]. */
+  fun encode(host: String = LSD_HOST_IPV4): ByteArray = buildString {
     append("BT-SEARCH * HTTP/1.1\r\n")
-    append("Host: $LSD_GROUP_IPV4:$LSD_PORT\r\n")
+    append("Host: $host\r\n")
     append("Port: $port\r\n")
     for (hash in hashes) append("Infohash: ${hash.hex()}\r\n")
     if (cookie != null) append("cookie: $cookie\r\n")
@@ -131,7 +143,10 @@ internal class LsdTopic(val hash: ByteString, val deliver: (PeerEndpoint) -> Uni
   init { require(hash.size == 20) }
 }
 
-/** Whether an announce from [address] may come from our network: private or link-local. */
+/**
+ * Whether an announce from [address] may come from our network: private or link-local IPv4,
+ * link-local or unique local IPv6.
+ */
 internal fun lsdSenderAllowed(address: ByteArray): Boolean = when (address.size) {
   4 -> privateIpv4(address) ||
     (address[0].toInt() and 255) == 169 && (address[1].toInt() and 255) == 254
@@ -142,16 +157,25 @@ internal fun lsdSenderAllowed(address: ByteArray): Boolean = when (address.size)
 }
 
 /**
+ * Whether an allowed sender can be dialed back: not an IPv6 link-local (fe80::/10) one, which is
+ * reachable only through the interface it was heard on, a zone peer endpoints do not carry.
+ */
+internal fun lsdPeerDialable(address: ByteArray): Boolean =
+  !(address.size == 16 && (address[0].toInt() and 255) == 0xfe &&
+    (address[1].toInt() and 0xc0) == 0x80)
+
+/**
  * Local Service Discovery (BEP 14): announces the torrents that [participate] while they run to
- * the LAN's multicast group, and hands them the peers other clients announce for them, so devices
- * at home find each other without trackers or DHT. Only public torrents may participate: the
- * engine never registers private (BEP 27) or tracker-only ones.
+ * the LAN's multicast groups, and hands them the peers other clients announce for them, so
+ * devices at home find each other without trackers or DHT. Only public torrents may participate:
+ * the engine never registers private (BEP 27) or tracker-only ones.
  *
  * Each torrent is announced when it starts and every 5 minutes, never more than once a minute,
- * several to a datagram. The group is joined only while a torrent participates and [enabled].
- * Announces are accepted only from private or link-local senders, at most [ACCEPT_BURST] at once
- * and [ACCEPT_PER_SECOND] a second after that, and each peer once a minute per torrent. Ours come
- * back from the group too: our [cookie] tells them apart.
+ * several to a datagram, to the IPv4 and the IPv6 group alike. The groups are joined only while
+ * a torrent participates and [enabled]. Announces are accepted only from private or link-local
+ * IPv4 and unique local IPv6 senders ([lsdSenderAllowed], [lsdPeerDialable]), at most
+ * [ACCEPT_BURST] at once and [ACCEPT_PER_SECOND] a second after that, and each peer once a minute
+ * per torrent. Ours come back from the groups too: our [cookie] tells them apart.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentLocalDiscovery(
@@ -246,13 +270,13 @@ internal class TorrentLocalDiscovery(
         if (transport == null) {
           log.d { "Local service discovery is unavailable on this device" }
         } else {
-          log.d { "Joined the local service discovery group" }
+          log.d { "Joined the local service discovery groups" }
           coroutineScope {
             val receiving = launch { receive(transport) }
             announce(transport)
             receiving.cancel()
           }
-          log.d { "The network changed: joining the local service discovery group again" }
+          log.d { "The network changed: joining the local service discovery groups again" }
           continue
         }
       } catch (e: CancellationException) {
@@ -271,7 +295,7 @@ internal class TorrentLocalDiscovery(
 
   /**
    * Announces the hashes as they fall due until the network changes, then returns so [run] joins
-   * the group on the current interfaces. A send that fails on every interface throws.
+   * the groups on the current interfaces. A send that fails on every interface throws.
    */
   private suspend fun announce(transport: LsdTransport) {
     var checkedAt = nowMs()
@@ -296,7 +320,7 @@ internal class TorrentLocalDiscovery(
       }
       for (batch in hashes.chunked(LsdAnnounce.MAX_HASHES)) {
         try {
-          transport.send(LsdAnnounce(port, batch, cookie).encode())
+          transport.send(LsdAnnounce(port, batch, cookie))
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
@@ -323,7 +347,7 @@ internal class TorrentLocalDiscovery(
   /** Delivers the peer [datagram] announces to the torrents it names, unless refused. */
   internal suspend fun accept(datagram: TorrentDatagram) {
     val address = numericAddress(datagram.remote.host) ?: return
-    if (!lsdSenderAllowed(address)) return
+    if (!lsdSenderAllowed(address) || !lsdPeerDialable(address)) return
     val message = LsdAnnounce.parse(datagram.bytes) ?: return
     if (message.cookie == cookie) return
     if (!takeToken()) {

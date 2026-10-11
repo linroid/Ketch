@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.lsd
 
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentDatagram
+import com.linroid.ketch.torrent.net.numericAddress
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -41,9 +43,9 @@ internal class FakeLsdTransport : LsdTransport {
     return this
   }
 
-  override suspend fun send(bytes: ByteArray) {
+  override suspend fun send(announce: LsdAnnounce) {
     if (failSends) throw IOException("Network is unreachable")
-    val announce = assertNotNull(LsdAnnounce.parse(bytes))
+    assertEquals(announce, LsdAnnounce.parse(announce.encode()))
     sent.update { it + announce }
   }
 
@@ -93,6 +95,28 @@ class TorrentLocalDiscoveryTest {
     val text = announce.encode().decodeToString()
     assertTrue(text.startsWith("BT-SEARCH * HTTP/1.1\r\nHost: 239.192.152.143:6771\r\n"))
     assertTrue(text.endsWith("\r\n\r\n\r\n"))
+  }
+
+  @Test
+  fun encode_forTheIpv6Group_namesItsHost() {
+    val announce = LsdAnnounce(51413, listOf(hashA), "c00k1e")
+    val bytes = announce.encode(LSD_HOST_IPV6)
+    assertTrue(bytes.decodeToString()
+      .startsWith("BT-SEARCH * HTTP/1.1\r\nHost: [ff15::efc0:988f]:6771\r\n"))
+    assertEquals(announce, LsdAnnounce.parse(bytes))
+  }
+
+  @Test
+  fun lsdSenderAllowed_ipv6LinkLocalAndUniqueLocalOnly() {
+    for (host in listOf("fe80::1", "febf::1", "fd12:3456::7", "fc00::1")) {
+      assertTrue(lsdSenderAllowed(assertNotNull(numericAddress(host))), host)
+    }
+    for (host in listOf("2001:db8::1", "fec0::1", "ff15::efc0:988f", "::1", "::ffff:192.168.1.2")) {
+      assertFalse(lsdSenderAllowed(assertNotNull(numericAddress(host))), host)
+    }
+    assertFalse(lsdPeerDialable(assertNotNull(numericAddress("fe80::1"))))
+    assertTrue(lsdPeerDialable(assertNotNull(numericAddress("fd12:3456::7"))))
+    assertTrue(lsdPeerDialable(assertNotNull(numericAddress("192.168.1.2"))))
   }
 
   @Test
@@ -267,6 +291,22 @@ class TorrentLocalDiscoveryTest {
       "BT-SEARCH * HTTP/1.1\r\n\r\n".encodeToByteArray()))
     runCurrent()
     assertEquals(emptyList(), found)
+  }
+
+  @Test
+  fun accept_ipv6_deliversUniqueLocalSendersOnly() = runTest {
+    val transport = FakeLsdTransport()
+    val service = service(transport)
+    val found = mutableListOf<Pair<ByteString, PeerEndpoint>>()
+    join(service, found, hashA)
+    runCurrent()
+    transport.announceFrom("fd12:3456:0:0:0:0:0:7", 7000, hashA)
+    // Link-local senders need the zone they were heard on, which endpoints do not carry.
+    transport.announceFrom("fe80::1", 7001, hashA)
+    transport.announceFrom("2001:db8::1", 7002, hashA)
+    transport.announceFrom("::1", 7003, hashA)
+    runCurrent()
+    assertEquals(listOf(hashA to PeerEndpoint("fd12:3456:0:0:0:0:0:7", 7000)), found)
   }
 
   @Test
