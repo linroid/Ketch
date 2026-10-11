@@ -250,8 +250,15 @@ class UtpEndpointTest {
   @Test
   fun fallback_peerNoLongerOnUtp_usesTcpAndIsForgotten() = endpoints { network, scope ->
     val a = side(network, scope, dialOptions = UtpOptions(synRetries = 0))
-    // TCP works; nothing answers uTP there.
-    val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+    // TCP works; nothing answers uTP there. A silent socket holds the UDP port, as Windows may
+    // give a UDP socket, such as our own endpoint's, the TCP listener's port number.
+    var listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+    var silent = runCatching { network.bindUdp(PeerEndpoint("127.0.0.1", listener.local.port)) }
+    while (silent.isFailure) {
+      listener.close()
+      listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      silent = runCatching { network.bindUdp(PeerEndpoint("127.0.0.1", listener.local.port)) }
+    }
     val target = PeerEndpoint("127.0.0.1", listener.local.port)
     var tcp = 0
     val counting = object : TorrentNetwork by network {
@@ -268,6 +275,7 @@ class UtpEndpointTest {
       // uTP was tried once, then forgotten: both dials ended on TCP.
       assertEquals(2, tcp)
     } finally {
+      silent.getOrThrow().close()
       listener.close()
     }
   }
