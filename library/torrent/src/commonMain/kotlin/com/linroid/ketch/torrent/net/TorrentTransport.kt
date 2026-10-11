@@ -1,20 +1,7 @@
 package com.linroid.ketch.torrent.net
 
 import com.linroid.ketch.torrent.mse.TorrentPeerEncryption
-import io.ktor.network.selector.SelectorManager
-import io.ktor.network.sockets.Datagram
-import io.ktor.network.sockets.InetSocketAddress
-import io.ktor.network.sockets.Socket
-import io.ktor.network.sockets.aSocket
-import io.ktor.network.sockets.openReadChannel
-import io.ktor.network.sockets.openWriteChannel
-import io.ktor.utils.io.readFully
-import io.ktor.utils.io.writeFully
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withTimeout
-import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -137,104 +124,5 @@ internal class TorrentResources {
 
   fun close() {
     resources.exchange(null)?.forEach { lease -> runCatching { lease.close() } }
-  }
-}
-
-/**
- * TCP/UDP adapter. Higher layers own protocol deadlines and datagram validation.
- *
- * Every network selects on [sharedSelector] by default, so engines share one selector thread;
- * [close] closes the network's sockets, never the selector.
- */
-internal class KtorTorrentNetwork(
-  private val connectTimeoutMs: Long = 10_000,
-  private val selector: SelectorManager = sharedSelector,
-) : TorrentNetwork {
-  private val resources = TorrentResources()
-
-  override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
-    require(remote.port != 0)
-    var connection: TorrentConnection? = null
-    try {
-      withTimeout(connectTimeoutMs) {
-        connection = wrap(aSocket(selector).tcp().connect(remote.host, remote.port))
-      }
-      return checkNotNull(connection)
-    } catch (e: Throwable) {
-      connection?.close()
-      throw e
-    }
-  }
-
-  override suspend fun listen(local: PeerEndpoint): TorrentListener {
-    val socket = aSocket(selector).tcp().bind(local.host, local.port)
-    val lease = resources.register { socket.close() }
-    return object : TorrentListener {
-      override val local = endpoint(socket.localAddress as InetSocketAddress)
-      override suspend fun accept(): TorrentConnection = wrap(socket.accept())
-      override fun close() = lease.close()
-    }
-  }
-
-  override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
-    val socket = aSocket(selector).udp().bind(local.host, local.port)
-    val lease = resources.register { socket.close() }
-    val bound = endpoint(socket.localAddress as InetSocketAddress)
-    // JVM dual-stack UDP may report :: even when the requested wildcard is IPv4.
-    val logicalLocal = if (local.host == "0.0.0.0") bound.copy(host = "0.0.0.0") else bound
-    return object : TorrentDatagramSocket {
-      override val local = logicalLocal
-      override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) {
-        require(bytes.size <= 65507 && remote.port != 0)
-        val packet = Buffer().apply { write(bytes) }
-        socket.send(Datagram(packet, InetSocketAddress(remote.host, remote.port)))
-      }
-      override suspend fun receive(): TorrentDatagram {
-        val datagram = socket.receive()
-        return datagram.packet.use {
-          TorrentDatagram(endpoint(datagram.address as InetSocketAddress), it.readByteArray())
-        }
-      }
-      override fun close() = lease.close()
-    }
-  }
-
-  private fun wrap(socket: Socket): TorrentConnection {
-    val lease = resources.register { socket.close() }
-    try {
-      val input = socket.openReadChannel()
-      val output = socket.openWriteChannel(autoFlush = true)
-      return object : TorrentConnection {
-        override val remote = endpoint(socket.remoteAddress as InetSocketAddress)
-        override suspend fun readExactly(size: Int): ByteArray {
-          require(size in 0..16 * 1024 * 1024)
-          return ByteArray(size).also { input.readFully(it) }
-        }
-        override suspend fun write(bytes: ByteArray) {
-          output.writeFully(bytes)
-        }
-        override fun close() = lease.close()
-      }
-    } catch (e: Throwable) {
-      lease.close()
-      throw e
-    }
-  }
-
-  override fun close() {
-    resources.close()
-  }
-
-  private fun endpoint(address: InetSocketAddress): PeerEndpoint {
-    val bytes = checkNotNull(address.resolveAddress()) { "Unresolved socket address" }
-    return PeerEndpoint(numericHost(bytes), address.port)
-  }
-
-  companion object {
-    /**
-     * The selector every network shares by default, created on first use and never closed: it
-     * waits for every engine's sockets on one thread, where a selector per engine took one each.
-     */
-    val sharedSelector: SelectorManager by lazy { SelectorManager(Dispatchers.IO) }
   }
 }

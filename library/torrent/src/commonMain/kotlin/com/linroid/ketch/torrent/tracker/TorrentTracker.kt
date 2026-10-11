@@ -11,17 +11,14 @@ import com.linroid.ketch.torrent.net.TorrentDatagramSocket
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.numericHost
+import com.linroid.ketch.torrent.net.resolveTorrentHost
 import com.linroid.ketch.torrent.trackerLabel
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.encodedPath
-import io.ktor.network.sockets.InetSocketAddress
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.Buffer
 import okio.IOException
@@ -75,11 +72,9 @@ internal class TorrentTracker(
   private val http: TorrentHttp,
   private val network: TorrentNetwork,
   private val resolve: suspend (PeerEndpoint) -> PeerEndpoint = { endpoint ->
-    withContext(Dispatchers.IO) {
-      val address = InetSocketAddress(endpoint.host, endpoint.port).resolveAddress()
-        ?: throw IOException("Could not resolve the tracker's host")
-      PeerEndpoint(numericHost(address), endpoint.port)
-    }
+    val address = resolveTorrentHost(endpoint.host).firstOrNull()
+      ?: throw IOException("Could not resolve the tracker's host")
+    PeerEndpoint(numericHost(address), endpoint.port)
   },
   private val retryDelaysMs: List<Long> = listOf(15_000, 30_000, 60_000),
 ) {

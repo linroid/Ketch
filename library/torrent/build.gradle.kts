@@ -53,7 +53,6 @@ kotlin {
       api(projects.library.core)
       api(projects.library.torrentApi)
       implementation(libs.okio)
-      implementation(libs.ktor.network)
       implementation(libs.ktor.http)
       implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
