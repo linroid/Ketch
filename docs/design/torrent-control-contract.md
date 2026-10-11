@@ -105,8 +105,10 @@ over the task records and ledgered commands of core's `SourceHost`;
 `events` stream (`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
 serve them. What the runtime does, where it narrows the contract above:
 
-- **Capabilities.** `inspect`, `file-selection`, `v1`, `v2` and `hybrid`, plus `seeding` only while
-  the live upload policy is `SEED_AFTER_COMPLETION`. Every other name is never advertised.
+- **Capabilities.** `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, plus
+  `seeding` only while the live upload policy is `SEED_AFTER_COMPLETION`. `utp` and `mse-pe` say
+  the engine speaks uTP and protocol encryption, whether or not `utp` is on and `encryption` is off
+  in the settings at the moment. Every other name is never advertised.
   `maxPageSize` is 1000, `maxSubscriptions` 16, and `backgroundTransfers` is false: seeding runs
   only while the process runs. The remote adapter fails closed: it checks the server's capabilities,
   read once per connection, before every command and refuses with `UNSUPPORTED` before sending

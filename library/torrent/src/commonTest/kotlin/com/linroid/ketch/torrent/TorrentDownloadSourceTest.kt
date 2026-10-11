@@ -205,9 +205,22 @@ class TorrentDownloadSourceTest {
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL), source.features)
-    assertEquals(setOf("file-selection", "v1", "v2", "hybrid"), source.torrentCapabilities)
+    assertEquals(setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe"),
+      source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)
+  }
+
+  @Test
+  fun torrentCapabilities_utpAndEncryptionOff_stillListsEngineProtocols() = runTest {
+    val off = TorrentDownloadSource(
+      TorrentConfig(utpEnabled = false, encryption = TorrentEncryption.DISABLED),
+    )
+    off.setUtpEnabled(false)
+    off.setEncryption(TorrentEncryption.DISABLED)
+    // Capabilities describe the backend; the settings only choose what it uses now.
+    assertTrue("utp" in off.torrentCapabilities)
+    assertTrue("mse-pe" in off.torrentCapabilities)
   }
 
   @Test

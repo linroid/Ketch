@@ -203,13 +203,21 @@ class TorrentDownloadSource(
       source.changeSeedingSelection(taskId, fileIds)
   }
 
-  /** What [TorrentControlSource.torrentCapabilities] reports. */
+  /**
+   * What [TorrentControlSource.torrentCapabilities] reports.
+   *
+   * `utp` and `mse-pe` name what the engine can speak, whatever [TorrentConfig.utpEnabled] and
+   * [TorrentConfig.encryption] currently say: capabilities describe the backend, and those
+   * settings change live without the backend gaining or losing the protocol.
+   */
   internal val torrentCapabilities: Set<String>
     get() = buildSet {
       add(TorrentCapability.FILE_SELECTION.wireName)
       add(TorrentCapability.V1.wireName)
       add(TorrentCapability.V2.wireName)
       add(TorrentCapability.HYBRID.wireName)
+      add(TorrentCapability.UTP.wireName)
+      add(TorrentCapability.ENCRYPTION.wireName)
       // Sharing follows the live upload setting.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)

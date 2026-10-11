@@ -93,7 +93,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   registered, `RemoteKetch` one over REST and SSE that fails closed against older servers),
   `TorrentInterest(taskId)` (a task's snapshots through `KetchApi.subscribe`, `null` once gone),
   `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
-  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, and `seeding` while uploads seed),
+  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, which the engine
+  speaks whatever its settings, and `seeding` while uploads seed),
   `TorrentSnapshot`, `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
   `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
