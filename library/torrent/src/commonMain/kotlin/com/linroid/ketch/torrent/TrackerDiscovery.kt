@@ -70,6 +70,11 @@ internal class TrackerDiscovery private constructor(
   private var retryAt = 0L
   private var retryDelayMs = 15_000L
   private var started = false
+  /**
+   * A `started` announce went out but was canceled before its answer: the tracker may count us
+   * anyway, so leaving still sends `stopped`, while the next announce is `started` again.
+   */
+  private var startUnconfirmed = false
   private var completed = false
   private val key = okio.Buffer().write(torrentRandomBytes(4)).readInt()
 
@@ -92,7 +97,7 @@ internal class TrackerDiscovery private constructor(
     require(stopTimeoutMs in 1..30_000 && downloaded >= 0 && uploaded >= 0)
     val replacement = TrackerConfiguration.prepare(tiers)
     remaining(verified) // Validate state before contacting the old configuration.
-    if (started) withTimeoutOrNull(stopTimeoutMs) {
+    if (started || startUnconfirmed) withTimeoutOrNull(stopTimeoutMs) {
       try {
         poll(verified, downloaded, uploaded, stopped = true)
       } catch (error: CancellationException) {
@@ -104,6 +109,7 @@ internal class TrackerDiscovery private constructor(
     currentCoroutineContext().ensureActive()
     trackers.replace(replacement)
     started = false
+    startUnconfirmed = false
     completed = false
     nextAnnounce = 0L
     nextManualAnnounce = 0L
@@ -121,7 +127,7 @@ internal class TrackerDiscovery private constructor(
     val left = remaining(verified)
     if (!stopped && nowMs() < retryAt) return null
     val event = when {
-      stopped && started -> TrackerEvent.STOPPED
+      stopped && (started || startUnconfirmed) -> TrackerEvent.STOPPED
       stopped -> return null
       !started -> TrackerEvent.STARTED
       left == 0L && !completed && announceCompletion() -> TrackerEvent.COMPLETED
@@ -135,6 +141,7 @@ internal class TrackerDiscovery private constructor(
       trackers.announce(TrackerAnnounce(topic, peerId, port(), downloaded,
         left, uploaded, event, key))
     } catch (error: CancellationException) {
+      if (event == TrackerEvent.STARTED) startUnconfirmed = true
       throw error
     } catch (error: Exception) {
       currentCoroutineContext().ensureActive()
@@ -143,6 +150,7 @@ internal class TrackerDiscovery private constructor(
       throw error
     }
     started = event != TrackerEvent.STOPPED
+    startUnconfirmed = false
     if (event == TrackerEvent.COMPLETED || (event == TrackerEvent.STARTED && left == 0L)) {
       completed = true
     }
