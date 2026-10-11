@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * @property progress how often downloading tasks report progress; the shortest rule that names a
  *   task wins, and tasks no rule names report it only in state changes
  * @property segments how often tasks report their segments
- * @property statsIntervalMs how often [StreamStats] is sent, or `null` for never
+ * @property statsIntervalMs how often `KetchStats` are sent, or `null` for never
  * @property torrents task IDs whose torrent snapshots are sent
  * @property connectionsLimit the limit of the live connections sent, or `null` for none
  */

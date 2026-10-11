@@ -113,8 +113,11 @@ private suspend fun ApplicationCall.checkLimit(limit: Int): Boolean {
   return false
 }
 
-/** Responds with an SSE stream run by [handler], as Ktor's `sse` routes do. */
-private suspend fun ApplicationCall.respondEvents(handler: suspend ServerSSESession.() -> Unit) {
+/**
+ * Responds with an SSE stream run by [handler], as Ktor's `sse` routes do, and tells proxies not
+ * to buffer it.
+ */
+internal suspend fun ApplicationCall.respondEvents(handler: suspend ServerSSESession.() -> Unit) {
   response.header(HttpHeaders.ContentType, ContentType.Text.EventStream.toString())
   response.header(HttpHeaders.CacheControl, "no-store")
   if (request.httpVersion.startsWith("HTTP/1.")) {

@@ -2,10 +2,10 @@ package com.linroid.ketch.server.stream
 
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
-import com.linroid.ketch.endpoints.stream.StreamStats
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
@@ -76,7 +76,7 @@ internal class EventStream(
   private val progressFlushed = HashMap<Long, ComparableTimeMark>()
   private val segmentsFlushed = HashMap<Long, ComparableTimeMark>()
   private var statsSentAt: ComparableTimeMark? = null
-  private var lastStats: StreamStats? = null
+  private var lastStats: KetchStats? = null
   private var sequence = 0L
 
   private val listener: (String) -> Unit = ::taskChanged
@@ -330,7 +330,7 @@ internal class EventStream(
     val sentAt = statsSentAt
     if (sentAt != null && now - sentAt < interval.milliseconds) return
     statsSentAt = now
-    val stats = statsOf(tracker.frames())
+    val stats = KetchStats.of(tracker.frames().map { it.state })
     if (stats != lastStats) {
       lastStats = stats
       send(event(StreamEvents.STATS, encode(stats)))
@@ -444,27 +444,4 @@ internal class IntervalRules private constructor(
       return IntervalRules(everyTask, byTask)
     }
   }
-}
-
-/** [StreamStats] of the tasks that are downloading among [frames]. */
-internal fun statsOf(frames: List<TaskFrame>): StreamStats {
-  var speed = 0L
-  var downloaded = 0L
-  var total = 0L
-  var remaining = 0L
-  var downloading = 0
-  var unknownSizes = 0
-  for (frame in frames) {
-    val progress = (frame.state as? DownloadState.Downloading)?.progress ?: continue
-    downloading++
-    speed += progress.bytesPerSecond
-    if (progress.totalBytes > 0) {
-      downloaded += progress.downloadedBytes
-      total += progress.totalBytes
-      remaining += (progress.totalBytes - progress.downloadedBytes).coerceAtLeast(0)
-    } else {
-      unknownSizes++
-    }
-  }
-  return StreamStats(speed, downloaded, total, remaining, downloading, unknownSizes)
 }

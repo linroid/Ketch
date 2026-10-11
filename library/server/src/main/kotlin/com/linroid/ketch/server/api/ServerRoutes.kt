@@ -9,6 +9,7 @@ import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
@@ -30,7 +31,9 @@ private const val CATEGORIES = "categories"
 internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard) {
   get<Api.Status> {
     log.d { "GET /api/status" }
-    call.respond(ketch.status())
+    val status = ketch.status()
+    // The event stream is the server's, whatever the engine behind it.
+    call.respond(status.copy(features = status.features + StreamEvents.FEATURE))
   }
 
   put<Api.Config> {

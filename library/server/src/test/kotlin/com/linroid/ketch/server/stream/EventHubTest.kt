@@ -12,6 +12,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -20,7 +21,6 @@ import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.endpoints.stream.StreamError
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.endpoints.stream.StreamHello
-import com.linroid.ketch.endpoints.stream.StreamStats
 import com.linroid.ketch.endpoints.stream.StreamSubscribed
 import com.linroid.ketch.endpoints.stream.StreamSubscription
 import com.linroid.ketch.endpoints.stream.StreamTaskRef
@@ -282,7 +282,7 @@ class EventHubTest {
     val client = connect(hub)
     hub.subscribe(client.stream.id, null, subscription(statsIntervalMs = 1_000))
     runCurrent()
-    assertEquals(100, client.decode<StreamStats>(client.names().lastIndex).downloadBps)
+    assertEquals(100, client.decode<KetchStats>(client.names().lastIndex).downloadBps)
     client.clear()
 
     advanceTimeBy(3_000)
@@ -292,7 +292,7 @@ class EventHubTest {
     task.state.value = downloading(50, bps = 300)
     advanceTimeBy(1_000)
     runCurrent()
-    val stats = client.decode<StreamStats>(0)
+    val stats = client.decode<KetchStats>(0)
     assertEquals(300, stats.downloadBps)
     assertEquals(50, stats.remainingBytes)
   }

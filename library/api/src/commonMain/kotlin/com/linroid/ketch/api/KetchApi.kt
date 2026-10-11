@@ -1,8 +1,13 @@
 package com.linroid.ketch.api
 
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Service interface for managing downloads. Both core (in-process)
@@ -140,6 +145,32 @@ interface KetchApi {
   fun activeConnections(limit: Int = ActiveConnections.DEFAULT_LIMIT): Flow<ActiveConnections> {
     require(limit in 1..ActiveConnections.MAX_LIMIT) { "limit must be in 1..1024" }
     return flow { throw UnsupportedOperationException("Active connections are not supported") }
+  }
+
+  /**
+   * Keeps the progress and segments of the tasks [interest] names at least as fresh as it asks,
+   * on [DownloadTask.state] and [DownloadTask.segments], until the caller is cancelled; it never
+   * returns otherwise. Callers that show tasks declare them here: an in-process instance updates
+   * every task as it changes and only waits, while a remote one sends a task's progress only as
+   * often as some caller asks, and its state changes always at once.
+   */
+  suspend fun watch(interest: TaskInterest): Nothing = awaitCancellation()
+
+  /**
+   * Totals of the tasks that are downloading, every [interval] while they change. The default
+   * computes them from [tasks]; a remote instance asks its server, so they stay current while
+   * the tasks' own progress updates less often.
+   *
+   * @throws IllegalArgumentException if [interval] is not positive
+   */
+  fun stats(interval: Duration = 1.seconds): Flow<KetchStats> {
+    require(interval.isPositive()) { "interval must be positive" }
+    return flow {
+      while (true) {
+        emit(KetchStats.of(tasks.value.map { it.state.value }))
+        delay(interval)
+      }
+    }.distinctUntilChanged()
   }
 
   /** Release resources (HTTP client, SSE connection, etc.). */

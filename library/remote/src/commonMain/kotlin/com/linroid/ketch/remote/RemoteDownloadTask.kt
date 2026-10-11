@@ -3,6 +3,7 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
@@ -86,6 +87,23 @@ internal class RemoteDownloadTask(
   ) {
     appliedEvents++
     updateState(newState, request, segments, queuePosition)
+  }
+
+  /**
+   * Applies a downloading task's progress from the event stream; the caller holds [updateLock].
+   * A task that is not downloading here keeps its state: the stream sends state changes before
+   * later progress, so this progress was overtaken, such as by a command's response.
+   */
+  internal fun applyProgress(progress: DownloadProgress) {
+    if (_state.value !is DownloadState.Downloading) return
+    updates++
+    _state.value = DownloadState.Downloading(progress)
+  }
+
+  /** Applies segments from the event stream; the caller holds [updateLock]. */
+  internal fun applySegments(segments: List<Segment>) {
+    updates++
+    _segments.value = segments
   }
 
   /**

@@ -60,7 +60,7 @@ event: task.removed     StreamTaskRef {taskId}
 event: task.state       TaskStateUpdate {taskId, state, queuePosition, request?}  request only when changed
 event: task.progress    TaskProgressUpdate {taskId, progress}
 event: task.segments    TaskSegmentsUpdate {taskId, segments}
-event: stats            StreamStats {downloadBps, downloadedBytes, totalBytes, remainingBytes, downloading, unknownSizes}
+event: stats            KetchStats {downloadBps, downloadedBytes, totalBytes, remainingBytes, downloading, unknownSizes}
 event: torrent          TorrentSnapshot
 event: torrent.removed  StreamTaskRef
 event: connections      ActiveConnections

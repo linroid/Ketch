@@ -6,6 +6,12 @@ package com.linroid.ketch.endpoints.stream
  * is sent once the client asks for it with a [StreamSubscription].
  */
 object StreamEvents {
+  /**
+   * The feature servers serving the stream list in `KetchStatus.features`; clients use the
+   * older `/api/events` without it.
+   */
+  const val FEATURE: String = "events.stream"
+
   /** Version of the stream's protocol, in [StreamHello.protocol]. */
   const val PROTOCOL: Int = 1
 
@@ -36,7 +42,7 @@ object StreamEvents {
   /** A [TaskSegmentsUpdate]. */
   const val TASK_SEGMENTS: String = "task.segments"
 
-  /** A [StreamStats]. */
+  /** A `KetchStats`. */
   const val STATS: String = "stats"
 
   /** A `TorrentSnapshot`. */

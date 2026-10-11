@@ -38,8 +38,11 @@ import io.ktor.http.isSuccess
 import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -54,11 +57,15 @@ import kotlinx.serialization.json.Json
  * outcome the server recorded.
  *
  * @param generation counts the connections to the server; it changes on every reconnect
+ * @param streamed whether the client reads the server's event stream: snapshots then come from
+ *   [streamTorrent] rather than a stream of their own
  */
 internal class RemoteTorrentController(
   private val httpClient: HttpClient,
   private val generation: StateFlow<Long>,
   private val json: Json,
+  private val streamed: StateFlow<Boolean> = MutableStateFlow(false),
+  private val streamTorrent: (String) -> Flow<TopicItem<TorrentSnapshot>> = { emptyFlow() },
 ) : TorrentController {
   private val log = KetchLogger("RemoteTorrents")
   private val mutex = Mutex()
@@ -93,6 +100,10 @@ internal class RemoteTorrentController(
 
   override fun observe(taskId: String): Flow<TorrentSnapshot?> = flow {
     requireCapability(TorrentCapability.INSPECT)
+    if (streamed.value) {
+      emitAll(observeOnStream(taskId))
+      return@flow
+    }
     // Engines such as Darwin's run execute's block on another dispatcher, where a plain flow may
     // not emit; the stream is read in a channel flow and its outcome is replayed here in order,
     // so a snapshot read just before a failure is still delivered.
@@ -101,6 +112,33 @@ internal class RemoteTorrentController(
         is StreamEvent.Update -> emit(event.snapshot)
         is StreamEvent.Failed -> throw event.error
       }
+    }
+  }
+
+  /** The snapshots of [taskId] the event stream sends, under the same rules as its own stream. */
+  private fun observeOnStream(taskId: String): Flow<TorrentSnapshot?> = flow {
+    var current: TorrentRevision? = null
+    try {
+      streamTorrent(taskId).collect { item ->
+        when (item) {
+          is TopicItem.Value -> when (current?.compareIncoming(item.value.revision)) {
+            null, TorrentRevisionDecision.APPLY -> {
+              current = item.value.revision
+              emit(item.value)
+            }
+            TorrentRevisionDecision.IGNORE -> {}
+            TorrentRevisionDecision.RESYNC -> throw connectionChanged()
+          }
+          TopicItem.Removed -> emit(null)
+          is TopicItem.Failed -> throw TorrentCommandException(
+            error = TorrentCommandError.fromWire(item.error.error)
+              ?: TorrentCommandError.UNSUPPORTED,
+            message = item.error.message,
+          )
+        }
+      }
+    } catch (_: StreamLostException) {
+      throw connectionChanged()
     }
   }
 

@@ -156,7 +156,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [plan](docs/plans/event-stream.md); not served yet): `StreamEvents` (event names, error codes,
   limits, `intervalStep`), `StreamSubscription`, `TaskInterval`, `StreamHello`,
   `StreamSubscribed`, `TaskStateUpdate`, `TaskProgressUpdate`, `TaskSegmentsUpdate`,
-  `StreamStats`, `StreamTaskRef`, `StreamError`
+  `StreamTaskRef`, `StreamError`
 
 ### `updater` (JVM module, also consumed by direct Android)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -1238,7 +1238,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "Connections", "RemoteKetch", "RemoteTask", "RemotePairing", "RemoteTorrents", "TokenBucket",
   "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
-  "ConnectionRoutes", "EventRoutes", "EventHub", "Pairing", "McpStdio", "GitHubReleases";
+  "ConnectionRoutes", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
+  "GitHubReleases";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable

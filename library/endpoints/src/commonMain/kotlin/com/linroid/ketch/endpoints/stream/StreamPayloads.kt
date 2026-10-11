@@ -40,26 +40,6 @@ data class TaskSegmentsUpdate(
 )
 
 /**
- * Totals of the tasks that are downloading; counts per state follow from the task lifecycle.
- *
- * @property downloadBps the summed download speed, in bytes per second
- * @property downloadedBytes bytes downloaded by tasks of known size
- * @property totalBytes size of the tasks of known size
- * @property remainingBytes bytes the tasks of known size still have to download
- * @property downloading tasks that are downloading
- * @property unknownSizes tasks that are downloading content of unknown size
- */
-@Serializable
-data class StreamStats(
-  val downloadBps: Long = 0,
-  val downloadedBytes: Long = 0,
-  val totalBytes: Long = 0,
-  val remainingBytes: Long = 0,
-  val downloading: Int = 0,
-  val unknownSizes: Int = 0,
-)
-
-/**
  * A failure on the stream.
  *
  * @property error a stable code from [StreamEvents], or a torrent command error's wire name

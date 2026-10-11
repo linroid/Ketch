@@ -13,11 +13,13 @@ import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
+import com.linroid.ketch.server.api.streamRoutes
 import com.linroid.ketch.server.api.toErrorResponse
 import com.linroid.ketch.server.api.torrentErrorStatus
 import com.linroid.ketch.server.api.torrentRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
+import com.linroid.ketch.server.stream.EventHub
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import io.ktor.http.ContentType
@@ -277,6 +279,7 @@ class KetchServer(
   )
   private val throttle = AuthThrottle()
   private val connectionStreams = ConnectionStreams()
+  private val events = EventHub(ketch, scope)
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -494,10 +497,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, destinations, connectionStreams)
+          apiRoutes(ketch, destinations, connectionStreams, events)
         }
       } else {
-        apiRoutes(ketch, destinations, connectionStreams)
+        apiRoutes(ketch, destinations, connectionStreams, events)
       }
       pairing?.let { pairingRoutes(it) }
       healthRoutes { ready }
@@ -530,11 +533,13 @@ private fun Route.apiRoutes(
   ketch: KetchApi,
   destinations: DestinationGuard,
   connectionStreams: ConnectionStreams,
+  events: EventHub,
 ) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
   ketch.control(TorrentController)?.let { torrentRoutes(it) }
   connectionRoutes(ketch, connectionStreams)
+  streamRoutes(events)
   eventRoutes(ketch)
 }
 
