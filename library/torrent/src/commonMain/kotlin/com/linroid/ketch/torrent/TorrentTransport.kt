@@ -63,8 +63,36 @@ internal interface TorrentNetwork {
  * member, so networks that wrap another by delegation keep routing dials through their own
  * [TorrentNetwork.connect].
  */
-internal suspend fun TorrentNetwork.connectPeer(remote: PeerEndpoint, tag: ByteArray):
-  TorrentConnection = if (this is TorrentPeerEncryption) dial(remote, tag) else connect(remote)
+internal suspend fun TorrentNetwork.connectPeer(
+  remote: PeerEndpoint,
+  tag: ByteArray,
+  /** Bounds each TCP connect; encryption and a plaintext retry have deadlines of their own. */
+  connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
+): TorrentConnection = if (this is TorrentPeerEncryption) {
+  dial(remote, tag, connectTimeoutMs)
+} else {
+  connectWithin(remote, connectTimeoutMs)
+}
+
+internal const val DEFAULT_CONNECT_TIMEOUT_MS = 10_000L
+
+/**
+ * [TorrentNetwork.connect] within [timeoutMs]. The socket is captured inside the timeout, so a
+ * cancellation at its return boundary closes it rather than losing it.
+ */
+internal suspend fun TorrentNetwork.connectWithin(
+  remote: PeerEndpoint,
+  timeoutMs: Long,
+): TorrentConnection {
+  var connection: TorrentConnection? = null
+  try {
+    withTimeout(timeoutMs) { connection = connect(remote) }
+    return checkNotNull(connection)
+  } catch (error: Throwable) {
+    connection?.close()
+    throw error
+  }
+}
 
 /** Owns live sockets only; closing a connection removes its runtime reference immediately. */
 @OptIn(ExperimentalAtomicApi::class)

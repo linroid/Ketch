@@ -23,14 +23,20 @@ internal class TorrentPeerEncryption(
   private val plaintextPeers = LinkedHashSet<PeerEndpoint>()
 
   /** Connects to [remote] for the torrent with wire tag [tag], negotiating MSE as the policy says. */
-  suspend fun dial(remote: PeerEndpoint, tag: ByteArray): TorrentConnection {
-    if (policy == TorrentEncryption.DISABLED) return delegate.connect(remote)
+  suspend fun dial(
+    remote: PeerEndpoint,
+    tag: ByteArray,
+    connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
+  ): TorrentConnection {
+    // Each connect has its own deadline, so a plaintext retry still has time after MSE failed.
+    suspend fun connect() = delegate.connectWithin(remote, connectTimeoutMs)
+    if (policy == TorrentEncryption.DISABLED) return connect()
     if (policy == TorrentEncryption.PREFERRED && mutex.withLock { remote in plaintextPeers }) {
-      return delegate.connect(remote)
+      return connect()
     }
     val provide = if (policy == TorrentEncryption.REQUIRED) MseHandshake.CRYPTO_RC4
       else MseHandshake.CRYPTO_RC4 or MseHandshake.CRYPTO_PLAINTEXT
-    val connection = delegate.connect(remote)
+    val connection = connect()
     val failure: Throwable = try {
       val stream = withTimeoutOrNull(handshakeTimeoutMs) {
         MseHandshake.initiate(connection, tag, provide)
@@ -51,7 +57,7 @@ internal class TorrentPeerEncryption(
       plaintextPeers += remote
       if (plaintextPeers.size > 1024) plaintextPeers.remove(plaintextPeers.first())
     }
-    return delegate.connect(remote)
+    return connect()
   }
 
   /**

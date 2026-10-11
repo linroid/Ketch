@@ -83,6 +83,27 @@ class TorrentPeerEncryptionTest {
   }
 
   @Test
+  fun preferred_peerSilentOnMse_getsItsPlaintextRetryPastTheConnectTimeout() = runTest {
+    // The peer accepts and reads, but never answers an encrypted opening.
+    val silent = object : TorrentNetwork {
+      var connects = 0
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
+        connects++
+        return End(remote, Pipe(), Pipe())
+      }
+      override suspend fun listen(local: PeerEndpoint): TorrentListener = error("Unused")
+      override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket = error("Unused")
+      override fun close() = Unit
+    }
+    val network = TorrentPeerEncryption(silent, TorrentEncryption.PREFERRED,
+      handshakeTimeoutMs = 2_000)
+    // The connect timeout bounds each TCP connect, not the negotiation and its retry.
+    val connection = network.connectPeer(peer, tag, connectTimeoutMs = 1_000)
+    assertFalse(connection.encrypted)
+    assertEquals(2, silent.connects)
+  }
+
+  @Test
   fun required_peerWithoutEncryption_fails() = runTest {
     val peers = PlaintextPeers(backgroundScope)
     val network = TorrentPeerEncryption(peers, TorrentEncryption.REQUIRED)
