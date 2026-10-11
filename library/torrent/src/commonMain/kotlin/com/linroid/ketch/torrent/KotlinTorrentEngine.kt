@@ -643,6 +643,15 @@ internal class KotlinTorrentEngine(
           delay(discoveryIntervalMs)
         }
       }
+      // LAN peers announced for the hash (a v2 magnet's truncated one) are asked too, until the
+      // metadata is found or the resolve stops; a full channel drops them, as BEP 14 repeats.
+      lsd?.let { service ->
+        launch {
+          service.participate(listOf(LsdTopic(topic.wireBytes().toByteString()) {
+            output.trySend(it)
+          }))
+        }
+      }
     }
 
   override suspend fun addTorrent(

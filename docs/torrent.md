@@ -113,9 +113,10 @@ including a development run, hands its files to the running app instead of openi
 ## Discovery and upload
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
-- Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange for v1, v2 and hybrid torrents; Ketch advertises its listen port (BEP 10
-  `p`) and never dials an incoming peer's source port, only the listen port it announced.
+- Public magnets use BEP 9 metadata exchange, DHT, trackers, local service discovery, and
+  explicit peers. Public swarms support peer exchange for v1, v2 and hybrid torrents; Ketch
+  advertises its listen port (BEP 10 `p`) and never dials an incoming peer's source port, only
+  the listen port it announced.
   Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in a `torrent-state` folder in their app data directory.
@@ -225,8 +226,16 @@ including a development run, hands its files to the running app instead of openi
   are never shared through peer exchange. Private (BEP 27) and tracker-only torrents never
   announce or accept them. IPv6 (`[ff15::efc0:988f]`) is not used. On Android the app holds a
   Wi-Fi `MulticastLock` (`TorrentDownloadSource(multicastLock = ...)`) only while the group is
-  joined, and Android 17 may block it until the local network permission is granted; iOS does not
-  run it, as multicast there needs Apple's multicast networking entitlement
+  joined, and Android 17 blocks it until the local network permission is granted: the app asks
+  for it once, the first time discovery wants the LAN, and again whenever the setting is switched
+  on (the system stops asking after two denials); without it the engine retries joining every
+  minute. iOS does not run it, as multicast there needs Apple's multicast networking entitlement
+- While a public magnet looks for its metadata, it takes part in local service discovery under
+  its info hash (a btmh magnet under the first 20 bytes of its SHA-256 hash), and LAN peers that
+  announce it are asked for the metadata like DHT and tracker peers, so a magnet resolves from
+  another device at home without trackers or the internet. It leaves the group once the metadata
+  is found or the lookup stops. LAN peers announce every 5 minutes, so one may take that long to
+  be heard; tracker-only magnets never take part
 - The apps and the CLI read encryption, uTP, port mapping and local service discovery from
   `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
   `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
