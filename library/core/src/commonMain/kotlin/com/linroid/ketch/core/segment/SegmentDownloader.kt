@@ -5,6 +5,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SpeedLimiter
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CancellationException
@@ -17,6 +18,7 @@ internal class SegmentDownloader(
   private val taskLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   taskId: String? = null,
+  private val watchdog: TransferWatchdog = TransferWatchdog.Off,
 ) {
   private val log = KetchLogger("SegmentDownloader")
   private val owner = taskId?.let { " for taskId=$it" }.orEmpty()
@@ -43,25 +45,30 @@ internal class SegmentDownloader(
     var downloadedBytes = segment.downloadedBytes
     val range = segment.currentOffset..segment.end
 
-    httpEngine.download(url, range, headers) { data ->
-      currentCoroutineContext().ensureActive()
-      if (data.size > segment.totalBytes - downloadedBytes) {
-        throw KetchError.Unsupported(IllegalStateException("Response exceeds segment boundary"))
-      }
-      taskLimiter.acquire(data.size)
-      globalLimiter.acquire(data.size)
+    watchdog.watch { monitor ->
+      httpEngine.download(url, range, headers) { data ->
+        currentCoroutineContext().ensureActive()
+        monitor.received(data.size)
+        if (data.size > segment.totalBytes - downloadedBytes) {
+          throw KetchError.Unsupported(IllegalStateException("Response exceeds segment boundary"))
+        }
+        monitor.throttled {
+          taskLimiter.acquire(data.size)
+          globalLimiter.acquire(data.size)
+        }
 
-      val writeOffset = segment.start + downloadedBytes
-      try {
-        fileAccessor.writeAt(writeOffset, data)
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        if (e is KetchError) throw e
-        throw KetchError.Disk(e)
+        val writeOffset = segment.start + downloadedBytes
+        try {
+          fileAccessor.writeAt(writeOffset, data)
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          if (e is KetchError) throw e
+          throw KetchError.Disk(e)
+        }
+        downloadedBytes += data.size
+        handle.received(data.size)
+        onProgress(downloadedBytes)
       }
-      downloadedBytes += data.size
-      handle.received(data.size)
-      onProgress(downloadedBytes)
     }
 
     if (downloadedBytes < segment.totalBytes) {

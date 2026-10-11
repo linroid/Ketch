@@ -198,9 +198,10 @@ internal class TorrentSwarm(
     val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
     val webSeeds = webSeedUrls.mapIndexed { number, url ->
       // Negative IDs never collide with peer workers'.
-      val worker = WebSeedWorker(-1 - number, url, store, scheduler, checkNotNull(webSeedHttp),
-        webSeedStats, logLabel, reporter, webSeedRetryMs, downloadPayload = downloadPayload,
+      val pieces = SwarmWebSeedPieces(-1 - number, url, store, scheduler,
         onVerified = { progressEvents.trySend(Unit) })
+      val worker = WebSeedWorker(url, pieces, checkNotNull(webSeedHttp), webSeedStats, logLabel,
+        reporter, webSeedRetryMs, downloadPayload = downloadPayload)
       launch(Dispatchers.Default) {
         try {
           worker.run()
@@ -625,8 +626,8 @@ internal class TorrentSwarm(
      * same for the connection, and a piece we verify later is served once its HAVE goes out.
      */
     private suspend fun offerAllowedFast() {
-      val address = allowedFastAddress(connection.remote.host) ?: return
-      val pieces = allowedFastSet(address, store.metadata.infoHash.toBytes(), store.pieceCount)
+      val pieces = allowedFastOffer(connection.remote.host, store.metadata.infoHash.toBytes(),
+        store.pieceCount)
       allowedFast = pieces.toSet()
       for (index in pieces) wire.send(PeerMessage.AllowedFast(index))
     }
@@ -1005,9 +1006,6 @@ private const val REQUEST_QUEUE = 16
 
 /** Block requests we keep outstanding with one v1 peer. */
 private const val PIPELINE = 16
-
-/** How long a Fast peer that choked us has to reject our requests (BEP 6). */
-internal const val FAST_REJECT_GRACE_MS = 5_000L
 
 /** The longest a peer worker waits for a message before its next pass. */
 private const val IDLE_MS = 100L

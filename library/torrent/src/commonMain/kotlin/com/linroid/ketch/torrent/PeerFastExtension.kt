@@ -3,6 +3,9 @@ package com.linroid.ketch.torrent
 /** Allowed-fast pieces we offer a peer (BEP 6 suggests 10). */
 internal const val ALLOWED_FAST_COUNT = 10
 
+/** How long a Fast peer that choked us has to reject our requests (BEP 6). */
+internal const val FAST_REJECT_GRACE_MS = 5_000L
+
 /**
  * BEP 6's canonical allowed-fast set: the pieces a peer at [ipv4] may download from us while
  * we choke it. Peers in one /24 share the set, so many addresses gain no more pieces. SHA-1 of
@@ -29,6 +32,15 @@ internal fun allowedFastSet(
     }
   }
   return allowed.toList()
+}
+
+/**
+ * The canonical allowed-fast pieces (BEP 6) we offer a peer at [host] of the swarm whose
+ * handshake named [infoHash]; none for IPv6 peers and names.
+ */
+internal fun allowedFastOffer(host: String, infoHash: ByteArray, pieceCount: Int): List<Int> {
+  val address = allowedFastAddress(host) ?: return emptyList()
+  return allowedFastSet(address, infoHash, pieceCount)
 }
 
 /**

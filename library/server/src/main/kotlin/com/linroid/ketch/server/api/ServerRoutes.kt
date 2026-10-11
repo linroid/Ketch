@@ -17,11 +17,9 @@ import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 private val log = KetchLogger("ServerRoutes")
-
-/** The [DownloadConfig.categories] field of a `PUT /api/config` body. */
-private const val CATEGORIES = "categories"
 
 /**
  * Installs server-level status, configuration, network interface, and URL resolution endpoints.
@@ -35,11 +33,13 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
 
   put<Api.Config> {
     val fields = call.receiveJson<JsonObject>()
-    val sent = ServerJson.decodeFromJsonElement(DownloadConfig.serializer(), fields)
-    // Clients older than category folders leave them out, which must not delete them.
-    val body = if (CATEGORIES in fields) sent else {
-      sent.copy(categories = ketch.status().config.categories)
-    }
+    // Fields a client leaves out keep their current values: clients older than a setting, such
+    // as category folders or idle timeouts, must not reset it.
+    val current = ServerJson.encodeToJsonElement(DownloadConfig.serializer(), ketch.status().config)
+    val body = ServerJson.decodeFromJsonElement(
+      DownloadConfig.serializer(),
+      JsonObject(current.jsonObject + fields),
+    )
     log.i { "PUT /api/config: speedLimit=${body.speedLimit}" }
     destinations.checkConfig(body)
     ketch.updateConfig(body)

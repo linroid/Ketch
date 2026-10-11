@@ -149,21 +149,6 @@ internal data class TorrentMetadata(
       )
     }
 
-    /**
-     * The http and https URLs of a BEP 19 `url-list`, a string or a list of strings. It lies
-     * outside the info dictionary, so an unusable entry is skipped rather than failing the torrent.
-     */
-    private fun webSeedsOf(node: Bencode.Node?): List<String> {
-      if (node == null) return emptyList()
-      val entries = node.list ?: listOf(node)
-      return entries.asSequence()
-        .mapNotNull { entry -> runCatching { entry.text() }.getOrNull()?.trim() }
-        .filter(::isWebSeedUrl)
-        .distinct()
-        .take(MAX_WEB_SEEDS)
-        .toList()
-    }
-
     internal fun validatePathComponent(value: String) {
       require(value.isNotEmpty() && value != "." && value != "..") { "Unsafe torrent path" }
       require(value.encodeToByteArray().size <= 255 && value.none { it < ' ' || it in "/\\:*?\"<>|" }) {
@@ -187,6 +172,21 @@ internal fun isWebSeedUrl(url: String): Boolean {
   val scheme = url.substringBefore("://", "").lowercase()
   if (scheme != "http" && scheme != "https") return false
   return url.substringAfter("://").substringBefore('/').substringAfterLast('@').isNotEmpty()
+}
+
+/**
+ * The http and https URLs of a BEP 19 `url-list`, a string or a list of strings. It lies outside
+ * the info dictionary, so an unusable entry is skipped rather than failing the torrent.
+ */
+internal fun webSeedsOf(node: Bencode.Node?): List<String> {
+  if (node == null) return emptyList()
+  val entries = node.list ?: listOf(node)
+  return entries.asSequence()
+    .mapNotNull { entry -> runCatching { entry.text() }.getOrNull()?.trim() }
+    .filter(::isWebSeedUrl)
+    .distinct()
+    .take(MAX_WEB_SEEDS)
+    .toList()
 }
 
 /** Filesystem collision key; hashes use the original encoded bytes. */

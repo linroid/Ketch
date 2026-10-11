@@ -432,6 +432,14 @@
   <string name="settings_downloads_retries_never_state">再試行しない</string>
   <string name="settings_downloads_retries_fewer">再試行の回数を減らす</string>
   <string name="settings_downloads_retries_more">再試行の回数を増やす</string>
+  <string name="settings_downloads_retries_unlimited_state">一時停止するまで再試行</string>
+  <string name="settings_downloads_stall">停滞した接続</string>
+  <string name="settings_downloads_stall_hint">この時間データを受信しない接続を再試行します。</string>
+  <string name="settings_downloads_stall_off">オフ</string>
+  <string name="settings_downloads_stall_off_state">停滞した接続を待ち続ける</string>
+  <string name="settings_downloads_stall_state">データが %1$s 届かないと再試行</string>
+  <string name="settings_downloads_stall_sooner">早めに再試行</string>
+  <string name="settings_downloads_stall_later">長く待つ</string>
 
   <string name="settings_speed_mode_full">フルスピード</string>
   <string name="settings_speed_mode_slow_lane">低速モード</string>

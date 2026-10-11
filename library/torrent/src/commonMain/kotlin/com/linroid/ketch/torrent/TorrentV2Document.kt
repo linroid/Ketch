@@ -12,6 +12,8 @@ internal class TorrentV2Document private constructor(
   val info: TorrentV2Info,
   val pieceLayers: Map<ByteString, ByteString>,
   val hybrid: TorrentHybridLayout?,
+  /** HTTP(S) web seeds (BEP 19 `url-list`), outside the info dictionary. */
+  val webSeeds: List<String> = emptyList(),
 ) {
   val identity: TorrentIdentity get() = hybrid?.identity ?: TorrentIdentity(v2 = info.hash)
 
@@ -55,7 +57,8 @@ internal class TorrentV2Document private constructor(
           put(root, hashes.toByteString())
         }
       }
-      return TorrentV2Document(info, info.validatePieceLayers(layers, maxLayerBytes), hybrid)
+      return TorrentV2Document(info, info.validatePieceLayers(layers, maxLayerBytes), hybrid,
+        webSeedsOf(envelope["url-list"]))
     }
   }
 }

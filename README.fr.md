@@ -265,8 +265,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   publiée par le serveur
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
   aux plus lentes pour ne plus attendre la connexion la plus lente
-- **Détection des blocages et réglages de reprise** — Reconnecter lorsqu'une connexion n'envoie
-  plus de données et choisir les délais d'attente et le nombre de tentatives, même illimité
 - **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
   au choix, une fois la file d'attente vide
 - **Automatisation** — Exécuter une commande ou appeler un webhook à la fin ou à l'échec d'un

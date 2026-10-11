@@ -519,7 +519,8 @@ internal class KotlinTorrentEngine(
     }
     suspend fun fetch(endpoint: PeerEndpoint): ByteArray =
       TorrentV2MetadataExchange(network, config.maxMetadataBytes,
-        budget = exchangeBudgets.metadata).fetch(magnet.identity, endpoint, tiers, privacy)
+        budget = exchangeBudgets.metadata).fetch(magnet.identity, endpoint, tiers, privacy,
+          magnet.webSeeds)
     if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       var attempts = 0
       while (isActive) {
@@ -834,7 +835,8 @@ internal class KotlinTorrentEngine(
           uploadPolicy = { uploadPolicy.load() },
           listenPortFor = { advertisedPort.current() }, allowLocalPeers = allowLocalPeers,
           uploadBuffers = exchangeBudgets.uploads, dhtPortFor = ::dhtPortFor,
-          onDhtNode = { dhtIntroductions.trySend(it) }, peerOutcomes = peerOutcomes),
+          onDhtNode = { dhtIntroductions.trySend(it) }, peerOutcomes = peerOutcomes,
+          webSeedHttp = http),
         TorrentV2SessionOptions(maxPeers = MAX_V2_PEERS,
           initialConnections = minOf(config.connectionsPerTorrent, MAX_V2_PEERS),
           privacy = spec.privacy, waitForPeers = true, throttle = spec.throttle,

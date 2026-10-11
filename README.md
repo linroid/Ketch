@@ -236,8 +236,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Checksums** — Check a download against a hash you provide, or one the server publishes
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
-- **Stall detection and retry settings** — Reconnect when a connection stops sending data, and
-  choose timeouts and how often to retry, unlimited included
 - **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
   once the queue is empty
 - **Automation hooks** — Run a command or call a webhook when a download finishes or fails

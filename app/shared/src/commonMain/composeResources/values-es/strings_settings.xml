@@ -443,6 +443,14 @@
   <string name="settings_downloads_retries_never_state">Sin reintentos</string>
   <string name="settings_downloads_retries_fewer">Menos reintentos</string>
   <string name="settings_downloads_retries_more">Más reintentos</string>
+  <string name="settings_downloads_retries_unlimited_state">Reintenta hasta pausar</string>
+  <string name="settings_downloads_stall">Conexiones atascadas</string>
+  <string name="settings_downloads_stall_hint">Reintenta una conexión que no recibe nada durante este tiempo.</string>
+  <string name="settings_downloads_stall_off">Desactivado</string>
+  <string name="settings_downloads_stall_off_state">Espera en las conexiones atascadas</string>
+  <string name="settings_downloads_stall_state">Reintenta tras %1$s sin datos</string>
+  <string name="settings_downloads_stall_sooner">Reintentar antes</string>
+  <string name="settings_downloads_stall_later">Esperar más</string>
 
   <string name="settings_speed_mode_full">Velocidad máxima</string>
   <string name="settings_speed_mode_slow_lane">Modo lento</string>

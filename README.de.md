@@ -263,8 +263,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Prüfsummen** — Downloads gegen einen angegebenen oder vom Server veröffentlichten Hash prüfen
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer
   Verbindungen, damit der Download nicht auf die langsamste warten muss
-- **Stillstand erkennen und Wiederholungen einstellen** — Neu verbinden, wenn keine Daten mehr
-  ankommen; Zeitlimits und Wiederholungszahlen wählen, auch unbegrenzt
 - **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
   herunterfahren, sobald die Warteschlange leer ist
 - **Automatisierung** — Bei Abschluss oder Fehlschlag einen Befehl ausführen oder Webhook aufrufen

@@ -154,6 +154,7 @@ class Ketch(
     add(KetchFeatures.REQUEST_ID)
     if (httpEngine.supportsProxies) add(KetchFeatures.PROXY)
     add(KetchFeatures.CATEGORY_FOLDERS)
+    add(KetchFeatures.TRANSFER_TIMEOUTS)
     add(KetchFeatures.ACTIVE_CONNECTIONS)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {

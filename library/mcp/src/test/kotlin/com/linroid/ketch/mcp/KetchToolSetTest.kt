@@ -470,11 +470,33 @@ class KetchToolSetTest {
     return Json.parseToJsonElement(result).jsonObject
   }
 
+  @Test
+  fun updateConfig_retryAndTimeoutArguments_changeOnlyThoseFields() = runTest {
+    val ketch = RecordingKetchApi()
+
+    KetchToolSet(ketch).updateConfig(retryCount = -1, idleTimeoutSeconds = 0, minSpeed = 2048)
+
+    assertEquals(
+      DownloadConfig(unlimitedRetries = true, idleTimeoutMs = 0, minSpeed = 2048),
+      ketch.configs.single(),
+    )
+  }
+
+  @Test
+  fun updateConfig_retryCount_endsUnlimitedRetries() = runTest {
+    val ketch = RecordingKetchApi(config = DownloadConfig(unlimitedRetries = true))
+
+    KetchToolSet(ketch).updateConfig(retryCount = 5)
+
+    assertEquals(DownloadConfig(retryCount = 5), ketch.configs.single())
+  }
+
   private class RecordingKetchApi(
     tasks: List<DownloadTask> = emptyList(),
     private val features: Set<String> = setOf(KetchFeatures.REQUEST_ID),
     private val torrents: TorrentController? = null,
     private val resolved: ResolvedSource? = null,
+    private val config: DownloadConfig = DownloadConfig(),
   ) : KetchApi {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> control(key: ControlKey<T>): T? =
@@ -513,7 +535,7 @@ class KetchToolSetTest {
       version = "1.0.0",
       revision = "abc1234",
       uptime = 0,
-      config = DownloadConfig(),
+      config = config,
       system = SystemInfo(
         os = "TestOS",
         arch = "test",
@@ -531,7 +553,11 @@ class KetchToolSetTest {
       features = features,
     )
 
-    override suspend fun updateConfig(config: DownloadConfig) {}
+    val configs = mutableListOf<DownloadConfig>()
+
+    override suspend fun updateConfig(config: DownloadConfig) {
+      configs += config
+    }
 
     override fun close() {}
   }

@@ -432,6 +432,14 @@
   <string name="settings_downloads_retries_never_state">재시도 안 함</string>
   <string name="settings_downloads_retries_fewer">재시도 줄이기</string>
   <string name="settings_downloads_retries_more">재시도 늘리기</string>
+  <string name="settings_downloads_retries_unlimited_state">일시 정지할 때까지 재시도</string>
+  <string name="settings_downloads_stall">멈춘 연결</string>
+  <string name="settings_downloads_stall_hint">이 시간 동안 아무것도 받지 못한 연결을 재시도합니다.</string>
+  <string name="settings_downloads_stall_off">끔</string>
+  <string name="settings_downloads_stall_off_state">멈춘 연결을 계속 기다림</string>
+  <string name="settings_downloads_stall_state">%1$s 동안 데이터가 없으면 재시도</string>
+  <string name="settings_downloads_stall_sooner">더 빨리 재시도</string>
+  <string name="settings_downloads_stall_later">더 오래 기다리기</string>
 
   <string name="settings_speed_mode_full">최대 속도</string>
   <string name="settings_speed_mode_slow_lane">저속 모드</string>

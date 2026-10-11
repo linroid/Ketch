@@ -465,6 +465,14 @@
   <string name="settings_downloads_retries_never_state">Без повторов</string>
   <string name="settings_downloads_retries_fewer">Меньше повторов</string>
   <string name="settings_downloads_retries_more">Больше повторов</string>
+  <string name="settings_downloads_retries_unlimited_state">Повторяет до паузы</string>
+  <string name="settings_downloads_stall">Зависшие подключения</string>
+  <string name="settings_downloads_stall_hint">Подключение, которое ничего не получает столько времени, повторяется.</string>
+  <string name="settings_downloads_stall_off">Выкл.</string>
+  <string name="settings_downloads_stall_off_state">Ждёт зависшие подключения</string>
+  <string name="settings_downloads_stall_state">Повтор после %1$s без данных</string>
+  <string name="settings_downloads_stall_sooner">Повторять раньше</string>
+  <string name="settings_downloads_stall_later">Ждать дольше</string>
 
   <string name="settings_speed_mode_full">Полная скорость</string>
   <string name="settings_speed_mode_slow_lane">Низкая скорость</string>

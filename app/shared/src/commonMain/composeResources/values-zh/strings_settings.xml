@@ -432,6 +432,14 @@
   <string name="settings_downloads_retries_never_state">从不重试</string>
   <string name="settings_downloads_retries_fewer">减少重试次数</string>
   <string name="settings_downloads_retries_more">增加重试次数</string>
+  <string name="settings_downloads_retries_unlimited_state">重试直到暂停</string>
+  <string name="settings_downloads_stall">停滞的连接</string>
+  <string name="settings_downloads_stall_hint">连接在这段时间内收不到任何数据时重试。</string>
+  <string name="settings_downloads_stall_off">关闭</string>
+  <string name="settings_downloads_stall_off_state">一直等待停滞的连接</string>
+  <string name="settings_downloads_stall_state">%1$s 没有数据后重试</string>
+  <string name="settings_downloads_stall_sooner">更早重试</string>
+  <string name="settings_downloads_stall_later">等待更久</string>
 
   <string name="settings_speed_mode_full">全速</string>
   <string name="settings_speed_mode_slow_lane">低速模式</string>

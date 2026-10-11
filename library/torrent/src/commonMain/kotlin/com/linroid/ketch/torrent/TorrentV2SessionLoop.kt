@@ -62,11 +62,19 @@ internal class TorrentV2Swarm(
   val onIncomplete: suspend () -> Unit = {},
   /** Handshakes of peers that dialed us which failed, for the loop's peer diagnostics. */
   val incomingFailures: ReceiveChannel<PeerAttemptFailure>? = null,
+  /**
+   * The torrent's web seeds (BEP 19): the loop hands them whole pieces nobody else fetches,
+   * except in the endgame, and keeps the transfer going while one runs.
+   */
+  val webSeeds: TorrentV2WebSeeds? = null,
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
 internal object TorrentV2SessionLoop {
   private val log = KetchLogger("TorrentSwarm")
+
+  /** How long web seeds that found no piece wait before looking again, unless state changes. */
+  private const val MIRROR_RETRY_MS = 250L
 
   /** Live changes a swarm loop applies without restarting its pool, dialer or workers. */
   sealed interface Control {
@@ -97,6 +105,7 @@ internal object TorrentV2SessionLoop {
     data class Served(val value: ChannelResult<TorrentV2ServeWorker.Result>) : Event
     data object Retry : Event
     data class IncomingFailed(val value: ChannelResult<PeerAttemptFailure>) : Event
+    data class Mirror(val value: ChannelResult<TorrentV2WebSeeds.Event>) : Event
 
     /** The commit worker or the pool closed its queue, which they only do as the loop stops. */
     data class Stopped(val cause: Throwable?) : Event
@@ -220,6 +229,15 @@ internal object TorrentV2SessionLoop {
       var controlsOpen = swarm != null
       var servingOpen = swarm?.serve != null
       var incomingFailuresOpen = swarm?.incomingFailures != null
+      // Web seeds: those waiting for a piece, and how many still run.
+      val mirrors = swarm?.webSeeds
+      var mirrorsOpen = mirrors != null
+      var mirrorsRunning = mirrors?.urls?.size ?: 0
+      val idleMirrors = linkedSetOf<Int>()
+      // When web seeds found no piece, the scheduler's state then; they try again once it
+      // changes, or after a while for buffers freed elsewhere.
+      var mirrorVersion = -1L
+      var mirrorRetryAt = 0L
       // Every selected piece is verified; a seed keeps serving peers after that.
       var complete = false
       var seeding = false
@@ -249,13 +267,19 @@ internal object TorrentV2SessionLoop {
           }
           // A peer that told us how many requests it queues (BEP 10 `reqq`) gets no more.
           val window = minOf(pipeline, view.extensions.requestQueue ?: pipeline)
-          if (!interested || !view.interested || view.interestPending || view.choked ||
+          // Choked, a Fast peer still serves its allowed-fast pieces (BEP 6).
+          if (!interested || !view.interested || view.interestPending ||
+            view.choked && view.allowedFast.isEmpty() ||
             view.inFlight >= window || view.admissionBlocked) continue
-          var plan = pieces.planNext(peer.blocks) { rarity.has(peer, it) }
+          val eligible = { index: Int ->
+            rarity.has(peer, index) && index !in view.refused &&
+              (!view.choked || index in view.allowedFast)
+          }
+          var plan = pieces.planNext(peer.blocks, eligible)
           if (plan == null) {
-            val index = rarity.pick(peer) { pieces.canBegin(it) }
+            val index = rarity.pick(peer) { pieces.canBegin(it) && eligible(it) }
             if (index != null) {
-              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks) { rarity.has(peer, it) }
+              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, eligible)
               else {
                 view.admissionBlocked = true
                 // Downloads come first: the upload cache gives its pieces back.
@@ -281,6 +305,20 @@ internal object TorrentV2SessionLoop {
               view.admissionBlocked = true
             }
           }
+        }
+        if (mirrors != null && idleMirrors.isNotEmpty() && !complete &&
+          (pieces.version != mirrorVersion || nowMs() >= mirrorRetryAt)) {
+          while (idleMirrors.isNotEmpty()) {
+            val claim = pieces.claimWebSeed() ?: break
+            val seed = idleMirrors.first()
+            idleMirrors.remove(seed)
+            if (!mirrors.assign(seed, claim)) {
+              claim.lease.close()
+              pieces.webSeedDone(claim.index, verified = false)
+            }
+          }
+          mirrorVersion = pieces.version
+          mirrorRetryAt = nowMs() + MIRROR_RETRY_MS
         }
         if (swarm != null && book != null) {
           while (pool.size + dialing < limit) {
@@ -330,6 +368,25 @@ internal object TorrentV2SessionLoop {
         member.listen = PeerEndpoint(origin.remote.host, port)
       }
 
+      /**
+       * A request came back unserved, which is no fault of the peer. Dropped by a CHOKE, its block
+       * goes to whoever asks next; rejected by a Fast peer that serves us (unchoked, or allowed
+       * fast), it is asked for again, until the piece has had as many rejects as blocks and is
+       * left to other peers until this one unchokes us anew (BEP 6).
+       */
+      fun rejected(view: TorrentV2PeerView, response: PeerBlockExchange.Response.Rejected) {
+        val index = response.ticket.request.index
+        if (view.choked && index !in view.allowedFast) return
+        val count = (view.rejects[index] ?: 0) + 1
+        val blocks = (layout.v2Piece(index.toLong()).length + PeerWire.BLOCK_SIZE - 1) /
+          PeerWire.BLOCK_SIZE
+        if (count < blocks) view.rejects[index] = count else {
+          view.rejects.remove(index)
+          view.refused += index
+          log.v { "V2 peer of $label keeps rejecting piece $index" }
+        }
+      }
+
       suspend fun message(peer: PeerV2Pool.Peer, value: PeerV2DownloadActor.Event) {
         val view = peers[peer] ?: return
         when (value) {
@@ -341,6 +398,20 @@ internal object TorrentV2SessionLoop {
                 view.remoteHaveCount = update.bytes.sumOf { it.toInt().and(255).countOneBits() }
               }
             }
+            // A Fast peer's availability (BEP 6): all of it, or nothing to add.
+            PeerMessage.HaveAll -> {
+              if (!rarity.update(peer, pieceBitfield(BooleanArray(pieceCount) { true }))) {
+                stop(peer)
+              } else {
+                view.needed = pieces.neededCount { rarity.has(peer, it) }
+                view.remoteHaveCount = pieceCount
+              }
+            }
+            // Its block exchange keeps the first ones too; requests follow both.
+            is PeerMessage.AllowedFast ->
+              if (view.allowedFast.size < PeerProtocolState.MAX_ALLOWED_FAST) {
+                view.allowedFast += update.index
+              }
             is PeerMessage.Have -> {
               val known = rarity.has(peer, update.index)
               val newlyNeeded = !known && pieces.isNeeded(update.index)
@@ -353,7 +424,12 @@ internal object TorrentV2SessionLoop {
             is PeerMessage.Control -> {
               when (update.signal) {
                 PeerMessage.Signal.CHOKE -> view.choked = true
-                PeerMessage.Signal.UNCHOKE -> view.choked = false
+                PeerMessage.Signal.UNCHOKE -> {
+                  view.choked = false
+                  // Unchoked anew, the peer may serve what it refused (BEP 6).
+                  view.refused.clear()
+                  view.rejects.clear()
+                }
                 else -> Unit
               }
               uploads?.update(peer, view, update, pieces::isVerified)
@@ -395,6 +471,7 @@ internal object TorrentV2SessionLoop {
             check(view.inFlight > 0)
             view.inFlight--
             val block = value.value as? PeerBlockExchange.Response.Block
+            (value.value as? PeerBlockExchange.Response.Rejected)?.let { rejected(view, it) }
             if (block != null) {
               store.recordReceived(block.ticket.request.length)
               // What crossed the wire: on a v1 route, the canonical block with its padding.
@@ -625,7 +702,7 @@ internal object TorrentV2SessionLoop {
 
       onProgress()
       var preference = 0
-      val branches = if (swarm == null) 3 else 8
+      val branches = if (swarm == null) 3 else 9
       var acceptingConnections = connections != null
       // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
       var nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
@@ -660,27 +737,33 @@ internal object TorrentV2SessionLoop {
               val incoming = members.keys.count { it.info?.origin is PeerV2Origin.Incoming }
               // A hybrid's peers from the v1 swarm, on canonical v1 blocks without hashes.
               val legacy = members.keys.count { it.info?.mode == PeerIdentityHandshake.Mode.V1 }
-              " (in=$incoming, v1=$legacy) ${uploads?.summary().orEmpty()}" +
+              // Peers that negotiated the Fast extension (BEP 6).
+              val fast = members.keys.count { it.info?.fast == true }
+              " (in=$incoming, v1=$legacy, fast=$fast) ${uploads?.summary().orEmpty()}" +
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
                 " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers"
             }
             val outcomes = diagnostics?.let { "; ${it.summary()}" }.orEmpty()
+            val webSeedPart = mirrors?.let {
+              "; ${it.stats.summary(mirrorsRunning, it.urls.size)}"
+            }.orEmpty()
             "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size}" +
               "$swarmPart unchoked=${peers.values.count { !it.choked }}, pendingCommits=" +
-              "${pieces.pendingCommitCount}$outcomes"
+              "${pieces.pendingCommitCount}$outcomes$webSeedPart"
           }
         }
         // Every peer tried is gone and nobody is left to dial: an owner waits for discovery to
         // find more, other sessions fail below.
         val outOfPeers = !seeding && !complete && pool.size == 0 && dialing == 0 &&
-          book?.hasWork() == false && (diagnostics?.recorded ?: 0) > 0
+          book?.hasWork() == false && (diagnostics?.recorded ?: 0) > 0 && mirrorsRunning == 0
         if (diagnostics != null && outOfPeers && !reportedOutOfPeers &&
           nowMs() >= nextOutOfPeersReport) {
           nextOutOfPeersReport = nowMs() + SWARM_SUMMARY_INTERVAL_MS
           log.i { "V2 swarm $label ran out of peers: ${diagnostics.summary()}" }
         }
         reportedOutOfPeers = outOfPeers
-        check(seeding || pool.size > 0 || pieces.pendingCommitCount > 0 ||
+        // A web seed that still runs may fetch every piece left.
+        check(seeding || pool.size > 0 || pieces.pendingCommitCount > 0 || mirrorsRunning > 0 ||
           acceptingConnections && (swarm == null || dialing > 0 || book?.hasWork() == true ||
             discoveryOpen || swarm.waitForPeers)) {
           "All torrent peers disconnected before completion"
@@ -717,6 +800,9 @@ internal object TorrentV2SessionLoop {
                 checkNotNull(swarm?.incomingFailures)
                   .onReceiveCatching { Event.IncomingFailed(it) }
               }
+              8 -> if (mirrorsOpen) {
+                checkNotNull(mirrors).updates.onReceiveCatching { Event.Mirror(it) }
+              }
             }
           }
           // Retry only blocked work; healthy idle peers do not poll.
@@ -730,12 +816,39 @@ internal object TorrentV2SessionLoop {
           val uploadDelay = uploads?.nextDueMs(peers)?.coerceAtLeast(1)
           // Peer exchange, and metadata answers waiting to go out.
           val exchangeDelay = extensions?.nextDueMs(peers)?.coerceAtLeast(1)
+          // Web seeds that found no piece look again, as a buffer may have been freed.
+          val mirrorDelay = if (idleMirrors.isNotEmpty() && !complete) {
+            (mirrorRetryAt - nowMs()).coerceAtLeast(1)
+          } else null
           val retryDelay = listOfNotNull(memoryDelay, rateDelay, dialDelay, uploadDelay,
-            exchangeDelay).minOrNull()
+            exchangeDelay, mirrorDelay).minOrNull()
           if (retryDelay != null) onTimeout(retryDelay) { Event.Retry }
         }
         preference = (preference + 1) % branches
         when (event) {
+          is Event.Mirror -> when (val update = event.value.getOrNull()) {
+            null -> mirrorsOpen = false
+            is TorrentV2WebSeeds.Event.Idle -> idleMirrors += update.seed
+            is TorrentV2WebSeeds.Event.Done -> {
+              val index = update.index
+              val gained = update.verified && !pieces.isVerified(index)
+              val needed = gained && pieces.isNeeded(index)
+              pieces.webSeedDone(index, update.verified)
+              if (needed) for ((peer, view) in peers) if (rarity.has(peer, index)) {
+                check(view.needed > 0)
+                view.needed--
+              }
+              // Peers hear we have it, as for a piece they sent.
+              if (gained) uploads?.committed(index)
+              onProgress()
+              wakeAdmission()
+            }
+            is TorrentV2WebSeeds.Event.Stopped -> {
+              mirrorsRunning--
+              idleMirrors.remove(update.seed)
+            }
+            is TorrentV2WebSeeds.Event.Failed -> throw update.cause
+          }
           is Event.Connection -> {
             val connected = event.value.getOrNull()
             if (connected == null) {

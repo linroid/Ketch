@@ -139,21 +139,24 @@ including a development run, hands its files to the running app instead of openi
   over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
   control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
   use it too: BEP 27 only rules out DHT and peer exchange
-- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1
-  torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable peer still
-  completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A single-file
-  torrent's URL names the file (or, ending in `/`, the folder holding it); a multi-file torrent's
-  URL names the folder holding the torrent's folder, and each file is fetched from the URL, the
-  torrent name and the file's path, each segment percent-encoded. Each web seed fetches whole
-  pieces in order, one range request per file a piece spans, pieces no peer or other seed is
-  fetching, and only pieces the selection wants; every piece passes the same SHA-1 check as a
-  peer's. A failed request or a corrupt piece backs that seed off (2 s, doubling up to a minute);
-  five failures in a row drop it until the task runs again. Requests go through the source's HTTP
+- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1, v2
+  and hybrid torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable
+  peer still completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A
+  single-file torrent's URL names the file (or, ending in `/`, the folder holding it); a
+  multi-file torrent's URL names the folder holding the torrent's folder, and each file is
+  fetched from the URL, the torrent name and the file's path, each segment percent-encoded. Each
+  web seed fetches whole pieces in order, one range request per file a piece spans, pieces no
+  peer or other seed is fetching, and only pieces the selection wants; every piece passes the
+  same check as a peer's: SHA-1 for v1, the file's piece layer (BEP 52) for v2 and hybrid
+  torrents. A v2 or hybrid piece lies in one file, so it is a single range request, and BEP 47
+  padding files are never requested. When every piece left is being fetched, a seed may also
+  fetch one a peer is fetching, and whichever arrives verified first is kept. A failed request or
+  a corrupt piece backs that seed off (2 s, doubling up to a minute); five failures in a row drop
+  it until the task runs again. Requests go through the source's HTTP
   engine, with its system proxy settings like HTTP metainfo, count against the download limits,
   fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
   URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its
-  metadata, which still comes from peers. V2 and hybrid torrents (which run as v2 owners) do not
-  use web seeds yet
+  metadata, which still comes from peers
 - Magnet metadata is asked of up to four peers at once, as they are found, within
   `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
@@ -397,13 +400,15 @@ limits once it was read, like uploading it: a limit owes at most a tenth of a se
 of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
 starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
 so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
-answering their handshake, v2 and hybrid like v1. v1 connections negotiate the Fast extension
-(BEP 6): availability as Have All or Have None, requests the other side will not serve rejected
-rather than dropped, a choke that leaves requests to be rejected (those still unanswered after
-5 seconds are canceled), and each side's allowed-fast pieces requested and served while choked;
-Ketch offers IPv4 peers BEP 6's canonical set of 10 pieces only while it uploads, within the
-upload limits. A rejected piece goes to other peers without counting against the peer. v2 and
-hybrid routes, including a hybrid's v1 peers, do not negotiate it yet.
+answering their handshake, v2 and hybrid like v1. Every connection, v1, v2 and hybrid (a
+hybrid's v1 peers included), negotiates the Fast extension (BEP 6): availability as Have All or
+Have None, requests the other side will not serve rejected rather than dropped, a choke that
+leaves requests to be rejected (those still unanswered after 5 seconds are canceled), and each
+side's allowed-fast pieces requested and served while choked. Ketch offers IPv4 peers BEP 6's
+canonical set of 10 pieces only while it uploads, within the upload limits, drawn from the info
+hash the handshake named (on a hybrid, the v2 one, or the v1 one in the v1 swarm). A rejected
+piece goes to other peers without counting against the peer. BEP 52 hash rejects are separate
+messages, unaffected.
 Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
 when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
 when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;
@@ -419,9 +424,8 @@ stopping it, or files that changed on disk, clear it. Seeding runs only while th
 Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
 in the background; on iOS seeding stops while the app is suspended.
 
-This version does not implement web seeds for v2 and hybrid torrents, local service discovery,
-torrent creation, or ratio management. Bounds include 4 MiB metainfo, 10,000 files, 16 MiB
-pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
+This version does not implement torrent creation or ratio management. Bounds include 4 MiB
+metainfo, 10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
 increases process memory beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the
