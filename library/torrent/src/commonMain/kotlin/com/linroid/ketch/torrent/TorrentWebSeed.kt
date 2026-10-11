@@ -174,16 +174,19 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     var failures = 0
     try {
       while (true) {
-        val run = pieces.claim()
-        if (run.isEmpty()) {
+        val claimed = pieces.claim()
+        if (claimed.isEmpty()) {
           // Nothing left to fetch, or no buffer free: the selection may still grow.
           disconnect()
           pieces.idle()
           continue
         }
-        val released = BooleanArray(run.size)
+        val first = claimed.first().index
+        val last = claimed.last().index
+        // A piece given back leaves the run, so its buffer is unreachable once its lease is.
+        val run: MutableList<P?> = claimed.toMutableList()
         val failure = try {
-          fetch(run, released)
+          fetch(run)
           null
         } catch (e: CancellationException) {
           throw e
@@ -194,7 +197,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         } finally {
           withContext(NonCancellable) {
             for (index in run.indices) {
-              if (!released[index]) pieces.release(run[index], verified = false)
+              run[index]?.let { pieces.release(it, verified = false) }
+              run[index] = null
             }
           }
         }
@@ -215,7 +219,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         }
         val backoff = (retryMs shl (failures - 1)).coerceAtMost(WEB_SEED_MAX_BACKOFF_MS)
         log.d {
-          "Web seed $label of $logLabel failed pieces ${run.first().index}..${run.last().index}" +
+          "Web seed $label of $logLabel failed pieces $first..$last" +
             ", retrying in $backoff ms: ${failure.describeWithoutUrls()}"
         }
         delay(backoff)
@@ -235,9 +239,10 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   }
 
   /** The spans of [run], those of a file that follow each other joined in one request. */
-  private fun requests(run: List<P>): List<Request> {
+  private fun requests(run: List<P?>): List<Request> {
     val requests = mutableListOf<Request>()
     for ((piece, claim) in run.withIndex()) {
+      if (claim == null) continue
       for (span in pieces.spans(claim)) {
         val previous = requests.lastOrNull()
         val request = if (previous != null && previous.url == span.url &&
@@ -251,12 +256,12 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   }
 
   /**
-   * Fetches [run], storing each piece once its bytes are in and marking it [released] once
+   * Fetches [run], storing each piece once its bytes are in and removing it from [run] once
    * given back; a corrupt piece or a failed request ends the run there.
    */
-  private suspend fun fetch(run: List<P>, released: BooleanArray) {
+  private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
-    val missing = IntArray(run.size) { run[it].bytes.size }
+    val missing = IntArray(run.size) { run[it]?.bytes?.size ?: 0 }
     for (request in requests(run)) {
       val length = request.last - request.first + 1
       var received = 0L
@@ -277,15 +282,15 @@ internal class WebSeedWorker<P : WebSeedPiece>(
               while (read < bytes.size) {
                 val target = request.parts[part]
                 val count = minOf(bytes.size - read, target.length - position)
-                bytes.copyInto(run[target.piece].bytes, target.offset + position, read,
-                  read + count)
+                val buffer = checkNotNull(run[target.piece]).bytes
+                bytes.copyInto(buffer, target.offset + position, read, read + count)
                 read += count
                 position += count
                 if (position == target.length) {
                   part++
                   position = 0
                   missing[target.piece] -= target.length
-                  if (missing[target.piece] == 0) store(run, target.piece, released)
+                  if (missing[target.piece] == 0) store(run, target.piece)
                 }
               }
             } catch (e: Exception) {
@@ -302,8 +307,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   }
 
   /** Stores piece [piece] of [run] and gives it back; a corrupt piece fails the run. */
-  private suspend fun store(run: List<P>, piece: Int, released: BooleanArray) {
-    val claim = run[piece]
+  private suspend fun store(run: MutableList<P?>, piece: Int) {
+    val claim = checkNotNull(run[piece])
     val outcome = webSeedStorage { pieces.commit(claim) }
     if (outcome == CommitOutcome.CORRUPT) {
       log.w { "Piece ${claim.index} of $logLabel from web seed $label failed its hash check" }
@@ -312,8 +317,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     // A piece the selection dropped while it arrived goes back unstored.
     val verified = outcome == CommitOutcome.VERIFIED
     if (verified) stats.pieces.incrementAndFetch()
+    run[piece] = null
     withContext(NonCancellable) { pieces.release(claim, verified) }
-    released[piece] = true
   }
 
   /** This seed among the task's live connections, while it fetches. */
