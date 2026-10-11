@@ -213,6 +213,36 @@ class UtpSocketTest {
   }
 
   @Test
+  fun lostSynAnswer_dataBeforeTheStateIsNotTakenAsTheStart() {
+    // B's STATE (packet 1) is lost and B sends data at once: A must not guess where B's stream
+    // starts from whichever data arrives first, and waits for the STATE its next SYN draws.
+    val network = Network(drop = setOf(1), jitter = 30_000, seed = 2)
+    val down = Transfer(Random(8).nextBytes(20_000))
+    network.connect()
+    network.run(10_000_000, step = { down.step(network.b, network.a, network.now) }) {
+      down.readBytes == down.payload.size
+    }
+    assertContentEquals(down.payload, down.received())
+  }
+
+  @Test
+  fun reorderBuffer_countsUnreadBytesAgainstTheWindow() {
+    val options = UtpOptions(receiveBuffer = 8 * 1200)
+    val sent = mutableListOf<UtpPacket>()
+    val syn = UtpPacket(UtpType.SYN, 7, 0, 0, 1_000_000, 1, 0)
+    val socket = UtpSocket.accept(syn, { sent += it }, 0, options, initialSeq = 100)
+    fun data(seq: Int) = UtpPacket(UtpType.DATA, 8, 0, 0, 1_000_000, seq, 99,
+      payload = ByteArray(1200))
+    // Six packets in order fill most of the buffer, unread.
+    for (seq in 2..7) socket.receive(data(seq), 0)
+    assertEquals(6L * 1200, socket.available)
+    // Past a gap, only what is left of the window is held: two packets, not eight.
+    for (seq in 9..16) socket.receive(data(seq), 0)
+    val window = sent.last().window
+    assertEquals(0L, window)
+  }
+
+  @Test
   fun silentPeer_failsAfterTheSynRetries() {
     val network = Network(loss = 1.0)
     val a = network.connect()
