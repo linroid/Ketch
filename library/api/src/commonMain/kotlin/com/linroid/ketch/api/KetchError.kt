@@ -12,12 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Sealed hierarchy of all errors that Ketch can produce.
- *
- * Use [isRetryable] to determine whether the operation should be
- * retried automatically. Only transient failures ([Network],
- * server-side [Http] 5xx, and rate-limiting 429) are considered
- * retryable.
+ * Every error Ketch reports; [isRetryable] tells transient ones apart.
  *
  * Serialized with a `type`, such as `{"type":"network","message":"..."}`. Read errors from
  * other versions with [tolerantSerializer].
@@ -31,7 +26,7 @@ sealed class KetchError(
   @Transient override val cause: Throwable? = null,
 ) : Exception(message, cause) {
 
-  /** Connection or timeout failure. Always retryable. */
+  /** Connection or timeout failure. Retryable. */
   @Serializable
   @SerialName("network")
   data class Network(
@@ -39,17 +34,11 @@ sealed class KetchError(
   ) : KetchError("Network error occurred", cause)
 
   /**
-   * Non-success HTTP status code.
-   * Retryable for server errors (5xx) and rate limiting (429).
+   * An HTTP error status; retryable for 5xx and 429.
    *
-   * @property code the HTTP status code
-   * @property statusMessage optional reason phrase from the server
-   * @property retryAfterSeconds value of the `Retry-After` header in
-   *   seconds, if the server provided one (typically on 429 responses).
-   *   Falls back to `RateLimit-Reset` when `Retry-After` is absent.
-   * @property rateLimitRemaining value of the `RateLimit-Remaining`
-   *   header, indicating how many requests remain in the current
-   *   rate limit window. Used on 429 to inform connection reduction.
+   * @property statusMessage the server's reason phrase
+   * @property retryAfterSeconds `Retry-After`, else `RateLimit-Reset`, in seconds
+   * @property rateLimitRemaining `RateLimit-Remaining`, which a 429 uses to cut connections
    */
   @Serializable
   @SerialName("http")
@@ -61,27 +50,21 @@ sealed class KetchError(
     @Transient override val cause: Throwable? = null,
   ) : KetchError("HTTP error $code" + statusMessage?.let { ": $it" }.orEmpty(), cause)
 
-  /** File I/O failure (write, flush, preallocate). Not retryable. */
+  /** File I/O failure. */
   @Serializable
   @SerialName("disk")
   data class Disk(
     @Transient override val cause: Throwable? = null,
   ) : KetchError("Disk I/O error", cause)
 
-  /** Server does not support a required feature (e.g., byte ranges). */
+  /** Something required is unsupported, such as byte ranges or the content's format. */
   @Serializable
   @SerialName("unsupported")
   data class Unsupported(
     @Transient override val cause: Throwable? = null,
   ) : KetchError("Operation not supported by server", cause)
 
-  /**
-   * Server file has changed since the download started (ETag,
-   * Last-Modified, or MDTM mismatch). Not retryable — the download
-   * must be restarted from scratch.
-   *
-   * @property reason description of what changed
-   */
+  /** The file changed on the server since the download started (ETag, date or MDTM). */
   @Serializable
   @SerialName("file_changed")
   data class FileChanged(
@@ -89,12 +72,7 @@ sealed class KetchError(
     @Transient override val cause: Throwable? = null,
   ) : KetchError("File changed on server: $reason", cause)
 
-  /**
-   * Resume state (stored JSON) could not be parsed. Not retryable —
-   * the download must be restarted from scratch.
-   *
-   * @property detail optional detail about what was corrupt
-   */
+  /** The saved resume state could not be read; the download must start over. */
   @Serializable
   @SerialName("corrupt_resume_state")
   data class CorruptResumeState(
@@ -105,7 +83,7 @@ sealed class KetchError(
     cause,
   )
 
-  /** Download was explicitly canceled by the user. */
+  /** The download was canceled. */
   @Serializable
   @SerialName("canceled")
   data class Canceled(
@@ -113,10 +91,9 @@ sealed class KetchError(
   ) : KetchError("Download was canceled", cause)
 
   /**
-   * Error originating from a pluggable source.
+   * A download source failed.
    *
-   * @property sourceType identifier of the source that failed
-   * @property detail optional explanation, safe to display and persist without credentials
+   * @property detail an explanation safe to show and save, without credentials
    */
   @Serializable
   @SerialName("source")
@@ -126,11 +103,7 @@ sealed class KetchError(
     val detail: String? = null,
   ) : KetchError(detail ?: "Source '$sourceType' error", cause)
 
-  /**
-   * Authentication failed (e.g., FTP 530 "Not logged in").
-   *
-   * @property sourceType identifier of the source that rejected credentials
-   */
+  /** The source rejected the credentials, such as FTP's 530. */
   @Serializable
   @SerialName("auth_failed")
   data class AuthenticationFailed(
@@ -141,16 +114,12 @@ sealed class KetchError(
   )
 
   /**
-   * The finished file's digest differs from the one it was checked against: the request's
-   * [DownloadRequest.checksum], or else a digest the server published for the file (an HTTP
-   * `Repr-Digest` or `Digest` header). Not retryable: the same bytes would fail again. The
-   * download's progress is discarded, so a resume downloads the file again.
+   * The finished file's digest differs from [DownloadRequest.checksum], or from the one the
+   * server published. Its progress is discarded, so a resume downloads it again.
    *
-   * @property algorithm the hash function both digests use
-   * @property expected the digest the file should have, as lowercase hex
-   * @property actual the digest the file has, as lowercase hex
-   * @property published `true` when [expected] is the digest the server published rather than
-   *   the request's checksum
+   * @property expected the digest it should have, as lowercase hex
+   * @property actual the digest it has, as lowercase hex
+   * @property published whether [expected] came from the server
    */
   @Serializable
   @SerialName("checksum_mismatch")
@@ -166,7 +135,7 @@ sealed class KetchError(
     cause,
   )
 
-  /** Catch-all for unexpected errors. Not retryable. */
+  /** Any other error. */
   @Serializable
   @SerialName("unknown")
   data class Unknown(
@@ -174,11 +143,7 @@ sealed class KetchError(
     val errorMessage: String? = null,
   ) : KetchError(errorMessage ?: "Unknown error occurred", cause)
 
-  /**
-   * Whether this error is transient and the download should be retried.
-   * [Network], [Http] with a 5xx status code, and [Http] 429
-   * (Too Many Requests) are retryable.
-   */
+  /** Whether this error is transient: [Network], and [Http] 5xx or 429. */
   val isRetryable: Boolean
     get() = when (this) {
       is Network -> true

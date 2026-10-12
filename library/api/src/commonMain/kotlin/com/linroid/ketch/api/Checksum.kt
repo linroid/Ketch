@@ -14,10 +14,9 @@ import kotlin.io.encoding.Base64
 /**
  * A hash function a [Checksum] names.
  *
- * @property id the lowercase name a checksum is written with, such as `sha256` in
- *   `sha256:<hex>`
- * @property label the name people read, such as `SHA-256`
- * @property byteCount the size of the digest in bytes
+ * @property id the name in `<id>:<hex>`, such as `sha256`
+ * @property label the display name, such as `SHA-256`
+ * @property byteCount the digest size in bytes
  */
 @Serializable
 enum class ChecksumAlgorithm(val id: String, val label: String, val byteCount: Int) {
@@ -34,10 +33,7 @@ enum class ChecksumAlgorithm(val id: String, val label: String, val byteCount: I
   SHA_512("sha512", "SHA-512", 64);
 
   companion object {
-    /**
-     * The algorithm called [name], ignoring case and dashes: `sha256`, `SHA-256` and `sha-256`
-     * all name [SHA_256]. `null` for any other name.
-     */
+    /** The algorithm called [name], ignoring case and dashes (`SHA-256`), or `null`. */
     fun named(name: String): ChecksumAlgorithm? {
       val key = name.trim().replace("-", "").lowercase()
       return entries.firstOrNull { it.id == key }
@@ -46,14 +42,10 @@ enum class ChecksumAlgorithm(val id: String, val label: String, val byteCount: I
 }
 
 /**
- * The digest a downloaded file is expected to have, or had.
+ * A file's expected or verified digest, written and serialized as `<algorithm>:<hex>`, such as
+ * `sha256:e3b0c442…`.
  *
- * Written as `<algorithm>:<hex>`, such as `sha256:e3b0c442…`, which is also how it is
- * serialized. [parse] reads that form, the base64 values of HTTP `Digest` and `Repr-Digest`
- * headers, and bare hex digests, whose length names the algorithm.
- *
- * @property algorithm the hash function
- * @property value the digest as lowercase hex, two digits per byte of [ChecksumAlgorithm.byteCount]
+ * @property value the digest as lowercase hex
  */
 @Serializable(with = ChecksumSerializer::class)
 data class Checksum(
@@ -66,16 +58,16 @@ data class Checksum(
     }
   }
 
-  /** This checksum as `<algorithm>:<hex>`, the form [parse] reads. */
+  /** `<algorithm>:<hex>`. */
   override fun toString(): String = "${algorithm.id}:$value"
 
-  /** Whether [digest], the bytes of an [algorithm] digest, is this checksum. */
+  /** Whether the [digest] bytes match. */
   fun matches(digest: ByteArray): Boolean = value == digest.toHex()
 
   companion object {
     private const val HEX_DIGITS = "0123456789abcdef"
 
-    /** The checksum of [digest], the bytes an [algorithm] digest produced. */
+    /** The checksum of [digest] bytes. */
     fun of(algorithm: ChecksumAlgorithm, digest: ByteArray): Checksum {
       require(digest.size == algorithm.byteCount) {
         "A ${algorithm.label} digest is ${algorithm.byteCount} bytes"
@@ -84,11 +76,8 @@ data class Checksum(
     }
 
     /**
-     * Reads a checksum written as `<algorithm>:<value>` or `<algorithm>=<value>`, where the
-     * value is hex (either case) or base64 (standard or URL-safe, padding optional, and
-     * optionally between colons as in `Repr-Digest`), or as a bare hex digest, whose length
-     * names the algorithm: 32 digits MD5, 40 SHA-1, 64 SHA-256 and 128 SHA-512. Algorithm names
-     * ignore case and dashes ([ChecksumAlgorithm.named]).
+     * Reads `<algorithm>:<value>` or `<algorithm>=<value>`, the value in hex or base64 (as in
+     * `Repr-Digest`), or a bare hex digest whose length names the algorithm.
      *
      * @throws IllegalArgumentException when [text] is not a checksum of a supported algorithm
      */
@@ -117,8 +106,7 @@ data class Checksum(
     }
 
     /**
-     * Reads an [algorithm] digest written as hex (either case) or base64 (standard or URL-safe,
-     * padding optional, optionally between colons).
+     * Reads an [algorithm] digest in hex or base64.
      *
      * @throws IllegalArgumentException when [value] is neither
      */

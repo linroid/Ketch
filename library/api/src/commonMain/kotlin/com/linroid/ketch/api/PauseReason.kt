@@ -11,49 +11,34 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Why a task is [DownloadState.Paused].
- *
- * Serialized as an object with a `type`: `{"type":"user"}`,
- * `{"type":"preempted","byTaskId":"..."}`, `{"type":"waiting_for_condition"}` or
- * `{"type":"shutdown"}`. A `type` this version does not know, such as one a newer server
- * sends, decodes as [User], so clients never fail on a reason added later.
+ * Why a task is [DownloadState.Paused]. Serialized with a `type`, such as
+ * `{"type":"preempted","byTaskId":"..."}`; unknown types decode as [User].
  */
 @Serializable(with = PauseReasonSerializer::class)
 sealed class PauseReason {
-  /**
-   * Paused through [DownloadTask.pause], or restored paused after a restart. Stays paused
-   * until [DownloadTask.resume] is called.
-   */
+  /** Paused by [DownloadTask.pause], or restored paused; waits for [DownloadTask.resume]. */
   data object User : PauseReason()
 
   /**
-   * Paused to give its download slot to the [DownloadPriority.URGENT] task [byTaskId]. The task
-   * still waits in the download queue, reports a [DownloadTask.queuePosition] and resumes on
-   * its own when a slot frees. [DownloadTask.pause] turns it into a [User] pause;
-   * [DownloadTask.resume] leaves it waiting.
+   * Gave its slot to the [DownloadPriority.URGENT] task [byTaskId]; still queued and resumes on
+   * its own. [DownloadTask.pause] makes it a [User] pause.
    */
   data class Preempted(val byTaskId: String) : PauseReason()
 
-  /** Waiting for its [DownloadCondition]s to be met again; resumes on its own. */
+  /** Waiting for its [DownloadCondition]s; resumes on its own. */
   data object WaitingForCondition : PauseReason()
 
-  /**
-   * Stopped because its Ketch instance closed. Its progress is kept and it resumes when the
-   * instance starts again.
-   */
+  /** Stopped by the instance closing; resumes when it starts again. */
   data object Shutdown : PauseReason()
 
   /**
-   * Waiting for [DownloadTask.selectFiles], as [DownloadRequest.awaitFileSelection] asked once
-   * its files or variants were known. Holds no download slot and has no queue position;
-   * [DownloadTask.resume] downloads the source's [default][ResolvedSource.defaultSelection].
-   * Older clients decode it as [User].
+   * Waiting for [DownloadTask.selectFiles] ([DownloadRequest.awaitFileSelection]), holding no
+   * slot; [DownloadTask.resume] downloads the [default][ResolvedSource.defaultSelection] files.
    */
   data object AwaitingFileSelection : PauseReason()
 }
 
-// The wire shape of every reason. Not polymorphic on purpose: a sealed polymorphic hierarchy
-// throws on a subtype it does not know, which would break older clients of newer servers.
+// Not polymorphic on purpose: that throws on unknown subtypes, breaking older clients.
 @Serializable
 @SerialName("com.linroid.ketch.api.PauseReason.Wire")
 private class PauseReasonWire(val type: String, val byTaskId: String? = null)
@@ -74,8 +59,7 @@ internal object PauseReasonSerializer : KSerializer<PauseReason> {
   }
 
   override fun deserialize(decoder: Decoder): PauseReason {
-    // From JSON the object is read as it is, so a newer reason with fields of its own decodes
-    // as User even where unknown keys are rejected, such as with Json.Default.
+    // Read as a JSON object, so newer reasons with extra fields decode even in strict Json.
     val (type, byTaskId) = if (decoder is JsonDecoder) {
       val fields = decoder.decodeJsonElement() as? JsonObject ?: return PauseReason.User
       fields.string("type") to fields.string("byTaskId")

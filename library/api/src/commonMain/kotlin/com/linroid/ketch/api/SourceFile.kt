@@ -3,17 +3,11 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Describes a single file within a multi-file download source.
+ * One file or variant of a source with several ([ResolvedSource.files]).
  *
- * Sources like torrent, HLS, or media extractors may resolve a URL
- * to multiple files or quality variants. Each [SourceFile] represents
- * one selectable item.
- *
- * @property id unique identifier for this file within the source
- * @property name human-readable display name
- * @property size file size in bytes, or -1 if unknown
- * @property metadata source-specific key-value pairs (e.g.,
- *   `"quality"` to `"1080p"`, `"path"` to `"Pack/Movie.mkv"`)
+ * @property id unique within the source
+ * @property size size in bytes, or -1 if unknown
+ * @property metadata source-specific values, such as `path` or `quality`
  */
 @Serializable
 data class SourceFile(

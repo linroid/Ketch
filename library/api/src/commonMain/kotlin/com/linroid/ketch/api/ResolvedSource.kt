@@ -3,36 +3,20 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Pre-resolved metadata about a download URL.
+ * What [KetchApi.resolve] learned about a URL; pass it in [DownloadRequest.resolvedSource] to
+ * skip probing again.
  *
- * Returned by [KetchApi.resolve] after probing the URL without
- * downloading. When passed in [DownloadRequest.resolvedSource], the
- * download engine skips its own HEAD/probe request and uses this
- * information directly.
- *
- * @property url the resolved download URL
- * @property sourceType identifier of the source that handled the
- *   URL (e.g., "http")
- * @property totalBytes total content size in bytes, or -1 if unknown
- * @property supportsResume whether the source supports resuming
- *   interrupted downloads
- * @property suggestedFileName file name suggested by the source
- *   (e.g., from Content-Disposition), or null
- * @property maxSegments maximum number of concurrent segments the
- *   source supports. 1 if no range/parallel support.
- * @property metadata source-specific key-value pairs
- * @property files list of selectable files within this source.
- *   Empty for single-file sources (e.g., HTTP). When non-empty,
- *   the UI should present a file selector before downloading.
- * @property selectionMode how the user selects from [files]:
- *   [FileSelectionMode.MULTIPLE] for subset selection (torrent),
- *   [FileSelectionMode.SINGLE] for one variant (reserved for HLS quality). A source offering a
- *   single choice lists its default variant first: see [defaultSelection].
- * @property contentType media type of the content as the source reports it, such as an HTTP
- *   `Content-Type` of `video/mp4`, or `null` when unknown. [DownloadCategory.mimeTypes] match it.
- * @property checksum the digest the source publishes for the whole content, such as an HTTP
- *   `Repr-Digest`, or `null`. A download without its own [DownloadRequest.checksum] is verified
- *   against it.
+ * @property sourceType the source that handles the URL, such as `http`
+ * @property totalBytes the content size, or -1 if unknown
+ * @property suggestedFileName a name from the source, such as `Content-Disposition`
+ * @property maxSegments the most segments it can download at once; 1 without ranges
+ * @property metadata source-specific values
+ * @property files the files or variants to choose from; empty for one file
+ * @property selectionMode how [files] are chosen: any subset ([FileSelectionMode.MULTIPLE]) or
+ *   one ([FileSelectionMode.SINGLE], default first; see [defaultSelection])
+ * @property contentType the media type the source reports, such as `video/mp4`
+ * @property checksum the digest the source publishes, which downloads without their own
+ *   [DownloadRequest.checksum] are verified against
  */
 @Serializable
 data class ResolvedSource(
@@ -49,21 +33,17 @@ data class ResolvedSource(
   val checksum: Checksum? = null,
 ) {
   companion object {
-    /**
-     * [metadata] key holding a source's whole content description, such as a torrent's base64
-     * metainfo. [withoutBulkMetadata] always leaves it out, whatever its size.
-     */
+    /** [metadata] key of the whole content description, such as a torrent's metainfo. */
     const val METAINFO_KEY: String = "metainfo"
 
-    /** [metadata] values longer than this are left out of task views and events. */
+    /** The longest [metadata] value task views keep. */
     const val MAX_VIEW_METADATA_CHARS: Int = 4096
   }
 }
 
 /**
- * This source without [ResolvedSource.METAINFO_KEY] and without metadata values longer than
- * [ResolvedSource.MAX_VIEW_METADATA_CHARS], as tasks keep and show it; [ResolvedSource.files]
- * are kept. Results of [KetchApi.resolve] keep everything.
+ * This source without [ResolvedSource.METAINFO_KEY] or metadata longer than
+ * [ResolvedSource.MAX_VIEW_METADATA_CHARS], as tasks keep it.
  */
 fun ResolvedSource.withoutBulkMetadata(): ResolvedSource {
   val kept = metadata.filter { (key, value) ->
@@ -72,11 +52,7 @@ fun ResolvedSource.withoutBulkMetadata(): ResolvedSource {
   return if (kept.size == metadata.size) this else copy(metadata = kept)
 }
 
-/**
- * The files this source downloads when none are chosen, as [DownloadTask.resume] of a task
- * waiting for a file selection picks them: every file for [FileSelectionMode.MULTIPLE], the
- * first of [ResolvedSource.files] for [FileSelectionMode.SINGLE]. Empty without files.
- */
+/** The files downloaded when none are chosen: all of them, or the first for a single choice. */
 fun ResolvedSource.defaultSelection(): Set<String> = when (selectionMode) {
   FileSelectionMode.MULTIPLE -> files.mapTo(LinkedHashSet()) { it.id }
   FileSelectionMode.SINGLE -> files.firstOrNull()?.let { setOf(it.id) }.orEmpty()

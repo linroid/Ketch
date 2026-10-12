@@ -3,68 +3,36 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Global download configuration.
+ * Global download configuration, replaced at runtime with [KetchApi.updateConfig].
+ * [speedLimit], [maxConcurrentDownloads] and [maxConnectionsPerHost] apply at once; other fields
+ * when a download starts or resumes.
  *
- * Defaults allow four downloads at once, at most sixteen per host, and four connections per
- * HTTP(S) or FTP(S) download. The per-host limit counts tasks, not their individual connections.
- *
- * Can be replaced at runtime with [KetchApi.updateConfig]. [speedLimit],
- * [maxConcurrentDownloads] and [maxConnectionsPerHost] apply immediately. Every other field
- * is read when a download starts or resumes, so a running download keeps the values it
- * started with until it is paused and resumed.
- *
- * @property defaultDirectory Default directory for saving downloaded files when
- *   [DownloadRequest.destination] does not name a directory or full path.
- *   `null` means the platform default: `~/Downloads` on JVM, the app's
- *   external `Download` folder on Android, the app's Documents folder on
- *   iOS, and `downloads` in the working directory elsewhere.
- * @property maxConnectionsPerDownload Default number of concurrent connections per task, used
- *   when [DownloadRequest.connections] is `0`. HTTP(S) opens one Range request per segment and
- *   FTP(S) one connection per segment using REST offsets. Servers without Range (HTTP) or REST
- *   (FTP) support always use a single connection. Sources that do not split files into byte
- *   ranges, such as BitTorrent, ignore this default.
- * @property retryCount Maximum number of automatic retries after a retryable failure
- *   ([KetchError.isRetryable]). Segment progress is kept between attempts, and the count starts
- *   over once an attempt gets further than every attempt before it, so only failures in a row
- *   without progress use it up. Ignored while [unlimitedRetries] is `true`.
- * @property unlimitedRetries Retries retryable failures until the download is paused or
- *   canceled, instead of giving up after [retryCount] of them.
- * @property retryDelayMs Base delay in milliseconds before the first retry. Each further retry in
- *   a row doubles it, up to [maxRetryDelayMs], and waits a random time between half of that delay
- *   and all of it, so downloads that failed together do not retry together. An HTTP 429
- *   response's `Retry-After` replaces the delay.
- * @property maxRetryDelayMs The longest delay before a retry, before the random part is applied.
- * @property idleTimeoutMs How long an HTTP(S), FTP(S), HLS or DASH transfer may receive no data
- *   before it counts as stalled: its connection is dropped and the download retried, as after a
- *   network error. Time a transfer waits for a speed limit does not count. `0` turns it off.
- * @property minSpeed A speed in bytes per second that a transfer has to reach, averaged over
- *   [MIN_SPEED_WINDOW_MS], or it counts as stalled like [idleTimeoutMs]. Each connection of a
- *   segmented download is checked on its own, and time spent waiting for a speed limit is left
- *   out of the average. `0` (the default) turns it off.
- * @property progressIntervalMs Minimum interval between progress updates of segmented
- *   (HTTP/FTP) downloads, to prevent UI spam
- * @property saveIntervalMs Interval for persisting segment progress during downloads
- * @property bufferSize Read buffer size in bytes for FTP data transfers. HTTP transfers use
- *   the buffering of the configured `HttpEngine`.
- * @property speedLimit Global speed limit shared by all downloads. Per-task limits
- *   ([DownloadRequest.speedLimit]) apply in addition to it.
- * @property maxConcurrentDownloads Maximum number of downloads that can
- *   run simultaneously. Additional downloads are queued and started
- *   automatically when slots become available. `0` means unlimited.
- *   Raising the limit at runtime starts queued downloads right away. Lowering it never
- *   interrupts running downloads; queued ones wait until enough of them finish.
- * @property maxConnectionsPerHost Maximum number of concurrent downloads per server, keyed
- *   by the URL host (case-insensitive, ignoring user info and port). Applies to URLs with a
- *   network host, such as HTTP(S) and FTP(S). Magnet links, `torrent:` identifiers and local
- *   files are not counted; a torrent added from an HTTP(S) `.torrent` URL counts against that
- *   URL's host. `0` means unlimited. Runtime changes behave like [maxConcurrentDownloads].
- * @property proxy How HTTP(S) downloads reach their servers, by default following the system's
- *   proxy settings. [DownloadRequest.proxy] replaces it for one download. Resolving a URL with
- *   [KetchApi.resolve] uses it too.
- * @property categories folders under [defaultDirectory] that downloads not choosing a folder
- *   are sorted into, by file extension, media type or site; the first category a download
- *   matches wins, and one that matches none stays in [defaultDirectory]. Empty by default, so
- *   every such download is saved in [defaultDirectory]. See [DownloadCategory].
+ * @property defaultDirectory where downloads go unless their destination names a folder or
+ *   path; `null` for the platform's downloads folder
+ * @property maxConnectionsPerDownload connections (segments) per HTTP(S) or FTP(S) download that
+ *   asks for none; servers without ranges use one, and BitTorrent ignores it
+ * @property retryCount retries after a retryable failure ([KetchError.isRetryable]), counted
+ *   again from zero once an attempt gets further than every one before
+ * @property unlimitedRetries retry until paused or canceled, ignoring [retryCount]
+ * @property retryDelayMs delay before the first retry, doubled for each further one up to
+ *   [maxRetryDelayMs], then randomized between half and all of it. A 429's `Retry-After` wins.
+ * @property maxRetryDelayMs the longest retry delay, before randomizing
+ * @property idleTimeoutMs how long a transfer may receive nothing, outside speed limit waits,
+ *   before it is dropped and retried; `0` turns it off
+ * @property minSpeed bytes per second each connection must average over [MIN_SPEED_WINDOW_MS],
+ *   or it is treated like [idleTimeoutMs]; `0` turns it off
+ * @property progressIntervalMs the least time between progress updates of segmented downloads
+ * @property saveIntervalMs how often segment progress is saved
+ * @property bufferSize read buffer size for FTP transfers, in bytes
+ * @property speedLimit the limit shared by all downloads
+ * @property maxConcurrentDownloads downloads running at once, `0` for unlimited; more wait in
+ *   the queue. Lowering it never stops running downloads.
+ * @property maxConnectionsPerHost downloads running at once per URL host, `0` for unlimited.
+ *   Magnets, `torrent:` IDs and local files have no host.
+ * @property proxy how HTTP(S) downloads and [KetchApi.resolve] reach servers;
+ *   [DownloadRequest.proxy] replaces it per download
+ * @property categories folders under [defaultDirectory] for downloads that choose none; the
+ *   first match wins ([DownloadCategory])
  */
 @Serializable
 data class DownloadConfig(
@@ -103,7 +71,7 @@ data class DownloadConfig(
     /** The span [minSpeed] is averaged over. */
     const val MIN_SPEED_WINDOW_MS: Long = 30_000
 
-    /** Default settings shared by the engine and its clients. */
+    /** The default configuration. */
     val Default: DownloadConfig = DownloadConfig()
   }
 }

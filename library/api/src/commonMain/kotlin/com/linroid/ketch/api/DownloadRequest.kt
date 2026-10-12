@@ -3,87 +3,39 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Describes a file to download.
+ * Describes a download.
  *
- * @property url the HTTP(S) URL to download from. Must not be blank.
- * @property destination where the file should be saved. Semantics depend
- *   on the value:
- *   - `null` — use the default directory, resolve file name from server
- *   - `Destination("/downloads/")` — directory (trailing `/`), resolve
- *     file name from server
- *   - `Destination("custom.zip")` — bare name ([Destination.isName]),
- *     use default directory
- *   - `Destination("/downloads/custom.zip")` — full file path, use as-is
- *   - `Destination("content://...")` — content URI, use as-is
- * @property connections number of concurrent connections (segments) to
- *   use. Must be non-negative. When `0` (the default), the engine uses
- *   [DownloadConfig.maxConnectionsPerDownload] as it was when the download
- *   started or resumed. Falls back to a single connection if the server
- *   does not support HTTP Range requests or FTP REST. BitTorrent sources
- *   treat a positive value as their peer connection limit instead.
- * @property headers custom HTTP headers to include in every request
- *   (HEAD and GET) for this download. Names must be tokens and values
- *   must not contain line breaks or other control characters, or
- *   [KetchApi.download] rejects the request. `Host`, `Range`,
- *   `Content-Length` and hop-by-hop headers such as `Connection` are
- *   ignored. When a redirect leads to another scheme, host or port, the
- *   Ktor engine's next request keeps only `User-Agent`, `Accept`,
- *   `Accept-Encoding`, `Accept-Language` and the origin of `Referer`, so
- *   cookies and other credentials stay with the site they were meant for.
- * @property properties arbitrary key-value pairs for use by custom
- *   extensions. The engine does not read these values. By convention
- *   `ketch.origin` names where a download was added from (`browser`,
- *   `discover`, `agent`, `app` or `cli`), which the apps show and filter
- *   by. They never reach [KetchApi.resolve], whose properties are headers.
- * @property speedLimit per-task speed limit. Applies in addition to the
- *   global [DownloadConfig.speedLimit], so the download runs at no more
- *   than the lower of the two. It cannot raise a download above the
- *   global limit. Defaults to [SpeedLimit.Unlimited] (only the global
- *   limit applies).
- * @property priority queue priority for this download. Higher-priority
- *   tasks are started before lower-priority ones when download slots
- *   become available. Defaults to [DownloadPriority.NORMAL].
- * @property schedule when the download should start. Defaults to
- *   [DownloadSchedule.Immediate].
- * @property conditions list of [DownloadCondition]s that must all be
- *   met before the download starts. Not persisted across restarts.
- * @property selectedFileIds IDs of files selected from
- *   [ResolvedSource.files]. Empty means download all/default.
- *   Sources read this via the download context to determine
- *   which files to download. [DownloadTask.selectFiles] changes it while the task exists, after
- *   which it always lists the chosen files.
- * @property resolvedSource pre-resolved metadata from
- *   [KetchApi.resolve]. When present, the download engine skips
- *   its own probe and uses this information directly. It is saved with the task: Ketch keeps its
- *   file list and, once the download starts, drops the bulky metadata
- *   ([ResolvedSource.withoutBulkMetadata]). Task views and events never carry
- *   [ResolvedSource.METAINFO_KEY].
- * @property proxy how this download reaches its servers, in place of
- *   [DownloadConfig.proxy]; `null` (the default) follows the global setting
- *   as it is when the download starts or resumes. Saved with the task, its
- *   password included.
- * @property requestId optional caller-generated UUID identifying a submission. Backends advertising
- *   [KetchFeatures.REQUEST_ID] return the existing task for an identical submission while that task
- *   is retained, including after restart. Reusing an ID with different source, destination,
- *   headers, properties, proxy or checksum is rejected. Mutable task controls (connections,
- *   speed limit, priority, schedule, the file selection and [awaitFileSelection]) and transient
- *   metadata/conditions are not compared; a repeated submission leaves the existing task's
- *   current settings unchanged.
- * @property awaitFileSelection when `true` and [selectedFileIds] is empty, a download with several
- *   files or variants ([ResolvedSource.files], such as a torrent's files) stops once they are
- *   known and waits, paused for [PauseReason.AwaitingFileSelection] and holding no download slot,
- *   until [DownloadTask.selectFiles] chooses; [DownloadTask.resume] downloads the source's
- *   [default][ResolvedSource.defaultSelection] (every file, or the first variant of a single
- *   choice). Ignored when files are selected or the content has one file. Servers that do not
- *   list [KetchFeatures.AWAIT_FILE_SELECTION] ignore it.
- * @property checksum the digest the downloaded file must have. Once the last byte is saved, Ketch
- *   hashes the file and fails the task with [KetchError.ChecksumMismatch] when it differs; the
- *   task completes only with a matching file. Without one, an HTTP download is checked against
- *   the digest its server publishes (`Repr-Digest`, or a legacy `Digest`), when it publishes one
- *   for the whole, unencoded file. Applies to downloads Ketch writes as one file (HTTP, FTP, HLS
- *   and DASH); [KetchApi.download] refuses it for sources that write their own files, such as
- *   torrents. Servers that do not list [KetchFeatures.CHECKSUM] would ignore it, so
- *   `RemoteKetch` refuses to send it to them.
+ * @property url what to download; must not be blank
+ * @property destination where to save: `null` for the default directory and the server's file
+ *   name, a folder (ending in `/`), a bare file name in the default directory
+ *   ([Destination.isName]), a full file path, or a content URI
+ * @property connections connections (segments) to use, or `0` for
+ *   [DownloadConfig.maxConnectionsPerDownload]. Servers without ranges use one; BitTorrent treats
+ *   it as its peer limit.
+ * @property headers HTTP headers for every request. Names must be tokens and values free of
+ *   control characters, or [KetchApi.download] rejects them; `Host`, `Range`, `Content-Length`
+ *   and hop-by-hop headers are dropped. A redirect to another origin keeps only `User-Agent`,
+ *   the `Accept*` headers and `Referer`'s origin, so credentials stay with their site.
+ * @property properties free-form values for extensions, which the engine ignores. `ketch.origin`
+ *   names where the download was added (`browser`, `discover`, `agent`, `app` or `cli`).
+ * @property speedLimit a cap on top of [DownloadConfig.speedLimit]; the lower one wins
+ * @property priority queue priority
+ * @property schedule when to start
+ * @property conditions what must all hold before starting; not saved
+ * @property selectedFileIds which of [ResolvedSource.files] to download; empty for the default
+ * @property resolvedSource the result of [KetchApi.resolve], which skips the probe. Saved
+ *   without its bulky metadata ([ResolvedSource.withoutBulkMetadata]) once the download starts.
+ * @property proxy replaces [DownloadConfig.proxy] for this download; saved with its password
+ * @property requestId a caller's UUID for this submission. With [KetchFeatures.REQUEST_ID], an
+ *   identical resubmission returns the existing task, unchanged; reusing it with another source,
+ *   destination, headers, properties, proxy or checksum is rejected.
+ * @property awaitFileSelection with no [selectedFileIds], pause for
+ *   [PauseReason.AwaitingFileSelection] once several files or variants are known
+ *   ([KetchFeatures.AWAIT_FILE_SELECTION])
+ * @property checksum the digest the file must have, checked once it is saved, failing with
+ *   [KetchError.ChecksumMismatch]. Without one, HTTP downloads are checked against a digest the
+ *   server publishes. Only for sources Ketch writes as one file (not torrents); needs
+ *   [KetchFeatures.CHECKSUM].
  */
 @Serializable
 data class DownloadRequest(

@@ -6,24 +6,9 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
- * Represents the lifecycle state of a download task.
- *
- * State transitions follow this general flow:
- * ```
- * Scheduled -> Queued -> Downloading -> Completed
- *                |            |
- *                v            v
- *             Canceled      Paused(User | Preempted | Shutdown) -> Downloading
- *                             |
- *                             v
- *                           Failed
- * ```
- *
- * A task paused for [PauseReason.Preempted] still waits in the queue. One that asked to wait for
- * a file selection goes from Queued to Paused([PauseReason.AwaitingFileSelection]) once its files
- * or variants are known, and a completed task whose selection gains files goes back to Queued.
- *
- * @see DownloadTask.state
+ * The lifecycle state of a [DownloadTask]: usually Scheduled, Queued, Downloading, then
+ * Completed, with Paused and Failed (resumable) or Canceled on the way. A completed task whose
+ * [file selection][DownloadTask.selectFiles] gains files goes back to Queued.
  */
 @Serializable
 sealed class DownloadState {
@@ -37,16 +22,12 @@ sealed class DownloadState {
   @SerialName("queued")
   data object Queued : DownloadState()
 
-  /** Actively downloading. [progress] is updated periodically. */
+  /** Downloading; [progress] updates periodically. */
   @Serializable
   @SerialName("downloading")
   data class Downloading(val progress: DownloadProgress) : DownloadState()
 
-  /**
-   * Download paused. [reason] says why: by the user, or by the engine, which then resumes it on
-   * its own (see [PauseReason]). Instances and servers that do not report a reason give
-   * [PauseReason.User].
-   */
+  /** Paused, for [reason]; [PauseReason.User] from servers that do not report one. */
   @Serializable
   @SerialName("paused")
   data class Paused(
@@ -55,23 +36,15 @@ sealed class DownloadState {
   ) : DownloadState()
 
   /**
-   * Download finished successfully.
+   * Download finished. Fields are `null` when unknown, such as from older versions.
    *
-   * @property outputPath the resolved output location
-   * @property totalBytes size of the downloaded content in bytes, or `null` if unknown
-   * @property downloadTime time spent downloading, summed over every run of the task and
-   *   excluding time it was scheduled, queued or paused; `null` if unknown, such as for a
-   *   task started by a version of Ketch that did not track it
-   * @property completedAt when the download finished, stamped each time it completes (a
-   *   selection that adds files clears it until then); `null` if unknown, such as for a task
-   *   that finished in a version of Ketch that did not record it, or one reported by an older
-   *   server
-   * @property sharing `true` while its source shares the finished content with others, such as a
-   *   torrent that seeds. Not persisted; `false` from servers that do not report it.
-   * @property checksum the digest the file was verified against when it finished: the request's
-   *   [DownloadRequest.checksum], or else one the server published. `null` when the file was not
-   *   verified. A published digest is reported by the run that checked it; a task restored after
-   *   a restart reports only the request's checksum.
+   * @property totalBytes size of the content in bytes
+   * @property downloadTime time spent downloading over every run, excluding waits and pauses
+   * @property completedAt when the download last finished
+   * @property sharing whether the source is sharing the content, such as a seeding torrent; not
+   *   saved
+   * @property checksum the digest the file was verified against: the request's, or one the
+   *   server published (not kept across restarts)
    */
   @Serializable
   @SerialName("completed")
@@ -84,26 +57,23 @@ sealed class DownloadState {
     val checksum: Checksum? = null,
   ) : DownloadState()
 
-  /**
-   * Download failed with [error]. May be retried if the error is retryable. Error types this
-   * version does not know read as [KetchError.Unknown].
-   */
+  /** Failed with [error]; unknown error types read as [KetchError.Unknown]. */
   @Serializable
   @SerialName("failed")
   data class Failed(
     @Serializable(with = KetchErrorSerializer::class) val error: KetchError,
   ) : DownloadState()
 
-  /** Download was explicitly canceled. */
+  /** Canceled. */
   @Serializable
   @SerialName("canceled")
   data object Canceled : DownloadState()
 
-  /** `true` when the task has reached a final state and cannot be resumed. */
+  /** Whether the task completed, failed or was canceled. */
   val isTerminal: Boolean
     get() = this is Completed || this is Failed || this is Canceled
 
-  /** `true` when the task is actively using a download slot. */
+  /** Whether the task is downloading. */
   val isActive: Boolean
     get() = this is Downloading
 }

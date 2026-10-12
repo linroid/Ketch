@@ -3,32 +3,19 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * A folder under [DownloadConfig.defaultDirectory] that one kind of download is saved to.
+ * A folder under [DownloadConfig.defaultDirectory] for downloads that choose none (a `null` or
+ * bare-name destination). A download matches when its type and its site both do:
+ * - type: its name ends with one of [extensions] or its `Content-Type` is one of [mimeTypes]
+ *   (any type when both are empty)
+ * - site: its host is one of [hosts] or their subdomains (any site when empty)
  *
- * A download that does not choose its folder, because [DownloadRequest.destination] is `null` or
- * a bare file name, is saved in the [folder] of the first of [DownloadConfig.categories] it
- * matches, and in the default directory itself when it matches none. A destination that names a
- * folder or a full path is used as it is.
+ * With all three lists empty it matches nothing. Rules ignore case and surrounding whitespace.
  *
- * A download matches when both its type and its site do:
- * - **Type**: its file name ends with one of [extensions], or the media type its server reports
- *   (`Content-Type`) is one of [mimeTypes]; either is enough. With both lists empty, every type
- *   matches.
- * - **Site**: the host of its URL is one of [hosts] or a subdomain of one. With the list empty,
- *   every site matches.
- *
- * A category whose three lists are all empty matches nothing. Rules ignore case and surrounding
- * whitespace.
- *
- * @property folder where the downloads go, relative to the default directory; `/` or `\`
- *   separates nested folders, as in `Video/Clips`. Each folder name is made safe to create the
- *   way file names from servers are, and missing folders are created when a download starts.
- * @property extensions file name extensions, such as `mp4` or `tar.gz`; a leading `.` or `*.` is
- *   ignored.
- * @property mimeTypes media types, such as `application/pdf`, or every type of a kind, such as
- *   video/\* for any video.
- * @property hosts host names, such as `example.com`, which also covers `cdn.example.com`; a
- *   leading `.` or `*.` is ignored. Links without a host, such as magnet links, match no host.
+ * @property folder relative to the default directory, nested with `/` or `\`; names are made
+ *   safe, and missing folders created
+ * @property extensions such as `mp4` or `tar.gz`; a leading `.` or `*.` is ignored
+ * @property mimeTypes such as `application/pdf`, or video/\* for a whole kind
+ * @property hosts such as `example.com`, covering its subdomains; a leading `.` or `*.` is ignored
  */
 @Serializable
 data class DownloadCategory(
@@ -47,10 +34,7 @@ data class DownloadCategory(
     }
   }
 
-  /**
-   * Whether a download named [fileName], of media type [contentType] as its server reports it
-   * (`null` when unknown), from [host] (`null` for links without one) belongs in this category.
-   */
+  /** Whether a download named [fileName], of [contentType], from [host] belongs here. */
   fun matches(fileName: String, contentType: String?, host: String?): Boolean {
     val extensionRules = extensions.mapNotNull { it.normalized(prefixes = WILDCARD_PREFIXES) }
     val typeRules = mimeTypes.mapNotNull { it.normalized() }
@@ -87,11 +71,7 @@ data class DownloadCategory(
   }
 }
 
-/**
- * The first of [DownloadConfig.categories] that a download named [fileName], of media type
- * [contentType], from [host] matches, or `null` when it matches none and is saved in the default
- * directory. See [DownloadCategory] for how a download matches.
- */
+/** The first of [DownloadConfig.categories] the download matches, or `null`. */
 fun DownloadConfig.categoryFor(
   fileName: String,
   contentType: String?,

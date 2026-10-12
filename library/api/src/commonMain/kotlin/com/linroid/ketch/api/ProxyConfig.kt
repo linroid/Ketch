@@ -4,29 +4,18 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * How HTTP(S) downloads, HLS and DASH included, reach their servers: following the system's proxy
- * settings, directly, or through the proxy at [url]. FTP and BitTorrent downloads do not use it.
+ * How HTTP(S) downloads, HLS and DASH included, reach servers: the system's settings, directly,
+ * or through [url]. FTP and BitTorrent ignore it. Loopback hosts always go directly. [toString]
+ * masks [password].
  *
- * Requests to loopback hosts (`localhost`, `*.localhost`, `127.0.0.0/8` and `::1`) always go
- * directly, as do those whose host matches [bypass] in [ProxyMode.MANUAL] mode.
- *
- * [toString] masks [password], so the configuration can be logged.
- *
- * @property mode where the proxy settings come from.
- * @property url the proxy [ProxyMode.MANUAL] uses, also kept while another mode is chosen:
- *   `http://host:port` for an HTTP proxy, which also carries HTTPS through `CONNECT` tunnels,
- *   or `socks5://host:port` (or `socks5h://`) for a SOCKS5 proxy, which resolves host names
- *   itself. Without a scheme it is an HTTP proxy; without a port, 80 for HTTP and 1080 for
- *   SOCKS5. Credentials go in [username] and [password], not in the URL; [manual] moves them
- *   there. Must be set in [ProxyMode.MANUAL] mode.
- * @property username user name for the proxy, sent with HTTP Basic authentication or SOCKS5
- *   username/password authentication; `null` for none.
- * @property password password for [username].
- * @property bypass hosts [ProxyMode.MANUAL] connects to directly, matched against the host of
- *   each request's URL as written, without resolving it: a domain name (`example.com`,
- *   `.example.com` and `*.example.com` all match `example.com` and its subdomains), an IP
- *   address, a CIDR range such as `10.0.0.0/8` or `fd00::/8`, `<local>` for host names without
- *   a dot, or `*` for every host. A `:port` suffix is ignored.
+ * @property url the [ProxyMode.MANUAL] proxy, kept in other modes: `http://host:port` (80 by
+ *   default; also the default scheme) or `socks5://host:port` (1080). Credentials go in
+ *   [username] and [password], not the URL; [manual] moves them. Required in
+ *   [ProxyMode.MANUAL].
+ * @property username for HTTP Basic or SOCKS5 authentication
+ * @property bypass hosts [ProxyMode.MANUAL] reaches directly, matched against the URL's host
+ *   unresolved: a domain with its subdomains (a leading `.` or `*.` is optional), an IP, a CIDR
+ *   range, `<local>` for names without a dot, or `*`; a `:port` is ignored
  */
 @Serializable
 data class ProxyConfig(
@@ -48,14 +37,10 @@ data class ProxyConfig(
     }
   }
 
-  /** The proxy at [url], or `null` when there is none. */
+  /** [url] parsed, or `null`. */
   val address: ProxyAddress? get() = url?.let { ProxyAddress.parse(it) }
 
-  /**
-   * Whether a request to [host] goes directly in [ProxyMode.MANUAL] mode: loopback hosts and
-   * those that match [bypass]. [host] is the host of a URL, an IPv6 address with or without
-   * brackets.
-   */
+  /** Whether [ProxyMode.MANUAL] reaches [host] directly: loopback or matching [bypass]. */
   fun bypasses(host: String): Boolean = ProxyBypass.isLoopback(host) ||
     bypass.any { ProxyBypass.matches(it, host) }
 
@@ -64,21 +49,20 @@ data class ProxyConfig(
       "password=${if (password == null) "null" else "***"}, bypass=$bypass)"
 
   companion object {
-    /** Follows the system's proxy settings. */
+    /** The system's proxy settings. */
     val System: ProxyConfig = ProxyConfig()
 
-    /** Connects directly, whatever the system's proxy settings are. */
+    /** No proxy, whatever the system says. */
     val Direct: ProxyConfig = ProxyConfig(mode = ProxyMode.DIRECT)
 
-    /** Whether [entry] can go in [bypass]: a host name, IP address, CIDR range or wildcard. */
+    /** Whether [entry] is a valid [bypass] entry. */
     fun isValidBypass(entry: String): Boolean = ProxyBypass.isValid(entry)
 
     /**
-     * The proxy at [url], which may carry credentials (`socks5://user:secret@host:1080`); they
-     * move to [username] and [password].
+     * The proxy at [url], moving its credentials (`socks5://user:secret@host`) to [username] and
+     * [password].
      *
-     * @throws IllegalArgumentException if [url] is not a supported proxy URL, or [bypass]
-     *   holds an entry that is not a host, address or range
+     * @throws IllegalArgumentException if [url] or a [bypass] entry is invalid
      */
     fun manual(url: String, bypass: List<String> = emptyList()): ProxyConfig {
       val address = requireNotNull(ProxyAddress.parse(url)) { "Invalid proxy URL" }
@@ -97,17 +81,12 @@ data class ProxyConfig(
 @Serializable
 enum class ProxyMode {
   /**
-   * The system's settings. On the JVM, the `https_proxy`, `http_proxy`, `all_proxy` and
-   * `no_proxy` environment variables (in either case), then the JVM's default `ProxySelector`,
-   * which reads the `http.proxyHost` family of system properties, and the operating system's
-   * settings when `java.net.useSystemProxies` is `true`. Android uses the active network's
-   * proxy and iOS the system's. Proxy auto-configuration (PAC) scripts are not evaluated on
-   * the JVM.
+   * The system's settings: on the JVM the `*_proxy` environment variables, then the default
+   * `ProxySelector` (no PAC scripts); the active network's on Android; the system's on iOS.
    */
   @SerialName("system")
   SYSTEM,
 
-  /** No proxy. */
   @SerialName("direct")
   DIRECT,
 
@@ -117,14 +96,9 @@ enum class ProxyMode {
 }
 
 /**
- * A proxy server, parsed from a URL such as `http://proxy.lan:3128` or
- * `socks5://user:secret@127.0.0.1:1080`.
+ * A proxy server parsed from a URL, such as `socks5://user:secret@127.0.0.1:1080`.
  *
- * @property type the protocol spoken with the proxy.
- * @property host the proxy's host name or IP address, IPv6 addresses without brackets.
- * @property port the proxy's port.
- * @property username user name from the URL, if any.
- * @property password password from the URL, if any.
+ * @property host a host name or IP (IPv6 without brackets)
  */
 data class ProxyAddress(
   val type: Type,
@@ -133,16 +107,16 @@ data class ProxyAddress(
   val username: String? = null,
   val password: String? = null,
 ) {
-  /** Protocols a proxy can speak. */
+  /** A proxy's protocol. */
   enum class Type {
-    /** An HTTP proxy, which tunnels HTTPS with `CONNECT`. */
+    /** Tunnels HTTPS with `CONNECT`. */
     HTTP,
 
-    /** A SOCKS5 proxy, which also resolves host names. */
+    /** Also resolves host names. */
     SOCKS5,
   }
 
-  /** The URL of this proxy, with any credentials masked. */
+  /** The proxy's URL, its password masked. */
   override fun toString(): String {
     val scheme = if (type == Type.HTTP) "http" else "socks5"
     val user = username?.let { "${it.encodeUserInfo()}${if (password != null) ":***" else ""}@" }
@@ -152,9 +126,8 @@ data class ProxyAddress(
 
   companion object {
     /**
-     * Parses a proxy [url]: `http://`, `socks5://` or `socks5h://`, a host, an optional port and
-     * optional percent-encoded credentials. A URL without a scheme is an HTTP proxy. Returns
-     * `null` for anything else, including HTTPS proxies and URLs with a path.
+     * Parses `http://`, `socks5://` or `socks5h://` URLs (HTTP without a scheme) with optional
+     * port and percent-encoded credentials; `null` for anything else, such as a path or HTTPS.
      */
     fun parse(url: String): ProxyAddress? {
       val trimmed = url.trim()

@@ -3,15 +3,12 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Totals of the tasks that are downloading, which [Interest.Stats] reports. Counts per state
- * follow from [KetchApi.tasks].
+ * Totals of the downloading tasks, which [Interest.Stats] reports. Byte counts cover tasks of
+ * known size only.
  *
- * @property downloadBps the summed download speed, in bytes per second
- * @property downloadedBytes bytes downloaded by the tasks of known size
- * @property totalBytes size of the tasks of known size
- * @property remainingBytes bytes the tasks of known size still have to download
- * @property downloading tasks that are downloading
- * @property unknownSizes tasks that are downloading content of unknown size
+ * @property downloadBps their summed speed, in bytes per second
+ * @property downloading how many tasks are downloading
+ * @property unknownSizes how many of them have an unknown size
  */
 @Serializable
 data class KetchStats(
@@ -23,7 +20,7 @@ data class KetchStats(
   val unknownSizes: Int = 0,
 ) {
   companion object {
-    /** The totals of the [states] of some tasks. */
+    /** The totals of [states]. */
     fun of(states: Iterable<DownloadState>): KetchStats {
       var speed = 0L
       var downloaded = 0L

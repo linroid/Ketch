@@ -5,23 +5,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 
 /**
- * Service interface for managing downloads. Both core (in-process)
- * and remote (HTTP+SSE) backends implement this interface, allowing
- * the UI to work identically regardless of backend mode.
+ * Manages downloads. Implemented in-process by `Ketch` and over HTTP and SSE by `RemoteKetch`,
+ * so callers work the same with either.
  */
 @SubclassOptInRequired(KetchImplementationApi::class)
 interface KetchApi {
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
-  /** Reactive task list updated on any state change. */
+  /** Every task of this instance. */
   val tasks: StateFlow<List<DownloadTask>>
 
   /**
-   * Follows [interest] while the flow is collected, reporting what it names; see the interests
-   * nested in [Interest]. A remote instance asks its server to send updates about every
-   * [interval], the shortest of its callers' winning; an in-process one reports changes as they
-   * happen, and stats every [interval]. Interests an instance does not know fail with
+   * Follows [interest] while collected. A remote instance asks its server for updates every
+   * [interval] (the shortest its callers ask for); an in-process one reports changes as they
+   * happen, and stats every [interval]. Unknown interests fail with
    * [UnsupportedOperationException] when collected.
    *
    * @throws IllegalArgumentException if [interval] is not positive
@@ -29,24 +27,17 @@ interface KetchApi {
   fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
 
   /**
-   * The optional controller this backend offers for [key], or `null` when it offers none. Modules
-   * beside this one define controllers and their keys; the in-process engine returns those its
-   * download sources contribute, and a remote backend those its client knows how to reach on the
-   * server. Before relying on a controller's commands, check the feature its module names in
-   * [KetchStatus.features]: a remote controller fails closed against servers without it.
+   * The controller this backend offers for [key], defined by another module, or `null`. Check the
+   * feature its module names in [KetchStatus.features] first: a remote controller fails against
+   * servers without it.
    */
   fun <T : Any> control(key: ControlKey<T>): T? = null
 
-  /**
-   * Initialize backend runtime state.
-   *
-   * - Core backend restores persisted tasks.
-   * - Remote backend establishes connection and syncs tasks.
-   */
+  /** Restores saved tasks (in-process) or connects and loads them (remote). */
   suspend fun start()
 
   /**
-   * Create a new download and return the task handle.
+   * Adds a download.
    *
    * @throws UnsupportedOperationException if [DownloadRequest.proxy] sets a proxy and this
    *   backend does not list [KetchFeatures.PROXY]
@@ -54,18 +45,10 @@ interface KetchApi {
   suspend fun download(request: DownloadRequest): DownloadTask
 
   /**
-   * Resolves metadata for the given URL without downloading.
+   * Probes [url] without downloading it. Pass the result in [DownloadRequest.resolvedSource] to
+   * skip the probe when downloading.
    *
-   * Probes the URL (e.g., via an HTTP HEAD request) and returns
-   * file size, resume support, suggested file name, and other
-   * source-specific metadata. The returned [ResolvedSource] can be
-   * passed in [DownloadRequest.resolvedSource] to skip the probe
-   * during [download].
-   *
-   * @param url the URL to resolve
-   * @param properties source-specific key-value pairs. For HTTP
-   *   sources this contains HTTP headers; other sources may
-   *   interpret them differently or ignore them.
+   * @param properties request headers for HTTP sources; other sources may ignore them
    */
   suspend fun resolve(
     url: String,
@@ -73,16 +56,11 @@ interface KetchApi {
   ): ResolvedSource
 
   /**
-   * Resolves metadata from file content the caller already holds, such as
-   * a `.torrent` file picked or dropped by the user, without fetching it.
+   * Resolves file content the caller holds, such as a `.torrent` file. The content is not kept,
+   * so download it by passing the result in [DownloadRequest.resolvedSource], with its
+   * [ResolvedSource.url] as [DownloadRequest.url].
    *
-   * The content is not stored anywhere else, so start the download by
-   * passing the returned [ResolvedSource] in [DownloadRequest.resolvedSource]
-   * with its [ResolvedSource.url] as [DownloadRequest.url].
-   *
-   * @param content the raw file content
-   * @param fileName the original file name, if known. Sources may use its
-   *   extension to recognize the content.
+   * @param fileName the original file name, whose extension may identify the content
    * @throws KetchError.Unsupported if no source recognizes the content
    * @throws UnsupportedOperationException if this backend cannot resolve content
    */
@@ -93,28 +71,12 @@ interface KetchApi {
     throw UnsupportedOperationException("Resolving file content is unavailable")
   }
 
-  /**
-   * Returns a point-in-time status snapshot including
-   * configuration, system information, and storage details, and the optional
-   * behaviors the instance supports in [KetchStatus.features].
-   */
+  /** The instance's configuration, system, storage and [features][KetchStatus.features]. */
   suspend fun status(): KetchStatus
 
   /**
-   * Replaces the runtime download configuration.
-   *
-   * Applied immediately:
-   * - [DownloadConfig.speedLimit] throttles all active downloads.
-   * - [DownloadConfig.maxConcurrentDownloads] and [DownloadConfig.maxConnectionsPerHost]:
-   *   raising a limit starts queued downloads right away; lowering one never interrupts
-   *   running downloads, queued ones wait until enough of them finish.
-   *
-   * Applied to downloads that start or resume after the update (running downloads keep the
-   * values they started with until paused and resumed):
-   * [DownloadConfig.defaultDirectory], [DownloadConfig.maxConnectionsPerDownload],
-   * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
-   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs],
-   * [DownloadConfig.bufferSize] and [DownloadConfig.proxy].
+   * Replaces the download configuration. Speed and queue limits apply at once; other fields
+   * apply to downloads that start or resume afterwards (see [DownloadConfig]).
    *
    * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
    *   changed to a folder that does not exist on this instance
@@ -127,9 +89,8 @@ interface KetchApi {
   suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces()
 
   /**
-   * Selects interfaces for subsequent HTTP requests, including retries and new segments.
-   * In-flight requests finish on their existing network. An empty selection restores default
-   * routing. Selection is runtime-only and is not persisted across instance restarts.
+   * Selects the interfaces later HTTP requests use, round-robin; requests in flight keep theirs.
+   * Empty restores default routing. Not saved across restarts.
    *
    * @throws IllegalArgumentException if an ID is unknown or unavailable
    * @throws UnsupportedOperationException if this backend cannot configure interfaces
@@ -138,10 +99,11 @@ interface KetchApi {
     throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
   }
 
-  /** Release resources (HTTP client, SSE connection, etc.). */
+  /** Releases the instance's resources. */
   fun close()
 
   // Not `const`, which callers would inline, reporting the version they were compiled against.
+  @Suppress("MayBeConstant")
   companion object {
     /** Library version string (e.g., "0.0.1-dev"). */
     val VERSION: String = KETCH_BUILD_VERSION

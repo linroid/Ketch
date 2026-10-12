@@ -3,17 +3,12 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Comprehensive status snapshot of a Ketch instance, returned
- * by [KetchApi.status].
+ * A Ketch instance's status, from [KetchApi.status].
  *
- * @property name user-configured instance name
- * @property version library version string
- * @property revision build revision (git short hash)
+ * @property revision the build's git short hash
  * @property uptime seconds since the instance started
- * @property config current download configuration (with runtime speed limit)
- * @property system host system and storage information
- * @property features optional API behaviors this instance supports, from [KetchFeatures];
- *   empty for older instances and servers, which support none of them
+ * @property features the optional behaviors it supports ([KetchFeatures]); empty from older
+ *   versions
  */
 @Serializable
 data class KetchStatus(
@@ -27,24 +22,16 @@ data class KetchStatus(
 )
 
 /**
- * Host system and storage information.
+ * The instance's host system and storage. Sizes are in bytes.
  *
- * @property os operating system name
- * @property arch CPU architecture
- * @property separator file path separator (`/` on Unix, `\` on Windows)
- * @property javaVersion JVM version (or "N/A" on non-JVM platforms)
- * @property availableProcessors number of available CPU cores
- * @property maxMemory max heap / physical memory in bytes
- * @property totalMemory current heap size / physical memory in bytes
- * @property freeMemory free memory in bytes (0 when unavailable)
- * @property downloadDirectory folder downloads are saved to: [DownloadConfig.defaultDirectory],
- *   or [defaultDownloadDirectory] when that is not set
- * @property defaultDownloadDirectory the platform's default download folder, used when
- *   [DownloadConfig.defaultDirectory] is not set; `null` from instances that do not report it,
- *   such as older servers
- * @property totalSpace total disk space in bytes
- * @property freeSpace free disk space in bytes
- * @property usableSpace usable disk space in bytes
+ * @property separator the file path separator
+ * @property javaVersion the JVM version, or "N/A"
+ * @property maxMemory the heap limit, or physical memory
+ * @property totalMemory the heap size, or physical memory
+ * @property freeMemory free memory; 0 when unknown
+ * @property downloadDirectory where downloads are saved: [DownloadConfig.defaultDirectory], else
+ *   [defaultDownloadDirectory]
+ * @property defaultDownloadDirectory the platform's downloads folder; `null` from older servers
  */
 @Serializable
 data class SystemInfo(

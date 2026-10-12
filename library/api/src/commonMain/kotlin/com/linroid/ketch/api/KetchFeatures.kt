@@ -13,13 +13,13 @@ object KetchFeatures {
   /** [DownloadConfig.proxy] and [DownloadRequest.proxy] are applied to HTTP(S) downloads. */
   const val PROXY: String = "http.proxy"
 
-  /** Finite, clear single-stream HLS and DASH downloads, with restart rather than byte resume. */
+  /** Both [FINITE_HLS] and [FINITE_DASH]; kept for older clients. */
   const val FINITE_MEDIA: String = "media.finite"
 
-  /** Finite, unencrypted HLS downloads that restart on resume. */
+  /** Finite, unencrypted HLS downloads, restarted on resume. */
   const val FINITE_HLS: String = "hls.finite"
 
-  /** Finite, unencrypted DASH downloads that restart on resume. */
+  /** Finite, unencrypted DASH downloads, restarted on resume. */
   const val FINITE_DASH: String = "dash.finite"
 
   /** [DownloadConfig.categories] sort downloads into folders. */
@@ -27,36 +27,23 @@ object KetchFeatures {
 
   /**
    * [DownloadConfig.idleTimeoutMs], [DownloadConfig.minSpeed], [DownloadConfig.unlimitedRetries]
-   * and [DownloadConfig.maxRetryDelayMs] apply; older instances ignore them.
+   * and [DownloadConfig.maxRetryDelayMs] apply.
    */
   const val TRANSFER_TIMEOUTS: String = "download.timeouts"
 
-  /**
-   * [DownloadTask.selectFiles] works in every state but canceled for downloads whose
-   * [ResolvedSource.files] list several files or variants, following their
-   * [ResolvedSource.selectionMode]. Listed by the sources that implement it.
-   */
+  /** [DownloadTask.selectFiles] works; listed by the sources that implement it. */
   const val FILE_SELECTION: String = "download.fileSelection"
 
-  /**
-   * [DownloadRequest.awaitFileSelection] is honored: a download with several files or variants
-   * waits for a choice once they are known. Listed by the sources that implement it.
-   */
+  /** [DownloadRequest.awaitFileSelection] works; listed by the sources that implement it. */
   const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
 
-  /**
-   * [DownloadRequest.checksum] is verified once a download finishes, and HTTP downloads are
-   * checked against the digest their server publishes ([KetchError.ChecksumMismatch]).
-   */
+  /** [DownloadRequest.checksum] and digests servers publish are verified. */
   const val CHECKSUM: String = "download.checksum"
 
   /** [Interest.Connections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
-  /**
-   * Every feature named here, which this version of Ketch supports, including those of its
-   * optional sources. Modules beside this one name the features of their own controllers.
-   */
+  /** Every feature named here; other modules name their controllers' own. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,

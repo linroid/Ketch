@@ -1,23 +1,17 @@
 package com.linroid.ketch.api
 
-/**
- * How a list of files, such as the files of a [ResolvedSource] or of a task, is sorted with
- * [sortedByFileOrder]. Ties keep the [SOURCE] order, so every order is total and stable.
- */
+/** How [sortedByFileOrder] sorts files; ties keep the [SOURCE] order. */
 enum class FileOrder {
-  /** The order the source lists the files in (file ID order for torrents). */
+  /** As the source lists them. */
   SOURCE,
 
-  /**
-   * Case-insensitive natural order of the full path ([NaturalOrder]), so "Episode 2" comes before
-   * "Episode 10".
-   */
+  /** The full path in [NaturalOrder]. */
   NAME,
 
-  /** File size, smallest first. */
+  /** Smallest first. */
   SIZE,
 
-  /** Lowercased file extension ([fileExtension]), then [NAME]. */
+  /** [fileExtension], then [NAME]. */
   EXTENSION,
 
   /** Selected files first, then [NAME]. */
@@ -25,10 +19,8 @@ enum class FileOrder {
 }
 
 /**
- * Case-insensitive natural order of strings such as file paths: runs of digits compare by their
- * numeric value, so "Episode 2" comes before "Episode 10", and other characters compare without
- * case. Strings that differ only in case or in leading zeros are ordered by those last, so the
- * order is total.
+ * Case-insensitive order in which digit runs compare by value ("Episode 2" before "Episode 10").
+ * Case and leading zeros only break ties, so the order is total.
  */
 object NaturalOrder : Comparator<String> {
   override fun compare(a: String, b: String): Int {
@@ -62,7 +54,7 @@ object NaturalOrder : Comparator<String> {
     return if (remaining != 0) remaining else tieBreak
   }
 
-  /** Compares the digit runs `a[startA until endA]` and `b[startB until endB]` by value. */
+  /** Compares two digit runs by value. */
   private fun compareNumbers(
     a: String,
     startA: Int,
@@ -89,10 +81,7 @@ object NaturalOrder : Comparator<String> {
   private fun Char.isAsciiDigit(): Boolean = this in '0'..'9'
 }
 
-/**
- * The lowercased extension of the last segment of [path] (after its last `.`), or an empty string
- * when it has none. A leading dot, as in `.hidden`, starts a name rather than an extension.
- */
+/** The lowercased extension of [path]'s last segment, or empty (`.hidden` has none). */
 fun fileExtension(path: String): String {
   val name = path.substring(maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
   val dot = name.lastIndexOf('.')
@@ -100,10 +89,8 @@ fun fileExtension(path: String): String {
 }
 
 /**
- * These files, in their source's order, sorted by [order]: [descending] reverses the order, and
- * files the order ranks equal keep their source order, so the result is total and stable. [path],
- * [size] and [selected] read a file's full path inside the source, its size and whether it is
- * chosen. Backends that sort file pages, such as the torrent controller, sort the same way.
+ * These files, in source order, sorted by [order] ([descending] reverses it); ties keep source
+ * order. File pages, such as the torrent controller's, sort the same way.
  */
 fun <T> List<T>.sortedByFileOrder(
   order: FileOrder,

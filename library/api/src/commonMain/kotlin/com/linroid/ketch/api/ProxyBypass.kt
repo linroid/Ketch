@@ -1,6 +1,6 @@
 package com.linroid.ketch.api
 
-/** Matches hosts against the [ProxyConfig.bypass] entries, without resolving them. */
+/** Matches hosts against [ProxyConfig.bypass] entries, unresolved. */
 internal object ProxyBypass {
   /** Whether [entry] is a domain name, an IP address, a CIDR range, `<local>` or `*`. */
   fun isValid(entry: String): Boolean {
@@ -36,7 +36,7 @@ internal object ProxyBypass {
     return target == domain || target.endsWith(".$domain")
   }
 
-  /** Whether [host] is this machine: `localhost`, `*.localhost` or a loopback address. */
+  /** Whether [host] is `localhost`, `*.localhost` or a loopback address. */
   fun isLoopback(host: String): Boolean {
     val target = normalize(host)
     if (target == "localhost" || target.endsWith(".localhost")) return true
@@ -58,7 +58,7 @@ internal object ProxyBypass {
   private fun normalize(host: String): String =
     host.trim().lowercase().removePrefix("[").removeSuffix("]").removeSuffix(".")
 
-  /** [value] without a `:port` suffix or the brackets of an IPv6 address, or `null`. */
+  /** [value] without `:port` or IPv6 brackets, or `null`. */
   private fun withoutPort(value: String): String? {
     if (value.startsWith("[")) {
       val close = value.indexOf(']')
@@ -91,15 +91,15 @@ internal object ProxyBypass {
   private const val LOCAL = "<local>"
 }
 
-/** Parses IPv4 and IPv6 address literals without resolving anything. */
+/** Parses IPv4 and IPv6 literals. */
 internal object IpAddress {
-  /** The 4 or 16 bytes of [text], or `null` when it is not an address literal. */
+  /** The 4 or 16 bytes of [text], or `null`. */
   fun parse(text: String): ByteArray? {
     val value = text.substringBefore('%')
     return if (':' in value) parseV6(value) else parseV4(value)
   }
 
-  /** Whether the first [prefix] bits of [address] and [network] are the same. */
+  /** Whether [address] and [network] share their first [prefix] bits. */
   fun sameNetwork(address: ByteArray, network: ByteArray, prefix: Int): Boolean {
     for (bit in 0 until prefix) {
       val index = bit / 8
@@ -138,7 +138,7 @@ internal object IpAddress {
     return bytes
   }
 
-  /** The bytes of colon-separated hex groups, the last of which may be an IPv4 address. */
+  /** The bytes of colon-separated hex groups, the last possibly IPv4. */
   private fun groups(text: String): List<Byte>? {
     if (text.isEmpty()) return emptyList()
     val parts = text.split(':')

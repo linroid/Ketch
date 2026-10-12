@@ -10,30 +10,18 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Something a caller follows on a Ketch instance with [KetchApi.subscribe], reporting [T]: what
- * to follow, while `subscribe` says how often. Interests are serializable: a remote instance
- * sends its server the interests its callers hold, and the server sends only what they ask for.
- *
- * Its flow ends when what it follows is gone, as a removed torrent's does, and fails when the
- * instance cannot report it: an instance that does not know an interest fails it with
- * [UnsupportedOperationException] when it is collected.
- *
- * The built-in interests are nested here. Modules beside this one define their own, as they
- * define [ControlKey]s.
+ * What [KetchApi.subscribe] follows, reporting [T]. Serializable, so remote instances can send
+ * it to their server. Its flow ends when what it follows is gone and fails with
+ * [UnsupportedOperationException] on instances that do not know it. Other modules define their
+ * own beside the built-in ones nested here.
  */
 interface Interest<T> {
-  /**
-   * Encodes what this interest reports, as a server sends it to remote instances. Not part of the
-   * interest's own serialized form.
-   */
+  /** Encodes what this interest reports, as servers send it. */
   val valueSerializer: KSerializer<T>
 
   /**
-   * The segments of the tasks with [taskIds], by task ID; they also update on
-   * [DownloadTask.segments]. Segments are the one part of a task that only comes when asked for:
-   * its lifecycle, state changes and progress come anyway. A torrent has one per file.
-   *
-   * @property taskIds the tasks, at most 1024
+   * The [segments][DownloadTask.segments] of [taskIds] (at most 1024), by task ID. Unlike state
+   * and progress, remote segments only come when followed.
    */
   @Serializable
   @SerialName("segments")
@@ -46,10 +34,7 @@ interface Interest<T> {
       get() = MapSerializer(String.serializer(), ListSerializer(Segment.serializer()))
   }
 
-  /**
-   * Totals of the tasks that are downloading, while they change. A remote instance asks its
-   * server, so they stay current however often its tasks' progress updates.
-   */
+  /** Totals of the downloading tasks. */
   @Serializable
   @SerialName("stats")
   data object Stats : Interest<KetchStats> {
@@ -57,12 +42,8 @@ interface Interest<T> {
   }
 
   /**
-   * Live network connections of every task: HTTP requests, FTP transfers, media fetches and
-   * torrent peers, sampled once a second while followed. Reports a snapshot right away, then one
-   * each time something changes (rates, opens, closes).
-   *
-   * Check that [KetchStatus.features] lists [KetchFeatures.ACTIVE_CONNECTIONS] first; without
-   * it, collecting fails with [UnsupportedOperationException].
+   * Live network connections of every task, sampled each second: a snapshot at once, then one
+   * per change. Needs [KetchFeatures.ACTIVE_CONNECTIONS].
    *
    * @property limit the most connections a snapshot holds, in 1..[ActiveConnections.MAX_LIMIT]
    */
@@ -81,7 +62,7 @@ interface Interest<T> {
   }
 
   companion object {
-    /** How often [KetchApi.subscribe] reports unless asked otherwise. */
+    /** [KetchApi.subscribe]'s default interval. */
     val DEFAULT_INTERVAL: Duration = 1.seconds
   }
 }

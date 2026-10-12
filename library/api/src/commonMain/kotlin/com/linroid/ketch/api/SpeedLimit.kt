@@ -13,69 +13,41 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.jvm.JvmInline
 
 /**
- * Represents a download speed limit in bytes per second.
+ * A speed limit: [Unlimited], or one made with [of], [kbps] or [mbps]. Serialized as `10m`
+ * (MiB/s), `500k` (KiB/s), bytes, or `unlimited`.
  *
- * Use [Unlimited] for no throttling, or factory methods [of], [kbps],
- * [mbps] to create a specific limit.
- *
- * Serializes as a human-readable string: `"10m"` (MB/s), `"500k"`
- * (KB/s), raw bytes, or `"unlimited"`.
- *
- * @property bytesPerSecond the speed limit in bytes per second.
- *   `0` means unlimited.
+ * @property bytesPerSecond the limit, `0` for unlimited
  */
 @Serializable(with = SpeedLimitSerializer::class)
 @JvmInline
 value class SpeedLimit private constructor(val bytesPerSecond: Long) {
 
-  /** Whether this speed limit is unlimited (no throttling). */
+  /** Whether there is no limit. */
   val isUnlimited: Boolean get() = bytesPerSecond == 0L
 
   companion object {
-    /** No speed limit. Downloads run at full speed. */
+    /** No limit. */
     val Unlimited = SpeedLimit(0)
 
-    /**
-     * Creates a speed limit of [bytesPerSecond] bytes per second.
-     * @throws IllegalArgumentException if [bytesPerSecond] is not positive
-     */
+    /** @throws IllegalArgumentException if [bytesPerSecond] is not positive */
     fun of(bytesPerSecond: Long): SpeedLimit {
       require(bytesPerSecond > 0) { "bytesPerSecond must be positive" }
       return SpeedLimit(bytesPerSecond)
     }
 
-    /**
-     * Creates a speed limit of [kilobytesPerSecond] KB/s.
-     * @throws IllegalArgumentException if [kilobytesPerSecond] is not positive, or so large that
-     *   its bytes per second overflow a [Long]
-     */
+    /** @throws IllegalArgumentException if not positive, or too large for a [Long] of bytes */
     fun kbps(kilobytesPerSecond: Long): SpeedLimit {
       require(kilobytesPerSecond <= Long.MAX_VALUE / KB) { "kilobytesPerSecond is too large" }
       return of(kilobytesPerSecond * KB)
     }
 
-    /**
-     * Creates a speed limit of [megabytesPerSecond] MB/s.
-     * @throws IllegalArgumentException if [megabytesPerSecond] is not positive, or so large that
-     *   its bytes per second overflow a [Long]
-     */
+    /** @throws IllegalArgumentException if not positive, or too large for a [Long] of bytes */
     fun mbps(megabytesPerSecond: Long): SpeedLimit {
       require(megabytesPerSecond <= Long.MAX_VALUE / MB) { "megabytesPerSecond is too large" }
       return of(megabytesPerSecond * MB)
     }
 
-    /**
-     * Parses a speed limit string with optional suffix.
-     *
-     * Accepted formats:
-     * - `"unlimited"` — no throttling
-     * - `"10m"` — 10 MB/s
-     * - `"500k"` — 500 KB/s
-     * - `"1048576"` — raw bytes per second
-     *
-     * @return the parsed [SpeedLimit], or `null` if the value is invalid, including a rate
-     *   too large for a [Long] of bytes per second.
-     */
+    /** Reads `unlimited`, `10m`, `500k` or bytes per second; `null` if invalid or too large. */
     fun parse(value: String): SpeedLimit? {
       val trimmed = value.trim().lowercase()
       if (trimmed == "unlimited") return Unlimited
@@ -98,13 +70,7 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
       }
     }
 
-    /**
-     * Formats a [SpeedLimit] as a human-readable string.
-     *
-     * Uses the most compact representation: `"10m"` for whole MB/s,
-     * `"500k"` for whole KB/s, raw bytes otherwise,
-     * or `"unlimited"`.
-     */
+    /** The shortest form [parse] reads. */
     internal fun format(limit: SpeedLimit): String {
       if (limit.isUnlimited) return "unlimited"
       val bytes = limit.bytesPerSecond

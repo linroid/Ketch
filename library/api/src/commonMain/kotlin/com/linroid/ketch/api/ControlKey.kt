@@ -1,14 +1,10 @@
 package com.linroid.ketch.api
 
 /**
- * Names an optional controller that a [KetchApi] backend may offer beyond the download API, such
- * as the typed controls of one download protocol. The module that defines a controller defines its
- * key, usually as the controller's companion object, and [KetchApi.control] returns a backend's
- * controller for it. Keys compare by identity.
- *
- * @param T the controller type
+ * Names an optional controller, such as a protocol's controls, for [KetchApi.control]. Defined
+ * with the controller, usually as its companion object; keys compare by identity.
  */
 interface ControlKey<T : Any> {
-  /** A short stable name of the controller, for logs and error messages. */
+  /** A short stable name, for logs and errors. */
   val name: String
 }
