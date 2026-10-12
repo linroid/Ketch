@@ -171,12 +171,12 @@ class TorrentDownloadSourceTest {
     try {
       // With one slot, each attempt only reaches the engine if the failed one released it.
       engine.addTorrentError = KetchError.Disk(IOException("full"))
-      assertIs<KetchError.Disk>(assertFailsWith<KetchError> { single.download(context()) })
+      assertIs<KetchError.Disk>(assertFailsWith<KetchError> { single.download(context(), null) })
       engine.addTorrentError = timeout
-      assertIs<KetchError.Network>(assertFailsWith<KetchError> { single.download(context()) })
+      assertIs<KetchError.Network>(assertFailsWith<KetchError> { single.download(context(), null) })
       engine.addTorrentError = IllegalStateException("Too many open files")
       assertIs<KetchError.SourceError>(
-        assertFailsWith<KetchError> { single.download(context()) })
+        assertFailsWith<KetchError> { single.download(context(), null) })
       assertEquals(3, engine.removedTorrents.size)
     } finally { single.close() }
   }

@@ -45,8 +45,7 @@ class ResolveContentRoutesTest {
         maxSegments = 1,
       )
     }
-    override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
   }
 
   @Test

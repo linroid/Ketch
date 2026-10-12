@@ -106,7 +106,11 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
     }
   }
 
-  override suspend fun download(context: DownloadContext) {
+  override suspend fun download(context: DownloadContext, state: FtpResumeState?) {
+    if (state == null) downloadFresh(context) else continueFrom(context, state)
+  }
+
+  private suspend fun downloadFresh(context: DownloadContext) {
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
@@ -163,8 +167,8 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
     downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
-  override suspend fun resume(context: DownloadContext, state: FtpResumeState?) {
-    state ?: throw KetchError.CorruptResumeState("No resume state for taskId=${context.taskId}")
+  /** Continues from [context]'s segments once the file's modification time still matches. */
+  private suspend fun continueFrom(context: DownloadContext, state: FtpResumeState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)

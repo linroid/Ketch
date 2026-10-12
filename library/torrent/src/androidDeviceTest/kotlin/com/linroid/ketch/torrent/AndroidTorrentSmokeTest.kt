@@ -74,7 +74,7 @@ class AndroidTorrentSmokeTest {
         outputPath = output.absolutePath,
       )
       try {
-        source.download(context)
+        source.download(context, null)
         assertContentEquals(bytes, output.readBytes())
         assertEquals(4L, context.segments.value.single().downloadedBytes)
         source.cleanup(context, source.store(context), deleteFiles = true)

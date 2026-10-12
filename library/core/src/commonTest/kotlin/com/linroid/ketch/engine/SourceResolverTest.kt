@@ -40,11 +40,7 @@ class SourceResolverTest {
         maxSegments = 1,
       )
     }
-    override suspend fun download(context: DownloadContext) {}
-    override suspend fun resume(
-      context: DownloadContext,
-      state: Unit?,
-    ) {}
+    override suspend fun download(context: DownloadContext, state: Unit?) {}
   }
 
   @Test

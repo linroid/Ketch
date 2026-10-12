@@ -88,7 +88,7 @@ class SeedingWatcherTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       context.onProgress(0, 100)
       gates[context.url]?.await()
       context.segments.value = listOf(Segment(0, 0, 99, 100))
@@ -96,8 +96,6 @@ class SeedingWatcherTest {
       onFinish(context.taskId)
     }
 
-    override suspend fun resume(context: DownloadContext, state: Unit?) =
-      download(context)
 
     override suspend fun torrentFiles(
       resumeState: SourceResumeState?,

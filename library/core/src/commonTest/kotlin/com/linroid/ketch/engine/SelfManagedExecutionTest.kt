@@ -69,12 +69,11 @@ class SelfManagedExecutionTest {
         calls++
         return if (finalState) "final" else null
       }
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun download(context: DownloadContext, state: String?) {
         assertEquals("/tmp/ketch-self-managed-output", context.outputPath)
         started.complete(Unit)
         try { awaitCancellation() } finally { finalState = true }
       }
-      override suspend fun resume(context: DownloadContext, state: String?) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input", selectedFileIds = setOf("0"),
@@ -118,8 +117,7 @@ class SelfManagedExecutionTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override suspend fun download(context: DownloadContext) { downloads++ }
-      override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
+      override suspend fun download(context: DownloadContext, state: Unit?) { downloads++ }
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",
@@ -165,7 +163,14 @@ class SelfManagedExecutionTest {
       }
       override suspend fun store(context: DownloadContext) =
         if (saved) "final" else "initial"
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun download(context: DownloadContext, state: String?) {
+        if (state != null) {
+          assertEquals("final", state)
+          assertTrue(saved)
+          context.segments.value = listOf(Segment(0, 0, 3, 4))
+          resumed.complete(Unit)
+          return
+        }
         context.segments.value = listOf(Segment(0, 0, 3, 1))
         context.onProgress(1, 4)
         started.complete(Unit)
@@ -177,12 +182,6 @@ class SelfManagedExecutionTest {
             saved = true
           }
         }
-      }
-      override suspend fun resume(context: DownloadContext, state: String?) {
-        assertEquals("final", state)
-        assertTrue(saved)
-        context.segments.value = listOf(Segment(0, 0, 3, 4))
-        resumed.complete(Unit)
       }
     }
     val now = Clock.System.now()
@@ -224,4 +223,49 @@ class SelfManagedExecutionTest {
     }
   }
 
+  @Test
+  fun retry_continuesFromTheLatestStoredState() = runTest {
+    val received = mutableListOf<String?>()
+    val source = object : DownloadSource<String> {
+      override val resumeStateSerializer = String.serializer()
+      override val type = "fixture"
+      override val managesOwnFileIo = true
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
+      override suspend fun store(context: DownloadContext) = "stored"
+      override suspend fun download(context: DownloadContext, state: String?) {
+        received += state
+        if (received.size == 1) throw KetchError.Network()
+        context.segments.value = listOf(Segment(0, 0, 3, 4))
+      }
+    }
+    val now = Clock.System.now()
+    val request = DownloadRequest("fixture:input", destination = Destination("/tmp/ketch-retry"))
+    val handle = object : TaskHandle {
+      override val taskId = "retry"
+      override val request = request
+      override val createdAt = now
+      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
+      override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
+        createdAt = now, updatedAt = now)) {}
+    }
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
+      DefaultFileNameResolver(), DownloadConfig(retryCount = 1, saveIntervalMs = 60_000),
+      SpeedLimiter.Unlimited, KetchDispatchers(dispatcher, dispatcher, dispatcher))
+
+    execution.execute()
+
+    // A fresh run starts from nothing; its retry checks what the first attempt wrote.
+    assertEquals(listOf(null, "stored"), received)
+  }
 }

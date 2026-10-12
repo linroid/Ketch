@@ -119,10 +119,8 @@ internal class SelectableSource(
     return Unit
   }
 
-  override suspend fun download(context: DownloadContext) = execute(context, resumed = false)
-
-  override suspend fun resume(context: DownloadContext, state: Unit?) =
-    execute(context, resumed = true)
+  override suspend fun download(context: DownloadContext, state: Unit?) =
+    execute(context, resumed = state != null)
 
   private suspend fun execute(context: DownloadContext, resumed: Boolean): Unit = coroutineScope {
     val initial = context.selection.value

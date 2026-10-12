@@ -925,17 +925,17 @@ class TorrentDownloadSource(
     }
   }
 
-  override suspend fun download(context: DownloadContext) = reportingFailures {
-    val resolved = context.preResolved
-      ?: resolveUntilFound(context.url, config.discoveryPrivacy, context.headers)
-    execute(context, resolved, null)
-  }
-
-  /** Continues from [state]; a task that stopped before its session started downloads anew. */
-  override suspend fun resume(
+  /** Continues from [state], or downloads anew without one, as before its session started. */
+  override suspend fun download(
     context: DownloadContext,
     state: TorrentResumeState?,
-  ) = if (state == null) download(context) else reportingFailures {
+  ) = reportingFailures {
+    if (state == null) {
+      val resolved = context.preResolved
+        ?: resolveUntilFound(context.url, config.discoveryPrivacy, context.headers)
+      execute(context, resolved, null)
+      return@reportingFailures
+    }
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
     val privacy = state.privacy ?: config.discoveryPrivacy

@@ -85,7 +85,7 @@ class KotlinRuntimeDhtTest {
               headers = emptyMap(), preResolved = resolved,
               outputPath = (root / "result").toString(),
             )
-            source.download(context)
+            source.download(context, null)
             assertContentEquals(bytes, torrentFileSystem.read(root / "result") { readByteArray() })
           } finally {
             source.close()

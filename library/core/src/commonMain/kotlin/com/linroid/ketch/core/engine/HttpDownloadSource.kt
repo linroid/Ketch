@@ -80,7 +80,11 @@ internal class HttpDownloadSource(
     )
   }
 
-  override suspend fun download(context: DownloadContext) {
+  override suspend fun download(context: DownloadContext, state: HttpResumeState?) {
+    if (state == null) downloadFresh(context) else continueFrom(context, state)
+  }
+
+  private suspend fun downloadFresh(context: DownloadContext) {
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
         .also { context.publishedChecksum = it.checksum }
@@ -142,8 +146,8 @@ internal class HttpDownloadSource(
     downloadSegments(context, segments, totalBytes, resolved.supportsResume, requested)
   }
 
-  override suspend fun resume(context: DownloadContext, state: HttpResumeState?) {
-    state ?: throw KetchError.CorruptResumeState("No resume state for taskId=${context.taskId}")
+  /** Continues from [context]'s segments once the server's identity still matches [state]. */
+  private suspend fun continueFrom(context: DownloadContext, state: HttpResumeState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
     if (state.totalBytes < 0) {
       // Bytes written without a known size cannot be continued, so a changed file is no concern.

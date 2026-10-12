@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.HttpDownloadSource
@@ -24,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
 
@@ -64,6 +66,38 @@ class DownloadCoordinatorResumeTest {
       assertIs<DownloadState.Completed>(task.state.value)
       assertEquals(0L..999L, engine.lastDownloadRange)
       assertContentEquals(engine.content, platformFileSystem.read(output) { readByteArray() })
+    }
+  }
+
+  @Test
+  fun resume_progressWithoutState_startsOver() = runTest {
+    withKetch { ketch, engine, store, output ->
+      // Half the bytes claimed, but no state to check that the server still has that file.
+      platformFileSystem.write(output) { write(ByteArray(1000) { 7 }) }
+      val now = Clock.System.now()
+      store.save(
+        TaskRecord(
+          taskId = "stateless",
+          request = request(output),
+          outputPath = output.toString(),
+          state = TaskState.PAUSED,
+          totalBytes = 1000,
+          segments = listOf(Segment(0, 0, 999, 500)),
+          sourceType = HttpDownloadSource.TYPE,
+          createdAt = now,
+          updatedAt = now,
+        ),
+      )
+      ketch.start()
+      val task = ketch.tasks.value.single()
+
+      task.resume()
+      runCurrent()
+
+      assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals(0L..999L, engine.lastDownloadRange)
+      assertContentEquals(engine.content, platformFileSystem.read(output) { readByteArray() })
+      assertNotNull(store.load(task.taskId)?.sourceResumeState)
     }
   }
 

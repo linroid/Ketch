@@ -47,7 +47,7 @@ class TransmissionInteropTest {
           val resolved = source.resolve(magnet, emptyMap())
           val output = root.resolve("result.bin")
           val context = sourceContext(magnet, resolved, output.absolutePath)
-          source.download(context)
+          source.download(context, null)
           assertContentEquals(payload, output.readBytes())
           assertEquals(payload.size.toLong(), context.segments.value.sumOf { it.downloadedBytes })
           for (variable in listOf("KETCH_NATIVE_CLI", "KETCH_JVM_CLI")) {

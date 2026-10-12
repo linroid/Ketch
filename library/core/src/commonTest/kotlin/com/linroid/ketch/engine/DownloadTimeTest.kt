@@ -222,9 +222,7 @@ class DownloadTimeTest {
         suggestedFileName = "fixture", maxSegments = 1,
       )
     }
-    override suspend fun download(context: DownloadContext) = transfer()
-    override suspend fun resume(context: DownloadContext, state: Unit?) =
-      transfer()
+    override suspend fun download(context: DownloadContext, state: Unit?) = transfer()
 
     private suspend fun transfer() {
       timeSource += runTime

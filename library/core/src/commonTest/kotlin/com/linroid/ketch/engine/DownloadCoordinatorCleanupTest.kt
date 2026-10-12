@@ -47,11 +47,7 @@ class DownloadCoordinatorCleanupTest {
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       error("not used")
-    override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(
-      context: DownloadContext,
-      state: String?,
-    ) = Unit
+    override suspend fun download(context: DownloadContext, state: String?) = Unit
     override suspend fun cleanup(
       context: DownloadContext,
       state: String?,

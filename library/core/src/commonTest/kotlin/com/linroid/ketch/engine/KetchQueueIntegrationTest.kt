@@ -486,7 +486,11 @@ class KetchQueueIntegrationTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    // Stored as each run starts, so a resumed run gets it back.
+    override suspend fun store(context: DownloadContext) = Unit
+
+    override suspend fun download(context: DownloadContext, state: Unit?) {
+      if (state != null) resumed += context.url.substringAfterLast('/')
       if (failNext) {
         failNext = false
         throw KetchError.Unsupported()
@@ -504,11 +508,5 @@ class KetchQueueIntegrationTest {
         active--
       }
     }
-
-    override suspend fun resume(context: DownloadContext, state: Unit?) {
-      resumed += context.url.substringAfterLast('/')
-      download(context)
-    }
-
   }
 }

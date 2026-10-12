@@ -38,11 +38,7 @@ class DownloadSourceCleanupTest {
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       error("not used")
-    override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(
-      context: DownloadContext,
-      state: Unit?,
-    ) = Unit
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
   }
 
   private fun context(accessor: FileAccessor): DownloadContext =

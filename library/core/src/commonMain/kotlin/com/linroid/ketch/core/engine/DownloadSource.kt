@@ -11,8 +11,8 @@ import kotlinx.serialization.KSerializer
  * A download protocol, such as HTTP ([HttpDownloadSource]), FTP or BitTorrent. [SourceResolver]
  * routes each URL, or file content, to the first registered source that [canHandle]s it.
  *
- * A source probes a URL with [resolve], transfers it with [download] and [resume], and saves what
- * a resume needs with [store]. The other members are optional.
+ * A source probes a URL with [resolve], transfers it with [download], and saves what a later
+ * [download] needs to continue with [store]. The other members are optional.
  *
  * @param S the state this source saves with a task to resume it, such as an HTTP `ETag` or a
  *   torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
@@ -93,35 +93,33 @@ interface DownloadSource<S : Any> {
   // Transferring
 
   /**
-   * Downloads from scratch: writes through [DownloadContext.fileAccessor], reports
-   * [DownloadContext.onProgress] and [DownloadContext.segments], waits on
-   * [DownloadContext.throttle], and stops when cancelled.
+   * Downloads, continuing from the [state] the task last [store]d, or from the beginning when it
+   * is `null`. Writes through [DownloadContext.fileAccessor], reports [DownloadContext.onProgress]
+   * and [DownloadContext.segments], waits on [DownloadContext.throttle], and stops when cancelled,
+   * which is how a task pauses.
+   *
+   * With a [state], a source checks that the content did not change since it was stored (failing
+   * with [KetchError.FileChanged]) before it continues from [DownloadContext.segments]. Ketch
+   * passes the state the run started from, then on each retry the latest one stored. A state that
+   * can't be decoded fails the task with [KetchError.CorruptResumeState] before this is called.
+   * [DownloadContext.preResolved] holds the resolution the run starts from, if any, such as the
+   * one the task kept ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]).
    *
    * Settings come from [DownloadContext.config]. Segmented sources size their transfers with
    * [DownloadContext.effectiveConnections] and follow later [DownloadContext.maxConnections]
-   * changes. After a retryable failure the engine calls this again with the same context, so a
-   * source that can should continue from the progress in [DownloadContext.segments].
+   * changes.
    *
    * When [ResolvedSource.totalBytes] is -1 the size is unknown: a source that can stream such
    * content writes it from offset zero and the engine records the final size, while one that
    * can't throws [KetchError.SourceError]. Sources that [write their own files][managesOwnFileIo]
    * never get such a download.
    */
-  suspend fun download(context: DownloadContext)
+  suspend fun download(context: DownloadContext, state: S?)
 
   /**
-   * Continues an interrupted download from the [state] its task last [store]d, or `null` when it
-   * stored none. [DownloadContext.preResolved] holds the resolution the task kept
-   * ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]), if any. A saved state that can't be
-   * decoded fails the task with [KetchError.CorruptResumeState] before this is called. Sources
-   * that can't resume throw [KetchError.Unsupported].
-   */
-  suspend fun resume(context: DownloadContext, state: S?)
-
-  /**
-   * What a later [resume] needs, such as the HTTP `ETag` the content had or a torrent's verified
-   * pieces, or `null` to keep what the task saved last. Ketch calls it as each [download] or
-   * [resume] starts, before any byte is written, then periodically, and once more as it stops.
+   * What a later [download] needs to continue, such as the HTTP `ETag` the content had or a
+   * torrent's verified pieces, or `null` to keep what the task saved last. Ketch calls it as each
+   * run starts, before any byte is written, then periodically, and once more as it stops.
    */
   suspend fun store(context: DownloadContext): S? = null
 

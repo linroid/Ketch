@@ -143,7 +143,7 @@ class TorrentSourceSeedingTest {
             seeder.seed()
           }
           // The download returns while its session keeps seeding on the lent slot.
-          source.download(context("seeding", seeding, "unused-seeding"))
+          source.download(context("seeding", seeding, "unused-seeding"), null)
           seeds.join()
           assertTrue(engine.removedTorrents.isEmpty())
           // Seeding ends by itself, such as when uploads are switched off.
@@ -157,7 +157,7 @@ class TorrentSourceSeedingTest {
             eventually { downloader.resumed }
             downloader.finish()
           }
-          source.download(context("next", next, "unused-next"))
+          source.download(context("next", next, "unused-next"), null)
           finishes.join()
           assertEquals(listOf(seedingHash to false, nextHash to false), engine.removedTorrents)
         } finally { source.close() }
@@ -182,7 +182,7 @@ class TorrentSourceSeedingTest {
             eventually { seeder.resumed }
             seeder.seed()
           }
-          source.download(context("first", resolved, "unused-first"))
+          source.download(context("first", resolved, "unused-first"), null)
           seeds.join()
           assertTrue(engine.removedTorrents.isEmpty())
           // The same torrent again, as another task: the seeder gives way instead of failing it.
@@ -192,7 +192,7 @@ class TorrentSourceSeedingTest {
             eventually { again.resumed }
             again.finish()
           }
-          source.download(context("second", resolved, "unused-second"))
+          source.download(context("second", resolved, "unused-second"), null)
           finishes.join()
           assertEquals(listOf(hash to false, hash to false), engine.removedTorrents)
           // The first task finds nothing left to stop.
@@ -256,7 +256,7 @@ class TorrentSourceSeedingTest {
     val state = TorrentResumeState(fixture.document.info.hash.hex, resolved.totalBytes,
       encodeBase64(checkpoint.encode()), resolved.files.map { it.id }.toSet(), output.toString(),
       encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
-    resume(context(taskId, resolved, output.toString(), connections), state)
+    download(context(taskId, resolved, output.toString(), connections), state)
   }
 
   @Test

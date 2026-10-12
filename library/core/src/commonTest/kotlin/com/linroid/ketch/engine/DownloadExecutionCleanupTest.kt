@@ -163,10 +163,9 @@ class DownloadExecutionCleanupTest {
           suggestedFileName = "fixture.bin", maxSegments = 1,
         )
       }
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun download(context: DownloadContext, state: Unit?) {
         context.segments.value = listOf(Segment(0, 0, 99, 100))
       }
-      override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
     }
     val dispatcher = StandardTestDispatcher(testScheduler)
     val execution = DownloadExecution(

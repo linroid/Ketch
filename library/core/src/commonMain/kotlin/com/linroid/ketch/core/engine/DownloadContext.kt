@@ -110,9 +110,9 @@ class DownloadContext(
 
   /**
    * Confirms that this run delivers the files of [selection] revision [revision] before
-   * [DownloadSource.download] or [DownloadSource.resume] returns. Never acknowledge a revision
-   * the run can no longer act on, such as one that arrives after the transfer finished: Ketch
-   * then runs the download again, through [DownloadSource.resume], with the saved selection.
+   * [DownloadSource.download] returns. Never acknowledge a revision the run can no longer act on,
+   * such as one that arrives after the transfer finished: Ketch then runs the download again,
+   * from its latest state, with the saved selection.
    */
   fun acknowledgeSelection(revision: Int) {
     acknowledged.update { maxOf(it, revision) }

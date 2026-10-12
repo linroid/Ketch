@@ -444,11 +444,10 @@ class DownloadExecutionDestPathTest {
         suggestedFileName = suggestedFileName, maxSegments = 1, contentType = contentType,
       )
     }
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       outputPaths += context.outputPath.orEmpty()
       context.segments.value = listOf(Segment(0, 0, 3, 4))
       if (outputPaths.size == 1) firstWaitsFor?.await()
     }
-    override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
   }
 }

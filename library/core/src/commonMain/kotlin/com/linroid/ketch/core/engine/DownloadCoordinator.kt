@@ -205,6 +205,12 @@ internal class DownloadCoordinator(
       log.i { "No saved progress for taskId=$taskId, starting it again" }
       return false
     }
+    if (taskRecord.sourceResumeState == null && !managesOwnFileIo(taskRecord)) {
+      // Nothing to check the saved bytes against, so they are not trusted.
+      log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
+      handle.mutableSegments.value = emptyList()
+      return false
+    }
     log.d {
       "Resume loaded record: taskId=$taskId, " +
         "segments=${segments.size}, " +

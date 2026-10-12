@@ -64,7 +64,7 @@ class DownloadCoordinatorCancelTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       downloadStarted.complete(Unit)
       try {
         awaitCancellation()
@@ -73,10 +73,6 @@ class DownloadCoordinatorCancelTest {
       }
     }
 
-    override suspend fun resume(
-      context: DownloadContext,
-      state: Unit?,
-    ) = Unit
 
   }
 

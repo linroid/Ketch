@@ -242,7 +242,7 @@ class KotlinTorrentV2SwarmTest {
       assertEquals("v2", resolved.metadata["format"])
       assertEquals(fixture.names.size, resolved.files.size)
       val output = root / "magnet"
-      source.download(context("magnet", resolved, output.toString()))
+      source.download(context("magnet", resolved, output.toString()), null)
       for ((index, name) in fixture.names.withIndex()) {
         assertContentEquals(fixture.payloads[index],
           torrentFileSystem.read(output / name) { readByteArray() })

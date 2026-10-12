@@ -156,13 +156,11 @@ class KetchUpdateConfigTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       outputPath = context.outputPath
       context.segments.value = listOf(Segment(index = 0, start = 0, end = 3, downloadedBytes = 4))
     }
 
-    override suspend fun resume(context: DownloadContext, state: Unit?) =
-      download(context)
 
   }
 }

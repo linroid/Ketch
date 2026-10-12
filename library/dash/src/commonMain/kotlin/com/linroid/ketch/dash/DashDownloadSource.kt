@@ -34,13 +34,9 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     return helper.resolve(url, plan(url, headers, config.proxy))
   }
 
-  override suspend fun download(context: DownloadContext) {
-    helper.download(context, plan(context.url, context.headers, context.config.proxy))
-  }
-
   /** Media transfers restart from zero; no byte offset can identify a refreshed manifest part. */
-  override suspend fun resume(context: DownloadContext, state: Unit?) {
-    download(context)
+  override suspend fun download(context: DownloadContext, state: Unit?) {
+    helper.download(context, plan(context.url, context.headers, context.config.proxy))
   }
 
   private suspend fun plan(

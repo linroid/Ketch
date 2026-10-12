@@ -128,7 +128,7 @@ class KotlinTorrentSourceTest {
             val resolved = source.resolve("http://fixture/bundle.torrent", emptyMap())
             assertEquals(8L, resolved.totalBytes)
             val first = context(resolved)
-            source.download(first)
+            source.download(first, null)
             assertEquals(listOf(1), first.segments.value.map { it.index })
             assertEquals(2L, first.segments.value.single().downloadedBytes)
             assertContentEquals(byteArrayOf(3, 4),
@@ -144,7 +144,7 @@ class KotlinTorrentSourceTest {
               TorrentConfig(encryption = TorrentEncryption.DISABLED, dhtEnabled = false))
             try {
               val second = context(null)
-              restored.resume(second, saved)
+              restored.download(second, saved)
               assertEquals(2L, second.segments.value.single().downloadedBytes)
               restored.cleanup(second, assertNotNull(restored.store(second)), deleteFiles = true)
               assertFalse(FileSystem.SYSTEM.exists(output / "selected"))

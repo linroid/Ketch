@@ -46,11 +46,11 @@ fun <S : Any> DownloadSource<S>.decodeResumeState(saved: SourceResumeState): S {
   }
 }
 
-/** [DownloadSource.resume] from the state a task record [saved], if any. */
-internal suspend fun <S : Any> DownloadSource<S>.resumeSaved(
+/** [DownloadSource.download] from the state a task record [saved], if any. */
+internal suspend fun <S : Any> DownloadSource<S>.downloadSaved(
   context: DownloadContext,
   saved: SourceResumeState?,
-) = resume(context, saved?.let { decodeResumeState(it) })
+) = download(context, saved?.let { decodeResumeState(it) })
 
 /** [DownloadSource.store], encoded for the task record. */
 internal suspend fun <S : Any> DownloadSource<S>.stored(

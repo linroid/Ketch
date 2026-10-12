@@ -96,8 +96,6 @@ class ResolveWaitTest {
         supportsResume = true, suggestedFileName = "empty.bin", maxSegments = 1,
       )
     }
-    override suspend fun download(context: DownloadContext) = context.onProgress(0, 0)
-    override suspend fun resume(context: DownloadContext, state: Unit?) =
-      download(context)
+    override suspend fun download(context: DownloadContext, state: Unit?) = context.onProgress(0, 0)
   }
 }

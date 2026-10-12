@@ -63,7 +63,7 @@ class DownloadCoordinatorFailureTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       when (context.url.substringAfterLast('/')) {
         "hang" -> {
           hanging.complete(Unit)
@@ -74,10 +74,6 @@ class DownloadCoordinatorFailureTest {
       }
     }
 
-    override suspend fun resume(
-      context: DownloadContext,
-      state: Unit?,
-    ) = Unit
 
   }
 

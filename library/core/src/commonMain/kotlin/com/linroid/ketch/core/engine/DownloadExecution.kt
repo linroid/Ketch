@@ -329,7 +329,7 @@ internal class DownloadExecution(
         updatedAt = now,
       )
     }
-    return Prepared(target, total, resolvedUrl) { ctx -> source.download(ctx) }
+    return Prepared(target, total, resolvedUrl, state = null)
   }
 
   /**
@@ -451,18 +451,20 @@ internal class DownloadExecution(
         partial = record.partialPath.takeUnless { source.managesOwnFileIo },
         replace = record.request.destination?.isFile() == true,
       )
-      Prepared(target, record.totalBytes, record.resolvedSource) { ctx ->
-        source.resumeSaved(ctx, resumeState)
-      }
+      Prepared(target, record.totalBytes, record.resolvedSource, resumeState)
     }
   }
 
-  /** What a download needs once it is prepared under the task's control lock. */
+  /**
+   * What a download needs once it is prepared under the task's control lock.
+   *
+   * @property state the saved state the run continues from; `null` starts from the beginning
+   */
   private class Prepared(
     val target: OutputTarget,
     val total: Long,
     val preResolved: ResolvedSource?,
-    val block: suspend (DownloadContext) -> Unit,
+    val state: SourceResumeState?,
   )
 
   /**
@@ -472,7 +474,7 @@ internal class DownloadExecution(
    * execution without a download.
    *
    * A selection delivered while the source ran but not acknowledged by it runs the download
-   * again through [DownloadSource.resume], so completion always covers the latest selection.
+   * again from its latest state, so completion always covers the latest selection.
    *
    * When [DownloadSource.managesOwnFileIo] is `true`, the source
    * handles its own file I/O so we use [NoOpFileAccessor] and skip
@@ -547,10 +549,17 @@ internal class DownloadExecution(
               it.copy(sourceResumeState = state, updatedAt = Clock.System.now())
             }
           }
-          var block = prepared.block
+          // The first attempt continues from the state the run started from; a retry or a rerun
+          // from the latest one stored, so the source checks what it already wrote.
+          var state = prepared.state
           var rerunFor = -1
           while (true) {
-            downloadWithRetry(ctx) { block(ctx) }
+            var retry = false
+            downloadWithRetry(ctx) {
+              if (retry) state = handle.record.value.sourceResumeState ?: state
+              retry = true
+              source.downloadSaved(ctx, state)
+            }
             val pending = handle.controlLock.withLock {
               val latest = ctx.selection.value.revision
               if (ctx.acknowledgedSelection.value >= latest) {
@@ -568,8 +577,7 @@ internal class DownloadExecution(
             }
             rerunFor = pending
             log.i { "Selection of taskId=$taskId changed as it finished; continuing with it" }
-            val state = source.stored(ctx) ?: handle.record.value.sourceResumeState
-            block = { source.resumeSaved(it, state) }
+            state = source.stored(ctx) ?: handle.record.value.sourceResumeState
           }
         } finally {
           withContext(NonCancellable) {

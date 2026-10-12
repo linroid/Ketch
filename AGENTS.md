@@ -518,12 +518,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source is a `DownloadSource<S>` over its own serializable resume state `S`
   (`HttpResumeState`, `FtpResumeState`, `TorrentResumeState`, `Unit` for HLS/DASH) and defines
-  `type`, `resumeStateSerializer`, `canHandle(input)`, `resolve(input, config)` and `download()`,
-  plus three state functions: `store(context)`, the state to save (Ketch asks as each run starts,
-  before any byte is written, every `saveIntervalMs` and once as it stops, the pause checkpoint;
-  `null` keeps the last), `resume(context, state)` (`null` when nothing was stored) and
-  `cleanup(context, state, deleteFiles)` on removal (stops what outlived the download, such as a
-  seeding torrent, and deletes files only with `deleteFiles`). Ketch saves the state as JSON in
+  `type`, `resumeStateSerializer`, `canHandle(input)` and `resolve(input, config)`, plus three
+  state functions: `download(context, state)` continues from the stored `state` after checking
+  the content is unchanged, or starts from the beginning with `null` (Ketch passes the state the
+  run started from, then the latest stored one on each retry, and drops the saved segments of a
+  task with progress but no state); `store(context)` is the state to save (Ketch asks as each run
+  starts, before any byte is written, every `saveIntervalMs` and once as it stops, the pause
+  checkpoint; `null` keeps the last); and `cleanup(context, state, deleteFiles)` runs on removal
+  (stops what outlived the download, such as a seeding torrent, and deletes files only with
+  `deleteFiles`). Segments are Ketch's (`TaskRecord.segments`, `DownloadContext.segments`), not
+  part of a source's state. Ketch saves the state as JSON in
   `TaskRecord.sourceResumeState` (`SourceResumeState`, written and read only through
   `encodeResumeState`/`decodeResumeState`, which ignores unknown fields and refuses another
   source's state) and hands sources their state decoded: one that cannot be decoded fails a

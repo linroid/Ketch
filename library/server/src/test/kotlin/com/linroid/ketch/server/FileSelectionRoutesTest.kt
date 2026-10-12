@@ -84,12 +84,11 @@ class FileSelectionRoutesTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       context.onProgress(0, 30)
       awaitCancellation()
     }
 
-    override suspend fun resume(context: DownloadContext, state: Unit?) = download(context)
   }
 
   private fun ketch(): KetchApi =

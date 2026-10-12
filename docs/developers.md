@@ -174,7 +174,7 @@ A `DownloadSource<S>` says which inputs it takes (`canHandle`), probes them (`re
 downloads them (`download`). What it needs to continue later is `S`, any `@Serializable` type it
 names with `resumeStateSerializer` (`Unit` for none): Ketch asks for it with `store` as a run
 starts, periodically and as it stops (a pause is the run stopping), saves it with the task, and
-passes it back decoded to `resume`. `cleanup` runs when the task is removed, deleting its files
+passes it back decoded to `download`, which starts from the beginning when it is `null`. `cleanup` runs when the task is removed, deleting its files
 only when asked to. `canHandle` and `resolve` take a `ResolveInput`; most sources accept only
 its `Url` case, and file content such as a `.torrent` file arrives as `Content`. Register it with
 `Ketch(additionalSources = listOf(MySource()))`; the first source whose `canHandle` matches wins,
