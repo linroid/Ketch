@@ -125,6 +125,37 @@ fun LaneStrip(
   )
 }
 
+/**
+ * A download's total progress in the look of a [LaneStrip], for the list and the table, where
+ * every connection's lane would be noise: one lane filled to the downloaded share, with a write
+ * head while downloading that turns amber while [stalled], the shimmer of an unknown size and the
+ * completion sheen. Connections show in the inspector and the table's Connections column.
+ *
+ * @param state state of the task, which picks the colors and gives the progress.
+ * @param height one of the [LaneStripDefaults] heights.
+ * @param stalled whether the whole download has received no data for a while.
+ * @param onCompletionShown runs once the completion sheen has played, or as soon as the strip is
+ *   shown for a task that is already complete.
+ */
+@Composable
+fun ProgressStrip(
+  state: DownloadState,
+  modifier: Modifier = Modifier,
+  height: Dp = LaneStripDefaults.RowHeight,
+  stalled: Boolean = false,
+  onCompletionShown: () -> Unit = {},
+) {
+  LaneStripCanvas(
+    segments = emptyList(),
+    phase = state.lanePhase(),
+    progress = state.laneProgress(),
+    modifier = modifier,
+    height = height,
+    stalled = if (stalled) STALLED_PROGRESS else emptySet(),
+    onCompletionShown = onCompletionShown,
+  )
+}
+
 /** What a lane strip shows, from the state of its task. */
 internal enum class LanePhase {
   /** The accent lanes, with write heads. */
@@ -710,7 +741,10 @@ internal fun laneStripDescription(
   } else {
     Res.string.component_lanes_size_unknown.text()
   }
-  if (stalled > 0) parts += Res.plurals.component_lanes_stalled.text(stalled)
+  // A single lane's stall is the row's own "Stalled" status.
+  if (stalled > 0 && connections > 0) {
+    parts += Res.plurals.component_lanes_stalled.text(stalled)
+  }
   return parts.joinText(DESCRIPTION_SEPARATOR)
 }
 
@@ -756,3 +790,6 @@ private val HeadWidth = 2.dp
 private val HeadOverhang = 2.dp
 private val HeadGlow = 2.dp
 private val StillDashMin = 6.dp
+
+/** The stalled lanes of a [ProgressStrip]: its one lane, which starts at byte 0. */
+private val STALLED_PROGRESS = setOf(0L)

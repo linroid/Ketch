@@ -654,7 +654,7 @@ illustration is static.
 | `KetchBadge` / count pill | h20 `full`, `surfaceSunken`, `numeralS`. Failed count: white on `dangerFill` (never on `status.failed`, which is light in dark). |
 | `StatusDot` | 8 dp (6 dp in table rows) + `caption` `textSecondary` label. Only Failed colors its label. The Downloading pulse is drawn with `drawBehind` (the current halo is invisible: `DownloadListItem.kt:327-337`). |
 | `PriorityGlyph` | See §3.2.4. |
-| `LaneStrip` | One `Canvas`, `xs` radius. Heights: 4 dp (list row), 6 dp (table progress cell), 10 dp (inspector header), 16 dp (Connections tab). Each segment is drawn at `start/total` to `(end+1)/total` with its downloaded part filled. 1 dp `surface` seams only between unfinished segments, and only when there are 32 segments or fewer. A write head per active segment. Unknown size: a 30%-wide shimmer cycling every 1.2 s. Semantics: "8 connections, 6 active, 42 percent". Replaces `KetchSegmentBar`, `KetchSegmentDetail`, `HealthDot` and `KetchProgressBar` for tasks. |
+| `LaneStrip` | One `Canvas`, `xs` radius. Heights: 4 dp (list row), 6 dp (table progress cell), 10 dp (inspector header), 16 dp (Connections tab). Each segment is drawn at `start/total` to `(end+1)/total` with its downloaded part filled. 1 dp `surface` seams only between unfinished segments, and only when there are 32 segments or fewer. A write head per active segment. Unknown size: a 30%-wide shimmer cycling every 1.2 s. Semantics: "8 connections, 6 active, 42 percent". Replaces `KetchSegmentBar`, `KetchSegmentDetail`, `HealthDot` and `KetchProgressBar` for tasks. List rows and the table's Progress column draw `ProgressStrip` instead: one lane for the total, its head amber while the task is stalled, as a row's connections are noise at a glance; the table's Connections column keeps a mini `LaneStrip` with stalled heads. |
 | `KetchFileTypeChip` | 20 dp (table), 28 dp (list), 36 dp (phone), 40 dp (inspector, intake preview). Hue at 13% + glyph. |
 | `KetchHueTile` | 32/40/48 dp, r = size × 0.28, hue gradient 18% → 6% top-left to bottom-right, 1 dp `#FFFFFF` at 40% top highlight (light only). Used for settings categories, device types and Discover results. |
 | `DevicePennant` | 16/20/24/32/40 dp circle in the device hue with the white solid glyph of its `DeviceType` (Laptop, Desktop, Server, Phone, Tablet, Browser) at 60% of the circle; a device whose type is not known yet shows a monogram instead (two letters from the name: "NB", "LM"). 2 dp **health ring** (§3.2.4) offset 2 dp. Failed badge: 14 dp `dangerFill` circle with a white `numeralS` count at top-end. The ring encodes **health only**. Aggregate progress is a separate outer arc, shown only on the rail's All-devices avatar. |
@@ -1317,7 +1317,7 @@ ubuntu-24.04.iso". This replaces the Retry that does nothing on canceled tasks.
 | Status | 28 | 6 dp dot per §3.2.4; becomes a 16 dp checkbox on hover or whenever anything is selected |
 | Name | flex, min 240 | 20 dp file chip + display name in `cellStrong` (middle ellipsis keeps the extension) + priority glyph + `↧2 MB/s` pill for a per-task cap; device pennant under All devices |
 | Size | 96 | "2.4/5.7 GB" running; "5.7 GB" done; "–" unknown |
-| Progress | 140 | 6 dp `LaneStrip` + "42%" in `numeralS` |
+| Progress | 140 | 6 dp `ProgressStrip` + "42%" in `numeralS` |
 | Speed | 92 | "6.4 MB/s"; "0 B/s" for a real zero; muted "–" unknown; blank when not applicable. Sorted numerically |
 | Left | 76 | ETA; "took 3m" when done |
 | Added | 104 | "Today 11:42", "Yesterday", "Sep 28" (kotlinx-datetime, local zone) |
@@ -1386,8 +1386,8 @@ while a magnet is still downloading needs `DownloadTask.fileName` (W5).
 - Height: 56 dp (pointer) or 64/72 dp (touch, with lanes).
 - Layout: 12 dp padding; a 28 dp chip (36 dp on touch); line 1 is the name in `bodyStrong` plus
   the priority glyph, with the metric right-aligned in `numeral`; line 2 is `caption` text joined
-  with " · ", wrapping instead of truncating the speed; a 4 dp `LaneStrip` under line 2 while
-  Downloading or Paused.
+  with " · ", wrapping instead of truncating the speed; a 4 dp `ProgressStrip` under line 2
+  while Downloading or Paused.
 - Dividers are inset 60 dp.
 - Hover: `surfaceHover`, `md`, inset 4. Two 28 dp hover actions fade in over the metric in 120 ms.
 - Touch: a 44 dp trailing primary action. `SwipeToDismissBox`, acting past 40% of the row's

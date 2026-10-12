@@ -44,8 +44,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchSegmented
-import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
+import com.linroid.ketch.app.components.ProgressStrip
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
@@ -520,9 +520,8 @@ private fun TableRow(row: TaskRow, actions: ListActions) {
           verticalAlignment = Alignment.CenterVertically,
           modifier = Modifier.width(160.dp).padding(start = 16.dp),
         ) {
-          LaneStrip(
+          ProgressStrip(
             state = row.state,
-            segments = row.segments,
             modifier = Modifier.weight(1f),
             height = LaneStripDefaults.CellHeight,
           )

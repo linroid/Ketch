@@ -65,6 +65,7 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.KetchTriStateCheckbox
 import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
+import com.linroid.ketch.app.components.ProgressStrip
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
@@ -675,11 +676,10 @@ private fun Cell(
       modifier = cell,
     ) {
       if (lanes) {
-        LaneStrip(
+        ProgressStrip(
           state = row.state,
-          segments = row.segments,
           height = LaneStripDefaults.CellHeight,
-          stalled = rememberStalledLanes(row),
+          stalled = content.status == RowStatus.Stalled,
           onCompletionShown = onSheenShown,
           modifier = Modifier.weight(1f),
         )
@@ -725,6 +725,7 @@ private fun Cell(
           state = row.state,
           segments = row.segments,
           height = LaneStripDefaults.LaneHeight,
+          stalled = rememberStalledLanes(row),
           modifier = Modifier.width(MiniStripWidth),
         )
       }

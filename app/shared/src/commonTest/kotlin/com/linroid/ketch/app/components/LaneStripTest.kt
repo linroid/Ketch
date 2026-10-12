@@ -260,6 +260,28 @@ class LaneStripTest {
   }
 
   @Test
+  fun laneStripDescription_singleStalledLane_leavesTheStallToTheRow() = runTest {
+    val progress = DownloadProgress(downloadedBytes = 420, totalBytes = 1000)
+
+    assertEquals(
+      "42 percent",
+      laneStripDescription(emptyList(), progress, LanePhase.Downloading, stalled = 1).load()
+    )
+  }
+
+  @Test
+  fun laneLayout_progressOnly_stallsItsOneLaneAtByteZero() {
+    val progress = DownloadProgress(downloadedBytes = 420, totalBytes = 1000)
+
+    val layout = laneLayout(emptyList(), progress, stalled = setOf(0L))
+
+    assertEquals(1, layout.count)
+    assertTrue(layout.stalled[0])
+    assertTrue(layout.unfinished[0])
+    assertFalse(layout.segmented)
+  }
+
+  @Test
   fun laneFraction_completed_isWhole() {
     assertEquals(1f, laneFraction(emptyList(), progress = null, phase = LanePhase.Completed))
   }
