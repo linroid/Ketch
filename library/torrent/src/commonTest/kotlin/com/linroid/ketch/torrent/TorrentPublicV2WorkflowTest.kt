@@ -8,6 +8,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.encodeResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -393,8 +394,9 @@ class TorrentPublicV2WorkflowTest {
       assertTrue(stored.sourceResumeState?.data?.contains(peer.document.info.hash.hex) == true)
       first.close()
       if (staleCheckpoint) {
-        records.save(stored.copy(sourceResumeState = firstSource.buildResumeState(
-          source().resolveMetainfo(peer.metainfo), peer.payload.size.toLong())))
+        records.save(stored.copy(sourceResumeState = firstSource.encodeResumeState(
+          firstSource.buildResumeState(source().resolveMetainfo(peer.metainfo),
+            peer.payload.size.toLong()))))
       }
       // Persisted verified bits cannot authorize payload modified while the process was away.
       torrentFileSystem.openReadWrite(root / "out" / "a").use {

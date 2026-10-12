@@ -10,7 +10,6 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -282,7 +281,7 @@ class AwaitFileSelectionTest {
         request = request(selected = setOf("0"), await = false).copy(resolvedSource = client),
         state = TaskState.QUEUED,
         sourceType = SelectableSource.TYPE,
-        sourceResumeState = SourceResumeState(SelectableSource.TYPE, "stored:pick:files"),
+        sourceResumeState = SelectableSource.storedState("pick:files"),
         createdAt = now,
         updatedAt = now,
       )
@@ -357,7 +356,7 @@ class AwaitFileSelectionTest {
         totalBytes = 100,
         segments = listOf(Segment(0, 0, 99, 10)),
         sourceType = SelectableSource.TYPE,
-        sourceResumeState = SourceResumeState(SelectableSource.TYPE, "stored:pick:files"),
+        sourceResumeState = SelectableSource.storedState("pick:files"),
         createdAt = now,
         updatedAt = now,
       )

@@ -1,39 +1,33 @@
 package com.linroid.ketch.ftp
 
-import kotlinx.serialization.json.Json
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.decodeResumeState
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class FtpResumeStateTest {
+  private val source = FtpDownloadSource()
 
   @Test
-  fun buildResumeState_setsSourceTypeAndEncodesFields() {
-    val resumeState = FtpDownloadSource.buildResumeState(
+  fun buildResumeState_keepsServerModificationTime() {
+    val resolved = ResolvedSource(
+      url = "ftp://example.com/file.bin",
+      sourceType = FtpDownloadSource.TYPE,
       totalBytes = 4096,
-      mdtm = "20250115120000",
+      supportsResume = true,
+      suggestedFileName = "file.bin",
+      maxSegments = 4,
+      metadata = mapOf(FtpDownloadSource.META_MDTM to "20250115120000"),
     )
-    assertEquals("ftp", resumeState.sourceType)
 
-    val decoded = Json.decodeFromString<FtpResumeState>(
-      resumeState.data
-    )
-    assertEquals(4096, decoded.totalBytes)
-    assertEquals("20250115120000", decoded.mdtm)
+    assertEquals(FtpResumeState(4096, "20250115120000"), source.buildResumeState(resolved, 4096))
   }
 
   @Test
-  fun buildResumeState_nullMdtm_encodesCorrectly() {
-    val resumeState = FtpDownloadSource.buildResumeState(
-      totalBytes = 0,
-      mdtm = null,
-    )
-    assertEquals("ftp", resumeState.sourceType)
+  fun decodeResumeState_withoutMdtm_readsNull() {
+    val saved = SourceResumeState(FtpDownloadSource.TYPE, """{"totalBytes":4096}""")
 
-    val decoded = Json.decodeFromString<FtpResumeState>(
-      resumeState.data
-    )
-    assertEquals(0, decoded.totalBytes)
-    assertNull(decoded.mdtm)
+    assertEquals(FtpResumeState(4096, null), source.decodeResumeState(saved))
   }
 }

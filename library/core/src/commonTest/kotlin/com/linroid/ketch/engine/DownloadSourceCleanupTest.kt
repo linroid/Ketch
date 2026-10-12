@@ -5,13 +5,13 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.serializer
 
 class DownloadSourceCleanupTest {
 
@@ -30,7 +30,8 @@ class DownloadSourceCleanupTest {
     override suspend fun preallocate(size: Long) = Unit
   }
 
-  private class StubSource : DownloadSource {
+  private class StubSource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "stub"
     override fun canHandle(url: String): Boolean = true
     override suspend fun resolve(
@@ -40,12 +41,12 @@ class DownloadSourceCleanupTest {
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(
       context: DownloadContext,
-      resumeState: SourceResumeState,
+      state: Unit,
     ) = Unit
     override fun buildResumeState(
       resolved: ResolvedSource,
       totalBytes: Long,
-    ): SourceResumeState = SourceResumeState(type, "")
+    ) = Unit
   }
 
   private fun context(accessor: FileAccessor): DownloadContext =
@@ -68,7 +69,7 @@ class DownloadSourceCleanupTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(context(accessor), resumeState = null)
+    source.cleanup(context(accessor), state = null)
 
     assertEquals(1, accessor.deleteCount)
   }
@@ -81,7 +82,7 @@ class DownloadSourceCleanupTest {
     val source = StubSource()
 
     // Should not throw — best-effort cleanup.
-    source.cleanup(context(accessor), resumeState = null)
+    source.cleanup(context(accessor), state = null)
 
     assertEquals(1, accessor.deleteCount)
   }
@@ -91,10 +92,7 @@ class DownloadSourceCleanupTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(
-      context = context(accessor),
-      resumeState = SourceResumeState("stub", "{}"),
-    )
+    source.cleanup(context = context(accessor), state = Unit)
 
     assertEquals(1, accessor.deleteCount)
   }

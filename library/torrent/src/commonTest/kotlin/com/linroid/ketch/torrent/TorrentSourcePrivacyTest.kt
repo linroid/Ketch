@@ -5,6 +5,8 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.decodeResumeState
+import com.linroid.ketch.core.engine.encodeResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.engine.TorrentEngine
 import com.linroid.ketch.torrent.engine.TorrentSession
@@ -80,8 +82,7 @@ class TorrentSourcePrivacyTest {
       val explicit = source.resolve(magnet, TorrentDiscoveryPrivacy.PUBLIC)
       assertEquals(listOf(TorrentDiscoveryPrivacy.TRACKER_ONLY, TorrentDiscoveryPrivacy.PUBLIC),
         engine.fetches)
-      val restrictedState = Json.decodeFromString<TorrentResumeState>(
-        source.buildResumeState(restricted, 0).data)
+      val restrictedState = source.buildResumeState(restricted, 0)
       assertEquals(2, restrictedState.version)
       assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, restrictedState.privacy)
       source.download(context(explicit))
@@ -95,31 +96,25 @@ class TorrentSourcePrivacyTest {
     val source = source(engine, TorrentDiscoveryPrivacy.PUBLIC)
     val resolved = source.resolve(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY)
     val first = context(resolved)
-    val saved: SourceResumeState
+    val saved: TorrentResumeState
     try {
       source.download(first)
       assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, engine.tasks.single().privacy)
       saved = assertNotNull(source.updateResumeState(first))
-      assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY,
-        Json.decodeFromString<TorrentResumeState>(saved.data).privacy)
+      assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, saved.privacy)
     } finally { source.close() }
     for (refetch in listOf(false, true)) {
       val restoredEngine = Engine(metadata)
       val restored = source(restoredEngine, TorrentDiscoveryPrivacy.PUBLIC)
       try {
-        val state = if (refetch) {
-          val decoded = Json.decodeFromString<TorrentResumeState>(saved.data)
-          SourceResumeState(TorrentDownloadSource.TYPE,
-            Json.encodeToString(decoded.copy(metainfo = "", resumeData = "")))
-        } else saved
+        val state = if (refetch) saved.copy(metainfo = "", resumeData = "") else saved
         val resumed = context()
         restored.resume(resumed, state)
         assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, restoredEngine.tasks.single().privacy)
         assertEquals(if (refetch) listOf(TorrentDiscoveryPrivacy.TRACKER_ONLY) else emptyList(),
           restoredEngine.fetches)
         assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY,
-          Json.decodeFromString<TorrentResumeState>(
-            assertNotNull(restored.updateResumeState(resumed)).data).privacy)
+          assertNotNull(restored.updateResumeState(resumed)).privacy)
       } finally { restored.close() }
     }
   }
@@ -134,11 +129,11 @@ class TorrentSourcePrivacyTest {
         val encoded = Json.encodeToString(legacy)
         assertFalse("privacy" in encoded)
         val resumed = context()
-        source.resume(resumed, SourceResumeState(TorrentDownloadSource.TYPE, encoded))
+        source.resume(resumed,
+          source.decodeResumeState(SourceResumeState(TorrentDownloadSource.TYPE, encoded)))
         assertEquals(listOf(privacy), engine.fetches)
         assertEquals(privacy, engine.tasks.single().privacy)
-        val saved = Json.decodeFromString<TorrentResumeState>(
-          assertNotNull(source.updateResumeState(resumed)).data)
+        val saved = assertNotNull(source.updateResumeState(resumed))
         assertEquals(2, saved.version)
         assertEquals(privacy, saved.privacy)
       } finally { source.close() }
@@ -152,12 +147,13 @@ class TorrentSourcePrivacyTest {
     try {
       val resolved = source.resolveMetainfo(metadata.metainfoBytes,
         TorrentDiscoveryPrivacy.TRACKER_ONLY)
-      val valid = Json.parseToJsonElement(source.buildResumeState(resolved, 0).data).jsonObject
+      val saved = source.encodeResumeState(source.buildResumeState(resolved, 0))
+      val valid = Json.parseToJsonElement(saved.data).jsonObject
       val invalid = listOf(valid - "privacy", valid + ("version" to JsonPrimitive(1)),
         valid + ("version" to JsonPrimitive(99)), valid + ("privacy" to JsonPrimitive("unknown")))
       for (fields in invalid) {
         assertFailsWith<KetchError.CorruptResumeState> {
-          source.resume(context(), SourceResumeState(TorrentDownloadSource.TYPE,
+          source.decodeResumeState(SourceResumeState(TorrentDownloadSource.TYPE,
             JsonObject(fields).toString()))
         }
         assertFalse(engine.started)

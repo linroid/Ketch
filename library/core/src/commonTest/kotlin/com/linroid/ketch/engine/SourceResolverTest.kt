@@ -6,12 +6,12 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.serializer
 
 class SourceResolverTest {
 
@@ -19,7 +19,8 @@ class SourceResolverTest {
     httpEngine = FakeHttpEngine(),
   )
 
-  private val fakeSource = object : DownloadSource {
+  private val fakeSource = object : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "magnet"
     override fun canHandle(url: String) =
       url.startsWith("magnet:")
@@ -37,18 +38,18 @@ class SourceResolverTest {
     override suspend fun download(context: DownloadContext) {}
     override suspend fun resume(
       context: DownloadContext,
-      resumeState: SourceResumeState,
+      state: Unit,
     ) {}
     override fun buildResumeState(
       resolved: ResolvedSource,
       totalBytes: Long,
-    ) = SourceResumeState(sourceType = "magnet", data = "{}")
+    ) = Unit
   }
 
   @Test
   fun close_duplicateInstance_closedOnceAndCannotResolve() {
     var closeCount = 0
-    val source = object : DownloadSource by fakeSource {
+    val source = object : DownloadSource<Unit> by fakeSource {
       override fun close() { closeCount++ }
     }
     val resolver = SourceResolver(listOf(source, source))
@@ -63,10 +64,10 @@ class SourceResolverTest {
   @Test
   fun close_failingSource_otherSourcesStillClose() {
     var closed = false
-    val failing = object : DownloadSource by fakeSource {
+    val failing = object : DownloadSource<Unit> by fakeSource {
       override fun close() { error("close failed") }
     }
-    val succeeding = object : DownloadSource by fakeSource {
+    val succeeding = object : DownloadSource<Unit> by fakeSource {
       override fun close() { closed = true }
     }
     SourceResolver(listOf(failing, succeeding)).close()
@@ -118,7 +119,7 @@ class SourceResolverTest {
 
   @Test
   fun resolveByType_sharedPreviousType_usesUrlAndPrefersExactType() {
-    fun renamed(type: String) = object : DownloadSource by fakeSource {
+    fun renamed(type: String) = object : DownloadSource<Unit> by fakeSource {
       override val type: String = type
       override val previousTypes: Set<String> = setOf("old")
       override fun canHandle(url: String): Boolean = url.startsWith("$type:")
@@ -145,7 +146,7 @@ class SourceResolverTest {
 
   @Test
   fun resolveContent_matchingSource_returnsFirstMatch() {
-    val contentSource = object : DownloadSource by fakeSource {
+    val contentSource = object : DownloadSource<Unit> by fakeSource {
       override val type = "content"
       override fun canHandleContent(content: ByteArray, fileName: String?) =
         fileName == "a.torrent"

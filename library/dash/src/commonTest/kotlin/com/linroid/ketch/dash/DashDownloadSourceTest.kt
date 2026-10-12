@@ -9,6 +9,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.decodeResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -35,7 +36,6 @@ class DashDownloadSourceTest {
     val resolved = source.resolve(engine.url)
     assertEquals("dash", resolved.sourceType)
     assertEquals("index.mp4", resolved.suggestedFileName)
-    assertEquals("dash", source.buildResumeState(resolved, 0).sourceType)
   }
 
   @Test
@@ -92,7 +92,8 @@ class DashDownloadSourceTest {
     assertEquals(listOf(mapOf("User-Agent" to "Ketch"), mapOf("User-Agent" to "Ketch")),
       engine.parts.map { it.second })
     file.bytes = "stale partial output".encodeToByteArray()
-    source.resume(context, SourceResumeState("media", "{}"))
+    // Tasks saved before media sources split carry the "media" type and an empty object.
+    source.resume(context, source.decodeResumeState(SourceResumeState("media", "{}")))
     assertEquals("firstsecond", file.bytes.decodeToString())
   }
 

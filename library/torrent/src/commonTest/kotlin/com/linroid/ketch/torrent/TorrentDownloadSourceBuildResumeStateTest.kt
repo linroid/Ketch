@@ -1,71 +1,55 @@
 package com.linroid.ketch.torrent
 
-import kotlinx.serialization.json.Json
+import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SourceFile
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Tests for [TorrentDownloadSource.buildResumeState].
  */
 class TorrentDownloadSourceBuildResumeStateTest {
+  private val source = TorrentDownloadSource()
+
+  private fun resolved(infoHash: String, format: String?) = ResolvedSource(
+    url = "torrent:$infoHash",
+    sourceType = TorrentDownloadSource.TYPE,
+    totalBytes = 30,
+    supportsResume = true,
+    suggestedFileName = "pack",
+    maxSegments = 1,
+    metadata = buildMap {
+      put(TorrentDownloadSource.META_INFO_HASH, infoHash)
+      put(ResolvedSource.METAINFO_KEY, "bWV0YWluZm8=")
+      put(TorrentDownloadSource.META_PRIVACY, TorrentDiscoveryPrivacy.PUBLIC.name)
+      format?.let { put("format", it) }
+    },
+    files = listOf(SourceFile("0", "a.bin", 10), SourceFile("2", "b.bin", 20)),
+    selectionMode = FileSelectionMode.MULTIPLE,
+  )
 
   @Test
-  fun buildResumeState_createsValidSourceResumeState() {
-    val resumeData = byteArrayOf(1, 2, 3, 4, 5)
-    val state = TorrentDownloadSource.buildResumeState(
-      infoHash = "aabbccddee11223344556677889900aabbccddee",
-      totalBytes = 5000L,
-      resumeData = resumeData,
-      selectedFileIds = setOf("0", "2"),
-      savePath = "/downloads/torrent",
-    )
-    assertEquals("torrent", state.sourceType)
+  fun buildResumeState_v1_keepsMetainfoAndEveryFile() {
+    val hash = "aabbccddee11223344556677889900aabbccddee"
 
-    // Verify the data can be deserialized back
-    val parsed =
-      Json.decodeFromString<TorrentResumeState>(state.data)
-    assertEquals(
-      "aabbccddee11223344556677889900aabbccddee",
-      parsed.infoHash,
-    )
-    assertEquals(5000L, parsed.totalBytes)
-    assertEquals(setOf("0", "2"), parsed.selectedFileIds)
-    assertEquals("/downloads/torrent", parsed.savePath)
-    // resumeData should be base64-encoded, not empty
-    assertTrue(parsed.resumeData.isNotEmpty())
+    val state = source.buildResumeState(resolved(hash, format = null), totalBytes = 30)
+
+    assertEquals(hash, state.infoHash)
+    assertEquals(30, state.totalBytes)
+    assertEquals(setOf("0", "2"), state.selectedFileIds)
+    assertEquals("bWV0YWluZm8=", state.metainfo)
+    assertEquals(2, state.version)
+    assertEquals(TorrentDiscoveryPrivacy.PUBLIC, state.privacy)
   }
 
   @Test
-  fun buildResumeState_emptyResumeData() {
-    val state = TorrentDownloadSource.buildResumeState(
-      infoHash = "0123456789abcdef0123456789abcdef01234567",
-      totalBytes = 0L,
-      resumeData = ByteArray(0),
-      selectedFileIds = emptySet(),
-      savePath = "/tmp",
-    )
-    assertEquals("torrent", state.sourceType)
+  fun buildResumeState_v2_savesVersion3() {
+    val hash = "ab".repeat(32)
 
-    val parsed =
-      Json.decodeFromString<TorrentResumeState>(state.data)
-    assertEquals(0L, parsed.totalBytes)
-    assertEquals(emptySet(), parsed.selectedFileIds)
-  }
+    val state = source.buildResumeState(resolved(hash, format = "v2"), totalBytes = 10)
 
-  @Test
-  fun buildResumeState_allFileIdsPreserved() {
-    val ids = (0 until 50).map { it.toString() }.toSet()
-    val state = TorrentDownloadSource.buildResumeState(
-      infoHash = "aabbccddee11223344556677889900aabbccddee",
-      totalBytes = 100_000L,
-      resumeData = ByteArray(16) { it.toByte() },
-      selectedFileIds = ids,
-      savePath = "/data",
-    )
-    val parsed =
-      Json.decodeFromString<TorrentResumeState>(state.data)
-    assertEquals(50, parsed.selectedFileIds.size)
-    assertEquals(ids, parsed.selectedFileIds)
+    assertEquals(3, state.version)
+    assertEquals(10, state.totalBytes)
   }
 }

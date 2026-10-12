@@ -17,6 +17,7 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.decodeResumeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -80,7 +81,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.KSerializer
 import okio.IOException
 import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -114,7 +115,7 @@ class TorrentDownloadSource(
   httpEngine: HttpEngine? = null,
   private val restoreSeeding: Boolean = true,
   private val multicastLock: TorrentMulticastLock? = null,
-) : DownloadSource {
+) : DownloadSource<TorrentResumeState> {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
@@ -165,6 +166,9 @@ class TorrentDownloadSource(
   private val waitingForSlot = MutableStateFlow<Set<String>>(emptySet())
   private val log = KetchLogger("TorrentSource")
   override val type: String = TYPE
+
+  override val resumeStateSerializer: KSerializer<TorrentResumeState> =
+    TorrentResumeState.serializer()
   override val managesOwnFileIo: Boolean = true
   override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
     KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL)
@@ -442,8 +446,7 @@ class TorrentDownloadSource(
   }
 
   /** Rebuilds the resolution a task saved, from the metainfo in its state; no network access. */
-  override suspend fun resolveStored(resumeState: SourceResumeState): ResolvedSource? {
-    val state = decodeResumeState(resumeState.data)
+  override suspend fun resolveStored(state: TorrentResumeState): ResolvedSource? {
     if (state.metainfo.isEmpty()) return null
     val resolved = withContext(TorrentDispatchers.engine) {
       parseMetainfo(decodeBase64(state.metainfo), state.privacy ?: config.discoveryPrivacy)
@@ -457,8 +460,8 @@ class TorrentDownloadSource(
    * its resolution, else a v1 checkpoint), never from file sizes a client sent. A v2 or hybrid
    * task that started refuses a newly chosen file whose path holds something it does not own.
    */
-  override suspend fun planSelection(request: SelectionRequest): SelectionPlan {
-    val state = request.resumeState?.let { decodeResumeState(it.data) }
+  override suspend fun planSelection(request: SelectionRequest<TorrentResumeState>): SelectionPlan {
+    val state = request.resumeState
     val table = fileTable(state, request.resolved)
       ?: throw IllegalStateException("The file list is not known yet")
     val requested = request.fileIds ?: table.ids
@@ -536,7 +539,7 @@ class TorrentDownloadSource(
     resumeState: SourceResumeState?,
     resolved: ResolvedSource?,
   ): List<SourceFile>? {
-    val table = fileTable(resumeState?.let { decodeResumeState(it.data) }, resolved) ?: return null
+    val table = fileTable(resumeState?.let { decodeResumeState(it) }, resolved) ?: return null
     return table.files.map {
       SourceFile(it.id, it.path, it.size, metadata = mapOf("path" to it.path))
     }
@@ -666,7 +669,7 @@ class TorrentDownloadSource(
   private class SeedPlan(val hash: String, val open: suspend () -> TorrentSession)
 
   private suspend fun seedPlan(task: SeedingTask): SeedPlan {
-    val state = decodeResumeState(task.resumeState.data)
+    val state = decodeResumeState(task.resumeState)
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
     val bytes = state.metainfo.takeIf { it.isNotEmpty() }?.let(::decodeBase64)
@@ -898,25 +901,25 @@ class TorrentDownloadSource(
     selectionMode = FileSelectionMode.MULTIPLE,
   )
 
-  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
-    encode(TorrentResumeState(resolved.metadata[META_INFO_HASH] ?: "", totalBytes, "",
+  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): TorrentResumeState =
+    TorrentResumeState(resolved.metadata[META_INFO_HASH] ?: "", totalBytes, "",
       resolved.files.map { it.id }.toSet(), "",
       resolved.metadata[ResolvedSource.METAINFO_KEY] ?: "",
       version = if (resolved.metadata["format"] == "v2") 3 else 2,
-      privacy = resolvedPrivacy(resolved)))
+      privacy = resolvedPrivacy(resolved))
 
   private fun resolvedPrivacy(resolved: ResolvedSource): TorrentDiscoveryPrivacy =
     resolved.metadata[META_PRIVACY]?.let(TorrentDiscoveryPrivacy::valueOf)
       ?: config.discoveryPrivacy
 
-  override suspend fun updateResumeState(context: DownloadContext): SourceResumeState? {
+  override suspend fun updateResumeState(context: DownloadContext): TorrentResumeState? {
     val owner = tasks.session(context.taskId)
     val saved = owner?.saveResumeData()
     return stateMutex.withLock {
       val state = states[context.taskId] ?: return@withLock null
       val updated = if (saved != null) state.copy(resumeData = encodeBase64(saved)) else state
       if (owner == null) states.remove(context.taskId) else states[context.taskId] = updated
-      encode(updated)
+      updated
     }
   }
 
@@ -928,10 +931,8 @@ class TorrentDownloadSource(
 
   override suspend fun resume(
     context: DownloadContext,
-    resumeState: SourceResumeState,
+    state: TorrentResumeState,
   ) = reportingFailures {
-    val state = try { decodeResumeState(resumeState.data)
-    } catch (e: Exception) { throw KetchError.CorruptResumeState(e.message, e) }
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
     val privacy = state.privacy ?: config.discoveryPrivacy
@@ -1395,7 +1396,7 @@ class TorrentDownloadSource(
   }
 
   /** Stops a session that outlived its download, such as one still seeding. */
-  override suspend fun release(taskId: String, resumeState: SourceResumeState?) {
+  override suspend fun release(taskId: String) {
     val owned = slots.reclaim(taskId)
     try {
       stopSession(taskId)
@@ -1404,10 +1405,9 @@ class TorrentDownloadSource(
     }
   }
 
-  override suspend fun cleanup(context: DownloadContext, resumeState: SourceResumeState?) {
-    if (resumeState == null) return
+  override suspend fun cleanup(context: DownloadContext, state: TorrentResumeState?) {
+    if (state == null) return
     try {
-      val state = decodeResumeState(resumeState.data)
       if (state.version == 3) {
         cleanupV2(context, state)
         return
@@ -1466,9 +1466,6 @@ class TorrentDownloadSource(
     } finally { store.close() }
   }
 
-  private fun encode(state: TorrentResumeState): SourceResumeState =
-    SourceResumeState(TYPE, Json.encodeToString(state))
-
   companion object {
     const val TYPE = "torrent"
     internal const val META_INFO_HASH = "infoHash"
@@ -1476,26 +1473,6 @@ class TorrentDownloadSource(
     internal const val META_PIECE_LENGTH = "pieceLength"
     internal const val META_COMMENT = "comment"
     internal const val META_PRIVACY = "discoveryPrivacy"
-
-    fun buildResumeState(
-      infoHash: String,
-      totalBytes: Long,
-      resumeData: ByteArray,
-      selectedFileIds: Set<String>,
-      savePath: String,
-    ): SourceResumeState {
-      val state = TorrentResumeState(
-        infoHash = infoHash,
-        totalBytes = totalBytes,
-        resumeData = encodeBase64(resumeData),
-        selectedFileIds = selectedFileIds,
-        savePath = savePath,
-      )
-      return SourceResumeState(
-        sourceType = TYPE,
-        data = Json.encodeToString(state),
-      )
-    }
   }
 }
 

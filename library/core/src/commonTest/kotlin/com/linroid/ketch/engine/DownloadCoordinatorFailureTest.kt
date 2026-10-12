@@ -12,7 +12,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
@@ -34,6 +33,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.builtins.serializer
 
 /**
  * A download that fails with something other than an [Exception], or with a
@@ -43,7 +43,8 @@ import kotlin.time.Duration.Companion.seconds
 class DownloadCoordinatorFailureTest {
 
   /** Downloads `/hang` until cancelled; `/error` and `/cancel` fail at once. */
-  private class ScriptedSource : DownloadSource {
+  private class ScriptedSource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     val hanging = CompletableDeferred<Unit>()
 
     override val type: String = "scripted"
@@ -74,13 +75,13 @@ class DownloadCoordinatorFailureTest {
 
     override suspend fun resume(
       context: DownloadContext,
-      resumeState: SourceResumeState,
+      state: Unit,
     ) = Unit
 
     override fun buildResumeState(
       resolved: ResolvedSource,
       totalBytes: Long,
-    ): SourceResumeState = SourceResumeState(type, "")
+    ) = Unit
   }
 
   private fun createHandle(name: String, taskId: String = name): TaskHandle {
@@ -108,7 +109,7 @@ class DownloadCoordinatorFailureTest {
     }
   }
 
-  private fun createCoordinator(source: DownloadSource): DownloadCoordinator =
+  private fun createCoordinator(source: DownloadSource<*>): DownloadCoordinator =
     DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       config = { DownloadConfig(retryCount = 0) },

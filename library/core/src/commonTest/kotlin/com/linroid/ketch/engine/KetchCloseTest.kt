@@ -11,7 +11,6 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
@@ -19,6 +18,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,35 +89,35 @@ class KetchCloseTest {
   }
 
   /** Never finishes resolving. */
-  private class StuckSource : DownloadSource {
+  private class StuckSource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "stuck"
     override fun canHandle(url: String): Boolean = url.startsWith("stuck:")
     override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
       awaitCancellation()
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = awaitCancellation()
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       awaitCancellation()
   }
 
   /** Writes the first half of an 8-byte file, then waits until it is cancelled. */
-  private class HalfWaySource : DownloadSource {
+  private class HalfWaySource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "fixture"
     override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
     override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 8, supportsResume = true,
       suggestedFileName = "partial.bin", maxSegments = 1,
     )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       context.fileAccessor.writeAt(0, byteArrayOf(1, 2, 3, 4))
       context.segments.value = listOf(Segment(0, 0, 7, 4))
       context.onProgress(4, 8)
       awaitCancellation()
     }
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       download(context)
   }
 }

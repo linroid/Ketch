@@ -9,7 +9,6 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.engine.FakeHttpEngine
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -20,6 +19,7 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlinx.serialization.builtins.serializer
 
 class KetchUpdateConfigTest {
   private val firstDir = Files.createTempDirectory("ketch-config-a").toFile()
@@ -135,7 +135,8 @@ class KetchUpdateConfigTest {
   }
 
   /** Completes at once and records where the engine told it to write. */
-  private class RecordingSource : DownloadSource {
+  private class RecordingSource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     var outputPath: String? = null
@@ -153,10 +154,9 @@ class KetchUpdateConfigTest {
       context.segments.value = listOf(Segment(index = 0, start = 0, end = 3, downloadedBytes = 4))
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       download(context)
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
-      SourceResumeState(type, "{}")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
   }
 }

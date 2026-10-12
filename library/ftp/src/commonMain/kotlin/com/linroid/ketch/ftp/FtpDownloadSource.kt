@@ -11,14 +11,13 @@ import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.KSerializer
 
 /**
  * FTP/FTPS download source using the [FtpClient] protocol layer.
@@ -38,7 +37,7 @@ import kotlinx.serialization.json.Json
  * single connection. Retries after a dropped connection continue from the
  * bytes already written.
  */
-class FtpDownloadSource : DownloadSource {
+class FtpDownloadSource : DownloadSource<FtpResumeState> {
 
   /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
   internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
@@ -48,20 +47,15 @@ class FtpDownloadSource : DownloadSource {
 
   override val type: String = TYPE
 
+  override val resumeStateSerializer: KSerializer<FtpResumeState> = FtpResumeState.serializer()
+
   override fun canHandle(url: String): Boolean {
     val lower = url.lowercase()
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
-  override fun buildResumeState(
-    resolved: ResolvedSource,
-    totalBytes: Long,
-  ): SourceResumeState {
-    return buildResumeState(
-      totalBytes = totalBytes,
-      mdtm = resolved.metadata[META_MDTM],
-    )
-  }
+  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): FtpResumeState =
+    FtpResumeState(totalBytes = totalBytes, mdtm = resolved.metadata[META_MDTM])
 
   override suspend fun resolve(
     url: String,
@@ -171,17 +165,7 @@ class FtpDownloadSource : DownloadSource {
     downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
-  override suspend fun resume(
-    context: DownloadContext,
-    resumeState: SourceResumeState,
-  ) {
-    val state = try {
-      Json.decodeFromString<FtpResumeState>(resumeState.data)
-    } catch (e: Exception) {
-      if (e is CancellationException) throw e
-      throw KetchError.CorruptResumeState(e.message, e)
-    }
-
+  override suspend fun resume(context: DownloadContext, state: FtpResumeState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)
@@ -444,19 +428,5 @@ class FtpDownloadSource : DownloadSource {
     internal const val META_MDTM = "mdtm"
     internal const val META_SIZE = "size"
     internal const val META_REST = "rest"
-
-    fun buildResumeState(
-      totalBytes: Long,
-      mdtm: String?,
-    ): SourceResumeState {
-      val state = FtpResumeState(
-        totalBytes = totalBytes,
-        mdtm = mdtm,
-      )
-      return SourceResumeState(
-        sourceType = TYPE,
-        data = Json.encodeToString(state),
-      )
-    }
   }
 }

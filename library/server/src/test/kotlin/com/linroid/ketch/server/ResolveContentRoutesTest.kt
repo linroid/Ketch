@@ -5,7 +5,6 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.server.api.MAX_RESOLVE_CONTENT_BYTES
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -16,6 +15,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -24,9 +24,10 @@ import kotlin.test.assertNull
 
 class ResolveContentRoutesTest {
 
-  private class ContentSource(private val malformed: Boolean = false) : DownloadSource {
+  private class ContentSource(private val malformed: Boolean = false) : DownloadSource<Unit> {
     var received: Pair<ByteArray, String?>? = null
     override val type = "content"
+    override val resumeStateSerializer = Unit.serializer()
     override fun canHandle(url: String) = false
     override fun canHandleContent(content: ByteArray, fileName: String?) =
       fileName?.endsWith(".torrent") == true
@@ -45,9 +46,8 @@ class ResolveContentRoutesTest {
     override suspend fun resolve(url: String, headers: Map<String, String>) =
       error("Unexpected URL resolution")
     override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "{}")
+    override suspend fun resume(context: DownloadContext, state: Unit) = Unit
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
   }
 
   @Test

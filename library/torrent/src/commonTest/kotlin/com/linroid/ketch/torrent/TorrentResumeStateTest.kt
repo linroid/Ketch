@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.decodeResumeState
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -51,11 +53,14 @@ class TorrentResumeStateTest {
   @Test
   fun decode_unknownKeys_areIgnored() {
     // A newer build may add fields; every decode site reads them leniently.
-    val state = decodeResumeState("""
+    val state = TorrentDownloadSource().decodeResumeState(SourceResumeState(
+      TorrentDownloadSource.TYPE,
+      """
       {"infoHash":"0123456789abcdef0123456789abcdef01234567","totalBytes":7,
        "resumeData":"","selectedFileIds":["1"],"savePath":"/tmp","metainfo":"",
        "version":2,"privacy":"PUBLIC","selectionGeneration":4,"seeding":{"intent":true}}
-    """.trimIndent())
+      """.trimIndent(),
+    ))
     assertEquals(setOf("1"), state.selectedFileIds)
     assertEquals(2, state.version)
     assertEquals(TorrentDiscoveryPrivacy.PUBLIC, state.privacy)

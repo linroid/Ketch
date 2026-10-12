@@ -1,12 +1,11 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
- * Persisted resume state for torrent downloads. Ketch's task record, not this state, decides
- * what a task downloads: the request's selection wins, and this one mirrors what the engine last
- * ran with.
+ * What [TorrentDownloadSource] saves to resume a download; opaque outside this module. Ketch's
+ * task record, not this state, decides what a task downloads: the request's selection wins, and
+ * this one mirrors what the engine last ran with.
  *
  * @property infoHash hex-encoded info hash
  * @property totalBytes total selected bytes
@@ -17,15 +16,16 @@ import kotlinx.serialization.json.Json
  * @property savePath directory where files are saved
  */
 @Serializable
-internal data class TorrentResumeState(
-  val infoHash: String,
-  val totalBytes: Long,
-  val resumeData: String,
-  val selectedFileIds: Set<String>,
-  val savePath: String,
-  val metainfo: String = "",
-  val version: Int = 1,
-  val privacy: TorrentDiscoveryPrivacy? = null,
+@ConsistentCopyVisibility
+data class TorrentResumeState internal constructor(
+  internal val infoHash: String,
+  internal val totalBytes: Long,
+  internal val resumeData: String,
+  internal val selectedFileIds: Set<String>,
+  internal val savePath: String,
+  internal val metainfo: String = "",
+  internal val version: Int = 1,
+  internal val privacy: TorrentDiscoveryPrivacy? = null,
 ) {
   init {
     require(version in 1..3) { "Unsupported torrent resume version" }
@@ -33,10 +33,3 @@ internal data class TorrentResumeState(
     require((version == 1) == (privacy == null)) { "Invalid torrent resume privacy" }
   }
 }
-
-// Lenient, so states written by newer builds still decode; encoding stays the default Json.
-private val ResumeJson = Json { ignoreUnknownKeys = true }
-
-/** Decodes a [TorrentResumeState]; every decode site goes through it. */
-internal fun decodeResumeState(data: String): TorrentResumeState =
-  ResumeJson.decodeFromString(data)

@@ -31,6 +31,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -167,7 +168,7 @@ class DownloadTimeTest {
     state = state,
     totalBytes = 4,
     sourceType = FIXTURE,
-    sourceResumeState = SourceResumeState(FIXTURE, ""),
+    sourceResumeState = SourceResumeState(FIXTURE, "{}"),
     downloadTime = downloadTime,
     createdAt = now,
     updatedAt = now,
@@ -184,7 +185,10 @@ class DownloadTimeTest {
     override val record = AtomicSaver(record) {}
   }
 
-  private fun TestScope.execution(handle: TaskHandle, source: DownloadSource): DownloadExecution {
+  private fun TestScope.execution(
+    handle: TaskHandle,
+    source: DownloadSource<*>,
+  ): DownloadExecution {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadExecution(
       handle = handle,
@@ -205,7 +209,8 @@ class DownloadTimeTest {
     private val finishes: Boolean = true,
     private val totalBytes: Long = 4,
     selfManaged: Boolean = true,
-  ) : DownloadSource {
+  ) : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = FIXTURE
     override val managesOwnFileIo = selfManaged
     override fun canHandle(url: String) = true
@@ -213,10 +218,9 @@ class DownloadTimeTest {
       url = url, sourceType = type, totalBytes = totalBytes, supportsResume = true,
       suggestedFileName = "fixture", maxSegments = 1,
     )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = transfer()
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       transfer()
 
     private suspend fun transfer() {

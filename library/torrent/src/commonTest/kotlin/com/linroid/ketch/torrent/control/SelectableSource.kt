@@ -12,7 +12,6 @@ import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SelectionUpdate
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.torrent.MemoryTaskStore
@@ -21,6 +20,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.serializer
 import okio.IOException
 
 /**
@@ -33,8 +33,9 @@ import okio.IOException
 internal class SelectableSource(
   private val sizes: List<Long> = listOf(100, 200, 300),
   private val mode: FileSelectionMode = FileSelectionMode.MULTIPLE,
-) : DownloadSource {
+) : DownloadSource<String> {
   override val type = TYPE
+  override val resumeStateSerializer = String.serializer()
   override val managesOwnFileIo = true
 
   /** Whether runs follow delivered selections; when false they never see them. */
@@ -94,16 +95,16 @@ internal class SelectableSource(
   ): ResolvedSource = resolve(url, headers)
 
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-    SourceResumeState(type, "$STORED${resolved.url}")
+    "$STORED${resolved.url}"
 
-  override suspend fun resolveStored(resumeState: SourceResumeState): ResolvedSource? {
-    if (!resumeState.data.startsWith(STORED)) return null
+  override suspend fun resolveStored(state: String): ResolvedSource? {
+    if (!state.startsWith(STORED)) return null
     storedResolves++
-    return resolved(resumeState.data.removePrefix(STORED), "stored")
+    return resolved(state.removePrefix(STORED), "stored")
   }
 
-  override suspend fun planSelection(request: SelectionRequest): SelectionPlan {
-    val known = request.resumeState?.data?.startsWith(STORED) == true || request.resolved != null
+  override suspend fun planSelection(request: SelectionRequest<String>): SelectionPlan {
+    val known = request.resumeState?.startsWith(STORED) == true || request.resolved != null
     check(known) { "The file list is not known yet" }
     planned += request.fileIds
     val chosen = request.fileIds ?: ids
@@ -125,14 +126,14 @@ internal class SelectableSource(
     )
   }
 
-  override suspend fun updateResumeState(context: DownloadContext): SourceResumeState? {
+  override suspend fun updateResumeState(context: DownloadContext): String? {
     saveGate?.await()
     return null
   }
 
   override suspend fun download(context: DownloadContext) = execute(context, resumed = false)
 
-  override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+  override suspend fun resume(context: DownloadContext, state: String) =
     execute(context, resumed = true)
 
   private suspend fun execute(context: DownloadContext, resumed: Boolean): Unit = coroutineScope {

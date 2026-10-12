@@ -513,8 +513,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
-- Each source defines: `type`, `canHandle()`, `resolve()`, `download()`, `resume()`,
-  `buildResumeState()`; optional `canHandleContent()` / `resolveContent()` accept file content
+- Each source is a `DownloadSource<S>` over its own serializable resume state `S`
+  (`HttpResumeState`, `FtpResumeState`, `TorrentResumeState`, `Unit` for HLS/DASH) and defines:
+  `type`, `resumeStateSerializer`, `canHandle()`, `resolve()`, `download()`, `resume(state)`,
+  `buildResumeState()`. Ketch saves the state as JSON in `TaskRecord.sourceResumeState`
+  (`SourceResumeState`, written and read only through `encodeResumeState`/`decodeResumeState`,
+  which ignores unknown fields) and hands sources their state decoded: one that cannot be decoded
+  fails a resume with `KetchError.CorruptResumeState` and reaches `cleanup` as `null`. Optional
+  `canHandleContent()` / `resolveContent()` accept file content
   such as `.torrent` bytes (`KetchApi.resolveContent`), and `resolveForDownload()` lets a task
   wait where a preview (`resolve()`) would fail, as magnets whose peers are offline do
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)

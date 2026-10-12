@@ -7,7 +7,6 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -25,7 +24,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -305,8 +303,7 @@ class TorrentDownloadSourceSelectionTest {
       state = TaskState.PAUSED, totalBytes = torrent.sizeOf(0),
       segments = listOf(Segment(0, 0, torrent.sizeOf(0) - 1)),
       sourceType = TorrentDownloadSource.TYPE,
-      sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
-        Json.encodeToString(state)),
+      sourceResumeState = state.saved(),
       createdAt = now, updatedAt = now))
     val source = source()
     val ketch = ketch(source, store)

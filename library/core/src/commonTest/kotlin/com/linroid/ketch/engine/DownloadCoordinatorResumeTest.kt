@@ -7,6 +7,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.HttpDownloadSource
+import com.linroid.ketch.core.engine.HttpResumeState
+import com.linroid.ketch.core.engine.encodeResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskRecord
@@ -46,10 +48,8 @@ class DownloadCoordinatorResumeTest {
           totalBytes = 1000,
           segments = emptyList(),
           sourceType = HttpDownloadSource.TYPE,
-          sourceResumeState = HttpDownloadSource.buildResumeState(
-            etag = null,
-            lastModified = null,
-            totalBytes = 1000,
+          sourceResumeState = HttpDownloadSource(FakeHttpEngine()).encodeResumeState(
+            HttpResumeState(etag = null, lastModified = null, totalBytes = 1000),
           ),
           createdAt = now,
           updatedAt = now,

@@ -13,7 +13,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileAccessor
@@ -30,6 +29,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import okio.Path
 import kotlin.random.Random
@@ -151,19 +151,19 @@ class DownloadExecutionCleanupTest {
       override suspend fun delete() { deleted = true }
     }
     // Every byte is reported written, but the final flush fails.
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
       override fun canHandle(url: String) = true
       override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
         url = url, sourceType = type, totalBytes = 100, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,
       )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "")
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         context.segments.value = listOf(Segment(0, 0, 99, 100))
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
     }
     val dispatcher = StandardTestDispatcher(testScheduler)
     val execution = DownloadExecution(

@@ -9,12 +9,12 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,7 +53,8 @@ class ResolveForDownloadTest {
   }
 
   /** Records which resolve each caller used, and downloads an empty file. */
-  private class RecordingSource : DownloadSource {
+  private class RecordingSource : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     val calls = mutableListOf<String>()
     override val type = "record"
     override fun canHandle(url: String): Boolean = url.startsWith("record:")
@@ -69,10 +70,9 @@ class ResolveForDownloadTest {
       calls += "task"
       return resolved(url)
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = context.onProgress(0, 0)
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       download(context)
 
     private fun resolved(url: String) = ResolvedSource(

@@ -6,7 +6,6 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -16,6 +15,7 @@ import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentResumeState
+import com.linroid.ketch.torrent.saved
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -43,7 +43,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.IOException
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -290,8 +289,7 @@ class KotlinRuntimePrivateTest {
             destination = Destination((root / "private").toString())),
           outputPath = (root / "private").toString(), state = TaskState.COMPLETED,
           totalBytes = 4, sourceType = TorrentDownloadSource.TYPE,
-          sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
-            Json.encodeToString(state)),
+          sourceResumeState = state.saved(),
           createdAt = now, updatedAt = now, completedAt = now,
           control = TaskControl(sharing = true)))
         var created = 0

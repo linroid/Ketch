@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.KSerializer
 
 /**
  * Abstraction for pluggable download source types.
@@ -14,8 +15,12 @@ import kotlinx.coroutines.CancellationException
  *
  * Sources are registered with [SourceResolver] which routes
  * download requests to the appropriate source based on URL matching.
+ *
+ * @param S the state this source saves in a task's record to resume it, such as an HTTP ETag
+ *   or a torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
+ *   decoded; a source without one uses [Unit].
  */
-interface DownloadSource {
+interface DownloadSource<S : Any> {
   /**
    * Releases resources owned by this source. Called when Ketch closes.
    * Implementations must be idempotent and stop accepting new work.
@@ -51,6 +56,13 @@ interface DownloadSource {
    * creation, flush, and cleanup.
    */
   val managesOwnFileIo: Boolean get() = false
+
+  /**
+   * Serializer of [S]. A task record saves the state as JSON, so later builds must still read
+   * what earlier ones wrote: add fields with defaults, never rename or retype them. Unknown
+   * fields are ignored.
+   */
+  val resumeStateSerializer: KSerializer<S>
 
   /** Returns true if this source can handle the given URL. */
   fun canHandle(url: String): Boolean
@@ -140,16 +152,15 @@ interface DownloadSource {
    * @throws IllegalStateException when the file list is not known yet, or a file the task does
    *   not own is where a newly chosen file would be saved
    */
-  suspend fun planSelection(request: SelectionRequest): SelectionPlan =
+  suspend fun planSelection(request: SelectionRequest<S>): SelectionPlan =
     throw UnsupportedOperationException("This download has no files to choose")
 
   /**
-   * The [ResolvedSource] a task saved in [resumeState], rebuilt without network access, or
-   * `null` when the state holds none. Ketch starts a task that already resolved, such as one
-   * that waited for a file selection, from it instead of resolving again. The default returns
-   * `null`.
+   * The [ResolvedSource] a task saved in [state], rebuilt without network access, or `null` when
+   * the state holds none. Ketch starts a task that already resolved, such as one that waited for
+   * a file selection, from it instead of resolving again. The default returns `null`.
    */
-  suspend fun resolveStored(resumeState: SourceResumeState): ResolvedSource? = null
+  suspend fun resolveStored(state: S): ResolvedSource? = null
 
   /**
    * Executes a fresh download. The source is responsible for writing
@@ -177,43 +188,32 @@ interface DownloadSource {
   suspend fun download(context: DownloadContext)
 
   /**
-   * Resumes a previously interrupted download using persisted
-   * state. Sources that do not support resume should throw
-   * [com.linroid.ketch.api.KetchError.Unsupported].
+   * Resumes a previously interrupted download from the [state] its task saved. A saved state
+   * that cannot be decoded fails the task with
+   * [com.linroid.ketch.api.KetchError.CorruptResumeState] before this is called. Sources that
+   * do not support resume should throw [com.linroid.ketch.api.KetchError.Unsupported].
    */
-  suspend fun resume(context: DownloadContext, resumeState: SourceResumeState)
+  suspend fun resume(context: DownloadContext, state: S)
 
   /**
-   * Builds an opaque [SourceResumeState] from resolved metadata.
-   *
-   * Called after [resolve] completes to persist source-specific
-   * state needed for resume validation (e.g., HTTP ETag/Last-Modified,
-   * FTP MDTM, torrent info hash). The returned state is stored in
-   * the task record and passed back to [resume] on restart.
+   * Builds the state to save once [resolve] completes, holding what [resume] needs to check the
+   * content did not change (e.g., HTTP ETag/Last-Modified, FTP MDTM, torrent info hash). It is
+   * saved in the task record and passed back to [resume] on restart.
    *
    * @param resolved the metadata returned by [resolve]
    * @param totalBytes total download size in bytes
    */
-  fun buildResumeState(
-    resolved: ResolvedSource,
-    totalBytes: Long,
-  ): SourceResumeState
+  fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): S
 
   /**
-   * Called periodically during download to let the source update
-   * its resume state. The returned state replaces the current
-   * resume state in the task record.
-   *
-   * Default implementation returns `null` (no update needed).
-   * Sources like BitTorrent override this to persist bitfield
-   * progress incrementally.
+   * Called periodically during download, and once it stops, to let the source update its saved
+   * state, which the returned one replaces. Sources like BitTorrent override this to persist
+   * their progress incrementally.
    *
    * @param context the active download context
-   * @return updated resume state, or `null` to keep the current one
+   * @return updated resume state, or `null` (the default) to keep the current one
    */
-  suspend fun updateResumeState(
-    context: DownloadContext,
-  ): SourceResumeState? = null
+  suspend fun updateResumeState(context: DownloadContext): S? = null
 
   /**
    * Releases work this source keeps alive for a task after [download]
@@ -225,10 +225,8 @@ interface DownloadSource {
    * Best-effort, like [cleanup]. The default implementation does nothing.
    *
    * @param taskId the removed task
-   * @param resumeState the source-specific resume state persisted in the
-   *   task record, or `null` if the task never produced one
    */
-  suspend fun release(taskId: String, resumeState: SourceResumeState?) {}
+  suspend fun release(taskId: String) {}
 
   /**
    * Deletes any data this source wrote for the given task. Called by
@@ -242,18 +240,15 @@ interface DownloadSource {
    * The default implementation deletes [DownloadContext.fileAccessor],
    * which is the right behavior for sources that write to a single
    * output file. Sources with `managesOwnFileIo = true` (e.g.
-   * torrents) should override this and use [resumeState] to locate
+   * torrents) should override this and use [state] to locate
    * their internal handle (such as an info hash) for cleanup.
    *
    * @param context the download context, with a [DownloadContext.fileAccessor]
    *   pointing at the persisted output path
-   * @param resumeState the source-specific resume state persisted in the
-   *   task record, or `null` if the task never produced one
+   * @param state the state saved in the task record, or `null` if the task never produced one
+   *   or it cannot be decoded
    */
-  suspend fun cleanup(
-    context: DownloadContext,
-    resumeState: SourceResumeState?,
-  ) {
+  suspend fun cleanup(context: DownloadContext, state: S?) {
     try {
       context.fileAccessor.delete()
     } catch (e: CancellationException) {

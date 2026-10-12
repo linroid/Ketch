@@ -7,13 +7,13 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.serializer
 
 class ResolveUrlTest {
 
@@ -259,7 +259,8 @@ class ResolveUrlTest {
 
   @Test
   fun sourceResolver_unsupportedUrl_throwsUnsupported() {
-    val fakeSource = object : DownloadSource {
+    val fakeSource = object : DownloadSource<Unit> {
+      override val resumeStateSerializer = Unit.serializer()
       override val type = "magnet"
       override fun canHandle(url: String) =
         url.startsWith("magnet:")
@@ -277,12 +278,12 @@ class ResolveUrlTest {
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
-        resumeState: SourceResumeState,
+        state: Unit,
       ) {}
       override fun buildResumeState(
         resolved: ResolvedSource,
         totalBytes: Long,
-      ) = SourceResumeState(sourceType = "magnet", data = "{}")
+      ) = Unit
     }
     val resolver = SourceResolver(listOf(fakeSource))
     assertFailsWith<KetchError.Unsupported> {
@@ -294,7 +295,8 @@ class ResolveUrlTest {
 
   @Test
   fun resolve_customSource_returnsCorrectResolvedSource() = runTest {
-    val fakeSource = object : DownloadSource {
+    val fakeSource = object : DownloadSource<Unit> {
+      override val resumeStateSerializer = Unit.serializer()
       override val type = "magnet"
       override fun canHandle(url: String) =
         url.startsWith("magnet:")
@@ -312,12 +314,12 @@ class ResolveUrlTest {
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
-        resumeState: SourceResumeState,
+        state: Unit,
       ) {}
       override fun buildResumeState(
         resolved: ResolvedSource,
         totalBytes: Long,
-      ) = SourceResumeState(sourceType = "magnet", data = "{}")
+      ) = Unit
     }
 
     val engine = FakeHttpEngine()

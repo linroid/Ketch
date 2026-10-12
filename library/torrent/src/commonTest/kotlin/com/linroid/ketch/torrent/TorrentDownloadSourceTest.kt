@@ -11,7 +11,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.encodeResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.IOException
 import kotlin.test.Test
@@ -194,7 +193,7 @@ class TorrentDownloadSourceTest {
     fileIds: Set<String>?,
     resolved: com.linroid.ketch.api.ResolvedSource? = null,
     current: Set<String> = emptySet(),
-    resumeState: SourceResumeState? = null,
+    resumeState: TorrentResumeState? = null,
     outputPath: String? = null,
     segments: List<Segment>? = null,
     completed: Boolean = false,
@@ -296,10 +295,9 @@ class TorrentDownloadSourceTest {
       } finally {
         store.close()
       }
-      val state = SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(
-        TorrentResumeState(fixture.document.info.hash.hex, 40_000,
-          encodeBase64(checkpoint.encode()), setOf("0"), output.toString(),
-          encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)))
+      val state = TorrentResumeState(fixture.document.info.hash.hex, 40_000,
+        encodeBase64(checkpoint.encode()), setOf("0"), output.toString(),
+        encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
       // Something the task never created is where b would be saved.
       torrentFileSystem.write(output / "b") { writeUtf8("foreign") }
       val refused = assertFailsWith<IllegalStateException> {
@@ -328,8 +326,8 @@ class TorrentDownloadSourceTest {
     assertEquals(resolved.metadata["infoHash"], stored.metadata["infoHash"])
     assertEquals(resolved.files, stored.files)
     // A state saved without metainfo rebuilds nothing.
-    assertNull(source.resolveStored(TorrentDownloadSource.buildResumeState(
-      pack.metadata.infoHash.hex, 1, ByteArray(0), setOf("0"), "/tmp/torrent")))
+    assertNull(source.resolveStored(TorrentResumeState(
+      pack.metadata.infoHash.hex, 1, "", setOf("0"), "/tmp/torrent")))
   }
 
   @Test
@@ -340,8 +338,8 @@ class TorrentDownloadSourceTest {
     assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"), files.map { it.name })
     assertEquals(pack.sizes.map { it.toLong() }, files.map { it.size })
     // The saved state is enough once the request lost its metainfo.
-    assertEquals(files, source.torrentFiles(source.buildResumeState(resolved,
-      resolved.totalBytes), resolved.withoutBulkMetadata()))
+    val saved = source.encodeResumeState(source.buildResumeState(resolved, resolved.totalBytes))
+    assertEquals(files, source.torrentFiles(saved, resolved.withoutBulkMetadata()))
     assertNull(source.torrentFiles(null, resolved.withoutBulkMetadata()))
     // Hybrid IDs are the v1 indices, so the padding file between a and b leaves a gap.
     val hybrid = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)

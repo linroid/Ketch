@@ -15,7 +15,7 @@ import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.encodeResumeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -41,6 +41,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import kotlinx.serialization.builtins.serializer
 
 class SelfManagedExecutionTest {
   @Test
@@ -48,7 +49,8 @@ class SelfManagedExecutionTest {
     val started = CompletableDeferred<Unit>()
     var finalState = false
     var calls = 0
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<String> {
+      override val resumeStateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
@@ -58,21 +60,21 @@ class SelfManagedExecutionTest {
         files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
         selectionMode = FileSelectionMode.MULTIPLE,
       )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState {
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): String {
         assertEquals(0L, totalBytes)
-        return SourceResumeState(type, "initial")
+        return "initial"
       }
-      override suspend fun updateResumeState(context: DownloadContext): SourceResumeState {
+      override suspend fun updateResumeState(context: DownloadContext): String {
         calls++
         assertTrue(finalState)
-        return SourceResumeState(type, "final")
+        return "final"
       }
       override suspend fun download(context: DownloadContext) {
         assertEquals("/tmp/ketch-self-managed-output", context.outputPath)
         started.complete(Unit)
         try { awaitCancellation() } finally { finalState = true }
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+      override suspend fun resume(context: DownloadContext, state: String) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input", selectedFileIds = setOf("0"),
@@ -97,13 +99,14 @@ class SelfManagedExecutionTest {
     assertEquals(0L, execution.totalBytes)
     job.cancelAndJoin()
     assertEquals(1, calls)
-    assertEquals("final", handle.record.value.sourceResumeState?.data)
+    assertEquals(source.encodeResumeState("final"), handle.record.value.sourceResumeState)
   }
 
   @Test
   fun execute_unknownSize_failsWithoutCallingSource() = runTest {
     var downloads = 0
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
@@ -111,10 +114,9 @@ class SelfManagedExecutionTest {
         url = url, sourceType = type, totalBytes = -1, supportsResume = false,
         suggestedFileName = "fixture", maxSegments = 1,
       )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "")
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) { downloads++ }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",
@@ -146,7 +148,8 @@ class SelfManagedExecutionTest {
     val allowCheckpoint = CompletableDeferred<Unit>()
     val resumed = CompletableDeferred<Unit>()
     var saved = false
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<String> {
+      override val resumeStateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
@@ -154,10 +157,9 @@ class SelfManagedExecutionTest {
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture", maxSegments = 1,
       )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "initial")
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = "initial"
       override suspend fun updateResumeState(context: DownloadContext) =
-        SourceResumeState(type, if (saved) "final" else "initial")
+        if (saved) "final" else "initial"
       override suspend fun download(context: DownloadContext) {
         context.segments.value = listOf(Segment(0, 0, 3, 1))
         context.onProgress(1, 4)
@@ -171,8 +173,8 @@ class SelfManagedExecutionTest {
           }
         }
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
-        assertEquals("final", resumeState.data)
+      override suspend fun resume(context: DownloadContext, state: String) {
+        assertEquals("final", state)
         assertTrue(saved)
         context.segments.value = listOf(Segment(0, 0, 3, 4))
         resumed.complete(Unit)

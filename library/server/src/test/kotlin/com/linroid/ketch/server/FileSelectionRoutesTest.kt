@@ -13,7 +13,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.FileSelectionRequest
 import com.linroid.ketch.endpoints.model.TaskSnapshot
@@ -29,6 +28,7 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,8 +45,9 @@ class FileSelectionRoutesTest {
    * A source of two files ("0" of 10 bytes, "1" of 20) that downloads until it is stopped;
    * `files:unknown` never finds its file list.
    */
-  private class FilesSource : DownloadSource {
+  private class FilesSource : DownloadSource<String> {
     override val type = "files"
+    override val resumeStateSerializer = String.serializer()
     override val managesOwnFileIo = true
     private val ids = setOf("0", "1")
     private val sizes = mapOf("0" to 10L, "1" to 20L)
@@ -69,10 +70,9 @@ class FileSelectionRoutesTest {
       return resolve(url, headers)
     }
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, resolved.url)
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = resolved.url
 
-    override suspend fun planSelection(request: SelectionRequest): SelectionPlan {
+    override suspend fun planSelection(request: SelectionRequest<String>): SelectionPlan {
       check(request.resumeState != null || request.resolved != null) {
         "The file list is not known yet"
       }
@@ -93,8 +93,7 @@ class FileSelectionRoutesTest {
       awaitCancellation()
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      download(context)
+    override suspend fun resume(context: DownloadContext, state: String) = download(context)
   }
 
   private fun ketch(): KetchApi =

@@ -7,7 +7,6 @@ import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.through
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.httpConnectionSpec
 import com.linroid.ketch.core.engine.observeExchanges
 import com.linroid.ketch.core.file.sanitizeFileName
@@ -85,9 +84,6 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     }
     context.onProgress(written, written)
   }
-
-  /** Media transfers restart from zero; no byte offset can identify a refreshed manifest part. */
-  fun buildResumeState(): SourceResumeState = SourceResumeState(type, "{}")
 
   /**
    * Fetches at most 1 MiB through [proxy] and retains the final URL and headers safe for that

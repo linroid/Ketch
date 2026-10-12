@@ -31,6 +31,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -48,8 +49,9 @@ class SeedingWatcherTest {
   private val folder = "/tmp/ketch-seeding-watcher/"
 
   /** A source that completes each download once its gate opens and seeds on request. */
-  private class SeedingSource : DownloadSource, TorrentControlSource {
+  private class SeedingSource : DownloadSource<Unit>, TorrentControlSource {
     override val type = TYPE
+    override val resumeStateSerializer = Unit.serializer()
     override val managesOwnFileIo = true
 
     override fun attach(host: SourceHost): SourceExtension =
@@ -78,8 +80,7 @@ class SeedingWatcherTest {
       suggestedFileName = "seed", maxSegments = 1, files = listOf(SourceFile("0", "seed", 100)),
     )
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(TYPE, resolved.url)
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
 
     override suspend fun download(context: DownloadContext) {
       context.onProgress(0, 100)
@@ -89,7 +90,7 @@ class SeedingWatcherTest {
       onFinish(context.taskId)
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, state: Unit) =
       download(context)
 
     override suspend fun torrentFiles(
@@ -153,7 +154,7 @@ class SeedingWatcherTest {
       state = state,
       totalBytes = 100,
       sourceType = SeedingSource.TYPE,
-      sourceResumeState = SourceResumeState(SeedingSource.TYPE, "seed:$taskId"),
+      sourceResumeState = SourceResumeState(SeedingSource.TYPE, "{}"),
       createdAt = at,
       updatedAt = at,
       completedAt = at,

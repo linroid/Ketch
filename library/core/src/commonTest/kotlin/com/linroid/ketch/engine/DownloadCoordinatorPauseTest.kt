@@ -13,7 +13,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
@@ -36,6 +35,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Verifies that [DownloadCoordinator.pause] keeps the segments the execution saves while
@@ -116,7 +116,10 @@ class DownloadCoordinatorPauseTest {
   }
 
   /** Publishes some progress, then waits for [checkpoint] while it stops. */
-  private class StoppingSource(private val checkpoint: CompletableDeferred<Unit>) : DownloadSource {
+  private class StoppingSource(
+    private val checkpoint: CompletableDeferred<Unit>,
+  ) : DownloadSource<Unit> {
+    override val resumeStateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     override fun canHandle(url: String) = true
@@ -124,8 +127,7 @@ class DownloadCoordinatorPauseTest {
       url = url, sourceType = type, totalBytes = 100, supportsResume = true,
       suggestedFileName = "fixture", maxSegments = 1,
     )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
+    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       context.segments.value = listOf(Segment(0, 0, 99, 20))
       try {
@@ -134,7 +136,7 @@ class DownloadCoordinatorPauseTest {
         withContext(NonCancellable) { checkpoint.await() }
       }
     }
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+    override suspend fun resume(context: DownloadContext, state: Unit) = Unit
   }
 
   private fun handle(onSave: (TaskRecord) -> Unit = {}): TaskHandle {
@@ -154,7 +156,7 @@ class DownloadCoordinatorPauseTest {
     }
   }
 
-  private fun TestScope.coordinator(source: DownloadSource): DownloadCoordinator {
+  private fun TestScope.coordinator(source: DownloadSource<*>): DownloadCoordinator {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadCoordinator(SourceResolver(listOf(source)),
       { DownloadConfig(saveIntervalMs = 60_000) }, DefaultFileNameResolver(),
@@ -165,7 +167,8 @@ class DownloadCoordinatorPauseTest {
     published: List<Segment>,
     final: List<Segment>,
   ): TaskRecord {
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
@@ -173,14 +176,13 @@ class DownloadCoordinatorPauseTest {
         url = url, sourceType = type, totalBytes = 100, supportsResume = true,
         suggestedFileName = "fixture", maxSegments = 1,
       )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "")
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         context.segments.value = published
         // Like SegmentedDownloadHelper, which publishes throttled progress when a batch stops.
         try { awaitCancellation() } finally { context.segments.value = final }
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",

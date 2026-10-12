@@ -5,7 +5,6 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
@@ -35,7 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
@@ -197,7 +195,7 @@ class TorrentSourceSeedingTest {
           finishes.join()
           assertEquals(listOf(hash to false, hash to false), engine.removedTorrents)
           // The first task finds nothing left to stop.
-          source.release("first", null)
+          source.release("first")
           assertEquals(2, engine.removedTorrents.size)
         } finally { source.close() }
       }
@@ -257,8 +255,7 @@ class TorrentSourceSeedingTest {
     val state = TorrentResumeState(fixture.document.info.hash.hex, resolved.totalBytes,
       encodeBase64(checkpoint.encode()), resolved.files.map { it.id }.toSet(), output.toString(),
       encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
-    resume(context(taskId, resolved, output.toString(), connections),
-      SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(state)))
+    resume(context(taskId, resolved, output.toString(), connections), state)
   }
 
   @Test
@@ -296,10 +293,10 @@ class TorrentSourceSeedingTest {
       assertContentEquals(fixture.payloads[0],
         torrentFileSystem.read(root / "seeding" / "a") { readByteArray() })
       // Removing the stopped task finds nothing left to stop and frees no slot twice.
-      source.release("seeder", null)
+      source.release("seeder")
       assertFalse(engine().hasFreeSlot())
       // The new task seeds on the slot until it is removed too.
-      source.release("other", null)
+      source.release("other")
       assertTrue(engine().hasFreeSlot())
       assertEquals(emptySet(), engine().incomingTags())
       assertEquals(0, engine().admittedSessionBytes)
@@ -317,11 +314,11 @@ class TorrentSourceSeedingTest {
       assertContentEquals(fixture.payloads[0],
         torrentFileSystem.read(root / "again" / "a") { readByteArray() })
       // The first task's seeder is gone, and the slot it held went to the new task.
-      source.release("seeder", null)
+      source.release("seeder")
       assertTrue(engine().hasFreeSlot())
       source.setTaskUploadRateLimit("again", 0)
       assertFailsWith<IllegalStateException> { source.setTaskUploadRateLimit("seeder", 0) }
-      source.release("again", null)
+      source.release("again")
       assertEquals(emptySet(), engine().incomingTags())
       assertEquals(0, engine().admittedSessionBytes)
     }
@@ -363,7 +360,7 @@ class TorrentSourceSeedingTest {
       connection.close()
     } finally { network.close() }
     // The download already returned; removing the task stops the seeder.
-    source.release("seeder", null)
+    source.release("seeder")
     assertTrue(engine().hasFreeSlot())
     assertEquals(0, engine().admittedSessionBytes)
     assertFailsWith<IllegalStateException> { source.setTaskUploadRateLimit("seeder", 0) }
@@ -396,7 +393,7 @@ class TorrentSourceSeedingTest {
       connection.close()
       eventually("the peer to close") { peer.closed }
     } finally { network.close() }
-    source.release("seeder", null)
+    source.release("seeder")
     assertEquals(emptyList(), recorder.open)
   }
 
@@ -428,7 +425,7 @@ class TorrentSourceSeedingTest {
             encodeBase64(metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
           assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
             "http://fixture/seeder.torrent",
-            SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(state)),
+            state.saved(),
             output.toString(), ids, recorder)))
           val connection = network.connect(PeerEndpoint("127.0.0.1",
             checkNotNull(engine).listenPort))

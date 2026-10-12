@@ -1,19 +1,81 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
- * Opaque resume state persisted by a [DownloadSource].
- *
- * Each source type serializes its own resume data into the [data]
- * string. The [sourceType] field identifies which source produced
- * the state so the correct source can deserialize it on resume.
+ * A [DownloadSource]'s resume state as a task record saves it: the source's own state, encoded
+ * with its [DownloadSource.resumeStateSerializer]. Sources never build or read it; Ketch does,
+ * with [encodeResumeState] and [decodeResumeState].
  *
  * @property sourceType the [DownloadSource.type] that produced this state
- * @property data source-specific serialized resume data
+ * @property data the state as JSON
  */
 @Serializable
 data class SourceResumeState(
   val sourceType: String,
   val data: String,
 )
+
+// Lenient, so states written by newer builds still decode; encoding stays the default Json.
+private val ResumeStateJson = Json { ignoreUnknownKeys = true }
+
+/** Encodes [state] as a task record saves it. */
+fun <S : Any> DownloadSource<S>.encodeResumeState(state: S): SourceResumeState =
+  SourceResumeState(type, ResumeStateJson.encodeToString(resumeStateSerializer, state))
+
+/**
+ * Decodes the state a task record [saved].
+ *
+ * @throws KetchError.CorruptResumeState when it is not a state of this source
+ */
+fun <S : Any> DownloadSource<S>.decodeResumeState(saved: SourceResumeState): S = try {
+  ResumeStateJson.decodeFromString(resumeStateSerializer, saved.data)
+} catch (e: CancellationException) {
+  throw e
+} catch (e: Exception) {
+  throw KetchError.CorruptResumeState(e.message, e)
+}
+
+/** [DownloadSource.resume] from the state a task record [saved]. */
+internal suspend fun <S : Any> DownloadSource<S>.resumeSaved(
+  context: DownloadContext,
+  saved: SourceResumeState,
+) = resume(context, decodeResumeState(saved))
+
+/** [DownloadSource.resolveStored] from the state a task record [saved]. */
+internal suspend fun <S : Any> DownloadSource<S>.resolveSaved(
+  saved: SourceResumeState,
+): ResolvedSource? = resolveStored(decodeResumeState(saved))
+
+/** [DownloadSource.buildResumeState], encoded for the task record. */
+internal fun <S : Any> DownloadSource<S>.savedResumeState(
+  resolved: ResolvedSource,
+  totalBytes: Long,
+): SourceResumeState = encodeResumeState(buildResumeState(resolved, totalBytes))
+
+/** [DownloadSource.updateResumeState], encoded for the task record. */
+internal suspend fun <S : Any> DownloadSource<S>.updatedResumeState(
+  context: DownloadContext,
+): SourceResumeState? = updateResumeState(context)?.let { encodeResumeState(it) }
+
+/**
+ * [DownloadSource.cleanup] with the state a task record [saved]. One that cannot be read is
+ * reported to [unreadable] and passed as `null`, so the source cleans up only what it can prove.
+ */
+internal suspend fun <S : Any> DownloadSource<S>.cleanupSaved(
+  context: DownloadContext,
+  saved: SourceResumeState?,
+  unreadable: (KetchError.CorruptResumeState) -> Unit,
+) {
+  val state = try {
+    saved?.let { decodeResumeState(it) }
+  } catch (e: KetchError.CorruptResumeState) {
+    unreadable(e)
+    null
+  }
+  cleanup(context, state)
+}

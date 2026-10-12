@@ -403,7 +403,7 @@ internal class DownloadCoordinator(
       log.w(e) { "Skipping release for taskId=${handle.taskId}: unknown source '$sourceType'" }
       return
     }
-    source.release(handle.taskId, record.sourceResumeState)
+    source.release(handle.taskId)
   }
 
   /**
@@ -451,7 +451,9 @@ internal class DownloadCoordinator(
       config = config().forRequest(handle.request),
     )
     try {
-      source.cleanup(ctx, record.sourceResumeState)
+      source.cleanupSaved(ctx, record.sourceResumeState) { e ->
+        log.w { "Unreadable saved state of taskId=${handle.taskId}: ${e.describeCauses()}" }
+      }
     } finally {
       if (!source.managesOwnFileIo) {
         fa.close()
