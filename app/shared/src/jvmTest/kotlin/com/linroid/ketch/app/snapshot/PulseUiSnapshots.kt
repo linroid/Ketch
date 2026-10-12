@@ -451,9 +451,10 @@ private fun PulseCard(state: AppState, width: Dp) {
           ToastHost(
             messages = state.messages,
             modifier = Modifier
-              .align(Alignment.BottomCenter)
+              .align(Alignment.BottomEnd)
               .padding(horizontal = spacing.s4)
               .padding(bottom = spacing.s2),
+            horizontalAlignment = Alignment.End,
           )
         }
         PulseBar(state)

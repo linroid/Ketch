@@ -404,9 +404,10 @@ private fun WideShell(
       ToastHost(
         messages = appState.messages,
         modifier = Modifier
-          .align(Alignment.BottomCenter)
+          .align(Alignment.BottomEnd)
           .padding(horizontal = spacing.s4)
           .padding(bottom = clearance + spacing.s2),
+        horizontalAlignment = Alignment.End,
       )
       if (appState.showInstanceSelector) {
         // Under the page header, by the device chip.

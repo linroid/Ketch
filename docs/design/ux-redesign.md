@@ -2383,8 +2383,8 @@ list. `capabilities` comes from the owning device (`canReschedule`, `canOpenFile
 
 - `AppMessage(id, level: Info|Success|Warning|Error, title, detail?, taskKey?, deviceId?, actions: List<MessageAction> (≤ 2), at, toast: Auto|Sticky|Silent, notify: Boolean)`.
 - Keeps an in-memory history of the last 100 messages and an `unreadCount`.
-- `ToastHost` renders `KetchToast` at bottom center, 8 dp above the Pulse bar (on phones above the
-  FAB or bottom bar), at most 3 stacked.
+- `ToastHost` renders `KetchToast` at the bottom end of the content card, 8 dp above the Pulse bar
+  (on phones centered above the FAB or bottom bar), at most 3 stacked.
 - The Activity popover (`⌘J`, 🔔 in the Pulse bar) lists the history grouped Today / Earlier. Each
   entry has a device chip when it is not the active device, its actions, "Mark all read" and
   "Clear".
