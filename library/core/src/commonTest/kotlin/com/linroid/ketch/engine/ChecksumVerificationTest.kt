@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
@@ -251,11 +252,17 @@ class ChecksumVerificationTest {
     override val resumeStateSerializer = Unit.serializer()
     override val type = "self"
     override val managesOwnFileIo = true
-    override fun canHandle(url: String) = url.startsWith("self:")
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 1, supportsResume = false,
-      suggestedFileName = "self", maxSegments = 1,
-    )
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("self:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 1, supportsResume = false,
+        suggestedFileName = "self", maxSegments = 1,
+      )
+    }
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(context: DownloadContext, state: Unit) = Unit

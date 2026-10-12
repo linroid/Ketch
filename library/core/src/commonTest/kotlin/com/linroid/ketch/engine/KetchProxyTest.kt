@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.HttpEngine

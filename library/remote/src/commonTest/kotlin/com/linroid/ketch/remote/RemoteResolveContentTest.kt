@@ -2,6 +2,7 @@ package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.resolve
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -42,7 +43,7 @@ class RemoteResolveContentTest {
     }
     val remote = RemoteKetch("remote.example", 8642, null, false, transport)
     try {
-      assertEquals(resolved, remote.resolveContent(content, "my pack.torrent"))
+      assertEquals(resolved, remote.resolve(content, "my pack.torrent"))
     } finally {
       remote.close()
     }
@@ -55,7 +56,7 @@ class RemoteResolveContentTest {
         respond("", status)
       })
       try {
-        remote.resolveContent(byteArrayOf(1), "a.torrent")
+        remote.resolve(byteArrayOf(1), "a.torrent")
       } finally {
         remote.close()
       }
@@ -82,7 +83,7 @@ class RemoteResolveContentTest {
     })
     try {
       val error = assertFailsWith<KetchError.SourceError> {
-        remote.resolveContent(byteArrayOf(1), "broken.torrent")
+        remote.resolve(byteArrayOf(1), "broken.torrent")
       }
       assertEquals("torrent", error.sourceType)
     } finally {

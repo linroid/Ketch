@@ -19,6 +19,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -538,7 +539,8 @@ class KetchToolSetTest {
       return QueuedTask(request)
     }
 
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+    override suspend fun resolve(input: ResolveInput): ResolvedSource {
+      val (url, headers) = input as ResolveInput.Url
       resolveProperties += headers
       return resolved ?: ResolvedSource(
         url = url,
@@ -549,9 +551,6 @@ class KetchToolSetTest {
         maxSegments = 1,
       )
     }
-
-    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-      throw UnsupportedOperationException()
 
     override suspend fun start() {}
 

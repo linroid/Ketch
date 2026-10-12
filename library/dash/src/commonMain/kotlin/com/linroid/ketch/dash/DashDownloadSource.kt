@@ -3,6 +3,7 @@ package com.linroid.ketch.dash
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
@@ -24,17 +25,14 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
   override val previousTypes: Set<String> = setOf("media")
   private val helper = MediaDownloadHelper(httpEngine, type)
 
-  override fun canHandle(url: String): Boolean =
-    Regex("https?://[^?#]+\\.mpd(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(url)
+  override fun canHandle(input: ResolveInput): Boolean =
+    input is ResolveInput.Url &&
+      Regex("https?://[^?#]+\\.mpd(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(input.url)
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    helper.resolve(url, plan(url, headers, ProxyConfig.System))
-
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = helper.resolve(url, plan(url, headers, config.proxy))
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+    val (url, headers) = input as ResolveInput.Url
+    return helper.resolve(url, plan(url, headers, config.proxy))
+  }
 
   override suspend fun download(context: DownloadContext) {
     helper.download(context, plan(context.url, context.headers, context.config.proxy))

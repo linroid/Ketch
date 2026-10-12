@@ -17,6 +17,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -412,8 +413,9 @@ internal class SampleKetchApi(
     return task
   }
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    ResolvedSource(
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    val url = (input as? ResolveInput.Url)?.url ?: throw KetchError.Unsupported()
+    return ResolvedSource(
       url = url,
       sourceType = "http",
       totalBytes = 734_003_200,
@@ -421,9 +423,7 @@ internal class SampleKetchApi(
       suggestedFileName = extractFilename(url),
       maxSegments = 8,
     )
-
-  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    throw KetchError.Unsupported()
+  }
 
   override suspend fun status(): KetchStatus = KetchStatus(
     name = name,
@@ -492,8 +492,9 @@ internal class SampleDeviceApi(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     download?.invoke(request) ?: throw UnsupportedOperationException("Not in snapshots")
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    resolve?.invoke(url) ?: throw UnsupportedOperationException("Not in snapshots")
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    (input as? ResolveInput.Url)?.let { resolve?.invoke(it.url) }
+      ?: throw UnsupportedOperationException("Not in snapshots")
 
   override suspend fun start() {}
 

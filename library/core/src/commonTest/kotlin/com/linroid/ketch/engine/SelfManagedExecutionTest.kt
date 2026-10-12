@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -53,13 +54,16 @@ class SelfManagedExecutionTest {
       override val resumeStateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 2,
-        files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
-        selectionMode = FileSelectionMode.MULTIPLE,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 2,
+          files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
+          selectionMode = FileSelectionMode.MULTIPLE,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): String {
         assertEquals(0L, totalBytes)
         return "initial"
@@ -109,11 +113,14 @@ class SelfManagedExecutionTest {
       override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = -1, supportsResume = false,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = -1, supportsResume = false,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) { downloads++ }
       override suspend fun resume(context: DownloadContext, state: Unit) = Unit
@@ -152,11 +159,14 @@ class SelfManagedExecutionTest {
       override val resumeStateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = "initial"
       override suspend fun updateResumeState(context: DownloadContext) =
         if (saved) "final" else "initial"

@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.Ketch
@@ -52,22 +53,20 @@ class FileSelectionRoutesTest {
     private val ids = setOf("0", "1")
     private val sizes = mapOf("0" to 10L, "1" to 20L)
 
-    override fun canHandle(url: String) = url.startsWith("files:")
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("files:")
+    }
 
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 30, supportsResume = true,
-      suggestedFileName = "pack", maxSegments = 2,
-      files = listOf(SourceFile("0", "a.bin", 10), SourceFile("1", "b.bin", 20)),
-      selectionMode = FileSelectionMode.MULTIPLE,
-    )
-
-    override suspend fun resolveForDownload(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ): ResolvedSource {
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
       if (url == "files:unknown") awaitCancellation()
-      return resolve(url, headers)
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 30, supportsResume = true,
+        suggestedFileName = "pack", maxSegments = 2,
+        files = listOf(SourceFile("0", "a.bin", 10), SourceFile("1", "b.bin", 20)),
+        selectionMode = FileSelectionMode.MULTIPLE,
+      )
     }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = resolved.url

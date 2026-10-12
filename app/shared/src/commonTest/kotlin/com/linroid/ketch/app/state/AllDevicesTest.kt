@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -59,7 +60,8 @@ class AllDevicesTest {
   ) : KetchApi by recording {
     val resolved = mutableListOf<String>()
 
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+    override suspend fun resolve(input: ResolveInput): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
       resolved += url
       return ResolvedSource(
         url = url,

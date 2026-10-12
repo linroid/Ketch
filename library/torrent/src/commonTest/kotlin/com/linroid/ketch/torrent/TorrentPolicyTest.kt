@@ -26,6 +26,5 @@ class TorrentPolicyTest {
     assertFailsWith<IllegalArgumentException> { TorrentConfig(listenPort = 65536) }
     assertFailsWith<IllegalArgumentException> { TorrentConfig(maxMetadataBytes = 0) }
     assertFailsWith<IllegalArgumentException> { TorrentConfig(maxBufferedBytes = 16383) }
-    assertFailsWith<IllegalArgumentException> { TorrentConfig(metadataTimeoutSeconds = -1) }
   }
 }

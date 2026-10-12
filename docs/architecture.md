@@ -74,8 +74,7 @@ KetchApi
   |-- tasks: StateFlow<List<DownloadTask>>
   |-- start()
   |-- download(request): DownloadTask
-  |-- resolve(url, properties): ResolvedSource
-  |-- resolveContent(content, fileName): ResolvedSource
+  |-- resolve(input: ResolveInput): ResolvedSource   (a URL, or the caller's file content)
   |-- status(): KetchStatus
   |-- updateConfig(config)
   |-- networkInterfaces() / selectNetworkInterfaces(config)

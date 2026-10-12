@@ -12,6 +12,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -55,7 +56,7 @@ internal class FakeDevice : KetchApi {
     return add(DownloadState.Queued, request)
   }
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
     error("Not used")
 
   override suspend fun start() {}

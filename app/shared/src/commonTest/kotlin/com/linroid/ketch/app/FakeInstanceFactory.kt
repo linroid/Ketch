@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -121,7 +122,7 @@ class FakeRemote(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException("FakeRemote does not support downloads")
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
     throw UnsupportedOperationException("FakeRemote does not support resolve")
 
   override suspend fun updateConfig(config: DownloadConfig) {}

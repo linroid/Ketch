@@ -13,6 +13,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -301,8 +302,8 @@ private class ResolvingApi(
   private val base: KetchApi,
   private val check: suspend (String) -> ResolvedSource,
 ) : KetchApi by base {
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    check(url)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    check((input as ResolveInput.Url).url)
 }
 
 private val WIDE_AND_PHONE = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)

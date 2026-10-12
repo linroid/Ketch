@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -78,19 +79,17 @@ internal class SelectableSource(
       selectionMode = mode,
     )
 
-  override fun canHandle(url: String) = url.startsWith("pick:")
+  override fun canHandle(input: ResolveInput): Boolean {
+    val url = (input as? ResolveInput.Url)?.url ?: return false
+    return url.startsWith("pick:")
+  }
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+    val url = (input as ResolveInput.Url).url
     resolves++
     resolveGate?.await()
     return resolved(url, "network")
   }
-
-  override suspend fun resolveForDownload(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = resolve(url, headers)
 
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
     "$STORED${resolved.url}"

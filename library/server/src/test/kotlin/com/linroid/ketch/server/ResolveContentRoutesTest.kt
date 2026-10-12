@@ -1,6 +1,8 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
@@ -28,11 +30,11 @@ class ResolveContentRoutesTest {
     var received: Pair<ByteArray, String?>? = null
     override val type = "content"
     override val resumeStateSerializer = Unit.serializer()
-    override fun canHandle(url: String) = false
-    override fun canHandleContent(content: ByteArray, fileName: String?) =
-      fileName?.endsWith(".torrent") == true
-    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource {
-      received = content to fileName
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Content && input.fileName?.endsWith(".torrent") == true
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      check(input is ResolveInput.Content) { "Unexpected URL resolution" }
+      received = input.bytes to input.fileName
       if (malformed) throw KetchError.SourceError(type)
       return ResolvedSource(
         url = "torrent:abc",
@@ -43,8 +45,6 @@ class ResolveContentRoutesTest {
         maxSegments = 1,
       )
     }
-    override suspend fun resolve(url: String, headers: Map<String, String>) =
-      error("Unexpected URL resolution")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(context: DownloadContext, state: Unit) = Unit
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit

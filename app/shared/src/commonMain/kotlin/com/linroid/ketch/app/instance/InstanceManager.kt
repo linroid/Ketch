@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -566,7 +567,7 @@ private object DisconnectedApi : KetchApi {
 
   override suspend fun download(request: DownloadRequest): DownloadTask = notConnected()
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
     notConnected()
 
   override suspend fun status(): KetchStatus = notConnected()

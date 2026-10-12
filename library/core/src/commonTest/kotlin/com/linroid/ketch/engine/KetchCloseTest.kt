@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -92,8 +93,11 @@ class KetchCloseTest {
   private class StuckSource : DownloadSource<Unit> {
     override val resumeStateSerializer = Unit.serializer()
     override val type = "stuck"
-    override fun canHandle(url: String): Boolean = url.startsWith("stuck:")
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("stuck:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       awaitCancellation()
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = awaitCancellation()
@@ -105,11 +109,17 @@ class KetchCloseTest {
   private class HalfWaySource : DownloadSource<Unit> {
     override val resumeStateSerializer = Unit.serializer()
     override val type = "fixture"
-    override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 8, supportsResume = true,
-      suggestedFileName = "partial.bin", maxSegments = 1,
-    )
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("fixture:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 8, supportsResume = true,
+        suggestedFileName = "partial.bin", maxSegments = 1,
+      )
+    }
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       context.fileAccessor.writeAt(0, byteArrayOf(1, 2, 3, 4))

@@ -8,6 +8,8 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.TransferStalledException
+import com.linroid.ketch.core.engine.canHandle
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.currentTime

@@ -35,9 +35,9 @@ files needs all its bytes for verification; skipped boundary bytes live in a hid
 not in skipped output files. Network speed includes received payload, including those boundary
 bytes/retries.
 
-For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
+For SDK-provided bytes, call `ketch.resolve(bytes, "name.torrent")` (or
 `torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. `resolveContent` also works
+`DownloadRequest.resolvedSource`, with its `url` as the request URL. Resolving content also works
 through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
 apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
@@ -102,7 +102,7 @@ The apps register for `.torrent` files, so the system file manager offers Ketch 
 Each opened file shows the add dialog with its name, size and file selection, as a dropped file
 does; nothing downloads until the user confirms. Several files open one after another, and a file
 stays pending until downloaded or dismissed, so it survives an Android activity recreation. Like a
-dropped file, it reaches the active backend through `resolveContent`, so remote daemons work too.
+dropped file, its content reaches the active backend through `resolve`, so remote daemons work too.
 Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the app's
 `Documents/Inbox` are deleted after reading.
 
@@ -166,16 +166,16 @@ including a development run, hands its files to the running app instead of openi
   fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
   URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its
   metadata, which still comes from peers
-- Magnet metadata is asked of up to four peers at once, as they are found, within
-  `metadataTimeout`. A peer only takes the shared metadata buffer once it answers the handshake,
+- Magnet metadata is asked of up to four peers at once, as they are found. A peer only takes the shared metadata buffer once it answers the handshake,
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
   5, 15 and 30 seconds, behind peers found meanwhile, so swarms of one or two briefly busy peers
   still resolve. Each failure and its reason is logged at debug, each exchange step at verbose.
-- A task keeps looking for a magnet's metadata (`DownloadSource.resolveForDownload`), one
-  `metadataTimeout` lookup after another, until it is found or the task is paused or canceled,
-  since the peers of a small swarm may come online later; each fruitless lookup is logged at
-  info. A preview such as `KetchApi.resolve` still gives up after one lookup. The apps show such
-  a task as Starting, "Finding peers", once it holds a download slot.
+- The source keeps looking for a magnet's metadata until it is found or the caller stops, since
+  the peers of a small swarm may come online later. It looks in 2-minute lookups, each asking
+  again the peers the last one gave up on, and logs each fruitless one at info. A task waits
+  until it is paused or canceled, and a preview such as `KetchApi.resolve` until its caller
+  cancels it. The apps show such a task as Starting, "Finding peers", once it holds a download
+  slot; the add sheet offers Keep waiting and Add anyway once a preview has taken 2 minutes.
 - `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
   `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
   and at most 128 are used. Each one is announced alongside the torrent's own trackers rather than

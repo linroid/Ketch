@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.remote.RemoteKetch

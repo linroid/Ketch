@@ -2,251 +2,153 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 
 /**
- * Abstraction for pluggable download source types.
+ * A download protocol, such as HTTP ([HttpDownloadSource]), FTP or BitTorrent. [SourceResolver]
+ * routes each URL, or file content, to the first registered source that [canHandle]s it.
  *
- * Each source handles a specific protocol or download mechanism.
- * The default implementation is [HttpDownloadSource] for HTTP/HTTPS
- * downloads. Other implementations include FTP, BitTorrent, etc.
+ * A source probes a URL with [resolve], transfers it with [download] and [resume], and saves what
+ * a resume needs with [buildResumeState]. The other members are optional.
  *
- * Sources are registered with [SourceResolver] which routes
- * download requests to the appropriate source based on URL matching.
- *
- * @param S the state this source saves in a task's record to resume it, such as an HTTP ETag
- *   or a torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
+ * @param S the state this source saves with a task to resume it, such as an HTTP `ETag` or a
+ *   torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
  *   decoded; a source without one uses [Unit].
  */
 interface DownloadSource<S : Any> {
-  /**
-   * Releases resources owned by this source. Called when Ketch closes.
-   * Implementations must be idempotent and stop accepting new work.
-   * Injected resources owned by the caller must not be closed here.
-   */
-  fun close() {}
-
-  /** Unique identifier for this source type (e.g., "http", "torrent"). */
+  /** A unique name for this kind of source, such as `http` or `torrent`. */
   val type: String
 
-  /** Optional capabilities contributed to the instance's status by this source. */
+  /** Names this source used before, so tasks saved under them still find it by URL. */
+  val previousTypes: Set<String> get() = emptySet()
+
+  /** Optional behaviors this source adds to [com.linroid.ketch.api.KetchStatus.features]. */
   val features: Set<String> get() = emptySet()
 
   /**
-   * Gives this source a [SourceExtension] over the tasks of the [com.linroid.ketch.core.Ketch]
-   * that runs it, for typed controllers ([com.linroid.ketch.api.KetchApi.control]) and task
-   * lifecycle hooks; `null`, the default, for none. Each Ketch calls it once, while it is
-   * created, with its own [host]; the extension must not call the host before its hooks run.
-   */
-  fun attach(host: SourceHost): SourceExtension? = null
-
-  /**
-   * Former source type names accepted for stored or pre-resolved tasks.
-   * A former type matches only when [canHandle] also accepts the task URL.
-   * An exact type match takes precedence over these migration aliases.
-   */
-  val previousTypes: Set<String> get() = emptySet()
-
-  /**
-   * Whether this source manages its own file I/O instead of using
-   * [DownloadContext.fileAccessor]. When `true`, the download engine
-   * skips [FileAccessor][com.linroid.ketch.core.file.FileAccessor]
-   * creation, flush, and cleanup.
+   * Whether this source writes its own files, as torrents do, so the engine opens no
+   * [FileAccessor][com.linroid.ketch.core.file.FileAccessor] for it.
    */
   val managesOwnFileIo: Boolean get() = false
 
   /**
-   * Serializer of [S]. A task record saves the state as JSON, so later builds must still read
-   * what earlier ones wrote: add fields with defaults, never rename or retype them. Unknown
-   * fields are ignored.
+   * Returns this source's controllers ([com.linroid.ketch.api.KetchApi.controller]) and task
+   * lifecycle hooks for the Ketch instance behind [host], or `null` for none. Called once per
+   * instance, while it is created; don't use [host] before the hooks run.
+   */
+  fun attach(host: SourceHost): SourceExtension? = null
+
+  /** Releases what this source owns, once Ketch closes. Must be safe to call twice. */
+  fun close() {}
+
+  /**
+   * Serializer of [S]. Tasks save the state as JSON, so later builds must still read what earlier
+   * ones wrote: add fields with defaults, never rename or retype them. Unknown fields are ignored.
    */
   val resumeStateSerializer: KSerializer<S>
 
-  /** Returns true if this source can handle the given URL. */
-  fun canHandle(url: String): Boolean
+  // Resolving
 
   /**
-   * Resolves source metadata for the given URL without downloading.
-   * This is analogous to an HTTP HEAD request but generalized for
-   * any source type.
+   * Whether this source resolves [input]: a URL it downloads, or file content it reads, such as a
+   * `.torrent` file. Most sources accept only [ResolveInput.Url]s.
+   */
+  fun canHandle(input: ResolveInput): Boolean
+
+  /**
+   * Probes [input], which [canHandle] accepted, without downloading it, as an HTTP `HEAD` does.
+   * It may take as long as finding the content does, as a magnet link waits for peers to come
+   * online, and stops when cancelled. [config] is Ketch's own for a preview, or the task's.
    *
-   * @param url the URL to resolve
-   * @param headers request headers for HTTP sources; other sources may ignore them
+   * A result for [ResolveInput.Content] must carry everything [download] needs, as it gets it as
+   * [DownloadContext.preResolved] rather than resolving [ResolvedSource.url] again.
    */
   suspend fun resolve(
-    url: String,
-    headers: Map<String, String> = emptyMap(),
+    input: ResolveInput,
+    config: DownloadConfig = DownloadConfig.Default,
   ): ResolvedSource
 
   /**
-   * Resolves source metadata with the engine's current global [config].
-   * Ketch calls this overload for a preview, such as `KetchApi.resolve`,
-   * and [resolveForDownload] for a task, whose [config] carries the task's
-   * own [DownloadConfig.proxy] when it has one. Override it when the resolved
-   * metadata depends on global defaults, for example when
-   * [ResolvedSource.maxSegments] reports
-   * [DownloadConfig.maxConnectionsPerDownload]. The default ignores
-   * [config] and delegates to [resolve].
+   * The [ResolvedSource] a task saved in [state], rebuilt offline, or `null` when it holds none. A
+   * task that already resolved, such as one that waited for a file selection, starts from it.
    */
-  suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = resolve(url, headers)
+  suspend fun resolveStored(state: S): ResolvedSource? = null
+
+  // File selection
 
   /**
-   * Resolves source metadata for a task that is starting, which can wait
-   * where a preview would rather fail. Ketch calls this, inside its retries,
-   * before [download]. The default delegates to [resolve] with [config];
-   * a source whose metadata can take long to appear, such as a magnet link
-   * whose peers are offline, overrides it to keep looking until it succeeds
-   * or the task is paused or canceled.
-   */
-  suspend fun resolveForDownload(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = resolve(url, headers, config)
-
-  /**
-   * Returns true if this source can resolve caller-supplied file
-   * [content] via [resolveContent]. [fileName] is the original file
-   * name, if known. The default implementation returns `false`.
-   */
-  fun canHandleContent(content: ByteArray, fileName: String?): Boolean = false
-
-  /**
-   * Resolves source metadata from caller-supplied file [content]
-   * without network access, such as the bytes of a `.torrent` file.
+   * Checks [request] against this source's own file list and sizes it, without side effects. A
+   * running download follows [DownloadContext.selection] and confirms each revision with
+   * [DownloadContext.acknowledgeSelection]. For a single choice the request holds exactly one ID.
    *
-   * The returned [ResolvedSource] must carry everything needed to
-   * download, because the engine passes it to [download] as
-   * [DownloadContext.preResolved] instead of calling [resolve] with
-   * [ResolvedSource.url].
+   * Sources that implement it list [com.linroid.ketch.api.KetchFeatures.FILE_SELECTION], and
+   * [com.linroid.ketch.api.KetchFeatures.AWAIT_FILE_SELECTION] when their tasks can wait for a
+   * choice. The default refuses, as the source has no files to choose.
    *
-   * @param content the raw file content
-   * @param fileName the original file name, if known
-   */
-  suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource {
-    throw KetchError.Unsupported()
-  }
-
-  /**
-   * Validates [request] against this source's own metadata and sizes it, with no side effects
-   * beyond checking which files exist. Sources that implement it must follow
-   * [DownloadContext.selection] while a download runs and confirm each revision they apply with
-   * [DownloadContext.acknowledgeSelection]. A source that resolves with
-   * [com.linroid.ketch.api.FileSelectionMode.SINGLE] gets exactly one ID: Ketch refuses several
-   * before asking, and chooses the first of its [ResolvedSource.files] in place of every file. The
-   * default refuses: the source has no files to choose.
-   *
-   * Sources that implement it list [com.linroid.ketch.api.KetchFeatures.FILE_SELECTION] in
-   * [features], and [com.linroid.ketch.api.KetchFeatures.AWAIT_FILE_SELECTION] when their tasks
-   * can wait for a choice ([com.linroid.ketch.api.DownloadRequest.awaitFileSelection]); with
-   * [resolveStored] such a task starts from what it saved instead of resolving again.
-   *
-   * @throws IllegalArgumentException for unknown file IDs, an empty selection, or several IDs
-   *   for a single choice
+   * @throws IllegalArgumentException for an empty selection, unknown IDs, or several IDs for a
+   *   single choice
    * @throws IllegalStateException when the file list is not known yet, or a file the task does
-   *   not own is where a newly chosen file would be saved
+   *   not own is in the way
    */
   suspend fun planSelection(request: SelectionRequest<S>): SelectionPlan =
     throw UnsupportedOperationException("This download has no files to choose")
 
-  /**
-   * The [ResolvedSource] a task saved in [state], rebuilt without network access, or `null` when
-   * the state holds none. Ketch starts a task that already resolved, such as one that waited for
-   * a file selection, from it instead of resolving again. The default returns `null`.
-   */
-  suspend fun resolveStored(state: S): ResolvedSource? = null
+  // Transferring
 
   /**
-   * Executes a fresh download. The source is responsible for writing
-   * data via [DownloadContext.fileAccessor], reporting progress via
-   * [DownloadContext.onProgress], and updating segments via
-   * [DownloadContext.segments].
+   * Downloads from scratch: writes through [DownloadContext.fileAccessor], reports
+   * [DownloadContext.onProgress] and [DownloadContext.segments], waits on
+   * [DownloadContext.throttle], and stops when cancelled.
    *
-   * The source must respect cancellation by checking coroutine
-   * context and must apply throttling via
-   * [DownloadContext.throttle].
+   * Settings come from [DownloadContext.config]. Segmented sources size their transfers with
+   * [DownloadContext.effectiveConnections] and follow later [DownloadContext.maxConnections]
+   * changes. After a retryable failure the engine calls this again with the same context, so a
+   * source that can should continue from the progress in [DownloadContext.segments].
    *
-   * Global defaults come from [DownloadContext.config]. Segmented sources
-   * should size their transfers with [DownloadContext.effectiveConnections]
-   * and follow later [DownloadContext.maxConnections] changes. After a
-   * retryable failure the engine calls this method again with the same
-   * context, so sources that can transfer from byte offsets should continue
-   * from the progress in [DownloadContext.segments] rather than restart.
-   *
-   * The engine also calls this method when [ResolvedSource.totalBytes] is
-   * -1, unless [managesOwnFileIo] is `true`: such a download fails with
-   * [KetchError.SourceError]. A source that cannot transfer content of
-   * unknown size throws that error too; one that can writes it from offset
-   * zero, and the engine records the final file size as the task's size.
+   * When [ResolvedSource.totalBytes] is -1 the size is unknown: a source that can stream such
+   * content writes it from offset zero and the engine records the final size, while one that
+   * can't throws [KetchError.SourceError]. Sources that [write their own files][managesOwnFileIo]
+   * never get such a download.
    */
   suspend fun download(context: DownloadContext)
 
   /**
-   * Resumes a previously interrupted download from the [state] its task saved. A saved state
-   * that cannot be decoded fails the task with
-   * [com.linroid.ketch.api.KetchError.CorruptResumeState] before this is called. Sources that
-   * do not support resume should throw [com.linroid.ketch.api.KetchError.Unsupported].
+   * Continues an interrupted download from the [state] its task saved. A saved state that can't be
+   * decoded fails the task with [KetchError.CorruptResumeState] before this is called. Sources
+   * that can't resume throw [KetchError.Unsupported].
    */
   suspend fun resume(context: DownloadContext, state: S)
 
   /**
-   * Builds the state to save once [resolve] completes, holding what [resume] needs to check the
-   * content did not change (e.g., HTTP ETag/Last-Modified, FTP MDTM, torrent info hash). It is
-   * saved in the task record and passed back to [resume] on restart.
-   *
-   * @param resolved the metadata returned by [resolve]
-   * @param totalBytes total download size in bytes
+   * What a resume needs to check that the content is unchanged, such as an HTTP `ETag`, an FTP
+   * `MDTM` or a torrent's info hash. Saved with the task once it resolves, and passed to [resume].
    */
   fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): S
 
   /**
-   * Called periodically during download, and once it stops, to let the source update its saved
-   * state, which the returned one replaces. Sources like BitTorrent override this to persist
-   * their progress incrementally.
-   *
-   * @param context the active download context
-   * @return updated resume state, or `null` (the default) to keep the current one
+   * A newer resume state to save while [context] downloads, such as a torrent's verified pieces,
+   * or `null` to keep the current one. Called periodically.
    */
   suspend fun updateResumeState(context: DownloadContext): S? = null
 
+  // Removing
+
   /**
-   * Releases work this source keeps alive for a task after [download]
-   * or [resume] has returned, such as a torrent that is still seeding.
-   * Called by the engine whenever a task is removed, with or without
-   * deleting files, after the active download (if any) has been
-   * cancelled and before [cleanup].
-   *
-   * Best-effort, like [cleanup]. The default implementation does nothing.
-   *
-   * @param taskId the removed task
+   * Stops what this source keeps running for a removed task after its download returned, such as
+   * a seeding torrent. Called before [cleanup], whether or not files are deleted; best-effort.
    */
   suspend fun release(taskId: String) {}
 
   /**
-   * Deletes any data this source wrote for the given task. Called by
-   * the engine when a task is removed with `deleteFiles = true`,
-   * after the active download (if any) has been cancelled.
+   * Deletes the files this source wrote for a task removed with `deleteFiles = true`, after its
+   * download stopped. Best-effort: report failures without throwing, except cancellation.
    *
-   * Best-effort: implementations should log and swallow non-fatal
-   * errors rather than throwing. [CancellationException] must still
-   * propagate.
-   *
-   * The default implementation deletes [DownloadContext.fileAccessor],
-   * which is the right behavior for sources that write to a single
-   * output file. Sources with `managesOwnFileIo = true` (e.g.
-   * torrents) should override this and use [state] to locate
-   * their internal handle (such as an info hash) for cleanup.
-   *
-   * @param context the download context, with a [DownloadContext.fileAccessor]
-   *   pointing at the persisted output path
-   * @param state the state saved in the task record, or `null` if the task never produced one
-   *   or it cannot be decoded
+   * The default deletes [DownloadContext.fileAccessor]'s file, which suits sources that write one
+   * file. Sources that write their own ([managesOwnFileIo]) find their files from [state], which
+   * is `null` when the task saved none or it can't be decoded.
    */
   suspend fun cleanup(context: DownloadContext, state: S?) {
     try {
@@ -254,7 +156,17 @@ interface DownloadSource<S : Any> {
     } catch (e: CancellationException) {
       throw e
     } catch (_: Throwable) {
-      // best-effort; caller is responsible for logging
+      // Best-effort; the caller is responsible for logging.
     }
   }
 }
+
+/** Whether this source downloads [url]. */
+fun DownloadSource<*>.canHandle(url: String): Boolean = canHandle(ResolveInput.Url(url))
+
+/** [DownloadSource.resolve] for [url], with [headers] for HTTP sources. */
+suspend fun DownloadSource<*>.resolve(
+  url: String,
+  headers: Map<String, String> = emptyMap(),
+  config: DownloadConfig = DownloadConfig.Default,
+): ResolvedSource = resolve(ResolveInput.Url(url, headers), config)

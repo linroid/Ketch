@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -49,19 +50,19 @@ class DownloadCoordinatorCancelTest {
     var downloadFinallyRan: Boolean = false
 
     override val type: String = "suspend"
-    override fun canHandle(url: String): Boolean = true
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
 
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-    ): ResolvedSource = ResolvedSource(
-      url = url,
-      sourceType = type,
-      totalBytes = 16L,
-      supportsResume = false,
-      suggestedFileName = "file.bin",
-      maxSegments = 1,
-    )
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url,
+        sourceType = type,
+        totalBytes = 16L,
+        supportsResume = false,
+        suggestedFileName = "file.bin",
+        maxSegments = 1,
+      )
+    }
 
     override suspend fun download(context: DownloadContext) {
       downloadStarted.complete(Unit)

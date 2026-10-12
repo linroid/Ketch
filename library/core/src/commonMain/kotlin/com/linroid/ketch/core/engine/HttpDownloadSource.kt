@@ -2,6 +2,7 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.file.DefaultFileNameResolver
@@ -40,21 +41,14 @@ internal class HttpDownloadSource(
 
   override val resumeStateSerializer: KSerializer<HttpResumeState> = HttpResumeState.serializer()
 
-  override fun canHandle(url: String): Boolean {
+  override fun canHandle(input: ResolveInput): Boolean {
+    val url = (input as? ResolveInput.Url)?.url ?: return false
     val lower = url.lowercase()
     return lower.startsWith("http://") || lower.startsWith("https://")
   }
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-  ): ResolvedSource = resolve(url, headers, DownloadConfig.Default)
-
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+    val (url, headers) = input as ResolveInput.Url
     val detector = RangeSupportDetector(httpEngine.through(config.proxy))
     val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {

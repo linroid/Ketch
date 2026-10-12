@@ -3,6 +3,7 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -36,11 +37,14 @@ class SelfManagedDefaultFolderTest {
       override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         outputPath = context.outputPath

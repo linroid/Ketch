@@ -14,6 +14,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
@@ -21,6 +22,7 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
@@ -1054,7 +1056,7 @@ class AppState(
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
-        api.resolveContent(content, file.name)
+        api.resolve(content, file.name)
       }.onSuccess { result ->
         if (droppedFile === file) {
           resolveState = ResolveState.Resolved(result)
@@ -2324,11 +2326,8 @@ internal fun credentialWarningText(
 internal const val COOKIE_HEADER = "Cookie"
 internal const val AUTHORIZATION_HEADER = "Authorization"
 
-/**
- * Largest dropped `.torrent` file read; matches the daemon's upload limit, while torrent metainfo
- * is 4 MiB by default.
- */
-internal const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
+/** Largest dropped file read: what a remote instance accepts. */
+internal const val MAX_DROPPED_FILE_BYTES = ResolveInput.Content.MAX_CONTENT_BYTES
 
 /** Largest link list read from a dropped file. */
 internal const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024

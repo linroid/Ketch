@@ -12,6 +12,7 @@ import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -99,10 +100,7 @@ internal class RecordingKetchApi(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     RecordingTask(delegate.download(request), removeCalls)
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-  ): ResolvedSource = delegate.resolve(url, headers)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource = delegate.resolve(input)
 
   override suspend fun start() = delegate.start()
   override suspend fun status(): KetchStatus = delegate.status()

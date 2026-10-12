@@ -3,10 +3,15 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -122,40 +127,34 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
-  fun resolveForDownload_magnetWithoutMetadata_looksAgainUntilFound() = runTest {
+  fun resolve_magnetWithoutMetadata_looksAgainUntilFound() = runTest {
     fakeEngine.fetchMetadataResults.addAll(listOf(null, null))
     fakeEngine.fetchMetadataResult = singleFileMetadata()
-    val resolved = source.resolveForDownload(
-      "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
-    )
+    val resolved = source.resolve("magnet:?xt=urn:btih:$sampleHash")
     assertEquals("test.txt", resolved.suggestedFileName)
     assertEquals(3, fakeEngine.fetchMetadataCalls)
   }
 
   @Test
-  fun resolveForDownload_magnetWithOtherNetworkError_fails() = runTest {
+  fun resolve_magnetWithOtherNetworkError_fails() = runTest {
     fakeEngine.fetchMetadataError = KetchError.Network(IOException("port in use"))
     assertFailsWith<KetchError.Network> {
-      source.resolveForDownload(
-        "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
-      )
+      source.resolve("magnet:?xt=urn:btih:$sampleHash")
     }
     assertEquals(1, fakeEngine.fetchMetadataCalls)
   }
 
   @Test
-  fun resolve_magnetUri_timeoutReturnsNull_throwsNetworkError() =
-    runTest {
-      fakeEngine.fetchMetadataResult = null
+  fun resolve_magnetWithoutMetadata_looksUntilTheCallerStops() = runTest {
+    fakeEngine.fetchMetadataResult = null
 
-      val error = assertFailsWith<KetchError.Network> {
-        source.resolve(
-          "magnet:?xt=urn:btih:$sampleHash",
-          emptyMap(),
-        )
-      }
-      assertNotNull(error.cause)
+    val resolved = withTimeoutOrNull(10.minutes) {
+      source.resolve("magnet:?xt=urn:btih:$sampleHash")
     }
+
+    assertNull(resolved)
+    assertTrue(fakeEngine.fetchMetadataCalls > 1)
+  }
 
   @Test
   fun resolve_magnetUri_engineError_wrapsAsSourceError() = runTest {
@@ -187,7 +186,7 @@ class TorrentDownloadSourceResolveTest {
       ),
     ))
 
-    val resolved = source.resolveContent(content, "pack.torrent")
+    val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
 
     val hash = TorrentMetadata.fromBencode(content).infoHash.hex
     assertEquals("torrent:$hash", resolved.url)
@@ -203,7 +202,7 @@ class TorrentDownloadSourceResolveTest {
   @Test
   fun resolveContent_malformedBytes_throwsSourceError() = runTest {
     val error = assertFailsWith<KetchError.SourceError> {
-      source.resolveContent("d8:announce".encodeToByteArray(), "broken.torrent")
+      source.resolve(ResolveInput.Content("d8:announce".encodeToByteArray(), "broken.torrent"))
     }
     assertEquals("torrent", error.sourceType)
   }

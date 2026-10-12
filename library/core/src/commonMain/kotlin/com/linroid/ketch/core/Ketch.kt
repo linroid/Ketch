@@ -22,6 +22,7 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -300,22 +301,15 @@ class Ketch(
     return task
   }
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-  ): ResolvedSource {
-    log.i { "Resolving URL: ${redactUrl(url)}" }
-    val source = sourceResolver.resolve(url)
-    return source.resolve(url, headers, currentConfig)
-  }
-
-  override suspend fun resolveContent(
-    content: ByteArray,
-    fileName: String?,
-  ): ResolvedSource {
-    log.i { "Resolving content: fileName=$fileName, size=${content.size}" }
-    val source = sourceResolver.resolveContent(content, fileName)
-    return source.resolveContent(content, fileName)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    log.i {
+      when (input) {
+        is ResolveInput.Url -> "Resolving URL: ${redactUrl(input.url)}"
+        is ResolveInput.Content ->
+          "Resolving content: fileName=${input.fileName}, size=${input.bytes.size}"
+      }
+    }
+    return sourceResolver.resolve(input).resolve(input, currentConfig)
   }
 
   override suspend fun start() {

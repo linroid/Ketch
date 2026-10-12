@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.sha256Digest
@@ -81,8 +82,7 @@ class PublicV2IndependentSeederTest {
         merkle.toByteString() to hashes.fold(ByteArray(0)) { a, b -> a + b })))
       val expected = TorrentV2Document.parse(data)
       val manager = SessionManager()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
-        metadataTimeoutSeconds = 10))
+      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
       val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(source))
       try {
         val torrent = TorrentInfo(data)

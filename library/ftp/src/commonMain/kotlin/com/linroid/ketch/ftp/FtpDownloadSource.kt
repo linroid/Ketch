@@ -3,6 +3,7 @@ package com.linroid.ketch.ftp
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
@@ -11,6 +12,7 @@ import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
@@ -49,7 +51,8 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
 
   override val resumeStateSerializer: KSerializer<FtpResumeState> = FtpResumeState.serializer()
 
-  override fun canHandle(url: String): Boolean {
+  override fun canHandle(input: ResolveInput): Boolean {
+    val url = (input as? ResolveInput.Url)?.url ?: return false
     val lower = url.lowercase()
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
@@ -57,16 +60,8 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): FtpResumeState =
     FtpResumeState(totalBytes = totalBytes, mdtm = resolved.metadata[META_MDTM])
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-  ): ResolvedSource = resolve(url, headers, DownloadConfig.Default)
-
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+    val url = (input as ResolveInput.Url).url
     val ftpUrl = try {
       FtpUrl.parse(url)
     } catch (e: IllegalArgumentException) {

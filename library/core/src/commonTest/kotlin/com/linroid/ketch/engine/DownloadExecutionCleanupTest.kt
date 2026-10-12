@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -154,11 +155,14 @@ class DownloadExecutionCleanupTest {
     val source = object : DownloadSource<Unit> {
       override val resumeStateSerializer = Unit.serializer()
       override val type = "fixture"
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-        suggestedFileName = "fixture.bin", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+          suggestedFileName = "fixture.bin", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         context.segments.value = listOf(Segment(0, 0, 99, 100))

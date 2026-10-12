@@ -71,6 +71,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
   `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
+  which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
+  and `resolve(bytes, fileName)` extensions build them),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
@@ -515,14 +518,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source is a `DownloadSource<S>` over its own serializable resume state `S`
   (`HttpResumeState`, `FtpResumeState`, `TorrentResumeState`, `Unit` for HLS/DASH) and defines:
-  `type`, `resumeStateSerializer`, `canHandle()`, `resolve()`, `download()`, `resume(state)`,
-  `buildResumeState()`. Ketch saves the state as JSON in `TaskRecord.sourceResumeState`
-  (`SourceResumeState`, written and read only through `encodeResumeState`/`decodeResumeState`,
-  which ignores unknown fields) and hands sources their state decoded: one that cannot be decoded
-  fails a resume with `KetchError.CorruptResumeState` and reaches `cleanup` as `null`. Optional
-  `canHandleContent()` / `resolveContent()` accept file content
-  such as `.torrent` bytes (`KetchApi.resolveContent`), and `resolveForDownload()` lets a task
-  wait where a preview (`resolve()`) would fail, as magnets whose peers are offline do
+  `type`, `resumeStateSerializer`, `canHandle(input)`, `resolve(input, config)`, `download()`,
+  `resume(state)`, `buildResumeState()`. Ketch saves the state as JSON in
+  `TaskRecord.sourceResumeState` (`SourceResumeState`, written and read only through
+  `encodeResumeState`/`decodeResumeState`, which ignores unknown fields) and hands sources their
+  state decoded: one that cannot be decoded fails a resume with `KetchError.CorruptResumeState`
+  and reaches `cleanup` as `null`. `canHandle` and `resolve` take a `ResolveInput`: a URL, or
+  file content such as `.torrent` bytes, which only the torrent source accepts; the
+  `canHandle(url)` and `resolve(url, headers, config)` extensions build the URL input. `resolve`
+  may take as long as finding the content does (a magnet waits for peers) and stops when
+  cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it if they
+  must (the server's resolve routes stop when the client disconnects)
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support
@@ -621,9 +627,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
-- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; a task
-  keeps looking (`DownloadSource.resolveForDownload`) until found or stopped, while previews
-  give up after one `metadataTimeout`. The apps show it as Starting, "Finding peers"
+- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; tasks
+  and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
+  peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
+  and a preview that takes 2 minutes offers Keep waiting and Add anyway
 - Verified selected-file storage, ownership journal, restart rehash, live limits, and opt-in
   upload and seeding (`[torrent] upload`)
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
@@ -685,7 +692,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
   `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
-  app) and resolve them through `KetchApi.resolveContent`, like dropped files
+  app) and resolve their content through `KetchApi.resolve`, like dropped files
 - Native torrent engine dependencies exist only in interoperability tests
 - uTP (BEP 29), `TorrentConfig.utpEnabled` (on by default): `UtpPacket` (codec, selective-ack
   and unknown extensions, `looksLikeUtp`) and `UtpSocket`, a deterministic state machine without
@@ -1410,7 +1417,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks
 - Forwards cookies, referrer and user agent as `DownloadRequest.headers`; `.torrent` downloads
-  whose URL Ketch would not recognize are fetched and resolved via `resolveContent`
+  whose URL Ketch would not recognize are fetched and resolved via `POST /api/resolve/content`
 - Tags every request with `DownloadRequest.properties["ketch.origin"] = "browser"`. The apps
   read this origin (`browser`, `discover`, `agent`, `app` or `cli`, set by whoever adds the
   download) for the Origin search facet; it never goes to `resolve()`, whose properties are headers

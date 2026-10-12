@@ -7,6 +7,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpResumeState
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow

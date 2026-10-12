@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo

@@ -19,6 +19,7 @@ import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.config.CONFIG_DIR_ENV
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig

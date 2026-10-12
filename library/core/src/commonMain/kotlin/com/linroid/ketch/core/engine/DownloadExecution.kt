@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -218,7 +219,7 @@ internal class DownloadExecution(
         "Resolved source '${source.type}' for taskId=$taskId: url=${redactUrl(request.url)}"
       }
       resolvedUrl = downloadWithRetry {
-        source.resolveForDownload(request.url, request.headers, config)
+        source.resolve(ResolveInput.Url(request.url, request.headers), config)
       }
     }
 

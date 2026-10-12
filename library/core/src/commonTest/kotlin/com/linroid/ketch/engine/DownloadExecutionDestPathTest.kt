@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -435,11 +436,14 @@ class DownloadExecutionDestPathTest {
     val outputPaths = mutableListOf<String>()
 
     override val type = "fixture"
-    override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 4, supportsResume = true,
-      suggestedFileName = suggestedFileName, maxSegments = 1, contentType = contentType,
-    )
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+        suggestedFileName = suggestedFileName, maxSegments = 1, contentType = contentType,
+      )
+    }
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       outputPaths += context.outputPath.orEmpty()

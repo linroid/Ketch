@@ -37,31 +37,17 @@ interface KetchApi {
   // Probing
 
   /**
-   * Probes [url] without downloading it. Pass the result in [DownloadRequest.resolvedSource] to
-   * skip the probe when downloading.
+   * Probes [input] without downloading it: a URL the instance fetches, or file content the caller
+   * holds. Pass the result in [DownloadRequest.resolvedSource] to skip probing again. The
+   * `resolve(url)` and `resolve(content, fileName)` extensions build the input.
    *
-   * @param headers request headers for HTTP sources; other sources may ignore them
-   */
-  suspend fun resolve(
-    url: String,
-    headers: Map<String, String> = emptyMap(),
-  ): ResolvedSource
-
-  /**
-   * Resolves file content the caller holds, such as a `.torrent` file. The content is not kept,
-   * so download it by passing the result in [DownloadRequest.resolvedSource], with its
-   * [ResolvedSource.url] as [DownloadRequest.url].
+   * It runs until it has an answer, as a magnet link waits for peers to come online; cancel the
+   * call to stop it.
    *
-   * @param fileName the original file name, whose extension may identify the content
-   * @throws KetchError.Unsupported if no source recognizes the content
+   * @throws KetchError.Unsupported if no source handles the URL or recognizes the content
    * @throws UnsupportedOperationException if this backend cannot resolve content
    */
-  suspend fun resolveContent(
-    content: ByteArray,
-    fileName: String? = null,
-  ): ResolvedSource {
-    throw UnsupportedOperationException("Resolving file content is unavailable")
-  }
+  suspend fun resolve(input: ResolveInput): ResolvedSource
 
   // Status and settings
 

@@ -77,8 +77,7 @@ interface KetchApi {
   val tasks: StateFlow<List<DownloadTask>>
   suspend fun start()  // core: restore persisted tasks; remote: connect and sync
   suspend fun download(request: DownloadRequest): DownloadTask
-  suspend fun resolve(url: String, properties: Map<String, String> = emptyMap()): ResolvedSource
-  suspend fun resolveContent(content: ByteArray, fileName: String? = null): ResolvedSource
+  suspend fun resolve(input: ResolveInput): ResolvedSource  // ResolveInput.Url or .Content
   suspend fun status(): KetchStatus
   suspend fun updateConfig(config: DownloadConfig)
   fun <T> subscribe(interest: Interest<T>, interval: Duration = 1.seconds): Flow<T>
@@ -90,18 +89,20 @@ interface KetchApi {
 Call `start()` once before use; persisted tasks only appear in `tasks` after it. The library
 version is available as `KetchApi.VERSION` and `KetchApi.REVISION`.
 
-`resolve(url)` probes a URL (for HTTP, a HEAD request, or a `GET` for its first byte when the
-server refuses HEAD) and returns its size, resume support,
-suggested file name and, for sources with several files or variants such as torrents, the
-selectable `files` and their `selectionMode`: `MULTIPLE` for any subset, `SINGLE` for exactly
-one variant (reserved for HLS quality; no built-in source offers it yet).
-`resolveContent(bytes, fileName)` does the same for file content the caller already holds, such
-as a picked `.torrent` file. Pass the result as `DownloadRequest.resolvedSource` (with its `url`
-as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files`, or one of
-them for a `SINGLE` choice (empty downloads the source's `defaultSelection()`: every file, or the
-first variant). With `awaitFileSelection = true` and no `selectedFileIds`, a download with several
-files or variants waits once they are known, as `Paused(AwaitingFileSelection)` holding no
-download slot, until `selectFiles` chooses; `resume()` downloads the default instead.
+`resolve(url)` probes a URL (for HTTP, a HEAD request, or a `GET` for its first byte when the server
+refuses HEAD) and returns its size, resume support, suggested file name and, for sources with
+several files or variants such as torrents, the selectable `files` and their `selectionMode`:
+`MULTIPLE` for any subset, `SINGLE` for exactly one variant (reserved for HLS quality; no built-in
+source offers it yet). `resolve(bytes, fileName)` does the same for file content the caller already
+holds, such as a picked `.torrent` file. Both are extensions building a `ResolveInput` (`Url(url,
+headers)` or `Content(bytes, fileName)`) for `KetchApi.resolve`, the one function backends
+implement; a URL is fetched by the instance, as a download's is, while content comes from the
+caller. Pass the result as `DownloadRequest.resolvedSource` (with its `url` as the request URL) to
+skip the probe; `selectedFileIds` picks a subset of `files`, or one of them for a `SINGLE` choice
+(empty downloads the source's `defaultSelection()`: every file, or the first variant). With
+`awaitFileSelection = true` and no `selectedFileIds`, a download with several files or variants
+waits once they are known, as `Paused(AwaitingFileSelection)` holding no download slot, until
+`selectFiles` chooses; `resume()` downloads the default instead.
 
 `KetchApi.download(...)` returns a `DownloadTask` for controlling an
 individual download. Tasks expose reactive state and per-task actions:
@@ -263,7 +264,7 @@ The built-in HTTP(S) source is the fallback. `additionalSources` adds other prot
 `library:dash` add [finite media downloads](media.md), sharing `Ketch`'s HTTP engine.
 `FtpDownloadSource` from `library:ftp` and `TorrentDownloadSource` from `library:torrent` (see
 [BitTorrent downloads](torrent.md)), or your own `DownloadSource`. The first source whose
-`canHandle(url)` matches is used. `fileNameResolver` and `dispatchers` can also be replaced;
+`canHandle` accepts the URL is used. `fileNameResolver` and `dispatchers` can also be replaced;
 `dispatchers` defaults to `KetchDispatchers.Default`, which every instance in the process shares
 (see [architecture](architecture.md#expectactual)).
 

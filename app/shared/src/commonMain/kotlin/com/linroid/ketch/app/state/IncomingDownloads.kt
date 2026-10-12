@@ -33,8 +33,8 @@ sealed interface IncomingDownload {
   val label: String
 
   /**
-   * A `.torrent` file's [content], resolved like a dropped file through
-   * [com.linroid.ketch.api.KetchApi.resolveContent] so remote backends work too.
+   * A `.torrent` file's [content], resolved like a dropped file, as
+   * [com.linroid.ketch.api.ResolveInput.Content], so remote backends work too.
    */
   class Ready(override val label: String, val content: ByteArray) : IncomingDownload {
     // Content equality lets opening the same file twice queue it only once.

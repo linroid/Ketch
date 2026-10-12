@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
@@ -17,6 +18,7 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.decodeResumeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
@@ -29,6 +31,7 @@ import com.linroid.ketch.torrent.control.TorrentControls
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.MAGNET_LOOKUP_TIME
 import com.linroid.ketch.torrent.engine.KotlinTorrentSession
 import com.linroid.ketch.torrent.engine.TorrentActiveSlots
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -89,6 +92,7 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration
 
 /**
  * Pure Kotlin BitTorrent v1, v2, and hybrid download source for JVM, Android, and iOS.
@@ -130,12 +134,16 @@ class TorrentDownloadSource(
   /** The upload policy of running and later torrents: the configured one or the last set. */
   internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
 
+  /** Test hook: how long one magnet metadata lookup runs before the next starts. */
+  internal var magnetLookupTime: Duration = MAGNET_LOOKUP_TIME
+
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
     // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
     // localDiscovery, which their setters change, decide if it does.
     KotlinTorrentEngine(it, http = http, portMapping = true,
-      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock)
+      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock,
+      magnetLookupTime = magnetLookupTime)
   }
   private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.disk)
   private val trackerListSubscription = TrackerLists(
@@ -406,31 +414,24 @@ class TorrentDownloadSource(
   internal fun extraTrackers(): List<String> =
     (additionalTrackers.load() + listedTrackers.load()).distinct()
 
-  override fun canHandle(url: String): Boolean {
-    val lower = url.lowercase()
-    return lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
-      lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
-  }
-
-  /** Accepts `.torrent` file names, or content that starts like a bencoded dictionary. */
-  override fun canHandleContent(content: ByteArray, fileName: String?): Boolean {
-    if (fileName?.endsWith(".torrent", ignoreCase = true) == true) return true
-    // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
-    return content.size >= 2 && content[0] == 'd'.code.toByte() &&
-      content[1] in '1'.code.toByte()..'9'.code.toByte()
-  }
-
-  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
-  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    withContext(TorrentDispatchers.engine) {
-      try {
-        resolveMetainfo(content)
-      } catch (e: CancellationException) { throw e
-      } catch (e: Exception) {
-        if (e is KetchError) throw e
-        throw KetchError.SourceError(TYPE, e)
-      }
+  /**
+   * Accepts magnets, `torrent:` IDs and `.torrent` URLs or paths, and content named `.torrent` or
+   * starting like a bencoded dictionary.
+   */
+  override fun canHandle(input: ResolveInput): Boolean = when (input) {
+    is ResolveInput.Url -> {
+      val lower = input.url.lowercase()
+      lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
+        lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
     }
+    is ResolveInput.Content -> {
+      val bytes = input.bytes
+      // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
+      input.fileName?.endsWith(".torrent", ignoreCase = true) == true ||
+        bytes.size >= 2 && bytes[0] == 'd'.code.toByte() &&
+        bytes[1] in '1'.code.toByte()..'9'.code.toByte()
+    }
+  }
 
   /** Resolve metainfo supplied by a file picker or SDK caller without making a network request. */
   fun resolveMetainfo(
@@ -770,8 +771,25 @@ class TorrentDownloadSource(
   /** The task's registered session; for tests. */
   internal suspend fun sessionOf(taskId: String): TorrentSession? = tasks.session(taskId)
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    resolve(url, config.discoveryPrivacy, headers)
+  /** A magnet keeps looking for its metadata until it is found or the caller stops. */
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+    when (input) {
+      is ResolveInput.Url ->
+        resolveUntilFound(input.url, this.config.discoveryPrivacy, input.headers)
+      is ResolveInput.Content -> resolveContent(input.bytes)
+    }
+
+  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  private suspend fun resolveContent(content: ByteArray): ResolvedSource =
+    withContext(TorrentDispatchers.engine) {
+      try {
+        resolveMetainfo(content)
+      } catch (e: CancellationException) { throw e
+      } catch (e: Exception) {
+        if (e is KetchError) throw e
+        throw KetchError.SourceError(TYPE, e)
+      }
+    }
 
   /** Resolve with an explicit privacy choice before any discovery or metadata request starts. */
   suspend fun resolve(
@@ -823,17 +841,11 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Resolves [url] for a task. A magnet keeps looking for its metadata, in lookups of
-   * [TorrentConfig.metadataTimeoutSeconds] each, until one finds it or the task stops: the peers
-   * of a small swarm may come online at any time. Other inputs resolve as [resolve] does.
+   * Resolves [url] as [resolve] does, except that a magnet keeps looking for its metadata, one
+   * lookup after another, until one finds it or the caller stops: the peers of a small swarm may
+   * come online at any time.
    */
-  override suspend fun resolveForDownload(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = resolveForTask(url, this.config.discoveryPrivacy, headers)
-
-  private suspend fun resolveForTask(
+  private suspend fun resolveUntilFound(
     url: String,
     privacy: TorrentDiscoveryPrivacy,
     properties: Map<String, String>,
@@ -925,7 +937,7 @@ class TorrentDownloadSource(
 
   override suspend fun download(context: DownloadContext) = reportingFailures {
     val resolved = context.preResolved
-      ?: resolveForTask(context.url, config.discoveryPrivacy, context.headers)
+      ?: resolveUntilFound(context.url, config.discoveryPrivacy, context.headers)
     execute(context, resolved, null)
   }
 
@@ -939,7 +951,7 @@ class TorrentDownloadSource(
     val resolved = when {
       state.metainfo.isNotEmpty() -> resolveMetainfo(decodeBase64(state.metainfo), privacy)
       checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
-      else -> resolveForTask(context.url, privacy, context.headers)
+      else -> resolveUntilFound(context.url, privacy, context.headers)
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Resume torrent changed" }
     execute(context, resolved, state)
