@@ -18,7 +18,6 @@ import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first

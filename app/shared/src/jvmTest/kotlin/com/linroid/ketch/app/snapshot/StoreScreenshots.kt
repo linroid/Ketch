@@ -66,7 +66,6 @@ import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.Surface
 import java.io.File
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

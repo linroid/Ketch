@@ -328,7 +328,9 @@ internal class TorrentV2Uploader private constructor(
     val start = turn++ % serving.size
     for (offset in serving.indices) {
       val view = serving[(start + offset) % serving.size].value
-      while (canServe(view, now) && dispatch(view, now, peers)) Unit
+      while (canServe(view, now)) {
+        if (!dispatch(view, now, peers)) break
+      }
     }
   }
 

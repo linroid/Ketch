@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.ApplicationScope
+import androidx.compose.ui.window.MenuComposable
 import androidx.compose.ui.window.MenuScope
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.TrayState
@@ -130,7 +131,7 @@ internal fun ApplicationScope.SystemTrayIcon(
   state: TrayState,
   tooltip: String?,
   onAction: () -> Unit,
-  menu: @Composable MenuScope.() -> Unit,
+  menu: @Composable @MenuComposable MenuScope.() -> Unit,
 ) {
   val mac = DesktopOs.current == DesktopOs.MAC
   val density = LocalDensity.current

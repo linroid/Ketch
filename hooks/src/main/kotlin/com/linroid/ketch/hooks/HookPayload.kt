@@ -7,7 +7,6 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.categoryFor
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.log.redactUrlsIn
-import com.linroid.ketch.config.HookConfig
 import com.linroid.ketch.config.HookEvent
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

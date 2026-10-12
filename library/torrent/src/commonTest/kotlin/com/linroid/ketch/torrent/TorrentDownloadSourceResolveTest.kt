@@ -1,6 +1,5 @@
 package com.linroid.ketch.torrent
 
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolveInput

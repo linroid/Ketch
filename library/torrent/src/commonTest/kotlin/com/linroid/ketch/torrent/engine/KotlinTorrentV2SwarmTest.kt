@@ -176,7 +176,9 @@ class KotlinTorrentV2SwarmTest {
           assertContentEquals(pieceBitfield(BooleanArray(pieceCount) { true }),
             assertIs<PeerMessage.Bitfield>(wire.read()).bytes)
           wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
-          while (wire.read() != PeerMessage.Control(PeerMessage.Signal.UNCHOKE)) Unit
+          do {
+            val message = wire.read()
+          } while (message != PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
           // Canonical v1 blocks of every piece, padding included, hashed as v1 peers do.
           for (index in 0 until pieceCount) {
             val size = minOf(legacy.pieceLength, legacy.totalBytes - index * legacy.pieceLength)

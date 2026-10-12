@@ -43,7 +43,7 @@ kotlin {
   // Intermediate source set shared between JVM and Android
   applyDefaultHierarchyTemplate()
   sourceSets {
-    val jvmAndAndroidMain by creating {
+    val jvmAndAndroidMain = create("jvmAndAndroidMain") {
       dependsOn(commonMain.get())
     }
     androidMain.get().dependsOn(jvmAndAndroidMain)

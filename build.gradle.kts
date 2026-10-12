@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
@@ -45,12 +45,31 @@ subprojects {
 }
 
 // Every module here is Ketch's own, so it may use and implement what library:api reserves.
+val ketchOptIns = listOf(
+  "com.linroid.ketch.api.InternalKetchApi",
+  "com.linroid.ketch.api.KetchImplementationApi",
+)
+// Tests drive virtual time with kotlinx-coroutines-test, whose scheduler controls are experimental.
+val testOptIn = "kotlinx.coroutines.ExperimentalCoroutinesApi"
+
 subprojects {
   tasks.withType<KotlinCompilationTask<*>>().configureEach {
-    compilerOptions.optIn.addAll(
-      "com.linroid.ketch.api.InternalKetchApi",
-      "com.linroid.ketch.api.KetchImplementationApi",
-    )
+    compilerOptions.optIn.addAll(ketchOptIns)
+  }
+  // The IDE reads the settings of shared source sets, such as commonMain, from the extension and
+  // never from a compile task, so multiplatform modules opt in there too.
+  pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
+    extensions.configure<KotlinMultiplatformExtension> {
+      compilerOptions.optIn.addAll(ketchOptIns)
+      sourceSets.matching { it.name.endsWith("Test") }.configureEach {
+        languageSettings.optIn(testOptIn)
+      }
+    }
+  }
+  pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+    extensions.configure<KotlinJvmProjectExtension> {
+      sourceSets.named("test") { languageSettings.optIn(testOptIn) }
+    }
   }
 }
 

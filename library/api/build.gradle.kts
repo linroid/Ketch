@@ -17,7 +17,7 @@ val gitRevision: String by lazy {
   }.standardOutput.asText.get().trim()
 }
 
-val generateVersion by tasks.registering {
+val generateVersion = tasks.register("generateVersion") {
   val outputDir = layout.buildDirectory.dir("generated/version")
   val ver = findProperty("VERSION_NAME")?.toString() ?: "dev"
   // Test CI can keep this stable so unrelated commits do not invalidate every API consumer.

@@ -122,7 +122,7 @@ class ResolveContentRoutesTest {
     try {
       val response = client.post("/api/resolve/content?fileName=big.torrent") {
         contentType(ContentType.Application.OctetStream)
-        setBody(ByteArray(MAX_RESOLVE_CONTENT_BYTES.toInt() + 1))
+        setBody(ByteArray(MAX_RESOLVE_CONTENT_BYTES + 1))
       }
       assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
       assertNull(source.received)

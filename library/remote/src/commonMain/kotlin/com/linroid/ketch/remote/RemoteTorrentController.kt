@@ -2,7 +2,6 @@ package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
@@ -37,7 +36,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -188,7 +187,7 @@ internal class RemoteTorrentController(
       var name: String? = null
       val data = StringBuilder()
       while (!ended) {
-        val line = channel.readUTF8Line()
+        val line = channel.readLine()
         // A blank line ends an event; so does the end of the stream, leniently.
         if (line.isNullOrEmpty()) {
           val event = name

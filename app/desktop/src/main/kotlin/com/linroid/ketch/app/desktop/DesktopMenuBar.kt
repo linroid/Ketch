@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ComposableOpenTarget
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -132,6 +133,7 @@ class DesktopActions(
  * @param speedMode switches the active device's speed mode; `null` leaves out Slow lane.
  */
 @Composable
+@ComposableOpenTarget(-1)
 fun FrameWindowScope.KetchMenuBar(
   controller: AppController,
   status: DesktopStatus,

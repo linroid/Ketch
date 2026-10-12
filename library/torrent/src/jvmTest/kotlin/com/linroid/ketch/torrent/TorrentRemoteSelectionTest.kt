@@ -33,7 +33,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
-import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -101,7 +101,7 @@ class TorrentRemoteSelectionTest {
           val channel = it.bodyAsChannel()
           started.complete(Unit)
           while (true) {
-            val line = channel.readUTF8Line() ?: break
+            val line = channel.readLine() ?: break
             synchronized(events) { events.append(line).append('\n') }
           }
         }

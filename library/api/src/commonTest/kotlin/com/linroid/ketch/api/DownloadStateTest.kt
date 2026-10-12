@@ -8,6 +8,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
 class DownloadStateTest {
 
   @Test
@@ -130,8 +132,7 @@ class DownloadStateTest {
        "reason":{"type":"thermal","celsius":90}}
     """.trimIndent()
 
-    val state = Json { ignoreUnknownKeys = true }
-      .decodeFromString(DownloadState.serializer(), json)
+    val state = lenientJson.decodeFromString(DownloadState.serializer(), json)
 
     assertEquals(PauseReason.User, (state as DownloadState.Paused).reason)
   }

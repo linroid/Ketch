@@ -4,7 +4,6 @@ import okio.FileHandle
 import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.Path
-import okio.Path.Companion.toPath
 import okio.Sink
 import okio.Source
 import java.io.IOException

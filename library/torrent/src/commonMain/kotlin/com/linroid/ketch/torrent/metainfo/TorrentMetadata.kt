@@ -65,7 +65,7 @@ internal data class TorrentMetadata(
       requireNotNull(info.dictionary) { "Info must be a dictionary" }
       val version = info["meta version"]
       val hybrid = version != null
-      require(!hybrid || allowHybrid && version?.integer == 2L) {
+      require(!hybrid || allowHybrid && version.integer == 2L) {
         "BitTorrent v2/hybrid is not supported"
       }
       val name = requireNotNull(info["name"]?.text()) { "Missing name" }

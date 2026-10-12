@@ -79,7 +79,7 @@ val webSourceDir = if (prebuiltWebDir.isPresent) {
     .dir("dist/wasmJs/productionExecutable").get()
 }
 
-val bundleWebApp by tasks.registering(Sync::class) {
+val bundleWebApp = tasks.register<Sync>("bundleWebApp") {
   if (!prebuiltWebDir.isPresent) {
     dependsOn(":app:web:wasmJsBrowserDistribution")
   }
@@ -131,7 +131,7 @@ distributions.main {
   }
 }
 
-val prepareNativeLicenses by tasks.registering(Sync::class) {
+val prepareNativeLicenses = tasks.register<Sync>("prepareNativeLicenses") {
   from(releaseLicenses)
   into(layout.buildDirectory.dir("native/nativeCompile/licenses"))
 }

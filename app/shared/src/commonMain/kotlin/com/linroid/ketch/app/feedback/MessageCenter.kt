@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.TaskKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

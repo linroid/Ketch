@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalWasmJsInterop::class)
+
 package com.linroid.ketch.app.i18n
+
+import kotlin.js.ExperimentalWasmJsInterop
 
 internal actual fun decimalSeparator(): Char = localeDecimalSeparator().firstOrNull() ?: '.'
 

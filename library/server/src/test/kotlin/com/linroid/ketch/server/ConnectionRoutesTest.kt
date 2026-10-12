@@ -29,7 +29,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -138,7 +138,7 @@ class ConnectionRoutesTest {
     var name = ""
     val data = StringBuilder()
     while (true) {
-      val line = readUTF8Line() ?: error("The stream ended")
+      val line = readLine() ?: error("The stream ended")
       if (line.isEmpty()) {
         if (name.isNotEmpty()) return name to data.toString()
         continue

@@ -17,7 +17,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Notification
@@ -117,6 +116,7 @@ import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.icon
 import ketch.app.desktop.generated.resources.keep_awake_reason
 import ketch.app.desktop.generated.resources.message_command_stopped
 import ketch.app.desktop.generated.resources.message_command_stopped_hint
@@ -152,6 +152,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
+import org.jetbrains.compose.resources.painterResource
 import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.EventQueue
@@ -561,7 +562,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   // Closed to the menu bar, Ketch leaves the Dock until a window opens again.
   MacDockPresence(shown = behavior.windowVisible || settingsWindow.isOpen)
 
-  val icon = painterResource("icon.svg")
+  val icon = painterResource(Res.drawable.icon)
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
     if (behavior.windowVisible) {

@@ -225,7 +225,7 @@ configurations.runtimeClasspath {
 //   ProGuard task does not, such as Ktor's and kotlinx.coroutines' for their atomic fields.
 // - The names of the services in META-INF/services: ServiceLoader finds a service's providers by
 //   the name of its interface. proguard-rules.pro keeps the providers the app uses.
-val proguardRules by tasks.registering {
+val proguardRules = tasks.register("proguardRules") {
   val libraries = objects.fileCollection().from(configurations.runtimeClasspath)
   val mapping = layout.buildDirectory.file("outputs/proguard/mapping.txt")
   val rules = layout.buildDirectory.file("generated/proguard/rules.pro")

@@ -3,7 +3,6 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.verbatim
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job

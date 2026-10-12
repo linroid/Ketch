@@ -15,7 +15,6 @@ import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 class RealDownloadTaskRemoveTest {

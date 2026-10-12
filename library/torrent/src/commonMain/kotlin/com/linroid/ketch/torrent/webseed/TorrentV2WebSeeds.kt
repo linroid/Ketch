@@ -9,6 +9,7 @@ import com.linroid.ketch.torrent.storage.CommitOutcome
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -141,6 +142,7 @@ internal class TorrentV2WebSeeds private constructor(
     private var waiting = false
     private var next: List<TorrentV2PieceScheduler.WebSeedClaim>? = null
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun claim(): List<TorrentV2PieceScheduler.WebSeedClaim> {
       next?.let {
         next = null

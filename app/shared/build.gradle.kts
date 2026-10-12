@@ -12,6 +12,11 @@ plugins {
 }
 
 kotlin {
+  // PlatformLanguage is an expect object, which Kotlin still calls Beta.
+  compilerOptions {
+    freeCompilerArgs.add("-Xexpect-actual-classes")
+  }
+
   android {
     namespace = "com.linroid.ketch.app.shared"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -63,10 +68,10 @@ kotlin {
 
   sourceSets {
     // The targets that run the engine inside the app: Android, desktop and iOS.
-    val nonWebMain by creating {
+    val nonWebMain = create("nonWebMain") {
       dependsOn(commonMain.get())
     }
-    val jvmAndAndroidMain by creating {
+    val jvmAndAndroidMain = create("jvmAndAndroidMain") {
       dependsOn(nonWebMain)
     }
     androidMain.get().dependsOn(jvmAndAndroidMain)

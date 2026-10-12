@@ -250,7 +250,7 @@ class MixedDownloadLimitsTest {
           seedEngine?.stop()
           torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
-        seedEngine?.assertNoLeaks()
+        seedEngine.assertNoLeaks()
       }
     }
   }
