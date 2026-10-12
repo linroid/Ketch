@@ -1,16 +1,16 @@
 package com.linroid.ketch.torrent
 
-import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.decodeResumeState
+import com.linroid.ketch.core.engine.SourceState
+import com.linroid.ketch.core.engine.decodeState
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TorrentResumeStateTest {
+class TorrentSourceStateTest {
 
   @Test
   fun serialization_roundtrip() {
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = 1024000,
       resumeData = "base64encodeddata==",
@@ -18,13 +18,13 @@ class TorrentResumeStateTest {
       savePath = "/downloads/torrent",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(state, decoded)
   }
 
   @Test
   fun deserialization_preservesSelectedFileIds() {
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "0123456789abcdef0123456789abcdef01234567",
       totalBytes = 5000,
       resumeData = "data",
@@ -32,13 +32,13 @@ class TorrentResumeStateTest {
       savePath = "/tmp",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(setOf("1", "3"), decoded.selectedFileIds)
   }
 
   @Test
   fun deserialization_emptySelectedFileIds() {
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "0123456789abcdef0123456789abcdef01234567",
       totalBytes = 0,
       resumeData = "",
@@ -46,14 +46,14 @@ class TorrentResumeStateTest {
       savePath = "/tmp",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(emptySet(), decoded.selectedFileIds)
   }
 
   @Test
   fun decode_unknownKeys_areIgnored() {
     // A newer build may add fields; every decode site reads them leniently.
-    val state = TorrentDownloadSource().decodeResumeState(SourceResumeState(
+    val state = TorrentDownloadSource().decodeState(SourceState(
       TorrentDownloadSource.TYPE,
       """
       {"infoHash":"0123456789abcdef0123456789abcdef01234567","totalBytes":7,

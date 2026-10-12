@@ -227,7 +227,7 @@ class FtpDownloadSourceTest {
       Segment(index = 1, start = 500, end = 999, downloadedBytes = 100),
     )
 
-    source(server).download(context, FtpResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -260,7 +260,7 @@ class FtpDownloadSourceTest {
     file.preallocate(1000)
     val context = context(file, connections = 1)
 
-    source(server).download(context, FtpResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)

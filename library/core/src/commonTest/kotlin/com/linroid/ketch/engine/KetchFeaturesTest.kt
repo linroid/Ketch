@@ -6,7 +6,7 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.HttpResumeState
+import com.linroid.ketch.core.engine.HttpSourceState
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
@@ -25,7 +25,7 @@ class KetchFeaturesTest {
       setOf(KetchFeatures.FINITE_HLS, KetchFeatures.FINITE_DASH))) {
       val engine = FakeHttpEngine()
       val sources = features.map { feature ->
-        object : DownloadSource<HttpResumeState> by HttpDownloadSource(engine) {
+        object : DownloadSource<HttpSourceState> by HttpDownloadSource(engine) {
           override val features: Set<String> = setOf(feature)
         }
       }

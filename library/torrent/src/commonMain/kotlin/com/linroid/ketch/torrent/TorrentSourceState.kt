@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 @ConsistentCopyVisibility
-data class TorrentResumeState internal constructor(
+data class TorrentSourceState internal constructor(
   internal val infoHash: String,
   internal val totalBytes: Long,
   internal val resumeData: String,

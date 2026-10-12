@@ -45,7 +45,7 @@ class DownloadCoordinatorFailureTest {
 
   /** Downloads `/hang` until cancelled; `/error` and `/cancel` fail at once. */
   private class ScriptedSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     val hanging = CompletableDeferred<Unit>()
 
     override val type: String = "scripted"

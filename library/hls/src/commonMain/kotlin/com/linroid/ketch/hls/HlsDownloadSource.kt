@@ -23,7 +23,7 @@ import kotlinx.serialization.builtins.serializer
  */
 class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
   override val type: String = "hls"
-  override val resumeStateSerializer: KSerializer<Unit> = Unit.serializer()
+  override val stateSerializer: KSerializer<Unit> = Unit.serializer()
   override val features: Set<String> = setOf(KetchFeatures.FINITE_HLS)
   override val previousTypes: Set<String> = setOf("media")
   private val helper = MediaDownloadHelper(httpEngine, type)

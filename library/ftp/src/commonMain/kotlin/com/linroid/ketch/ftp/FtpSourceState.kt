@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  *   detect if the remote file has changed since the download started
  */
 @Serializable
-data class FtpResumeState(
+data class FtpSourceState(
   val totalBytes: Long,
   val mdtm: String? = null,
 )

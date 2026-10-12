@@ -14,7 +14,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
-import com.linroid.ketch.torrent.TorrentResumeState
+import com.linroid.ketch.torrent.TorrentSourceState
 import com.linroid.ketch.torrent.saved
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -280,7 +280,7 @@ class KotlinRuntimePrivateTest {
           override fun close() = Unit
         }
         val now = Instant.fromEpochMilliseconds(1_000)
-        val state = TorrentResumeState(metadata.infoHash.hex, 4, "", setOf("0"),
+        val state = TorrentSourceState(metadata.infoHash.hex, 4, "", setOf("0"),
           (root / "private").toString(), encodeBase64(metainfo), version = 2,
           privacy = TorrentDiscoveryPrivacy.PUBLIC)
         val store = MemoryTaskStore()
@@ -289,7 +289,7 @@ class KotlinRuntimePrivateTest {
             destination = Destination((root / "private").toString())),
           outputPath = (root / "private").toString(), state = TaskState.COMPLETED,
           totalBytes = 4, sourceType = TorrentDownloadSource.TYPE,
-          sourceResumeState = state.saved(),
+          sourceState = state.saved(),
           createdAt = now, updatedAt = now, completedAt = now,
           control = TaskControl(sharing = true)))
         var created = 0

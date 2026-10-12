@@ -153,7 +153,7 @@ class DownloadExecutionCleanupTest {
     }
     // Every byte is reported written, but the final flush fails.
     val source = object : DownloadSource<Unit> {
-      override val resumeStateSerializer = Unit.serializer()
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
       override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {

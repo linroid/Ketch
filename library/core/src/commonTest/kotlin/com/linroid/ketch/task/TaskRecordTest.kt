@@ -104,7 +104,7 @@ class TaskRecordTest {
     """.trimIndent()
     val record = json.decodeFromString<TaskRecord>(jsonStr)
     assertNull(record.sourceType)
-    assertNull(record.sourceResumeState)
+    assertNull(record.sourceState)
   }
 
   @Test

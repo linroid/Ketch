@@ -17,9 +17,9 @@ import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
-import com.linroid.ketch.core.engine.decodeResumeState
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -119,7 +119,7 @@ class TorrentDownloadSource(
   httpEngine: HttpEngine? = null,
   private val restoreSeeding: Boolean = true,
   private val multicastLock: TorrentMulticastLock? = null,
-) : DownloadSource<TorrentResumeState> {
+) : DownloadSource<TorrentSourceState> {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
@@ -165,7 +165,7 @@ class TorrentDownloadSource(
   // Magnet fetches beyond the runtime's pending-metadata bound queue instead of failing.
   private val metadataFetches = Semaphore(MAX_PENDING_METADATA)
   private val stateMutex = Mutex()
-  private val states = linkedMapOf<String, TorrentResumeState>()
+  private val states = linkedMapOf<String, TorrentSourceState>()
   // Guarded by stateMutex: what stops each seeding session's lent slot coming back.
   private val seedWatchers = mutableMapOf<String, Job>()
   private val fileTables = TorrentFileTables()
@@ -175,8 +175,8 @@ class TorrentDownloadSource(
   private val log = KetchLogger("TorrentSource")
   override val type: String = TYPE
 
-  override val resumeStateSerializer: KSerializer<TorrentResumeState> =
-    TorrentResumeState.serializer()
+  override val stateSerializer: KSerializer<TorrentSourceState> =
+    TorrentSourceState.serializer()
   override val managesOwnFileIo: Boolean = true
   override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
     KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL)
@@ -198,8 +198,8 @@ class TorrentDownloadSource(
     override val seedingTaskIds: StateFlow<Set<String>> get() = source.seedingTaskIds
     override val restoresSeeding: Boolean get() = source.restoresSeeding
 
-    override suspend fun torrentFiles(resumeState: SourceResumeState?, resolved: ResolvedSource?) =
-      source.torrentFiles(resumeState, resolved)
+    override suspend fun torrentFiles(sourceState: SourceState?, resolved: ResolvedSource?) =
+      source.torrentFiles(sourceState, resolved)
 
     override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
 
@@ -451,8 +451,8 @@ class TorrentDownloadSource(
    * else a v1 checkpoint's), never from file sizes a client sent. A v2 or hybrid
    * task that started refuses a newly chosen file whose path holds something it does not own.
    */
-  override suspend fun planSelection(request: SelectionRequest<TorrentResumeState>): SelectionPlan {
-    val state = request.resumeState
+  override suspend fun planSelection(request: SelectionRequest<TorrentSourceState>): SelectionPlan {
+    val state = request.sourceState
     val table = fileTable(state, request.resolved)
       ?: throw IllegalStateException("The file list is not known yet")
     val requested = request.fileIds ?: table.ids
@@ -485,7 +485,7 @@ class TorrentDownloadSource(
   private suspend fun requireOwnedPaths(
     taskId: String,
     table: TorrentFileTable,
-    state: TorrentResumeState?,
+    state: TorrentSourceState?,
     output: String,
     added: Set<String>,
   ) {
@@ -511,7 +511,7 @@ class TorrentDownloadSource(
    * A task's metainfo: from [resolved], the resolution Ketch kept, else from [state] as builds
    * before that saved it; null when neither holds it.
    */
-  private fun metainfoOf(resolved: ResolvedSource?, state: TorrentResumeState?): ByteArray? =
+  private fun metainfoOf(resolved: ResolvedSource?, state: TorrentSourceState?): ByteArray? =
     (resolved?.metadata?.get(ResolvedSource.METAINFO_KEY)?.takeIf { it.isNotEmpty() }
       ?: state?.metainfo?.takeIf { it.isNotEmpty() })?.let(::decodeBase64)
 
@@ -520,7 +520,7 @@ class TorrentDownloadSource(
    * null when none holds any.
    */
   private suspend fun fileTable(
-    state: TorrentResumeState?,
+    state: TorrentSourceState?,
     resolved: ResolvedSource?,
   ): TorrentFileTable? {
     val bytes = metainfoOf(resolved, state)
@@ -533,10 +533,10 @@ class TorrentDownloadSource(
   }
 
   internal suspend fun torrentFiles(
-    resumeState: SourceResumeState?,
+    sourceState: SourceState?,
     resolved: ResolvedSource?,
   ): List<SourceFile>? {
-    val table = fileTable(resumeState?.let { decodeResumeState(it) }, resolved) ?: return null
+    val table = fileTable(sourceState?.let { decodeState(it) }, resolved) ?: return null
     return table.files.map {
       SourceFile(it.id, it.path, it.size, metadata = mapOf("path" to it.path))
     }
@@ -666,7 +666,7 @@ class TorrentDownloadSource(
   private class SeedPlan(val hash: String, val open: suspend () -> TorrentSession)
 
   private suspend fun seedPlan(task: SeedingTask): SeedPlan {
-    val state = decodeResumeState(task.resumeState)
+    val state = decodeState(task.sourceState)
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
     val bytes = metainfoOf(task.resolved, state)
@@ -914,7 +914,7 @@ class TorrentDownloadSource(
       ?: config.discoveryPrivacy
 
   /** The running session's state with its latest checkpoint; none until a session started. */
-  override suspend fun store(context: DownloadContext): TorrentResumeState? {
+  override suspend fun store(context: DownloadContext): TorrentSourceState? {
     val owner = tasks.session(context.taskId)
     val saved = owner?.saveResumeData()
     return stateMutex.withLock {
@@ -928,7 +928,7 @@ class TorrentDownloadSource(
   /** Continues from [state], or downloads anew without one, as before its session started. */
   override suspend fun download(
     context: DownloadContext,
-    state: TorrentResumeState?,
+    state: TorrentSourceState?,
   ) = reportingFailures {
     if (state == null) {
       val resolved = context.preResolved
@@ -966,7 +966,7 @@ class TorrentDownloadSource(
   private suspend fun execute(
     context: DownloadContext,
     resolved: ResolvedSource,
-    previous: TorrentResumeState?,
+    previous: TorrentSourceState?,
   ) {
     val hash = requireNotNull(resolved.metadata[META_INFO_HASH])
     val bytes = decodeBase64(requireNotNull(resolved.metadata[ResolvedSource.METAINFO_KEY]))
@@ -989,7 +989,7 @@ class TorrentDownloadSource(
     val total = table.totalOf(selected)
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
     // The metainfo is Ketch's to keep; only states older builds saved carry it.
-    val state = TorrentResumeState(hash, total, previous?.resumeData ?: "", selected, output,
+    val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
       previous?.metainfo.orEmpty(), version = 2, privacy = privacy)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
@@ -1008,7 +1008,7 @@ class TorrentDownloadSource(
   private suspend fun executeV2(
     context: DownloadContext,
     resolved: ResolvedSource,
-    previous: TorrentResumeState?,
+    previous: TorrentSourceState?,
   ) {
     require(previous == null || previous.version == 3) { "Invalid v2 resume state" }
     val bytes = decodeBase64(resolved.metadata.getValue(ResolvedSource.METAINFO_KEY))
@@ -1024,7 +1024,7 @@ class TorrentDownloadSource(
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
     val hash = document.info.hash.hex
     val total = table.totalOf(selected)
-    val state = TorrentResumeState(hash, total, previous?.resumeData.orEmpty(), selected, output,
+    val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
       previous?.metainfo.orEmpty(), version = 3, privacy = privacy)
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
@@ -1053,7 +1053,7 @@ class TorrentDownloadSource(
   private fun selectionOf(
     table: TorrentFileTable,
     requested: Set<String>,
-    previous: TorrentResumeState?,
+    previous: TorrentSourceState?,
   ): Set<String> {
     val ids = requested.ifEmpty { previous?.selectedFileIds.orEmpty() }.ifEmpty { table.ids }
     require(ids.all { table[it] != null }) { "Invalid file selection" }
@@ -1069,7 +1069,7 @@ class TorrentDownloadSource(
     context: DownloadContext,
     hash: String,
     table: TorrentFileTable,
-    state: TorrentResumeState,
+    state: TorrentSourceState,
     initialRevision: Int,
     open: suspend () -> TorrentSession,
   ) {
@@ -1375,7 +1375,7 @@ class TorrentDownloadSource(
    * Finished snapshots are bounded; persisted task state and the ownership journal recover tasks
    * after eviction. Active entries must remain until the final core snapshot.
    */
-  private suspend fun rememberState(taskId: String, state: TorrentResumeState) =
+  private suspend fun rememberState(taskId: String, state: TorrentSourceState) =
     stateMutex.withLock {
       while (states.size >= 128 && taskId !in states) {
         val finished = checkNotNull(states.keys.firstOrNull { !tasks.isReserved(it) }) {
@@ -1412,7 +1412,7 @@ class TorrentDownloadSource(
 
   override suspend fun cleanup(
     context: DownloadContext,
-    state: TorrentResumeState?,
+    state: TorrentSourceState?,
     deleteFiles: Boolean,
   ) {
     release(context.taskId)
@@ -1448,7 +1448,7 @@ class TorrentDownloadSource(
     }
   }
 
-  private suspend fun cleanupV2(context: DownloadContext, state: TorrentResumeState) {
+  private suspend fun cleanupV2(context: DownloadContext, state: TorrentSourceState) {
     check(!tasks.isReserved(context.taskId)) { "Join the torrent download before cleanup" }
     val metainfo = requireNotNull(metainfoOf(context.preResolved, state)) { "No saved metainfo" }
     val document = TorrentV2Document.parse(metainfo,

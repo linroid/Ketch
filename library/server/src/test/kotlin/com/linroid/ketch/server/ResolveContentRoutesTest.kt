@@ -29,7 +29,7 @@ class ResolveContentRoutesTest {
   private class ContentSource(private val malformed: Boolean = false) : DownloadSource<Unit> {
     var received: Pair<ByteArray, String?>? = null
     override val type = "content"
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override fun canHandle(input: ResolveInput): Boolean =
       input is ResolveInput.Content && input.fileName?.endsWith(".torrent") == true
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {

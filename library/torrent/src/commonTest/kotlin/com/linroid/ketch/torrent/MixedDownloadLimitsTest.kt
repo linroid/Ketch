@@ -193,7 +193,7 @@ class MixedDownloadLimitsTest {
         // A completed task that seeded when its Ketch last stopped.
         val ids = setOf("0", "1")
         val total = torrent.sizes.sum().toLong()
-        val state = TorrentResumeState(torrent.metadata.infoHash.hex, total, "", ids,
+        val state = TorrentSourceState(torrent.metadata.infoHash.hex, total, "", ids,
           seeded.toString(), encodeBase64(torrent.metainfo), version = 2,
           privacy = TorrentDiscoveryPrivacy.PUBLIC)
         val now = Instant.fromEpochMilliseconds(1_000)
@@ -203,7 +203,7 @@ class MixedDownloadLimitsTest {
             destination = Destination(seeded.toString()), selectedFileIds = ids),
           outputPath = seeded.toString(), state = TaskState.COMPLETED, totalBytes = total,
           sourceType = TorrentDownloadSource.TYPE,
-          sourceResumeState = state.saved(),
+          sourceState = state.saved(),
           createdAt = now, updatedAt = now, completedAt = now,
           control = TaskControl(sharing = true)))
         var seedEngine: KotlinTorrentEngine? = null

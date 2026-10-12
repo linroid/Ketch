@@ -8,10 +8,10 @@ import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve
-import com.linroid.ketch.core.engine.decodeResumeState
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -95,7 +95,7 @@ class DashDownloadSourceTest {
       engine.parts.map { it.second })
     file.bytes = "stale partial output".encodeToByteArray()
     // Tasks saved before media sources split carry the "media" type and an empty object.
-    source.download(context, source.decodeResumeState(SourceResumeState("media", "{}")))
+    source.download(context, source.decodeState(SourceState("media", "{}")))
     assertEquals("firstsecond", file.bytes.decodeToString())
   }
 

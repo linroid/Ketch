@@ -91,7 +91,7 @@ class KetchCloseTest {
 
   /** Never finishes resolving. */
   private class StuckSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "stuck"
     override fun canHandle(input: ResolveInput): Boolean {
       val url = (input as? ResolveInput.Url)?.url ?: return false
@@ -104,7 +104,7 @@ class KetchCloseTest {
 
   /** Writes the first half of an 8-byte file, then waits until it is cancelled. */
   private class HalfWaySource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override fun canHandle(input: ResolveInput): Boolean {
       val url = (input as? ResolveInput.Url)?.url ?: return false

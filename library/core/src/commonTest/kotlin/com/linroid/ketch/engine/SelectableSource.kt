@@ -31,7 +31,7 @@ internal class SelectableSource(
   private val sizes: List<Long> = listOf(100, 200, 300),
   private val mode: FileSelectionMode = FileSelectionMode.MULTIPLE,
 ) : DownloadSource<Unit> {
-  override val resumeStateSerializer = Unit.serializer()
+  override val stateSerializer = Unit.serializer()
   override val type = TYPE
   override val managesOwnFileIo = true
 
@@ -47,7 +47,7 @@ internal class SelectableSource(
   /** Holds metadata lookups until completed. */
   var resolveGate: CompletableDeferred<Unit>? = null
 
-  /** Holds every resume state update, the periodic and the final save's, until completed. */
+  /** Holds every [store], the periodic and the final save's, until completed. */
   var saveGate: CompletableDeferred<Unit>? = null
 
   var resolves = 0

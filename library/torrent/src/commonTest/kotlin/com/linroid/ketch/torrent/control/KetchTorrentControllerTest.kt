@@ -13,7 +13,7 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.task.TaskCommandRecord
 import com.linroid.ketch.core.task.TaskControl
@@ -80,7 +80,7 @@ class KetchTorrentControllerTest {
     val stopped = mutableListOf<String>()
 
     override suspend fun torrentFiles(
-      resumeState: SourceResumeState?,
+      sourceState: SourceState?,
       resolved: ResolvedSource?,
     ): List<SourceFile>? {
       return if (resolved != null) inner.resolved("pick:files", "files").files else null

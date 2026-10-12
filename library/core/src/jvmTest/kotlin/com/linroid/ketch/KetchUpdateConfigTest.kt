@@ -138,7 +138,7 @@ class KetchUpdateConfigTest {
 
   /** Completes at once and records where the engine told it to write. */
   private class RecordingSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     var outputPath: String? = null

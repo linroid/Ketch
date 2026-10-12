@@ -432,7 +432,7 @@ class DownloadExecutionDestPathTest {
     private val firstWaitsFor: CompletableDeferred<Unit>? = null,
     private val contentType: String? = null,
   ) : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     val outputPaths = mutableListOf<String>()
 
     override val type = "fixture"

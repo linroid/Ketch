@@ -34,7 +34,7 @@ class SelfManagedDefaultFolderTest {
   fun execute_defaultFolderIsAContentUri_givesTheSourceAFilesystemPath() = runTest {
     var outputPath: String? = null
     val source = object : DownloadSource<Unit> {
-      override val resumeStateSerializer = Unit.serializer()
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url

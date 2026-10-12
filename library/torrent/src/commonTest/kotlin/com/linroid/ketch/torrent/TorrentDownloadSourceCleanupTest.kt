@@ -63,7 +63,7 @@ class TorrentDownloadSourceCleanupTest {
     headers = emptyMap(),
   )
 
-  private fun resumeStateFor(infoHash: String) = TorrentResumeState(
+  private fun resumeStateFor(infoHash: String) = TorrentSourceState(
     infoHash = infoHash,
     totalBytes = 1024L,
     resumeData = "",
@@ -197,7 +197,7 @@ class TorrentDownloadSourceCleanupTest {
       }
       assertTrue(torrentFileSystem.exists(v2CreationLog(output, "task")))
       // The state mirrors b and the record chooses both: neither is the log's binding.
-      val state = TorrentResumeState(fixture.document.info.hash.hex, 5,
+      val state = TorrentSourceState(fixture.document.info.hash.hex, 5,
         encodeBase64(checkpoint.encode()), setOf("1"), output.toString(),
         encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
       val context = DownloadContext(taskId = "task", url = "http://fixture/file.torrent",

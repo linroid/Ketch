@@ -16,7 +16,7 @@ import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.encodeResumeState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -51,7 +51,7 @@ class SelfManagedExecutionTest {
     var finalState = false
     var calls = 0
     val source = object : DownloadSource<String> {
-      override val resumeStateSerializer = String.serializer()
+      override val stateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -96,17 +96,17 @@ class SelfManagedExecutionTest {
     val job = launch { execution.execute() }
     started.await()
     assertEquals(0L, execution.totalBytes)
-    assertEquals(null, handle.record.value.sourceResumeState)
+    assertEquals(null, handle.record.value.sourceState)
     job.cancelAndJoin()
     assertEquals(2, calls)
-    assertEquals(source.encodeResumeState("final"), handle.record.value.sourceResumeState)
+    assertEquals(source.encodeState("final"), handle.record.value.sourceState)
   }
 
   @Test
   fun execute_unknownSize_failsWithoutCallingSource() = runTest {
     var downloads = 0
     val source = object : DownloadSource<Unit> {
-      override val resumeStateSerializer = Unit.serializer()
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -150,7 +150,7 @@ class SelfManagedExecutionTest {
     val resumed = CompletableDeferred<Unit>()
     var saved = false
     val source = object : DownloadSource<String> {
-      override val resumeStateSerializer = String.serializer()
+      override val stateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -227,7 +227,7 @@ class SelfManagedExecutionTest {
   fun retry_continuesFromTheLatestStoredState() = runTest {
     val received = mutableListOf<String?>()
     val source = object : DownloadSource<String> {
-      override val resumeStateSerializer = String.serializer()
+      override val stateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url

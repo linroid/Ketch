@@ -305,7 +305,7 @@ internal class DownloadExecution(
 
     // A fresh run stores its own state as it starts; one from the kept resolution, such as a task
     // that waited for its files, keeps what it saved.
-    val resumeState = handle.record.value.sourceResumeState.takeIf { fromStored }
+    val sourceState = handle.record.value.sourceState.takeIf { fromStored }
     // A resolution the record keeps leaves the request only what views need: the file list
     // without the bulky metadata.
     val kept = resolvedUrl.takeIf { it.isKeptWithTask() }
@@ -317,7 +317,7 @@ internal class DownloadExecution(
         state = TaskState.DOWNLOADING,
         totalBytes = total,
         sourceType = source.type,
-        sourceResumeState = resumeState,
+        sourceState = sourceState,
         resolvedSource = kept,
         request = if (kept != null) {
           it.request.copy(
@@ -354,7 +354,7 @@ internal class DownloadExecution(
           taskId = taskId,
           fileIds = selected,
           current = emptySet(),
-          resumeState = null,
+          sourceState = null,
           resolved = resolved,
           segments = null,
           outputPath = null,
@@ -390,7 +390,7 @@ internal class DownloadExecution(
       it.copy(
         state = TaskState.PAUSED,
         sourceType = source.type,
-        sourceResumeState = it.sourceResumeState.takeIf { fromStored },
+        sourceState = it.sourceState.takeIf { fromStored },
         resolvedSource = kept,
         totalBytes = resolved.totalBytes,
         outputPath = null,
@@ -443,7 +443,7 @@ internal class DownloadExecution(
       val record = handle.record.value
       reserve(outputPath)
       totalBytes = record.totalBytes
-      val resumeState = record.sourceResumeState
+      val sourceState = record.sourceState
       // A record without a partial file, as tasks saved before them have, keeps writing to its
       // output path: its bytes are there, and nothing is moved when it completes.
       val target = OutputTarget(
@@ -451,7 +451,7 @@ internal class DownloadExecution(
         partial = record.partialPath.takeUnless { source.managesOwnFileIo },
         replace = record.request.destination?.isFile() == true,
       )
-      Prepared(target, record.totalBytes, record.resolvedSource, resumeState)
+      Prepared(target, record.totalBytes, record.resolvedSource, sourceState)
     }
   }
 
@@ -464,7 +464,7 @@ internal class DownloadExecution(
     val target: OutputTarget,
     val total: Long,
     val preResolved: ResolvedSource?,
-    val state: SourceResumeState?,
+    val state: SourceState?,
   )
 
   /**
@@ -534,8 +534,8 @@ internal class DownloadExecution(
             handle.record.update {
               it.copy(
                 segments = savedSegments(snapshot),
-                sourceResumeState = updatedResume
-                  ?: it.sourceResumeState,
+                sourceState = updatedResume
+                  ?: it.sourceState,
                 downloadTime = downloadTime(),
                 updatedAt = Clock.System.now(),
               )
@@ -546,7 +546,7 @@ internal class DownloadExecution(
           // Saved before any byte is written, so a resume can tell whether the content changed.
           source.stored(ctx)?.let { state ->
             handle.record.update {
-              it.copy(sourceResumeState = state, updatedAt = Clock.System.now())
+              it.copy(sourceState = state, updatedAt = Clock.System.now())
             }
           }
           // The first attempt continues from the state the run started from; a retry or a rerun
@@ -556,7 +556,7 @@ internal class DownloadExecution(
           while (true) {
             var retry = false
             downloadWithRetry(ctx) {
-              if (retry) state = handle.record.value.sourceResumeState ?: state
+              if (retry) state = handle.record.value.sourceState ?: state
               retry = true
               source.downloadSaved(ctx, state)
             }
@@ -577,7 +577,7 @@ internal class DownloadExecution(
             }
             rerunFor = pending
             log.i { "Selection of taskId=$taskId changed as it finished; continuing with it" }
-            state = source.stored(ctx) ?: handle.record.value.sourceResumeState
+            state = source.stored(ctx) ?: handle.record.value.sourceState
           }
         } finally {
           withContext(NonCancellable) {
@@ -586,7 +586,7 @@ internal class DownloadExecution(
             val snapshot = handle.mutableSegments.value
             handle.record.update {
               it.copy(segments = savedSegments(snapshot),
-                sourceResumeState = updatedResume ?: it.sourceResumeState,
+                sourceState = updatedResume ?: it.sourceState,
                 downloadTime = downloadTime(),
                 updatedAt = Clock.System.now())
             }

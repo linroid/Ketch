@@ -33,7 +33,7 @@ class DownloadSourceCleanupTest {
   }
 
   private class StubSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "stub"
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
@@ -80,7 +80,7 @@ class DownloadSourceCleanupTest {
   }
 
   @Test
-  fun defaultCleanup_ignoresResumeState() = runTest {
+  fun defaultCleanup_ignoresState() = runTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 

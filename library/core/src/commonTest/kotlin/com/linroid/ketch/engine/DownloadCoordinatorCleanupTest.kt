@@ -12,8 +12,8 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.engine.encodeResumeState
+import com.linroid.ketch.core.engine.SourceState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
@@ -37,10 +37,10 @@ class DownloadCoordinatorCleanupTest {
     override val type: String = "rec",
     override val managesOwnFileIo: Boolean = false,
   ) : DownloadSource<String> {
-    override val resumeStateSerializer = String.serializer()
+    override val stateSerializer = String.serializer()
     var lastOutputPath: String? = null
     var cleanupCalls = 0
-    var lastResumeState: String? = null
+    var lastState: String? = null
     var lastFileAccessorType: String? = null
     var lastDeleteFiles: Boolean? = null
 
@@ -55,7 +55,7 @@ class DownloadCoordinatorCleanupTest {
     ) {
       lastOutputPath = context.outputPath
       cleanupCalls++
-      lastResumeState = state
+      lastState = state
       lastDeleteFiles = deleteFiles
       lastFileAccessorType =
         context.fileAccessor::class.simpleName
@@ -77,7 +77,7 @@ class DownloadCoordinatorCleanupTest {
   private fun createHandle(
     sourceType: String?,
     outputPath: String?,
-    resumeState: SourceResumeState? = null,
+    sourceState: SourceState? = null,
   ): TaskHandle {
     val now = Clock.System.now()
     val request = DownloadRequest(
@@ -90,7 +90,7 @@ class DownloadCoordinatorCleanupTest {
       outputPath = outputPath,
       state = TaskState.COMPLETED,
       sourceType = sourceType,
-      sourceResumeState = resumeState,
+      sourceState = sourceState,
       createdAt = now,
       updatedAt = now,
     )
@@ -109,36 +109,36 @@ class DownloadCoordinatorCleanupTest {
   }
 
   @Test
-  fun cleanup_invokesSourceWithResumeState() = runTest {
+  fun cleanup_invokesSourceWithState() = runTest {
     val source = RecordingSource()
     val coordinator = createCoordinator(source)
     val handle = createHandle(
       sourceType = "rec",
       outputPath = "/tmp/file.zip",
-      resumeState = source.encodeResumeState("payload"),
+      sourceState = source.encodeState("payload"),
     )
 
     coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(1, source.cleanupCalls)
-    assertEquals("payload", source.lastResumeState)
+    assertEquals("payload", source.lastState)
     assertEquals("/tmp/file.zip", source.lastOutputPath)
   }
 
   @Test
-  fun cleanup_unreadableResumeState_passesNull() = runTest {
+  fun cleanup_unreadableState_passesNull() = runTest {
     val source = RecordingSource()
     val coordinator = createCoordinator(source)
     val handle = createHandle(
       sourceType = "rec",
       outputPath = "/tmp/file.zip",
-      resumeState = SourceResumeState("rec", "not-json"),
+      sourceState = SourceState("rec", "not-json"),
     )
 
     coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(1, source.cleanupCalls)
-    assertNull(source.lastResumeState)
+    assertNull(source.lastState)
   }
 
   @Test

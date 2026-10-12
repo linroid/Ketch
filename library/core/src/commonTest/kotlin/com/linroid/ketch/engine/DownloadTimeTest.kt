@@ -13,7 +13,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.platformFileSystem
@@ -169,7 +169,7 @@ class DownloadTimeTest {
     state = state,
     totalBytes = 4,
     sourceType = FIXTURE,
-    sourceResumeState = SourceResumeState(FIXTURE, "{}"),
+    sourceState = SourceState(FIXTURE, "{}"),
     downloadTime = downloadTime,
     createdAt = now,
     updatedAt = now,
@@ -211,7 +211,7 @@ class DownloadTimeTest {
     private val totalBytes: Long = 4,
     selfManaged: Boolean = true,
   ) : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = FIXTURE
     override val managesOwnFileIo = selfManaged
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url

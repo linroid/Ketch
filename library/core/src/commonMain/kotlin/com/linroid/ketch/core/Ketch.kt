@@ -51,7 +51,7 @@ import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
-import com.linroid.ketch.core.engine.decodeResumeState
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
@@ -787,7 +787,7 @@ class Ketch(
       taskId = record.taskId,
       fileIds = fileIds,
       current = record.request.selectedFileIds,
-      resumeState = record.sourceResumeState?.let { decodeResumeState(it) },
+      sourceState = record.sourceState?.let { decodeState(it) },
       resolved = record.resolvedSource ?: record.request.resolvedSource,
       segments = record.segments,
       outputPath = record.outputPath,

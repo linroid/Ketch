@@ -39,7 +39,7 @@ import kotlinx.serialization.KSerializer
  * single connection. Retries after a dropped connection continue from the
  * bytes already written.
  */
-class FtpDownloadSource : DownloadSource<FtpResumeState> {
+class FtpDownloadSource : DownloadSource<FtpSourceState> {
 
   /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
   internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
@@ -49,7 +49,7 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
 
   override val type: String = TYPE
 
-  override val resumeStateSerializer: KSerializer<FtpResumeState> = FtpResumeState.serializer()
+  override val stateSerializer: KSerializer<FtpSourceState> = FtpSourceState.serializer()
 
   override fun canHandle(input: ResolveInput): Boolean {
     val url = (input as? ResolveInput.Url)?.url ?: return false
@@ -58,9 +58,9 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
   }
 
   /** The file's size and modification time as the download started, once; a resume keeps them. */
-  override suspend fun store(context: DownloadContext): FtpResumeState? =
+  override suspend fun store(context: DownloadContext): FtpSourceState? =
     context.preResolved?.let {
-      FtpResumeState(totalBytes = it.totalBytes, mdtm = it.metadata[META_MDTM])
+      FtpSourceState(totalBytes = it.totalBytes, mdtm = it.metadata[META_MDTM])
     }
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
@@ -106,7 +106,7 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
     }
   }
 
-  override suspend fun download(context: DownloadContext, state: FtpResumeState?) {
+  override suspend fun download(context: DownloadContext, state: FtpSourceState?) {
     if (state == null) downloadFresh(context) else continueFrom(context, state)
   }
 
@@ -168,7 +168,7 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
   }
 
   /** Continues from [context]'s segments once the file's modification time still matches. */
-  private suspend fun continueFrom(context: DownloadContext, state: FtpResumeState) {
+  private suspend fun continueFrom(context: DownloadContext, state: FtpSourceState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)

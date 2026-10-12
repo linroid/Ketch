@@ -45,7 +45,7 @@ import kotlinx.serialization.builtins.serializer
 class DownloadCoordinatorCancelTest {
 
   private class SuspendingSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     val downloadStarted = CompletableDeferred<Unit>()
     var downloadFinallyRan: Boolean = false
 

@@ -196,11 +196,11 @@ class TorrentDownloadSourceTest {
     fileIds: Set<String>?,
     resolved: com.linroid.ketch.api.ResolvedSource? = null,
     current: Set<String> = emptySet(),
-    resumeState: TorrentResumeState? = null,
+    sourceState: TorrentSourceState? = null,
     outputPath: String? = null,
     segments: List<Segment>? = null,
     completed: Boolean = false,
-  ) = SelectionRequest("task", fileIds, current, resumeState, resolved, segments, outputPath,
+  ) = SelectionRequest("task", fileIds, current, sourceState, resolved, segments, outputPath,
     completed)
 
   @Test
@@ -298,22 +298,22 @@ class TorrentDownloadSourceTest {
       } finally {
         store.close()
       }
-      val state = TorrentResumeState(fixture.document.info.hash.hex, 40_000,
+      val state = TorrentSourceState(fixture.document.info.hash.hex, 40_000,
         encodeBase64(checkpoint.encode()), setOf("0"), output.toString(),
         encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
       // Something the task never created is where b would be saved.
       torrentFileSystem.write(output / "b") { writeUtf8("foreign") }
       val refused = assertFailsWith<IllegalStateException> {
-        source.planSelection(selection(setOf("0", "1"), current = setOf("0"), resumeState = state,
+        source.planSelection(selection(setOf("0", "1"), current = setOf("0"), sourceState = state,
           outputPath = output.toString()))
       }
       assertFalse(refused.message.orEmpty().contains(root.toString()))
       // Files the task already has are not in the way.
       assertFalse(source.planSelection(selection(setOf("0"), current = setOf("0"),
-        resumeState = state, outputPath = output.toString())).changed)
+        sourceState = state, outputPath = output.toString())).changed)
       torrentFileSystem.delete(output / "b")
       val plan = source.planSelection(selection(setOf("0", "1"), current = setOf("0"),
-        resumeState = state, outputPath = output.toString()))
+        sourceState = state, outputPath = output.toString()))
       assertTrue(plan.expands)
       assertEquals(40_005L, plan.totalBytes)
     } finally {
@@ -329,7 +329,7 @@ class TorrentDownloadSourceTest {
     assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"), files.map { it.name })
     assertEquals(pack.sizes.map { it.toLong() }, files.map { it.size })
     // A state older builds saved holds the metainfo the request lost.
-    val legacy = TorrentResumeState(pack.metadata.infoHash.hex, resolved.totalBytes, "",
+    val legacy = TorrentSourceState(pack.metadata.infoHash.hex, resolved.totalBytes, "",
       setOf("0", "1", "2"), "", resolved.metadata.getValue(ResolvedSource.METAINFO_KEY),
       version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
     assertEquals(files, source.torrentFiles(legacy.saved(), resolved.withoutBulkMetadata()))

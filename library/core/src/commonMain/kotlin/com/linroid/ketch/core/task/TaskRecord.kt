@@ -5,7 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -45,7 +45,7 @@ data class TaskRecord(
   val error: KetchError? = null,
   val segments: List<Segment>? = null,
   val sourceType: String? = null,
-  val sourceResumeState: SourceResumeState? = null,
+  val sourceState: SourceState? = null,
   val resolvedSource: ResolvedSource? = null,
   val downloadTime: Duration? = null,
   val createdAt: Instant,

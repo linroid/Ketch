@@ -14,9 +14,12 @@ import kotlinx.serialization.KSerializer
  * A source probes a URL with [resolve], transfers it with [download], and saves what a later
  * [download] needs to continue with [store]. The other members are optional.
  *
- * @param S the state this source saves with a task to resume it, such as an HTTP `ETag` or a
- *   torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
- *   decoded; a source without one uses [Unit].
+ * A task resumes from two parts: Ketch's [DownloadContext.segments], the byte ranges done, which
+ * Ketch saves and shows for every source, and this source's own state [S].
+ *
+ * @param S what only this source knows about the task, such as the HTTP `ETag` the content had
+ *   or a torrent's checkpoint of verified pieces. Ketch encodes it with [stateSerializer] and
+ *   hands it back decoded; a source without one uses [Unit].
  */
 interface DownloadSource<S : Any> {
   /** A unique name for this kind of source, such as `http` or `torrent`. */
@@ -48,7 +51,7 @@ interface DownloadSource<S : Any> {
    * Serializer of [S]. Tasks save the state as JSON, so later builds must still read what earlier
    * ones wrote: add fields with defaults, never rename or retype them. Unknown fields are ignored.
    */
-  val resumeStateSerializer: KSerializer<S>
+  val stateSerializer: KSerializer<S>
 
   // Resolving
 

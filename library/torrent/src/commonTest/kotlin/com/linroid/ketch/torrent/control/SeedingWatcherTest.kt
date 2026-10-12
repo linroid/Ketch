@@ -14,7 +14,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
@@ -53,7 +53,7 @@ class SeedingWatcherTest {
   /** A source that completes each download once its gate opens and seeds on request. */
   private class SeedingSource : DownloadSource<Unit>, TorrentControlSource {
     override val type = TYPE
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val managesOwnFileIo = true
 
     override fun attach(host: SourceHost): SourceExtension =
@@ -98,7 +98,7 @@ class SeedingWatcherTest {
 
 
     override suspend fun torrentFiles(
-      resumeState: SourceResumeState?,
+      sourceState: SourceState?,
       resolved: ResolvedSource?,
     ): List<SourceFile>? = null
 
@@ -158,7 +158,7 @@ class SeedingWatcherTest {
       state = state,
       totalBytes = 100,
       sourceType = SeedingSource.TYPE,
-      sourceResumeState = SourceResumeState(SeedingSource.TYPE, "{}"),
+      sourceState = SourceState(SeedingSource.TYPE, "{}"),
       createdAt = at,
       updatedAt = at,
       completedAt = at,

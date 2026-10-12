@@ -296,14 +296,14 @@ class TorrentDownloadSourceSelectionTest {
     val store = MemoryTaskStore()
     val now = Clock.System.now()
     // A record saved before Ketch kept resolutions: only the source state has the metainfo.
-    val state = TorrentResumeState(torrent.metadata.infoHash.hex, torrent.sizeOf(0), "",
+    val state = TorrentSourceState(torrent.metadata.infoHash.hex, torrent.sizeOf(0), "",
       setOf("0"), output.toString(), encodeBase64(torrent.metainfo), version = 2,
       privacy = TorrentDiscoveryPrivacy.PUBLIC)
     store.save(TaskRecord(taskId = "older", request = request(0), outputPath = output.toString(),
       state = TaskState.PAUSED, totalBytes = torrent.sizeOf(0),
       segments = listOf(Segment(0, 0, torrent.sizeOf(0) - 1)),
       sourceType = TorrentDownloadSource.TYPE,
-      sourceResumeState = state.saved(),
+      sourceState = state.saved(),
       createdAt = now, updatedAt = now))
     val source = source()
     val ketch = ketch(source, store)

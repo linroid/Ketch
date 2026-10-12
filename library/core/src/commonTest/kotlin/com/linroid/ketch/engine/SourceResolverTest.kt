@@ -24,7 +24,7 @@ class SourceResolverTest {
   )
 
   private val fakeSource = object : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "magnet"
     override fun canHandle(input: ResolveInput): Boolean =
       input is ResolveInput.Url &&

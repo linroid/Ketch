@@ -120,7 +120,7 @@ class DownloadCoordinatorPauseTest {
   private class StoppingSource(
     private val checkpoint: CompletableDeferred<Unit>,
   ) : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -170,7 +170,7 @@ class DownloadCoordinatorPauseTest {
     final: List<Segment>,
   ): TaskRecord {
     val source = object : DownloadSource<Unit> {
-      override val resumeStateSerializer = Unit.serializer()
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url

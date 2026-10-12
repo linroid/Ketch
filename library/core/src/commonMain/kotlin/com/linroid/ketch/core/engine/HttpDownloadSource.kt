@@ -34,12 +34,12 @@ import kotlin.time.TimeSource
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
-) : DownloadSource<HttpResumeState> {
+) : DownloadSource<HttpSourceState> {
   private val log = KetchLogger("HttpSource")
 
   override val type: String = TYPE
 
-  override val resumeStateSerializer: KSerializer<HttpResumeState> = HttpResumeState.serializer()
+  override val stateSerializer: KSerializer<HttpSourceState> = HttpSourceState.serializer()
 
   override fun canHandle(input: ResolveInput): Boolean {
     val url = (input as? ResolveInput.Url)?.url ?: return false
@@ -80,7 +80,7 @@ internal class HttpDownloadSource(
     )
   }
 
-  override suspend fun download(context: DownloadContext, state: HttpResumeState?) {
+  override suspend fun download(context: DownloadContext, state: HttpSourceState?) {
     if (state == null) downloadFresh(context) else continueFrom(context, state)
   }
 
@@ -147,7 +147,7 @@ internal class HttpDownloadSource(
   }
 
   /** Continues from [context]'s segments once the server's identity still matches [state]. */
-  private suspend fun continueFrom(context: DownloadContext, state: HttpResumeState) {
+  private suspend fun continueFrom(context: DownloadContext, state: HttpSourceState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
     if (state.totalBytes < 0) {
       // Bytes written without a known size cannot be continued, so a changed file is no concern.
@@ -417,9 +417,9 @@ internal class HttpDownloadSource(
   }
 
   /** The server's identity of the content as the download started, once; a resume keeps it. */
-  override suspend fun store(context: DownloadContext): HttpResumeState? =
+  override suspend fun store(context: DownloadContext): HttpSourceState? =
     context.preResolved?.let { resolved ->
-      HttpResumeState(
+      HttpSourceState(
         etag = resolved.metadata[META_ETAG],
         lastModified = resolved.metadata[META_LAST_MODIFIED],
         totalBytes = resolved.totalBytes,
@@ -445,7 +445,7 @@ internal class HttpDownloadSource(
  * @property totalBytes the content size, `-1` when the server did not report it
  */
 @Serializable
-internal data class HttpResumeState(
+internal data class HttpSourceState(
   val etag: String?,
   val lastModified: String?,
   val totalBytes: Long,

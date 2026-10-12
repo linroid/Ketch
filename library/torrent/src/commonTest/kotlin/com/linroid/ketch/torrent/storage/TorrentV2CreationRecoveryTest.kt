@@ -206,7 +206,7 @@ class TorrentV2CreationRecoveryTest {
       restored.initialize()
       assertContentEquals(booleanArrayOf(true, false), restored.recheck())
       restored.close()
-      // So does the selection a task's resume state mirrors, without any checkpoint.
+      // So does the selection a task's source state mirrors, without any checkpoint.
       val mirrored = store(root, selected = setOf("1"), legacy = listOf(setOf("0")))
       mirrored.initialize()
       mirrored.cleanup()

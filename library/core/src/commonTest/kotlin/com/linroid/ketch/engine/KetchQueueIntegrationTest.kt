@@ -462,7 +462,7 @@ class KetchQueueIntegrationTest {
   )
 
   private class GatedSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     var maximumActive = 0

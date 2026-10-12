@@ -249,7 +249,7 @@ class ChecksumVerificationTest {
 
   /** A source that writes its own files, as the torrent source does. */
   private class SelfManagedSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val type = "self"
     override val managesOwnFileIo = true
     override fun canHandle(input: ResolveInput): Boolean {

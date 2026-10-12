@@ -8,8 +8,8 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.HttpResumeState
-import com.linroid.ketch.core.engine.encodeResumeState
+import com.linroid.ketch.core.engine.HttpSourceState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskRecord
@@ -50,8 +50,8 @@ class DownloadCoordinatorResumeTest {
           totalBytes = 1000,
           segments = emptyList(),
           sourceType = HttpDownloadSource.TYPE,
-          sourceResumeState = HttpDownloadSource(FakeHttpEngine()).encodeResumeState(
-            HttpResumeState(etag = null, lastModified = null, totalBytes = 1000),
+          sourceState = HttpDownloadSource(FakeHttpEngine()).encodeState(
+            HttpSourceState(etag = null, lastModified = null, totalBytes = 1000),
           ),
           createdAt = now,
           updatedAt = now,
@@ -97,7 +97,7 @@ class DownloadCoordinatorResumeTest {
       assertIs<DownloadState.Completed>(task.state.value)
       assertEquals(0L..999L, engine.lastDownloadRange)
       assertContentEquals(engine.content, platformFileSystem.read(output) { readByteArray() })
-      assertNotNull(store.load(task.taskId)?.sourceResumeState)
+      assertNotNull(store.load(task.taskId)?.sourceState)
     }
   }
 

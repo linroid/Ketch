@@ -205,7 +205,7 @@ internal class DownloadCoordinator(
       log.i { "No saved progress for taskId=$taskId, starting it again" }
       return false
     }
-    if (taskRecord.sourceResumeState == null && !managesOwnFileIo(taskRecord)) {
+    if (taskRecord.sourceState == null && !managesOwnFileIo(taskRecord)) {
       // Nothing to check the saved bytes against, so they are not trusted.
       log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
       handle.mutableSegments.value = emptyList()
@@ -431,7 +431,7 @@ internal class DownloadCoordinator(
       config = config().forRequest(handle.request),
     )
     try {
-      source.cleanupSaved(ctx, record.sourceResumeState, deleteFiles && outputPath != null) { e ->
+      source.cleanupSaved(ctx, record.sourceState, deleteFiles && outputPath != null) { e ->
         log.w { "Unreadable saved state of taskId=${handle.taskId}: ${e.describeCauses()}" }
       }
     } finally {

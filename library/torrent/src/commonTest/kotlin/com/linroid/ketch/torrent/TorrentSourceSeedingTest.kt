@@ -253,7 +253,7 @@ class TorrentSourceSeedingTest {
   ) {
     val checkpoint = fixture.preseed(output, taskId)
     val resolved = resolveMetainfo(fixture.metainfo)
-    val state = TorrentResumeState(fixture.document.info.hash.hex, resolved.totalBytes,
+    val state = TorrentSourceState(fixture.document.info.hash.hex, resolved.totalBytes,
       encodeBase64(checkpoint.encode()), resolved.files.map { it.id }.toSet(), output.toString(),
       encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
     download(context(taskId, resolved, output.toString(), connections), state)
@@ -422,7 +422,7 @@ class TorrentSourceSeedingTest {
         val network = createTorrentNetwork()
         try {
           val ids = TorrentFileTable.parse(metainfo, TorrentConfig()).ids
-          val state = TorrentResumeState(metadata.infoHash.hex, 4, "", ids, output.toString(),
+          val state = TorrentSourceState(metadata.infoHash.hex, 4, "", ids, output.toString(),
             encodeBase64(metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
           assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
             "http://fixture/seeder.torrent",

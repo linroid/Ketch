@@ -48,7 +48,7 @@ class FileSelectionRoutesTest {
    */
   private class FilesSource : DownloadSource<Unit> {
     override val type = "files"
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     override val managesOwnFileIo = true
     private val ids = setOf("0", "1")
     private val sizes = mapOf("0" to 10L, "1" to 20L)

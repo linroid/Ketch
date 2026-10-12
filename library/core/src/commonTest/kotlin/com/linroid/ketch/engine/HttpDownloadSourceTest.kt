@@ -5,7 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.HttpResumeState
+import com.linroid.ketch.core.engine.HttpSourceState
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
@@ -122,7 +122,7 @@ class HttpDownloadSourceTest {
   fun resume_unknownSize_restartsWithoutCheckingServerIdentity() = runTest {
     val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE.copy(etag = "\"new\""))
     val file = MemoryFile(ByteArray(1500) { 9 })
-    val state = HttpResumeState(
+    val state = HttpSourceState(
       etag = "\"old\"", lastModified = null, totalBytes = -1,
     )
 
@@ -138,9 +138,9 @@ class HttpDownloadSourceTest {
     // A zero-filled file of the full size passes the local file check.
     val file = MemoryFile(ByteArray(1000))
     val context = context(fileAccessor = file)
-    val resumeState = HttpResumeState(null, null, totalBytes = 1000)
+    val sourceState = HttpSourceState(null, null, totalBytes = 1000)
 
-    HttpDownloadSource(engine).download(context, resumeState)
+    HttpDownloadSource(engine).download(context, sourceState)
 
     assertContentEquals(engine.content, file.bytes)
     assertTrue(context.segments.value.all { it.isComplete })
@@ -166,7 +166,7 @@ class HttpDownloadSourceTest {
   fun resume_headRefused_checksServerIdentityWithProbe() = runTest {
     val engine = FakeHttpEngine(headErrorCode = 405)
     val file = MemoryFile(ByteArray(1000))
-    val state = HttpResumeState(
+    val state = HttpSourceState(
       etag = "\"old\"", lastModified = null, totalBytes = 1000,
     )
 

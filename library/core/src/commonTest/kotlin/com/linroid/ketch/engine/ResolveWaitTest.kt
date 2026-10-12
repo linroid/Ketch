@@ -84,7 +84,7 @@ class ResolveWaitTest {
 
   /** Answers only once [found] completes, and downloads an empty file. */
   private class SlowSource : DownloadSource<Unit> {
-    override val resumeStateSerializer = Unit.serializer()
+    override val stateSerializer = Unit.serializer()
     val found = CompletableDeferred<Unit>()
     override val type = "slow"
     override fun canHandle(input: ResolveInput): Boolean =

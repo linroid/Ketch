@@ -172,7 +172,7 @@ Every part that varies by platform or use is an interface you can replace:
 
 A `DownloadSource<S>` says which inputs it takes (`canHandle`), probes them (`resolve`) and
 downloads them (`download`). What it needs to continue later is `S`, any `@Serializable` type it
-names with `resumeStateSerializer` (`Unit` for none): Ketch asks for it with `store` as a run
+names with `stateSerializer` (`Unit` for none): Ketch asks for it with `store` as a run
 starts, periodically and as it stops (a pause is the run stopping), saves it with the task, and
 passes it back decoded to `download`, which starts from the beginning when it is `null`. `cleanup` runs when the task is removed, deleting its files
 only when asked to. `canHandle` and `resolve` take a `ResolveInput`; most sources accept only
