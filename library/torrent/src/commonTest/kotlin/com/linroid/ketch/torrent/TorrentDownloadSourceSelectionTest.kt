@@ -280,8 +280,11 @@ class TorrentDownloadSourceSelectionTest {
     val ketch = ketch(source)
     ketch.start()
     seeder.openAll()
-    val task = ketch.download(request(1))
-    assertNull(task.request.resolvedSource)
+    // Added without a preview: the request names no files. The task's own copy may gain them
+    // as soon as the download resolves the source, so that one is only read once it completes.
+    val request = request(1)
+    assertNull(request.resolvedSource)
+    val task = ketch.download(request)
     task.awaitCompleted()
     val resolved = assertNotNull(task.request.resolvedSource)
     assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"), resolved.files.map { it.name })
