@@ -767,8 +767,11 @@ class TorrentDownloadSource(
   /** The task's registered session; for tests. */
   internal suspend fun sessionOf(taskId: String): TorrentSession? = tasks.session(taskId)
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    resolve(url, config.discoveryPrivacy, headers)
+  override suspend fun resolve(
+    url: String,
+    headers: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = resolve(url, this.config.discoveryPrivacy, headers)
 
   /** Resolve with an explicit privacy choice before any discovery or metadata request starts. */
   suspend fun resolve(

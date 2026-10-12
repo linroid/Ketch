@@ -92,7 +92,11 @@ class KetchCloseTest {
   private class StuckSource : DownloadSource {
     override val type = "stuck"
     override fun canHandle(url: String): Boolean = url.startsWith("stuck:")
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ): ResolvedSource =
       awaitCancellation()
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
       SourceResumeState(type, "")
@@ -105,7 +109,11 @@ class KetchCloseTest {
   private class HalfWaySource : DownloadSource {
     override val type = "fixture"
     override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 8, supportsResume = true,
       suggestedFileName = "partial.bin", maxSegments = 1,
     )

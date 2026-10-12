@@ -77,7 +77,11 @@ internal class SelectableSource(
 
   override fun canHandle(url: String) = url.startsWith("pick:")
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+  override suspend fun resolve(
+    url: String,
+    headers: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource {
     resolves++
     resolveGate?.await()
     return resolved(url, "network")

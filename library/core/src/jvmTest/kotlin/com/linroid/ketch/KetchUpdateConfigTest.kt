@@ -143,7 +143,11 @@ class KetchUpdateConfigTest {
 
     override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
 
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ): ResolvedSource =
       ResolvedSource(
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,

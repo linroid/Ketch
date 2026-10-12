@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
@@ -42,7 +43,11 @@ class ResolveContentRoutesTest {
         maxSegments = 1,
       )
     }
-    override suspend fun resolve(url: String, headers: Map<String, String>) =
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ) =
       error("Unexpected URL resolution")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit

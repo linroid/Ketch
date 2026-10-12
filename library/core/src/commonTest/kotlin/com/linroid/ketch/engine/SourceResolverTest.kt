@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
@@ -26,6 +27,7 @@ class SourceResolverTest {
     override suspend fun resolve(
       url: String,
       headers: Map<String, String>,
+      config: DownloadConfig,
     ) = ResolvedSource(
       url = url,
       sourceType = "magnet",

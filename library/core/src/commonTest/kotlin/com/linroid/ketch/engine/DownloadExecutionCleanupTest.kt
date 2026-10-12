@@ -154,7 +154,11 @@ class DownloadExecutionCleanupTest {
     val source = object : DownloadSource {
       override val type = "fixture"
       override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
+      override suspend fun resolve(
+        url: String,
+        headers: Map<String, String>,
+        config: DownloadConfig,
+      ) = ResolvedSource(
         url = url, sourceType = type, totalBytes = 100, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,
       )

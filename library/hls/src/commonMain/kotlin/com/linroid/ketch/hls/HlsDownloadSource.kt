@@ -28,9 +28,6 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource {
   override fun canHandle(url: String): Boolean =
     Regex("https?://[^?#]+\\.m3u8(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(url)
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    helper.resolve(url, plan(url, headers, ProxyConfig.System))
-
   override suspend fun resolve(
     url: String,
     headers: Map<String, String>,

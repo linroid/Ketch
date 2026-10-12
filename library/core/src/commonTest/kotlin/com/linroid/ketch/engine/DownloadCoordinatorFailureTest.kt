@@ -52,6 +52,7 @@ class DownloadCoordinatorFailureTest {
     override suspend fun resolve(
       url: String,
       headers: Map<String, String>,
+      config: DownloadConfig,
     ): ResolvedSource = ResolvedSource(
       url = url,
       sourceType = type,

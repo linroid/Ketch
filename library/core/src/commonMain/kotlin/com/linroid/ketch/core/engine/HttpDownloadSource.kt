@@ -46,11 +46,6 @@ internal class HttpDownloadSource(
   override suspend fun resolve(
     url: String,
     headers: Map<String, String>,
-  ): ResolvedSource = resolve(url, headers, DownloadConfig.Default)
-
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine.through(config.proxy))

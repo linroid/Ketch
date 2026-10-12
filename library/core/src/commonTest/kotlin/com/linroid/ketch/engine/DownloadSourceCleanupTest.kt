@@ -1,6 +1,7 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
@@ -36,6 +37,7 @@ class DownloadSourceCleanupTest {
     override suspend fun resolve(
       url: String,
       headers: Map<String, String>,
+      config: DownloadConfig,
     ): ResolvedSource = error("not used")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(

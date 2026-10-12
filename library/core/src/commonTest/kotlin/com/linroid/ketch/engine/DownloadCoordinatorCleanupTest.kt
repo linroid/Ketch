@@ -43,6 +43,7 @@ class DownloadCoordinatorCleanupTest {
     override suspend fun resolve(
       url: String,
       headers: Map<String, String>,
+      config: DownloadConfig,
     ): ResolvedSource = error("not used")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(

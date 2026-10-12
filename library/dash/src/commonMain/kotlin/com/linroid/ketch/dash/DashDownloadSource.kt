@@ -25,9 +25,6 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource {
   override fun canHandle(url: String): Boolean =
     Regex("https?://[^?#]+\\.mpd(?:[?#].*)?", RegexOption.IGNORE_CASE).matches(url)
 
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    helper.resolve(url, plan(url, headers, ProxyConfig.System))
-
   override suspend fun resolve(
     url: String,
     headers: Map<String, String>,

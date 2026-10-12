@@ -66,11 +66,6 @@ class FtpDownloadSource : DownloadSource {
   override suspend fun resolve(
     url: String,
     headers: Map<String, String>,
-  ): ResolvedSource = resolve(url, headers, DownloadConfig.Default)
-
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
     val ftpUrl = try {

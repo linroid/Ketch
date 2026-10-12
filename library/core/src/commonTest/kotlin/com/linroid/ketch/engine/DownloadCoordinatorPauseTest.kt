@@ -120,7 +120,11 @@ class DownloadCoordinatorPauseTest {
     override val type = "fixture"
     override val managesOwnFileIo = true
     override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 100, supportsResume = true,
       suggestedFileName = "fixture", maxSegments = 1,
     )
@@ -169,7 +173,11 @@ class DownloadCoordinatorPauseTest {
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
+      override suspend fun resolve(
+        url: String,
+        headers: Map<String, String>,
+        config: DownloadConfig,
+      ) = ResolvedSource(
         url = url, sourceType = type, totalBytes = 100, supportsResume = true,
         suggestedFileName = "fixture", maxSegments = 1,
       )

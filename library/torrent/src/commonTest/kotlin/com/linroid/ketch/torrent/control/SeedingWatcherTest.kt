@@ -73,7 +73,11 @@ class SeedingWatcherTest {
 
     override fun canHandle(url: String) = url.startsWith("seed:")
 
-    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(
+      url: String,
+      headers: Map<String, String>,
+      config: DownloadConfig,
+    ) = ResolvedSource(
       url = url, sourceType = TYPE, totalBytes = 100, supportsResume = true,
       suggestedFileName = "seed", maxSegments = 1, files = listOf(SourceFile("0", "seed", 100)),
     )
