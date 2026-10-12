@@ -2,12 +2,15 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.ProxyConfig
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,6 +47,21 @@ class HttpDispatcherTest {
       }
       assertTrue(waiting.any { it.startsWith("ketch-http-") }, "Selected on $waiting")
     }
+  }
+
+  @Test
+  fun cio_runsFewTasksAtOnce(): Unit = runBlocking {
+    // A burst of CIO's short tasks takes at most its slice, not a thread each up to OkHttp's 64.
+    val running = AtomicInteger()
+    val most = AtomicInteger()
+    List(40) {
+      async(cioDispatcher) {
+        most.accumulateAndGet(running.incrementAndGet(), ::maxOf)
+        Thread.sleep(20)
+        running.decrementAndGet()
+      }
+    }.awaitAll()
+    assertEquals(8, most.get())
   }
 
   /**
