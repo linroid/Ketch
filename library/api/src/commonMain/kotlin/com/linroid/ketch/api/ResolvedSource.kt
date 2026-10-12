@@ -33,7 +33,11 @@ data class ResolvedSource(
   val checksum: Checksum? = null,
 ) {
   companion object {
-    /** [metadata] key of the whole content description, such as a torrent's metainfo. */
+    /**
+     * [metadata] key of the whole content description, such as a torrent's metainfo. Ketch keeps
+     * a resolution that carries it with its task and starts and resumes from it, as it cannot
+     * go stale, instead of resolving again.
+     */
     const val METAINFO_KEY: String = "metainfo"
 
     /** The longest [metadata] value task views keep. */

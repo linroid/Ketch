@@ -76,13 +76,9 @@ class DownloadCoordinatorFailureTest {
 
     override suspend fun resume(
       context: DownloadContext,
-      state: Unit,
+      state: Unit?,
     ) = Unit
 
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ) = Unit
   }
 
   private fun createHandle(name: String, taskId: String = name): TaskHandle {

@@ -13,7 +13,7 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.canHandle
-import com.linroid.ketch.core.engine.encodeResumeState
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -322,27 +322,17 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
-  fun resolveStored_returnsTheStoredMetainfo() = runTest {
-    val resolved = source.resolveMetainfo(pack.metainfo)
-    val stored = assertNotNull(source.resolveStored(
-      source.buildResumeState(resolved, resolved.totalBytes)))
-    assertEquals(resolved.metadata["infoHash"], stored.metadata["infoHash"])
-    assertEquals(resolved.files, stored.files)
-    // A state saved without metainfo rebuilds nothing.
-    assertNull(source.resolveStored(TorrentResumeState(
-      pack.metadata.infoHash.hex, 1, "", setOf("0"), "/tmp/torrent")))
-  }
-
-  @Test
   fun torrentFiles_listsEveryFileInOrder() = runTest {
     val resolved = source.resolveMetainfo(pack.metainfo)
     val files = assertNotNull(source.torrentFiles(null, resolved))
     assertEquals(listOf("0", "1", "2"), files.map { it.id })
     assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"), files.map { it.name })
     assertEquals(pack.sizes.map { it.toLong() }, files.map { it.size })
-    // The saved state is enough once the request lost its metainfo.
-    val saved = source.encodeResumeState(source.buildResumeState(resolved, resolved.totalBytes))
-    assertEquals(files, source.torrentFiles(saved, resolved.withoutBulkMetadata()))
+    // A state older builds saved holds the metainfo the request lost.
+    val legacy = TorrentResumeState(pack.metadata.infoHash.hex, resolved.totalBytes, "",
+      setOf("0", "1", "2"), "", resolved.metadata.getValue(ResolvedSource.METAINFO_KEY),
+      version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+    assertEquals(files, source.torrentFiles(legacy.saved(), resolved.withoutBulkMetadata()))
     assertNull(source.torrentFiles(null, resolved.withoutBulkMetadata()))
     // Hybrid IDs are the v1 indices, so the padding file between a and b leaves a gap.
     val hybrid = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)

@@ -28,9 +28,9 @@ internal interface TorrentControlSource {
   val restoresSeeding: Boolean
 
   /**
-   * Every content file of a task in metainfo order, from metadata the source holds in
-   * [resumeState] or, before the task started, in [resolved]; `null` while the files are not
-   * known, such as for a magnet still looking for its metadata.
+   * Every content file of a task in metainfo order, from the resolution the task kept, else the
+   * request's ([resolved]), or as older builds saved it in [resumeState]; `null` while the files
+   * are not known, such as for a magnet still looking for its metadata.
    */
   suspend fun torrentFiles(
     resumeState: SourceResumeState?,
@@ -88,6 +88,7 @@ internal class LiveTorrent(
  *
  * @property url the task's URL
  * @property resumeState the task's saved source state
+ * @property resolved the resolution the task kept, which holds its metainfo
  * @property outputPath where the task saved its files
  * @property selectedFileIds the task's files; empty for every file
  * @property connections opens the task's live network connections while it seeds, as
@@ -97,6 +98,7 @@ internal class SeedingTask(
   val taskId: String,
   val url: String,
   val resumeState: SourceResumeState,
+  val resolved: ResolvedSource?,
   val outputPath: String,
   val selectedFileIds: Set<String>,
   val connections: ConnectionReporter = ConnectionReporter.None,

@@ -83,9 +83,8 @@ class TorrentSourcePrivacyTest {
       val explicit = source.resolve(magnet, TorrentDiscoveryPrivacy.PUBLIC)
       assertEquals(listOf(TorrentDiscoveryPrivacy.TRACKER_ONLY, TorrentDiscoveryPrivacy.PUBLIC),
         engine.fetches)
-      val restrictedState = source.buildResumeState(restricted, 0)
-      assertEquals(2, restrictedState.version)
-      assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, restrictedState.privacy)
+      assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY.name,
+        restricted.metadata[TorrentDownloadSource.META_PRIVACY])
       source.download(context(explicit))
       assertEquals(TorrentDiscoveryPrivacy.PUBLIC, engine.tasks.single().privacy)
     } finally { source.close() }
@@ -101,21 +100,22 @@ class TorrentSourcePrivacyTest {
     try {
       source.download(first)
       assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, engine.tasks.single().privacy)
-      saved = assertNotNull(source.updateResumeState(first))
+      saved = assertNotNull(source.store(first))
       assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, saved.privacy)
     } finally { source.close() }
     for (refetch in listOf(false, true)) {
       val restoredEngine = Engine(metadata)
       val restored = source(restoredEngine, TorrentDiscoveryPrivacy.PUBLIC)
       try {
-        val state = if (refetch) saved.copy(metainfo = "", resumeData = "") else saved
-        val resumed = context()
+        // The task kept its resolution, else it lost the metainfo and fetches it again.
+        val state = if (refetch) saved.copy(resumeData = "") else saved
+        val resumed = if (refetch) context() else context(resolved)
         restored.resume(resumed, state)
         assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY, restoredEngine.tasks.single().privacy)
         assertEquals(if (refetch) listOf(TorrentDiscoveryPrivacy.TRACKER_ONLY) else emptyList(),
           restoredEngine.fetches)
         assertEquals(TorrentDiscoveryPrivacy.TRACKER_ONLY,
-          assertNotNull(restored.updateResumeState(resumed)).privacy)
+          assertNotNull(restored.store(resumed)).privacy)
       } finally { restored.close() }
     }
   }
@@ -134,7 +134,7 @@ class TorrentSourcePrivacyTest {
           source.decodeResumeState(SourceResumeState(TorrentDownloadSource.TYPE, encoded)))
         assertEquals(listOf(privacy), engine.fetches)
         assertEquals(privacy, engine.tasks.single().privacy)
-        val saved = assertNotNull(source.updateResumeState(resumed))
+        val saved = assertNotNull(source.store(resumed))
         assertEquals(2, saved.version)
         assertEquals(privacy, saved.privacy)
       } finally { source.close() }
@@ -146,9 +146,8 @@ class TorrentSourcePrivacyTest {
     val engine = FakeTorrentEngine()
     val source = source(engine, TorrentDiscoveryPrivacy.PUBLIC)
     try {
-      val resolved = source.resolveMetainfo(metadata.metainfoBytes,
-        TorrentDiscoveryPrivacy.TRACKER_ONLY)
-      val saved = source.encodeResumeState(source.buildResumeState(resolved, 0))
+      val saved = TorrentResumeState(metadata.infoHash.hex, 0, "", setOf("0"), "", version = 2,
+        privacy = TorrentDiscoveryPrivacy.TRACKER_ONLY).saved()
       val valid = Json.parseToJsonElement(saved.data).jsonObject
       val invalid = listOf(valid - "privacy", valid + ("version" to JsonPrimitive(1)),
         valid + ("version" to JsonPrimitive(99)), valid + ("privacy" to JsonPrimitive("unknown")))

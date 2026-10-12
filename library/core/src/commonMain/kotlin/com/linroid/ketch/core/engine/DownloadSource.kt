@@ -12,7 +12,7 @@ import kotlinx.serialization.KSerializer
  * routes each URL, or file content, to the first registered source that [canHandle]s it.
  *
  * A source probes a URL with [resolve], transfers it with [download] and [resume], and saves what
- * a resume needs with [buildResumeState]. The other members are optional.
+ * a resume needs with [store]. The other members are optional.
  *
  * @param S the state this source saves with a task to resume it, such as an HTTP `ETag` or a
  *   torrent's checkpoint. Ketch encodes it with [resumeStateSerializer] and hands it back
@@ -71,12 +71,6 @@ interface DownloadSource<S : Any> {
     config: DownloadConfig = DownloadConfig.Default,
   ): ResolvedSource
 
-  /**
-   * The [ResolvedSource] a task saved in [state], rebuilt offline, or `null` when it holds none. A
-   * task that already resolved, such as one that waited for a file selection, starts from it.
-   */
-  suspend fun resolveStored(state: S): ResolvedSource? = null
-
   // File selection
 
   /**
@@ -116,41 +110,34 @@ interface DownloadSource<S : Any> {
   suspend fun download(context: DownloadContext)
 
   /**
-   * Continues an interrupted download from the [state] its task saved. A saved state that can't be
+   * Continues an interrupted download from the [state] its task last [store]d, or `null` when it
+   * stored none. [DownloadContext.preResolved] holds the resolution the task kept
+   * ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]), if any. A saved state that can't be
    * decoded fails the task with [KetchError.CorruptResumeState] before this is called. Sources
    * that can't resume throw [KetchError.Unsupported].
    */
-  suspend fun resume(context: DownloadContext, state: S)
+  suspend fun resume(context: DownloadContext, state: S?)
 
   /**
-   * What a resume needs to check that the content is unchanged, such as an HTTP `ETag`, an FTP
-   * `MDTM` or a torrent's info hash. Saved with the task once it resolves, and passed to [resume].
+   * What a later [resume] needs, such as the HTTP `ETag` the content had or a torrent's verified
+   * pieces, or `null` to keep what the task saved last. Ketch calls it as each [download] or
+   * [resume] starts, before any byte is written, then periodically, and once more as it stops.
    */
-  fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): S
-
-  /**
-   * A newer resume state to save while [context] downloads, such as a torrent's verified pieces,
-   * or `null` to keep the current one. Called periodically.
-   */
-  suspend fun updateResumeState(context: DownloadContext): S? = null
+  suspend fun store(context: DownloadContext): S? = null
 
   // Removing
 
   /**
-   * Stops what this source keeps running for a removed task after its download returned, such as
-   * a seeding torrent. Called before [cleanup], whether or not files are deleted; best-effort.
-   */
-  suspend fun release(taskId: String) {}
-
-  /**
-   * Deletes the files this source wrote for a task removed with `deleteFiles = true`, after its
-   * download stopped. Best-effort: report failures without throwing, except cancellation.
+   * Called when a task is removed, after its download stopped: stops what this source keeps
+   * running for it, such as a seeding torrent, and with [deleteFiles] deletes the files it wrote.
+   * Best-effort: report failures without throwing, except cancellation.
    *
    * The default deletes [DownloadContext.fileAccessor]'s file, which suits sources that write one
    * file. Sources that write their own ([managesOwnFileIo]) find their files from [state], which
-   * is `null` when the task saved none or it can't be decoded.
+   * is `null` when the task stored none or it can't be decoded.
    */
-  suspend fun cleanup(context: DownloadContext, state: S?) {
+  suspend fun cleanup(context: DownloadContext, state: S?, deleteFiles: Boolean) {
+    if (!deleteFiles) return
     try {
       context.fileAccessor.delete()
     } catch (e: CancellationException) {

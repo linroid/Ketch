@@ -42,6 +42,7 @@ class DownloadCoordinatorCleanupTest {
     var cleanupCalls = 0
     var lastResumeState: String? = null
     var lastFileAccessorType: String? = null
+    var lastDeleteFiles: Boolean? = null
 
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
@@ -49,19 +50,17 @@ class DownloadCoordinatorCleanupTest {
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(
       context: DownloadContext,
-      state: String,
+      state: String?,
     ) = Unit
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ) = ""
     override suspend fun cleanup(
       context: DownloadContext,
       state: String?,
+      deleteFiles: Boolean,
     ) {
       lastOutputPath = context.outputPath
       cleanupCalls++
       lastResumeState = state
+      lastDeleteFiles = deleteFiles
       lastFileAccessorType =
         context.fileAccessor::class.simpleName
     }
@@ -123,7 +122,7 @@ class DownloadCoordinatorCleanupTest {
       resumeState = source.encodeResumeState("payload"),
     )
 
-    coordinator.cleanup(handle)
+    coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(1, source.cleanupCalls)
     assertEquals("payload", source.lastResumeState)
@@ -140,7 +139,7 @@ class DownloadCoordinatorCleanupTest {
       resumeState = SourceResumeState("rec", "not-json"),
     )
 
-    coordinator.cleanup(handle)
+    coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(1, source.cleanupCalls)
     assertNull(source.lastResumeState)
@@ -155,7 +154,7 @@ class DownloadCoordinatorCleanupTest {
       outputPath = "/tmp/file.zip",
     )
 
-    coordinator.cleanup(handle)
+    coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(1, source.cleanupCalls)
     assertEquals("NoOpFileAccessor", source.lastFileAccessorType)
@@ -170,13 +169,13 @@ class DownloadCoordinatorCleanupTest {
       outputPath = "/tmp/file.zip",
     )
 
-    coordinator.cleanup(handle)
+    coordinator.cleanup(handle, deleteFiles = true)
 
     assertEquals(0, source.cleanupCalls)
   }
 
   @Test
-  fun cleanup_missingOutputPath_isNoOp() = runTest {
+  fun cleanup_missingOutputPath_releasesWithoutDeleting() = runTest {
     val source = RecordingSource()
     val coordinator = createCoordinator(source)
     val handle = createHandle(
@@ -184,8 +183,24 @@ class DownloadCoordinatorCleanupTest {
       outputPath = null,
     )
 
-    coordinator.cleanup(handle)
+    coordinator.cleanup(handle, deleteFiles = true)
 
-    assertEquals(0, source.cleanupCalls)
+    assertEquals(1, source.cleanupCalls)
+    assertEquals(false, source.lastDeleteFiles)
+  }
+
+  @Test
+  fun cleanup_keepingFiles_stillCallsSource() = runTest {
+    val source = RecordingSource()
+    val coordinator = createCoordinator(source)
+    val handle = createHandle(
+      sourceType = "rec",
+      outputPath = "/tmp/file.zip",
+    )
+
+    coordinator.cleanup(handle, deleteFiles = false)
+
+    assertEquals(1, source.cleanupCalls)
+    assertEquals(false, source.lastDeleteFiles)
   }
 }

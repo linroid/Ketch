@@ -292,10 +292,10 @@ class TorrentDownloadSourceSelectionTest {
   }
 
   @Test
-  fun resolvedSource_olderRecordResumed_namesItsFiles() = harness {
+  fun olderRecordResumed_downloadsFromTheMetainfoInItsState() = harness {
     val store = MemoryTaskStore()
     val now = Clock.System.now()
-    // A record saved before the request kept the file list: only the source state has it.
+    // A record saved before Ketch kept resolutions: only the source state has the metainfo.
     val state = TorrentResumeState(torrent.metadata.infoHash.hex, torrent.sizeOf(0), "",
       setOf("0"), output.toString(), encodeBase64(torrent.metainfo), version = 2,
       privacy = TorrentDiscoveryPrivacy.PUBLIC)
@@ -309,13 +309,10 @@ class TorrentDownloadSourceSelectionTest {
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.tasks.value.single()
-    assertNull(task.request.resolvedSource)
     seeder.openAll()
     task.resume()
     task.awaitCompleted()
     assertFile(0)
-    assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"),
-      assertNotNull(task.request.resolvedSource).files.map { it.name })
     source.assertNoLeaks()
   }
 }

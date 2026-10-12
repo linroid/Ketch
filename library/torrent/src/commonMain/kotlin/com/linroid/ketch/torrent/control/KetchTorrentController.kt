@@ -398,7 +398,7 @@ internal class KetchTorrentController(
   private suspend fun filesOf(task: DownloadTask): List<SourceFile>? {
     val record = recordOf(task)
     val resumeState = record.sourceResumeState
-    val resolved = record.request.resolvedSource
+    val resolved = record.resolvedSource ?: record.request.resolvedSource
     cacheMutex.withLock {
       val cached = fileCache.remove(task.taskId)
       if (cached != null && cached.matches(resumeState, resolved)) {

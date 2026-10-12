@@ -26,8 +26,10 @@ class SelectionUpdate(
  *   `null`, and refuses several before planning
  * @property current the saved selection; empty for tasks that download every file
  * @property resumeState the task's saved state, if any
- * @property resolved the task's [com.linroid.ketch.api.DownloadRequest.resolvedSource]: supplied
- *   by the client and possibly without its bulky metadata, so never trusted for sizes
+ * @property resolved the resolution the task kept
+ *   ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]), else its
+ *   [com.linroid.ketch.api.DownloadRequest.resolvedSource]: possibly from the client, so never
+ *   trusted for sizes
  * @property segments the task's saved segments, if any
  * @property outputPath where the task saves, once it started
  * @property completed whether the task has completed

@@ -1,8 +1,12 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.decodeResumeState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -10,7 +14,7 @@ class FtpResumeStateTest {
   private val source = FtpDownloadSource()
 
   @Test
-  fun buildResumeState_keepsServerModificationTime() {
+  fun store_keepsServerModificationTime() = runTest {
     val resolved = ResolvedSource(
       url = "ftp://example.com/file.bin",
       sourceType = FtpDownloadSource.TYPE,
@@ -21,7 +25,19 @@ class FtpResumeStateTest {
       metadata = mapOf(FtpDownloadSource.META_MDTM to "20250115120000"),
     )
 
-    assertEquals(FtpResumeState(4096, "20250115120000"), source.buildResumeState(resolved, 4096))
+    val context = DownloadContext(
+      taskId = "ftp",
+      url = resolved.url,
+      request = DownloadRequest(resolved.url),
+      fileAccessor = MemoryFileAccessor(),
+      segments = MutableStateFlow(emptyList()),
+      onProgress = { _, _ -> },
+      throttle = {},
+      headers = emptyMap(),
+      preResolved = resolved,
+    )
+
+    assertEquals(FtpResumeState(4096, "20250115120000"), source.store(context))
   }
 
   @Test

@@ -46,9 +46,9 @@ class FileSelectionRoutesTest {
    * A source of two files ("0" of 10 bytes, "1" of 20) that downloads until it is stopped;
    * `files:unknown` never finds its file list.
    */
-  private class FilesSource : DownloadSource<String> {
+  private class FilesSource : DownloadSource<Unit> {
     override val type = "files"
-    override val resumeStateSerializer = String.serializer()
+    override val resumeStateSerializer = Unit.serializer()
     override val managesOwnFileIo = true
     private val ids = setOf("0", "1")
     private val sizes = mapOf("0" to 10L, "1" to 20L)
@@ -64,17 +64,14 @@ class FileSelectionRoutesTest {
       return ResolvedSource(
         url = url, sourceType = type, totalBytes = 30, supportsResume = true,
         suggestedFileName = "pack", maxSegments = 2,
+        metadata = mapOf(ResolvedSource.METAINFO_KEY to "pack"),
         files = listOf(SourceFile("0", "a.bin", 10), SourceFile("1", "b.bin", 20)),
         selectionMode = FileSelectionMode.MULTIPLE,
       )
     }
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = resolved.url
-
-    override suspend fun planSelection(request: SelectionRequest<String>): SelectionPlan {
-      check(request.resumeState != null || request.resolved != null) {
-        "The file list is not known yet"
-      }
+    override suspend fun planSelection(request: SelectionRequest<Unit>): SelectionPlan {
+      check(request.resolved != null) { "The file list is not known yet" }
       val chosen = request.fileIds ?: ids
       require(chosen.all { it in ids }) { "Unknown file id" }
       val effective = request.current.ifEmpty { ids }
@@ -92,7 +89,7 @@ class FileSelectionRoutesTest {
       awaitCancellation()
     }
 
-    override suspend fun resume(context: DownloadContext, state: String) = download(context)
+    override suspend fun resume(context: DownloadContext, state: Unit?) = download(context)
   }
 
   private fun ketch(): KetchApi =

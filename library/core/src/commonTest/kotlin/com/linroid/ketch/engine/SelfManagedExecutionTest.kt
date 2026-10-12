@@ -64,21 +64,17 @@ class SelfManagedExecutionTest {
           selectionMode = FileSelectionMode.MULTIPLE,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): String {
-        assertEquals(0L, totalBytes)
-        return "initial"
-      }
-      override suspend fun updateResumeState(context: DownloadContext): String {
+      // Asked as the run starts, before any state exists, and once more as it stops.
+      override suspend fun store(context: DownloadContext): String? {
         calls++
-        assertTrue(finalState)
-        return "final"
+        return if (finalState) "final" else null
       }
       override suspend fun download(context: DownloadContext) {
         assertEquals("/tmp/ketch-self-managed-output", context.outputPath)
         started.complete(Unit)
         try { awaitCancellation() } finally { finalState = true }
       }
-      override suspend fun resume(context: DownloadContext, state: String) = Unit
+      override suspend fun resume(context: DownloadContext, state: String?) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input", selectedFileIds = setOf("0"),
@@ -101,8 +97,9 @@ class SelfManagedExecutionTest {
     val job = launch { execution.execute() }
     started.await()
     assertEquals(0L, execution.totalBytes)
+    assertEquals(null, handle.record.value.sourceResumeState)
     job.cancelAndJoin()
-    assertEquals(1, calls)
+    assertEquals(2, calls)
     assertEquals(source.encodeResumeState("final"), handle.record.value.sourceResumeState)
   }
 
@@ -121,9 +118,8 @@ class SelfManagedExecutionTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) { downloads++ }
-      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",
@@ -167,8 +163,7 @@ class SelfManagedExecutionTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = "initial"
-      override suspend fun updateResumeState(context: DownloadContext) =
+      override suspend fun store(context: DownloadContext) =
         if (saved) "final" else "initial"
       override suspend fun download(context: DownloadContext) {
         context.segments.value = listOf(Segment(0, 0, 3, 1))
@@ -183,7 +178,7 @@ class SelfManagedExecutionTest {
           }
         }
       }
-      override suspend fun resume(context: DownloadContext, state: String) {
+      override suspend fun resume(context: DownloadContext, state: String?) {
         assertEquals("final", state)
         assertTrue(saved)
         context.segments.value = listOf(Segment(0, 0, 3, 4))

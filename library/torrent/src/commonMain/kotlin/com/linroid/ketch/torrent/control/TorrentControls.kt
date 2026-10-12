@@ -168,7 +168,7 @@ internal class TorrentControls(
     }
     val outcome = try {
       source.startSeeding(
-        SeedingTask(taskId, record.request.url, resumeState, outputPath,
+        SeedingTask(taskId, record.request.url, resumeState, record.resolvedSource, outputPath,
           record.request.selectedFileIds, host.connections(task))
       )
     } catch (e: CancellationException) {

@@ -57,8 +57,11 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
-  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): FtpResumeState =
-    FtpResumeState(totalBytes = totalBytes, mdtm = resolved.metadata[META_MDTM])
+  /** The file's size and modification time as the download started, once; a resume keeps them. */
+  override suspend fun store(context: DownloadContext): FtpResumeState? =
+    context.preResolved?.let {
+      FtpResumeState(totalBytes = it.totalBytes, mdtm = it.metadata[META_MDTM])
+    }
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val url = (input as ResolveInput.Url).url
@@ -160,7 +163,8 @@ class FtpDownloadSource : DownloadSource<FtpResumeState> {
     downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
-  override suspend fun resume(context: DownloadContext, state: FtpResumeState) {
+  override suspend fun resume(context: DownloadContext, state: FtpResumeState?) {
+    state ?: throw KetchError.CorruptResumeState("No resume state for taskId=${context.taskId}")
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)

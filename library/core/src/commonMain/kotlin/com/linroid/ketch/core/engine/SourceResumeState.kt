@@ -1,7 +1,6 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -47,27 +46,16 @@ fun <S : Any> DownloadSource<S>.decodeResumeState(saved: SourceResumeState): S {
   }
 }
 
-/** [DownloadSource.resume] from the state a task record [saved]. */
+/** [DownloadSource.resume] from the state a task record [saved], if any. */
 internal suspend fun <S : Any> DownloadSource<S>.resumeSaved(
   context: DownloadContext,
-  saved: SourceResumeState,
-) = resume(context, decodeResumeState(saved))
+  saved: SourceResumeState?,
+) = resume(context, saved?.let { decodeResumeState(it) })
 
-/** [DownloadSource.resolveStored] from the state a task record [saved]. */
-internal suspend fun <S : Any> DownloadSource<S>.resolveSaved(
-  saved: SourceResumeState,
-): ResolvedSource? = resolveStored(decodeResumeState(saved))
-
-/** [DownloadSource.buildResumeState], encoded for the task record. */
-internal fun <S : Any> DownloadSource<S>.savedResumeState(
-  resolved: ResolvedSource,
-  totalBytes: Long,
-): SourceResumeState = encodeResumeState(buildResumeState(resolved, totalBytes))
-
-/** [DownloadSource.updateResumeState], encoded for the task record. */
-internal suspend fun <S : Any> DownloadSource<S>.updatedResumeState(
+/** [DownloadSource.store], encoded for the task record. */
+internal suspend fun <S : Any> DownloadSource<S>.stored(
   context: DownloadContext,
-): SourceResumeState? = updateResumeState(context)?.let { encodeResumeState(it) }
+): SourceResumeState? = store(context)?.let { encodeResumeState(it) }
 
 /**
  * [DownloadSource.cleanup] with the state a task record [saved]. One that cannot be read is
@@ -76,6 +64,7 @@ internal suspend fun <S : Any> DownloadSource<S>.updatedResumeState(
 internal suspend fun <S : Any> DownloadSource<S>.cleanupSaved(
   context: DownloadContext,
   saved: SourceResumeState?,
+  deleteFiles: Boolean,
   unreadable: (KetchError.CorruptResumeState) -> Unit,
 ) {
   val state = try {
@@ -84,5 +73,5 @@ internal suspend fun <S : Any> DownloadSource<S>.cleanupSaved(
     unreadable(e)
     null
   }
-  cleanup(context, state)
+  cleanup(context, state, deleteFiles)
 }

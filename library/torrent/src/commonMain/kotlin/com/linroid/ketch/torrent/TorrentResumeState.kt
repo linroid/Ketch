@@ -14,6 +14,9 @@ import kotlinx.serialization.Serializable
  *   mapping IDs (v2 and hybrid). Read only when the task's request has no selection, as in
  *   records older than file selection changes, and as a creation log binding older builds used
  * @property savePath directory where files are saved
+ * @property metainfo base64 metainfo, which builds before Ketch kept it in
+ *   [com.linroid.ketch.core.task.TaskRecord.resolvedSource] saved here; read only as their
+ *   fallback, and carried over for their tasks
  */
 @Serializable
 @ConsistentCopyVisibility

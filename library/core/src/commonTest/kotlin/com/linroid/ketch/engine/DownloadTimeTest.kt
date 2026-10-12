@@ -222,9 +222,8 @@ class DownloadTimeTest {
         suggestedFileName = "fixture", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = transfer()
-    override suspend fun resume(context: DownloadContext, state: Unit) =
+    override suspend fun resume(context: DownloadContext, state: Unit?) =
       transfer()
 
     private suspend fun transfer() {

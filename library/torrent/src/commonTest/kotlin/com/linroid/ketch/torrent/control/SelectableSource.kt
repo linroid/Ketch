@@ -34,9 +34,9 @@ import okio.IOException
 internal class SelectableSource(
   private val sizes: List<Long> = listOf(100, 200, 300),
   private val mode: FileSelectionMode = FileSelectionMode.MULTIPLE,
-) : DownloadSource<String> {
+) : DownloadSource<Unit> {
   override val type = TYPE
-  override val resumeStateSerializer = String.serializer()
+  override val resumeStateSerializer = Unit.serializer()
   override val managesOwnFileIo = true
 
   /** Whether runs follow delivered selections; when false they never see them. */
@@ -55,7 +55,6 @@ internal class SelectableSource(
   var saveGate: CompletableDeferred<Unit>? = null
 
   var resolves = 0
-  var storedResolves = 0
 
   val runs = MutableStateFlow<List<Run>>(emptyList())
 
@@ -93,18 +92,8 @@ internal class SelectableSource(
     return resolved(url, "network")
   }
 
-  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-    "$STORED${resolved.url}"
-
-  override suspend fun resolveStored(state: String): ResolvedSource? {
-    if (!state.startsWith(STORED)) return null
-    storedResolves++
-    return resolved(state.removePrefix(STORED), "stored")
-  }
-
-  override suspend fun planSelection(request: SelectionRequest<String>): SelectionPlan {
-    val known = request.resumeState?.startsWith(STORED) == true || request.resolved != null
-    check(known) { "The file list is not known yet" }
+  override suspend fun planSelection(request: SelectionRequest<Unit>): SelectionPlan {
+    check(request.resolved != null) { "The file list is not known yet" }
     planned += request.fileIds
     val chosen = request.fileIds ?: ids
     require(chosen.isNotEmpty() && chosen.all { it in ids }) { "Unknown file id" }
@@ -125,14 +114,14 @@ internal class SelectableSource(
     )
   }
 
-  override suspend fun updateResumeState(context: DownloadContext): String? {
+  override suspend fun store(context: DownloadContext): Unit? {
     saveGate?.await()
-    return null
+    return Unit
   }
 
   override suspend fun download(context: DownloadContext) = execute(context, resumed = false)
 
-  override suspend fun resume(context: DownloadContext, state: String) =
+  override suspend fun resume(context: DownloadContext, state: Unit?) =
     execute(context, resumed = true)
 
   private suspend fun execute(context: DownloadContext, resumed: Boolean): Unit = coroutineScope {
@@ -177,7 +166,6 @@ internal class SelectableSource(
   companion object {
     const val TYPE = "pick"
     const val MARKER = "marker"
-    const val STORED = "stored:"
   }
 }
 

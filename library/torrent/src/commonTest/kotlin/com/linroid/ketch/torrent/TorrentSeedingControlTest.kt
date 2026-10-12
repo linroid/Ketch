@@ -156,7 +156,7 @@ class TorrentSeedingControlTest {
 
   /** A seeding task of [record] to start through the source. */
   private fun seedingTask(record: TaskRecord) = SeedingTask(record.taskId, record.request.url,
-    checkNotNull(record.sourceResumeState), checkNotNull(record.outputPath),
+    checkNotNull(record.sourceResumeState), record.resolvedSource, checkNotNull(record.outputPath),
     record.request.selectedFileIds)
 
   /** A completed v1 task of [torrent], already on disk at [output], that seeded. */

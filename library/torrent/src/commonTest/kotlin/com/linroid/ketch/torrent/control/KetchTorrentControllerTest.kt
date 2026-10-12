@@ -15,7 +15,6 @@ import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.canHandle
-import com.linroid.ketch.core.engine.decodeResumeState
 import com.linroid.ketch.core.task.TaskCommandRecord
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
@@ -66,7 +65,7 @@ class KetchTorrentControllerTest {
   /** [SelectableSource] with the torrent controls of a fake engine. */
   private class ControlledSource(
     val inner: SelectableSource = SelectableSource(),
-  ) : DownloadSource<String> by inner, TorrentControlSource {
+  ) : DownloadSource<Unit> by inner, TorrentControlSource {
     override fun attach(host: SourceHost): SourceExtension =
       TorrentControls(this, type, ::canHandle, host)
 
@@ -84,9 +83,7 @@ class KetchTorrentControllerTest {
       resumeState: SourceResumeState?,
       resolved: ResolvedSource?,
     ): List<SourceFile>? {
-      val stored = resumeState?.let { inner.decodeResumeState(it) }
-      val known = stored?.startsWith(SelectableSource.STORED) == true || resolved != null
-      return if (known) inner.resolved("pick:files", "files").files else null
+      return if (resolved != null) inner.resolved("pick:files", "files").files else null
     }
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = live[taskId]

@@ -517,18 +517,27 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source is a `DownloadSource<S>` over its own serializable resume state `S`
-  (`HttpResumeState`, `FtpResumeState`, `TorrentResumeState`, `Unit` for HLS/DASH) and defines:
-  `type`, `resumeStateSerializer`, `canHandle(input)`, `resolve(input, config)`, `download()`,
-  `resume(state)`, `buildResumeState()`. Ketch saves the state as JSON in
+  (`HttpResumeState`, `FtpResumeState`, `TorrentResumeState`, `Unit` for HLS/DASH) and defines
+  `type`, `resumeStateSerializer`, `canHandle(input)`, `resolve(input, config)` and `download()`,
+  plus three state functions: `store(context)`, the state to save (Ketch asks as each run starts,
+  before any byte is written, every `saveIntervalMs` and once as it stops, the pause checkpoint;
+  `null` keeps the last), `resume(context, state)` (`null` when nothing was stored) and
+  `cleanup(context, state, deleteFiles)` on removal (stops what outlived the download, such as a
+  seeding torrent, and deletes files only with `deleteFiles`). Ketch saves the state as JSON in
   `TaskRecord.sourceResumeState` (`SourceResumeState`, written and read only through
-  `encodeResumeState`/`decodeResumeState`, which ignores unknown fields) and hands sources their
-  state decoded: one that cannot be decoded fails a resume with `KetchError.CorruptResumeState`
-  and reaches `cleanup` as `null`. `canHandle` and `resolve` take a `ResolveInput`: a URL, or
-  file content such as `.torrent` bytes, which only the torrent source accepts; the
-  `canHandle(url)` and `resolve(url, headers, config)` extensions build the URL input. `resolve`
-  may take as long as finding the content does (a magnet waits for peers) and stops when
-  cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it if they
-  must (the server's resolve routes stop when the client disconnects)
+  `encodeResumeState`/`decodeResumeState`, which ignores unknown fields and refuses another
+  source's state) and hands sources their state decoded: one that cannot be decoded fails a
+  resume with `KetchError.CorruptResumeState` and reaches `cleanup` as `null`. A resolution that
+  describes all the content (`ResolvedSource.METAINFO_KEY`, a torrent's metainfo) is kept in
+  `TaskRecord.resolvedSource` (SQLite `resolved_source_json`, `7.sqm`), which only Ketch writes:
+  fresh starts and resumes get it as `DownloadContext.preResolved`, selections as
+  `SelectionRequest.resolved`, and the request keeps it without the bulky metadata. Torrent
+  states saved before then keep their `metainfo`, read as a fallback. `canHandle` and `resolve`
+  take a `ResolveInput`: a URL, or file content such as `.torrent` bytes, which only the torrent
+  source accepts; the `canHandle(url)` and `resolve(url, headers, config)` extensions build the
+  URL input. `resolve` may take as long as finding the content does (a magnet waits for peers) and
+  stops when cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it
+  if they must (the server's resolve routes stop when the client disconnects)
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support

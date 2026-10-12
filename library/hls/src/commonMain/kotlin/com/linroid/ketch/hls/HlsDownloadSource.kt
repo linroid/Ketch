@@ -42,11 +42,9 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
   }
 
   /** Media transfers restart from zero; no byte offset can identify a refreshed manifest part. */
-  override suspend fun resume(context: DownloadContext, state: Unit) {
+  override suspend fun resume(context: DownloadContext, state: Unit?) {
     download(context)
   }
-
-  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
 
   private suspend fun plan(
     original: String,

@@ -52,7 +52,6 @@ import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.engine.decodeResumeState
-import com.linroid.ketch.core.engine.resolveSaved
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
@@ -391,20 +390,11 @@ class Ketch(
       coordinator.cancel(handle, deletePartialFile = deleteFiles)
       queue.dequeue(taskId)
       try {
-        coordinator.release(handle)
+        coordinator.cleanup(handle, deleteFiles)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Throwable) {
-        log.w(e) { "Release failed for taskId=$taskId" }
-      }
-      if (deleteFiles) {
-        try {
-          coordinator.cleanup(handle)
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Throwable) {
-          log.w(e) { "Cleanup failed for taskId=$taskId" }
-        }
+        log.w(e) { "Cleanup failed for taskId=$taskId" }
       }
       connectionRegistry.closeTask(taskId)
       taskStore.remove(taskId)
@@ -616,7 +606,7 @@ class Ketch(
     val source = selectionSource(record)
     val plan = source.planFor(
       record,
-      choiceFor(source, record, fileIds),
+      choiceFor(record, fileIds),
       completed = state is DownloadState.Completed,
     )
     val awaiting = record.awaitsFileSelection()
@@ -774,26 +764,13 @@ class Ketch(
    * The files to plan for [record]: [fileIds] as given, unless its source offers a single choice
    * ([FileSelectionMode.SINGLE]), which takes exactly one ID and its
    * [default][defaultSelection], the first variant, in place of every file (`null`). The mode
-   * comes from the request's [ResolvedSource], else the one its saved state rebuilds; unknown,
-   * the source decides.
+   * comes from the resolution the task kept, else the request's [ResolvedSource]; unknown, the
+   * source decides.
    *
    * @throws IllegalArgumentException when several IDs are given for a single choice
    */
-  private suspend fun choiceFor(
-    source: DownloadSource<*>,
-    record: TaskRecord,
-    fileIds: Set<String>?,
-  ): Set<String>? {
-    val resolved = record.request.resolvedSource ?: record.sourceResumeState?.let { state ->
-      try {
-        source.resolveSaved(state)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.d { "No saved file list for taskId=${record.taskId}: ${e.describeCauses()}" }
-        null
-      }
-    }
+  private fun choiceFor(record: TaskRecord, fileIds: Set<String>?): Set<String>? {
+    val resolved = record.resolvedSource ?: record.request.resolvedSource
     if (resolved?.selectionMode != FileSelectionMode.SINGLE) return fileIds
     if (fileIds == null) return resolved.defaultSelection().ifEmpty { null }
     require(fileIds.size == 1) { SINGLE_CHOICE_MESSAGE }
@@ -811,7 +788,7 @@ class Ketch(
       fileIds = fileIds,
       current = record.request.selectedFileIds,
       resumeState = record.sourceResumeState?.let { decodeResumeState(it) },
-      resolved = record.request.resolvedSource,
+      resolved = record.resolvedSource ?: record.request.resolvedSource,
       segments = record.segments,
       outputPath = record.outputPath,
       completed = completed,

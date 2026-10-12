@@ -136,7 +136,7 @@ class KotlinTorrentSourceTest {
             assertFalse(FileSystem.SYSTEM.exists(output / "skip-a"))
             assertFalse(FileSystem.SYSTEM.exists(output / "skip-b"))
             assertFalse("completed" in http.events) // Only a subset of the torrent is present.
-            val saved = assertNotNull(source.updateResumeState(first))
+            val saved = assertNotNull(source.store(first))
             source.close()
             server.cancelAndJoin()
             network.close()
@@ -146,7 +146,7 @@ class KotlinTorrentSourceTest {
               val second = context(null)
               restored.resume(second, saved)
               assertEquals(2L, second.segments.value.single().downloadedBytes)
-              restored.cleanup(second, assertNotNull(restored.updateResumeState(second)))
+              restored.cleanup(second, assertNotNull(restored.store(second)), deleteFiles = true)
               assertFalse(FileSystem.SYSTEM.exists(output / "selected"))
             } finally { restored.close() }
             assertFalse(http.closed)

@@ -41,11 +41,7 @@ class DownloadSourceCleanupTest {
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(
       context: DownloadContext,
-      state: Unit,
-    ) = Unit
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
+      state: Unit?,
     ) = Unit
   }
 
@@ -69,7 +65,7 @@ class DownloadSourceCleanupTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(context(accessor), state = null)
+    source.cleanup(context(accessor), state = null, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
   }
@@ -82,7 +78,7 @@ class DownloadSourceCleanupTest {
     val source = StubSource()
 
     // Should not throw — best-effort cleanup.
-    source.cleanup(context(accessor), state = null)
+    source.cleanup(context(accessor), state = null, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
   }
@@ -92,8 +88,18 @@ class DownloadSourceCleanupTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(context = context(accessor), state = Unit)
+    source.cleanup(context = context(accessor), state = Unit, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
+  }
+
+  @Test
+  fun defaultCleanup_keepingFiles_deletesNothing() = runTest {
+    val accessor = RecordingFileAccessor()
+    val source = StubSource()
+
+    source.cleanup(context(accessor), state = null, deleteFiles = false)
+
+    assertEquals(0, accessor.deleteCount)
   }
 }

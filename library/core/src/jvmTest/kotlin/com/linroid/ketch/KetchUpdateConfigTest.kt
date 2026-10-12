@@ -161,9 +161,8 @@ class KetchUpdateConfigTest {
       context.segments.value = listOf(Segment(index = 0, start = 0, end = 3, downloadedBytes = 4))
     }
 
-    override suspend fun resume(context: DownloadContext, state: Unit) =
+    override suspend fun resume(context: DownloadContext, state: Unit?) =
       download(context)
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
   }
 }

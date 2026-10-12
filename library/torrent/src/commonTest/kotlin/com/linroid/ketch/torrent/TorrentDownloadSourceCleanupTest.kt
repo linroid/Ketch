@@ -76,7 +76,7 @@ class TorrentDownloadSourceCleanupTest {
     val engine = FakeTorrentEngine()
     val source = buildSource(engine)
 
-    source.cleanup(buildContext(), resumeStateFor(infoHash))
+    source.cleanup(buildContext(), resumeStateFor(infoHash), deleteFiles = true)
 
     assertTrue(engine.removedTorrents.isEmpty())
     assertTrue(!engine.started)
@@ -87,7 +87,7 @@ class TorrentDownloadSourceCleanupTest {
     val engine = FakeTorrentEngine()
     val source = buildSource(engine)
 
-    source.cleanup(buildContext(), state = null)
+    source.cleanup(buildContext(), state = null, deleteFiles = true)
 
     assertTrue(engine.removedTorrents.isEmpty())
   }
@@ -98,7 +98,7 @@ class TorrentDownloadSourceCleanupTest {
     val source = buildSource(engine)
 
     // Must not propagate.
-    source.cleanup(buildContext(), resumeStateFor(infoHash))
+    source.cleanup(buildContext(), resumeStateFor(infoHash), deleteFiles = true)
 
     assertEquals(0, engine.removeAttempts)
   }
@@ -206,7 +206,8 @@ class TorrentDownloadSourceCleanupTest {
         fileAccessor = StubFileAccessor, segments = MutableStateFlow(emptyList()),
         onProgress = { _, _ -> }, throttle = { _ -> }, headers = emptyMap(),
         outputPath = output.toString())
-      TorrentDownloadSource(TorrentConfig(dhtEnabled = false)).cleanup(context, state)
+      TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+        .cleanup(context, state, deleteFiles = true)
       assertFalse(torrentFileSystem.exists(output / "a"))
       assertFalse(torrentFileSystem.exists(v2CreationLog(output, "task")))
     } finally {

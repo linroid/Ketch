@@ -505,11 +505,10 @@ class KetchQueueIntegrationTest {
       }
     }
 
-    override suspend fun resume(context: DownloadContext, state: Unit) {
+    override suspend fun resume(context: DownloadContext, state: Unit?) {
       resumed += context.url.substringAfterLast('/')
       download(context)
     }
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
   }
 }

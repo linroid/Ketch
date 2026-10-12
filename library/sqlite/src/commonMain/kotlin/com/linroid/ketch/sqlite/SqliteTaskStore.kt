@@ -3,6 +3,7 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.SqlDriver
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -34,6 +35,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val segmentListSerializer = ListSerializer(Segment.serializer())
   private val resumeStateSerializer = SourceResumeState.serializer()
   private val controlSerializer = TaskControl.serializer()
+  private val resolvedSerializer = ResolvedSource.serializer()
 
   /**
    * Saves a [TaskRecord] to the SQLite database. If a record with the same
@@ -54,6 +56,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       json.encodeToString(resumeStateSerializer, it)
     }
     val controlJson = record.control?.let { json.encodeToString(controlSerializer, it) }
+    val resolvedJson = record.resolvedSource?.let { json.encodeToString(resolvedSerializer, it) }
     queries.transaction {
       queries.insertOrIgnore(
         task_id = record.taskId,
@@ -69,6 +72,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         completed_at = record.completedAt?.toEpochMilliseconds(),
         control_json = controlJson,
         partial_path = record.partialPath,
+        resolved_source_json = resolvedJson,
       )
       queries.update(
         task_id = record.taskId,
@@ -84,6 +88,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         completed_at = record.completedAt?.toEpochMilliseconds(),
         control_json = controlJson,
         partial_path = record.partialPath,
+        resolved_source_json = resolvedJson,
       )
     }
   }
@@ -171,6 +176,14 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         }
       },
       partialPath = partial_path,
+      resolvedSource = resolved_source_json?.let {
+        try {
+          json.decodeFromString(resolvedSerializer, it)
+        } catch (e: Exception) {
+          log.w { "Unreadable resolution for taskId=$task_id: ${e.describeCauses()}" }
+          null
+        }
+      },
     )
   }
 }

@@ -282,12 +282,8 @@ class ResolveUrlTest {
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
-        state: Unit,
+        state: Unit?,
       ) {}
-      override fun buildResumeState(
-        resolved: ResolvedSource,
-        totalBytes: Long,
-      ) = Unit
     }
     val resolver = SourceResolver(listOf(fakeSource))
     assertFailsWith<KetchError.Unsupported> {
@@ -319,12 +315,8 @@ class ResolveUrlTest {
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
-        state: Unit,
+        state: Unit?,
       ) {}
-      override fun buildResumeState(
-        resolved: ResolvedSource,
-        totalBytes: Long,
-      ) = Unit
     }
 
     val engine = FakeHttpEngine()

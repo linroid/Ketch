@@ -170,10 +170,12 @@ Every part that varies by platform or use is an interface you can replace:
 | `Logger` | Send logs to your backend | `Logger.console()`, `Logger.combine()`, `KermitLogger` |
 | `FileNameResolver` | Name files the source names nothing | `DefaultFileNameResolver` |
 
-A `DownloadSource<S>` says which inputs it takes (`canHandle`), probes them (`resolve`), downloads
-and resumes them, and saves what it needs to resume as `S`, any `@Serializable` type it names
-with `resumeStateSerializer` (`Unit` for none); Ketch stores it with the task and passes it back
-to `resume` decoded. `canHandle` and `resolve` take a `ResolveInput`; most sources accept only
+A `DownloadSource<S>` says which inputs it takes (`canHandle`), probes them (`resolve`) and
+downloads them (`download`). What it needs to continue later is `S`, any `@Serializable` type it
+names with `resumeStateSerializer` (`Unit` for none): Ketch asks for it with `store` as a run
+starts, periodically and as it stops (a pause is the run stopping), saves it with the task, and
+passes it back decoded to `resume`. `cleanup` runs when the task is removed, deleting its files
+only when asked to. `canHandle` and `resolve` take a `ResolveInput`; most sources accept only
 its `Url` case, and file content such as a `.torrent` file arrives as `Content`. Register it with
 `Ketch(additionalSources = listOf(MySource()))`; the first source whose `canHandle` matches wins,
 and HTTP(S) is the fallback. Pass a name read from a response or a URL through

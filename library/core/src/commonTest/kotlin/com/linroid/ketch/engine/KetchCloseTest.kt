@@ -99,9 +99,8 @@ class KetchCloseTest {
     }
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       awaitCancellation()
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) = awaitCancellation()
-    override suspend fun resume(context: DownloadContext, state: Unit) =
+    override suspend fun resume(context: DownloadContext, state: Unit?) =
       awaitCancellation()
   }
 
@@ -120,14 +119,13 @@ class KetchCloseTest {
         suggestedFileName = "partial.bin", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       context.fileAccessor.writeAt(0, byteArrayOf(1, 2, 3, 4))
       context.segments.value = listOf(Segment(0, 0, 7, 4))
       context.onProgress(4, 8)
       awaitCancellation()
     }
-    override suspend fun resume(context: DownloadContext, state: Unit) =
+    override suspend fun resume(context: DownloadContext, state: Unit?) =
       download(context)
   }
 }

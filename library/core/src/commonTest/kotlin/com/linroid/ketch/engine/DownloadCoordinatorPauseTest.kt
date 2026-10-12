@@ -131,7 +131,6 @@ class DownloadCoordinatorPauseTest {
         suggestedFileName = "fixture", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
     override suspend fun download(context: DownloadContext) {
       context.segments.value = listOf(Segment(0, 0, 99, 20))
       try {
@@ -140,7 +139,7 @@ class DownloadCoordinatorPauseTest {
         withContext(NonCancellable) { checkpoint.await() }
       }
     }
-    override suspend fun resume(context: DownloadContext, state: Unit) = Unit
+    override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
   }
 
   private fun handle(onSave: (TaskRecord) -> Unit = {}): TaskHandle {
@@ -183,13 +182,12 @@ class DownloadCoordinatorPauseTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         context.segments.value = published
         // Like SegmentedDownloadHelper, which publishes throttled progress when a batch stops.
         try { awaitCancellation() } finally { context.segments.value = final }
       }
-      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",

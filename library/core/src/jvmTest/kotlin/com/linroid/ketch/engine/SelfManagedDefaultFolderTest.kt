@@ -45,11 +45,10 @@ class SelfManagedDefaultFolderTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
       override suspend fun download(context: DownloadContext) {
         outputPath = context.outputPath
       }
-      override suspend fun resume(context: DownloadContext, state: Unit) = Unit
+      override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input")

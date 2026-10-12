@@ -46,8 +46,7 @@ class ResolveContentRoutesTest {
       )
     }
     override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(context: DownloadContext, state: Unit) = Unit
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) = Unit
+    override suspend fun resume(context: DownloadContext, state: Unit?) = Unit
   }
 
   @Test

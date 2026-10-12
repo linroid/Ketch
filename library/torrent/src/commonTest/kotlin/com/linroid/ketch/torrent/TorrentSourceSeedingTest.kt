@@ -426,7 +426,7 @@ class TorrentSourceSeedingTest {
             encodeBase64(metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
           assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
             "http://fixture/seeder.torrent",
-            state.saved(),
+            state.saved(), null,
             output.toString(), ids, recorder)))
           val connection = network.connect(PeerEndpoint("127.0.0.1",
             checkNotNull(engine).listenPort))

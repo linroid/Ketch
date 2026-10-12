@@ -49,7 +49,7 @@ class SourceExtensionTest {
   /** [SelectableSource] with an extension that records its hooks. */
   private class ExtendedSource(
     val inner: SelectableSource = SelectableSource(),
-  ) : DownloadSource<String> by inner {
+  ) : DownloadSource<Unit> by inner {
     val greeter = Greeter()
     var host: SourceHost? = null
     var attaches = 0

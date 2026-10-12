@@ -3,6 +3,7 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.task.TaskCommandRecord
 import com.linroid.ketch.core.task.TaskControl
@@ -234,6 +235,40 @@ class SqliteTaskStoreTest {
       assertEquals("/d/a", old.outputPath)
       assertNull(old.partialPath)
       assertEquals("/d/b.ketch", records.getValue("new").partialPath)
+    } finally {
+      dir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun migrate_fromVersion7_keepsTheResolutionsTasksSave() = runTest {
+    val dir = Files.createTempDirectory("ketch-sqlite").toFile()
+    try {
+      val path = File(dir, "ketch.db").absolutePath
+      // The schema of version 7, before resolved_source_json existed.
+      JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+        val columns = "$VERSION_6_COLUMNS,\n  partial_path TEXT"
+        driver.execute(null, VERSION_5_TABLE.replace("completed_at INTEGER", columns), 0)
+        driver.insertRow("old", "{\"url\":\"magnet:?xt=old\"}", "PAUSED")
+        driver.execute(null, "PRAGMA user_version = 7", 0)
+      }
+      val resolved = ResolvedSource(
+        url = "magnet:?xt=new", sourceType = "torrent", totalBytes = 3, supportsResume = true,
+        suggestedFileName = "pack", maxSegments = 1,
+        metadata = mapOf(ResolvedSource.METAINFO_KEY to "bWV0YWluZm8="),
+      )
+
+      val driver = DriverFactory(path).createDriver()
+      val records = try {
+        val store = SqliteTaskStore(driver)
+        store.save(record("new").copy(resolvedSource = resolved))
+        store.loadAll().associateBy { it.taskId }
+      } finally {
+        driver.close()
+      }
+
+      assertNull(records.getValue("old").resolvedSource)
+      assertEquals(resolved, records.getValue("new").resolvedSource)
     } finally {
       dir.deleteRecursively()
     }

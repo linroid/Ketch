@@ -142,7 +142,8 @@ internal class HttpDownloadSource(
     downloadSegments(context, segments, totalBytes, resolved.supportsResume, requested)
   }
 
-  override suspend fun resume(context: DownloadContext, state: HttpResumeState) {
+  override suspend fun resume(context: DownloadContext, state: HttpResumeState?) {
+    state ?: throw KetchError.CorruptResumeState("No resume state for taskId=${context.taskId}")
     log.i { "Resuming download for taskId=${context.taskId}" }
     if (state.totalBytes < 0) {
       // Bytes written without a known size cannot be continued, so a changed file is no concern.
@@ -411,12 +412,15 @@ internal class HttpDownloadSource(
     return connections
   }
 
-  override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): HttpResumeState =
-    HttpResumeState(
-      etag = resolved.metadata[META_ETAG],
-      lastModified = resolved.metadata[META_LAST_MODIFIED],
-      totalBytes = totalBytes,
-    )
+  /** The server's identity of the content as the download started, once; a resume keeps it. */
+  override suspend fun store(context: DownloadContext): HttpResumeState? =
+    context.preResolved?.let { resolved ->
+      HttpResumeState(
+        etag = resolved.metadata[META_ETAG],
+        lastModified = resolved.metadata[META_LAST_MODIFIED],
+        totalBytes = resolved.totalBytes,
+      )
+    }
 
   companion object {
     const val TYPE = "http"
