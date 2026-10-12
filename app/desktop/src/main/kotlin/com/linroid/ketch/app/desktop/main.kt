@@ -166,7 +166,26 @@ import kotlin.time.TimeSource
 
 private val log = KetchLogger("DesktopApp")
 
+/**
+ * Caps kotlinx.coroutines' shared pool before anything uses it, unless `-D` already set these, as
+ * the launcher's `jvmArgs` do: runs started otherwise, such as from an IDE, get the same caps.
+ * `Dispatchers.IO` at 16 threads rather than 64, and idle workers end after 10 s rather than 60.
+ * Ketch's own blocking work runs on pools of its own; what is left there, such as ktor-network's
+ * socket loops, never blocks for long.
+ */
+private fun capCoroutineThreads() {
+  for ((key, value) in COROUTINE_THREAD_LIMITS) {
+    if (System.getProperty(key) == null) System.setProperty(key, value)
+  }
+}
+
+private val COROUTINE_THREAD_LIMITS = mapOf(
+  "kotlinx.coroutines.io.parallelism" to "16",
+  "kotlinx.coroutines.scheduler.keep.alive.sec" to "10",
+)
+
 fun main(args: Array<String>) {
+  capCoroutineThreads()
   // A portable copy keeps its data in its own folder, and so does its browser extension host.
   val portable = PortableApp.detect()
   val configDir = portable?.writableDataDir() ?: File(defaultConfigDir())

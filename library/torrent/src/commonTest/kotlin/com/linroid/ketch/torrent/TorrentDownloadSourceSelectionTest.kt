@@ -280,7 +280,8 @@ class TorrentDownloadSourceSelectionTest {
     val ketch = ketch(source)
     ketch.start()
     seeder.openAll()
-    // Added without a preview; the task may resolve it before download() returns.
+    // Added without a preview: the request names no files. The task's own copy may gain them
+    // as soon as the download resolves the source, so that one is only read once it completes.
     val request = request(1)
     assertNull(request.resolvedSource)
     val task = ketch.download(request)

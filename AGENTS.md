@@ -1488,14 +1488,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   writes. Not ktor-network, which runs every socket's loops on `Dispatchers.IO` (hardcoded), so
   hundreds of peers grew that pool to its 64 threads; HTTP (CIO) and FTP sockets still do, with
   few connections
-- HTTP threads (`library:ktor`, `httpDispatcher`): the OkHttp and CIO clients `KtorHttpEngine`
-  builds block on `ketch-http-N` daemon threads (OkHttp reads each response body there while it
-  streams, CIO resolves names and selects), at most 64, started only when every one is busy and
-  ended after 30 s idle. Our apps cap the app-wide `Dispatchers.IO` at 16
-  (`kotlinx.coroutines.io.parallelism`) and idle workers at 10 s: the desktop launcher's
-  `jvmArgs`, the CLI's `main` (and `native-image`'s `-D` arguments, as the binary initializes
-  kotlinx.coroutines while it is built) and the Android `KetchApplication`'s constructor. The
-  library sets neither
+- HTTP threads (`library:ktor`, `HttpDispatcher.kt`): the clients `KtorHttpEngine` builds run on
+  `ketch-http-N` daemon threads, started only when every one is busy and ended after 30 s idle:
+  OkHttp (`httpDispatcher`), which reads each response body there while it streams, at most 64 at
+  once; CIO, whose selector, connections and name lookups run there, at most 8 per client
+  (`cioDispatcher()`, a slice of its own, as each client's selector keeps a thread of it), as a
+  burst of its short tasks would otherwise start a thread each. Our apps cap the app-wide
+  `Dispatchers.IO` at 16 (`kotlinx.coroutines.io.parallelism`) and idle workers at 10 s: the desktop
+  app's `main` (and its launcher's `jvmArgs`), the CLI's `main` (and `native-image`'s `-D`
+  arguments, as the binary initializes kotlinx.coroutines while it is built) and the Android
+  `KetchApplication`'s constructor. The library sets neither
 - Console logger: platform-specific implementations
 
 ### Coroutine-Based Concurrency
