@@ -1817,8 +1817,8 @@ on phones, and applies to every item.
   remembered): File name (single item only), Referer, User-Agent (Ketch / Chrome / Firefox /
   Safari / Custom), Cookie (masked, multi-line), Authorization, "+ Add header", and [Paste cURL].
   A "2 headers" chip after the pill opens it while it is closed.
-  - Headers go to **both** `resolve(url, properties = headers)` (for HTTP sources the
-    `properties` of `resolve` *are* request headers) and `DownloadRequest.headers`. Bookkeeping keys
+  - Headers go to **both** `resolve(url, headers)` (`ResolveInput.Url.headers`, sent with the
+    probe) and `DownloadRequest.headers`. Bookkeeping keys
     such as `ketch.origin` go only to `DownloadRequest.properties`, which Ketch never reads, and
     never to `resolve()`.
   - Caption: "Headers are saved with the task and visible to devices connected to this one."
@@ -3374,7 +3374,7 @@ remote devices with the tooltip; choosing Urgent with busy slots shows the preem
   multi-line input; items with 4 parallel resolves on the target device; summary and free-space
   check; the single-item preview with the segment preview; option pills (Save to with recent,
   pinned and `FilePicker.pickFolder()`, Speed, Priority, Start, Connections); Advanced headers and
-  cURL (headers go to `resolve(url, properties = headers)` and `DownloadRequest.headers`;
+  cURL (headers go to `resolve(url, headers)` and `DownloadRequest.headers`;
   `properties["ketch.origin"] = "app"` goes only to `DownloadRequest.properties`); outcome line;
   per-item submit and feedback; `IntakeProblems`; `⌥↩` → `openDiscover`.
 - Torrent stage: background metadata fetch, filters, tree, extras skipped.

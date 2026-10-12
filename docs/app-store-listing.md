@@ -1,6 +1,10 @@
 # App store listings
 
-Status: assets and answers prepared on 2026-10-05 for a first Google Play and App Store release.
+This page is the checklist for publishing the Ketch apps on Google Play and the App Store: where
+the listing text and screenshots live, what to fix before the first upload, and how to answer
+each store's privacy and policy questions. It is for whoever prepares a store release.
+
+Status: assets and answers prepared on 2026-10-05, checked against the code on 2026-10-12.
 Nothing has been submitted. The [distribution plan](plans/v1-distribution.md) treats both stores
 as follow-up work after v1.0.0; this page is what that work starts from.
 
@@ -64,7 +68,7 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
 - [ ] **Closed test first, on a new personal account.** Personal developer accounts created
   after 13 November 2023 need a closed test with at least 12 testers opted in for 14 days in a
   row before they can apply for production.
-- [ ] The package name `com.linroid.ketch.app` is permanent once uploaded. Target SDK 36 meets
+- [ ] The package name `com.linroid.ketch.app` is permanent once uploaded. Target SDK 37 meets
   the current requirement.
 
 ### App content answers
@@ -79,7 +83,8 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
   location sharing. BitTorrent exchanges file data with peers (uploading is off unless the user
   turns it on) but not messages; answer the sharing questions by IARC's definitions.
 - **Data safety**: Ketch's developer receives nothing, and the app sends data only where the
-  user points it (see [PRIVACY.md](../PRIVACY.md)). Downloads are like a browser's requests, and
+  user points it, plus the daily tracker list downloads from GitHub or jsDelivr, which carry no
+  user data (see [PRIVACY.md](../PRIVACY.md)). Downloads are like a browser's requests, and
   are not declared. Discover is the one judgment call: it sends the request and page text to the
   AI service the user sets up with their own key. "No data collected" is defensible; the cautious
   answer is *App activity › Other user-generated content*: collected, optional, for app
@@ -96,9 +101,14 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
   fail the user's downloads." Record the video on a device: add a download, leave the app, show
   the notification. Android 15 limits `dataSync` services to six hours a day; long downloads may
   need the user-initiated data transfer job API later.
-- **Nearby Wi-Fi devices**: Ketch uses it only to find devices with multicast DNS. Consider
-  declaring it with `android:usesPermissionFlags="neverForLocation"` (and checking discovery
-  still works) so it is never read as a location permission.
+- **Local network**: Ketch asks for `ACCESS_LOCAL_NETWORK` on Android 17 and later, and for
+  `NEARBY_WIFI_DEVICES` (declared up to SDK 36) on Android 13 to 16, only to find and reach the
+  user's devices with multicast DNS and, with `CHANGE_WIFI_MULTICAST_STATE`, for BitTorrent local
+  peer discovery. Consider declaring `NEARBY_WIFI_DEVICES` with
+  `android:usesPermissionFlags="neverForLocation"` (and checking discovery still works) so it is
+  never read as a location permission.
+- **Install packages**: only the `direct` flavor declares `REQUEST_INSTALL_PACKAGES`; the Play
+  bundle leaves it out, so there is nothing to declare.
 - **AI-generated content**: Google's policy asks apps that generate content with AI to let
   people report offensive output in the app. Discover's summaries and result descriptions come
   from a model; a Report action on a Discover result, even one that opens the issue tracker,
@@ -118,9 +128,13 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
 - [ ] **Privacy manifest.** Add `app/ios/PrivacyInfo.xcprivacy` to the Ketch target (Copy Bundle
   Resources), then compare it with Xcode's privacy report of an archive. Uploads without one are
   refused (ITMS-91053).
-- [ ] **Export compliance.** Ketch uses only the system's TLS and hashes, which are exempt.
-  Adding `ITSAppUsesNonExemptEncryption` = `NO` to `Ketch-Info.plist` saves answering this on
-  every upload; confirm before setting it.
+- [ ] **Export compliance.** Besides the system's TLS, Ketch ships its own pure Kotlin hashes
+  (MD5, SHA-1, SHA-256, SHA-512) and, in the torrent engine, BitTorrent protocol encryption
+  (MSE/PE: a Diffie-Hellman key exchange and RC4), which is on by default. Whether that still
+  qualifies for an exemption needs a decision before answering; if the App Store build leaves out
+  torrents (see [below](#bittorrent-on-the-app-store)), only the system's TLS and the hashes
+  remain. Once settled, adding `ITSAppUsesNonExemptEncryption` to `Ketch-Info.plist` saves
+  answering this on every upload.
 - [ ] **Screenshots** are ready; re-render them if the app changes.
 
 ### Answers

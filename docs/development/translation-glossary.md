@@ -1,15 +1,38 @@
-# Ketch translation glossary
+# Translation glossary
 
-Use these terms everywhere (apps, desktop, Android, iOS, browser extension) so a feature has one name
-per language. Product and protocol names stay as they are: Ketch, BitTorrent, FTP, FTPS, HTTP(S),
-Chrome, Firefox, macOS, Windows, Linux, Android, iOS, iPhone, iPad, Mac, PC. The file managers go
-by the name the system gives them in your language: Finder (访达 in Simplified Chinese), Explorer
-(文件资源管理器, 檔案總管, エクスプローラー, 파일 탐색기, Explorador de archivos, Explorador de
-Arquivos, Datei-Explorer, Explorateur de fichiers, Проводник) and the Files app (文件, 檔案,
-ファイル, 파일, Archivos, Arquivos, Dateien, Fichiers, Файлы).
-Tone: short, plain, friendly UI copy, like the system's own apps. Use the informal address where the
-platform's own apps do (German "du", Spanish "tú", Portuguese "você", French "vous", Russian "вы",
-Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidable).
+The terms every Ketch translation uses, so that a feature has one name per language across the
+apps, the desktop app, Android, iOS and the browser extension. It is for translators and for
+contributors who add UI text; how strings are written and stored is in
+[localization](localization.md).
+
+## Names that stay as they are
+
+Product and protocol names are never translated: Ketch, BitTorrent, FTP, FTPS, HTTP(S), Chrome,
+Firefox, macOS, Windows, Linux, Android, iOS, iPhone, iPad, Mac, PC.
+
+File managers go by the name the system gives them in each language:
+
+- **Finder**: 访达 in Simplified Chinese, Finder elsewhere.
+- **Explorer**: 文件资源管理器, 檔案總管, エクスプローラー, 파일 탐색기, Explorador de archivos,
+  Explorador de Arquivos, Datei-Explorer, Explorateur de fichiers, Проводник.
+- **The Files app**: 文件, 檔案, ファイル, 파일, Archivos, Arquivos, Dateien, Fichiers, Файлы.
+
+## Tone
+
+Short, plain, friendly UI copy, like the system's own apps. Use the informal address where the
+platform's own apps do:
+
+| Language | Address |
+| --- | --- |
+| German | "du" |
+| Spanish | "tú" |
+| Portuguese | "você" |
+| French | "vous" |
+| Russian | "вы" |
+| Japanese, Korean | Polite but concise UI register |
+| Chinese | No pronoun where avoidable |
+
+## Terms
 
 | English | zh-Hans | zh-Hant (Taiwan) | ja | ko | es | pt-BR | de | fr | ru |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -60,19 +83,27 @@ Japanese/Korean polite but concise UI register, Chinese no pronoun where avoidab
 | add sheet (where links are added) | 添加面板 | 新增面板 | 追加シート | 추가 시트 | panel de añadir | painel de adicionar | Hinzufügen-Fenster | panneau d'ajout | окно добавления |
 | inspector (task details panel) | 详情面板 | 詳細面板 | インスペクタ | 인스펙터 | inspector | inspetor | Informationen | inspecteur | инспектор |
 
-Units and formats (shared UI `strings_common.xml`): sizes stay B/KB/MB/GB/TB except French
-(o/Ko/Mo/Go/To) and Russian (Б/КБ/МБ/ГБ/ТБ); speeds add "/s" (Russian "/с"). French puts a
-no-break space (U+00A0) before `%`, `:`, `?`, `!` and `;` — type the character itself in the XML.
-German, French, Spanish, Portuguese and Russian use a space between number and `%` (with U+00A0).
-Durations: write natural short forms ("1 h 5 min" in de/fr/es/pt, "1 ч 5 мин" in ru,
-"1小时5分钟" in zh-Hans, "1小時5分鐘" in zh-Hant, "1時間5分" in ja, "1시간 5분" in ko).
-Dates: month-day order of the language (zh/ja "9月28日", ko "9월 28일", de "28. Sep.",
-fr "28 sept.", es "28 sept", pt "28 de set.", ru "28 сент.").
+## Units and formats
 
-Localized names for the Slow lane speed mode describe reduced speed rather than translating the
-road metaphor. Use the names in the table consistently across settings, the speed panel, commands,
-and desktop notifications.
+These live in the shared UI's `strings_common.xml`.
 
-In Chinese, use 下载/下載 for the action and 下载任务/下載項目 when a count or sentence needs a noun;
-Discover finds 可下载的文件/可下載的檔案. Describe clipboard suggestions as
-提示下载已复制的链接/提示下載已複製的連結 so they do not read as instructions to copy a link.
+- **Sizes** stay B/KB/MB/GB/TB, except French (o/Ko/Mo/Go/To) and Russian (Б/КБ/МБ/ГБ/ТБ).
+- **Speeds** add "/s" (Russian "/с").
+- **Punctuation**: French puts a no-break space (U+00A0) before `%`, `:`, `?`, `!` and `;`; type
+  the character itself in the XML.
+- **Percent**: German, French, Spanish, Portuguese and Russian put a space (U+00A0) between the
+  number and `%`.
+- **Durations**: write natural short forms: "1 h 5 min" in de/fr/es/pt, "1 ч 5 мин" in ru,
+  "1小时5分钟" in zh-Hans, "1小時5分鐘" in zh-Hant, "1時間5分" in ja, "1시간 5분" in ko.
+- **Dates**: the month-day order of the language: zh/ja "9月28日", ko "9월 28일", de "28. Sep.",
+  fr "28 sept.", es "28 sept", pt "28 de set.", ru "28 сент.".
+
+## Notes
+
+- **Slow lane**: localized names for this speed mode describe reduced speed rather than
+  translating the road metaphor. Use the names in the table consistently across settings, the
+  speed panel, commands and desktop notifications.
+- **Chinese "download"**: use 下载/下載 for the action and 下载任务/下載項目 when a count or
+  sentence needs a noun. Discover finds 可下载的文件/可下載的檔案.
+- **Chinese clipboard suggestions**: describe them as 提示下载已复制的链接/提示下載已複製的連結,
+  so they do not read as instructions to copy a link.

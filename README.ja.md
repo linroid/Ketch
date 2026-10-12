@@ -32,6 +32,7 @@
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![デスクトップ](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![ライセンス](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
@@ -67,7 +68,7 @@ Web リンク、FTP サーバー、トレント、マグネットリンクをひ
 Maven Central で公開しています。[Ketch の組み込みを始める →](docs/developers.md#quick-start)
 
 > [!WARNING]
-> 🚧 Ketch は開発中で、現在はリリース候補版のみを公開しています。不具合が見つかる可能性があります。
+> 🚧 Ketch は開発中で、まだ 1.0 に達していません。不具合が見つかる可能性があります。
 > 気づいた点は [issue でお知らせください](https://github.com/linroid/Ketch/issues)。
 
 <a id="download"></a>
@@ -82,7 +83,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 | Android 8.0+ | [最新リリース][release]の `.apk` |
 | iOS 18+ | Xcode でソースからビルド（[`app/ios`](app/ios/)） |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/) から別のデバイスで動作する Ketch を操作 |
-| ブラウザ拡張機能 | Chrome、Edge、Brave、Firefox など：[最新リリース][release]の `.zip`（[インストール方法](app/browser-extension/README.md#installing)） |
+| ブラウザ拡張機能 | Chrome、Edge、Brave などの Chromium 系ブラウザ：[Chrome ウェブストア](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)、Firefox：拡張機能の[リリース](https://github.com/linroid/Ketch/releases)の `.zip`（[インストール方法](app/browser-extension/README.md#installing)） |
 | コマンドラインとサーバー | macOS、Linux、Windows：[インストールスクリプト](#run-ketch-on-a-server)または[最新リリース][release] |
 | Docker | x64 と ARM64 の NAS・ホームサーバー：`ghcr.io/linroid/ketch`（[ガイド](docs/docker.md)、TrueNAS と fnOS の手順付き） |
 
@@ -115,8 +116,9 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 - **HTTP と HTTPS** — ブラウザ拡張機能から送る場合は、ページの Cookie とリファラーを引き継ぎます。
 - **FTP と FTPS** — 並列接続と再開に対応します。
 - **BitTorrent とマグネットリンク** — 純粋な Kotlin 製のエンジンで v1、v2、ハイブリッドの
-  トレントに対応し、ダウンロードするファイルを選べ、必要ならシードもできます
-  （[詳細](docs/torrent.md)）。
+  トレントに対応し、ダウンロードするファイルを選べ、必要ならシードもできます。uTP と
+  プロトコル暗号化に対応し、Web シードからもダウンロードし、ルーターのポートを転送して、
+  ローカルネットワーク上のピアも見つけます（[詳細](docs/torrent.md)）。
 - **トレントのファイルをいつでも選択** — ダウンロード前にも途中にもファイルを選べ、変更しても
   最初からやり直しになりません。詳細の取得前に追加したマグネットリンクは選択を待ちます。
   完了したトレントのシードは停止・再開でき、共有を続けるトレントは Ketch の再起動後もシードします。
@@ -173,7 +175,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
   自動でスリープしないようにします。画面はオフになることがあります（「設定 → 一般」）。
 - **好みの外観と言語** — ライト・ダークテーマと 7 色のアクセントカラーを用意。
   English、简体中文、繁體中文、日本語、한국어、Español、Português (Brasil)、Deutsch、
-  Français に対応します（[翻訳への参加](docs/development/localization.md)）。
+  Français、Русский に対応します（[翻訳への参加](docs/development/localization.md)）。
 - **検証済みのダウンロード** — SHA-256、SHA-512、SHA-1、MD5 のチェックサムを指定すると、
   完了したファイルをそれで検証します。指定しない場合は、サーバーが公開する
   チェックサムで検証します。
@@ -220,14 +222,15 @@ REST API と Web アプリをポート 8642 で提供するサーバーを起動
 ketch server
 ```
 
-アプリの「デバイス → デバイスを追加」で追加するか、ブラウザで
+初回の起動時にアクセストークンを生成し、一度だけ表示します。アプリの「デバイス → デバイスを追加」で
+そのトークンを使って追加するか、ブラウザで
 `http://<サーバーのアドレス>:8642` を開きます。コマンドラインから直接ダウンロードすることもできます。
 
 ```bash
 ketch https://example.com/file.zip
 ```
 
-アクセスコード、ポートなどは[設定ファイル](cli/README.md#configuration-file)で指定します。
+独自のトークン、ポートなどは[設定ファイル](cli/README.md#configuration-file)で指定します。
 すべてのコマンドは [CLI ドキュメント](cli/README.md)を参照してください。
 
 NAS など Docker が動く環境では、代わりにイメージを起動します。設定と TrueNAS・fnOS での手順は
@@ -241,7 +244,7 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 
 ## ロードマップ
 
-- **v1.0.0 までの配布準備** — Windows 版の署名、macOS 版の署名と公証、ブラウザストアでの
+- **v1.0.0 までの配布準備** — Windows 版の署名、macOS 版の署名と公証、より多くのブラウザストアでの
   拡張機能の公開、インストールと更新手順の検証（[計画](docs/plans/v1-distribution.md)）
 - **Metalink** — チェックサム検証付きの複数ミラーからの同時ダウンロード
 - **WebDAV** — 再開に対応した WebDAV サーバーからのダウンロード
@@ -266,6 +269,21 @@ Android、iOS、JVM アプリ内では `core` と `ktor` でエンジンを実�
 Node.js と WASI では `core` に独自の HTTP エンジンを組み合わせます。
 また、`remote` を使えば、Android、iOS、JVM、ブラウザから共通の `KetchApi` で
 Ketch サーバーを操作できます。
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [開発者ガイド](docs/developers.md) — モジュール、クイックスタート、REST API、機能拡張
 - [API リファレンス](docs/api.md) — インストール、設定、優先度、エラー、ログ

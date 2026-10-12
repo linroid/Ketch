@@ -1,14 +1,17 @@
-# API Reference
+# API reference
 
-The reference for Ketch's Kotlin library. For an overview of the modules, a quick start and the
-REST API, see the [developer guide](developers.md).
+This is the reference for Ketch's Kotlin library: how to install it, the `KetchApi` and
+`DownloadTask` interfaces, configuration, checksums, errors and logging. It is for developers who
+embed the download engine or control a Ketch server from Kotlin. For an overview of the modules, a
+quick start and the REST API, start with the [developer guide](developers.md).
 
 ## Installation
 
-Add the dependencies to your `build.gradle.kts`:
+Ketch is published on Maven Central under `com.linroid.ketch`. Add the modules you need to your
+version catalog:
 
-```kotlin
-// Version catalog (gradle/libs.versions.toml)
+```toml
+# gradle/libs.versions.toml
 [versions]
 ketch = "<latest-version>"
 
@@ -25,20 +28,19 @@ ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
 ketch-torrent-api = { module = "com.linroid.ketch:torrent-api", version.ref = "ketch" }
 ```
 
+Then add them to the source sets whose targets they support:
+
 ```kotlin
 // build.gradle.kts
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(libs.ketch.core)  // Download engine
-      implementation(libs.ketch.ktor)  // HTTP engine (required by core)
+      implementation(libs.ketch.core)    // download engine
+      implementation(libs.ketch.ktor)    // HTTP engine for core
+      implementation(libs.ketch.kermit)  // optional: Kermit logging
+      implementation(libs.ketch.remote)  // optional: client of a Ketch server
     }
-    // Optional modules
-    commonMain.dependencies {
-      implementation(libs.ketch.kermit)  // Kermit logging
-      implementation(libs.ketch.remote)  // Remote client for daemon server
-    }
-    // Android, iOS and JVM only: SQLite persistence (add ketch.ftp and ketch.torrent the same way)
+    // Android, iOS and JVM only. Add ketch.ftp and ketch.torrent the same way.
     androidMain.dependencies { implementation(libs.ketch.sqlite) }
     iosMain.dependencies { implementation(libs.ketch.sqlite) }
     jvmMain.dependencies { implementation(libs.ketch.sqlite) }
@@ -46,17 +48,7 @@ kotlin {
 }
 ```
 
-`core`, `hls` and `dash` target Android, iOS, JVM, JavaScript (Node.js) and WasmWasi; `ktor`,
-`sqlite`, `ftp` and `torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to
-control a daemon instead of running the engine in-process. `torrent-api`, the torrent controller
-contract that `torrent` and `remote` expose, has the targets of `api`, so any client can inspect
-and command torrents (`ketch.controller(TorrentController)`).
-
-The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
-It does not support WASI because Kermit 2.1.0 does not publish a WASI variant. Projects with
-a WASI target should add Kermit only to source sets shared by its supported targets.
-
-Or without a version catalog:
+Without a version catalog:
 
 ```kotlin
 dependencies {
@@ -65,308 +57,564 @@ dependencies {
 }
 ```
 
-## Modules
+### Platform support
 
-### `library:api`
+| Modules | Targets |
+|---|---|
+| `api`, `torrent-api` | Android, iOS, JVM, JS, WasmJs, WasmWasi |
+| `core`, `hls`, `dash` | Android, iOS, JVM, JS (Node.js), WasmWasi |
+| `ktor`, `sqlite`, `ftp`, `torrent` | Android, iOS, JVM |
+| `remote`, `endpoints` | Android, iOS, JVM, WasmJs |
+| `kermit` | Android, iOS, JVM, JS, WasmJs |
 
-The public API surface. Both `library:core` and `library:remote` implement the `KetchApi` interface,
-so UI code works identically regardless of backend:
+- Browser (WasmJs) apps cannot run the engine. They use `remote` to control a Ketch server.
+- On JS and WasmWasi, `core` has file I/O but `ktor` ships no `HttpEngine`, so pass your own.
+- `torrent-api` is the torrent control contract that both `torrent` and `remote` implement. It has
+  the targets of `api`, so any client can inspect and command torrents.
+- Kermit publishes no WASI variant. Projects with a WASI target should add `kermit` only to source
+  sets shared by its supported targets.
 
-```kotlin
-interface KetchApi {
-  val tasks: StateFlow<List<DownloadTask>>
-  suspend fun start()  // core: restore persisted tasks; remote: connect and sync
-  suspend fun download(request: DownloadRequest): DownloadTask
-  suspend fun resolve(input: ResolveInput): ResolvedSource  // ResolveInput.Url or .Content
-  suspend fun status(): KetchStatus
-  suspend fun updateConfig(config: DownloadConfig)
-  fun <T> subscribe(interest: Interest<T>, interval: Duration = 1.seconds): Flow<T>
-  fun close()
-  // ... plus backendLabel, controller(), networkInterfaces(), selectNetworkInterfaces()
-}
-```
+## A quick tour
 
-Call `start()` once before use; persisted tasks only appear in `tasks` after it. The library
-version is available as `KetchApi.VERSION` and `KetchApi.REVISION`.
-
-`resolve(url)` probes a URL (for HTTP, a HEAD request, or a `GET` for its first byte when the server
-refuses HEAD) and returns its size, resume support, suggested file name and, for sources with
-several files or variants such as torrents, the selectable `files` and their `selectionMode`:
-`MULTIPLE` for any subset, `SINGLE` for exactly one variant (reserved for HLS quality; no built-in
-source offers it yet). `resolve(bytes, fileName)` does the same for file content the caller already
-holds, such as a picked `.torrent` file. Both are extensions building a `ResolveInput` (`Url(url,
-headers)` or `Content(bytes, fileName)`) for `KetchApi.resolve`, the one function backends
-implement; a URL is fetched by the instance, as a download's is, while content comes from the
-caller. Pass the result as `DownloadRequest.resolvedSource` (with its `url` as the request URL) to
-skip the probe; `selectedFileIds` picks a subset of `files`, or one of them for a `SINGLE` choice
-(empty downloads the source's `defaultSelection()`: every file, or the first variant). With
-`awaitFileSelection = true` and no `selectedFileIds`, a download with several files or variants
-waits once they are known, as `Paused(AwaitingFileSelection)` holding no download slot, until
-`selectFiles` chooses; `resume()` downloads the default instead.
-
-`KetchApi.download(...)` returns a `DownloadTask` for controlling an
-individual download. Tasks expose reactive state and per-task actions:
-
-```kotlin
-interface DownloadTask {
-  val taskId: String
-  val request: DownloadRequest
-  val requestState: StateFlow<DownloadRequest>  // request including runtime changes
-  val createdAt: Instant
-  val state: StateFlow<DownloadState>
-  val segments: StateFlow<List<Segment>>
-  val queuePosition: StateFlow<Int?>  // 1 = starts next; null when not waiting for a slot
-
-  suspend fun pause()
-  suspend fun resume(destination: Destination? = null)
-  suspend fun cancel()
-  suspend fun setSpeedLimit(limit: SpeedLimit)
-  suspend fun setPriority(priority: DownloadPriority)
-  suspend fun setConnections(connections: Int)  // 0 = Auto, the configured default
-  suspend fun selectFiles(fileIds: Set<String>)  // several files or variants: change them
-  suspend fun reschedule(
-    schedule: DownloadSchedule,
-    conditions: List<DownloadCondition> = emptyList(),
-  )
-
-  /**
-   * Cancels the download and removes it from the task list.
-   *
-   * @param deleteFiles when `true`, also delete the data this task
-   *   wrote to disk (partial bytes, completed file, or a torrent's
-   *   save path). Deletion is best-effort — failures are logged
-   *   and do not prevent the task record from being removed.
-   *   Defaults to `false`.
-   */
-  suspend fun remove(deleteFiles: Boolean = false)
-
-  /** Suspends until the task reaches a terminal state. */
-  suspend fun await(): Result<String>
-}
-```
-
-`selectFiles(ids)` changes which files or variant of a download with several the task
-downloads, in every state but canceled: any subset for `MULTIPLE`, exactly one ID for `SINGLE`.
-A running source that applies the change live, as a torrent does without reconnecting, keeps
-going; one that does not confirm it runs again through resume. Newly chosen files are downloaded
-and unchosen ones stop downloading but stay on disk, and a completed task that gains files
-downloads them and completes again. It throws `IllegalArgumentException` for an empty set, several
-IDs for a `SINGLE` choice or an ID the download does not have, `IllegalStateException` while the
-file list is not known or after `cancel()`, and `UnsupportedOperationException` for tasks without
-files or backends that cannot change them (see [torrents](torrent.md#choosing-files)).
-
-`DownloadState.Paused.reason` is a `PauseReason`: `User` for `pause()` (and tasks restored
-paused), `Preempted(byTaskId)` for a task that gave its slot to an URGENT one and still waits in
-the queue, `Shutdown` for a task that was downloading when its `Ketch` closed (its partial file
-is kept and it resumes on the next `start()`), `AwaitingFileSelection` for a download that waits
-for `selectFiles`, and `WaitingForCondition`. A reason the client does not know decodes as
-`User`. `DownloadState.Completed.completedAt` is when the task last finished, in whole
-milliseconds; it is `null` for tasks that finished before Ketch recorded it.
-`DownloadState.Completed.sharing` is `true` while its source shares the finished content with
-others, as a seeding torrent does. `DownloadState.Completed.checksum` is the checksum the file was
-verified against (see [checksums](#checksums)), or `null`.
-`queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`)
-in the order the queue starts them, priority first, then age.
-
-`KetchStatus.features` lists the optional behaviors an instance supports, from
-`KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`), `QUEUE_POSITION`, `REQUEST_ID`,
-`PROXY`, `CATEGORY_FOLDERS`, `ACTIVE_CONNECTIONS`, `CHECKSUM` (`download.checksum`), the media
-sources' `FINITE_HLS` and
-`FINITE_DASH`, `FILE_SELECTION`
-(`download.fileSelection`, `selectFiles`) and `AWAIT_FILE_SELECTION`
-(`download.awaitFileSelection`, `awaitFileSelection`), listed by the sources that choose files
-(the torrent source today). Modules beside `library:api` name their own: the torrent source lists
-`TorrentFeatures.CONTROL` (`torrent.control`, in `library:torrent-api`).
-Older servers send fewer, so
-their tasks report no position and `setConnections(0)` on them throws
-`UnsupportedOperationException`.
-
-`KetchApi.subscribe(interest, interval)` follows an `Interest` while the flow is collected and
-reports what it names. Interests are serializable, so a remote instance sends its server the
-ones its callers hold and receives only those; `interval` (default 1 s) is how often updates come
-at most, the shortest of the callers' winning. The built-in ones are nested in `Interest`:
-
-- `Interest.Segments(taskIds)`: the named tasks' segments, by task ID, which also update on
-  `DownloadTask.segments`. A remote instance sends a task's lifecycle, state changes and progress
-  anyway, but its segments (one per file for a torrent) only while followed.
-- `Interest.Stats`: `KetchStats`, the totals of the tasks that are downloading.
-- `Interest.Connections(limit)`: `ActiveConnections` snapshots of every task's live network
-  connections (HTTP requests, FTP transfers, media fetches, torrent peers), once a second while
-  something changes, on instances listing `ACTIVE_CONNECTIONS`. `limit` (1..1024, default 256)
-  caps the connections a snapshot holds; `total` and the rates count all of them. Without the
-  feature, collecting it throws `UnsupportedOperationException`.
-
-Modules define their own, such as `TorrentInterest` in `library:torrent-api`; an instance fails
-the interests it does not know with `UnsupportedOperationException` when collected. A flow ends
-when what it follows is gone, as a removed torrent's does after its `null`.
-
-Each interest names its `valueSerializer`, which a server encodes what it reports with, so any
-interest whose type `StreamSerializers` (`library:endpoints`) names reaches a remote instance
-without code of its own on either side. A remote instance's interests other than segments and
-stats end with the failure when the connection drops, so collect them again to resume.
-
-`RemoteKetch(progressInterval = 1.seconds)` sets how often every downloading task's progress
-comes; set `foreground = false` while nothing is shown, and the server sends only state changes.
-
-`KetchApi.controller(key)` returns an optional typed controller a backend offers beyond the download
-API, or `null`; `library:api` defines only the `ControlKey` lookup, and the module that defines a
-controller defines its key. `library:api` also holds the file orders every client shares:
-`FileOrder`, `NaturalOrder`, `fileExtension()` and `sortedByFileOrder()`.
-
-### `library:torrent-api`
-
-The torrent control contract, with the targets of `library:api`, so browser and remote clients
-use it without linking the torrent engine. `ketch.controller(TorrentController)` is a
-`TorrentController`, or `null` without a torrent source: capabilities, a task's snapshot, its
-files a page at a time (`files`, sorted by `TorrentFileOrder`, which names a
-`FileOrder`, and optionally descending), and the `select` and `setSeeding` commands, each guarded
-by a `TorrentCommandContext` (an idempotency key and the expected revision). Failures throw
-`TorrentCommandException` with a `TorrentCommandError`. `RemoteKetch` returns one that fails closed
-against servers without `TorrentFeatures.CONTROL`. A task's snapshots, as they change, come from
-`subscribe(TorrentInterest(taskId))`. See the
-[control contract](design/torrent-control-contract.md#version-1-runtime).
-
-### `library:core`
-
-The in-process download engine. Depends on an `HttpEngine` interface (no HTTP client dependency):
-
-```kotlin
-interface HttpEngine {
-  suspend fun head(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
-  // GET with `Range: bytes=0-0`, used when HEAD is refused (400, 403, 404, 405 or 501)
-  suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
-  suspend fun download(url: String, range: LongRange?, headers: Map<String, String> = emptyMap(), onData: suspend (ByteArray) -> Unit)
-  fun close()
-}
-```
-
-`probe` has a default that throws `UnsupportedOperationException`; an engine without it fails
-when a server refuses HEAD, as before. `RequestHeaders` holds the header rules engines share:
-`Ketch.download` rejects names that are not tokens and values with line breaks or other control
-characters, and engines ignore `Host`, `Range`, `Content-Length` and hop-by-hop headers.
-
-`Ketch` implements `KetchApi`. Everything except the `HttpEngine` has a default:
+Create a `Ketch`, start it once, add a download and follow its state:
 
 ```kotlin
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   taskStore = createSqliteTaskStore(driverFactory), // default: InMemoryTaskStore()
-  config = DownloadConfig(),
-  name = "Ketch",                                   // reported by status()
   additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   logger = Logger.console(),                        // default: Logger.None
 )
-ketch.start()
+ketch.start() // restores saved tasks
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/large-file.zip",
+    destination = Destination("/downloads/"), // trailing slash: a folder
+  )
+)
+
+task.state.collect { state ->
+  when (state) {
+    is DownloadState.Downloading -> println("${(state.progress.percent * 100).toInt()}%")
+    is DownloadState.Completed -> println("Saved to ${state.outputPath}")
+    is DownloadState.Failed -> println("Failed: ${state.error.message}")
+    else -> Unit
+  }
+}
 ```
 
-The built-in HTTP(S) source is the fallback. `additionalSources` adds other protocols:
-`HlsDownloadSource(httpEngine)` from `library:hls` and `DashDownloadSource(httpEngine)` from
-`library:dash` add [finite media downloads](media.md), sharing `Ketch`'s HTTP engine.
-`FtpDownloadSource` from `library:ftp` and `TorrentDownloadSource` from `library:torrent` (see
-[BitTorrent downloads](torrent.md)), or your own `DownloadSource`. The first source whose
-`canHandle` accepts the URL is used. `fileNameResolver` and `dispatchers` can also be replaced;
-`dispatchers` defaults to `KetchDispatchers.Default`, which every instance in the process shares
-(see [architecture](architecture.md#expectactual)).
+The same code works against a server: replace `Ketch(...)` with `RemoteKetch(host = ...)` (see
+[RemoteKetch](#remoteketch)).
 
-### `library:ktor`
+## KetchApi
 
-Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
-
-| Platform | Ktor Engine |
-|---|---|
-| Android | OkHttp |
-| iOS | Darwin |
-| Desktop | CIO; OkHttp through a proxy |
-
-On JavaScript and WasmWasi, pass your own `HttpEngine` to `Ketch`.
-
-`KtorHttpEngine` sends `User-Agent: Ketch/<version>` (`KtorHttpEngine.DEFAULT_USER_AGENT`) unless
-the request headers name one; pass `userAgent` to change it, or `null` to leave it to the client.
-It follows redirects itself, at most 20, and refuses those from HTTPS to HTTP or to other
-schemes. A redirect to another scheme, host or port keeps only `User-Agent`, `Accept`,
-`Accept-Encoding`, `Accept-Language` and the origin of `Referer`: cookies, `Authorization` and
-any other header, which may hold a credential, stay with the origin they were given for. The
-engine remembers where a request's redirects led, so a download's segments go to the server that
-answered its probe; when that server fails, for example because a signed link expired, the next
-request follows the redirects again.
-
-`KtorHttpEngine` applies `DownloadConfig.proxy` and `DownloadRequest.proxy` (see
-[proxies](proxy.md)): every request, and every hop of a redirect, goes directly or through an
-HTTP or SOCKS5 proxy as the setting says for its URL. An engine built around an `HttpClient` of
-your own only follows the system's proxy settings, in the client's own way. `Ketch` lists the
-`http.proxy` feature only when its engine reports `HttpEngine.supportsProxies`, and otherwise
-refuses other proxies in `updateConfig` and `download` with `UnsupportedOperationException`.
-
-For downloading across multiple interfaces, wrap network-bound engines in
-`MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;
-Android provides `KtorHttpEngine.forNetwork(Network)`. These are extension functions in
-`com.linroid.ketch.engine` and must be imported explicitly. See
-[multiple network interfaces](multiple-networks.md) for setup and platform limits.
-
-`KetchApi.networkInterfaces()` returns supported interfaces and their current selection on the
-download instance. `KetchApi.selectNetworkInterfaces(NetworkInterfaceConfig(interfaceIds))`
-changes the selection for subsequent HTTP requests; an empty list restores system-default
-routing. `RemoteKetch` forwards these methods through `GET`/`PUT /api/network-interfaces`.
-Selection is runtime-only. SDK instances enable these controls with
-`KtorHttpEngine.withNetworkInterfaces()` on JVM or
-`KtorHttpEngine.withNetworkInterfaces(connectivityManager)` on Android.
-
-## Configuration
+`KetchApi` (`library:api`) is the service interface. `Ketch` (`library:core`) implements it
+in-process, and `RemoteKetch` (`library:remote`) implements it over HTTP and server-sent events,
+so UI code works the same with either.
 
 ```kotlin
-DownloadConfig(
-  defaultDirectory = null,        // null = platform default, e.g. ~/Downloads on JVM
-  maxConnectionsPerDownload = 4,  // default concurrent segments per task
-  retryCount = 3,                 // retries in a row without progress before failing
-  retryDelayMs = 1000,            // first retry delay, doubled for each further retry
-  unlimitedRetries = false,       // true retries until the task is paused or canceled
-  maxRetryDelayMs = 60_000,       // retry delay cap; each delay is randomized from half to all
-  idleTimeoutMs = 60_000,         // retry a connection that receives no data this long (0 = off)
-  minSpeed = 0,                   // bytes/s a connection must average over 30 s (0 = off)
-  progressIntervalMs = 200,       // progress throttle
-  saveIntervalMs = 5000,          // how often segment progress is persisted
-  bufferSize = 8192,              // FTP read buffer size
-  speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
-  maxConcurrentDownloads = 4,     // max simultaneous downloads (0 = unlimited)
-  maxConnectionsPerHost = 16,     // max simultaneous downloads per host (0 = unlimited)
-  proxy = Proxy.System,           // HTTP(S) proxy: System, Direct or Proxy.Manual(url)
-  categories = emptyList(),       // folders inside defaultDirectory, by type or site
+interface KetchApi {
+  val backendLabel: String                    // "Core" or "Remote · host:port"
+  val tasks: StateFlow<List<DownloadTask>>
+
+  suspend fun start()                         // core: restore saved tasks; remote: connect
+  fun close()
+
+  suspend fun download(request: DownloadRequest): DownloadTask
+  suspend fun resolve(input: ResolveInput): ResolvedSource
+  suspend fun status(): KetchStatus
+  suspend fun updateConfig(config: DownloadConfig)
+  suspend fun networkInterfaces(): NetworkInterfaces
+  suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces
+
+  fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
+  fun <T : Any> controller(key: ControlKey<T>): T?
+}
+```
+
+- Call `start()` once before use. Saved tasks only appear in `tasks` after it.
+- `KetchApi.VERSION` and `KetchApi.REVISION` give the library version and its git revision.
+- Implementing `KetchApi` or `DownloadTask` yourself requires opting in to
+  `KetchImplementationApi`.
+
+### Resolve a link before downloading
+
+`resolve` probes a download without starting it. It answers with a `ResolvedSource`: the size
+(`-1` when unknown), whether it can resume, a suggested file name, the content type, a checksum
+the server publishes and, for sources with several files or variants such as torrents, the
+selectable `files` and their `selectionMode`.
+
+```kotlin
+val preview = ketch.resolve("https://example.com/file.iso")          // a URL
+val torrent = ketch.resolve(pickedBytes, fileName = "ubuntu.torrent") // content you hold
+
+ketch.download(
+  DownloadRequest(
+    url = torrent.url,
+    resolvedSource = torrent,                   // skips probing again
+    selectedFileIds = setOf(torrent.files.first().id),
+  )
 )
 ```
 
-The values shown are the defaults, except `speedLimit`. A `null` `defaultDirectory` resolves to
-`~/Downloads` on JVM, the app's external `Download` folder on Android and `Downloads` in the app's
-Documents folder on iOS. `status().system` reports the folder in use as `downloadDirectory` and
-this platform default as `defaultDownloadDirectory`.
+- Both calls are extensions that build a `ResolveInput` for `KetchApi.resolve`:
+  `ResolveInput.Url(url, headers)`, which the instance fetches as it would a download, or
+  `ResolveInput.Content(bytes, fileName)`, file content the caller holds. Remote instances accept
+  content up to `ResolveInput.Content.MAX_CONTENT_BYTES` (16 MiB).
+- An HTTP probe is a `HEAD` request, or a `GET` for the first byte when the server refuses `HEAD`.
+- `resolve` runs until it has an answer; a magnet link, for example, waits for peers. There is no
+  timeout, so cancel the call (for example with `withTimeout`) if you need one.
+- It throws `KetchError.Unsupported` when no source handles the URL or recognizes the content.
+- To download content you resolved, pass the result as `DownloadRequest.resolvedSource`, with its
+  `url` as the request URL. The result does not keep the bytes.
 
-`ketch.updateConfig(config)` replaces the configuration at runtime. `speedLimit`,
-`maxConcurrentDownloads` and `maxConnectionsPerHost` apply immediately: raising a queue limit
-starts queued downloads, lowering one lets running downloads finish. All other fields apply to
-downloads that start or resume afterwards; pause and resume a running download to pick them up.
-A changed `defaultDirectory` that does not exist or is not a folder is rejected with
-`IllegalArgumentException`, and the previous configuration stays in effect.
+### Choose files
 
-The per-host limit counts downloads by URL host (case-insensitive, ignoring user info and port),
-not their individual connections. With the defaults, the global limit of four downloads applies
-before the per-host limit of sixteen. Explicit values in an existing configuration are kept;
-omitted fields use the current defaults.
-Magnet links, `torrent:` identifiers and local files are not counted.
+`selectedFileIds` picks which of `ResolvedSource.files` to download:
 
-`maxConnectionsPerDownload` and `DownloadRequest.connections` split HTTP(S) and FTP(S)
-downloads into parallel ranges when the server supports HTTP Range or FTP REST; otherwise a
-single connection is used. BitTorrent treats a per-task connection count as its peer limit.
-A count of 0 (Auto) uses the configured default of the run: `maxConnectionsPerDownload`, or a
-torrent's own peer limit; `setConnections(0)` returns a running task to it.
-`bufferSize` sets the FTP read buffer; HTTP buffering is up to the `HttpEngine`.
+- `FileSelectionMode.MULTIPLE` takes any subset. An empty set downloads every file.
+- `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. It is reserved
+  for HLS quality; no built-in source offers it yet.
+- `ResolvedSource.defaultSelection()` returns what an empty selection downloads.
+
+With `awaitFileSelection = true` and no `selectedFileIds`, a download with several files or
+variants pauses as `Paused(AwaitingFileSelection)` once they are known. It holds no download slot
+until `selectFiles` chooses, and `resume()` downloads the default selection instead.
+
+## DownloadTask
+
+`download(...)` returns a `DownloadTask`, which exposes the download's state and the commands
+that change it:
+
+```kotlin
+interface DownloadTask {
+  val taskId: String
+  val request: DownloadRequest
+  val requestState: StateFlow<DownloadRequest> // the request, including changes made later
+  val createdAt: Instant
+  val state: StateFlow<DownloadState>
+  val segments: StateFlow<List<Segment>>
+  val queuePosition: StateFlow<Int?>           // 1 = starts next; null when not waiting
+  val outputPath: String?                      // where it saves, once chosen; null from remote
+
+  suspend fun pause()
+  suspend fun resume(destination: Destination? = null)
+  suspend fun cancel()
+  suspend fun remove(deleteFiles: Boolean = false)
+  suspend fun await(): Result<String>          // output path, or the KetchError
+
+  suspend fun setSpeedLimit(limit: SpeedLimit)
+  suspend fun setPriority(priority: DownloadPriority)
+  suspend fun setConnections(connections: Int) // 0 = Auto, the configured default
+  suspend fun selectFiles(fileIds: Set<String>)
+  suspend fun reschedule(
+    schedule: DownloadSchedule,
+    conditions: List<DownloadCondition> = emptyList(),
+  )
+}
+```
+
+### Commands
+
+- **`pause()`** keeps the progress. A queued or preempted task leaves the queue until `resume()`.
+- **`resume(destination)`** continues a paused or failed task. A preempted task already waits and
+  is left as it is. Pass a `destination` when the target moved, such as an Android document URI
+  that changed while naming the same file.
+- **`remove(deleteFiles)`** cancels the download and forgets the task. With `deleteFiles = true`
+  it also deletes the partial or finished files, best-effort: failures are logged and the task is
+  removed anyway.
+- **`setSpeedLimit`, `setConnections`, `setPriority`** are saved for queued, scheduled, paused and
+  failed tasks and apply when the task starts or resumes; a running task applies them at once.
+  `setConnections` throws `IllegalArgumentException` for a negative count, and
+  `UnsupportedOperationException` for `0` on servers that do not list `AUTO_CONNECTIONS`.
+- **`reschedule`** pauses the task and starts it again per the new schedule and conditions. The
+  schedule is saved; the conditions are not. Remote tasks cannot be rescheduled.
+
+### Changing files while a task runs
+
+`selectFiles(ids)` changes which files, or which variant, a download fetches. It works in every
+state except canceled:
+
+- A running torrent switches without reconnecting its peers. A source that cannot confirm the
+  change live runs again through resume.
+- Newly chosen files are downloaded. Unchosen ones stop downloading but stay on disk.
+- A completed task that gains files downloads them and completes again; one that only drops files
+  just changes its size.
+- A task waiting for a selection starts.
+
+It throws:
+
+| Exception | When |
+|---|---|
+| `IllegalArgumentException` | The set is empty, has several IDs for a `SINGLE` choice, names an unknown ID, or exceeds `MAX_SELECTED_FILES` (100,000) or `MAX_FILE_ID_LENGTH` (128) |
+| `IllegalStateException` | The file list is not known yet, the task was canceled, or a file Ketch does not own is in the way |
+| `UnsupportedOperationException` | The task has no files to choose, or the backend does not list `FILE_SELECTION` |
+
+See [choosing torrent files](torrent.md#choosing-files) for the torrent specifics.
+
+## Download states
+
+`DownloadState` is a sealed class. A task usually moves through `Scheduled`, `Queued`,
+`Downloading` and `Completed`, and may pass through `Paused` and `Failed` (both resumable) or end
+`Canceled`.
+
+| State | Meaning |
+|---|---|
+| `Scheduled(schedule)` | Waiting for a `DownloadSchedule` time or its `DownloadCondition`s |
+| `Queued` | Waiting for a free download slot |
+| `Downloading(progress)` | Transferring; `progress` has `downloadedBytes`, `totalBytes` (0 when unknown), `bytesPerSecond` and `percent` (`0f..1f`) |
+| `Paused(progress, reason)` | Paused for a `PauseReason` |
+| `Completed(...)` | Finished; see below |
+| `Failed(error)` | Failed with a `KetchError`; unknown error types read as `KetchError.Unknown` |
+| `Canceled` | Canceled for good |
+
+`isTerminal` is true for `Completed`, `Failed` and `Canceled`; `isActive` is true for
+`Downloading`.
+
+### Why a task is paused
+
+| `PauseReason` | Cause | What happens next |
+|---|---|---|
+| `User` | `pause()`, or a task restored paused | Waits for `resume()` |
+| `Preempted(byTaskId)` | Gave its slot to an `URGENT` task | Stays queued and resumes on its own; `pause()` turns it into a `User` pause |
+| `Shutdown` | Was downloading when its `Ketch` closed | Keeps its partial file and resumes on the next `start()` |
+| `AwaitingFileSelection` | Added with `awaitFileSelection` and several files | Starts on `selectFiles`; `resume()` downloads the default selection |
+| `WaitingForCondition` | Waiting for its conditions | Resumes on its own |
+
+A reason a client does not know decodes as `User`.
+
+### Completed tasks
+
+`DownloadState.Completed` reports:
+
+- `outputPath`: the saved file, or the folder of a multi-file download.
+- `totalBytes`: the size.
+- `downloadTime`: time spent downloading over every run, excluding time scheduled, queued or
+  paused.
+- `completedAt`: when the task last finished, in whole milliseconds.
+- `sharing`: `true` while the source shares the content with others, as a seeding torrent does.
+  Not saved.
+- `checksum`: the digest the file was verified against (see [checksums](#checksums)). Not kept
+  across restarts.
+
+Fields are `null` when unknown, for example for tasks finished by older versions.
+
+### Queue position
+
+`queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`) in
+the order the queue starts them: priority first, then age. It is `null` for tasks that do not
+wait, including a queued task that already holds a slot. A task held back by
+`maxConnectionsPerHost` keeps its place while later ones start. The position is a separate flow
+from `state`, so the two can briefly disagree.
+
+## Follow live data with `subscribe`
+
+`subscribe(interest, interval)` follows an `Interest` while the flow is collected. Interests are
+serializable, so a remote instance sends its server only the ones its callers hold. `interval`
+(default 1 s) is the most often updates come; with several callers the shortest wins.
+
+```kotlin
+ketch.subscribe(Interest.Stats).collect { stats ->
+  println("${stats.downloading} downloading at ${stats.downloadBps} B/s")
+}
+```
+
+The built-in interests are nested in `Interest`:
+
+| Interest | Reports | Notes |
+|---|---|---|
+| `Segments(taskIds)` | `Map<String, List<Segment>>` for up to 1024 tasks | Also updates `DownloadTask.segments`. A remote instance sends state and progress anyway, but segments (one per file for a torrent) only while followed |
+| `Stats` | `KetchStats`: totals of the downloading tasks | |
+| `Connections(limit)` | `ActiveConnections` snapshots of every task's live connections (HTTP requests, FTP transfers, media fetches, torrent peers) | Needs `ACTIVE_CONNECTIONS`. `limit` is 1..1024 (default 256); `total` and the rates count every connection. A snapshot comes at once, then one per change |
+
+Other modules define their own, such as `TorrentInterest(taskId)` in `library:torrent-api`.
+
+- A flow ends when what it follows is gone, as a removed torrent's does after its `null`.
+- An instance that does not know an interest fails it with `UnsupportedOperationException` when
+  collected.
+- Each interest names a `valueSerializer`, which servers encode what they report with. Any
+  interest whose type `StreamSerializers` (`library:endpoints`) names reaches a remote instance
+  with no extra code on either side.
+- On a remote instance, interests other than segments and stats end with the failure when the
+  connection drops. Collect them again to resume.
+
+## Controllers and features
+
+### Optional controllers
+
+`controller(key)` returns a typed controller that a backend offers beyond the download API, or
+`null`. `library:api` defines only the `ControlKey` lookup; the module that defines a controller
+also defines its key, usually as the controller's companion object.
+
+```kotlin
+val torrents: TorrentController? = ketch.controller(TorrentController)
+```
+
+Check the feature the module names in `status().features` first: a remote controller fails
+against servers that lack it.
+
+### The torrent controller
+
+`library:torrent-api` holds the torrent control contract. It has the targets of `library:api`,
+so browser and remote clients use it without linking the torrent engine.
+
+`ketch.controller(TorrentController)` returns a `TorrentController`, or `null` without a torrent
+source. It offers:
+
+- `capabilities()` and `snapshot(taskId)`.
+- `files(...)`: a task's files a page at a time, sorted by a `TorrentFileOrder` (each naming a
+  `FileOrder`), optionally descending.
+- `select(...)` and `setSeeding(...)`, each guarded by a `TorrentCommandContext` (an idempotency
+  key and the expected `TorrentRevision`). Failures throw `TorrentCommandException` with a
+  `TorrentCommandError`.
+
+Live snapshots come from `subscribe(TorrentInterest(taskId))`. `RemoteKetch` returns a controller
+that fails closed against servers without `TorrentFeatures.CONTROL`. See the
+[control contract](design/torrent-control-contract.md#version-1-runtime).
+
+`library:api` also holds the file orders every client shares: `FileOrder`, `NaturalOrder`,
+`fileExtension()` and `sortedByFileOrder()`.
+
+### Feature flags
+
+`status().features` lists the optional behaviors an instance supports. Gate client features on
+these rather than on version numbers: older servers send fewer.
+
+| `KetchFeatures` constant | Wire name | Enables |
+|---|---|---|
+| `REQUEST_ID` | `task.requestId` | `DownloadRequest.requestId` deduplication |
+| `AUTO_CONNECTIONS` | `task.autoConnections` | `setConnections(0)` |
+| `QUEUE_POSITION` | `task.queuePosition` | `DownloadTask.queuePosition` |
+| `PROXY` | `http.proxy` | Proxies other than `Proxy.System` |
+| `CATEGORY_FOLDERS` | `download.categories` | `DownloadConfig.categories` |
+| `TRANSFER_TIMEOUTS` | `download.timeouts` | `idleTimeoutMs`, `minSpeed`, `unlimitedRetries` |
+| `CHECKSUM` | `download.checksum` | `DownloadRequest.checksum` |
+| `ACTIVE_CONNECTIONS` | `net.activeConnections` | `Interest.Connections` |
+| `FILE_SELECTION` | `download.fileSelection` | `selectFiles` (listed by sources that choose files) |
+| `AWAIT_FILE_SELECTION` | `download.awaitFileSelection` | `awaitFileSelection` |
+| `FINITE_HLS`, `FINITE_DASH` | `hls.finite`, `dash.finite` | The HLS and DASH sources; `FINITE_MEDIA` (`media.finite`) is listed when both are |
+
+Modules beside `library:api` name their own: the torrent source lists `TorrentFeatures.CONTROL`
+(`torrent.control`). On servers without `QUEUE_POSITION` tasks report no position, and without
+`AUTO_CONNECTIONS` `setConnections(0)` throws `UnsupportedOperationException`.
+
+## The Ketch engine (`library:core`)
+
+`Ketch` implements `KetchApi` in-process. Everything except the `HttpEngine` has a default:
+
+```kotlin
+val ketch = Ketch(
+  httpEngine = KtorHttpEngine(),
+  taskStore = InMemoryTaskStore(),             // or createSqliteTaskStore(driverFactory)
+  config = DownloadConfig(),
+  name = "Ketch",                              // reported by status()
+  fileNameResolver = DefaultFileNameResolver(),
+  additionalSources = emptyList(),
+  logger = Logger.None,
+  dispatchers = KetchDispatchers.Default,
+)
+```
+
+### Download sources
+
+The built-in HTTP(S) source is the fallback. `additionalSources` adds other protocols, checked in
+order before HTTP; the first source whose `canHandle` accepts the URL is used:
+
+- `FtpDownloadSource()` from `library:ftp`.
+- `TorrentDownloadSource()` from `library:torrent` (see [BitTorrent downloads](torrent.md)).
+- `HlsDownloadSource(httpEngine)` from `library:hls` and `DashDownloadSource(httpEngine)` from
+  `library:dash`, for [finite streaming media](media.md). Pass them the engine you give `Ketch`.
+  Register them before HTTP, which `additionalSources` does.
+- Your own `DownloadSource` (see [writing a download source](developers.md#write-your-own-download-source)).
+
+### Dispatchers
+
+`dispatchers` defaults to `KetchDispatchers.Default`, created once per process and shared by every
+instance. On Android and the JVM it runs on Ketch's own daemon threads, which start only when
+needed and end after 30 seconds idle. See [architecture](architecture.md#threads) for details.
+Pass your own `KetchDispatchers(main, network, disk)` to control threading; `Ketch.close()`
+closes them once its coroutines have finished.
+
+### HttpEngine
+
+`library:core` depends on an `HttpEngine` interface, not on an HTTP client:
+
+```kotlin
+interface HttpEngine {
+  suspend fun head(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
+
+  // GET with `Range: bytes=0-0`, used when HEAD is refused (400, 403, 404, 405 or 501).
+  // The default throws UnsupportedOperationException, keeping the HEAD error.
+  suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
+
+  suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String> = emptyMap(),
+    onData: suspend (ByteArray) -> Unit,
+  )
+
+  // Streams a whole resource and returns its final URL after redirects (manifests use it).
+  suspend fun downloadResource(
+    url: String,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ): String
+
+  val supportsProxies: Boolean get() = false
+  fun withProxy(proxy: Proxy): HttpEngine // default: this for Proxy.System, else refuses
+  fun close()
+}
+```
+
+- Engines that follow redirects must override `downloadResource` to return the final URL.
+- An engine that can choose proxies overrides `withProxy` and reports `supportsProxies`. The
+  default refuses any proxy but `Proxy.System` with `KetchError.Unsupported`, so a download never
+  silently skips its proxy. `Ketch` lists `http.proxy` only when its engine supports proxies, and
+  otherwise refuses other proxies in `updateConfig` and `download` with
+  `UnsupportedOperationException`.
+- `RequestHeaders` holds the header rules engines share: `Ketch.download` rejects header names that
+  are not tokens and values with line breaks or other control characters, and engines drop `Host`,
+  `Range`, `Content-Length` and hop-by-hop headers.
+- `ServerInfo.publishedChecksum` reads `Repr-Digest` and `Digest` headers for custom engines.
+
+## HTTP engine (`library:ktor`)
+
+`KtorHttpEngine` is the ready-made `HttpEngine`, backed by Ktor Client:
+
+| Platform | Ktor engine |
+|---|---|
+| Android | OkHttp |
+| iOS | Darwin |
+| JVM | CIO; OkHttp for requests that go through a proxy |
+
+### Headers and redirects
+
+- It sends `User-Agent: Ketch/<version>` (`KtorHttpEngine.DEFAULT_USER_AGENT`) unless the request
+  names one. Pass `userAgent` to change it, or `null` to leave it to the client.
+- It follows redirects itself, at most 20, and refuses those from HTTPS to HTTP or to other
+  schemes.
+- A redirect to another scheme, host or port keeps only `User-Agent`, `Accept`,
+  `Accept-Encoding`, `Accept-Language` and the origin of `Referer`. Cookies, `Authorization` and
+  any other header that may hold a credential stay with the origin they were given for.
+- It remembers where a request's redirects led, so a download's segments go to the server that
+  answered its probe. When that server fails, for example because a signed link expired, the next
+  request follows the redirects again.
+
+### Proxies
+
+`KtorHttpEngine` applies `DownloadConfig.proxy` and `DownloadRequest.proxy` (see
+[proxies](proxy.md)). Every request, and every hop of a redirect, goes directly or through an HTTP
+or SOCKS5 proxy as the setting says for its URL. An engine built around an `HttpClient` of your
+own only follows the system's proxy settings, in the client's own way.
+
+### Multiple network interfaces
+
+To spread downloads across interfaces, wrap network-bound engines in `MultiNetworkHttpEngine`. The
+factories are extension functions in `com.linroid.ketch.engine`; import them explicitly:
+
+- JVM: `KtorHttpEngine.forLocalAddress(InetAddress)`.
+- Android: `KtorHttpEngine.forNetwork(Network)`.
+
+To let users pick interfaces at runtime, build the engine with
+`KtorHttpEngine.withNetworkInterfaces()` (JVM) or
+`KtorHttpEngine.withNetworkInterfaces(connectivityManager)` (Android). Then:
+
+- `networkInterfaces()` lists the supported interfaces and the current selection.
+- `selectNetworkInterfaces(NetworkInterfaceConfig(interfaceIds))` changes the selection for later
+  HTTP requests; requests in flight keep theirs. An empty list restores default routing.
+- The selection is not saved across restarts. `RemoteKetch` forwards both calls to
+  `GET`/`PUT /api/network-interfaces`.
+
+See [multiple network interfaces](multiple-networks.md) for setup and platform limits.
+
+## RemoteKetch
+
+`RemoteKetch` (`library:remote`) is a `KetchApi` that controls a Ketch server over HTTP and
+server-sent events:
+
+```kotlin
+val api = RemoteKetch(
+  host = "192.168.1.20",
+  port = 8642,                 // default
+  apiToken = "my-secret",      // the server's token, if it has one
+  secure = false,              // true for https
+  progressInterval = 1.seconds, // how often running tasks' progress comes; null for none
+)
+api.start() // connects, loads the tasks and keeps reconnecting
+```
+
+- Set `api.foreground = false` while nothing is shown; the server then sends only lifecycle and
+  state changes.
+- It reconnects with exponential backoff, and stops when the server rejects the token.
+- Calls the server refuses throw `RemoteApiException` with the HTTP status, the error code and
+  message, and `Retry-After`, unless `KetchApi` documents another exception for the case.
+- It refuses requests that need features the server lacks, such as a proxy without `http.proxy`
+  or a checksum without `download.checksum`, instead of letting the server ignore them.
+
+## Configuration
+
+`DownloadConfig` holds the instance-wide settings. These are the defaults, except `speedLimit`:
+
+```kotlin
+DownloadConfig(
+  defaultDirectory = null,           // null = platform default, e.g. ~/Downloads on JVM
+  maxConnectionsPerDownload = 4,     // default concurrent segments per task
+  retryCount = 3,                    // retries in a row without progress before failing
+  retryDelayMs = 1_000,              // first retry delay, doubled for each further retry
+  unlimitedRetries = false,          // true retries until the task is paused or canceled
+  maxRetryDelayMs = 60_000,          // retry delay cap; each delay is randomized from half to all
+  idleTimeoutMs = 60_000,            // retry a connection that receives no data this long (0 = off)
+  minSpeed = 0,                      // bytes/s a connection must average over 30 s (0 = off)
+  progressIntervalMs = 200,          // progress throttle
+  saveIntervalMs = 5_000,            // how often progress and source state are saved
+  bufferSize = 8 * 1024,             // FTP read buffer size
+  speedLimit = SpeedLimit.kbps(500), // global speed limit (default: SpeedLimit.Unlimited)
+  maxConcurrentDownloads = 4,        // simultaneous downloads (0 = unlimited)
+  maxConnectionsPerHost = 16,        // simultaneous downloads per host (0 = unlimited)
+  proxy = Proxy.System,              // HTTP(S) proxy: System, Direct or Proxy.Manual(url)
+  categories = emptyList(),          // folders inside defaultDirectory, by type or site
+)
+```
+
+### Changing settings at runtime
+
+`ketch.updateConfig(config)` replaces the configuration:
+
+- `speedLimit`, `maxConcurrentDownloads` and `maxConnectionsPerHost` apply immediately. Raising a
+  queue limit starts queued downloads; lowering one lets running downloads finish.
+- All other fields apply to downloads that start or resume afterwards. Pause and resume a running
+  download to pick them up.
+- A changed `defaultDirectory` that does not exist or is not a folder is rejected with
+  `IllegalArgumentException`, and the previous configuration stays in effect.
+
+### Folders
+
+A `null` `defaultDirectory` resolves to `~/Downloads` on the JVM, the app's external `Download`
+folder on Android, and `Downloads` in the app's Documents folder on iOS. `status().system`
+reports the folder in use as `downloadDirectory` and the platform default as
+`defaultDownloadDirectory`.
+
+`Destination` says where one download is saved: a file name (`file.zip`), a full file path, a
+folder ending in `/` (`/downloads/`), or an Android content URI. A full file path is used as it
+is.
+
+### Connections and limits
+
+- `maxConnectionsPerDownload` and `DownloadRequest.connections` split HTTP(S) and FTP(S)
+  downloads into parallel ranges when the server supports HTTP Range or FTP `REST`; otherwise one
+  connection is used. BitTorrent treats a per-task count as its peer limit.
+- A count of `0` (Auto) uses the run's default: `maxConnectionsPerDownload`, or a torrent's own
+  peer limit. `setConnections(0)` returns a running task to it.
+- The per-host limit counts downloads, not connections, by URL host (case-insensitive, ignoring
+  user info and port). Magnet links, `torrent:` identifiers and local files are not counted. With
+  the defaults, the global limit of four downloads applies before the per-host limit of sixteen.
+- `bufferSize` sets the FTP read buffer; HTTP buffering is up to the `HttpEngine`.
 
 ### Category folders
 
-`categories` sorts the downloads that do not choose a folder into folders inside
-`defaultDirectory`. A request whose `destination` is `null` or a bare file name is saved in the
-`folder` of the first `DownloadCategory` it matches, and in `defaultDirectory` when it matches
-none; a destination naming a folder or a full path is used as it is. Matching happens when a
-download starts, against the name it is saved under, the `Content-Type` the server reported
-(`ResolvedSource.contentType`) and the host of the request URL:
+`categories` sorts downloads that do not choose a folder into folders inside `defaultDirectory`:
 
 ```kotlin
 DownloadConfig(
@@ -381,59 +629,51 @@ DownloadConfig(
 )
 ```
 
+A request whose `destination` is `null` or a bare file name is saved in the `folder` of the first
+category it matches, or in `defaultDirectory` when it matches none. A destination naming a folder
+or a full path is used as it is. Matching happens when the download starts, against the name it
+is saved under, the server's `Content-Type` (`ResolvedSource.contentType`) and the request host.
+
 - A category matches when the file's type matches (its name ends with one of `extensions`, such
   as `tar.gz`, or its media type is one of `mimeTypes`, where `video/*` covers a whole kind) and,
-  when `hosts` is set, its host is one of them or a subdomain of one. Rules ignore case.
-- A category with no rules matches nothing. Order matters: the first match wins.
-- `folder` is relative to `defaultDirectory`, `/` separating nested folders; an absolute folder,
-  a drive or `..` is rejected with `IllegalArgumentException`. Each folder name is made safe like
-  a server's file name, and folders are created as the download starts, including inside an
-  Android `content://` tree.
-- Magnet links have no host, and a torrent matches by its name, which for a torrent of several
-  files is usually a folder name without an extension.
-- `DownloadConfig.categoryFor(fileName, contentType, host)` tells which category a download
-  would go to, as the apps' add sheet shows it. Instances that support category folders list
-  `KetchFeatures.CATEGORY_FOLDERS` in `status().features`.
-- `RemoteKetch.updateConfig` sends the categories to the server. A `PUT /api/config` body
-  without a `categories` field, as clients older than category folders send it, keeps the
-  server's categories rather than clearing them.
+  when `hosts` is set, its host is one of them or a subdomain. Rules ignore case.
+- A category with no rules matches nothing. The first match wins, so order matters.
+- `folder` is relative to `defaultDirectory`, with `/` between nested folders. An absolute folder,
+  a drive or `..` is rejected with `IllegalArgumentException`. Each name is made safe like a
+  server's file name, and folders are created as the download starts, including inside an Android
+  `content://` tree.
+- Magnet links have no host. A torrent matches by its name, which for a multi-file torrent is
+  usually a folder name without an extension.
+- `DownloadConfig.categoryFor(fileName, contentType, host)` tells which category a download would
+  go to. Instances that support categories list `CATEGORY_FOLDERS`.
+- `RemoteKetch.updateConfig` sends the categories to the server. A `PUT /api/config` body without
+  a `categories` field, as older clients send, keeps the server's categories.
 
-### Priority & Scheduling
-
-`task.setPriority(priority)` persists the change and updates `task.requestState`, including
-for active, paused, and scheduled tasks. LOW, NORMAL, and HIGH determine which queued task
-starts next. Changing a queued task to URGENT can immediately pause a lower-priority active
-task to make room. The interrupted task becomes `Paused` with `PauseReason.Preempted`, keeps
-its place in the queue and resumes on its own when a slot opens.
-Concurrency and per-host limits still apply; other URGENT tasks cannot be preempted.
-Priority changes do not resume manually paused tasks or bypass schedules and conditions.
-
-Priority does not reserve or weight bandwidth among active downloads. Use per-task
-`setSpeedLimit` and the global speed limit to control transfer rates.
+## Priority, scheduling, speed limits and proxies
 
 ```kotlin
-// High-priority download
+// Jump the queue
 ketch.download(
   DownloadRequest(
     url = "https://example.com/urgent.zip",
-    destination = Destination("/downloads/"),  // trailing slash: a directory
-    priority = DownloadPriority.URGENT,  // preempts lower-priority tasks
+    destination = Destination("/downloads/"),
+    priority = DownloadPriority.URGENT, // may preempt a lower-priority download
   )
 )
 
-// Scheduled download
+// Start later, only on Wi-Fi
 ketch.download(
   DownloadRequest(
     url = "https://example.com/file.zip",
-    destination = Destination("/downloads/file.zip"),  // full path, used as-is
-    schedule = DownloadSchedule.AtTime(startAt),
-    conditions = listOf(DownloadCondition.Test(wifiConnected)),  // Flow<Boolean>
+    destination = Destination("/downloads/file.zip"),
+    schedule = DownloadSchedule.AtTime(startAt), // or AfterDelay(30.minutes)
+    conditions = listOf(DownloadCondition.Test(wifiConnected)), // a Flow<Boolean>
   )
 )
 
-// Speed limiting
-task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
-ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // global
+// Speed limits
+task.setSpeedLimit(SpeedLimit.mbps(1))                              // one task
+ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // every task
 
 // Proxies: one for every download, and one for a single download
 ketch.updateConfig(config.copy(proxy = Proxy.Manual("http://proxy.lan:3128")))
@@ -445,92 +685,138 @@ ketch.download(
 )
 ```
 
-### Checksums
+### Priority
+
+- `LOW`, `NORMAL` and `HIGH` decide which queued task starts next.
+- Changing a task to `URGENT` can pause a lower-priority running task to make room. That task
+  becomes `Paused(Preempted)`, keeps its place in the queue and resumes on its own when a slot
+  opens. Concurrency and per-host limits still apply, and other `URGENT` tasks are never
+  preempted.
+- `setPriority` is saved and updates `requestState` in any state. It does not resume manually
+  paused tasks or bypass schedules and conditions.
+- Priority does not reserve bandwidth. Use speed limits to control transfer rates.
+
+### Speed limits
+
+A per-task limit applies on top of the global one, so a task never exceeds the lower of the two.
+Both can change while downloads run.
+
+### Schedules and conditions
+
+`DownloadSchedule` is `Immediate`, `AtTime(Instant)` or `AfterDelay(Duration)`.
+`DownloadCondition.Test(flow)` holds a task until a `Flow<Boolean>` emits `true`; a task starts
+once all its conditions hold. The schedule is saved with the task, but conditions are not: their
+flows cannot be stored.
+
+### Proxies
+
+`Proxy` is `System` (default), `Direct` or `Manual(url, bypass)`, where the URL is `http://` or
+`socks5://` with optional credentials. It applies to HTTP(S), HLS and DASH; FTP and BitTorrent
+ignore it, and loopback hosts always go directly. `DownloadRequest.proxy` replaces the global
+setting for one download. See [proxies](proxy.md).
+
+## Checksums
+
+Ask Ketch to verify a download against a known digest:
 
 ```kotlin
 ketch.download(
   DownloadRequest(
     url = "https://example.com/file.iso",
-    checksum = Checksum.parse("sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"),
+    checksum = Checksum.parse(
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    ),
   )
 )
 ```
 
-`DownloadRequest.checksum` is the digest the file must have: `Checksum(algorithm, hex)` with
-`ChecksumAlgorithm.MD5`, `SHA_1`, `SHA_256` or `SHA_512`. `Checksum.parse` reads
-`<algorithm>:<hex>` (`sha256:…`, `SHA-256:…`), base64 values (`sha-256=:…:`, as HTTP digest
-headers write them) and bare hex digests, whose length names the algorithm; JSON carries it as
-the text `"sha256:<hex>"`. The hash functions are pure Kotlin (`com.linroid.ketch.core.digest`),
-so every engine target verifies.
+`Checksum(algorithm, hex)` takes `ChecksumAlgorithm.MD5`, `SHA_1`, `SHA_256` or `SHA_512`.
+`Checksum.parse` reads:
 
-Once the last byte is flushed, Ketch reads the file back and hashes it before the task completes;
-the task keeps reporting `Downloading` with every byte downloaded meanwhile, and pausing or
-cancelling stops the hashing. A match completes the task with `Completed.checksum`; a difference
-fails it with `KetchError.ChecksumMismatch(algorithm, expected, actual, published)`, which is not
-retried. The mismatching file is deleted and the task's progress discarded, so it never stays
-where it looks complete and `resume()` downloads it again. A completed task is never hashed
-again.
+- `<algorithm>:<hex>`, such as `sha256:…` or `SHA-256:…`.
+- Base64 values as HTTP digest headers write them, such as `sha-256=:…:`.
+- Bare hex digests, whose length names the algorithm.
+
+JSON carries a checksum as the text `"sha256:<hex>"`. The hashes are pure Kotlin
+(`com.linroid.ketch.core.digest`), so every engine target can verify.
+
+### What happens on completion
+
+1. Once the last byte is flushed, Ketch reads the file back and hashes it. The task keeps
+   reporting `Downloading` with every byte downloaded meanwhile; pausing or canceling stops the
+   hashing.
+2. A match completes the task with `Completed.checksum`.
+3. A difference fails it with `KetchError.ChecksumMismatch(algorithm, expected, actual,
+   published)`, which is not retried. The file is deleted and the progress discarded, so it never
+   looks complete and `resume()` downloads it again.
+
+A completed task is never hashed again.
+
+### Digests the server publishes
 
 Without a checksum of its own, an HTTP download is checked against the digest its server
-publishes for the whole file: the strongest supported entry of `Repr-Digest` (RFC 9530), else of
-a legacy `Digest` (RFC 3230) from a `HEAD` or `200` response, never from a ranged one. A response
-with a `Content-Encoding` other than `identity` publishes nothing, as its digest covers the
-encoded bytes, and `Content-Digest` is never used. A mismatch against it fails the same way, with
-`published = true`. `ResolvedSource.checksum` and `ServerInfo.checksum` hold the published digest
-(`ServerInfo.publishedChecksum` reads the headers for custom `HttpEngine`s).
+publishes for the whole file: the strongest supported entry of `Repr-Digest` (RFC 9530), or else
+of a legacy `Digest` (RFC 3230), from a `HEAD` or `200` response and never a ranged one. A
+response with a `Content-Encoding` other than `identity` publishes nothing, as its digest covers
+the encoded bytes, and `Content-Digest` is never used. A mismatch fails the same way, with
+`published = true`. `ResolvedSource.checksum` and `ServerInfo.checksum` hold the published digest.
 
-Checksums apply to downloads Ketch writes as one file: HTTP, FTP, HLS and DASH. `download`
-refuses one for sources that write their own files, such as torrents, which verify their pieces
-themselves. Instances list `KetchFeatures.CHECKSUM`; `RemoteKetch` refuses a checksum for servers
-without it, which would ignore it. `FileAccessor.readAt` reads the file back; accessors without
-it skip published digests and fail a requested checksum with `KetchError.Unsupported`.
+### Limits
 
-A per-task limit applies in addition to the global one, so a task never exceeds the lower of
-the two. `setSpeedLimit`, `setConnections` and `setPriority` are persisted for queued, scheduled,
-paused and failed tasks and take effect when the task starts or resumes; `reschedule` is
-persisted too (conditions are not). `pause()` also works on a queued or preempted task: it
-leaves the queue until `resume()` is called.
+- Checksums apply to downloads Ketch writes as one file: HTTP, FTP, HLS and DASH. `download`
+  refuses one for sources that write their own files, such as torrents, which verify their pieces
+  themselves.
+- Instances list `CHECKSUM`. `RemoteKetch` refuses a checksum for servers without it.
+- Ketch reads the file back with `FileAccessor.readAt`. Accessors without it skip published
+  digests and fail a requested checksum with `KetchError.Unsupported`.
 
-## Error Handling
+## Errors
 
-All errors are modeled as a sealed class `KetchError`:
+Every failure is a `KetchError`, a sealed class that extends `Exception`:
 
-| Type | Retryable | Description |
+| Type | Retried | Meaning |
 |---|---|---|
-| `Network` | Yes | Connection / timeout failures |
-| `Http(code)` | 5xx and 429 | Non-success HTTP status |
-| `Disk` | No | File I/O failures |
-| `Unsupported` | No | Server or source doesn't support a required feature |
-| `FileChanged` | No | ETag / Last-Modified (or FTP MDTM) mismatch on resume |
-| `CorruptResumeState` | No | Persisted resume state cannot be read |
-| `SourceError` | No | Error from a pluggable download source |
-| `AuthenticationFailed` | No | Credentials rejected, e.g. FTP 530 |
+| `Network` | Yes | Connection or timeout failure, including a stalled transfer |
+| `Http(code)` | 5xx and 429 | Non-success HTTP status; carries `retryAfterSeconds` and `rateLimitRemaining` |
+| `Disk` | No | File I/O failure |
+| `Unsupported` | No | Something required is unsupported, such as ranges or the content's format, or no source handles the URL |
+| `FileChanged(reason)` | No | The file changed on the server since the download started (ETag, Last-Modified or FTP MDTM) |
+| `CorruptResumeState` | No | The saved resume state could not be read |
+| `SourceError(sourceType)` | No | A download source failed; `detail` is safe to show |
+| `AuthenticationFailed(sourceType)` | No | Credentials rejected, such as FTP 530 |
 | `ChecksumMismatch` | No | The finished file's digest differs from the expected or published one |
-| `Canceled` | No | Download was canceled |
-| `Unknown` | No | Unexpected errors |
+| `Canceled` | No | The download was canceled |
+| `Unknown` | No | Anything else |
 
-`KetchError.isRetryable` tells which errors Ketch retries automatically, up to
-`DownloadConfig.retryCount` times with exponential backoff. On HTTP 429 it also honors
-`Retry-After` and reduces the task's connections.
+`KetchError.isRetryable` tells which errors Ketch retries on its own: `retryCount` times in a row,
+with exponential backoff and jitter, the count starting over whenever an attempt gets further than
+every attempt before it. On HTTP 429 it waits for `Retry-After` when given and reduces the task's
+connections. `KetchError.tolerantSerializer()` reads unknown error types as `Unknown`.
 
 ## Logging
 
-Ketch provides pluggable logging with zero overhead when disabled (default).
+Logging is pluggable and costs nothing when off, the default:
 
 ```kotlin
 // No logging (default)
 Ketch(httpEngine = KtorHttpEngine())
 
-// Console logging (development)
+// Console logging, for development
 Ketch(httpEngine = KtorHttpEngine(), logger = Logger.console())
 
-// Kermit structured logging (production)
+// Kermit, from library:kermit
 Ketch(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
 
 // Several backends at once, each with its own level
 Ketch(httpEngine = KtorHttpEngine(), logger = Logger.combine(Logger.console(LogLevel.INFO), other))
 ```
 
-`Logger` and `LogLevel` live in `com.linroid.ketch.api.log` (`library:api`).
+`Logger` and `LogLevel` live in `com.linroid.ketch.api.log` (`library:api`). See
+[logging](logging.md) for the format, levels and what never gets logged.
 
-See [Logging](logging.md) for detailed documentation.
+## See also
+
+- [Developer guide](developers.md): modules, quick start, REST API and custom sources
+- [Architecture](architecture.md): how the engine, server and apps fit together
+- [BitTorrent downloads](torrent.md), [media downloads](media.md), [proxies](proxy.md)
+- [Multiple network interfaces](multiple-networks.md)

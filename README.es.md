@@ -32,6 +32,7 @@
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Escritorio](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Licencia](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
@@ -68,7 +69,7 @@ Multiplatform está disponible en Maven Central.
 [Empieza a integrar Ketch →](docs/developers.md#quick-start)
 
 > [!WARNING]
-> 🚧 Ketch está en desarrollo activo y por ahora solo tiene versiones candidatas. Puedes encontrar
+> 🚧 Ketch está en desarrollo activo y todavía no ha llegado a la 1.0. Puedes encontrar
 > problemas; por favor, [cuéntanos lo que encuentres](https://github.com/linroid/Ketch/issues).
 
 <a id="download"></a>
@@ -83,7 +84,7 @@ Multiplatform está disponible en Maven Central.
 | Android 8.0+ | `.apk` de la [última versión][release] |
 | iOS 18+ | Compila desde el código fuente con Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), para controlar Ketch en otro dispositivo |
-| Extensión del navegador | Chrome, Edge, Brave, Firefox y otros: `.zip` de la [última versión][release] ([instalación](app/browser-extension/README.md#installing)) |
+| Extensión del navegador | Chrome, Edge, Brave y otros navegadores Chromium: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` de las [versiones de la extensión](https://github.com/linroid/Ketch/releases) ([instalación](app/browser-extension/README.md#installing)) |
 | Línea de comandos y servidor | macOS, Linux y Windows: [script de instalación](#run-ketch-on-a-server) o la [última versión][release] |
 | Docker | NAS y servidores domésticos x64 y ARM64: `ghcr.io/linroid/ketch` ([guía](docs/docker.md), con TrueNAS y fnOS) |
 
@@ -119,7 +120,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   envía la descarga.
 - **FTP y FTPS**, con conexiones paralelas y reanudación.
 - **BitTorrent y enlaces magnet** — Torrents v1, v2 e híbridos, con selección de archivos,
-  sembrado opcional y un motor escrito íntegramente en Kotlin ([detalles](docs/torrent.md)).
+  sembrado opcional y un motor escrito íntegramente en Kotlin. Habla uTP y cifrado de protocolo,
+  descarga desde semillas web, abre su puerto en el router y encuentra pares en tu red local
+  ([detalles](docs/torrent.md)).
 - **Elegir archivos de un torrent en cualquier momento** — Elige los archivos de un torrent antes
   o durante la descarga y cámbialos sin empezar de nuevo; un enlace magnet añadido antes de
   recibir sus detalles espera a que elijas. Detén o reanuda el sembrado de un torrent terminado;
@@ -179,7 +182,7 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   reposo por sí mismo mientras hay descargas en curso; la pantalla puede apagarse igualmente
   (**Ajustes → General**).
 - **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
-  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch y Français
+  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français y Русский
   ([traducciones](docs/development/localization.md)).
 - **Descargas verificadas** — Añade a una descarga una suma de comprobación SHA-256, SHA-512, SHA-1
   o MD5 y Ketch comprueba con ella el archivo terminado, o con la que publica el servidor.
@@ -227,7 +230,8 @@ Inicia el servidor, con su API REST y aplicación web en el puerto 8642:
 ketch server
 ```
 
-Añádelo en las aplicaciones desde **Dispositivos → Añadir dispositivo**, o abre
+La primera vez crea un token de acceso y lo muestra una sola vez. Añade el servidor en las
+aplicaciones desde **Dispositivos → Añadir dispositivo** con ese token, o abre
 `http://<dirección del servidor>:8642` en un navegador. La línea de comandos también descarga por sí
 sola:
 
@@ -235,7 +239,7 @@ sola:
 ketch https://example.com/file.zip
 ```
 
-Configura el código de acceso, el puerto y otras opciones en un
+Configura tu propio token, el puerto y otras opciones en un
 [archivo de configuración](cli/README.md#configuration-file);
 la [documentación de la CLI](cli/README.md) enumera todos los comandos.
 
@@ -251,7 +255,7 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 ## Hoja de ruta
 
 - **Distribución antes de v1.0.0** — Versiones firmadas para Windows, firmadas y notarizadas para
-  macOS, extensiones en las tiendas de navegadores y procesos de instalación y actualización
+  macOS, la extensión en más tiendas de navegadores y procesos de instalación y actualización
   verificados ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Descargas desde varios servidores espejo a la vez, con sumas de comprobación
 - **WebDAV** — Descargas desde servidores WebDAV, con reanudación
@@ -279,6 +283,21 @@ desde Maven Central bajo `com.linroid.ketch`.
 Ejecuta el motor dentro de tu aplicación Android, iOS o JVM con `core` y `ktor`; Node.js y WASI
 pueden usar `core` con un motor HTTP personalizado. También puedes usar `remote` para controlar un
 servidor Ketch desde Android, iOS, la JVM o el navegador mediante la misma `KetchApi`.
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [Guía para desarrolladores](docs/developers.md) — Módulos, inicio rápido, API REST y extensiones
 - [Referencia de la API](docs/api.md) — Instalación, configuración, prioridades, errores y registros

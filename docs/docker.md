@@ -2,10 +2,13 @@
 
 [简体中文](docker.zh-CN.md)
 
-The Ketch Docker image runs [`ketch server`](../cli/README.md#server) on a NAS or home server: the
-download engine with its web UI and REST API, which the Ketch apps and the browser extension
-connect to. It downloads HTTP(S), FTP/FTPS, BitTorrent and magnet links, and finite HLS/DASH
-streams.
+This guide shows how to run Ketch on a NAS or home server with Docker, including step-by-step
+setups for [TrueNAS](#truenas) and [fnOS](#fnos). It is for anyone who wants downloads to keep
+running on an always-on machine.
+
+The image runs [`ketch server`](../cli/README.md#server): the download engine with its web UI and
+REST API, which the Ketch apps and the browser extension connect to. It downloads HTTP(S),
+FTP/FTPS, BitTorrent and magnet links, and finite HLS/DASH streams.
 
 - Images for x64 (`linux/amd64`) and ARM64 (`linux/arm64`), with the native `ketch` binary on
   Debian; no Java inside
@@ -15,8 +18,6 @@ streams.
 - A health check that passes once saved downloads are restored
 - Configured through environment variables, a config file, or both
 - A fixed BitTorrent port, 16881, which you can forward on your router
-
-Guides for [TrueNAS](#truenas) and [fnOS](#fnos) follow the general setup.
 
 ## Quick start
 
@@ -97,7 +98,8 @@ to the user and group that should own the downloads, usually the owner of the fo
   user cannot write to it, the log says so
 
 `UMASK` (default `022`) sets the permissions of new files: `002` lets the group write to them too.
-`PUID=0` runs Ketch as root, which is not recommended.
+`PUID=0` runs Ketch as root, which is not recommended. `PUID` and `PGID` must be numeric IDs;
+anything else stops the container with an error.
 
 You can also start the container as a user with compose's `user: "568:568"` or `docker run
 --user`. Ketch then runs as that user and the entrypoint changes no ownership, so `/config` and
@@ -170,6 +172,22 @@ Keep the access code. Without one (`command: ["server", "--no-token"]`), anyone 
 can use the server, and it only answers requests addressed to the container itself: on the bridge
 network, list the names and addresses you reach it by in `KETCH_ALLOWED_HOSTS`, such as
 `192.168.1.20,nas.local`. See [accepted hosts](../cli/README.md#accepted-hosts).
+
+## Running commands
+
+Options alone go to `ketch server`, so `docker run ... ghcr.io/linroid/ketch --port 9000` starts
+the server on port 9000. The `ketch` commands `server`, `health`, `mcp`, `ai-discover` and
+`update`, and URLs or magnet links, run as `ketch` with those arguments. Any other program, such
+as `sh`, runs as it is, which helps when debugging.
+
+To control the running server from inside the container, run the CLI with `docker exec`:
+
+```bash
+docker exec ketch ketch list
+```
+
+See the [CLI](../cli/README.md#work-on-a-running-ketch) for `add`, `list`, `pause`, `resume` and
+`watch`.
 
 ## Updating
 

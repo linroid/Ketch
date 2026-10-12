@@ -6,7 +6,7 @@ import com.linroid.ketch.api.ControlKey
  * Backend-owned torrent inspection and capability negotiation.
  *
  * Obtain this optional controller with `ketch.controller(TorrentController)`
- * ([com.linroid.ketch.api.KetchApi.control]). A null controller means the backend does not expose
+ * ([com.linroid.ketch.api.KetchApi.controller]). A null controller means the backend does not expose
  * this protocol; it does not imply that torrent downloads are unavailable. A remote backend's
  * controller fails closed against servers whose features lack [TorrentFeatures.CONTROL].
  * Runtime implementations and mutation commands are introduced with their roadmap capabilities.
@@ -26,7 +26,7 @@ import com.linroid.ketch.api.ControlKey
  * [TorrentCommandError.UNSUPPORTED].
  */
 interface TorrentController {
-  /** The key [com.linroid.ketch.api.KetchApi.control] looks torrent controllers up with. */
+  /** The key [com.linroid.ketch.api.KetchApi.controller] looks torrent controllers up with. */
   companion object Key : ControlKey<TorrentController> {
     override val name: String = "torrent"
   }

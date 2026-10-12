@@ -1,10 +1,333 @@
-# Kotlin torrent downloads
+# BitTorrent and magnet downloads
 
-`library:torrent` downloads BitTorrent v1, v2, and hybrid content in common Kotlin on JVM 11+,
-Android 26+, and iOS (arm64 and arm64 simulator). The desktop app, Android app, iOS app, CLI, and
-daemon register `TorrentDownloadSource`. Browsers control the daemon through `RemoteKetch`; the
+Ketch downloads BitTorrent v1, v2 and hybrid torrents, from `.torrent` files, `.torrent` URLs and
+magnet links, with an engine written in Kotlin. This page shows how to download and seed torrents
+in the apps and the CLI and how to configure them, then covers platform limits, the SDK API and
+how the engine works.
+
+The desktop, Android and iOS apps, the CLI and `ketch server` all include torrent support. The
+web app controls a device that has it, and the
 [browser extension](../app/browser-extension/README.md) sends clicked magnet links and `.torrent`
-downloads to an instance's REST API.
+downloads to a Ketch device.
+
+## Download a torrent or magnet
+
+### In the apps
+
+1. Paste a magnet link or a `.torrent` URL into the Add sheet, drop a `.torrent` file on the
+   window, or open one from the system file manager (see
+   [opening `.torrent` files](#opening-torrent-files-in-the-apps)).
+2. Ketch looks up the torrent and lists its files. Untick the ones you do not want.
+3. Choose where to save it and add it.
+
+A magnet link names a torrent without describing its files, so Ketch first asks peers for them.
+Ketch keeps looking until it finds them or you stop it, because the peers of a small swarm may come
+online later. If the lookup takes two minutes, the Add sheet offers:
+
+- **Keep waiting**, to go on looking.
+- **Add anyway**, to add the download now. It shows as Starting, "Finding peers", and once the file
+  list arrives it waits for you to choose files (see [choosing files](#choosing-files)).
+
+### With the CLI
+
+```bash
+ketch 'magnet:?xt=urn:btih:...'
+```
+
+```bash
+ketch https://example.com/linux.iso.torrent
+```
+
+To download only some files, list them first, then pass their IDs:
+
+```bash
+ketch --list-files 'magnet:?xt=urn:btih:...'
+```
+
+```bash
+ketch --files 0,2,5 'magnet:?xt=urn:btih:...'
+```
+
+`--list-files` prints `ID  SIZE  PATH` rows. Sort them with `--sort name|size|type` (`type` is the
+file extension) and `--reverse`. `ketch <url>` exits once its downloads finish; it does not seed.
+To keep seeding, run [`ketch server`](#seeding-and-uploading).
+
+### Where the files go
+
+- A v1 torrent with one file saves to the destination as a file; a v1 torrent with several files
+  saves into the destination as a folder.
+- A v2 or hybrid torrent always saves into a folder, even with a single file.
+- File names come from the torrent, cleaned of characters and paths that are not safe on disk.
+
+Progress counts verified bytes of the files you chose. The network speed also counts bytes that
+are received but not kept, such as retries and the parts of pieces that overlap a skipped file.
+
+### Opening `.torrent` files in the apps
+
+The apps register for `.torrent` files, so the system file manager offers Ketch under "Open with":
+
+| Platform | How it registers | How the file arrives |
+| --- | --- | --- |
+| Android | Opens `application/x-bittorrent`, and `.torrent` files with a generic type | A `content:` URI to the running app |
+| macOS | File association in the packaged app | Finder's open-file events |
+| Windows, Linux | File association in the MSI or DEB package; for the portable Windows app, Settings → Integration | A path or `file:` URI argument; a second launch hands it to the running app and exits |
+| iOS | `org.bittorrent.torrent` document type | Files, AirDrop and share sheets |
+| Web | Manifest `file_handlers` | Only in the app installed from a Chromium browser, over HTTPS or localhost |
+
+Each file opens the Add sheet with its name, size and file list, as a dropped file does. Nothing
+downloads until you confirm. Several files open one after another, and a file stays pending until
+it is added or dismissed. Its content goes to the device you are using, so remote devices work too.
+Files over 4 MiB are rejected. On iOS, the copies placed in the app's `Documents/Inbox` are deleted
+after reading.
+
+File associations only apply to packaged desktop builds (`packageDistributionForCurrentOS`), not to
+`./gradlew :app:desktop:run`. The desktop app runs once per configuration directory: another launch,
+including a development run, hands its files to the running app instead of opening a window.
+
+## Choosing files
+
+You can change which files a torrent downloads at any time until it is canceled, for v1, v2 and
+hybrid torrents alike:
+
+- **Apps**: the inspector's Files tab lists the files. Tick or untick them and apply. At least one
+  file stays selected.
+- **CLI**: `--files <ids>` when you start a download (see [above](#with-the-cli)).
+- **MCP**: the `listDownloadFiles` and `selectDownloadFiles` tools.
+- **SDK**: `DownloadTask.selectFiles(ids)`, with IDs from `ResolvedSource.files` (1 to 100,000 of
+  them). `RemoteKetch` sends it as `PUT /api/tasks/{id}/files`.
+
+What happens next depends on the task's state:
+
+- **Downloading**: the torrent switches without reconnecting to its peers. Newly chosen files are
+  created and downloaded. Files you deselect stop downloading but stay on disk as they are, with
+  their verified pieces.
+- **Paused, queued, scheduled or failed**: the new selection applies when the task starts.
+- **Completed**: adding files downloads them into the same folder (Queued, Downloading, then
+  Completed again), taking over the task's seeding if it seeds. Removing files only changes the
+  task's size, and seeding shares the smaller selection from then on.
+
+Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
+IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
+
+### Waiting for a choice
+
+A download added before its file list is known, as "Add anyway" adds a magnet, waits for you once
+the list arrives. It shows "Choose files to download", stays paused across restarts and holds no
+queue slot or folder until you choose. A torrent with a single file does not wait.
+
+- Choosing files starts it, without looking up the metadata again.
+- Resuming it, or **Download all files**, downloads every file.
+
+In the SDK, set `DownloadRequest.awaitFileSelection = true` and leave `selectedFileIds` empty; the
+task then pauses as `DownloadState.Paused(PauseReason.AwaitingFileSelection)`. A request sent again
+with the same `requestId` ignores the selection and this flag.
+
+### Sorting files
+
+The apps, the server's file pages and the CLI sort files the same way: torrent order, name in
+natural order ("Episode 2" before "Episode 10"), size, type, or selected files first, each
+reversible. The apps' Kind order groups files by kind (video, audio, subtitles, ...), while the
+server and the CLI sort by the plain file extension.
+
+## Seeding and uploading
+
+Ketch uploads nothing by default. Peers you upload to see this device's IP address. Choose a mode
+under Settings → BitTorrent → Uploading ("Share with peers"), or with `[torrent] upload`:
+
+| Mode | `upload` | What it does |
+| --- | --- | --- |
+| Off | `off` (default) | Never uploads. Peers cannot fetch a magnet's metadata from this device either. |
+| While downloading | `while-downloading` | Uploads verified pieces while a torrent downloads, and stops when it finishes. |
+| Keep seeding | `seed` | Keeps uploading finished torrents until you stop them, and seeds them again after a restart. |
+
+`[torrent] uploadLimit` caps the upload speed of all torrents together (unlimited by default). It
+takes the same values as other speed limits, such as `"1m"` or `"500k"`; a bare number is bytes
+per second. Both settings apply immediately: peers are choked within about 10 seconds, and seeding
+stops once the mode leaves `seed`.
+
+A seeding task shows as completed and "Seeding". Use **Stop seeding** on its row or in the
+inspector to stop it, and **Seed** in the inspector to start a completed task seeding again. Ketch
+rechecks the files first, and only seeds while the mode is `seed` and an engine slot is free.
+
+Ketch remembers which tasks seed. On the next start it seeds them again, oldest completion first,
+into free engine slots only, each after a recheck finds its files complete. Seeding stops when:
+
+- you stop it or remove the task;
+- the upload mode leaves `seed`;
+- a download waits for one of the engine's slots (`maxActiveTorrents`, 5 by default) and takes the
+  oldest seeder's; a torrent that finishes while a download waits does not seed at all;
+- the same torrent is added as another task;
+- Ketch quits.
+
+A seeder stopped by a waiting download or by quitting seeds again later; one you stop, or whose
+files changed on disk, does not.
+
+Which programs seed:
+
+- The apps seed while they run. On Android, a seeding-only app is not kept in the foreground, so
+  Android may stop it in the background. On iOS seeding stops while the app is suspended.
+- `ketch server` seeds while it runs, and again after a restart.
+- `ketch mcp --standalone` seeds while it runs, but never restores seeding after a restart. MCP has
+  no seeding tool.
+- `ketch <url>` exits once its downloads finish.
+
+## Settings
+
+The apps edit these settings under Settings → BitTorrent for the device they run on and apply them
+immediately. A remote device's BitTorrent settings can only be changed on that device or in its
+`config.toml`.
+
+### `config.toml`
+
+The apps, the CLI and `ketch server` read the `[torrent]` table:
+
+```toml
+[torrent]
+upload = "seed"               # "off" (default), "while-downloading" or "seed"
+uploadLimit = "1m"            # all torrents together; "unlimited" by default
+encryption = "preferred"      # "preferred" (default), "required" or "off"
+utp = true                    # default
+portMapping = true            # default
+localDiscovery = true         # default
+trackers = ["udp://tracker.example.org:6969/announce"]
+trackerList = true            # default
+listenPort = 16881            # read by `ketch server` only; 0 (default) picks a free port
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `upload` | `off` | What this device uploads; see [seeding](#seeding-and-uploading). |
+| `uploadLimit` | unlimited | Upload cap shared by all torrents. |
+| `encryption` | `preferred` | Protocol encryption; see [encryption](#encryption). An unknown value loads as `preferred`. |
+| `utp` | `true` | Also reach peers over uTP; see [uTP](#utp). |
+| `portMapping` | `true` | Ask the router to forward the listen port; see [port forwarding](#port-forwarding). |
+| `localDiscovery` | `true` | Find peers on the local network; see [local peer discovery](#local-peer-discovery). |
+| `trackers` | none | Extra `http`, `https` or `udp` trackers for public torrents. |
+| `trackerList` | `true` | Subscribe to the tracker lists in `trackerListUrls`. |
+| `trackerListUrls` | two public lists | Plain-text tracker lists, one announce URL per line. |
+| `listenPort` | `0` | Incoming peer port, read by `ketch server` only. |
+
+Values that cannot be read, such as `upload = false`, load as the default rather than failing the
+whole file.
+
+### Ports and firewalls
+
+Incoming peers connect to the listen port over TCP. DHT and uTP share one UDP socket on the same
+port when they can, so forwarding one port, TCP and UDP, reaches all three.
+
+- The apps and most CLI commands let the system pick a free port at every start, so they never
+  compete with a server on the same machine.
+- `ketch server` takes the port from `--torrent-port`, then `KETCH_TORRENT_PORT`, then
+  `[torrent] listenPort`. The [Docker image](docker.md) uses 16881.
+- A port in use fails the torrents that start with a network error, which is retried like other
+  temporary failures.
+
+### Encryption
+
+Protocol encryption (MSE/PE) hides BitTorrent traffic from networks that recognize and slow it
+down, and reaches peers that require it. It hides what the traffic is, not who you connect to; it
+is not authentication.
+
+| Setting | Behavior |
+| --- | --- |
+| `preferred` (default) | Connects encrypted first and unencrypted when a peer refuses. Accepts both. |
+| `required` | Only encrypted connections, both ways. Fewer peers can connect. |
+| `off` | Never encrypts. Peers that require encryption cannot connect. |
+
+### uTP
+
+uTP (BEP 29) carries peer connections over UDP. It reaches more peers behind routers, and slows
+down when your other traffic needs the bandwidth. With `utp` on, a peer that TCP cannot reach is
+tried over uTP, peers known to speak uTP are dialed over uTP first, and peers may connect to the
+listen port over uTP. Private torrents use it too.
+
+### Port forwarding
+
+With `portMapping` on, Ketch asks the home router to forward the listen port, so that peers behind
+other routers can connect to this device. It tries NAT-PMP first, then UPnP, and tells trackers,
+DHT and peers the external port it gets. Mappings last an hour, are renewed every half hour and are
+removed when the engine stops. Without a router that answers, Ketch logs that incoming peers need a
+forwarded port and tries again every 10 minutes.
+
+### Local peer discovery
+
+With `localDiscovery` on, Ketch finds devices on the local network that download or share the same
+public torrents (BEP 14), so they exchange pieces directly, without trackers or the internet. A
+public magnet can also get its file list from another device at home this way.
+
+- It works over IPv4 and IPv6. Over IPv6 it only finds devices with a unique local address
+  (`fc00::/7`); devices with only a link-local address are heard but cannot be dialed.
+- Devices announce every 5 minutes, so a new one may take that long to be found.
+- Private and tracker-only torrents never take part, and peers found this way are never shared
+  with other peers.
+- It runs on desktop and Android. iOS does not support it, as multicast there needs an entitlement
+  from Apple.
+- On Android 17 it needs the local network permission. The app asks once, the first time discovery
+  wants the network, and again whenever you switch the setting on; the system stops asking after
+  two denials. Without it, Ketch retries every minute.
+
+### Trackers and tracker lists
+
+Extra trackers help where a network blocks a torrent's own trackers, or where a magnet has no
+trackers and DHT cannot start. Ketch announces public torrents to them alongside the torrent's own
+trackers. Private torrents and tracker-only lookups never contact them.
+
+- **Extra trackers** (`trackers`, Settings → BitTorrent → Extra trackers): `http`, `https` or `udp`
+  announce URLs. Invalid URLs are ignored.
+- **Tracker lists** (`trackerList`, `trackerListUrls`, Settings → BitTorrent → Tracker lists): on by
+  default, subscribed to ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist)
+  and XIU2's [`best.txt`](https://github.com/XIU2/TrackersListCollection). Each list is downloaded
+  daily, from a jsDelivr mirror when GitHub fails, and a copy Ketch ships stands in for ngosang's
+  list until its first download. Downloading a list shows its host this device's IP address. Set
+  `trackerList = false` to turn the lists off.
+
+Ketch uses at most 128 extra trackers in all, the ones you added first. New lists apply to torrents
+started or resumed afterwards.
+
+### How download settings apply to torrents
+
+Torrent tasks follow the same download settings as HTTP and FTP tasks, with these differences:
+
+| Setting | Torrent behavior |
+| --- | --- |
+| Simultaneous downloads | Ketch's queue starts torrents like other tasks. The engine also runs at most 5 torrents at once, seeding included. Further torrents wait for a slot as downloading at 0 B/s; they can be paused or canceled at once and start by priority, then arrival order. A seeder gives its slot to a waiting download. |
+| Speed limits | Global and per-task limits apply to torrents too, live. |
+| Connections per task | The task's peer limit, applied live, clamped to 1-512 (v1) or 1-500 (v2). Auto (0) means 100 peers. |
+| Connections per download | Not used: it counts HTTP segments. The engine opens at most 200 peer connections across all torrents. |
+| Priority | Orders the queue and the wait for an engine slot. |
+| Retries | Peer, tracker and DHT failures are retried inside the torrent without failing the task. Network failures that reach the task, such as a failed `.torrent` download or a busy listen port, are retried; disk, verification and protocol failures are not. |
+
+## Public and private torrents
+
+Torrents are public by default: Ketch finds peers through trackers, DHT, peer exchange and local
+discovery.
+
+A **private** torrent (BEP 27) uses only its trackers: no DHT, peer exchange or local discovery,
+and it never shares its metadata with peers. It keeps one working tracker until that one fails, and
+disconnects its old peers before switching. A public magnet that turns out to describe a private
+torrent is rejected; use the `.torrent` file instead.
+
+SDK users can also resolve a torrent as **tracker-only**: it uses only the trackers it names, even
+when the torrent is public (see [discovery privacy](#choosing-discovery-privacy)). Trackers hear
+that a download completed only once every file is selected and complete.
+
+## Platform support and limits
+
+- Torrents download on Android 8.0+ (API 26), JVM 11+ (desktop, CLI, server) and iOS (arm64 and
+  the arm64 simulator). Browsers have no engine of their own; the web app controls another device.
+- Seeding only runs while the app or server runs. There is no background seeding.
+- Local peer discovery does not run on iOS.
+- Downloads go to ordinary folders. When the default directory is an Android `content://` folder,
+  torrents save to the platform's default directory instead. iOS saves inside the app sandbox.
+- Limits: `.torrent` files up to 4 MiB, 10,000 files per torrent and 16 MiB pieces. Many peers or
+  large pieces use more memory.
+- Ketch does not create torrents and has no ratio management.
+
+## For developers
+
+### Add the torrent source
+
+Add `com.linroid.ketch:torrent` and register `TorrentDownloadSource`:
 
 ```kotlin
 val torrents = TorrentDownloadSource(TorrentConfig())
@@ -13,7 +336,8 @@ val ketch = Ketch(
   additionalSources = listOf(torrents),
 )
 ketch.start()
-val resolved = ketch.resolve(torrentUrl) // HTTPS .torrent URL or btih/btmh magnet
+
+val resolved = ketch.resolve(torrentUrl) // a .torrent URL or path, or a btih/btmh magnet
 val task = ketch.download(
   DownloadRequest(
     url = torrentUrl,
@@ -26,299 +350,85 @@ task.await().getOrThrow()
 ketch.close()
 ```
 
-For v1, a single-file destination names the file; a multi-file destination names the root folder.
-For v2/hybrid, the destination always names a root folder, including single-file torrents. Files
-inside it use the sanitized paths shown by resolution. An empty selection downloads every file;
-see [choosing files](#choosing-files) to change it later. IDs retain their original metainfo
-indices. Progress counts verified selected bytes. In v1, a piece spanning selected and skipped
-files needs all its bytes for verification; skipped boundary bytes live in a hidden task sidecar,
-not in skipped output files. Network speed includes received payload, including those boundary
-bytes/retries.
+An empty `selectedFileIds` downloads every file. File IDs keep their index in the metainfo, so a
+hybrid torrent's IDs may have gaps where padding files are left out.
 
-For SDK-provided bytes, call `ketch.resolve(bytes, "name.torrent")` (or
-`torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. Resolving content also works
-through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
-apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
-`file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
-passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
-for private tracker URLs. A supplied HTTP engine remains owned by its caller. Torrent log lines
-reduce tracker URLs to `scheme://host:port` and magnets to their topic and name. At debug level,
-each running swarm logs a summary every 30 seconds; see
-[troubleshooting](logging.md#troubleshooting) for reading it when a magnet or torrent stalls.
+`KetchApi.resolve` waits until a magnet's metadata is found or the caller cancels it; bound it with
+`withTimeout` if you need to. Up to 16 magnet lookups run at once; more wait for one to finish.
 
-## Choosing files
+`TorrentDownloadSource` takes:
 
-`DownloadTask.selectFiles(ids)` changes which files a torrent task downloads at any time but
-after it is canceled, for v1, v2 and hybrid torrents alike (`KetchFeatures.FILE_SELECTION`,
-`download.fileSelection`, which the torrent source lists; the same API serves any source with
-several files or variants). IDs are those of `ResolvedSource.files`, 1 to 100,000 of them. Ketch
-checks them against the metainfo it saved for the task, never against sizes a client sent, saves
-the selection and its size as the task's total, and then applies it:
+- `config`: a `TorrentConfig` (below).
+- `httpEngine`: the engine for `.torrent` URLs, HTTP trackers and web seeds. It stays owned by the
+  caller; without one the source creates its own `KtorHttpEngine`.
+- `restoreSeeding`: whether `Ketch.start()` seeds remembered tasks again (`true`).
+- `multicastLock`: a `TorrentMulticastLock` held while local discovery is joined. The Android app
+  passes one backed by a Wi-Fi `MulticastLock`.
 
-- A running torrent follows it on its open connections, without reconnecting to its peers or
-  starting its tracker announces over. Newly chosen files are created and downloaded. Files no
-  longer chosen stop downloading and stay on disk as they are, with their verified pieces; pieces
-  of them that still arrive are discarded without blaming the peer.
-- Paused, queued, scheduled and failed tasks use it when they start.
-- A completed task that gains files downloads them into the same folder (Queued, Downloading,
-  then Completed again), taking over its seeding session if it has one. One that only drops files
-  changes its size, and a seeding session shares the smaller selection from then on.
-- In v1, the verified bytes of boundary pieces kept in the task's sidecar are copied into a file
-  chosen later and rechecked, and a recheck heals a piece from its sidecar. A v2 or hybrid task
-  refuses a newly chosen file whose path holds a file it did not create.
-- Choosing the current files again does nothing. An empty selection is refused; to download
-  nothing yet, wait for a choice instead.
+### Torrent content you already hold
 
-A torrent added with `DownloadRequest.awaitFileSelection = true` and no selection
-(`download.awaitFileSelection`), typically a magnet whose files are not known yet, waits for one:
-once its metadata arrives it stops as `DownloadState.Paused(PauseReason.AwaitingFileSelection)`,
-holding no queue slot, output folder or segments, and keeps waiting across restarts. A torrent of
-one file does not wait. `selectFiles` starts it with the chosen files, without
-looking up the metadata again; `resume()` downloads every file. The apps add a magnet this way
-when it is added before its file list arrives ("Add anyway"). A `requestId` resubmission ignores
-the selection and this flag.
+Pass `.torrent` bytes to `resolve`, then download with the returned source and its `url`:
 
-`RemoteKetch` changes the files through `PUT /api/tasks/{id}/files`.
-`ketch.controller(TorrentController)` (from `library:torrent-api`) lists a task's files a page at a
-time (`TorrentController.files`), sorted by `TorrentFileOrder`: torrent order, case-insensitive
-natural name order ("Episode 2" before "Episode 10"), size, extension then name, or selected
-files first, each reversible. The apps sort the same way, except that their Kind order groups
-files by type (video, audio, subtitles, ...), where the server sorts by the plain extension. The MCP tools `listDownloadFiles` and `selectDownloadFiles` and the CLI's `--list-files`
-and `--files` build on these.
+```kotlin
+val resolved = ketch.resolve(bytes, "example.torrent")
+val task = ketch.download(
+  DownloadRequest(url = resolved.url, resolvedSource = resolved),
+)
+```
 
-## Opening `.torrent` files in the apps
+`torrents.resolveMetainfo(bytes)` does the same on the source without a `Ketch`. `RemoteKetch`
+uploads the bytes to the server's `POST /api/resolve/content`, as the apps do for dropped files.
+Local `.torrent` paths and `file:` URLs also work as URLs.
 
-The apps register for `.torrent` files, so the system file manager offers Ketch under "Open with":
+### `TorrentConfig`
 
-| Platform | Registration | Delivery |
-|----------|--------------|----------|
-| Android | `ACTION_VIEW` filters for `application/x-bittorrent`, plus `.torrent` paths with a generic type | `content:` URI to the running activity |
-| macOS | File association in the packaged app | Finder open-file events |
-| Windows, Linux | File association in the MSI/DEB package; for the portable Windows app, Settings → Integration | Path or `file:` URI argument; a second launch forwards it to the running app and exits |
-| iOS | `org.bittorrent.torrent` document type | `onOpenURL` from Files, AirDrop and share sheets |
-| Web | Manifest `file_handlers` | `launchQueue`, only for the app installed from a Chromium browser over HTTPS or localhost |
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `uploadPolicy` | `null` (`enableUpload`) | `DISABLED`, `WHILE_DOWNLOADING` or `SEED_AFTER_COMPLETION`. |
+| `enableUpload` | `false` | Legacy switch: `true` means `SEED_AFTER_COMPLETION` when `uploadPolicy` is unset. |
+| `uploadRateLimit` | `0` | Upload cap for all torrents, bytes per second; 0 is unlimited. |
+| `encryption` | `PREFERRED` | `TorrentEncryption`: `PREFERRED`, `REQUIRED` or `DISABLED`. |
+| `utpEnabled` | `true` | Also use uTP. |
+| `portMapping` | `true` | NAT-PMP and UPnP port forwarding. |
+| `localDiscovery` | `true` | Local peer discovery (Android and JVM). |
+| `dhtEnabled` | `true` | Use the DHT. |
+| `dhtBootstrap` | four public routers | DHT bootstrap endpoints, `host:port` or `[IPv6]:port`. |
+| `listenPort` | `0` | Incoming TCP port, shared with UDP when possible; 0 picks one at every start. |
+| `stateDirectory` | `null` | Folder for DHT routing snapshots and tracker list copies. The apps and CLI use a `torrent-state` folder in their data directory. |
+| `discoveryPrivacy` | `PUBLIC` | Default for new inputs: `PUBLIC` or `TRACKER_ONLY`. |
+| `additionalTrackers` | empty | Extra trackers for public torrents. |
+| `trackerListUrls` | empty | Tracker lists to subscribe to. The apps and CLI pass `DEFAULT_TRACKER_LISTS`. |
+| `maxActiveTorrents` | `5` | Torrents the engine runs at once, seeding included (1-64). |
+| `connectionsPerTorrent` | `100` | Peer limit of a task that sets no connections (1-512). |
+| `maxConnections` | `200` | Connections across all torrents, metadata and incoming peers included. |
+| `maxBufferedBytes` | 32 MiB | Piece data buffered across the engine. |
+| `maxMetadataBytes` | 4 MiB | Largest metainfo accepted. |
+| `maxFilesPerTorrent`, `maxPiecesPerTorrent` | 10,000, 250,000 | Size limits checked before a torrent is loaded. |
 
-Each opened file shows the add dialog with its name, size and file selection, as a dropped file
-does; nothing downloads until the user confirms. Several files open one after another, and a file
-stays pending until downloaded or dismissed, so it survives an Android activity recreation. Like a
-dropped file, its content reaches the active backend through `resolve`, so remote daemons work too.
-Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the app's
-`Documents/Inbox` are deleted after reading.
+`maxExchangeBytes`, `maxCachedMetadataBytes`, `maxSessionStateBytes` and `maxOpenPayloadFiles`
+bound memory and open files further; see their KDoc.
 
-File associations apply to packaged desktop builds (`packageDistributionForCurrentOS`), not
-`./gradlew :app:desktop:run`. The desktop app runs once per configuration directory: another launch,
-including a development run, hands its files to the running app instead of opening a second window.
+### Changing settings at runtime
 
-## Discovery and upload
+These `TorrentDownloadSource` functions apply at once. The upload, encryption, uTP, port mapping,
+local discovery and tracker setters never start the engine; they only change a running one and the
+next one:
 
-- HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
-- Public magnets use BEP 9 metadata exchange, DHT, trackers, local service discovery, and
-  explicit peers. Public swarms support peer exchange for v1, v2 and hybrid torrents; Ketch
-  advertises its listen port (BEP 10 `p`) and never dials an incoming peer's source port, only
-  the listen port it announced.
-  Configure `stateDirectory` to persist DHT routing candidates;
-  a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
-  The apps and CLI keep it in a `torrent-state` folder in their app data directory.
-- Peers of public torrents, v1, v2 and hybrid, exchange DHT ports (BEP 5 `PORT`): Ketch sets
-  the DHT bit in its handshake, tells peers that set it where its DHT listens, and pings the nodes
-  peers name, so the DHT starts from a tracker's peers even where no bootstrap router answers.
-  Private and tracker-only torrents do neither
-- Protocol encryption (MSE/PE: a 768-bit Diffie-Hellman exchange, then RC4) is
-  `TorrentConfig.encryption`. `PREFERRED`, the default, dials every peer, metadata requests
-  included, encrypted first and offers RC4 or plaintext; a peer that hangs up or does not answer
-  within 10 s is dialed again in plaintext, and in plaintext first while it is among the last 1024
-  such peers. Incoming peers may open either way. `REQUIRED` uses RC4 only, both ways, and
-  `DISABLED` plaintext only. Ketch sends no initial payload: the BitTorrent handshake follows on
-  the negotiated stream. Encryption hides BitTorrent from traffic shaping and reaches peers that
-  require it; it is obfuscation, not authentication. Peers reached encrypted are advertised with
-  the BEP 11 encryption flag. libtorrent before 2.0.13 and 2.1.0 hashes the torrent's `req3` mask
-  over a shared secret that starts with a zero byte (one exchange in 256) without its leading
-  zeros: a dial that such a peer refuses after that secret is tried once more with new keys
-  before any plaintext retry. Incoming handshakes also accept that mask with a zero-filled tail,
-  which only matches when the peer's buffer held zeros; otherwise that peer's retry gets new keys
-- uTP (BEP 29, `TorrentConfig.utpEnabled`, on by default) reaches peers TCP cannot, often ones
-  behind NAT: a dial that fails over TCP tries uTP next, peers that peer exchange flags as uTP
-  or that answered uTP before are dialed over uTP first, and peers may connect to the listen port
-  over uTP. It carries v1, v2, hybrid and metadata connections alike, with LEDBAT congestion
-  control, which yields to other traffic by keeping queuing delay near 100 ms. Private torrents
-  use it too: BEP 27 only rules out DHT and peer exchange
-- Web seeds (BEP 19, the metainfo's `url-list`, and `ws` parameters of a magnet) download v1, v2
-  and hybrid torrents from HTTP(S) mirrors as well as from peers, so a torrent with no reachable
-  peer still completes from its mirrors. Only `http` and `https` URLs are kept, at most 16. A
-  single-file torrent's URL names the file (or, ending in `/`, the folder holding it); a
-  multi-file torrent's URL names the folder holding the torrent's folder, and each file is
-  fetched from the URL, the torrent name and the file's path, each segment percent-encoded. Each
-  web seed fetches runs of whole pieces in order, up to 16 pieces or 4 MiB, with one range
-  request per file a run spans, pieces no peer or other seed is fetching, and only pieces the
-  selection wants: a piece someone else fetches or the selection leaves out ends the run. A run
-  takes no more than its share of the free pieces, split between the peers and seeds, and its
-  later pieces only buffers that leave half the torrent buffer limit free, so peers keep pieces
-  and memory to fetch with. Each piece is checked as soon as its bytes arrive, with the same
-  check as a peer's: SHA-1 for v1, the file's piece layer (BEP 52) for v2 and hybrid torrents. A
-  v2 or hybrid piece lies in one file, and BEP 47 padding files are never requested. When every
-  piece left is being fetched, a seed may also fetch one a peer is fetching, a single piece
-  rather than a run, and whichever arrives verified first is kept. A failed request or a corrupt
-  piece ends the run there: the pieces stored before it are kept, the rest are given back, and
-  the seed backs off (2 s, doubling up to a minute); five failures in a row drop it until the
-  task runs again. Requests go through the source's HTTP
-  engine, with its system proxy settings like HTTP metainfo, count against the download limits,
-  fail after 30 s without data, and show among the task's live connections as `HTTP`. Web seed
-  URLs are logged only through `redactUrl()`. A magnet's `ws` mirrors cannot replace its
-  metadata, which still comes from peers
-- Magnet metadata is asked of up to four peers at once, as they are found. A peer only takes the shared metadata buffer once it answers the handshake,
-  so peers that never answer cannot hold up one that does. A peer that fails is asked again after
-  5, 15 and 30 seconds, behind peers found meanwhile, so swarms of one or two briefly busy peers
-  still resolve. Each failure and its reason is logged at debug, each exchange step at verbose.
-- The source keeps looking for a magnet's metadata until it is found or the caller stops, since
-  the peers of a small swarm may come online later. It looks in 2-minute lookups, each asking
-  again the peers the last one gave up on, and logs each fruitless one at info. A task waits
-  until it is paused or canceled, and a preview such as `KetchApi.resolve` until its caller
-  cancels it. The apps show such a task as Starting, "Finding peers", once it holds a download
-  slot; the add sheet offers Keep waiting and Add anyway once a preview has taken 2 minutes.
-- `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
-  `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
-  and at most 128 are used. Each one is announced alongside the torrent's own trackers rather than
-  as a later tier, so it helps when a network blocks the torrent's trackers. Private torrents and
-  tracker-only discovery never contact them. `TorrentDownloadSource.setAdditionalTrackers` changes
-  the list for torrents started or resumed later. The apps edit the embedded instance's list under
-  Settings → BitTorrent and apply it this way; a remote instance's list can only be changed on
-  that device.
-- `trackerListUrls` (`[torrent] trackerList` and `trackerListUrls`) subscribes to plain-text
-  tracker lists, one announce URL per line: by default ngosang's
-  [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's
-  [`best.txt`](https://github.com/XIU2/TrackersListCollection) (`DEFAULT_TRACKER_LISTS`). The
-  source downloads each when created and daily after, at most 256 KiB and 128 usable trackers
-  (others, such as `wss`, are dropped), from its jsDelivr mirror when a `raw.githubusercontent.com`
-  download fails, and uses their trackers, in list order and without repeats, like
-  `additionalTrackers`, after them, within the same 128. Each list keeps a copy in
-  `stateDirectory` (`tracker-list-<hash>.txt`), used on restart without downloading while it is
-  under a day old; a failed download keeps it and retries after an hour, and a list with no
-  usable trackers counts as failed. Until ngosang's list first downloads,
-  `TorrentConfig.BEST_TRACKERS`, the copy Ketch ships, stands in. The source has the shipped
-  trackers from the start, and the first torrent waits up to 5 seconds for the saved copies to
-  be read, so a magnet resolved right after launch already announces to them. The apps and CLI
-  subscribe by default (`[torrent] trackerList = false` turns it off), so magnets without
-  trackers still find peers where DHT cannot bootstrap; downloading a list shows its host this
-  device's IP address. A custom `trackerListUrl` saved by Ketch 0.3.0 stays the only list until
-  the lists are changed. `TorrentConfig.trackerListUrls` itself is empty for SDK users.
-  `setTrackerLists` and `refreshTrackerLists` change or update them at runtime, `trackerLists`
-  reports each; the apps show them under Settings → BitTorrent → Tracker lists.
-- `listenPort` is the port incoming peers connect to over TCP. DHT and uTP share one UDP socket
-  on the same port when they can (a dual-stack system refuses the IPv6 socket on it, which then
-  takes any port), so one forwarded port, TCP and UDP, reaches all three; trackers and DHT
-  announce it. `0`, the default, lets the system pick the TCP port at every start, and UDP takes
-  the same one when it can. `ketch server` takes it from `[torrent]
-  listenPort`, `KETCH_TORRENT_PORT` or `--torrent-port`, and the [Docker image](docker.md) sets
-  16881; the apps and the CLI's other commands always let the system pick. A port in use fails
-  the torrents that start with `KetchError.Network`, retried like other transient failures.
-- Port mapping (`TorrentConfig.portMapping`, on by default for engines a `TorrentDownloadSource`
-  creates) asks the home router to forward the listen port, so peers behind other NATs can connect
-  to us: NAT-PMP first (to the first and last host of each private /24 this device is on), then UPnP
-  IGD (an SSDP search, then SOAP on its WANIPConnection or WANPPPConnection service, only on a
-  device on one of our private networks and never through a proxy). TCP and the UDP port DHT and uTP
-  share map to one external port, which trackers, DHT and peers are told instead of the listen port.
-  Mappings last an hour, are renewed every half hour and removed when the engine stops; another
-  device holding the port moves UPnP to another. Without a gateway the engine logs that incoming
-  peers need a forwarded port and looks again every 10 minutes. Only engines listening on every
-  interface map ports
-- Local Service Discovery (BEP 14, `TorrentConfig.localDiscovery`, on by default for engines a
-  `TorrentDownloadSource` creates; engines built directly never join the group) finds peers on the
-  LAN without trackers or the internet. While a public torrent runs, the engine joins
-  `239.192.152.143:6771` on every interface with a private or link-local IPv4 address and
-  `[ff15::efc0:988f]:6771` on every interface with a link-local or unique local IPv6 address (not
-  VPN tunnels; one socket and port, shared with other clients, `SO_REUSEADDR`), sends `BT-SEARCH *
-  HTTP/1.1` announces with its TCP listen port (never a router-mapped one: LAN peers dial us
-  directly), a random `cookie` and up to 20 `Infohash` headers per datagram to both groups (each
-  with its own `Host`), when each torrent starts and every 5 minutes, never more than once a minute
-  per torrent, and leaves the group when the last one stops. A v1 torrent announces its info hash; a
-  v2 torrent the first 20 bytes of its SHA-256 hash, its wire tag, as DHT does; a hybrid both, and
-  peers found under each are dialed in that swarm's mode. Announces are accepted only from private
-  (10/8, 172.16/12, 192.168/16, 100.64/10) or link-local IPv4 senders and unique local IPv6 ones
-  (fc00::/7; an IPv6 link-local sender is heard but not dialed, as reaching it needs the interface
-  it spoke on, which peer addresses do not carry), with a valid `Port` and at most 20 hashes in 1400
-  bytes, never our own cookie, at most 32 at once then 4 a second, and each peer once a minute per
-  torrent. LAN peers are never shared through peer exchange. Private (BEP 27) and tracker-only
-  torrents never announce or accept them. The groups are joined again on the current interfaces when
-  either family's addresses change. On Android the app holds a Wi-Fi `MulticastLock`
-  (`TorrentDownloadSource(multicastLock = ...)`) only while the group is joined, and Android 17
-  blocks it until the local network permission is granted: the app asks for it once, the first time
-  discovery wants the LAN, and again whenever the setting is switched on (the system stops asking
-  after two denials); without it the engine retries joining every minute. iOS does not run it, as
-  multicast there needs Apple's multicast networking entitlement
-- While a public magnet looks for its metadata, it takes part in local service discovery under
-  its info hash (a btmh magnet under the first 20 bytes of its SHA-256 hash), and LAN peers that
-  announce it are asked for the metadata like DHT and tracker peers, so a magnet resolves from
-  another device at home without trackers or the internet. It leaves the group once the metadata
-  is found or the lookup stops. LAN peers announce every 5 minutes, so one may take that long to
-  be heard; tracker-only magnets never take part
-- The apps and the CLI read encryption, uTP, port mapping and local service discovery from
-  `[torrent] encryption` (`preferred`, `required` or `off`; an unknown value loads as
-  `preferred`), `utp`, `portMapping` and `localDiscovery`, all on by default. The apps edit them
-  under Settings → BitTorrent → Connections (local service discovery only on desktop and
-  Android, as iOS cannot join the group) and apply them at once through
-  `TorrentDownloadSource.setEncryption`, `setUtpEnabled`, `setPortMapping` and
-  `setLocalDiscovery`, which never start the engine: encryption and uTP apply to connections
-  opened after the change (open ones keep running, and a uTP port stays bound for DHT), port
-  mapping starts, or stops and removes its mapping, and local service discovery joins or leaves
-  the LAN group (peers it found stay connected)
-- Private metainfo disables DHT, local service discovery and peer exchange, does not offer
-  `ut_metadata`, keeps one working tracker until failover, and disconnects its old peers before
-  switching. Public-mode
-  magnets that reveal private metadata are rejected; use tracker-only resolution or authenticated
-  metainfo. Trackers hear `completed` only once every file is selected and complete, so a partial
-  selection never announces it.
-- Upload is opt-in, with the same `TorrentConfig.uploadPolicy` for v1, v2 and hybrid torrents.
-  It defaults to `DISABLED`, the previous `enableUpload = false` behavior; `enableUpload = true`
-  maps to `SEED_AFTER_COMPLETION` when no policy is supplied.
-  - `DISABLED` never unchokes a peer, does not offer `ut_metadata` (so magnet peers cannot fetch
-    the info dictionary from this device) and rejects every BEP 52 hash request.
-  - `WHILE_DOWNLOADING` uploads verified pieces while the task downloads and stops at completion.
-  - `SEED_AFTER_COMPLETION` keeps uploading after completion, also for a v2 task that starts
-    complete, until seeding is stopped, the task is removed, the policy leaves seeding, a waiting
-    download takes its engine slot, or the source is closed, and seeds again after a restart
-    (see [implementation boundary and limits](#implementation-boundary-and-limits)).
-
-  The apps and the CLI map `[torrent] upload` (`off`, `while-downloading` or `seed`) to these
-  policies and `[torrent] uploadLimit` to `uploadRateLimit`, the upload cap all torrents share;
-  the apps edit both under Settings → BitTorrent → Uploading and apply them at once.
-  `TorrentDownloadSource.setUploadPolicy` and `setUploadRateLimit` never start the engine: peers
-  are choked within a rechoke (about 10 seconds), seeding sessions finish once the policy leaves
-  seeding, and torrents started later use the new values. `ketch server` and
-  `ketch mcp --standalone` seed while they run, and `ketch server` also seeds again after a
-  restart; `ketch mcp --standalone` builds its source with `restoreSeeding = false`, and MCP
-  offers no seeding tool. A `ketch <url>` download exits once its downloads finish.
-- Each torrent has four upload slots: three regular ones, reassigned every 10 seconds to the
-  peers that sent the most while it downloads, or took the most while it seeds, and one
-  optimistic slot that rotates every 30 seconds. Peers are served verified pieces only, through
-  a bounded read cache; a verified piece that changed on disk stops the task. A hybrid's v1 peers
-  get canonical v1 blocks, with zeros for the padding.
-- Task and global download limits share Ketch's limiter with HTTP/FTP. Live connection limits
-  close excess peers (see [Ketch download settings](#ketch-download-settings)).
-  `setUploadRateLimit` on the torrent source caps the upload of all torrents and
-  `setTaskUploadRateLimit` one task's, v1, v2 or hybrid, also while it seeds; zero means
-  unlimited. A block either limit holds back waits in its peer's queue while the connection
-  keeps downloading, so a low upload limit never stalls downloads from the same peers.
-
-## Ketch download settings
-
-Torrent tasks honor the same `DownloadConfig` and per-task settings as HTTP and FTP tasks:
-
-| Setting | Torrent behavior |
+| Function | Effect |
 | --- | --- |
-| Simultaneous downloads (`maxConcurrentDownloads`) | Ketch's queue starts torrents like any other task. The engine also runs at most `TorrentConfig.maxActiveTorrents` (default 5) torrents, seeding sessions included. Further started torrents wait for an engine slot instead of failing: they report as downloading at 0 bytes/s with their restored progress, can be paused or canceled at once, and start by priority, then arrival order. A seeding session yields its slot to a waiting download. |
-| Global and per-task speed limits | Applied live to verified payload on v1 and v2, through the same limiter as HTTP/FTP. The per-task limit still applies after pause and resume. |
-| Per-task connections (`DownloadRequest.connections`, `DownloadTask.setConnections`) | The task's peer cap, applied live. Values are clamped to 1..512 (v1) or 1..500 (v2), never rejected. Unset (0) uses `TorrentConfig.connectionsPerTorrent` (default 100). |
-| Connections per download (`maxConnectionsPerDownload`) | Not used: it counts HTTP segments. `TorrentConfig.maxConnections` (default 200) bounds sockets across all torrents. |
-| Priority | Ordered by Ketch's queue, and by the engine-slot wait above. |
-| Retries (`retryCount`, `retryDelayMs`) | Peer, tracker and DHT failures are retried inside the swarm without failing the task. Failures that reach the task are retried only when transient (`KetchError.Network`: metadata resolution timeouts, remote metainfo fetches, a busy listen port). Storage failures (`KetchError.Disk`), verification and protocol failures (`KetchError.SourceError`) are not retried. |
-
-Up to 16 magnet metadata fetches run at once; further magnet resolutions wait for one to finish.
+| `setUploadPolicy`, `setUploadRateLimit` | Change uploading for running and later torrents. |
+| `setTaskUploadRateLimit(taskId, bps)` | Cap an active task's upload, also while it seeds; 0 is unlimited. |
+| `setEncryption`, `setUtpEnabled` | Apply to connections opened afterwards. |
+| `setPortMapping` | Start port mapping, or stop it and remove the mapping. |
+| `setLocalDiscovery` | Join or leave local discovery; peers it found stay connected. |
+| `setConnectionLimit` | Change `maxConnections` (1-4096), closing excess connections. |
+| `setAdditionalTrackers`, `setTrackerLists` | Apply to torrents started or resumed afterwards. |
+| `refreshTrackerLists()` | Download the tracker lists again; `trackerLists` reports each one's state. |
 
 ### Choosing discovery privacy
 
-Select privacy before resolving a magnet. Public discovery is the default. To use only the supplied
-trackers for one input, resolve it explicitly and pass that result into the download request:
+Choose privacy before resolving a magnet. To use only the trackers an input names, resolve it on
+the source and pass the result into the request:
 
 ```kotlin
 val resolved = torrents.resolve(
@@ -334,112 +444,202 @@ val task = ketch.download(
 )
 ```
 
-Alternatively, set `TorrentConfig(discoveryPrivacy = TorrentDiscoveryPrivacy.TRACKER_ONLY)` as the
-source default. `resolveMetainfo(bytes, privacy = ...)` accepts the same per-input choice. Tracker-only
-magnets require supplied tracker URLs, ignore explicit peer addresses, and do not use DHT or peer
-exchange, even if the metadata is public. Public discovery performed before this choice cannot be
-undone by a later private flag.
+Unlike `KetchApi.resolve`, this call makes a single two-minute lookup for a magnet and fails with
+`KetchError.Network` when it finds nothing; call it again to keep looking.
+`resolveMetainfo(bytes, privacy = ...)` takes the same choice, and
+`TorrentConfig(discoveryPrivacy = ...)` sets the default. Tracker-only magnets need tracker URLs,
+ignore explicit peer addresses and never use DHT or peer exchange. Discovery already performed in
+public cannot be undone by a later private choice. A task keeps the privacy it was resolved with,
+even when its metadata must be fetched again. Privacy can only be chosen locally; remote instances
+use their default.
 
-New source resume records retain the chosen privacy independently of later default changes, including
-when metadata must be fetched again. Legacy records without a privacy choice use the configured
-default and record it on their next save. Privacy is chosen at the source, for the local backend;
-remote privacy commands remain on the v2 roadmap. Capability negotiation, inspection, file pages
-and the selection and seeding commands are available through `ketch.controller(TorrentController)`,
-locally and,
-for servers listing `torrent.control`, over `/api/torrents`; see the
+### `TorrentController`
+
+`library:torrent-api` defines `TorrentController`, which Ketch returns when the torrent source is
+registered:
+
+```kotlin
+val controller = ketch.controller(TorrentController) ?: return // no torrent control
+val caps = controller.capabilities()
+val page = controller.files(taskId, order = TorrentFileOrder.NAME)
+```
+
+It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp`, `mse-pe` and
+`seeding`, which describe the backend, not its current settings), `snapshot(taskId)`, sorted file
+pages (`files`), and `select` and `setSeeding` commands guarded by a revision and an idempotency
+key. Follow a task's snapshots with `ketch.subscribe(TorrentInterest(taskId))`. `RemoteKetch`
+returns a controller that works over `/api/torrents` with servers listing `torrent.control`. See the
 [control contract](design/torrent-control-contract.md#version-1-runtime).
 
-## Storage and restart
+### Logging
 
-Use writable filesystem paths. Android's default directory is app-owned external Downloads
-(with an internal-files fallback); iOS uses the app sandbox. Arbitrary Android SAF content URIs
-and iOS security-scoped destinations are outside this version's scope: when the configured default
-directory is a content URI, torrents use the platform default directory instead.
+Torrent logs reduce tracker URLs to `scheme://host:port` and magnets to their hash and name, and
+never log tracker passkeys. Avoid turning on URL logging in your own HTTP engine for private
+trackers. At debug level, each running torrent logs a summary every 30 seconds; see
+[troubleshooting](logging.md#troubleshooting) for reading it when a torrent stalls.
 
-Payload is verified before it is committed. Checkpoints include metainfo, selection and ownership;
-restart rehashes actual data rather than trusting a saved bitmap. File identities and an append-only
-ownership journal prevent ordinary cleanup from deleting pre-existing or replaced files. Parent
-handles and no-follow opens prevent symlink traversal during payload I/O. Do not allow an untrusted
-process to mutate the destination concurrently with cleanup: final-entry identity checking and
-unlinking are not one atomic OS operation. A crash between creation and its ownership record may
-leave an unclaimed file, which recovery preserves rather than guessing ownership.
+## How it works
 
-Existing native resume blobs are never interpreted as Kotlin checkpoints. Metainfo, when available,
-is used to recheck existing payload. Legacy records with neither metainfo nor a usable magnet
-need their original `.torrent` input again; cleanup preserves data it cannot prove belongs to the task.
+This section describes the engine's protocol behavior for people who debug swarms or work on it.
 
-Choosing files changes no storage format, so an older Ketch still opens these tasks, with these
-limits: a magnet waiting for its files shows as paused and downloads every file when resumed; a
-paused task whose selection changed fails to resume (v1 with a source error, v2 and hybrid with a
-creation-log binding mismatch) and keeps its files; and the seeding intent, kept in the task
-database's `control_json` column, is ignored. Tasks whose selection never changed resume as
-before.
+### Finding peers
 
-## Implementation boundary and limits
+- **Trackers**: HTTP(S) and UDP trackers, with tiers, IPv4 and IPv6, lifecycle events and
+  failover. Extra trackers are announced alongside the torrent's own rather than as a later tier.
+- **DHT**: public torrents look up peers in the DHT. With a `stateDirectory`, routing candidates
+  are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
+  of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the
+  DHT starts from a tracker's peers even where no bootstrap router answers.
+- **Peer exchange** (BEP 11) for v1, v2 and hybrid public torrents. Ketch advertises its listen
+  port (BEP 10 `p`) and dials the port a peer announced, never an incoming peer's source port.
+  Peers reached over uTP or with encryption are advertised with the matching BEP 11 flags.
+- **Magnet metadata** (BEP 9) is asked of up to four peers at once. A peer only takes the shared
+  metadata buffer once it answers, and a failed one is asked again after 5, 15 and 30 seconds.
+  Lookups run in two-minute rounds, each asking again the peers the last one gave up on.
 
-The public v2/hybrid download-and-restart milestone landed in
-[PR #240](https://github.com/linroid/Ketch/pull/240), following #231–#238.
-The broader [production v2 roadmap](https://github.com/linroid/Ketch/issues/162) remains open;
-the supported download workflow below is not a complete downloader/seeder release claim.
+### Encryption details
 
-All torrent parsing, SHA-1, wire protocol, trackers, DHT, scheduling and storage coordination are
-Kotlin. Product artifacts contain no libtorrent engine or torrent JNI bindings. JVM filesystem
-adapters use JNA for OS directory/handle operations; Android and iOS call platform filesystem APIs.
-OS sockets, TLS, filesystem and Unicode normalization services are permitted platform dependencies.
-The pinned libtorrent4j dependency and its loader exist only in JVM tests as an independent peer.
-See [release licensing and provenance](development/licensing.md) for dependency notices and
-the scope of the torrent source provenance review.
+MSE/PE runs a 768-bit Diffie-Hellman exchange, then RC4. With `PREFERRED`, every dial, metadata
+requests included, starts encrypted; a peer that hangs up or does not answer within 10 seconds is
+dialed again unencrypted, and dialed unencrypted first while it is among the last 1024 such peers.
+Ketch sends no initial payload: the BitTorrent handshake follows on the negotiated stream.
 
-The public v2/hybrid download workflow supports metainfo imports, full-identity `btmh` magnets
-(including magnets with both exact topics), `btih` magnets of hybrid torrents, which resolve
-their v2 identity from the metadata, authenticated piece-layer exchange, trackers/DHT,
-selection, progress, shared download limits, live connection limits, pause/resume, safe removal,
-and task-store restart. Hybrid payloads must pass both SHA-1 and SHA-256 verification. Hybrid
-padding files are omitted from selection, so file IDs may have gaps. The source persists metainfo
-and full SHA-256 identity with ownership checkpoints; `.ketch-v2-<task-id>.creation` beside the
-output root also recovers owned files created before the first checkpoint. Keep this journal with
-the task until removal. Configure a durable `TaskStore` to retain task records across processes.
+Older libtorrent versions (before 2.0.13 and 2.1.0) compute one handshake value wrongly when the
+shared secret starts with a zero byte (one exchange in 256). Ketch retries such a refused dial once
+with new keys before falling back to plaintext, and accepts that value on incoming connections when
+it can.
 
-V2 and hybrid torrents accept incoming peers: the engine routes each connection by the 20-byte wire
-tag in its handshake, both of a hybrid's tags to its one task. They upload, seed, serve BEP 52
-proofs from the piece layer and, for verified pieces, the block layer, exchange peers, and take part
-in v1 swarms: a hybrid talks to v1-only peers, announces its v1 hash to trackers with tier state of
-its own and looks it up in DHT too. A private hybrid announces both hashes to one tracker at a time
-and moves both to the next one together (BEP 27). Pieces read back for peers and proofs waiting to
-be sent take at most half of `maxBufferedBytes` across all torrents, v1 and v2, so uploading never
-starves downloads. The default 32 MiB holds the largest pieces; with less, pieces larger than half
-of it are never uploaded. A piece read back to prove its block hashes is paid for from both upload
-limits once it was read, like uploading it: a limit owes at most a tenth of a second (or one block)
-of it at once, and such reads take at most half of a limit, so a peer asking for proofs never
-starves uploads of other peers or torrents. The block hashes of the last few pieces proved are kept,
-so repeated requests read nothing. A torrent at its peer limit closes peers that dial it before
-answering their handshake, v2 and hybrid like v1. Every connection, v1, v2 and hybrid (a
-hybrid's v1 peers included), negotiates the Fast extension (BEP 6): availability as Have All or
-Have None, requests the other side will not serve rejected rather than dropped, a choke that
-leaves requests to be rejected (those still unanswered after 5 seconds are canceled), and each
-side's allowed-fast pieces requested and served while choked. Ketch offers IPv4 peers BEP 6's
-canonical set of 10 pieces only while it uploads, within the upload limits, drawn from the info
-hash the handshake named (on a hybrid, the v2 one, or the v1 one in the v1 swarm). A rejected
-piece goes to other peers without counting against the peer. BEP 52 hash rejects are separate
-messages, unaffected.
-Seeding ends when it is stopped, when the task is removed, when the upload policy leaves seeding,
-when a download waiting for one of the `maxActiveTorrents` engine slots takes the oldest seeder's,
-when the same torrent is added as another task, which takes the seeder's slot, or when Ketch quits;
-a torrent that finishes while a download waits for a slot does not seed at all. Seeding shows as
-Completed with `DownloadState.Completed.sharing` set, and as the `SEEDING` activity of the
-`TorrentController`.
-`TorrentController.setSeeding` (REST `PUT /api/torrents/{id}/seeding`, the apps' inspector) stops
-it, or starts a completed task seeding again after a recheck, on a free engine slot only, while
-the upload policy seeds. Ketch remembers which tasks seed: `Ketch.start()` seeds them again, oldest
-completion first, under `SEED_AFTER_COMPLETION` and only into free engine slots, each once a
-recheck finds its files complete. A seeder that a download or shutdown stopped keeps that intent;
-stopping it, or files that changed on disk, clear it. Seeding runs only while the process runs: on
-Android a seeding-only app is not kept in the foreground, so Android may stop it, and its seeding,
-in the background; on iOS seeding stops while the app is suspended.
+### uTP details
 
-This version does not implement torrent creation or ratio management. Bounds include 4 MiB
-metainfo, 10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers or large pieces
-increases process memory beyond the piece-buffer budget.
+uTP uses LEDBAT congestion control, keeping queuing delay near 100 ms, and carries v1, v2, hybrid
+and metadata connections. Ketch dials TCP first and uTP when TCP fails, except for the last 4096
+peers known to speak uTP (from peer exchange flags, or a uTP fallback that worked), which get uTP
+first.
 
-See [verification and measurements](development/torrent-verification.md) and the
-[current implementation progress](plans/pure-kotlin-torrent-v2-progress.md).
+### Port mapping details
+
+NAT-PMP goes to the first and last address of each private /24 network this device is on. UPnP
+runs an SSDP search, then SOAP on the router's WANIPConnection or WANPPPConnection service, only on
+a device on one of our private networks and never through a proxy. TCP and the UDP port map to one
+external port; when another device holds that port, UPnP picks another. Only engines listening on
+every interface map ports.
+
+### Local discovery details
+
+While a public torrent runs, the engine joins `239.192.152.143:6771` on each interface with a
+private or link-local IPv4 address and `[ff15::efc0:988f]:6771` on each interface with a
+link-local or unique local IPv6 address (not VPN tunnels), on one socket shared with other clients
+(`SO_REUSEADDR`). It sends `BT-SEARCH` announces to both groups with its TCP listen port (never a
+router-mapped one), a random cookie and up to 20 info hashes, when each torrent starts and every 5
+minutes, at most once a minute per torrent. A v1 torrent announces its info hash, a v2 torrent the
+first 20 bytes of its SHA-256 hash, and a hybrid both.
+
+Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or link-local
+IPv4 senders and unique local IPv6 senders, with a valid port and at most 20 hashes in 1400 bytes,
+never with our own cookie, 32 at once then 4 a second, and each peer once a minute per torrent. The
+groups are joined again when either address family's interfaces change. A public magnet joins under
+its info hash (a btmh magnet under the first 20 bytes of its SHA-256 hash) until its metadata is
+found.
+
+### Web seeds
+
+Web seeds (BEP 19: a metainfo's `url-list`, or a magnet's `ws` parameters; `http` and `https` only,
+at most 16) let a torrent download from HTTP mirrors as well as peers, so it completes even with no
+reachable peer. A magnet's metadata still comes from peers.
+
+- A single-file torrent's URL names the file (or, ending in `/`, its folder). A multi-file
+  torrent's URL names the folder holding the torrent's folder; each file is fetched from the URL,
+  the torrent name and the file's path, percent-encoded.
+- Each seed fetches runs of whole pieces no one else is fetching, up to 16 pieces or 4 MiB, with
+  one range request per file a run spans, and no more than its share of the free pieces. Later
+  pieces of a run only use buffers that leave half the buffer limit free.
+- Each piece is checked as it arrives, like a peer's: SHA-1 for v1, the piece layer for v2 and
+  hybrid. BEP 47 padding files are never requested.
+- In the endgame a seed may fetch one piece a peer is fetching; the first verified copy wins.
+- A failed request or corrupt piece keeps the pieces stored before it, gives back the rest and
+  backs the seed off (2 seconds, doubling to a minute). Five failures in a row drop it until the
+  task runs again.
+- Requests go through the source's HTTP engine with the system's proxy settings, count against the
+  download limits, fail after 30 seconds without data, and show among the task's live connections
+  as `HTTP`.
+
+### Uploading
+
+Each torrent has four upload slots: three go every 10 seconds to the peers that sent the most
+while downloading, or took the most while seeding, and one optimistic slot rotates every 30
+seconds. Peers get verified pieces only, through a bounded read cache; a verified piece that
+changed on disk stops the task. A hybrid's v1 peers get v1 blocks, with zeros for the padding.
+
+An upload limit holds a block back in its peer's queue while the connection keeps downloading, so
+a low upload limit never stalls downloads from the same peers. With uploading off, Ketch never
+unchokes a peer, does not offer `ut_metadata` and rejects BEP 52 hash requests.
+
+### V2 and hybrid torrents
+
+V2 and hybrid torrents accept incoming peers, routed by the 20-byte tag in their handshake. They
+upload, seed, serve BEP 52 proofs and exchange peers. A hybrid also joins the v1 swarm: it talks to
+v1-only peers and announces its v1 hash to trackers and the DHT. A private hybrid announces both
+hashes to one tracker at a time. Hybrid payloads must pass both SHA-1 and SHA-256 checks.
+
+Pieces read for peers and proofs waiting to be sent take at most half of `maxBufferedBytes`, so
+uploads never starve downloads; with less than the default 32 MiB, pieces larger than half the
+buffer are never uploaded. Reading a piece to prove its block hashes counts against the upload
+limits, and such reads take at most half of a limit.
+
+### Fast extension
+
+Every connection, v1, v2 and hybrid, negotiates the Fast extension (BEP 6): Have All and Have None,
+rejected rather than dropped requests, a choke that leaves requests to be rejected (those still
+unanswered after 5 seconds are canceled), and allowed-fast pieces requested and served while
+choked. While it uploads, Ketch offers IPv4 peers BEP 6's set of 10 allowed-fast pieces. A rejected
+piece goes to other peers without counting against the peer. A torrent at its peer limit closes
+peers that dial it before answering their handshake.
+
+### Partial selections
+
+In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. The
+skipped file's part is kept in a hidden sidecar for the task, not in the skipped file. When that
+file is chosen later, its verified bytes are copied from the sidecar and rechecked. A v2 or hybrid
+task refuses a newly chosen file whose path holds a file it did not create.
+
+## Storage, restart and compatibility
+
+Data is verified before it is written as complete. Checkpoints record the metainfo, the selection
+and which files the task owns, and a restart rehashes the data rather than trusting a saved bitmap.
+Configure a durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across restarts.
+
+- File identities and an append-only ownership journal stop cleanup from deleting files that
+  existed before the download or were replaced. A v2 or hybrid task also keeps
+  `.ketch-v2-<task-id>.creation` beside its folder until it is removed, to recover files created
+  before the first checkpoint; keep it with the task.
+- Payload I/O opens files through their parent folder without following symlinks. Do not let an
+  untrusted process change the destination during cleanup: checking a file and deleting it are not
+  one atomic operation. A crash between creating a file and recording it may leave a file no task
+  claims, which recovery keeps rather than guessing.
+- Tasks from versions that used a native engine keep their data, but their resume data is never
+  read. With metainfo, existing data is rechecked; without metainfo or a usable magnet, add the
+  original `.torrent` again. Cleanup keeps data it cannot prove belongs to the task.
+
+Choosing files changed no storage format, so an older Ketch still opens these tasks, with limits:
+a magnet waiting for its files shows as paused and downloads every file when resumed; a paused task
+whose selection changed fails to resume and keeps its files; and the seeding choice is ignored.
+
+## Implementation status
+
+All torrent parsing, hashing, the wire protocol, trackers, DHT, scheduling and storage are Kotlin.
+Release builds contain no libtorrent engine or torrent JNI bindings. The JVM file system code uses
+JNA for OS directory and handle calls; Android and iOS call platform APIs. A pinned libtorrent4j
+exists only in JVM tests, as an independent peer. See
+[release licensing and provenance](development/licensing.md).
+
+The public v2 and hybrid download milestone landed in
+[PR #240](https://github.com/linroid/Ketch/pull/240). The broader
+[v2 roadmap](https://github.com/linroid/Ketch/issues/162) remains open.
+
+## See also
+
+- [Verification and measurements](development/torrent-verification.md)
+- [Implementation progress](plans/pure-kotlin-torrent-v2-progress.md)
+- [Torrent control contract](design/torrent-control-contract.md)
+- [Logging and troubleshooting](logging.md#troubleshooting)
+- [Docker](docker.md)

@@ -32,6 +32,7 @@
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Desktop](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Lizenz](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
@@ -69,7 +70,7 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 [Ketch integrieren →](docs/developers.md#quick-start)
 
 > [!WARNING]
-> 🚧 Ketch wird aktiv entwickelt und ist bisher nur als Release Candidate verfügbar. Es kann noch
+> 🚧 Ketch wird aktiv entwickelt und hat Version 1.0 noch nicht erreicht. Es kann noch
 > Probleme geben. Bitte [melde, was dir auffällt](https://github.com/linroid/Ketch/issues).
 
 <a id="download"></a>
@@ -84,7 +85,7 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 | Android 8.0+ | `.apk` der [neuesten Version][release] |
 | iOS 18+ | Mit Xcode aus dem Quellcode bauen ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), um Ketch auf einem anderen Gerät zu steuern |
-| Browsererweiterung | Chrome, Edge, Brave, Firefox und weitere: `.zip` der [neuesten Version][release] ([Installation](app/browser-extension/README.md#installing)) |
+| Browsererweiterung | Chrome, Edge, Brave und andere Chromium-Browser: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` aus den [Versionen der Erweiterung](https://github.com/linroid/Ketch/releases) ([Installation](app/browser-extension/README.md#installing)) |
 | Kommandozeile und Server | macOS, Linux und Windows: [Installationsskript](#run-ketch-on-a-server) oder [neueste Version][release] |
 | Docker | NAS und Heimserver mit x64 und ARM64: `ghcr.io/linroid/ketch` ([Anleitung](docs/docker.md), mit TrueNAS und fnOS) |
 
@@ -120,8 +121,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   übergibt.
 - **FTP und FTPS**, mit parallelen Verbindungen und Fortsetzen.
 - **BitTorrent und Magnet-Links** — v1-, v2- und Hybrid-Torrents mit Dateiauswahl und
-  optionalem Seeden, in einer vollständig in Kotlin geschriebenen Engine
-  ([Details](docs/torrent.md)).
+  optionalem Seeden, in einer vollständig in Kotlin geschriebenen Engine. Sie beherrscht uTP und
+  Protokollverschlüsselung, lädt von Webseeds, gibt ihren Port am Router frei und findet Peers im
+  lokalen Netzwerk ([Details](docs/torrent.md)).
 - **Torrent-Dateien jederzeit wählen** — Wähle die Dateien eines Torrents vor oder während des
   Downloads und ändere sie, ohne neu zu beginnen; ein Magnet-Link, der vor seinen Details
   hinzugefügt wurde, wartet auf deine Wahl. Das Seeden fertiger Torrents lässt sich beenden und
@@ -182,7 +184,7 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
   (**Einstellungen → Allgemein**).
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit sieben Akzentfarben, in English,
-  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch und Français
+  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français und Русский
   ([Übersetzungen](docs/development/localization.md)).
 - **Geprüfte Downloads** — Gib einem Download eine Prüfsumme (SHA-256, SHA-512, SHA-1 oder MD5) mit,
   und Ketch prüft die fertige Datei damit oder mit der Prüfsumme, die der Server veröffentlicht.
@@ -232,14 +234,15 @@ Starte den Server mit REST-API und Web-App auf Port 8642:
 ketch server
 ```
 
-Füge ihn dann in der App unter **Geräte → Gerät hinzufügen** hinzu oder öffne
+Beim ersten Start erzeugt er ein Zugriffstoken und zeigt es einmal an. Füge den Server dann in der
+App unter **Geräte → Gerät hinzufügen** mit diesem Token hinzu oder öffne
 `http://<Serveradresse>:8642` im Browser. Die Kommandozeile kann auch selbst herunterladen:
 
 ```bash
 ketch https://example.com/file.zip
 ```
 
-Zugangscode, Port und weitere Optionen legst du in einer
+Ein eigenes Token, Port und weitere Optionen legst du in einer
 [Konfigurationsdatei](cli/README.md#configuration-file) fest.
 Die [CLI-Dokumentation](cli/README.md) beschreibt alle Befehle.
 
@@ -256,8 +259,8 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 ## Roadmap
 
 - **Verteilung vor v1.0.0** — Signierte Windows-Versionen, signierte und notarisierte
-  macOS-Versionen, Erweiterungen in den Browser-Stores und geprüfte Installations- und Updatewege
-  ([Plan](docs/plans/v1-distribution.md))
+  macOS-Versionen, die Erweiterung in weiteren Browser-Stores und geprüfte Installations- und
+  Updatewege ([Plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads von mehreren Spiegelservern gleichzeitig, mit Prüfsummen
 - **WebDAV** — Downloads von WebDAV-Servern mit Fortsetzen
 - **Weitere HLS- und DASH-Formate** — Qualität wählen, getrennte Audio- und Videospuren verbinden
@@ -285,6 +288,21 @@ benötigten Module von Maven Central unter `com.linroid.ketch` hinzu.
 Mit `core` und `ktor` läuft die Engine in deiner Android-, iOS- oder JVM-App. Node.js und WASI
 können `core` mit einer eigenen HTTP-Engine verwenden. Mit `remote` steuerst du einen Ketch-Server
 von Android, iOS, der JVM oder dem Browser aus über dieselbe `KetchApi`.
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [Entwicklerhandbuch](docs/developers.md) — Module, Schnellstart, REST-API und Erweiterungen
 - [API-Referenz](docs/api.md) — Installation, Konfiguration, Prioritäten, Fehler und Logging

@@ -32,6 +32,7 @@
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Ordinateur](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Licence](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
@@ -68,7 +69,7 @@ La bibliothèque Kotlin Multiplatform est disponible sur Maven Central.
 [Commencer à intégrer Ketch →](docs/developers.md#quick-start)
 
 > [!WARNING]
-> 🚧 Ketch est en cours de développement et ne propose pour l'instant que des versions candidates.
+> 🚧 Ketch est en cours de développement et n'a pas encore atteint la version 1.0.
 > Des problèmes peuvent subsister ; merci de [nous les
 > signaler](https://github.com/linroid/Ketch/issues).
 
@@ -84,7 +85,7 @@ La bibliothèque Kotlin Multiplatform est disponible sur Maven Central.
 | Android 8.0+ | `.apk` de la [dernière version][release] |
 | iOS 18+ | Compiler depuis les sources avec Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), pour contrôler Ketch sur un autre appareil |
-| Extension de navigateur | Chrome, Edge, Brave, Firefox et autres : `.zip` de la [dernière version][release] ([installation](app/browser-extension/README.md#installing)) |
+| Extension de navigateur | Chrome, Edge, Brave et autres navigateurs Chromium : [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka) ; Firefox : `.zip` des [versions de l'extension](https://github.com/linroid/Ketch/releases) ([installation](app/browser-extension/README.md#installing)) |
 | Ligne de commande et serveur | macOS, Linux et Windows : [script d'installation](#run-ketch-on-a-server) ou [dernière version][release] |
 | Docker | NAS et serveurs domestiques x64 et ARM64 : `ghcr.io/linroid/ketch` ([guide](docs/docker.md), avec TrueNAS et fnOS) |
 
@@ -120,7 +121,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   transmet le téléchargement.
 - **FTP et FTPS**, avec connexions parallèles et reprise.
 - **BitTorrent et liens magnet** — Torrents v1, v2 et hybrides, avec sélection des fichiers et
-  partage facultatif, dans un moteur entièrement écrit en Kotlin ([détails](docs/torrent.md)).
+  partage facultatif, dans un moteur entièrement écrit en Kotlin. Il prend en charge uTP et le
+  chiffrement du protocole, télécharge depuis les sources web, ouvre son port sur le routeur et
+  trouve des pairs sur votre réseau local ([détails](docs/torrent.md)).
 - **Choix des fichiers torrent à tout moment** — Choisissez les fichiers d'un torrent avant ou
   pendant le téléchargement et modifiez-les sans tout reprendre ; un lien magnet ajouté avant
   l'arrivée de ses détails attend votre choix. Arrêtez ou relancez le partage d'un torrent
@@ -184,7 +187,7 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   en veille automatique du système pendant les téléchargements ; l'écran peut tout de même
   s'éteindre (**Réglages → Général**).
 - **Votre style, votre langue** — Thèmes clair et sombre avec sept couleurs d'accent, en English,
-  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch et Français
+  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français et Русский
   ([traductions](docs/development/localization.md)).
 - **Téléchargements vérifiés** — Indiquez une somme de contrôle SHA-256, SHA-512, SHA-1 ou MD5 pour
   un téléchargement et Ketch vérifie le fichier terminé avec elle, ou avec celle que publie le
@@ -234,7 +237,8 @@ Démarrez le serveur, avec son API REST et son application web sur le port 8642�
 ketch server
 ```
 
-Ajoutez-le ensuite dans les applications via **Appareils → Ajouter un appareil**, ou ouvrez
+Au premier lancement, il crée un jeton d'accès et l'affiche une seule fois. Ajoutez ensuite le
+serveur dans les applications via **Appareils → Ajouter un appareil** avec ce jeton, ou ouvrez
 `http://<adresse du serveur>:8642` dans un navigateur. La ligne de commande peut aussi télécharger
 seule :
 
@@ -242,7 +246,7 @@ seule :
 ketch https://example.com/file.zip
 ```
 
-Définissez le code d'accès, le port et les autres options dans un
+Définissez votre propre jeton, le port et les autres options dans un
 [fichier de configuration](cli/README.md#configuration-file).
 La [documentation CLI](cli/README.md) présente toutes les commandes.
 
@@ -258,8 +262,8 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 ## Feuille de route
 
 - **Distribution avant v1.0.0** — Versions Windows signées, versions macOS signées et notariées,
-  extensions dans les boutiques de navigateurs et parcours d'installation et de mise à jour vérifiés
-  ([plan](docs/plans/v1-distribution.md))
+  l'extension dans d'autres boutiques de navigateurs et parcours d'installation et de mise à
+  jour vérifiés ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Téléchargements depuis plusieurs miroirs à la fois, avec sommes de contrôle
 - **WebDAV** — Téléchargements depuis des serveurs WebDAV, avec reprise
 - **Davantage de formats HLS et DASH** — Choix de la qualité, fusion des pistes audio et vidéo
@@ -287,6 +291,21 @@ modules nécessaires depuis Maven Central sous `com.linroid.ketch`.
 Exécutez le moteur dans votre application Android, iOS ou JVM avec `core` et `ktor`. Node.js et
 WASI peuvent utiliser `core` avec un moteur HTTP personnalisé. Avec `remote`, contrôlez un serveur
 Ketch depuis Android, iOS, la JVM ou le navigateur, via la même `KetchApi`.
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [Guide de développement](docs/developers.md) — Modules, démarrage rapide, API REST et extensions
 - [Référence de l'API](docs/api.md) — Installation, configuration, priorités, erreurs et

@@ -37,8 +37,8 @@ data class TorrentConfig(
   val utpEnabled: Boolean = true,
   /**
    * Whether public torrents are announced on the LAN, and peers other clients announce there
-   * dialed (Local Service Discovery, BEP 14, over IPv4 multicast), so devices at home share
-   * pieces directly. Private and tracker-only torrents never take part. Android, JVM only.
+   * dialed (Local Service Discovery, BEP 14, over IPv4 and IPv6 multicast), so devices at home
+   * share pieces directly. Private and tracker-only torrents never take part. Android, JVM only.
    */
   val localDiscovery: Boolean = true,
   val maxActiveTorrents: Int = 5,

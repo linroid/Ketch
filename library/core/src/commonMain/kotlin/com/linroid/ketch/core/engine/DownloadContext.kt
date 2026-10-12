@@ -59,7 +59,7 @@ import kotlin.concurrent.Volatile
  *   while it runs. Sources that implement [DownloadSource.planSelection] apply each revision live
  *   and confirm it with [acknowledgeSelection].
  * @property connections opens the task's live network connections, which
- *   [com.linroid.ketch.api.KetchApi.activeConnections] reports. Sources open a handle when a
+ *   [com.linroid.ketch.api.Interest.Connections] reports. Sources open a handle when a
  *   transfer starts, count its bytes and close it when the transfer ends, also on failure and
  *   cancellation.
  * @property watchdog fails transfers that stall, from [DownloadConfig.idleTimeoutMs] and

@@ -2,47 +2,59 @@
 
 Hooks run a command or post a webhook when a download is added, starts, completes, fails, is
 canceled or is removed. Use them to move finished files, update a media library, send a chat
-message or start the next step of a script.
+message or start the next step of a script. This page is for people who run Ketch on a computer
+or server they control and edit its `config.toml`.
+
+## Quick start
+
+Add a `[[hooks]]` table to [`config.toml`](../cli/README.md#config-file-locations) and restart
+Ketch. This one runs a script whenever a download completes:
+
+```toml
+[[hooks]]
+events = ["completed"]
+command = ["/usr/local/bin/ketch-done"]
+```
+
+The script finds the download in environment variables:
+
+```sh
+#!/bin/sh
+# /usr/local/bin/ketch-done
+echo "$KETCH_FILE_NAME saved to $KETCH_OUTPUT_PATH" >> "$HOME/ketch-hooks.log"
+```
+
+To post to a web service instead, give a `webhook` URL:
+
+```toml
+[[hooks]]
+events = ["completed", "failed"]
+webhook = "https://hooks.example.com/ketch"
+secret = "change-me"
+```
 
 ## Where hooks run
 
-Hooks are `[[hooks]]` tables of `config.toml`, read once at launch by the process that runs this
-device's downloads:
+Hooks are read once, at launch, by the process that runs this device's downloads:
 
 | Process | Runs hooks |
 | --- | --- |
-| `ketch server`, also in the Docker image | Yes |
+| `ketch server`, also in the [Docker image](docker.md) | Yes |
 | `ketch mcp --standalone` | Yes |
 | The desktop app, while it runs the downloads itself | Yes |
 | The desktop app while `ketch server` runs the downloads | No: the server runs them |
 | `ketch <url>`, `ketch add` and the other CLI commands | No |
 | Android, iOS and the web app | No |
 
-Only the process holding the config directory's `instance.lock` runs the downloads, so a hook
-never runs twice for one event. Hooks are read when that process starts: restart it after editing
-them. Quit the desktop app before editing `config.toml` by hand, as it writes the file again when
-its settings change.
+Only one process runs a device's downloads at a time (the one holding the config folder's
+`instance.lock`), so a hook never runs twice for one event.
 
-Android does not run hooks yet: a background app cannot be relied on to run commands, and
-webhooks from the phone are a possible follow-up. To run hooks for a phone's downloads, send them
-to a `ketch server` instead.
-
-## Security
-
-Hooks run programs on the machine with the rights of the Ketch process, so only the local
-`config.toml` sets them. No API changes them: `PUT /api/config` takes download settings only,
-and neither the apps nor the REST API, MCP or the browser extension read or write hooks. Keep
-`config.toml` writable by its owner only; it also holds the server's `apiToken`. Webhook secrets
-and headers are stored in plain text there, like the other tokens.
-
-Commands never go through a shell. `command` is the program and its arguments, as a list, and
-nothing about the download is put into them: the payload reaches the program on its standard input
-and in environment variables, so a file named `a.zip; rm -rf ~` stays a file name. To use shell
-features, run a script of your own, which then must quote the variables it uses.
-
-Download URLs pass through the same redaction as the logs: passwords in the URL and the values of
-query parameters are replaced with `***`. Logs name a failing hook by its `name`, its program or
-its webhook's host, never the webhook URL, its headers, the secret or the arguments.
+- **After editing hooks**, restart that process: hooks are only read when it starts.
+- **Quit the desktop app** before editing `config.toml` by hand, as it writes the file again when
+  its settings change.
+- **Phones** do not run hooks yet: a background app cannot be relied on to run commands, and
+  webhooks from the phone are a possible follow-up. To run hooks for a phone's downloads, send
+  them to a `ketch server` instead.
 
 ## Configuration
 
@@ -66,10 +78,24 @@ hosts = ["example.com"]
 enabled = true                            # false keeps a hook without running it
 ```
 
-A hook runs its `command` when it has one, else posts to its `webhook`. One with neither, with no
-event Ketch knows, or with a webhook that is not an `http` or `https` URL is left out with a
-warning in the log. Event names Ketch does not know, such as ones a later version adds, are
-ignored, and a `timeoutSeconds` that is not a positive number is 30.
+| Key | Default | Description |
+| --- | --- | --- |
+| `events` | `[]` | The [events](#events) the hook runs on |
+| `command` | `[]` | Program and its arguments, as a list; never run through a shell |
+| `workingDirectory` | Ketch's own | Folder the command runs in |
+| `webhook` | none | `http` or `https` URL the event is posted to, used when there is no `command` |
+| `headers` | `{}` | Extra webhook request headers |
+| `secret` | none | Key that [signs](#checking-a-signature) the webhook body |
+| `timeoutSeconds` | `30` | How long a command may run, or a webhook request take |
+| `origins`, `categories`, `hosts` | `[]` | [Filters](#filters); every download passes an empty one |
+| `name` | none | Label for the logs |
+| `enabled` | `true` | `false` keeps the hook without running it |
+
+A hook runs its `command` when it has one, and otherwise posts to its `webhook`; one with both
+runs the command and logs a warning. A hook is left out, with a warning in the log, when it has
+neither, names no event Ketch knows, or has a webhook that is not an `http` or `https` URL. Event
+names Ketch does not know, such as ones a later version adds, are ignored, and a `timeoutSeconds`
+that is not a positive number counts as 30.
 
 ### Events
 
@@ -84,15 +110,15 @@ ignored, and a `timeoutSeconds` that is not a positive number is 30.
 
 ### Filters
 
-A hook with filters runs only for downloads that pass all of them:
+A hook with filters runs only for downloads that pass all of them. Names are compared ignoring
+case.
 
-- `origins`: where the download was added from, the `ketch.origin` request property: `browser`
-  (the extension), `discover`, `agent` (MCP), `app` or `cli`. Downloads that name no origin never
-  pass.
+- `origins`: where the download was added from: `browser` (the extension), `discover`, `agent`
+  (MCP), `app` or `cli`. Downloads that name no origin never pass.
 - `categories`: the folder of the [category](../cli/README.md#downloadcategories) the download's
-  file matches, such as `Video`, ignoring case.
-- `hosts`: the URL's host or its subdomains: `example.com` covers `cdn.example.com`. Magnets
-  never pass.
+  file matches, such as `Video`.
+- `hosts`: the URL's host or its subdomains: `example.com` (or `*.example.com`) covers
+  `cdn.example.com`. Magnets never pass.
 
 ## Payload
 
@@ -119,20 +145,24 @@ Every hook gets the event as JSON. Fields that do not apply are left out.
 }
 ```
 
-`state` is the download's state when the event happened (`scheduled`, `queued`, `downloading`,
-`paused`, `completed`, `failed` or `canceled`), `downloadedBytes` is set while it runs or is
-paused, and a failed download has an `error`:
+- `state` is the download's state when the event happened: `scheduled`, `queued`,
+  `downloading`, `paused`, `completed`, `failed` or `canceled`.
+- `downloadedBytes` is set while the download runs or is paused.
+- `url` is redacted like the logs: passwords in the URL and the values of query parameters are
+  replaced with `***`.
+- A failed download has an `error`:
 
-```json
-"error": { "kind": "http", "code": 404, "message": "HTTP error 404" }
-```
+  ```json
+  "error": { "kind": "http", "code": 404, "message": "HTTP error 404" }
+  ```
 
-`kind` is one of `network`, `http`, `disk`, `unsupported`, `file_changed`,
-`corrupt_resume_state`, `canceled`, `source`, `auth_failed`, `checksum_mismatch` and `unknown`.
+  `kind` is one of `network`, `http`, `disk`, `unsupported`, `file_changed`,
+  `corrupt_resume_state`, `canceled`, `source`, `auth_failed`, `checksum_mismatch` and `unknown`.
+  `code` is only set for `http`.
 
 ## Commands
 
-A command gets the JSON on its standard input and these environment variables, besides the ones
+A command gets the JSON on its standard input, and these environment variables besides the ones
 Ketch has, each only when it is set:
 
 | Variable | Field |
@@ -158,12 +188,13 @@ Ketch has, each only when it is set:
 | `KETCH_ERROR_CODE` | `error.code` |
 | `KETCH_ERROR_MESSAGE` | `error.message` |
 
-What a command prints is discarded: write to a log file of your own to debug one. A command that
-exits with a status other than 0 is logged as failed. One still running after `timeoutSeconds` is
-stopped, with the processes it started, and logged. Commands still running when Ketch quits keep
-running.
+- What a command prints is discarded: write to a log file of your own to debug one.
+- A command that exits with a status other than 0 is logged as failed.
+- A command still running after `timeoutSeconds` is stopped, along with the processes it
+  started, and logged.
+- Commands still running when Ketch quits keep running.
 
-For example, a script that files finished videos away:
+A script that files finished videos away:
 
 ```sh
 #!/bin/sh
@@ -172,7 +203,7 @@ For example, a script that files finished videos away:
 mv -- "$KETCH_OUTPUT_PATH" /srv/media/movies/
 ```
 
-Or one that reads the JSON with `jq`:
+One that reads the JSON with `jq`:
 
 ```sh
 #!/bin/sh
@@ -180,7 +211,11 @@ payload=$(cat)
 echo "$(echo "$payload" | jq -r .fileName) finished" >> "$HOME/ketch-hooks.log"
 ```
 
-On Windows, name the interpreter: `command = ["powershell", "-File", "C:\\Scripts\\done.ps1"]`.
+On Windows, name the interpreter:
+
+```toml
+command = ["powershell", "-File", "C:\\Scripts\\done.ps1"]
+```
 
 ## Webhooks
 
@@ -194,12 +229,14 @@ A webhook gets the JSON in a `POST` with these headers, besides the ones the hoo
 | `X-Ketch-Delivery` | `deliveryId`, the same on every attempt |
 | `X-Ketch-Signature` | `sha256=` and the hex HMAC-SHA256 of the body, keyed with `secret`; only with a `secret` |
 
-A request has `timeoutSeconds` to answer. Any 2xx answer delivers the event. A request that fails
-on the way, times out, or is answered 408, 429 or 5xx is sent again after 2 and then 10 seconds;
-other answers, redirects included, are not retried. Webhooks connect directly, without the
-download proxy.
+- Each request has `timeoutSeconds` to answer, and any 2xx answer delivers the event.
+- A request that fails on the way, times out, or is answered 408, 429 or 5xx is sent again after
+  2 and then 10 seconds. Other answers, redirects included, are not retried.
+- Webhooks connect directly, without the download proxy.
 
-To check a signature, compute the HMAC of the raw body before parsing it, for example in Python:
+### Checking a signature
+
+Compute the HMAC of the raw body before parsing it, for example in Python:
 
 ```python
 import hashlib, hmac
@@ -209,13 +246,39 @@ def verify(secret: bytes, body: bytes, header: str) -> bool:
     return hmac.compare_digest(expected, header)
 ```
 
+Use `X-Ketch-Delivery` to drop a delivery you have already handled.
+
 ## Delivery
 
-Hooks run in the background and never hold up a download. At most four run at once, and up to
-256 events wait for them; events beyond that are dropped with a warning. Events of one download
-are queued in the order they happen, but as hooks run side by side, a slow hook of one event may
-finish after a quick hook of the next. Events of a hook are not saved: those that have not run
-when Ketch quits are lost.
+Hooks run in the background and never hold up a download.
 
-Ketch logs a hook that fails at warn, under the `Hooks` tag ([logging](logging.md)), and one
-that runs at debug.
+- At most four hooks run at once, and up to 256 events wait for them; events beyond that are
+  dropped with a warning.
+- Events of one download are queued in the order they happen, but as hooks run side by side, a
+  slow hook for one event may finish after a quick hook for the next.
+- Events are not saved: those whose hooks have not run when Ketch quits are lost.
+
+Ketch logs a hook that fails at warn level, under the `Hooks` tag ([logging](logging.md)), and one
+that runs at debug level.
+
+## Security
+
+Hooks run programs on the machine with the rights of the Ketch process, so only the local
+`config.toml` sets them.
+
+- **No API changes hooks.** `PUT /api/config` takes download settings only, and neither the apps
+  nor the REST API, MCP or the browser extension read or write hooks.
+- **Protect `config.toml`.** Keep it writable by its owner only; it also holds the server's
+  `apiToken`. Webhook secrets and headers are stored in it in plain text, like the other tokens.
+- **Commands never go through a shell.** `command` is the program and its arguments, and nothing
+  about the download is put into them: the payload reaches the program on its standard input and
+  in environment variables, so a file named `a.zip; rm -rf ~` stays a file name. To use shell
+  features, run a script of your own, which must then quote the variables it uses.
+- **Secrets stay out of logs.** Download URLs are redacted, and logs name a failing hook by its
+  `name`, its program or its webhook's host, never the webhook URL, its headers, the secret or
+  the arguments.
+
+## See also
+
+- [CLI configuration reference](../cli/README.md#hooks), including category folders
+- [Docker](docker.md), where `/config/config.toml` holds the hooks

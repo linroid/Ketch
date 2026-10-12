@@ -1365,7 +1365,7 @@ private fun printUsage() {
   println("  --priority <level>       Set download priority")
   println("                           Values: low, normal, high, urgent")
   println("  --max-concurrent <n>     Max simultaneous downloads")
-  println("                           Default: 3")
+  println("                           Default: 4")
   println("  -H, --header <header>    Send a request header, e.g.")
   println("                           -H 'Cookie: sid=1'; repeatable")
   println("  --user-agent <value>     Send this User-Agent instead of")

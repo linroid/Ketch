@@ -62,7 +62,7 @@ data class ConnectionSpec(
 
 /**
  * Opens the connections of one task, reported by
- * [com.linroid.ketch.api.KetchApi.activeConnections]. Valid for the task's lifetime, not one run.
+ * [com.linroid.ketch.api.Interest.Connections]. Valid for the task's lifetime, not one run.
  */
 interface ConnectionReporter {
   /** Registers a connection described by [spec]; close the handle when the connection ends. */

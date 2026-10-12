@@ -2,9 +2,12 @@
 
 [English](docker.md)
 
-Ketch 的 Docker 镜像在 NAS 或家用服务器上运行 [`ketch server`](../cli/README.md#server)：下载引擎、
-网页版和 REST API，Ketch 各个 App 和浏览器扩展都可以连接它。它能下载 HTTP(S)、FTP/FTPS、BitTorrent
-和磁力链接，以及有限长度的 HLS/DASH 视频流。
+本文介绍如何用 Docker 在 NAS 或家用服务器上运行 Ketch，并分步说明 [飞牛 fnOS](#飞牛-fnos) 和
+[TrueNAS](#truenas) 上的设置方法。适合想让下载任务在一台常开的机器上持续运行的用户。
+
+镜像运行的是 [`ketch server`](../cli/README.md#server)：下载引擎、网页版和 REST API，Ketch 各个 App
+和浏览器扩展都可以连接它。它能下载 HTTP(S)、FTP/FTPS、BitTorrent 和磁力链接，以及有限长度的
+HLS/DASH 视频流。
 
 - 提供 x64（`linux/amd64`）和 ARM64（`linux/arm64`）镜像，内含原生 `ketch` 程序，基于 Debian，
   不需要 Java
@@ -14,8 +17,6 @@ Ketch 的 Docker 镜像在 NAS 或家用服务器上运行 [`ketch server`](../c
 - 自带健康检查，恢复完已保存的下载后即为健康
 - 用环境变量、配置文件或两者一起配置
 - 固定的 BitTorrent 端口 16881，可以在路由器上做端口转发
-
-通用设置之后是 [飞牛 fnOS](#飞牛-fnos) 和 [TrueNAS](#truenas) 的步骤。
 
 ## 快速开始
 
@@ -93,7 +94,7 @@ Ketch 在网络上提供服务时需要访问码，也就是它的 API 令牌。
   交给这个用户。你挂载的文件夹保持原有的所有者和权限；如果这个用户无法写入，日志里会提示
 
 `UMASK`（默认 `022`）决定新文件的权限：`002` 让同组用户也能写入。`PUID=0` 会以 root 运行 Ketch，
-不建议这样做。
+不建议这样做。`PUID` 和 `PGID` 必须是数字 ID，否则容器会报错并停止。
 
 也可以用 compose 的 `user: "568:568"` 或 `docker run --user` 以某个用户启动容器。这时 Ketch 以这个
 用户运行，入口脚本不会修改任何所有权，所以 `/config` 和 `/downloads` 必须已经可以被它写入。
@@ -161,6 +162,20 @@ NAS 上的其他 BitTorrent 客户端需要使用不同的端口。
 服务器，而且它只响应发给容器自身的请求：在 bridge 网络中，要把访问它所用的名称和地址写进
 `KETCH_ALLOWED_HOSTS`，例如 `192.168.1.20,nas.local`。参见[接受的主机](../cli/README.md#accepted-hosts)。
 
+## 运行命令
+
+只传选项时会交给 `ketch server`，所以 `docker run ... ghcr.io/linroid/ketch --port 9000` 会让服务器
+监听 9000 端口。`server`、`health`、`mcp`、`ai-discover`、`update` 这些 `ketch` 命令，以及网址和
+磁力链接，都会作为 `ketch` 的参数运行。其他程序（例如 `sh`）则原样运行，方便排查问题。
+
+要在容器里操作正在运行的服务器，可以用 `docker exec` 运行命令行：
+
+```bash
+docker exec ketch ketch list
+```
+
+`add`、`list`、`pause`、`resume` 和 `watch` 的用法参见[命令行](../cli/README.md#work-on-a-running-ketch)。
+
 ## 更新
 
 拉取新镜像并重建容器；设置、访问码和下载的文件都保存在你的文件夹里：
@@ -222,12 +237,36 @@ TrueNAS 24.10（Electric Eel）及以后的版本中，应用就是 Docker 容�
    这样 apps 用户（568）就有访问权限。选好下载文件存放的数据集，在它的权限里给 apps 用户写入权限，
    或者记下它所有者的 ID。
 2. 打开 **Apps → Discover Apps**，选择 **⋮ → Install via YAML**，名称填 `ketch`，粘贴
-   [`docker/truenas.yaml`](../docker/truenas.yaml)，把两个 `/mnt` 路径换成你的数据集；如果 apps
-   用户无法写入下载数据集，把 `568` 换成所有者的 ID。
+   [`docker/truenas.yaml`](../docker/truenas.yaml)：
+
+   ```yaml
+   services:
+     ketch:
+       image: ghcr.io/linroid/ketch:latest
+       restart: unless-stopped
+       environment:
+         PUID: "568"
+         PGID: "568"
+         TZ: Etc/UTC
+         KETCH_NAME: TrueNAS
+         KETCH_API_TOKEN: ""
+       volumes:
+         - /mnt/tank/apps/ketch:/config
+         - /mnt/tank/downloads:/downloads
+       ports:
+         - "8642:8642"
+         - "16881:16881"
+         - "16881:16881/udp"
+   ```
+
+   把两个 `/mnt` 路径换成你的数据集；如果 apps 用户无法写入下载数据集，把 `568` 换成所有者的 ID。
 3. 保存。应用运行后，在它的日志里查看访问码（或者事先设置 `KETCH_API_TOKEN`），然后打开
    `http://<TrueNAS 地址>:8642`。
 
 更新时，让 TrueNAS 重新拉取镜像并重新部署应用；设置、访问码和下载的文件都保存在数据集里。
+
+也可以用 **Custom App** 表单：镜像填 `ghcr.io/linroid/ketch`，标签填 `latest`，加上上面的环境变量和
+三个端口，再把主机路径分别挂载到 `/config` 和 `/downloads`。
 
 ## 自己构建镜像
 

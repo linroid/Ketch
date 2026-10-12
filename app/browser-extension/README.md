@@ -1,19 +1,23 @@
 # Ketch browser extension
 
 Hands downloads from your browser to Ketch: the Ketch app on this computer, which the extension
-opens when it needs it, or a Ketch server elsewhere, such as a NAS. Chromium and Firefox
-support automatic capture and native app launching. The limited Safari target sends reviewed
-links and page resources to a configured server.
+opens when it needs it, or a Ketch server elsewhere, such as a NAS. This README covers installing
+and using the extension, what it does with your data, and how to build, test and release it.
 
-- **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
-  can't be reached, the browser downloads them as usual.
-- **Context menu**: right-click and open **Ketch → Page resources** to scan the page. On a
-  link, image, video or audio, choose **Download link with Ketch** (or image, video, audio) in
-  that menu. With several Ketch instances, a submenu lets you pick one.
-- **Download directly**: choose **Ketch → Download directly** on an HTTP(S) link, image, video
-  or audio to save it in the browser for this download only, without changing capture settings.
-  On a linked image, this downloads the link. In Chromium private windows, use the browser's
-  built-in save command instead.
+Chromium browsers and Firefox get automatic capture and native app launching. The limited Safari
+target sends reviewed links and page resources to a configured server.
+
+## Features
+
+- **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch can't
+  be reached, the browser downloads them as usual.
+- **Context menu**: right-click and open **Ketch → Page resources** to scan the page. On a link,
+  image, video or audio, choose **Download link with Ketch** (or image, video, audio) in that
+  menu. With several Ketch instances, a submenu lets you pick one.
+- **Download directly**: choose **Ketch → Download directly** on an HTTP(S) link, image, video or
+  audio to save it in the browser for this download only, without changing capture settings. On a
+  linked image, this downloads the link. In Chromium private windows, use the browser's built-in
+  save command instead.
 - **Magnet links**: clicking a magnet link adds it to Ketch. Alt+click opens it in another app.
 - **Torrent files**: a `.torrent` download becomes a torrent task, even when the site serves it
   from a script such as `download.php?id=7`.
@@ -23,74 +27,68 @@ links and page resources to a configured server.
   along, so downloads that need a session work in Ketch too. They stay with that site: when a
   download redirects to another host, Ketch sends it the user agent and only the origin of the
   referring page, not the cookies.
+- **Review before sending** (optional): choose the receiving device, a file name and a folder
+  before each download is sent.
 
 ## Supported browsers
 
 | Browser | Minimum version | Build |
-|---|---|---|
+| --- | --- | --- |
 | Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers | Chromium 116 | `build/chrome` |
 | Firefox (desktop) | 128 | `build/firefox` |
 | Safari (macOS, limited features) | 16.4 | `build/safari` |
 
 Safari supports manual links, magnets, page resources and task controls, with review before
-sending. Automatic browser-download capture, native app launching and extension notifications
-are unavailable. See [Safari packaging](#safari-limited-macos-target).
+sending. Automatic browser-download capture, native app launching and extension notifications are
+unavailable. See [Safari](#safari-limited-macos-target).
 
 ## Installing
 
 - **Chrome, Edge, Brave and other Chromium browsers**: install Ketch from the
   [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka).
-
-The extension has its own releases, tagged `extension-v<app version>.<number>` and named
-like "Browser extension 0.4.0.1" on the [releases page](https://github.com/linroid/Ketch/releases);
-each app release links the latest one under *Add Ketch to your browser*. Each includes
-`ketch-extension-<version>-chrome.zip` (the Chrome Web Store package),
-`ketch-extension-<version>-firefox.zip` and `ketch-extension-<version>-safari.zip`. The Safari
-archive contains extension sources, not an installable app. Until the other stores list it:
-
-- **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the
-  Firefox package is what gets submitted to addons.mozilla.org for signing. Until it is signed,
-  load it for the current session from `about:debugging#/runtime/this-firefox` with **Load
-  Temporary Add-on**, or install it in Firefox Developer Edition or Nightly with
+- **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the Firefox
+  package is what gets submitted to addons.mozilla.org for signing. Until it is signed, load it
+  for the current session from `about:debugging#/runtime/this-firefox` with **Load Temporary
+  Add-on**, or install it in Firefox Developer Edition or Nightly with
   `xpinstall.signatures.required` set to `false` in `about:config`.
-
 - **Safari**: package the Safari source archive with Xcode, sign the generated host app and
-  enable the extension in Safari. See [Safari packaging](#safari-limited-macos-target) for
-  the converter command and setup instructions.
+  enable the extension in Safari. See [Safari](#safari-limited-macos-target).
 
-### Store submission
+The extension has its own releases on the
+[releases page](https://github.com/linroid/Ketch/releases), tagged
+`extension-v<app version>.<number>` and named like "Browser extension 0.4.0.1"; each app release
+links the latest one under *Add Ketch to your browser*. Each includes:
 
-Run `npm run build` and upload `build/ketch-extension-<version>-chrome.zip` to the
-Chrome Web Store or Edge Add-ons. The extension release workflow also attaches it to the
-extension's GitHub release.
-Its manifest omits the development `key` of `src/`, which the Chrome Web Store rejects on upload.
-
-The Chrome Web Store item is
-[`flnjeochbgpaipiofdjmoijaeooemhka`](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka),
-listed in `NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in `app/desktop` so the store extension
-can open the Ketch app. Add the Edge Add-ons id there once it is published.
+- `ketch-extension-<version>-chrome.zip`, the Chrome Web Store package;
+- `ketch-extension-<version>-firefox.zip`;
+- `ketch-extension-<version>-safari.zip`, which contains extension sources, not an installable
+  app.
 
 ## Setting up Ketch
 
-- **Ketch app on this computer (Chromium/Firefox)**: install the desktop app and open it once. It registers itself
-  with the browsers you have used (Chrome, Chromium, Edge, Brave, Vivaldi, Arc and Firefox), and
-  the extension is set up for it out of the box. From then on the extension opens Ketch when a
-  download needs it; there is no server to turn on or token to copy. For a browser installed
-  after Ketch, open Ketch once more.
-- **Safari, CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
-  `ketch server`, or in the app open **Settings → Sharing** and choose **Allow another device**.
-  Then choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
-  Sharing from the app always has an access code: enter the one under **Advanced** as the access
-  token. For `ketch server`, enter its `apiToken` or the token it printed when it created one
-  (see [its access token](../../cli/README.md#access-token)); on `--host 127.0.0.1` it needs
-  none unless you give it one.
+- **The Ketch app on this computer (Chromium and Firefox)**: install the desktop app and open it
+  once. It registers itself with the browsers you have used (Chrome, Chromium, Edge, Brave,
+  Vivaldi, Arc and Firefox), and the extension is set up for it out of the box. From then on the
+  extension opens Ketch when a download needs it; there is no server to turn on or token to copy.
+  For a browser installed after Ketch, open Ketch once more.
+- **Safari, the CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps):
+  run `ketch server`, or in the app open **Settings → Sharing** and choose **Allow another
+  device**. Then choose **Add server** in the extension's settings and enter
+  `http://127.0.0.1:8642`.
+  - Sharing from the app always has an access code: enter the one under **Advanced** as the access
+    token.
+  - For `ketch server`, enter its `apiToken` or the token it printed when it created one (see
+    [its access token](../../cli/README.md#access-token)); on `--host 127.0.0.1` it needs none
+    unless you give it one.
 - **Another device**: on that device, open **Settings → Sharing** and choose **Allow another
   device**; the access code is under **Advanced** (for `ketch server`, the token it uses, as
-  above). In the extension's settings, choose **Add server** and enter the address Ketch
-  shows, such as `http://192.168.1.20:8642`, and the code as the access token. A bare host such
-  as `nas.local` gets port 8642.
+  above). In the extension's settings, choose **Add server** and enter the address Ketch shows,
+  such as `http://192.168.1.20:8642`, and the code as the access token. A bare host such as
+  `nas.local` gets port 8642.
 
-## Instances
+## Using the extension
+
+### Instances
 
 The extension can send downloads to several Ketch instances. One of them is the default:
 
@@ -101,29 +99,13 @@ The extension can send downloads to several Ketch instances. One of them is the 
 Each instance card in the settings page shows whether it can be reached. Captured downloads fall
 back to the browser only when the default instance fails; they never switch to another instance.
 
-## How the extension reaches the Ketch app
+### Capturing downloads
 
-The Ketch app on this computer is reached through
-[native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging):
+Turn off **Capture browser downloads** in the popup to leave downloads to the browser. Magnet
+capture has its own switch in settings.
 
-1. The browser starts the host `com.linroid.ketch`, which is the Ketch app's own launcher run with
-   `--native-messaging-host`. Only this extension may start it.
-2. The host asks the running app for a connection, over the channel the app already uses to keep
-   a single instance. If Ketch is closed, the host opens it and waits for it, up to 30 seconds.
-3. The app replies with the address and token of a server only for the extension: it listens on
-   `127.0.0.1` only, on a port the system picks, with a token made for this run of the app. It is
-   separate from sharing in Settings → Sharing, which stays off unless you turn it on.
-4. The extension keeps that address and token in memory for the browser session and talks to it
-   like to any Ketch server. When the app is restarted, it asks the host again.
-
-Looking at the popup or the settings page never opens Ketch; sending a download, **Open Ketch**
-in the popup and **Test connection** do. A captured download waits for Ketch to start (up to 45
-seconds) before the browser takes it back.
-
-## How capturing works
-
-In Chromium browsers the extension holds each download while its file name is decided, before
-any "Save as" dialog. It asks Ketch to take the download, then cancels it in the browser. If Ketch
+In Chromium browsers the extension holds each download while its file name is decided, before any
+"Save as" dialog. It asks Ketch to take the download, then cancels it in the browser. If Ketch
 refuses or doesn't answer within 6 seconds, the browser continues as if nothing happened.
 
 Firefox has no such hook, so the extension pauses the download once it has started, then cancels
@@ -144,51 +126,79 @@ Downloads are left to the browser when:
 Site exclusions check the original URL, final URL, referring page and observed page origin, so
 files served through a CDN still respect the originating site's exclusion. Request metadata is
 kept in memory for at most 30 seconds and 512 requests; it contains no request bodies or headers.
-If the browser did not expose a request method, capture cannot establish whether it was a POST.
-
-Turn off **Capture browser downloads** in the popup to leave downloads to the browser.
-Magnet capture has its own switch in settings.
+If the browser did not expose a request method, capture cannot tell whether it was a POST.
 
 The file name the browser chose (from the `download` attribute or `Content-Disposition`) becomes
 the file name in Ketch's download folder, or in the category folder there that the receiving
-device sorts it into by type or site (Settings → Downloads in the app); Ketch picks a free name
-if it is taken.
+device sorts it into by type or site (Settings → Downloads in the app). Ketch picks a free name if
+it is taken.
 
-## Page resources
+### Page resources
 
-Choose **Page resources** in the popup or **Ketch → Page resources** in the right-click menu
-to scan that website on demand. The picker lists
-images, ordinary audio/video URLs and direct file links from accessible frames and resources
-already loaded by the page. It does not fetch candidates, start playback, or transmit page data
-to Ketch while scanning. Private and browser-internal pages cannot be scanned.
+Choose **Page resources** in the popup, or **Ketch → Page resources** in the right-click menu, to
+scan the page on demand. The picker lists images, ordinary audio and video URLs, and direct file
+links from accessible frames and resources the page has already loaded. It does not fetch
+candidates, start playback or send page data to Ketch while scanning. Private and
+browser-internal pages cannot be scanned.
 
-Filter by type, select visible resources and choose an instance to download the selection.
-Results are deduplicated and capped at 500. Each submission uses the current cookie permissions;
-changing the target's connection settings prevents the batch from silently switching servers.
-Successes and uncertain submissions are disabled to avoid resending them within the picker.
+- Filter by type, select visible resources and choose an instance to download the selection. The
+  picker also has an optional destination folder.
+- Results are deduplicated and capped at 500.
+- Each submission uses the current cookie permissions; changing the target's connection settings
+  prevents the batch from silently switching servers.
+- Successful and uncertain submissions are disabled, so they are not sent again from the picker.
+- Scroll or play media in the original tab, then **Scan again**, to find lazy-loaded content.
 
-Scroll or play media in the original tab, then **Scan again**, to find lazy-loaded content.
-`blob:` URLs, HLS/DASH playlists, DRM and resources hidden in custom player internals are not
-included. Finding a URL does not guarantee it is still valid or independently downloadable.
+`blob:` URLs, DRM and resources hidden in custom player internals are not included. Finding a URL
+does not guarantee it is still valid or downloadable on its own.
 
-## Submission recovery and diagnostics
+Streaming playlists in the picker need the receiving instance to support them: `hls.finite` for
+HLS and `dash.finite` for DASH (older servers' combined `media.finite` also counts). Finite,
+unencrypted, single-stream HLS and static MP4 DASH work within the
+[media engine's limits](../../docs/media.md); live or encrypted streams and separate tracks that
+would need merging are rejected by the engine.
 
-Each submission to a supporting Ketch instance has a UUID. Ketch returns the same retained task
-when that UUID is submitted again with the same options, including after loading its task store.
-Removing the task also removes that receipt. Older instances still accept downloads, but the
-extension never automatically repeats a write when its result is unknown.
+### Review before sending
+
+Turn on **Review downloads before sending** to choose the receiving device, an optional file name
+and a folder before each captured download, context-menu link, pasted link or magnet is sent. The
+folder belongs to the receiving device and stays subject to its server directory policy. Torrents
+keep their file layout. The page resource picker already reviews a batch.
+
+A captured browser download must pause successfully before the review opens:
+
+- canceling or closing an unsent review resumes it in the browser;
+- acceptance removes the browser original;
+- an uncertain send keeps it paused until you check pending downloads in settings.
+
+Reviews and receipts last only for the browser session. After restarting the browser, check Ketch
+and the browser's downloads before resuming a paused original by hand.
+
+### When a send is uncertain
+
+Each submission to a supporting Ketch instance carries a UUID. Ketch returns the same task when
+that UUID is submitted again with the same options, even after it reloads its task store. Removing
+the task also removes that receipt. Older instances still accept downloads, but the extension
+never automatically repeats a write whose result is unknown.
 
 If the response is lost, the extension checks the task list. When it still cannot confirm the
-result, it retains a pending receipt for the browser session and blocks another send of that URL
-to the same endpoint. An intercepted browser download is paused where possible; check Ketch
-before resuming it manually. In extension settings, **Check pending downloads** looks up receipts
-without launching the app or submitting downloads. Confirmed handoffs cancel the matching browser
-download. A missing receipt, removed task, or older server needs manual inspection; restarting the
-browser clears pending receipts. Changing a server's address or token does not move its receipts
-to the new connection.
+result:
+
+- it keeps a pending receipt for the browser session and blocks another send of that URL to the
+  same endpoint;
+- an intercepted browser download is paused where possible; check Ketch before resuming it by
+  hand.
+
+In the extension settings, **Check pending downloads** looks up receipts without launching the app
+or submitting downloads. Confirmed handoffs cancel the matching browser download. A missing
+receipt, a removed task or an older server needs checking by hand. Restarting the browser clears
+pending receipts, and changing a server's address or token does not move its receipts to the new
+connection.
+
+### Diagnostics
 
 **Export diagnostics** saves the last 100 outcome codes and timestamps with the extension version.
-It contains no URLs, filenames, instance names, cookies, access tokens or raw error messages.
+It contains no URLs, file names, instance names, cookies, access tokens or raw error messages.
 **Clear diagnostics** clears that history without forgetting pending submissions.
 
 ## Privacy and permissions
@@ -196,7 +206,7 @@ It contains no URLs, filenames, instance names, cookies, access tokens or raw er
 Nothing is sent anywhere except to the Ketch instances you add.
 
 | Permission | Why |
-|---|---|
+| --- | --- |
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
 | `nativeMessaging` | Reach and open the Ketch app on this computer |
 | `scripting`, `activeTab` | Scan page resources from the popup or context menu |
@@ -208,23 +218,25 @@ Nothing is sent anywhere except to the Ketch instances you add.
 | Access to all sites | Read cookies for any download, see magnet link clicks, and reach Ketch at any address |
 
 If the browser hasn't granted access to all sites, the settings page shows an **Allow access**
-button.
+button. The Safari build leaves out `downloads`, `nativeMessaging`, `notifications` and
+`webRequest`.
 
 Things to know:
 
-- **Send cookies and referrer** is a global switch. Remote servers additionally need **Allow
-  cookies and referrer for this server**, off by default, including when upgrading existing
-  settings without an explicit grant. Changing a server address clears its grant. The native
-  app and existing loopback servers retain local forwarding. With forwarding allowed, Ketch stores the cookies with the task so
-  it can resume it later, in its task database on the device that downloads. Turn the option off
-  for downloads that don't need a session.
-- Access tokens of servers are stored in the browser's extension storage, like the apps store
-  them in `config.toml`. The Ketch app's token only lives in memory, for the browser session.
-- Over plain `http://` to another device, the token and cookies travel unencrypted. The settings
-  page warns about such addresses; prefer `https://` behind a reverse proxy, or use a trusted
-  network.
-- The magnet link script only reacts to real clicks, so a page can't add downloads by scripting
-  clicks, and it never sees the access tokens.
+- **Cookies**: **Send cookies and referrer** is a global switch. Remote servers additionally need
+  **Allow cookies and referrer for this server**, off by default, including when upgrading
+  existing settings without an explicit grant. Changing a server address clears its grant. The
+  native app and existing loopback servers keep local forwarding. With forwarding allowed, Ketch
+  stores the cookies with the task, in its task database on the device that downloads, so it can
+  resume the task later. Turn the option off for downloads that don't need a session.
+- **Tokens**: access tokens of servers are stored in the browser's extension storage, as the apps
+  store them in `config.toml`. The Ketch app's token only lives in memory, for the browser
+  session.
+- **Plain HTTP**: over `http://` to another device, the token and cookies travel unencrypted. The
+  settings page warns about such addresses; prefer `https://` behind a reverse proxy, or use a
+  trusted network.
+- **Magnet clicks**: the magnet link script only reacts to real clicks, so a page can't add
+  downloads by scripting clicks, and it never sees the access tokens.
 
 ## Limitations
 
@@ -232,19 +244,85 @@ Things to know:
   turn capturing off in the popup.
 - Cookies are read from the tab's cookie store (including Firefox containers), but cookies a
   browser keeps partitioned for third-party frames aren't sent.
-- Streaming media (HLS, DASH, `blob:` videos) has no single file to download.
+- Streaming media (`blob:` videos, live or encrypted HLS and DASH) has no single file to download.
 - Firefox for Android isn't supported: it has no downloads API.
-- The Ketch app registers with the browsers listed under [Setting up Ketch](#setting-up-ketch).
-  In Opera, and in browsers installed as a Flatpak or Snap, add Ketch as a server instead.
+- The Ketch app registers with the browsers listed under [Setting up Ketch](#setting-up-ketch). In
+  Opera, and in browsers installed as a Flatpak or Snap, add Ketch as a server instead.
 - Uninstalling the app leaves its registration behind: files in the browsers'
   `NativeMessagingHosts` directories, or registry values on Windows.
-- Native messaging was tested with Chrome on macOS. The Windows and Linux registration and
-  launch code has unit tests but hasn't run against real browsers yet.
+- Native messaging was tested with Chrome on macOS. The Windows and Linux registration and launch
+  code has unit tests but hasn't run against real browsers yet.
+
+## How the extension reaches the Ketch app
+
+The Ketch app on this computer is reached through
+[native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging):
+
+1. The browser starts the host `com.linroid.ketch`, which is the Ketch app's own launcher run with
+   `--native-messaging-host`. Only this extension may start it.
+2. The host asks the running app for a connection, over the channel the app already uses to keep
+   a single instance. If Ketch is closed, the host opens it and waits for it, up to 30 seconds.
+3. The app replies with the address and token of a server only for the extension: it listens on
+   `127.0.0.1` only, on a port the system picks, with a token made for this run of the app. It is
+   separate from sharing in Settings → Sharing, which stays off unless you turn it on.
+4. The extension keeps that address and token in memory for the browser session and talks to it
+   like any Ketch server. When the app restarts, the extension asks the host again.
+
+Looking at the popup or the settings page never opens Ketch; sending a download, **Open Ketch** in
+the popup and **Test connection** do. A captured download waits up to 45 seconds for Ketch to start
+before the browser takes it back.
+
+## Safari (limited macOS target)
+
+`npm run build` also writes `build/safari` and a Safari source zip. This target needs Safari 16.4
+or later, for module background workers and session storage.
+
+- **Supported**: configured Ketch servers, reviewed context-menu links and magnets, pasted links,
+  page resources, task controls and diagnostics. Every individual send opens the review page;
+  batch sends are reviewed in the resource picker.
+- **Not supported**: intercepting browser downloads, launching the desktop app through a native
+  host, and extension notifications.
+
+To use it, start sharing in Ketch or start `ketch server`, then enter its address and access token
+in the extension settings. Safari must allow website access both to source pages and to the
+configured server. Cookie forwarding still needs the global switch and a grant for that server.
+
+### Package it
+
+On macOS with Xcode installed:
+
+```sh
+npm run safari
+```
+
+```sh
+open "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj"
+```
+
+The script uses Apple's converter to generate a host app and extension under `build/`; it replaces
+only that generated project. Choose a signing team in Xcode, run the host and enable the extension
+in Safari's settings. The source zip is not an installable Safari app. App Store signing,
+notarization, publishing and iOS packaging are outside this target.
+
+To check compilation without signing:
+
+```sh
+xcodebuild -project "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj" \
+  -scheme "Ketch for Safari" -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath build/safari-derived CODE_SIGNING_ALLOWED=NO build
+```
+
+Some converter versions warn about the background `type` key even though Safari 16.4+ supports
+module workers. See the
+[background compatibility data](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background)
+and [Apple's packaging guidance](https://developer.apple.com/documentation/safariservices/safari-web-extensions).
+Compilation and API-contract tests do not replace testing site permissions and downloads in a
+signed, enabled Safari extension.
 
 ## Development
 
-The extension is plain JavaScript modules with no dependencies or bundler. `src/` is the
-Chromium build, so it can be loaded as is while developing:
+The extension is plain JavaScript modules with no dependencies or bundler. `src/` is the Chromium
+build, so it can be loaded as is while developing:
 
 - **Chromium**: open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**
   and select `src/`. Not `build/chrome`: without the `key`, Chrome gives it an id the Ketch app
@@ -253,62 +331,95 @@ Chromium build, so it can be loaded as is while developing:
   Temporary Add-on** and select `build/firefox/manifest.json`.
 
 ```shell
-npm test        # unit tests, with Node's built-in test runner (Node 22.3+)
-npm run build   # build/chrome, build/firefox, build/safari and their zips
+npm test
 ```
+
+runs the unit tests with Node's built-in test runner (Node 22.3+), and
+
+```shell
+npm run build
+```
+
+writes `build/chrome`, `build/firefox`, `build/safari` and their zips.
+
+### Extension ids
 
 The `key` in `src/manifest.json` pins the Chromium extension id to
 `kddcjkhnjcjhekohejnehplbnjclbdbl` when `src/` is loaded unpacked, because the Ketch app only lets
-the ids it lists start its host (`NativeHostRegistration` in `app/desktop`). Extension stores
-assign their own id, so the packaged builds leave the `key` out; add each store's id there when
-publishing. Firefox identifies the add-on by its gecko id instead.
+the ids it lists start its host (`NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in
+`app/desktop`). Extension stores assign their own id, so the packaged builds leave the `key` out.
+The Chrome Web Store id, `flnjeochbgpaipiofdjmoijaeooemhka`, is in that list too; add the Edge
+Add-ons id there once it is published. Firefox identifies the add-on by its gecko id,
+`ketch@linroid.github.io`, instead.
 
-The build copies `src/`, removes the `key` from the Chromium build, rewrites the manifest
-for Firefox (an event page instead of a service worker, its add-on id, and no `key`), checks that
-every file the manifest names exists, and zips each build. Keep `version` in `package.json` and
-`src/manifest.json` the same; the build fails
-otherwise. The icons are rendered from the repository's `art/icon-app.svg` by
-`art/render-icons.sh`.
+### What the build does
 
-The extension is released apart from the apps, when it has changed, so a store review only
-follows changes to the extension. Run the `Extension Release` workflow
-(`.github/workflows/extension-release.yml`) from the Actions tab: it takes the version of the
-latest app release, runs the tests, runs `node build.mjs --version <app version> --build <run
-number>` and publishes the zips in a GitHub release tagged `extension-v<app version>.<run number>`,
-never marked latest, since the desktop and CLI updaters read the latest release. Then upload
-`ketch-extension-<app version>-chrome.zip` to the Chrome Web Store.
+`build.mjs` copies `src/` for each browser and:
 
-Browsers only accept versions made of numbers, so the run number becomes a fourth part
-(`0.3.1.7`) and every release is newer than the one before, as the stores require; Chromium shows
-the app version (`0.3.1`) as the version name. A pre-release keeps its numeric part:
-`0.4.0-rc2` becomes `0.4.0.<run number>`. The `version` in `package.json` and `src/manifest.json`
-only names local builds.
+- removes the `key` from the Chromium build, which the Chrome Web Store rejects on upload;
+- rewrites the manifest for Firefox: an event page instead of a service worker, its add-on id and
+  no `key`;
+- rewrites it for Safari, without the permissions Safari does not get;
+- checks that every file the manifest names exists, and the locales;
+- zips each build.
+
+Keep `version` in `package.json` and `src/manifest.json` the same; the build fails otherwise. The
+icons are rendered from the repository's `art/icon-app.svg` by `art/render-icons.sh`.
+
+### Source layout
 
 | Path | Contents |
-|---|---|
+| --- | --- |
 | `src/background.js` | Download capture, context menus, magnet link hand-off |
 | `src/content/magnet.js` | Sends clicked magnet links to the background script |
 | `src/popup/` | Toolbar popup |
 | `src/options/` | Settings page |
-| `src/ui/common.css` | Styles shared by the popup and the settings page |
+| `src/resources/` | Page resource picker |
+| `src/review/` | Review page shown before sending |
+| `src/ui/common.css` | Styles shared by the pages |
 | `src/lib/settings.js` | Settings, instances and their validation |
 | `src/lib/ketch-client.js` | Client for the Ketch REST API |
 | `src/lib/connection.js` | Reaches the Ketch app through native messaging |
 | `src/lib/handoff.js` | Creates the task with cookies, or resolves a fetched `.torrent` file first |
 | `src/lib/request.js` | Builds the download request and headers, tagged `ketch.origin: browser`; recognizes torrents |
+| `src/lib/request-context.js` | Remembers request methods and source pages for capture rules |
 | `src/lib/intercept.js` | Which browser downloads are captured |
+| `src/lib/page-resources.js` | Finds resources on a page |
+| `src/lib/review.js` | Review before sending |
+| `src/lib/submissions.js` | Submission receipts, pending sends and diagnostics |
 | `src/lib/format.js` | Text for tasks, sizes and connection problems |
 | `src/lib/i18n.js` | Messages in the browser's language, for scripts and pages |
 | `src/lib/ext.js` | The `browser` or `chrome` API namespace |
 | `src/_locales/` | Messages of each language |
+| `build.mjs` | Builds each browser's package |
+| `safari.mjs` | Generates the Safari Xcode project |
 | `test/` | Unit tests |
+
+### Releasing
+
+The extension is released apart from the apps, when it has changed, so a store review only follows
+changes to the extension:
+
+1. Run the `Extension Release` workflow (`.github/workflows/extension-release.yml`) from the
+   Actions tab. It takes the version of the latest app release, runs the tests, runs
+   `node build.mjs --version <app version> --build <run number>` and publishes the zips in a
+   GitHub release tagged `extension-v<app version>.<run number>`. That release is never marked
+   latest, since the desktop and CLI updaters read the latest release.
+2. Upload `ketch-extension-<app version>-chrome.zip` to the Chrome Web Store (or Edge Add-ons).
+   You can also build it locally with `npm run build`.
+
+Browsers only accept versions made of numbers, so the run number becomes a fourth part (`0.3.1.7`)
+and every release is newer than the one before, as the stores require; Chromium shows the app
+version (`0.3.1`) as the version name. A pre-release keeps its numeric part: `0.4.0-rc2` becomes
+`0.4.0.<run number>`. The `version` in `package.json` and `src/manifest.json` only names local
+builds.
 
 ## Translations
 
 The extension shows its text in the browser's language, in the
 [languages of the apps](../../docs/development/localization.md#languages). It falls back to
-English for other languages and for any message a translation lacks. The terms follow the
-[translation glossary](../../docs/development/translation-glossary.md) of the apps.
+English for other languages and for any message a translation lacks. The terms follow the apps'
+[translation glossary](../../docs/development/translation-glossary.md).
 
 Messages live in `src/_locales/<language>/messages.json`, in the
 [`i18n` format](https://developer.chrome.com/docs/extensions/reference/api/i18n) both browser
@@ -327,65 +438,9 @@ shows and what fills its placeholders. Translations hold only each `message` and
 
 To add a string, add it to `en/messages.json` with a description, use it as above and add it to
 the other languages; `test/locales.test.js` fails until every language has it, with the same
-placeholders. Write a whole sentence per message with placeholders for what changes, rather than
-joining pieces, and keep counts out of sentences: the `i18n` format has no plural forms. To add a
-language, copy a translation's folder under the language's
+placeholders. Write a whole sentence per message, with placeholders for what changes, rather than
+joining pieces, and keep counts out of sentences: the `i18n` format has no plural forms.
+
+To add a language, copy a translation's folder under the language's
 [locale code](https://developer.chrome.com/docs/extensions/reference/api/i18n#locales), translate
 it and set `language_tag` to the language's tag, such as `pt-BR`.
-
-Streaming playlists in the resource picker require `hls.finite` for HLS or `dash.finite` for
-DASH. The combined `media.finite` capability is also accepted for older servers.
-Finite, unencrypted, single-stream HLS and static MP4 DASH are supported within the
-[media engine's documented limits](../../docs/media.md). Live or encrypted streams and
-separate tracks that require merging are rejected by the engine.
-
-Turn on **Review downloads before sending** to choose the receiving device, an optional file
-name, and a folder before each captured download, context-menu link, pasted link or magnet is
-sent. The folder belongs to the receiving device and remains subject to its server directory
-policy. Torrents retain their file layout. The page resource picker already reviews a batch
-and also has an optional destination folder.
-
-A captured browser download must pause successfully before the review opens. Canceling or
-closing an unsent review resumes it in the browser. Acceptance removes the browser original;
-an uncertain send keeps it paused until you check pending downloads in settings. Reviews and
-receipts last only for the browser session. After restarting the browser, inspect Ketch and
-the browser's downloads before manually resuming a paused original.
-
-### Safari (limited macOS target)
-
-`npm run build` also writes `build/safari` and a Safari source zip. This target requires Safari
-16.4 or later for module background workers and session storage. It supports configured Ketch
-servers, reviewed context-menu links and magnets, pasted links, page resources, task controls,
-and diagnostics. It does not intercept browser downloads, launch the desktop app through a
-native host, or issue extension notifications. Every individual send opens the review page;
-batch sends are reviewed in the resource picker.
-
-Start sharing in Ketch or start `ketch server`, then enter its address and access token in the
-extension settings. Safari must allow website access both to source pages and to the configured
-server. Cookie forwarding still requires the global switch and a grant for that server.
-
-On macOS with Xcode installed:
-
-```sh
-npm run safari
-open "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj"
-```
-
-The script uses Apple's converter to generate a host app and extension under `build/`; it
-replaces only that generated project. Choose a signing team in Xcode, run the host and enable
-the extension in Safari settings. The source zip is not an installable Safari app. App Store
-signing, notarization, publishing, and iOS packaging are outside this target.
-
-To check compilation without signing:
-
-```sh
-xcodebuild -project "build/safari-xcode/Ketch for Safari/Ketch for Safari.xcodeproj" \
-  -scheme "Ketch for Safari" -configuration Debug -destination 'platform=macOS' \
-  -derivedDataPath build/safari-derived CODE_SIGNING_ALLOWED=NO build
-```
-
-Some converter versions warn about the background `type` key despite module workers being
-supported in Safari 16.4+. See the [background compatibility data](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background)
-and [Apple's packaging guidance](https://developer.apple.com/documentation/safariservices/safari-web-extensions).
-Compilation and API-contract tests do not replace testing site permissions and downloads in
-a signed, enabled Safari extension.

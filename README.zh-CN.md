@@ -32,6 +32,7 @@
 [![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![桌面端](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![许可证](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
@@ -66,7 +67,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 [开始集成 Ketch →](docs/developers.md#quick-start)
 
 > [!WARNING]
-> 🚧 Ketch 正在积极开发中，目前仅提供候选发布版本。使用中可能遇到问题，欢迎
+> 🚧 Ketch 正在积极开发中，尚未发布 1.0 版本。使用中可能遇到问题，欢迎
 > [反馈](https://github.com/linroid/Ketch/issues)。
 
 <a id="download"></a>
@@ -81,7 +82,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 | Android 8.0+ | [最新版本][release]中的 `.apk` |
 | iOS 18+ | 使用 Xcode 从源码构建（[`app/ios`](app/ios/)） |
 | 网页版 | [linroid.com/Ketch](https://linroid.com/Ketch/)，用于控制其他设备上运行的 Ketch |
-| 浏览器扩展 | Chrome、Edge、Brave、Firefox 等：[最新版本][release]中的 `.zip`（[安装方法](app/browser-extension/README.md#installing)） |
+| 浏览器扩展 | Chrome、Edge、Brave 等 Chromium 浏览器：[Chrome 应用商店](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)；Firefox：扩展[发布页](https://github.com/linroid/Ketch/releases)中的 `.zip`（[安装方法](app/browser-extension/README.md#installing)） |
 | 命令行和服务器 | macOS、Linux 和 Windows：[安装脚本](#run-ketch-on-a-server)或[最新版本][release] |
 | Docker | x64 和 ARM64 的 NAS 与家庭服务器：`ghcr.io/linroid/ketch`（[指南](docs/docker.zh-CN.md)，含飞牛 fnOS 和 TrueNAS） |
 
@@ -111,7 +112,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 - **HTTP 和 HTTPS**，浏览器扩展发送下载任务时会附带页面的 Cookie 和来源信息。
 - **FTP 和 FTPS**，支持并行连接与断点续传。
 - **BitTorrent 和磁力链接** — 纯 Kotlin 引擎支持 v1、v2 和混合种子，可选择要下载的文件，
-  也可选择做种（[详情](docs/torrent.md)）。
+  也可选择做种。支持 uTP 和协议加密，可从 Web 种子下载，自动在路由器上转发端口，
+  并能发现局域网中的节点（[详情](docs/torrent.md)）。
 - **随时选择种子文件** — 下载前或下载中都可选择种子的文件，更改后无需从头开始；
   在详情获取前添加的磁力链接会等待你选择。已完成的种子可停止或重新开始做种，
   保持做种的种子在 Ketch 重启后会继续做种。
@@ -160,7 +162,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 - **下载时保持唤醒** — 桌面版和 Android 版在下载进行时防止系统自动进入睡眠，屏幕仍可关闭
   （**设置 → 通用**）。
 - **外观与语言随心选择** — 浅色与深色主题、七种强调色，支持 English、简体中文、繁體中文、
-  日本語、한국어、Español、Português (Brasil)、Deutsch 和 Français
+  日本語、한국어、Español、Português (Brasil)、Deutsch、Français 和 Русский
   （[参与翻译](docs/development/localization.md)）。
 - **校验下载** — 添加下载时可填写 SHA-256、SHA-512、SHA-1 或 MD5 校验和，Ketch 会用它
   校验下载完成的文件；未填写时则使用服务器发布的校验和。
@@ -203,14 +205,15 @@ curl -fsSL https://raw.githubusercontent.com/linroid/Ketch/main/install.sh | bas
 ketch server
 ```
 
-然后在应用的「设备 → 添加设备」中添加它，或在浏览器中打开 `http://<服务器地址>:8642`。
+首次运行时，它会生成一个访问令牌并只显示一次。在应用的「设备 → 添加设备」中用该令牌添加服务器，
+或在浏览器中打开 `http://<服务器地址>:8642`。
 命令行也可直接下载：
 
 ```bash
 ketch https://example.com/file.zip
 ```
 
-在[配置文件](cli/README.md#configuration-file)中设置访问码、端口及其他选项；
+在[配置文件](cli/README.md#configuration-file)中设置自己的令牌、端口及其他选项；
 [命令行文档](cli/README.md)列出了所有命令。
 
 在 NAS 或其他能运行 Docker 的地方，可以改为启动镜像。[Docker 指南](docs/docker.zh-CN.md)介绍了
@@ -224,7 +227,7 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 
 ## 路线图
 
-- **v1.0.0 前的分发准备** — Windows 版本签名、macOS 版本签名与公证、浏览器扩展商店上架，
+- **v1.0.0 前的分发准备** — Windows 版本签名、macOS 版本签名与公证、在更多浏览器商店上架扩展，
   以及安装和更新流程验证（[计划](docs/plans/v1-distribution.md)）
 - **Metalink** — 同时从多个镜像下载，并校验校验和
 - **WebDAV** — 从 WebDAV 服务器下载，支持断点续传
@@ -247,6 +250,21 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 Android、iOS 或 JVM 应用可通过 `core` 和 `ktor` 在进程内运行引擎；
 Node.js 和 WASI 可使用 `core` 搭配自定义 HTTP 引擎。
 也可使用 `remote`，通过同一个 `KetchApi` 从 Android、iOS、JVM 或浏览器控制 Ketch 服务器。
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [开发者指南](docs/developers.md) — 模块、快速入门、REST API 和扩展 Ketch
 - [API 参考](docs/api.md) — 安装、配置、优先级、错误和日志

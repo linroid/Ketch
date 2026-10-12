@@ -18,7 +18,7 @@ import kotlin.time.Duration
 /**
  * What a [DownloadSource] adds to the [com.linroid.ketch.core.Ketch] that runs it beyond
  * downloading, through [DownloadSource.attach]: typed controllers that
- * [com.linroid.ketch.api.KetchApi.control] returns, the interests of its module that
+ * [com.linroid.ketch.api.KetchApi.controller] returns, the interests of its module that
  * [com.linroid.ketch.api.KetchApi.subscribe] follows, and hooks into the lifecycle of the tasks.
  * Ketch calls the hooks on its own coordination scope; long work belongs in [SourceHost.scope].
  */
@@ -65,7 +65,7 @@ interface SourceHost {
 
   /**
    * Where a session the extension starts for [task] outside a download, such as one sharing its
-   * finished files, reports its live connections ([KetchApi.activeConnections]).
+   * finished files, reports its live connections ([Interest.Connections]).
    */
   fun connections(task: DownloadTask): ConnectionReporter = ConnectionReporter.None
 

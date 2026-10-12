@@ -1,10 +1,11 @@
-# Ketch Kermit Logger
+# Ketch Kermit logger
 
-Kermit-based logger implementation for Ketch, providing structured logging across all platforms.
+Sends Ketch's logs to [Kermit](https://github.com/touchlab/Kermit), so they appear in Logcat on
+Android, OSLog on iOS and the console elsewhere, next to your app's own Kermit logs. Use it when
+your app already logs with Kermit, or when you want Ketch's logs on every platform without writing
+a `Logger` yourself.
 
 ## Installation
-
-Add the Kermit logger module to your dependencies:
 
 ```kotlin
 // build.gradle.kts
@@ -17,7 +18,7 @@ The module depends only on `library:api` and Kermit.
 
 ## Usage
 
-### Basic Usage
+Create a `KermitLogger` and pass it to `Ketch`:
 
 ```kotlin
 import co.touchlab.kermit.Severity
@@ -25,53 +26,58 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.log.KermitLogger
 
-// Create a KermitLogger with desired severity level (default: Severity.Info)
-val logger = KermitLogger(
-  minSeverity = Severity.Debug,
-)
-
-// Pass it to Ketch
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
-  logger = logger,
+  logger = KermitLogger(minSeverity = Severity.Debug),
 )
 ```
 
-### Log Levels
+`KermitLogger` takes three optional arguments:
 
-- **Verbose**: Detailed diagnostics (segment progress, FTP commands, per-peer torrent events)
-- **Debug**: Internal operations (server detection, segment calculations, tracker announces)
-- **Info**: User-facing events (download started, task state changes, completion)
-- **Warn**: Recoverable problems (retries, changed server files)
-- **Error**: Failures (download failures)
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `minSeverity` | `Severity.Info` | The lowest severity that is logged |
+| `tag` | `"Ketch"` | The Kermit tag of every Ketch log |
+| `config` | `null` | A Kermit `StaticConfig` to use instead of the platform writer; its `minSeverity` replaces the `minSeverity` argument |
+
+Messages below the minimum severity cost nothing: Ketch asks the logger before it builds them.
+
+### Choose a level
+
+| Severity | What Ketch logs |
+| --- | --- |
+| `Verbose` | Detailed diagnostics: speed limiter waits, FTP commands, per-peer torrent events |
+| `Debug` | Internal operations: server detection, segment calculations, tracker announces |
+| `Info` | User-facing events: download started, task state changes, completion |
+| `Warn` | Recoverable problems: retries, changed server files |
+| `Error` | Failures |
 
 ```kotlin
-// Verbose logging for detailed diagnostics
+// Detailed diagnostics
 val verboseLogger = KermitLogger(minSeverity = Severity.Verbose)
 
-// Info logging for production
+// Production
 val infoLogger = KermitLogger(minSeverity = Severity.Info)
 
 // Drop every Ketch log (Ketch never logs at Assert)
 val silentLogger = KermitLogger(minSeverity = Severity.Assert)
 ```
 
-To disable logging entirely, keep the default `Logger.None`: Ketch then skips building log
+To turn logging off entirely, keep `Ketch`'s default `Logger.None`: Ketch then skips building log
 messages altogether.
 
-### Custom Tag
+### Custom tag
 
 ```kotlin
 val logger = KermitLogger(
   minSeverity = Severity.Debug,
-  tag = "MyApp",  // Kermit tag for all Ketch logs (default: "Ketch")
+  tag = "MyApp",
 )
 ```
 
-### Custom Configuration
+### Custom configuration
 
-For advanced use cases, you can provide a custom Kermit configuration. Its `minSeverity`
-replaces the `minSeverity` argument:
+Pass your own Kermit configuration to add log writers:
 
 ```kotlin
 import co.touchlab.kermit.Severity
@@ -82,19 +88,19 @@ val config = StaticConfig(
   minSeverity = Severity.Debug,
   logWriterList = listOf(
     platformLogWriter(),
-    // Add your custom log writers here
+    // Add your own log writers here
   ),
 )
 
 val logger = KermitLogger(config = config)
 ```
 
-## Example Output
+## Example output
 
-Each message starts with the Ketch component that wrote it, such as `[Ketch]` or
-`[HttpSource]`. Kermit's platform writer adds the severity and tag; on the JVM it prints:
+Each message starts with the Ketch component that wrote it, such as `[Ketch]` or `[HttpSource]`.
+Kermit's platform writer adds the severity and tag; on the JVM it prints:
 
-```
+```text
 Info: (Ketch) [Ketch] Ketch v1.0.0 (762f2b3) initialized: name=Ketch
 Info: (Ketch) [Ketch] Downloading: taskId=3f2a, url=https://example.com/file.zip, connections=0, priority=NORMAL
 Info: (Ketch) [RangeDetector] Server info: contentLength=1048576, acceptRanges=true, supportsResume=true, etag="abc123", lastModified=null
@@ -110,19 +116,18 @@ Info: (Ketch) [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/m
 
 On Android the tag is the Logcat tag, and on iOS Kermit writes to OSLog.
 
-## Platform Support
+## Platform support
 
-The Kermit logger supports:
 - Android
-- iOS (arm64, simulator)
-- JVM/Desktop
+- iOS (arm64 and simulator)
+- JVM and desktop
 - JavaScript (browser and Node.js)
-- WebAssembly (wasmJs)
+- WebAssembly (`wasmJs`)
 
-It has no WASI target because Kermit does not publish one.
+There is no WASI target, because Kermit does not publish one.
 
-## See Also
+## See also
 
-- [Kermit Documentation](https://github.com/touchlab/Kermit)
-- [Ketch Logging](../../docs/logging.md)
-- [Ketch API Reference](../../docs/api.md)
+- [Kermit documentation](https://github.com/touchlab/Kermit)
+- [Ketch logging](../../docs/logging.md): log format, troubleshooting and what is never logged
+- [Ketch API reference](../../docs/api.md)
