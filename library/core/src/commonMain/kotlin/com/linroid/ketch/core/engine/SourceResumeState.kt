@@ -28,16 +28,23 @@ fun <S : Any> DownloadSource<S>.encodeResumeState(state: S): SourceResumeState =
   SourceResumeState(type, ResumeStateJson.encodeToString(resumeStateSerializer, state))
 
 /**
- * Decodes the state a task record [saved].
+ * Decodes the state a task record [saved]. Only a state this source wrote, under its
+ * [type][DownloadSource.type] or one of its [previousTypes][DownloadSource.previousTypes], is
+ * read: another source's state could decode as this one's and skip its checks.
  *
  * @throws KetchError.CorruptResumeState when it is not a state of this source
  */
-fun <S : Any> DownloadSource<S>.decodeResumeState(saved: SourceResumeState): S = try {
-  ResumeStateJson.decodeFromString(resumeStateSerializer, saved.data)
-} catch (e: CancellationException) {
-  throw e
-} catch (e: Exception) {
-  throw KetchError.CorruptResumeState(e.message, e)
+fun <S : Any> DownloadSource<S>.decodeResumeState(saved: SourceResumeState): S {
+  if (saved.sourceType != type && saved.sourceType !in previousTypes) {
+    throw KetchError.CorruptResumeState("Saved by source '${saved.sourceType}', not '$type'")
+  }
+  return try {
+    ResumeStateJson.decodeFromString(resumeStateSerializer, saved.data)
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    throw KetchError.CorruptResumeState(e.message, e)
+  }
 }
 
 /** [DownloadSource.resume] from the state a task record [saved]. */

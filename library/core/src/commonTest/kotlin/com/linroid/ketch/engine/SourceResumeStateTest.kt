@@ -45,6 +45,14 @@ class SourceResumeStateTest {
   }
 
   @Test
+  fun decodeResumeState_anotherSourcesState_throwsCorruptResumeState() {
+    // An FTP state would decode as HTTP's, skipping its ETag and Last-Modified checks.
+    val saved = SourceResumeState("ftp", """{"etag":null,"lastModified":null,"totalBytes":1}""")
+
+    assertFailsWith<KetchError.CorruptResumeState> { source.decodeResumeState(saved) }
+  }
+
+  @Test
   fun decodeResumeState_malformed_throwsCorruptResumeState() {
     assertFailsWith<KetchError.CorruptResumeState> {
       source.decodeResumeState(SourceResumeState("http", "not-json"))
