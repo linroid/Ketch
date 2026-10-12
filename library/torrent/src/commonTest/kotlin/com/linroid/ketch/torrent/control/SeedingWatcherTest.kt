@@ -14,7 +14,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
@@ -33,6 +33,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -50,8 +51,9 @@ class SeedingWatcherTest {
   private val folder = "/tmp/ketch-seeding-watcher/"
 
   /** A source that completes each download once its gate opens and seeds on request. */
-  private class SeedingSource : DownloadSource, TorrentControlSource {
+  private class SeedingSource : DownloadSource<Unit>, TorrentControlSource {
     override val type = TYPE
+    override val stateSerializer = Unit.serializer()
     override val managesOwnFileIo = true
 
     override fun attach(host: SourceHost): SourceExtension =
@@ -86,10 +88,7 @@ class SeedingWatcherTest {
       )
     }
 
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(TYPE, resolved.url)
-
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       context.onProgress(0, 100)
       gates[context.url]?.await()
       context.segments.value = listOf(Segment(0, 0, 99, 100))
@@ -97,11 +96,9 @@ class SeedingWatcherTest {
       onFinish(context.taskId)
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      download(context)
 
     override suspend fun torrentFiles(
-      resumeState: SourceResumeState?,
+      sourceState: SourceState?,
       resolved: ResolvedSource?,
     ): List<SourceFile>? = null
 
@@ -161,7 +158,7 @@ class SeedingWatcherTest {
       state = state,
       totalBytes = 100,
       sourceType = SeedingSource.TYPE,
-      sourceResumeState = SourceResumeState(SeedingSource.TYPE, "seed:$taskId"),
+      sourceState = SourceState(SeedingSource.TYPE, "{}"),
       createdAt = at,
       updatedAt = at,
       completedAt = at,

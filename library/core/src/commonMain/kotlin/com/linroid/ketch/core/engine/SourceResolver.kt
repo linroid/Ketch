@@ -16,13 +16,13 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * fallback.
  */
 @OptIn(ExperimentalAtomicApi::class)
-internal class SourceResolver(private val sources: List<DownloadSource>) {
+internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
   private val log = KetchLogger("SourceResolver")
   private val closed = AtomicBoolean(false)
 
   fun close() {
     if (!closed.compareAndSet(false, true)) return
-    val uniqueSources = mutableListOf<DownloadSource>()
+    val uniqueSources = mutableListOf<DownloadSource<*>>()
     for (source in sources) {
       if (uniqueSources.any { it === source }) continue
       uniqueSources.add(source)
@@ -42,7 +42,7 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
   }
 
   /** The first source that [DownloadSource.canHandle]s [input]. */
-  fun resolve(input: ResolveInput): DownloadSource {
+  fun resolve(input: ResolveInput): DownloadSource<*> {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.canHandle(input) }
     if (source != null) {
@@ -54,14 +54,14 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
   }
 
   /** The first source that downloads [url]. */
-  fun resolve(url: String): DownloadSource = resolve(ResolveInput.Url(url))
+  fun resolve(url: String): DownloadSource<*> = resolve(ResolveInput.Url(url))
 
   private fun ResolveInput.describe(): String = when (this) {
     is ResolveInput.Url -> "URL: ${redactUrl(url)}"
     is ResolveInput.Content -> "content: fileName=$fileName, size=${bytes.size}"
   }
 
-  fun resolveByType(type: String, url: String? = null): DownloadSource {
+  fun resolveByType(type: String, url: String? = null): DownloadSource<*> {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.type == type }
       ?: sources.firstOrNull { url != null && type in it.previousTypes && it.canHandle(url) }

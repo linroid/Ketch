@@ -51,6 +51,7 @@ import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
@@ -133,7 +134,7 @@ class Ketch(
   config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "Ketch",
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
-  additionalSources: List<DownloadSource> = emptyList(),
+  additionalSources: List<DownloadSource<*>> = emptyList(),
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
 ) : KetchApi {
@@ -389,20 +390,11 @@ class Ketch(
       coordinator.cancel(handle, deletePartialFile = deleteFiles)
       queue.dequeue(taskId)
       try {
-        coordinator.release(handle)
+        coordinator.cleanup(handle, deleteFiles)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Throwable) {
-        log.w(e) { "Release failed for taskId=$taskId" }
-      }
-      if (deleteFiles) {
-        try {
-          coordinator.cleanup(handle)
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Throwable) {
-          log.w(e) { "Cleanup failed for taskId=$taskId" }
-        }
+        log.w(e) { "Cleanup failed for taskId=$taskId" }
       }
       connectionRegistry.closeTask(taskId)
       taskStore.remove(taskId)
@@ -612,17 +604,10 @@ class Ketch(
     val ledger = command?.let { openLedger(record, it) }
     ledger?.replay?.let { return it }
     val source = selectionSource(record)
-    val plan = source.planSelection(
-      SelectionRequest(
-        taskId = taskId,
-        fileIds = choiceFor(source, record, fileIds),
-        current = record.request.selectedFileIds,
-        resumeState = record.sourceResumeState,
-        resolved = record.request.resolvedSource,
-        segments = record.segments,
-        outputPath = record.outputPath,
-        completed = state is DownloadState.Completed,
-      )
+    val plan = source.planFor(
+      record,
+      choiceFor(record, fileIds),
+      completed = state is DownloadState.Completed,
     )
     val awaiting = record.awaitsFileSelection()
     if (!plan.changed && !awaiting) {
@@ -779,34 +764,39 @@ class Ketch(
    * The files to plan for [record]: [fileIds] as given, unless its source offers a single choice
    * ([FileSelectionMode.SINGLE]), which takes exactly one ID and its
    * [default][defaultSelection], the first variant, in place of every file (`null`). The mode
-   * comes from the request's [ResolvedSource], else the one its saved state rebuilds; unknown,
-   * the source decides.
+   * comes from the resolution the task kept, else the request's [ResolvedSource]; unknown, the
+   * source decides.
    *
    * @throws IllegalArgumentException when several IDs are given for a single choice
    */
-  private suspend fun choiceFor(
-    source: DownloadSource,
-    record: TaskRecord,
-    fileIds: Set<String>?,
-  ): Set<String>? {
-    val resolved = record.request.resolvedSource ?: record.sourceResumeState?.let { state ->
-      try {
-        source.resolveStored(state)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.d { "No saved file list for taskId=${record.taskId}: ${e.describeCauses()}" }
-        null
-      }
-    }
+  private fun choiceFor(record: TaskRecord, fileIds: Set<String>?): Set<String>? {
+    val resolved = record.resolvedSource ?: record.request.resolvedSource
     if (resolved?.selectionMode != FileSelectionMode.SINGLE) return fileIds
     if (fileIds == null) return resolved.defaultSelection().ifEmpty { null }
     require(fileIds.size == 1) { SINGLE_CHOICE_MESSAGE }
     return fileIds
   }
 
+  /** [DownloadSource.planSelection] of [fileIds] for [record], with the state it saved. */
+  private suspend fun <S : Any> DownloadSource<S>.planFor(
+    record: TaskRecord,
+    fileIds: Set<String>?,
+    completed: Boolean,
+  ): SelectionPlan = planSelection(
+    SelectionRequest(
+      taskId = record.taskId,
+      fileIds = fileIds,
+      current = record.request.selectedFileIds,
+      sourceState = record.sourceState?.let { decodeState(it) },
+      resolved = record.resolvedSource ?: record.request.resolvedSource,
+      segments = record.segments,
+      outputPath = record.outputPath,
+      completed = completed,
+    )
+  )
+
   /** The source that plans [record]'s selection: its own, else its request's, else its URL's. */
-  private fun selectionSource(record: TaskRecord): DownloadSource {
+  private fun selectionSource(record: TaskRecord): DownloadSource<*> {
     val url = record.request.url
     record.sourceType?.let { return sourceResolver.resolveByType(it, url) }
     record.request.resolvedSource?.let {

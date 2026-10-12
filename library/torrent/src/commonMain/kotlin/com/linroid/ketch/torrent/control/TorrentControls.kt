@@ -160,15 +160,15 @@ internal class TorrentControls(
   private suspend fun seed(task: DownloadTask): SeedingOutcome? {
     val taskId = task.taskId
     val record = host.record(task)
-    val resumeState = record?.sourceResumeState
+    val sourceState = record?.sourceState
     val outputPath = record?.outputPath
-    if (resumeState == null || outputPath == null) {
+    if (sourceState == null || outputPath == null) {
       log.w { "Cannot seed taskId=$taskId: nothing saved to seed from" }
       return null
     }
     val outcome = try {
       source.startSeeding(
-        SeedingTask(taskId, record.request.url, resumeState, outputPath,
+        SeedingTask(taskId, record.request.url, sourceState, record.resolvedSource, outputPath,
           record.request.selectedFileIds, host.connections(task))
       )
     } catch (e: CancellationException) {

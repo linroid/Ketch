@@ -11,7 +11,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -26,6 +25,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 
 // The fallback folder is the platform default, which needs an Android context on Android, so
 // this runs on the JVM only.
@@ -33,7 +33,8 @@ class SelfManagedDefaultFolderTest {
   @Test
   fun execute_defaultFolderIsAContentUri_givesTheSourceAFilesystemPath() = runTest {
     var outputPath: String? = null
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -44,12 +45,9 @@ class SelfManagedDefaultFolderTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "initial")
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun download(context: DownloadContext, state: Unit?) {
         outputPath = context.outputPath
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input")

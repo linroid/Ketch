@@ -108,7 +108,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KetchDispatchers.Default`, shared by every instance)
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
-  `SourceResolver`, `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
+  `SourceResolver`, `SourceState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
@@ -143,7 +143,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:ftp`
 - `com.linroid.ketch.ftp` -- `FtpDownloadSource` (implements `DownloadSource`), `FtpClient`,
-  `RealFtpClient`, `FtpUrl`, `FtpReply`, `FtpError`, `FtpResumeState`, `tlsUpgrade()`
+  `RealFtpClient`, `FtpUrl`, `FtpReply`, `FtpError`, `FtpSourceState`, `tlsUpgrade()`
   (expect/actual)
 
 ### `library:hls`, `library:dash`
@@ -154,9 +154,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
-  `DownloadSource`), `TorrentConfig`, `TorrentEncryption`, `TorrentUploadPolicy`,
-  `TorrentDiscoveryPrivacy`, `TorrentMulticastLock` and `TrackerListState`; internal
-  `TorrentResumeState`, `TorrentSourceMetainfo` and the helpers every package uses
+  `DownloadSource<TorrentSourceState>`; the state is opaque outside the module), `TorrentConfig`,
+  `TorrentEncryption`, `TorrentUploadPolicy`, `TorrentDiscoveryPrivacy`, `TorrentMulticastLock`
+  and `TrackerListState`; internal `TorrentSourceMetainfo` and the helpers every package uses
   (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`). Everything else is internal, in
   sub-packages by concern:
 - `com.linroid.ketch.torrent.engine` -- `TorrentEngine`, `KotlinTorrentEngine`,
@@ -516,13 +516,32 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
-- Each source defines: `type`, `canHandle(input)`, `resolve(input, config)`, `download()`,
-  `resume()`, `buildResumeState()`. `canHandle` and `resolve` take a `ResolveInput`: a URL, or
-  file content such as `.torrent` bytes, which only the torrent source accepts; the
-  `canHandle(url)` and `resolve(url, headers, config)` extensions build the URL input. `resolve`
-  may take as long as finding the content does (a magnet waits for peers) and stops when
-  cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it if they
-  must (the server's resolve routes stop when the client disconnects)
+- Each source is a `DownloadSource<S>` over its own serializable source state `S`
+  (`HttpSourceState`, `FtpSourceState`, `TorrentSourceState`, `Unit` for HLS/DASH) and defines
+  `type`, `stateSerializer`, `canHandle(input)` and `resolve(input, config)`, plus three
+  state functions: `download(context, state)` continues from the stored `state` after checking
+  the content is unchanged, or starts from the beginning with `null` (Ketch passes the state the
+  run started from, then the latest stored one on each retry, and drops the saved segments of a
+  task with progress but no state); `store(context)` is the state to save (Ketch asks as each run
+  starts, before any byte is written, every `saveIntervalMs` and once as it stops, the pause
+  checkpoint; `null` keeps the last); and `cleanup(context, state, deleteFiles)` runs on removal
+  (stops what outlived the download, such as a seeding torrent, and deletes files only with
+  `deleteFiles`). Segments are Ketch's (`TaskRecord.segments`, `DownloadContext.segments`), not
+  part of a source's state. Ketch saves the state as JSON in
+  `TaskRecord.sourceState` (`SourceState`, written and read only through
+  `encodeState`/`decodeState`, which ignores unknown fields and refuses another
+  source's state) and hands sources their state decoded: one that cannot be decoded fails a
+  resume with `KetchError.CorruptResumeState` and reaches `cleanup` as `null`. A resolution that
+  describes all the content (`ResolvedSource.METAINFO_KEY`, a torrent's metainfo) is kept in
+  `TaskRecord.resolvedSource` (SQLite `resolved_source_json`, `7.sqm`), which only Ketch writes:
+  fresh starts and resumes get it as `DownloadContext.preResolved`, selections as
+  `SelectionRequest.resolved`, and the request keeps it without the bulky metadata. Torrent
+  states saved before then keep their `metainfo`, read as a fallback. `canHandle` and `resolve`
+  take a `ResolveInput`: a URL, or file content such as `.torrent` bytes, which only the torrent
+  source accepts; the `canHandle(url)` and `resolve(url, headers, config)` extensions build the
+  URL input. `resolve` may take as long as finding the content does (a magnet waits for peers) and
+  stops when cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it
+  if they must (the server's resolve routes stop when the client disconnects)
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support

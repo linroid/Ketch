@@ -15,7 +15,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
@@ -34,6 +33,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -394,7 +394,7 @@ class DownloadExecutionDestPathTest {
 
   private fun TestScope.execution(
     request: DownloadRequest,
-    source: DownloadSource,
+    source: DownloadSource<*>,
     fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
     config: DownloadConfig = DownloadConfig(saveIntervalMs = 60_000),
   ): DownloadExecution {
@@ -431,7 +431,8 @@ class DownloadExecutionDestPathTest {
     private val suggestedFileName: String?,
     private val firstWaitsFor: CompletableDeferred<Unit>? = null,
     private val contentType: String? = null,
-  ) : DownloadSource {
+  ) : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     val outputPaths = mutableListOf<String>()
 
     override val type = "fixture"
@@ -443,13 +444,10 @@ class DownloadExecutionDestPathTest {
         suggestedFileName = suggestedFileName, maxSegments = 1, contentType = contentType,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       outputPaths += context.outputPath.orEmpty()
       context.segments.value = listOf(Segment(0, 0, 3, 4))
       if (outputPaths.size == 1) firstWaitsFor?.await()
     }
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
   }
 }

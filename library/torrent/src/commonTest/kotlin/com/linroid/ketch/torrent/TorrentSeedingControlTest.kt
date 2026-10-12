@@ -6,7 +6,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -156,7 +156,7 @@ class TorrentSeedingControlTest {
 
   /** A seeding task of [record] to start through the source. */
   private fun seedingTask(record: TaskRecord) = SeedingTask(record.taskId, record.request.url,
-    checkNotNull(record.sourceResumeState), checkNotNull(record.outputPath),
+    checkNotNull(record.sourceState), record.resolvedSource, checkNotNull(record.outputPath),
     record.request.selectedFileIds)
 
   /** A completed v1 task of [torrent], already on disk at [output], that seeded. */
@@ -169,7 +169,7 @@ class TorrentSeedingControlTest {
     torrent.writeTo(output)
     val ids = torrent.sizes.indices.mapTo(LinkedHashSet()) { it.toString() }
     val total = torrent.sizes.sum().toLong()
-    val state = TorrentResumeState(torrent.metadata.infoHash.hex, total, "", ids,
+    val state = TorrentSourceState(torrent.metadata.infoHash.hex, total, "", ids,
       output.toString(), encodeBase64(torrent.metainfo), version = 2,
       privacy = TorrentDiscoveryPrivacy.PUBLIC)
     return completedRecord(taskId, "http://fixture/$taskId.torrent", output, total, ids,
@@ -185,7 +185,7 @@ class TorrentSeedingControlTest {
     val checkpoint = fixture.preseed(output, taskId)
     val ids = TorrentFileTable.parse(fixture.metainfo, TorrentConfig()).ids
     val total = fixture.payloads.sumOf { it.size.toLong() }
-    val state = TorrentResumeState(fixture.document.info.hash.hex, total,
+    val state = TorrentSourceState(fixture.document.info.hash.hex, total,
       encodeBase64(checkpoint.encode()), ids, output.toString(), encodeBase64(fixture.metainfo),
       version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
     return completedRecord(taskId, "http://fixture/$taskId.torrent", output, total, ids,
@@ -207,7 +207,7 @@ class TorrentSeedingControlTest {
         selectedFileIds = ids),
       outputPath = output.toString(), state = TaskState.COMPLETED, totalBytes = total,
       sourceType = TorrentDownloadSource.TYPE,
-      sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE, state),
+      sourceState = SourceState(TorrentDownloadSource.TYPE, state),
       createdAt = at, updatedAt = at, completedAt = at, control = TaskControl(sharing = true))
   }
 

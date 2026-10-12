@@ -205,6 +205,12 @@ internal class DownloadCoordinator(
       log.i { "No saved progress for taskId=$taskId, starting it again" }
       return false
     }
+    if (taskRecord.sourceState == null && !managesOwnFileIo(taskRecord)) {
+      // Nothing to check the saved bytes against, so they are not trusted.
+      log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
+      handle.mutableSegments.value = emptyList()
+      return false
+    }
     log.d {
       "Resume loaded record: taskId=$taskId, " +
         "segments=${segments.size}, " +
@@ -390,50 +396,23 @@ internal class DownloadCoordinator(
   }
 
   /**
-   * Lets the task's source stop work that outlived the download via
-   * [DownloadSource.release]. The caller must have cancelled the active
-   * download first. No-op for tasks without a recorded source type.
+   * Lets the task's source stop what outlived its download and, with [deleteFiles], delete the
+   * data it wrote ([DownloadSource.cleanup]). The caller must have cancelled the active download
+   * (if any) first. No-op for tasks without a recorded source type; files are only deleted once
+   * the task has an output path, as before that it wrote none.
    */
-  suspend fun release(handle: TaskHandle) {
+  suspend fun cleanup(handle: TaskHandle, deleteFiles: Boolean) {
     val record = handle.record.value
     val sourceType = record.sourceType ?: return
     val source = try {
       sourceResolver.resolveByType(sourceType, record.request.url)
     } catch (e: KetchError) {
-      log.w(e) { "Skipping release for taskId=${handle.taskId}: unknown source '$sourceType'" }
+      log.w(e) { "Skipping cleanup for taskId=${handle.taskId}: unknown source '$sourceType'" }
       return
     }
-    source.release(handle.taskId, record.sourceResumeState)
-  }
-
-  /**
-   * Deletes any data produced for the given task by dispatching to its
-   * [DownloadSource.cleanup]. The caller must have cancelled the active
-   * download (if any) before invoking this. No-op if the task has no
-   * recorded sourceType or outputPath (nothing to clean up).
-   */
-  suspend fun cleanup(handle: TaskHandle) {
-    val record = handle.record.value
-    val sourceType = record.sourceType
     // An unfinished download is only its partial file: a file at its output path is not its own.
     val outputPath = record.partialPath ?: record.outputPath
-    if (sourceType == null || outputPath == null) {
-      log.d {
-        "Skipping cleanup for taskId=${handle.taskId} " +
-          "(sourceType=$sourceType, outputPath=$outputPath)"
-      }
-      return
-    }
-    val source = try {
-      sourceResolver.resolveByType(sourceType, record.request.url)
-    } catch (e: KetchError) {
-      log.w(e) {
-        "Skipping cleanup for taskId=${handle.taskId}: " +
-          "unknown source type '$sourceType'"
-      }
-      return
-    }
-    val fa = if (source.managesOwnFileIo) {
+    val fa = if (source.managesOwnFileIo || outputPath == null) {
       NoOpFileAccessor
     } else {
       createFileAccessor(outputPath, dispatchers.disk)
@@ -447,15 +426,16 @@ internal class DownloadCoordinator(
       onProgress = { _, _ -> },
       throttle = { _ -> },
       headers = handle.request.headers,
+      preResolved = record.resolvedSource,
       outputPath = outputPath,
       config = config().forRequest(handle.request),
     )
     try {
-      source.cleanup(ctx, record.sourceResumeState)
-    } finally {
-      if (!source.managesOwnFileIo) {
-        fa.close()
+      source.cleanupSaved(ctx, record.sourceState, deleteFiles && outputPath != null) { e ->
+        log.w { "Unreadable saved state of taskId=${handle.taskId}: ${e.describeCauses()}" }
       }
+    } finally {
+      fa.close()
     }
   }
 

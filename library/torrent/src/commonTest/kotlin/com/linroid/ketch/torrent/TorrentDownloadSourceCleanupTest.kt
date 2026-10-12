@@ -5,7 +5,6 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
@@ -24,7 +23,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,21 +63,20 @@ class TorrentDownloadSourceCleanupTest {
     headers = emptyMap(),
   )
 
-  private fun resumeStateFor(infoHash: String): SourceResumeState =
-    TorrentDownloadSource.buildResumeState(
-      infoHash = infoHash,
-      totalBytes = 1024L,
-      resumeData = ByteArray(0),
-      selectedFileIds = setOf("0"),
-      savePath = "/tmp/torrent",
-    )
+  private fun resumeStateFor(infoHash: String) = TorrentSourceState(
+    infoHash = infoHash,
+    totalBytes = 1024L,
+    resumeData = "",
+    selectedFileIds = setOf("0"),
+    savePath = "/tmp/torrent",
+  )
 
   @Test
   fun cleanup_legacyStateDoesNotStartEngineOrGuessOwnership() = runTest {
     val engine = FakeTorrentEngine()
     val source = buildSource(engine)
 
-    source.cleanup(buildContext(), resumeStateFor(infoHash))
+    source.cleanup(buildContext(), resumeStateFor(infoHash), deleteFiles = true)
 
     assertTrue(engine.removedTorrents.isEmpty())
     assertTrue(!engine.started)
@@ -90,18 +87,7 @@ class TorrentDownloadSourceCleanupTest {
     val engine = FakeTorrentEngine()
     val source = buildSource(engine)
 
-    source.cleanup(buildContext(), resumeState = null)
-
-    assertTrue(engine.removedTorrents.isEmpty())
-  }
-
-  @Test
-  fun cleanup_corruptResumeState_isNoOp() = runTest {
-    val engine = FakeTorrentEngine()
-    val source = buildSource(engine)
-    val corrupt = SourceResumeState("torrent", "not-json")
-
-    source.cleanup(buildContext(), corrupt)
+    source.cleanup(buildContext(), state = null, deleteFiles = true)
 
     assertTrue(engine.removedTorrents.isEmpty())
   }
@@ -112,7 +98,7 @@ class TorrentDownloadSourceCleanupTest {
     val source = buildSource(engine)
 
     // Must not propagate.
-    source.cleanup(buildContext(), resumeStateFor(infoHash))
+    source.cleanup(buildContext(), resumeStateFor(infoHash), deleteFiles = true)
 
     assertEquals(0, engine.removeAttempts)
   }
@@ -211,17 +197,17 @@ class TorrentDownloadSourceCleanupTest {
       }
       assertTrue(torrentFileSystem.exists(v2CreationLog(output, "task")))
       // The state mirrors b and the record chooses both: neither is the log's binding.
-      val state = SourceResumeState(TorrentDownloadSource.TYPE, Json.encodeToString(
-        TorrentResumeState(fixture.document.info.hash.hex, 5, encodeBase64(checkpoint.encode()),
-          setOf("1"), output.toString(), encodeBase64(fixture.metainfo), version = 3,
-          privacy = TorrentDiscoveryPrivacy.PUBLIC)))
+      val state = TorrentSourceState(fixture.document.info.hash.hex, 5,
+        encodeBase64(checkpoint.encode()), setOf("1"), output.toString(),
+        encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
       val context = DownloadContext(taskId = "task", url = "http://fixture/file.torrent",
         request = DownloadRequest("http://fixture/file.torrent",
           selectedFileIds = setOf("0", "1")),
         fileAccessor = StubFileAccessor, segments = MutableStateFlow(emptyList()),
         onProgress = { _, _ -> }, throttle = { _ -> }, headers = emptyMap(),
         outputPath = output.toString())
-      TorrentDownloadSource(TorrentConfig(dhtEnabled = false)).cleanup(context, state)
+      TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+        .cleanup(context, state, deleteFiles = true)
       assertFalse(torrentFileSystem.exists(output / "a"))
       assertFalse(torrentFileSystem.exists(v2CreationLog(output, "task")))
     } finally {

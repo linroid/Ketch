@@ -46,7 +46,7 @@ internal class TorrentV2PieceStore(
   private val creationLogPath: Path? = null,
   /**
    * Selections an older build may have bound the creation log to, besides this store's own and
-   * its checkpoint's, such as the one a task's resume state mirrors.
+   * its checkpoint's, such as the one a task's source state mirrors.
    */
   private val legacySelections: List<Set<String>> = emptyList(),
 ) {

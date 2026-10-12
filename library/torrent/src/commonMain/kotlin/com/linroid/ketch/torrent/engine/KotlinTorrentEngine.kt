@@ -140,7 +140,7 @@ internal data class TorrentV2TaskSpec(
   val discoverMode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
   /**
    * Selections an older build may have bound the creation log to, such as the one the task's
-   * resume state mirrors; see [TorrentV2PieceStore].
+   * source state mirrors; see [TorrentV2PieceStore].
    */
   val legacySelections: List<Set<String>> = emptyList(),
   /**

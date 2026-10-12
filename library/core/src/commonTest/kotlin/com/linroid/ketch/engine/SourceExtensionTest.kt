@@ -49,7 +49,7 @@ class SourceExtensionTest {
   /** [SelectableSource] with an extension that records its hooks. */
   private class ExtendedSource(
     val inner: SelectableSource = SelectableSource(),
-  ) : DownloadSource by inner {
+  ) : DownloadSource<Unit> by inner {
     val greeter = Greeter()
     var host: SourceHost? = null
     var attaches = 0
@@ -80,7 +80,7 @@ class SourceExtensionTest {
     }
   }
 
-  private fun TestScope.ketch(source: DownloadSource): Ketch {
+  private fun TestScope.ketch(source: DownloadSource<*>): Ketch {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return Ketch(
       httpEngine = FakeHttpEngine(),

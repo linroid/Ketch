@@ -6,10 +6,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * Additional edge case tests for [TorrentResumeState] serialization
- * beyond the basics covered in [TorrentResumeStateTest].
+ * Additional edge case tests for [TorrentSourceState] serialization
+ * beyond the basics covered in [TorrentSourceStateTest].
  */
-class TorrentResumeStateEdgeCaseTest {
+class TorrentSourceStateEdgeCaseTest {
 
   private val lenientJson = Json { ignoreUnknownKeys = true }
 
@@ -25,7 +25,7 @@ class TorrentResumeStateEdgeCaseTest {
         "futureField": "unknown"
       }
     """.trimIndent()
-    val state = lenientJson.decodeFromString<TorrentResumeState>(json)
+    val state = lenientJson.decodeFromString<TorrentSourceState>(json)
     assertEquals(
       "aabbccddee11223344556677889900aabbccddee",
       state.infoHash,
@@ -45,14 +45,14 @@ class TorrentResumeStateEdgeCaseTest {
       }
     """.trimIndent()
     assertFailsWith<Exception> {
-      Json.decodeFromString<TorrentResumeState>(json)
+      Json.decodeFromString<TorrentSourceState>(json)
     }
   }
 
   @Test
   fun serialization_largeResumeData() {
     val largeData = "A".repeat(100_000)
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = 500L,
       resumeData = largeData,
@@ -60,14 +60,14 @@ class TorrentResumeStateEdgeCaseTest {
       savePath = "/tmp",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(largeData, decoded.resumeData)
   }
 
   @Test
   fun serialization_manySelectedFileIds() {
     val ids = (0 until 100).map { it.toString() }.toSet()
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = 10_000L,
       resumeData = "data",
@@ -75,7 +75,7 @@ class TorrentResumeStateEdgeCaseTest {
       savePath = "/downloads",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(100, decoded.selectedFileIds.size)
     assertEquals(ids, decoded.selectedFileIds)
   }
@@ -83,7 +83,7 @@ class TorrentResumeStateEdgeCaseTest {
   @Test
   fun serialization_specialCharsInSavePath() {
     val path = "/path/with spaces/and-special_chars/日本語"
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = 0,
       resumeData = "",
@@ -91,13 +91,13 @@ class TorrentResumeStateEdgeCaseTest {
       savePath = path,
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(path, decoded.savePath)
   }
 
   @Test
   fun serialization_zeroTotalBytes() {
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = 0L,
       resumeData = "",
@@ -105,13 +105,13 @@ class TorrentResumeStateEdgeCaseTest {
       savePath = "/tmp",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(0L, decoded.totalBytes)
   }
 
   @Test
   fun serialization_maxLongTotalBytes() {
-    val state = TorrentResumeState(
+    val state = TorrentSourceState(
       infoHash = "aabbccddee11223344556677889900aabbccddee",
       totalBytes = Long.MAX_VALUE,
       resumeData = "data",
@@ -119,7 +119,7 @@ class TorrentResumeStateEdgeCaseTest {
       savePath = "/tmp",
     )
     val json = Json.encodeToString(state)
-    val decoded = Json.decodeFromString<TorrentResumeState>(json)
+    val decoded = Json.decodeFromString<TorrentSourceState>(json)
     assertEquals(Long.MAX_VALUE, decoded.totalBytes)
   }
 }

@@ -19,23 +19,26 @@ class SelectionUpdate(
 /**
  * What [DownloadSource.planSelection] validates and sizes.
  *
+ * @param S the source's state
  * @property fileIds files to choose, never empty; `null` chooses every file. For a source whose
  *   [ResolvedSource.selectionMode] is [com.linroid.ketch.api.FileSelectionMode.SINGLE], Ketch
  *   passes exactly one ID, its [default][com.linroid.ketch.api.defaultSelection] in place of
  *   `null`, and refuses several before planning
  * @property current the saved selection; empty for tasks that download every file
- * @property resumeState the task's saved [SourceResumeState], if any
- * @property resolved the task's [com.linroid.ketch.api.DownloadRequest.resolvedSource]: supplied
- *   by the client and possibly without its bulky metadata, so never trusted for sizes
+ * @property sourceState the task's saved state, if any
+ * @property resolved the resolution the task kept
+ *   ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]), else its
+ *   [com.linroid.ketch.api.DownloadRequest.resolvedSource]: possibly from the client, so never
+ *   trusted for sizes
  * @property segments the task's saved segments, if any
  * @property outputPath where the task saves, once it started
  * @property completed whether the task has completed
  */
-class SelectionRequest(
+class SelectionRequest<out S : Any>(
   val taskId: String,
   val fileIds: Set<String>?,
   val current: Set<String>,
-  val resumeState: SourceResumeState?,
+  val sourceState: S?,
   val resolved: ResolvedSource?,
   val segments: List<Segment>?,
   val outputPath: String?,

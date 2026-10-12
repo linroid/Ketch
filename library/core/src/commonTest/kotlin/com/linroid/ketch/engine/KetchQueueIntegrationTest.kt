@@ -16,7 +16,6 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -30,6 +29,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -461,7 +461,8 @@ class KetchQueueIntegrationTest {
     destination = Destination("/test/$name"),
   )
 
-  private class GatedSource : DownloadSource {
+  private class GatedSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     var maximumActive = 0
@@ -485,7 +486,11 @@ class KetchQueueIntegrationTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    // Stored as each run starts, so a resumed run gets it back.
+    override suspend fun store(context: DownloadContext) = Unit
+
+    override suspend fun download(context: DownloadContext, state: Unit?) {
+      if (state != null) resumed += context.url.substringAfterLast('/')
       if (failNext) {
         failNext = false
         throw KetchError.Unsupported()
@@ -503,13 +508,5 @@ class KetchQueueIntegrationTest {
         active--
       }
     }
-
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
-      resumed += context.url.substringAfterLast('/')
-      download(context)
-    }
-
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
-      SourceResumeState(type, "{}")
   }
 }

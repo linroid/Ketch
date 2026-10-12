@@ -7,10 +7,8 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -82,13 +80,13 @@ class AwaitFileSelectionTest {
       val record = assertNotNull(store.load(parked.taskId))
       assertEquals(TaskState.PAUSED, record.state)
       assertEquals(SelectableSource.TYPE, record.sourceType)
-      assertNotNull(record.sourceResumeState)
       assertNull(record.outputPath)
       assertNull(record.segments)
       assertEquals(600, record.totalBytes)
-      val kept = assertNotNull(record.request.resolvedSource)
-      assertEquals(3, kept.files.size)
-      assertTrue(ResolvedSource.METAINFO_KEY in kept.metadata)
+      assertTrue(ResolvedSource.METAINFO_KEY in assertNotNull(record.resolvedSource).metadata)
+      val shown = assertNotNull(record.request.resolvedSource)
+      assertEquals(3, shown.files.size)
+      assertFalse(ResolvedSource.METAINFO_KEY in shown.metadata)
       // Its slot went to the next task.
       assertEquals(next.taskId, source.runs.value.single().context.taskId)
       assertIs<DownloadState.Downloading>(next.state.value)
@@ -113,7 +111,7 @@ class AwaitFileSelectionTest {
   }
 
   @Test
-  fun parkedTask_selectFiles_startsFromStoredStateWithoutResolving() = runTest {
+  fun parkedTask_selectFiles_startsFromKeptResolutionWithoutResolving() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()
     val ketch = ketch(source, store)
@@ -129,11 +127,13 @@ class AwaitFileSelectionTest {
       runCurrent()
       val run = source.runs.value.single()
       assertFalse(run.resumed)
-      assertEquals("stored", run.context.preResolved?.metadata?.get(SelectableSource.MARKER))
+      assertEquals("network", run.context.preResolved?.metadata?.get(SelectableSource.MARKER))
       assertEquals(setOf("1"), run.initial.fileIds)
       assertEquals(1, source.resolves)
-      assertEquals(1, source.storedResolves)
       val record = assertNotNull(store.load(task.taskId))
+      // Ketch keeps the whole resolution; the request keeps what views need.
+      assertNotNull(record.resolvedSource?.metadata?.get(ResolvedSource.METAINFO_KEY))
+      assertFalse(ResolvedSource.METAINFO_KEY in record.request.resolvedSource!!.metadata)
       assertEquals(TaskState.DOWNLOADING, record.state)
       assertEquals(200, record.totalBytes)
       assertNotNull(record.outputPath)
@@ -271,7 +271,7 @@ class AwaitFileSelectionTest {
   }
 
   @Test
-  fun executeFresh_storedState_preferredOverClientResolvedSource() = runTest {
+  fun executeFresh_keptResolution_preferredOverClientResolvedSource() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()
     val now = Clock.System.now()
@@ -282,7 +282,7 @@ class AwaitFileSelectionTest {
         request = request(selected = setOf("0"), await = false).copy(resolvedSource = client),
         state = TaskState.QUEUED,
         sourceType = SelectableSource.TYPE,
-        sourceResumeState = SourceResumeState(SelectableSource.TYPE, "stored:pick:files"),
+        resolvedSource = source.resolved("pick:files", "stored"),
         createdAt = now,
         updatedAt = now,
       )
@@ -316,7 +316,7 @@ class AwaitFileSelectionTest {
       assertFalse(ResolvedSource.METAINFO_KEY in kept.metadata)
       assertEquals(3, kept.files.size)
       assertEquals(record.request, task.request)
-      assertNotNull(record.sourceResumeState)
+      assertNotNull(record.resolvedSource)
       val run = source.runs.value.single()
       assertTrue(ResolvedSource.METAINFO_KEY in assertNotNull(run.context.preResolved).metadata)
     } finally {
@@ -338,43 +338,6 @@ class AwaitFileSelectionTest {
 
       assertEquals(300, store.load(task.taskId)?.totalBytes)
       assertEquals(300, assertIs<DownloadState.Downloading>(task.state.value).progress.totalBytes)
-    } finally {
-      ketch.close()
-    }
-  }
-
-  @Test
-  fun executeResume_requestWithoutResolvedSource_restoresTheFileList() = runTest {
-    val source = SelectableSource()
-    val store = RecordingTaskStore()
-    val now = Clock.System.now()
-    store.save(
-      TaskRecord(
-        taskId = "added-without-preview",
-        request = request(selected = setOf("0"), await = false),
-        outputPath = folder + "pick",
-        state = TaskState.DOWNLOADING,
-        totalBytes = 100,
-        segments = listOf(Segment(0, 0, 99, 10)),
-        sourceType = SelectableSource.TYPE,
-        sourceResumeState = SourceResumeState(SelectableSource.TYPE, "stored:pick:files"),
-        createdAt = now,
-        updatedAt = now,
-      )
-    )
-    val ketch = ketch(source, store)
-    try {
-      ketch.start()
-      runCurrent()
-
-      val run = source.runs.value.single()
-      assertTrue(run.resumed)
-      val task = ketch.tasks.value.single()
-      val restored = assertNotNull(task.request.resolvedSource)
-      assertEquals(listOf("file0", "file1", "file2"), restored.files.map { it.name })
-      assertFalse(ResolvedSource.METAINFO_KEY in restored.metadata)
-      assertEquals(restored, store.load(task.taskId)?.request?.resolvedSource)
-      assertEquals(restored, run.context.request.resolvedSource)
     } finally {
       ketch.close()
     }

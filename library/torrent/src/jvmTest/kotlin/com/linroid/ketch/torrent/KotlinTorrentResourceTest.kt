@@ -49,7 +49,7 @@ class KotlinTorrentResourceTest {
             try {
               val output = root.resolve("result-$index")
               source.download(sourceContext(magnet, source.resolveMetainfo(data),
-                output.absolutePath, "resource-$index"))
+                output.absolutePath, "resource-$index"), null)
               assertTrue(output.readBytes().contentEquals(bytes))
             } finally { source.close() }
             delay(50) // Allow canceled selector/accept jobs to finish closing their descriptors.

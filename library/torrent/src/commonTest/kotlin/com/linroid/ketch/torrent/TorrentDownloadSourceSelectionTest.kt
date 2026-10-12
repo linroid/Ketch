@@ -7,7 +7,6 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -24,7 +23,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -293,31 +291,27 @@ class TorrentDownloadSourceSelectionTest {
   }
 
   @Test
-  fun resolvedSource_olderRecordResumed_namesItsFiles() = harness {
+  fun olderRecordResumed_downloadsFromTheMetainfoInItsState() = harness {
     val store = MemoryTaskStore()
     val now = Clock.System.now()
-    // A record saved before the request kept the file list: only the source state has it.
-    val state = TorrentResumeState(torrent.metadata.infoHash.hex, torrent.sizeOf(0), "",
+    // A record saved before Ketch kept resolutions: only the source state has the metainfo.
+    val state = TorrentSourceState(torrent.metadata.infoHash.hex, torrent.sizeOf(0), "",
       setOf("0"), output.toString(), encodeBase64(torrent.metainfo), version = 2,
       privacy = TorrentDiscoveryPrivacy.PUBLIC)
     store.save(TaskRecord(taskId = "older", request = request(0), outputPath = output.toString(),
       state = TaskState.PAUSED, totalBytes = torrent.sizeOf(0),
       segments = listOf(Segment(0, 0, torrent.sizeOf(0) - 1)),
       sourceType = TorrentDownloadSource.TYPE,
-      sourceResumeState = SourceResumeState(TorrentDownloadSource.TYPE,
-        Json.encodeToString(state)),
+      sourceState = state.saved(),
       createdAt = now, updatedAt = now))
     val source = source()
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.tasks.value.single()
-    assertNull(task.request.resolvedSource)
     seeder.openAll()
     task.resume()
     task.awaitCompleted()
     assertFile(0)
-    assertEquals(listOf("pack/f0", "pack/f1", "pack/f2"),
-      assertNotNull(task.request.resolvedSource).files.map { it.name })
     source.assertNoLeaks()
   }
 }

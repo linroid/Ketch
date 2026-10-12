@@ -3,8 +3,9 @@ package com.linroid.ketch.core.task
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -25,6 +26,12 @@ import kotlin.time.Instant
  *   completes, and for a download that writes to [outputPath] itself: one whose name leaves no
  *   room for the suffix, one resumed with a new destination, or one started before partial files
  *   existed
+ * @property resolvedSource what the source resolved, kept when it describes all the content
+ *   ([ResolvedSource.METAINFO_KEY]), as a torrent's metainfo does: the task starts and resumes
+ *   from it without resolving again, and sources read the content's description from it
+ *   ([com.linroid.ketch.core.engine.DownloadContext.preResolved],
+ *   [com.linroid.ketch.core.engine.SelectionRequest.resolved]). Ketch writes it, never a client,
+ *   unlike the request's [DownloadRequest.resolvedSource], which then keeps only what views need
  * @property control state of typed controls (selection generations, the sharing intent and the
  *   retry ledger of controller commands) that Ketch owns; `null` until the first control change
  */
@@ -38,7 +45,8 @@ data class TaskRecord(
   val error: KetchError? = null,
   val segments: List<Segment>? = null,
   val sourceType: String? = null,
-  val sourceResumeState: SourceResumeState? = null,
+  val sourceState: SourceState? = null,
+  val resolvedSource: ResolvedSource? = null,
   val downloadTime: Duration? = null,
   val createdAt: Instant,
   val updatedAt: Instant,
@@ -46,6 +54,10 @@ data class TaskRecord(
   val control: TaskControl? = null,
   val partialPath: String? = null,
 )
+
+/** Whether a task keeps this resolution in [TaskRecord.resolvedSource]. */
+internal fun ResolvedSource.isKeptWithTask(): Boolean =
+  !metadata[ResolvedSource.METAINFO_KEY].isNullOrEmpty()
 
 /**
  * Control state of tasks whose sources offer typed controls

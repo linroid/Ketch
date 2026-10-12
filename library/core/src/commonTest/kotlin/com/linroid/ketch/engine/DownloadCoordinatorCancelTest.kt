@@ -12,7 +12,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
@@ -33,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Verifies that [DownloadCoordinator.cancel] does not return until the
@@ -43,7 +43,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class DownloadCoordinatorCancelTest {
 
-  private class SuspendingSource : DownloadSource {
+  private class SuspendingSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     val downloadStarted = CompletableDeferred<Unit>()
     var downloadFinallyRan: Boolean = false
 
@@ -62,7 +63,7 @@ class DownloadCoordinatorCancelTest {
       )
     }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       downloadStarted.complete(Unit)
       try {
         awaitCancellation()
@@ -71,15 +72,7 @@ class DownloadCoordinatorCancelTest {
       }
     }
 
-    override suspend fun resume(
-      context: DownloadContext,
-      resumeState: SourceResumeState,
-    ) = Unit
 
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ): SourceResumeState = SourceResumeState(type, "")
   }
 
   private fun createHandle(destination: String): TaskHandle {
@@ -109,7 +102,7 @@ class DownloadCoordinatorCancelTest {
     }
   }
 
-  private fun createCoordinator(source: DownloadSource): DownloadCoordinator =
+  private fun createCoordinator(source: DownloadSource<*>): DownloadCoordinator =
     DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       config = { DownloadConfig() },

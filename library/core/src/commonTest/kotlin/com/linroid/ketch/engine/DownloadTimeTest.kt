@@ -13,7 +13,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.platformFileSystem
@@ -32,6 +32,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -168,7 +169,7 @@ class DownloadTimeTest {
     state = state,
     totalBytes = 4,
     sourceType = FIXTURE,
-    sourceResumeState = SourceResumeState(FIXTURE, ""),
+    sourceState = SourceState(FIXTURE, "{}"),
     downloadTime = downloadTime,
     createdAt = now,
     updatedAt = now,
@@ -185,7 +186,10 @@ class DownloadTimeTest {
     override val record = AtomicSaver(record) {}
   }
 
-  private fun TestScope.execution(handle: TaskHandle, source: DownloadSource): DownloadExecution {
+  private fun TestScope.execution(
+    handle: TaskHandle,
+    source: DownloadSource<*>,
+  ): DownloadExecution {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadExecution(
       handle = handle,
@@ -206,7 +210,8 @@ class DownloadTimeTest {
     private val finishes: Boolean = true,
     private val totalBytes: Long = 4,
     selfManaged: Boolean = true,
-  ) : DownloadSource {
+  ) : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = FIXTURE
     override val managesOwnFileIo = selfManaged
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -217,11 +222,7 @@ class DownloadTimeTest {
         suggestedFileName = "fixture", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) = transfer()
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      transfer()
+    override suspend fun download(context: DownloadContext, state: Unit?) = transfer()
 
     private suspend fun transfer() {
       timeSource += runTime

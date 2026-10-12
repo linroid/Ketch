@@ -11,7 +11,6 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import kotlinx.coroutines.CompletableDeferred
@@ -21,6 +20,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,7 +71,7 @@ class ResolveWaitTest {
     }
   }
 
-  private fun TestScope.ketch(source: DownloadSource): Ketch {
+  private fun TestScope.ketch(source: DownloadSource<*>): Ketch {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return Ketch(
       httpEngine = FakeHttpEngine(),
@@ -83,7 +83,8 @@ class ResolveWaitTest {
   }
 
   /** Answers only once [found] completes, and downloads an empty file. */
-  private class SlowSource : DownloadSource {
+  private class SlowSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     val found = CompletableDeferred<Unit>()
     override val type = "slow"
     override fun canHandle(input: ResolveInput): Boolean =
@@ -95,10 +96,6 @@ class ResolveWaitTest {
         supportsResume = true, suggestedFileName = "empty.bin", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) = context.onProgress(0, 0)
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      download(context)
+    override suspend fun download(context: DownloadContext, state: Unit?) = context.onProgress(0, 0)
   }
 }

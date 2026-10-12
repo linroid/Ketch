@@ -16,7 +16,6 @@ import com.linroid.ketch.core.digest.newDigest
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.fileDigest
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.platformFileSystem
@@ -29,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import kotlin.test.Test
@@ -224,7 +224,7 @@ class ChecksumVerificationTest {
 
   private suspend fun TestScope.withKetch(
     engine: FakeHttpEngine,
-    sources: List<DownloadSource> = emptyList(),
+    sources: List<DownloadSource<*>> = emptyList(),
     block: suspend (Ketch, String, InMemoryTaskStore) -> Unit,
   ) {
     val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-checksum-test"
@@ -248,7 +248,8 @@ class ChecksumVerificationTest {
   }
 
   /** A source that writes its own files, as the torrent source does. */
-  private class SelfManagedSource : DownloadSource {
+  private class SelfManagedSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "self"
     override val managesOwnFileIo = true
     override fun canHandle(input: ResolveInput): Boolean {
@@ -262,9 +263,6 @@ class ChecksumVerificationTest {
         suggestedFileName = "self", maxSegments = 1,
       )
     }
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
   }
 }

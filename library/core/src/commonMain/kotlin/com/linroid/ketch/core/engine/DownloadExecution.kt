@@ -41,6 +41,7 @@ import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import com.linroid.ketch.core.task.isKeptWithTask
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -198,7 +199,7 @@ internal class DownloadExecution(
 
   private suspend fun executeFresh() {
     val stored = storedResolution()
-    val source: DownloadSource
+    val source: DownloadSource<*>
     val resolvedUrl: ResolvedSource
     val resolved = request.resolvedSource
 
@@ -227,22 +228,19 @@ internal class DownloadExecution(
   }
 
   /**
-   * The source and resolution a task saved in its record, rebuilt with
-   * [DownloadSource.resolveStored] without network access: it comes from metadata Ketch holds,
-   * so it is preferred over a client's [com.linroid.ketch.api.DownloadRequest.resolvedSource].
-   * `null` when the record has none or it cannot be used, and the task resolves as usual.
+   * The source and resolution the task's record saved ([TaskRecord.resolvedSource]), from
+   * metadata Ketch holds, so it is preferred over a client's
+   * [com.linroid.ketch.api.DownloadRequest.resolvedSource]. `null` when the record has none or
+   * its source is gone, and the task resolves as usual.
    */
-  private suspend fun storedResolution(): Pair<DownloadSource, ResolvedSource>? {
+  private fun storedResolution(): Pair<DownloadSource<*>, ResolvedSource>? {
     val record = handle.record.value
-    val state = record.sourceResumeState ?: return null
-    val type = record.sourceType ?: return null
+    val resolved = record.resolvedSource ?: return null
     return try {
-      val source = sourceResolver.resolveByType(type, record.request.url)
-      source.resolveStored(state)?.let { source to it }
-    } catch (e: CancellationException) {
-      throw e
+      val type = record.sourceType ?: resolved.sourceType
+      sourceResolver.resolveByType(type, record.request.url) to resolved
     } catch (e: Exception) {
-      log.w { "Saved source state of taskId=$taskId is unusable, resolving: ${e.describeCauses()}" }
+      log.w { "Saved resolution of taskId=$taskId is unusable, resolving: ${e.describeCauses()}" }
       null
     }
   }
@@ -255,7 +253,7 @@ internal class DownloadExecution(
    * download.
    */
   private suspend fun prepareFresh(
-    source: DownloadSource,
+    source: DownloadSource<*>,
     resolvedUrl: ResolvedSource,
     fromStored: Boolean,
   ): Prepared? {
@@ -305,16 +303,12 @@ internal class DownloadExecution(
       return null
     }
 
-    val savedState = handle.record.value.sourceResumeState
-    val resumeState = if (fromStored && savedState != null) {
-      savedState
-    } else {
-      source.buildResumeState(resolvedUrl, total)
-    }
-    // The saved state now holds the resolution, so the request keeps only what views need: the
-    // file list without the bulky metadata. Only when the state can rebuild the resolution, as a
-    // later fresh start would otherwise lack it.
-    val keepsResolution = fromStored || rebuildsResolution(source, resumeState)
+    // A fresh run stores its own state as it starts; one from the kept resolution, such as a task
+    // that waited for its files, keeps what it saved.
+    val sourceState = handle.record.value.sourceState.takeIf { fromStored }
+    // A resolution the record keeps leaves the request only what views need: the file list
+    // without the bulky metadata.
+    val kept = resolvedUrl.takeIf { it.isKeptWithTask() }
     val now = Clock.System.now()
     handle.record.update {
       it.copy(
@@ -323,8 +317,9 @@ internal class DownloadExecution(
         state = TaskState.DOWNLOADING,
         totalBytes = total,
         sourceType = source.type,
-        sourceResumeState = resumeState,
-        request = if (keepsResolution) {
+        sourceState = sourceState,
+        resolvedSource = kept,
+        request = if (kept != null) {
           it.request.copy(
             resolvedSource = (it.request.resolvedSource ?: resolvedUrl).withoutBulkMetadata(),
           )
@@ -334,7 +329,7 @@ internal class DownloadExecution(
         updatedAt = now,
       )
     }
-    return Prepared(target, total, resolvedUrl) { ctx -> source.download(ctx) }
+    return Prepared(target, total, resolvedUrl, state = null)
   }
 
   /**
@@ -345,7 +340,7 @@ internal class DownloadExecution(
    * @throws IllegalArgumentException when a source offering a single choice is given several
    */
   private suspend fun freshTotal(
-    source: DownloadSource,
+    source: DownloadSource<*>,
     resolved: ResolvedSource,
     selected: Set<String>,
   ): Long {
@@ -359,7 +354,7 @@ internal class DownloadExecution(
           taskId = taskId,
           fileIds = selected,
           current = emptySet(),
-          resumeState = null,
+          sourceState = null,
           resolved = resolved,
           segments = null,
           outputPath = null,
@@ -377,42 +372,33 @@ internal class DownloadExecution(
     }
   }
 
-  /** Whether [source] can rebuild its resolution from [state] alone. */
-  private suspend fun rebuildsResolution(
-    source: DownloadSource,
-    state: SourceResumeState,
-  ): Boolean = try {
-    source.resolveStored(state) != null
-  } catch (e: CancellationException) {
-    throw e
-  } catch (e: Exception) {
-    log.d { "Saved state of taskId=$taskId cannot rebuild its source: ${e.describeCauses()}" }
-    false
-  }
-
   /**
    * Stops the task, which asked to wait for a file selection, once its files are known. The
-   * record keeps the source and its state, so the task starts from them without resolving
-   * again, but no output path and no segments: nothing reserves a folder while it waits.
+   * record keeps the source, its state and its resolution, so the task starts from them without
+   * resolving again, but no output path and no segments: nothing reserves a folder while it
+   * waits.
    * Returning frees its download slot.
    */
   private suspend fun park(
-    source: DownloadSource,
+    source: DownloadSource<*>,
     resolved: ResolvedSource,
     fromStored: Boolean,
   ) {
+    val kept = resolved.takeIf { it.isKeptWithTask() }
     val now = Clock.System.now()
     handle.record.update {
       it.copy(
         state = TaskState.PAUSED,
         sourceType = source.type,
-        sourceResumeState = it.sourceResumeState.takeIf { fromStored }
-          ?: source.buildResumeState(resolved, resolved.totalBytes),
+        sourceState = it.sourceState.takeIf { fromStored },
+        resolvedSource = kept,
         totalBytes = resolved.totalBytes,
         outputPath = null,
         partialPath = null,
         segments = null,
-        request = it.request.copy(resolvedSource = resolved),
+        request = it.request.copy(
+          resolvedSource = if (kept != null) resolved.withoutBulkMetadata() else resolved,
+        ),
         updatedAt = now,
       )
     }
@@ -457,11 +443,7 @@ internal class DownloadExecution(
       val record = handle.record.value
       reserve(outputPath)
       totalBytes = record.totalBytes
-      val resumeState = record.sourceResumeState
-        ?: throw KetchError.CorruptResumeState(
-          "No resume state for taskId=${taskRecord.taskId}",
-        )
-      backfillResolvedSource(source, resumeState)
+      val sourceState = record.sourceState
       // A record without a partial file, as tasks saved before them have, keeps writing to its
       // output path: its bytes are there, and nothing is moved when it completes.
       val target = OutputTarget(
@@ -469,45 +451,20 @@ internal class DownloadExecution(
         partial = record.partialPath.takeUnless { source.managesOwnFileIo },
         replace = record.request.destination?.isFile() == true,
       )
-      Prepared(target, record.totalBytes, null) { ctx -> source.resume(ctx, resumeState) }
+      Prepared(target, record.totalBytes, record.resolvedSource, sourceState)
     }
   }
 
   /**
-   * Gives a request without a [ResolvedSource] the file list its saved state holds, such as a
-   * torrent added without a preview, so clients can name its files. Best effort: a state that
-   * cannot rebuild it leaves the request as it is.
+   * What a download needs once it is prepared under the task's control lock.
+   *
+   * @property state the saved state the run continues from; `null` starts from the beginning
    */
-  private suspend fun backfillResolvedSource(source: DownloadSource, state: SourceResumeState) {
-    if (handle.record.value.request.resolvedSource != null) return
-    val stored = try {
-      source.resolveStored(state)
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.d { "No file list in the saved state of taskId=$taskId: ${e.describeCauses()}" }
-      null
-    } ?: return
-    val now = Clock.System.now()
-    handle.record.update {
-      if (it.request.resolvedSource != null) {
-        it
-      } else {
-        it.copy(
-          request = it.request.copy(resolvedSource = stored.withoutBulkMetadata()),
-          updatedAt = now,
-        )
-      }
-    }
-    log.d { "Restored the file list of taskId=$taskId from its saved state" }
-  }
-
-  /** What a download needs once it is prepared under the task's control lock. */
   private class Prepared(
     val target: OutputTarget,
     val total: Long,
     val preResolved: ResolvedSource?,
-    val block: suspend (DownloadContext) -> Unit,
+    val state: SourceState?,
   )
 
   /**
@@ -517,7 +474,7 @@ internal class DownloadExecution(
    * execution without a download.
    *
    * A selection delivered while the source ran but not acknowledged by it runs the download
-   * again through [DownloadSource.resume], so completion always covers the latest selection.
+   * again from its latest state, so completion always covers the latest selection.
    *
    * When [DownloadSource.managesOwnFileIo] is `true`, the source
    * handles its own file I/O so we use [NoOpFileAccessor] and skip
@@ -527,7 +484,7 @@ internal class DownloadExecution(
    * [TaskHandle.controlLock]).
    */
   private suspend fun runDownload(
-    source: DownloadSource,
+    source: DownloadSource<*>,
     prepare: suspend () -> Prepared?,
   ) {
     val selfManagedIo = source.managesOwnFileIo
@@ -573,12 +530,12 @@ internal class DownloadExecution(
           while (true) {
             delay(config.saveIntervalMs)
             val snapshot = handle.mutableSegments.value
-            val updatedResume = source.updateResumeState(ctx)
+            val updatedResume = source.stored(ctx)
             handle.record.update {
               it.copy(
                 segments = savedSegments(snapshot),
-                sourceResumeState = updatedResume
-                  ?: it.sourceResumeState,
+                sourceState = updatedResume
+                  ?: it.sourceState,
                 downloadTime = downloadTime(),
                 updatedAt = Clock.System.now(),
               )
@@ -586,10 +543,23 @@ internal class DownloadExecution(
           }
         }
         try {
-          var block = prepared.block
+          // Saved before any byte is written, so a resume can tell whether the content changed.
+          source.stored(ctx)?.let { state ->
+            handle.record.update {
+              it.copy(sourceState = state, updatedAt = Clock.System.now())
+            }
+          }
+          // The first attempt continues from the state the run started from; a retry or a rerun
+          // from the latest one stored, so the source checks what it already wrote.
+          var state = prepared.state
           var rerunFor = -1
           while (true) {
-            downloadWithRetry(ctx) { block(ctx) }
+            var retry = false
+            downloadWithRetry(ctx) {
+              if (retry) state = handle.record.value.sourceState ?: state
+              retry = true
+              source.downloadSaved(ctx, state)
+            }
             val pending = handle.controlLock.withLock {
               val latest = ctx.selection.value.revision
               if (ctx.acknowledgedSelection.value >= latest) {
@@ -607,19 +577,16 @@ internal class DownloadExecution(
             }
             rerunFor = pending
             log.i { "Selection of taskId=$taskId changed as it finished; continuing with it" }
-            val state = source.updateResumeState(ctx)
-              ?: handle.record.value.sourceResumeState
-              ?: throw KetchError.CorruptResumeState("No resume state for taskId=$taskId")
-            block = { source.resume(it, state) }
+            state = source.stored(ctx) ?: handle.record.value.sourceState
           }
         } finally {
           withContext(NonCancellable) {
             saveJob.cancelAndJoin()
-            val updatedResume = source.updateResumeState(ctx)
+            val updatedResume = source.stored(ctx)
             val snapshot = handle.mutableSegments.value
             handle.record.update {
               it.copy(segments = savedSegments(snapshot),
-                sourceResumeState = updatedResume ?: it.sourceResumeState,
+                sourceState = updatedResume ?: it.sourceState,
                 downloadTime = downloadTime(),
                 updatedAt = Clock.System.now())
             }

@@ -8,9 +8,10 @@ import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -37,7 +38,6 @@ class DashDownloadSourceTest {
     val resolved = source.resolve(engine.url)
     assertEquals("dash", resolved.sourceType)
     assertEquals("index.mp4", resolved.suggestedFileName)
-    assertEquals("dash", source.buildResumeState(resolved, 0).sourceType)
   }
 
   @Test
@@ -86,7 +86,7 @@ class DashDownloadSourceTest {
       throttle = { throttled += it },
       headers = mapOf("Cookie" to "secret", "User-Agent" to "Ketch"),
     )
-    source.download(context)
+    source.download(context, null)
     assertEquals("firstsecond", file.bytes.decodeToString())
     assertEquals(11, throttled)
     assertEquals(listOf("https://cdn.example/media/a.mp4", "https://cdn.example/media/b.m4s"),
@@ -94,7 +94,8 @@ class DashDownloadSourceTest {
     assertEquals(listOf(mapOf("User-Agent" to "Ketch"), mapOf("User-Agent" to "Ketch")),
       engine.parts.map { it.second })
     file.bytes = "stale partial output".encodeToByteArray()
-    source.resume(context, SourceResumeState("media", "{}"))
+    // Tasks saved before media sources split carry the "media" type and an empty object.
+    source.download(context, source.decodeState(SourceState("media", "{}")))
     assertEquals("firstsecond", file.bytes.decodeToString())
   }
 
@@ -116,7 +117,7 @@ class DashDownloadSourceTest {
       connections = connections,
     )
 
-    DashDownloadSource(engine).download(context)
+    DashDownloadSource(engine).download(context, null)
 
     val connection = connections.opened.single()
     assertEquals(listOf("cdn.example" to 443, "edge.example" to 8443),
@@ -135,7 +136,7 @@ class DashDownloadSourceTest {
       file.bytes = "existing".encodeToByteArray()
       val context = DownloadContext("id", engine.url, DownloadRequest(engine.url), file,
         MutableStateFlow(emptyList()), { _, _ -> }, {}, emptyMap())
-      assertFailsWith<KetchError.SourceError> { source.download(context) }
+      assertFailsWith<KetchError.SourceError> { source.download(context, null) }
       assertEquals("existing", file.bytes.decodeToString())
       assertEquals(0, engine.parts.size)
     }

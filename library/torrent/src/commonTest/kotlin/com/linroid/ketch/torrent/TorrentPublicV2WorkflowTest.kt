@@ -390,11 +390,15 @@ class TorrentPublicV2WorkflowTest {
       task.pause()
       assertTrue(task.state.value is DownloadState.Paused, "Pause returned ${task.state.value}")
       val stored = requireNotNull(records.load(task.taskId))
-      assertTrue(stored.sourceResumeState?.data?.contains(peer.document.info.hash.hex) == true)
+      assertTrue(stored.sourceState?.data?.contains(peer.document.info.hash.hex) == true)
       first.close()
       if (staleCheckpoint) {
-        records.save(stored.copy(sourceResumeState = firstSource.buildResumeState(
-          source().resolveMetainfo(peer.metainfo), peer.payload.size.toLong())))
+        // A state without a checkpoint; the metainfo comes from the resolution the task kept.
+        val resolved = source().resolveMetainfo(peer.metainfo)
+        records.save(stored.copy(sourceState = TorrentSourceState(
+          peer.document.info.hash.hex, peer.payload.size.toLong(), "",
+          resolved.files.mapTo(LinkedHashSet()) { it.id }, "", version = 3,
+          privacy = TorrentDiscoveryPrivacy.PUBLIC).saved()))
       }
       // Persisted verified bits cannot authorize payload modified while the process was away.
       torrentFileSystem.openReadWrite(root / "out" / "a").use {

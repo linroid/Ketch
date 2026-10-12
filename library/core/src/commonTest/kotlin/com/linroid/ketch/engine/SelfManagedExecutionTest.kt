@@ -16,7 +16,7 @@ import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -42,6 +42,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import kotlinx.serialization.builtins.serializer
 
 class SelfManagedExecutionTest {
   @Test
@@ -49,7 +50,8 @@ class SelfManagedExecutionTest {
     val started = CompletableDeferred<Unit>()
     var finalState = false
     var calls = 0
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<String> {
+      override val stateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -62,21 +64,16 @@ class SelfManagedExecutionTest {
           selectionMode = FileSelectionMode.MULTIPLE,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState {
-        assertEquals(0L, totalBytes)
-        return SourceResumeState(type, "initial")
-      }
-      override suspend fun updateResumeState(context: DownloadContext): SourceResumeState {
+      // Asked as the run starts, before any state exists, and once more as it stops.
+      override suspend fun store(context: DownloadContext): String? {
         calls++
-        assertTrue(finalState)
-        return SourceResumeState(type, "final")
+        return if (finalState) "final" else null
       }
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun download(context: DownloadContext, state: String?) {
         assertEquals("/tmp/ketch-self-managed-output", context.outputPath)
         started.complete(Unit)
         try { awaitCancellation() } finally { finalState = true }
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input", selectedFileIds = setOf("0"),
@@ -99,15 +96,17 @@ class SelfManagedExecutionTest {
     val job = launch { execution.execute() }
     started.await()
     assertEquals(0L, execution.totalBytes)
+    assertEquals(null, handle.record.value.sourceState)
     job.cancelAndJoin()
-    assertEquals(1, calls)
-    assertEquals("final", handle.record.value.sourceResumeState?.data)
+    assertEquals(2, calls)
+    assertEquals(source.encodeState("final"), handle.record.value.sourceState)
   }
 
   @Test
   fun execute_unknownSize_failsWithoutCallingSource() = runTest {
     var downloads = 0
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -118,10 +117,7 @@ class SelfManagedExecutionTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "")
-      override suspend fun download(context: DownloadContext) { downloads++ }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+      override suspend fun download(context: DownloadContext, state: Unit?) { downloads++ }
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",
@@ -153,7 +149,8 @@ class SelfManagedExecutionTest {
     val allowCheckpoint = CompletableDeferred<Unit>()
     val resumed = CompletableDeferred<Unit>()
     var saved = false
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<String> {
+      override val stateSerializer = String.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -164,11 +161,16 @@ class SelfManagedExecutionTest {
           suggestedFileName = "fixture", maxSegments = 1,
         )
       }
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "initial")
-      override suspend fun updateResumeState(context: DownloadContext) =
-        SourceResumeState(type, if (saved) "final" else "initial")
-      override suspend fun download(context: DownloadContext) {
+      override suspend fun store(context: DownloadContext) =
+        if (saved) "final" else "initial"
+      override suspend fun download(context: DownloadContext, state: String?) {
+        if (state != null) {
+          assertEquals("final", state)
+          assertTrue(saved)
+          context.segments.value = listOf(Segment(0, 0, 3, 4))
+          resumed.complete(Unit)
+          return
+        }
         context.segments.value = listOf(Segment(0, 0, 3, 1))
         context.onProgress(1, 4)
         started.complete(Unit)
@@ -180,12 +182,6 @@ class SelfManagedExecutionTest {
             saved = true
           }
         }
-      }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
-        assertEquals("final", resumeState.data)
-        assertTrue(saved)
-        context.segments.value = listOf(Segment(0, 0, 3, 4))
-        resumed.complete(Unit)
       }
     }
     val now = Clock.System.now()
@@ -227,4 +223,49 @@ class SelfManagedExecutionTest {
     }
   }
 
+  @Test
+  fun retry_continuesFromTheLatestStoredState() = runTest {
+    val received = mutableListOf<String?>()
+    val source = object : DownloadSource<String> {
+      override val stateSerializer = String.serializer()
+      override val type = "fixture"
+      override val managesOwnFileIo = true
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
+      override suspend fun store(context: DownloadContext) = "stored"
+      override suspend fun download(context: DownloadContext, state: String?) {
+        received += state
+        if (received.size == 1) throw KetchError.Network()
+        context.segments.value = listOf(Segment(0, 0, 3, 4))
+      }
+    }
+    val now = Clock.System.now()
+    val request = DownloadRequest("fixture:input", destination = Destination("/tmp/ketch-retry"))
+    val handle = object : TaskHandle {
+      override val taskId = "retry"
+      override val request = request
+      override val createdAt = now
+      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
+      override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
+        createdAt = now, updatedAt = now)) {}
+    }
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
+      DefaultFileNameResolver(), DownloadConfig(retryCount = 1, saveIntervalMs = 60_000),
+      SpeedLimiter.Unlimited, KetchDispatchers(dispatcher, dispatcher, dispatcher))
+
+    execution.execute()
+
+    // A fresh run starts from nothing; its retry checks what the first attempt wrote.
+    assertEquals(listOf(null, "stored"), received)
+  }
 }

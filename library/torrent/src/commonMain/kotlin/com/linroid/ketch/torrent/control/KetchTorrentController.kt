@@ -10,7 +10,7 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.core.engine.SourceHost
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlOutcome
@@ -84,7 +84,7 @@ internal class KetchTorrentController(
   private val fileCache = LinkedHashMap<String, CachedFiles>()
 
   private class CachedFiles(
-    val resumeState: SourceResumeState?,
+    val sourceState: SourceState?,
     val resolved: ResolvedSource?,
     val files: List<SourceFile>,
   )
@@ -397,18 +397,18 @@ internal class KetchTorrentController(
   /** Every content file of [task] in metainfo order, or `null` while unknown. */
   private suspend fun filesOf(task: DownloadTask): List<SourceFile>? {
     val record = recordOf(task)
-    val resumeState = record.sourceResumeState
-    val resolved = record.request.resolvedSource
+    val sourceState = record.sourceState
+    val resolved = record.resolvedSource ?: record.request.resolvedSource
     cacheMutex.withLock {
       val cached = fileCache.remove(task.taskId)
-      if (cached != null && cached.matches(resumeState, resolved)) {
+      if (cached != null && cached.matches(sourceState, resolved)) {
         fileCache[task.taskId] = cached
         return cached.files
       }
     }
-    val files = source.torrentFiles(resumeState, resolved) ?: return null
+    val files = source.torrentFiles(sourceState, resolved) ?: return null
     cacheMutex.withLock {
-      fileCache[task.taskId] = CachedFiles(resumeState, resolved, files)
+      fileCache[task.taskId] = CachedFiles(sourceState, resolved, files)
       while (fileCache.size > MAX_CACHED_FILE_LISTS) {
         fileCache.remove(fileCache.keys.first())
       }
@@ -417,10 +417,10 @@ internal class KetchTorrentController(
   }
 
   private fun CachedFiles.matches(
-    resumeState: SourceResumeState?,
+    sourceState: SourceState?,
     resolved: ResolvedSource?,
-  ): Boolean = if (resumeState != null || this.resumeState != null) {
-    this.resumeState === resumeState || this.resumeState == resumeState
+  ): Boolean = if (sourceState != null || this.sourceState != null) {
+    this.sourceState === sourceState || this.sourceState == sourceState
   } else {
     this.resolved === resolved || this.resolved == resolved
   }

@@ -7,10 +7,10 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -31,20 +31,13 @@ class DownloadSourceCleanupTest {
     override suspend fun preallocate(size: Long) = Unit
   }
 
-  private class StubSource : DownloadSource {
+  private class StubSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "stub"
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       error("not used")
-    override suspend fun download(context: DownloadContext) = Unit
-    override suspend fun resume(
-      context: DownloadContext,
-      resumeState: SourceResumeState,
-    ) = Unit
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ): SourceResumeState = SourceResumeState(type, "")
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
   }
 
   private fun context(accessor: FileAccessor): DownloadContext =
@@ -67,7 +60,7 @@ class DownloadSourceCleanupTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(context(accessor), resumeState = null)
+    source.cleanup(context(accessor), state = null, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
   }
@@ -80,21 +73,28 @@ class DownloadSourceCleanupTest {
     val source = StubSource()
 
     // Should not throw — best-effort cleanup.
-    source.cleanup(context(accessor), resumeState = null)
+    source.cleanup(context(accessor), state = null, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
   }
 
   @Test
-  fun defaultCleanup_ignoresResumeState() = runTest {
+  fun defaultCleanup_ignoresState() = runTest {
     val accessor = RecordingFileAccessor()
     val source = StubSource()
 
-    source.cleanup(
-      context = context(accessor),
-      resumeState = SourceResumeState("stub", "{}"),
-    )
+    source.cleanup(context = context(accessor), state = Unit, deleteFiles = true)
 
     assertEquals(1, accessor.deleteCount)
+  }
+
+  @Test
+  fun defaultCleanup_keepingFiles_deletesNothing() = runTest {
+    val accessor = RecordingFileAccessor()
+    val source = StubSource()
+
+    source.cleanup(context(accessor), state = null, deleteFiles = false)
+
+    assertEquals(0, accessor.deleteCount)
   }
 }

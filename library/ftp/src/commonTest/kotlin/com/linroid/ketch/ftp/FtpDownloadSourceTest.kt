@@ -97,7 +97,7 @@ class FtpDownloadSourceTest {
       config = DownloadConfig(maxConnectionsPerDownload = 3, bufferSize = 4096),
     )
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(listOf(0L, 334L, 667L), server.retrieveOffsets.sorted())
     assertContentEquals(server.content, file.bytes)
@@ -110,7 +110,7 @@ class FtpDownloadSourceTest {
     val connections = RecordingConnections()
     val context = context(MemoryFileAccessor(), connections = 3, reporter = connections)
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(3, connections.opened.size)
     for (connection in connections.opened) {
@@ -137,7 +137,7 @@ class FtpDownloadSourceTest {
       url = FTPS_URL,
     )
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(2, connections.opened.size)
     for (connection in connections.opened) {
@@ -175,7 +175,7 @@ class FtpDownloadSourceTest {
     val server = FakeFtpServer(content(1000), supportsRest = false)
     val file = MemoryFileAccessor()
 
-    source(server).download(context(file, connections = 4))
+    source(server).download(context(file, connections = 4), null)
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -189,10 +189,10 @@ class FtpDownloadSourceTest {
     val context = context(file, connections = 1)
     val source = source(server)
 
-    assertFailsWith<KetchError.Network> { source.download(context) }
+    assertFailsWith<KetchError.Network> { source.download(context, null) }
     assertEquals(300L, context.segments.value.sumOf { it.downloadedBytes })
     // The engine retries a retryable failure by calling download again with the same context.
-    source.download(context)
+    source.download(context, null)
 
     assertEquals(listOf(0L, 300L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -206,11 +206,11 @@ class FtpDownloadSourceTest {
     val context = context(file, connections = 1, config = DownloadConfig(idleTimeoutMs = 10_000))
     val source = source(server)
 
-    val error = assertFailsWith<KetchError.Network> { source.download(context) }
+    val error = assertFailsWith<KetchError.Network> { source.download(context, null) }
     assertIs<TransferStalledException>(error.cause)
     assertTrue(currentTime >= 10_000)
     assertEquals(400L, context.segments.value.sumOf { it.downloadedBytes })
-    source.download(context)
+    source.download(context, null)
 
     assertEquals(listOf(0L, 400L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -227,7 +227,7 @@ class FtpDownloadSourceTest {
       Segment(index = 1, start = 500, end = 999, downloadedBytes = 100),
     )
 
-    source(server).resume(context, FtpDownloadSource.buildResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -246,7 +246,7 @@ class FtpDownloadSourceTest {
       }
     }
 
-    source(server).download(context(accessor, maxConnections = connections))
+    source(server).download(context(accessor, maxConnections = connections), null)
 
     assertEquals(listOf(0L, 250L, 500L, 750L), server.retrieveOffsets.sorted())
     assertContentEquals(server.content, file.bytes)
@@ -260,7 +260,7 @@ class FtpDownloadSourceTest {
     file.preallocate(1000)
     val context = context(file, connections = 1)
 
-    source(server).resume(context, FtpDownloadSource.buildResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -279,7 +279,7 @@ class FtpDownloadSourceTest {
       }
     })
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)

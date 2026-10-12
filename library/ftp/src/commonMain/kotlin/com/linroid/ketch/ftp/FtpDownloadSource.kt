@@ -12,7 +12,6 @@ import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
@@ -20,7 +19,7 @@ import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.KSerializer
 
 /**
  * FTP/FTPS download source using the [FtpClient] protocol layer.
@@ -40,7 +39,7 @@ import kotlinx.serialization.json.Json
  * single connection. Retries after a dropped connection continue from the
  * bytes already written.
  */
-class FtpDownloadSource : DownloadSource {
+class FtpDownloadSource : DownloadSource<FtpSourceState> {
 
   /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
   internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
@@ -50,21 +49,19 @@ class FtpDownloadSource : DownloadSource {
 
   override val type: String = TYPE
 
+  override val stateSerializer: KSerializer<FtpSourceState> = FtpSourceState.serializer()
+
   override fun canHandle(input: ResolveInput): Boolean {
     val url = (input as? ResolveInput.Url)?.url ?: return false
     val lower = url.lowercase()
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
-  override fun buildResumeState(
-    resolved: ResolvedSource,
-    totalBytes: Long,
-  ): SourceResumeState {
-    return buildResumeState(
-      totalBytes = totalBytes,
-      mdtm = resolved.metadata[META_MDTM],
-    )
-  }
+  /** The file's size and modification time as the download started, once; a resume keeps them. */
+  override suspend fun store(context: DownloadContext): FtpSourceState? =
+    context.preResolved?.let {
+      FtpSourceState(totalBytes = it.totalBytes, mdtm = it.metadata[META_MDTM])
+    }
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val url = (input as ResolveInput.Url).url
@@ -109,7 +106,11 @@ class FtpDownloadSource : DownloadSource {
     }
   }
 
-  override suspend fun download(context: DownloadContext) {
+  override suspend fun download(context: DownloadContext, state: FtpSourceState?) {
+    if (state == null) downloadFresh(context) else continueFrom(context, state)
+  }
+
+  private suspend fun downloadFresh(context: DownloadContext) {
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
@@ -166,17 +167,8 @@ class FtpDownloadSource : DownloadSource {
     downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
-  override suspend fun resume(
-    context: DownloadContext,
-    resumeState: SourceResumeState,
-  ) {
-    val state = try {
-      Json.decodeFromString<FtpResumeState>(resumeState.data)
-    } catch (e: Exception) {
-      if (e is CancellationException) throw e
-      throw KetchError.CorruptResumeState(e.message, e)
-    }
-
+  /** Continues from [context]'s segments once the file's modification time still matches. */
+  private suspend fun continueFrom(context: DownloadContext, state: FtpSourceState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)
@@ -439,19 +431,5 @@ class FtpDownloadSource : DownloadSource {
     internal const val META_MDTM = "mdtm"
     internal const val META_SIZE = "size"
     internal const val META_REST = "rest"
-
-    fun buildResumeState(
-      totalBytes: Long,
-      mdtm: String?,
-    ): SourceResumeState {
-      val state = FtpResumeState(
-        totalBytes = totalBytes,
-        mdtm = mdtm,
-      )
-      return SourceResumeState(
-        sourceType = TYPE,
-        data = Json.encodeToString(state),
-      )
-    }
   }
 }
