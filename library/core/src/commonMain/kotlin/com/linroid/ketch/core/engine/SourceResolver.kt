@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -40,26 +41,24 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
     }
   }
 
-  fun resolve(url: String): DownloadSource {
+  /** The first source that [DownloadSource.canHandle]s [input]. */
+  fun resolve(input: ResolveInput): DownloadSource {
     check(!closed.load()) { "Download sources are closed" }
-    val source = sources.firstOrNull { it.canHandle(url) }
+    val source = sources.firstOrNull { it.canHandle(input) }
     if (source != null) {
-      log.d { "Resolved source '${source.type}' for URL: ${redactUrl(url)}" }
+      log.d { "Resolved source '${source.type}' for ${input.describe()}" }
       return source
     }
-    log.e { "No source found for URL: ${redactUrl(url)}" }
+    log.e { "No source found for ${input.describe()}" }
     throw KetchError.Unsupported()
   }
 
-  fun resolveContent(content: ByteArray, fileName: String?): DownloadSource {
-    check(!closed.load()) { "Download sources are closed" }
-    val source = sources.firstOrNull { it.canHandleContent(content, fileName) }
-    if (source != null) {
-      log.d { "Resolved source '${source.type}' for content: fileName=$fileName" }
-      return source
-    }
-    log.e { "No source found for content: fileName=$fileName, size=${content.size}" }
-    throw KetchError.Unsupported()
+  /** The first source that downloads [url]. */
+  fun resolve(url: String): DownloadSource = resolve(ResolveInput.Url(url))
+
+  private fun ResolveInput.describe(): String = when (this) {
+    is ResolveInput.Url -> "URL: ${redactUrl(url)}"
+    is ResolveInput.Content -> "content: fileName=$fileName, size=${bytes.size}"
   }
 
   fun resolveByType(type: String, url: String? = null): DownloadSource {

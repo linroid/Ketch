@@ -2,12 +2,13 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
 
 /**
  * A download protocol, such as HTTP ([HttpDownloadSource]), FTP or BitTorrent. [SourceResolver]
- * routes each URL to the first registered source that [canHandle]s it.
+ * routes each URL, or file content, to the first registered source that [canHandle]s it.
  *
  * A source probes a URL with [resolve], transfers it with [download] and [resume], and saves what
  * a resume needs with [buildResumeState]. The other members are optional.
@@ -40,42 +41,31 @@ interface DownloadSource {
 
   // Resolving
 
-  /** Whether this source downloads [url]. */
-  fun canHandle(url: String): Boolean
+  /**
+   * Whether this source resolves [input]: a URL it downloads, or file content it reads, such as a
+   * `.torrent` file. Most sources accept only [ResolveInput.Url]s.
+   */
+  fun canHandle(input: ResolveInput): Boolean
 
   /**
-   * Probes [url] without downloading it, as an HTTP `HEAD` does, under [config]: Ketch passes its
-   * own configuration for a preview, and a task's for [resolveForDownload].
-   *
-   * @param headers request headers for HTTP sources; other sources may ignore them
+   * Probes [input], which [canHandle] accepted, without downloading it, as an HTTP `HEAD` does.
+   * [config] is Ketch's own for a preview, or a task's for [resolveForDownload]. A result for
+   * [ResolveInput.Content] must carry everything [download] needs, as it gets it as
+   * [DownloadContext.preResolved] rather than resolving [ResolvedSource.url] again.
    */
   suspend fun resolve(
-    url: String,
-    headers: Map<String, String> = emptyMap(),
+    input: ResolveInput,
     config: DownloadConfig = DownloadConfig.Default,
   ): ResolvedSource
 
   /**
-   * Probes [url] for a task that is starting. Unlike a preview it may wait, as a magnet link does
-   * for peers to come online, until it succeeds or the task stops. Defaults to [resolve].
+   * Probes [input] for a task that is starting. Unlike a preview it may wait, as a magnet link
+   * does for peers to come online, until it succeeds or the task stops. Defaults to [resolve].
    */
   suspend fun resolveForDownload(
-    url: String,
-    headers: Map<String, String>,
+    input: ResolveInput.Url,
     config: DownloadConfig,
-  ): ResolvedSource = resolve(url, headers, config)
-
-  /** Whether this source reads file [content] the caller holds, named [fileName] if known. */
-  fun canHandleContent(content: ByteArray, fileName: String?): Boolean = false
-
-  /**
-   * Reads file [content] the caller holds, such as a `.torrent` file, without network access. The
-   * result must carry everything [download] needs, as it gets it as [DownloadContext.preResolved]
-   * rather than resolving [ResolvedSource.url] again.
-   */
-  suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource {
-    throw KetchError.Unsupported()
-  }
+  ): ResolvedSource = resolve(input, config)
 
   /**
    * The [ResolvedSource] a task saved in [resumeState], rebuilt offline, or `null` when it holds
@@ -165,3 +155,13 @@ interface DownloadSource {
     }
   }
 }
+
+/** Whether this source downloads [url]. */
+fun DownloadSource.canHandle(url: String): Boolean = canHandle(ResolveInput.Url(url))
+
+/** [DownloadSource.resolve] for [url], with [headers] for HTTP sources. */
+suspend fun DownloadSource.resolve(
+  url: String,
+  headers: Map<String, String> = emptyMap(),
+  config: DownloadConfig = DownloadConfig.Default,
+): ResolvedSource = resolve(ResolveInput.Url(url, headers), config)

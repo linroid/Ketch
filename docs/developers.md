@@ -170,8 +170,10 @@ Every part that varies by platform or use is an interface you can replace:
 | `Logger` | Send logs to your backend | `Logger.console()`, `Logger.combine()`, `KermitLogger` |
 | `FileNameResolver` | Name files the source names nothing | `DefaultFileNameResolver` |
 
-A `DownloadSource` says which URLs it takes (`canHandle`), probes them (`resolve`), downloads and
-resumes them, and saves what it needs to resume as a `SourceResumeState`. Register it with
+A `DownloadSource` says which inputs it takes (`canHandle`), probes them (`resolve`), downloads and
+resumes them, and saves what it needs to resume as a `SourceResumeState`. Both take a
+`ResolveInput`; most sources accept only its `Url` case, and file content such as a `.torrent`
+file arrives as `Content`. Register it with
 `Ketch(additionalSources = listOf(MySource()))`; the first source whose `canHandle` matches wins,
 and HTTP(S) is the fallback. Pass a name read from a response or a URL through
 `sanitizeFileName()` before returning it as `suggestedFileName`; the engine sanitizes it again

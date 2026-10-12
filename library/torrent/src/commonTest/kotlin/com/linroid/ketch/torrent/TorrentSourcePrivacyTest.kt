@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.engine.TorrentEngine
 import com.linroid.ketch.torrent.engine.TorrentSession

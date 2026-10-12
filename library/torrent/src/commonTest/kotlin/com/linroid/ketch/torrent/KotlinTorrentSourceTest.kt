@@ -5,6 +5,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes

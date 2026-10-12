@@ -3,6 +3,8 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
@@ -126,7 +128,7 @@ class TorrentDownloadSourceResolveTest {
     fakeEngine.fetchMetadataResults.addAll(listOf(null, null))
     fakeEngine.fetchMetadataResult = singleFileMetadata()
     val resolved = source.resolveForDownload(
-      "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
+      ResolveInput.Url("magnet:?xt=urn:btih:$sampleHash"), DownloadConfig.Default,
     )
     assertEquals("test.txt", resolved.suggestedFileName)
     assertEquals(3, fakeEngine.fetchMetadataCalls)
@@ -137,7 +139,7 @@ class TorrentDownloadSourceResolveTest {
     fakeEngine.fetchMetadataError = KetchError.Network(IOException("port in use"))
     assertFailsWith<KetchError.Network> {
       source.resolveForDownload(
-        "magnet:?xt=urn:btih:$sampleHash", emptyMap(), DownloadConfig.Default,
+        ResolveInput.Url("magnet:?xt=urn:btih:$sampleHash"), DownloadConfig.Default,
       )
     }
     assertEquals(1, fakeEngine.fetchMetadataCalls)
@@ -187,7 +189,7 @@ class TorrentDownloadSourceResolveTest {
       ),
     ))
 
-    val resolved = source.resolveContent(content, "pack.torrent")
+    val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
 
     val hash = TorrentMetadata.fromBencode(content).infoHash.hex
     assertEquals("torrent:$hash", resolved.url)
@@ -203,7 +205,7 @@ class TorrentDownloadSourceResolveTest {
   @Test
   fun resolveContent_malformedBytes_throwsSourceError() = runTest {
     val error = assertFailsWith<KetchError.SourceError> {
-      source.resolveContent("d8:announce".encodeToByteArray(), "broken.torrent")
+      source.resolve(ResolveInput.Content("d8:announce".encodeToByteArray(), "broken.torrent"))
     }
     assertEquals("torrent", error.sourceType)
   }

@@ -516,10 +516,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
-- Each source defines: `type`, `canHandle()`, `resolve()`, `download()`, `resume()`,
-  `buildResumeState()`; optional `canHandleContent()` / `resolveContent()` accept file content
-  such as `.torrent` bytes (`ResolveInput.Content`), and `resolveForDownload()` lets a task
-  wait where a preview (`resolve()`) would fail, as magnets whose peers are offline do
+- Each source defines: `type`, `canHandle(input)`, `resolve(input, config)`, `download()`,
+  `resume()`, `buildResumeState()`. `canHandle` and `resolve` take a `ResolveInput`: a URL, or
+  file content such as `.torrent` bytes, which only the torrent source accepts; the
+  `canHandle(url)` and `resolve(url, headers, config)` extensions build the URL input. Optional
+  `resolveForDownload()` lets a task wait where a preview (`resolve()`) would fail, as magnets
+  whose peers are offline do
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support

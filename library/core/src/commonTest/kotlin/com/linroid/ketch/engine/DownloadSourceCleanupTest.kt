@@ -3,6 +3,7 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
@@ -33,12 +34,9 @@ class DownloadSourceCleanupTest {
 
   private class StubSource : DownloadSource {
     override val type = "stub"
-    override fun canHandle(url: String): Boolean = true
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ): ResolvedSource = error("not used")
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+      error("not used")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(
       context: DownloadContext,

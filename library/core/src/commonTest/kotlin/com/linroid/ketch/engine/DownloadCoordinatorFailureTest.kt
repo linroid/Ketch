@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -47,20 +48,19 @@ class DownloadCoordinatorFailureTest {
     val hanging = CompletableDeferred<Unit>()
 
     override val type: String = "scripted"
-    override fun canHandle(url: String): Boolean = true
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
 
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ): ResolvedSource = ResolvedSource(
-      url = url,
-      sourceType = type,
-      totalBytes = 16L,
-      supportsResume = false,
-      suggestedFileName = url.substringAfterLast('/') + ".bin",
-      maxSegments = 1,
-    )
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url,
+        sourceType = type,
+        totalBytes = 16L,
+        supportsResume = false,
+        suggestedFileName = url.substringAfterLast('/') + ".bin",
+        maxSegments = 1,
+      )
+    }
 
     override suspend fun download(context: DownloadContext) {
       when (context.url.substringAfterLast('/')) {

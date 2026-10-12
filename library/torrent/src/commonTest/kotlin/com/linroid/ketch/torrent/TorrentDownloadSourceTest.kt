@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.withoutBulkMetadata
 import com.linroid.ketch.core.Ketch
@@ -12,6 +13,7 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -87,22 +89,23 @@ class TorrentDownloadSourceTest {
 
   @Test
   fun canHandleContent_torrentFileName_caseInsensitive() {
-    assertTrue(source.canHandleContent("anything".encodeToByteArray(), "Ubuntu.TORRENT"))
+    val content = ResolveInput.Content("anything".encodeToByteArray(), "Ubuntu.TORRENT")
+    assertTrue(source.canHandle(content))
   }
 
   @Test
   fun canHandleContent_bencodedDictionaryWithoutTorrentName() {
     val content = "d8:announce3:urle".encodeToByteArray()
-    assertTrue(source.canHandleContent(content, null))
-    assertTrue(source.canHandleContent(content, "download"))
+    assertTrue(source.canHandle(ResolveInput.Content(content, null)))
+    assertTrue(source.canHandle(ResolveInput.Content(content, "download")))
   }
 
   @Test
   fun canHandleContent_otherContent_returnsFalse() {
-    assertFalse(source.canHandleContent("hello".encodeToByteArray(), "notes.txt"))
-    assertFalse(source.canHandleContent("data".encodeToByteArray(), null))
-    assertFalse(source.canHandleContent("d".encodeToByteArray(), null))
-    assertFalse(source.canHandleContent(ByteArray(0), null))
+    assertFalse(source.canHandle(ResolveInput.Content("hello".encodeToByteArray(), "notes.txt")))
+    assertFalse(source.canHandle(ResolveInput.Content("data".encodeToByteArray(), null)))
+    assertFalse(source.canHandle(ResolveInput.Content("d".encodeToByteArray(), null)))
+    assertFalse(source.canHandle(ResolveInput.Content(ByteArray(0), null)))
   }
 
   @Test

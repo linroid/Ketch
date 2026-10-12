@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -51,17 +52,16 @@ class SelfManagedExecutionTest {
     val source = object : DownloadSource {
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 2,
-        files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
-        selectionMode = FileSelectionMode.MULTIPLE,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 2,
+          files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
+          selectionMode = FileSelectionMode.MULTIPLE,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState {
         assertEquals(0L, totalBytes)
         return SourceResumeState(type, "initial")
@@ -110,15 +110,14 @@ class SelfManagedExecutionTest {
     val source = object : DownloadSource {
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = -1, supportsResume = false,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = -1, supportsResume = false,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
         SourceResumeState(type, "")
       override suspend fun download(context: DownloadContext) { downloads++ }
@@ -157,15 +156,14 @@ class SelfManagedExecutionTest {
     val source = object : DownloadSource {
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
         SourceResumeState(type, "initial")
       override suspend fun updateResumeState(context: DownloadContext) =

@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
@@ -17,6 +18,7 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -402,31 +404,24 @@ class TorrentDownloadSource(
   internal fun extraTrackers(): List<String> =
     (additionalTrackers.load() + listedTrackers.load()).distinct()
 
-  override fun canHandle(url: String): Boolean {
-    val lower = url.lowercase()
-    return lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
-      lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
-  }
-
-  /** Accepts `.torrent` file names, or content that starts like a bencoded dictionary. */
-  override fun canHandleContent(content: ByteArray, fileName: String?): Boolean {
-    if (fileName?.endsWith(".torrent", ignoreCase = true) == true) return true
-    // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
-    return content.size >= 2 && content[0] == 'd'.code.toByte() &&
-      content[1] in '1'.code.toByte()..'9'.code.toByte()
-  }
-
-  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
-  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    withContext(TorrentDispatchers.engine) {
-      try {
-        resolveMetainfo(content)
-      } catch (e: CancellationException) { throw e
-      } catch (e: Exception) {
-        if (e is KetchError) throw e
-        throw KetchError.SourceError(TYPE, e)
-      }
+  /**
+   * Accepts magnets, `torrent:` IDs and `.torrent` URLs or paths, and content named `.torrent` or
+   * starting like a bencoded dictionary.
+   */
+  override fun canHandle(input: ResolveInput): Boolean = when (input) {
+    is ResolveInput.Url -> {
+      val lower = input.url.lowercase()
+      lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
+        lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
     }
+    is ResolveInput.Content -> {
+      val bytes = input.bytes
+      // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
+      input.fileName?.endsWith(".torrent", ignoreCase = true) == true ||
+        bytes.size >= 2 && bytes[0] == 'd'.code.toByte() &&
+        bytes[1] in '1'.code.toByte()..'9'.code.toByte()
+    }
+  }
 
   /** Resolve metainfo supplied by a file picker or SDK caller without making a network request. */
   fun resolveMetainfo(
@@ -767,11 +762,23 @@ class TorrentDownloadSource(
   /** The task's registered session; for tests. */
   internal suspend fun sessionOf(taskId: String): TorrentSession? = tasks.session(taskId)
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource = resolve(url, this.config.discoveryPrivacy, headers)
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+    when (input) {
+      is ResolveInput.Url -> resolve(input.url, this.config.discoveryPrivacy, input.headers)
+      is ResolveInput.Content -> resolveContent(input.bytes)
+    }
+
+  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  private suspend fun resolveContent(content: ByteArray): ResolvedSource =
+    withContext(TorrentDispatchers.engine) {
+      try {
+        resolveMetainfo(content)
+      } catch (e: CancellationException) { throw e
+      } catch (e: Exception) {
+        if (e is KetchError) throw e
+        throw KetchError.SourceError(TYPE, e)
+      }
+    }
 
   /** Resolve with an explicit privacy choice before any discovery or metadata request starts. */
   suspend fun resolve(
@@ -828,10 +835,9 @@ class TorrentDownloadSource(
    * of a small swarm may come online at any time. Other inputs resolve as [resolve] does.
    */
   override suspend fun resolveForDownload(
-    url: String,
-    headers: Map<String, String>,
+    input: ResolveInput.Url,
     config: DownloadConfig,
-  ): ResolvedSource = resolveForTask(url, this.config.discoveryPrivacy, headers)
+  ): ResolvedSource = resolveForTask(input.url, this.config.discoveryPrivacy, input.headers)
 
   private suspend fun resolveForTask(
     url: String,

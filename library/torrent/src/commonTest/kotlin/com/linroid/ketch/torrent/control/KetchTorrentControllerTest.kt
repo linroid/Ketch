@@ -14,6 +14,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.task.TaskCommandRecord
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord

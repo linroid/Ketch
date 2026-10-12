@@ -299,17 +299,15 @@ class Ketch(
     return task
   }
 
-  override suspend fun resolve(input: ResolveInput): ResolvedSource = when (input) {
-    is ResolveInput.Url -> {
-      log.i { "Resolving URL: ${redactUrl(input.url)}" }
-      val source = sourceResolver.resolve(input.url)
-      source.resolve(input.url, input.headers, currentConfig)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    log.i {
+      when (input) {
+        is ResolveInput.Url -> "Resolving URL: ${redactUrl(input.url)}"
+        is ResolveInput.Content ->
+          "Resolving content: fileName=${input.fileName}, size=${input.bytes.size}"
+      }
     }
-    is ResolveInput.Content -> {
-      log.i { "Resolving content: fileName=${input.fileName}, size=${input.bytes.size}" }
-      val source = sourceResolver.resolveContent(input.bytes, input.fileName)
-      source.resolveContent(input.bytes, input.fileName)
-    }
+    return sourceResolver.resolve(input).resolve(input, currentConfig)
   }
 
   override suspend fun start() {

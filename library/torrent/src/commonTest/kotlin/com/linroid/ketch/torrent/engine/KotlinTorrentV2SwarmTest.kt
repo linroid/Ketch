@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.engine
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy

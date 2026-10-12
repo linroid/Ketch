@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -14,6 +15,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -71,16 +73,18 @@ class SeedingWatcherTest {
     /** Runs as a download finishes, before it returns. */
     var onFinish: (taskId: String) -> Unit = {}
 
-    override fun canHandle(url: String) = url.startsWith("seed:")
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("seed:")
+    }
 
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ) = ResolvedSource(
-      url = url, sourceType = TYPE, totalBytes = 100, supportsResume = true,
-      suggestedFileName = "seed", maxSegments = 1, files = listOf(SourceFile("0", "seed", 100)),
-    )
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = TYPE, totalBytes = 100, supportsResume = true,
+        suggestedFileName = "seed", maxSegments = 1, files = listOf(SourceFile("0", "seed", 100)),
+      )
+    }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
       SourceResumeState(TYPE, resolved.url)

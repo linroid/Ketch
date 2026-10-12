@@ -2,6 +2,7 @@ package com.linroid.ketch
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -141,17 +142,18 @@ class KetchUpdateConfigTest {
     override val managesOwnFileIo = true
     var outputPath: String? = null
 
-    override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("fixture:")
+    }
 
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ): ResolvedSource =
-      ResolvedSource(
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,
       )
+    }
 
     override suspend fun download(context: DownloadContext) {
       outputPath = context.outputPath

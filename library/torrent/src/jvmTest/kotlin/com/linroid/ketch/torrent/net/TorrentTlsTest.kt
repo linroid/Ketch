@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.net
 
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes

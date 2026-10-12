@@ -2,12 +2,15 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
+import com.linroid.ketch.core.engine.resolve
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,20 +25,20 @@ class SourceResolverTest {
 
   private val fakeSource = object : DownloadSource {
     override val type = "magnet"
-    override fun canHandle(url: String) =
-      url.startsWith("magnet:")
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ) = ResolvedSource(
-      url = url,
-      sourceType = "magnet",
-      totalBytes = 1000,
-      supportsResume = false,
-      suggestedFileName = null,
-      maxSegments = 1,
-    )
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Url &&
+      input.url.startsWith("magnet:")
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url,
+        sourceType = "magnet",
+        totalBytes = 1000,
+        supportsResume = false,
+        suggestedFileName = null,
+        maxSegments = 1,
+      )
+    }
     override suspend fun download(context: DownloadContext) {}
     override suspend fun resume(
       context: DownloadContext,
@@ -59,7 +62,9 @@ class SourceResolverTest {
     assertEquals(1, closeCount)
     assertFailsWith<IllegalStateException> { resolver.resolve("magnet:test") }
     assertFailsWith<IllegalStateException> { resolver.resolveByType("magnet") }
-    assertFailsWith<IllegalStateException> { resolver.resolveContent(byteArrayOf(1), null) }
+    assertFailsWith<IllegalStateException> {
+      resolver.resolve(ResolveInput.Content(byteArrayOf(1)))
+    }
   }
 
   @Test
@@ -123,7 +128,10 @@ class SourceResolverTest {
     fun renamed(type: String) = object : DownloadSource by fakeSource {
       override val type: String = type
       override val previousTypes: Set<String> = setOf("old")
-      override fun canHandle(url: String): Boolean = url.startsWith("$type:")
+      override fun canHandle(input: ResolveInput): Boolean {
+        val url = (input as? ResolveInput.Url)?.url ?: return false
+        return url.startsWith("$type:")
+      }
     }
     val first = renamed("first")
     val second = renamed("second")
@@ -149,11 +157,11 @@ class SourceResolverTest {
   fun resolveContent_matchingSource_returnsFirstMatch() {
     val contentSource = object : DownloadSource by fakeSource {
       override val type = "content"
-      override fun canHandleContent(content: ByteArray, fileName: String?) =
-        fileName == "a.torrent"
+      override fun canHandle(input: ResolveInput) =
+        input is ResolveInput.Content && input.fileName == "a.torrent"
     }
     val resolver = SourceResolver(listOf(httpSource, contentSource, fakeSource))
-    val source = resolver.resolveContent(byteArrayOf(1), "a.torrent")
+    val source = resolver.resolve(ResolveInput.Content(byteArrayOf(1), "a.torrent"))
     assertEquals("content", source.type)
   }
 
@@ -161,7 +169,7 @@ class SourceResolverTest {
   fun resolveContent_noSourceAccepts_throwsUnsupported() {
     val resolver = SourceResolver(listOf(httpSource, fakeSource))
     assertFailsWith<KetchError.Unsupported> {
-      resolver.resolveContent(byteArrayOf(1), "a.torrent")
+      resolver.resolve(ResolveInput.Content(byteArrayOf(1), "a.torrent"))
     }
   }
 

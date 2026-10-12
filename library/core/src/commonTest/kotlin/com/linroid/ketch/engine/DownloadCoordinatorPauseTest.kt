@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -119,15 +120,14 @@ class DownloadCoordinatorPauseTest {
   private class StoppingSource(private val checkpoint: CompletableDeferred<Unit>) : DownloadSource {
     override val type = "fixture"
     override val managesOwnFileIo = true
-    override fun canHandle(url: String) = true
-    override suspend fun resolve(
-      url: String,
-      headers: Map<String, String>,
-      config: DownloadConfig,
-    ) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-      suggestedFileName = "fixture", maxSegments = 1,
-    )
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+        suggestedFileName = "fixture", maxSegments = 1,
+      )
+    }
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
       SourceResumeState(type, "")
     override suspend fun download(context: DownloadContext) {
@@ -172,15 +172,14 @@ class DownloadCoordinatorPauseTest {
     val source = object : DownloadSource {
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
       override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
         SourceResumeState(type, "")
       override suspend fun download(context: DownloadContext) {

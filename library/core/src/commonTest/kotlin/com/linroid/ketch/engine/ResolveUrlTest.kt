@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
@@ -9,6 +10,7 @@ import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.resolve
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -262,20 +264,20 @@ class ResolveUrlTest {
   fun sourceResolver_unsupportedUrl_throwsUnsupported() {
     val fakeSource = object : DownloadSource {
       override val type = "magnet"
-      override fun canHandle(url: String) =
-        url.startsWith("magnet:")
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url,
-        sourceType = "magnet",
-        totalBytes = 1000,
-        supportsResume = false,
-        suggestedFileName = null,
-        maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean =
+        input is ResolveInput.Url &&
+        input.url.startsWith("magnet:")
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url,
+          sourceType = "magnet",
+          totalBytes = 1000,
+          supportsResume = false,
+          suggestedFileName = null,
+          maxSegments = 1,
+        )
+      }
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
@@ -298,20 +300,20 @@ class ResolveUrlTest {
   fun resolve_customSource_returnsCorrectResolvedSource() = runTest {
     val fakeSource = object : DownloadSource {
       override val type = "magnet"
-      override fun canHandle(url: String) =
-        url.startsWith("magnet:")
-      override suspend fun resolve(
-        url: String,
-        headers: Map<String, String>,
-        config: DownloadConfig,
-      ) = ResolvedSource(
-        url = url,
-        sourceType = "magnet",
-        totalBytes = 50000,
-        supportsResume = false,
-        suggestedFileName = "torrent-file.bin",
-        maxSegments = 1,
-      )
+      override fun canHandle(input: ResolveInput): Boolean =
+        input is ResolveInput.Url &&
+        input.url.startsWith("magnet:")
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url,
+          sourceType = "magnet",
+          totalBytes = 50000,
+          supportsResume = false,
+          suggestedFileName = "torrent-file.bin",
+          maxSegments = 1,
+        )
+      }
       override suspend fun download(context: DownloadContext) {}
       override suspend fun resume(
         context: DownloadContext,
