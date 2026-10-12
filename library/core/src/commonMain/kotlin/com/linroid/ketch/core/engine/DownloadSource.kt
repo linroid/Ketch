@@ -49,23 +49,17 @@ interface DownloadSource {
 
   /**
    * Probes [input], which [canHandle] accepted, without downloading it, as an HTTP `HEAD` does.
-   * [config] is Ketch's own for a preview, or a task's for [resolveForDownload]. A result for
-   * [ResolveInput.Content] must carry everything [download] needs, as it gets it as
+   * It may take as long as finding the content does, as a magnet link waits for peers to come
+   * online, and stops when cancelled: callers bound it, as Ketch's preview does, while a starting
+   * task waits. [config] is Ketch's own for a preview, or the task's.
+   *
+   * A result for [ResolveInput.Content] must carry everything [download] needs, as it gets it as
    * [DownloadContext.preResolved] rather than resolving [ResolvedSource.url] again.
    */
   suspend fun resolve(
     input: ResolveInput,
     config: DownloadConfig = DownloadConfig.Default,
   ): ResolvedSource
-
-  /**
-   * Probes [input] for a task that is starting. Unlike a preview it may wait, as a magnet link
-   * does for peers to come online, until it succeeds or the task stops. Defaults to [resolve].
-   */
-  suspend fun resolveForDownload(
-    input: ResolveInput.Url,
-    config: DownloadConfig,
-  ): ResolvedSource = resolve(input, config)
 
   /**
    * The [ResolvedSource] a task saved in [resumeState], rebuilt offline, or `null` when it holds

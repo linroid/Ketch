@@ -171,11 +171,11 @@ including a development run, hands its files to the running app instead of openi
   so peers that never answer cannot hold up one that does. A peer that fails is asked again after
   5, 15 and 30 seconds, behind peers found meanwhile, so swarms of one or two briefly busy peers
   still resolve. Each failure and its reason is logged at debug, each exchange step at verbose.
-- A task keeps looking for a magnet's metadata (`DownloadSource.resolveForDownload`), one
-  `metadataTimeout` lookup after another, until it is found or the task is paused or canceled,
-  since the peers of a small swarm may come online later; each fruitless lookup is logged at
-  info. A preview such as `KetchApi.resolve` still gives up after one lookup. The apps show such
-  a task as Starting, "Finding peers", once it holds a download slot.
+- The source keeps looking for a magnet's metadata, one `metadataTimeout` lookup after another,
+  until it is found or the caller stops, since the peers of a small swarm may come online later;
+  each fruitless lookup is logged at info. A task waits until it is paused or canceled, while a
+  preview such as `KetchApi.resolve` gives up after `Ketch`'s `resolveTimeout` (2 minutes). The apps
+  show such a task as Starting, "Finding peers", once it holds a download slot.
 - `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
   `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
   and at most 128 are used. Each one is announced alongside the torrent's own trackers rather than

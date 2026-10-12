@@ -69,6 +69,7 @@ import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -78,6 +79,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -104,6 +106,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.withTimeout
 
 /**
  * Core in-process implementation of [KetchApi]. No HTTP involved.
@@ -120,6 +123,9 @@ import kotlin.uuid.Uuid
  *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
  *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param logger logging backend
+ * @param resolveTimeout how long [resolve] waits for an answer, such as a magnet link's metadata
+ *   from peers, before failing with [KetchError.Network]; a starting task waits as long as it
+ *   takes
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
  *   are bounded, but network transfers suspend instead of blocking a thread, so their size does
@@ -136,6 +142,7 @@ class Ketch(
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
+  private val resolveTimeout: Duration = 2.minutes,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -307,7 +314,15 @@ class Ketch(
           "Resolving content: fileName=${input.fileName}, size=${input.bytes.size}"
       }
     }
-    return sourceResolver.resolve(input).resolve(input, currentConfig)
+    val source = sourceResolver.resolve(input)
+    // On Ketch's own dispatcher, so the limit follows its clock rather than the caller's.
+    return withContext(dispatchers.network) {
+      try {
+        withTimeout(resolveTimeout) { source.resolve(input, currentConfig) }
+      } catch (e: TimeoutCancellationException) {
+        throw KetchError.Network(e)
+      }
+    }
   }
 
   override suspend fun start() {

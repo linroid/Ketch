@@ -219,7 +219,7 @@ internal class DownloadExecution(
         "Resolved source '${source.type}' for taskId=$taskId: url=${redactUrl(request.url)}"
       }
       resolvedUrl = downloadWithRetry {
-        source.resolveForDownload(ResolveInput.Url(request.url, request.headers), config)
+        source.resolve(ResolveInput.Url(request.url, request.headers), config)
       }
     }
 

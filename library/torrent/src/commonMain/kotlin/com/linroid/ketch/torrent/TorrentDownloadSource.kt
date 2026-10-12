@@ -762,9 +762,11 @@ class TorrentDownloadSource(
   /** The task's registered session; for tests. */
   internal suspend fun sessionOf(taskId: String): TorrentSession? = tasks.session(taskId)
 
+  /** A magnet keeps looking for its metadata until it is found or the caller stops. */
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
     when (input) {
-      is ResolveInput.Url -> resolve(input.url, this.config.discoveryPrivacy, input.headers)
+      is ResolveInput.Url ->
+        resolveUntilFound(input.url, this.config.discoveryPrivacy, input.headers)
       is ResolveInput.Content -> resolveContent(input.bytes)
     }
 
@@ -830,16 +832,11 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Resolves [url] for a task. A magnet keeps looking for its metadata, in lookups of
-   * [TorrentConfig.metadataTimeoutSeconds] each, until one finds it or the task stops: the peers
-   * of a small swarm may come online at any time. Other inputs resolve as [resolve] does.
+   * Resolves [url] as [resolve] does, except that a magnet keeps looking for its metadata, in
+   * lookups of [TorrentConfig.metadataTimeoutSeconds] each, until one finds it or the caller
+   * stops: the peers of a small swarm may come online at any time.
    */
-  override suspend fun resolveForDownload(
-    input: ResolveInput.Url,
-    config: DownloadConfig,
-  ): ResolvedSource = resolveForTask(input.url, this.config.discoveryPrivacy, input.headers)
-
-  private suspend fun resolveForTask(
+  private suspend fun resolveUntilFound(
     url: String,
     privacy: TorrentDiscoveryPrivacy,
     properties: Map<String, String>,
@@ -931,7 +928,7 @@ class TorrentDownloadSource(
 
   override suspend fun download(context: DownloadContext) = reportingFailures {
     val resolved = context.preResolved
-      ?: resolveForTask(context.url, config.discoveryPrivacy, context.headers)
+      ?: resolveUntilFound(context.url, config.discoveryPrivacy, context.headers)
     execute(context, resolved, null)
   }
 
@@ -947,7 +944,7 @@ class TorrentDownloadSource(
     val resolved = when {
       state.metainfo.isNotEmpty() -> resolveMetainfo(decodeBase64(state.metainfo), privacy)
       checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
-      else -> resolveForTask(context.url, privacy, context.headers)
+      else -> resolveUntilFound(context.url, privacy, context.headers)
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Resume torrent changed" }
     execute(context, resolved, state)

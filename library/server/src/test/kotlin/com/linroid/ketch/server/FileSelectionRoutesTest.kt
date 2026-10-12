@@ -59,20 +59,13 @@ class FileSelectionRoutesTest {
 
     override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
       val url = (input as ResolveInput.Url).url
+      if (url == "files:unknown") awaitCancellation()
       return ResolvedSource(
         url = url, sourceType = type, totalBytes = 30, supportsResume = true,
         suggestedFileName = "pack", maxSegments = 2,
         files = listOf(SourceFile("0", "a.bin", 10), SourceFile("1", "b.bin", 20)),
         selectionMode = FileSelectionMode.MULTIPLE,
       )
-    }
-
-    override suspend fun resolveForDownload(
-      input: ResolveInput.Url,
-      config: DownloadConfig,
-    ): ResolvedSource {
-      if (input.url == "files:unknown") awaitCancellation()
-      return resolve(input, config)
     }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
