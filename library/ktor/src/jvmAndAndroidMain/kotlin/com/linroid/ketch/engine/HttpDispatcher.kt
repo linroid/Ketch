@@ -29,13 +29,13 @@ internal val httpDispatcher: CoroutineDispatcher by lazy {
 }
 
 /**
- * CIO's: its selector loop, its connections' coroutines, which never block, and its host name
- * lookups, which do. A burst of short tasks would otherwise start a thread for each, as the
- * view starts a worker per queued task up to its limit, so it gets few, [CIO_THREADS].
+ * A CIO client's own slice, [CIO_THREADS] of these threads: its selector loop, which keeps one
+ * while the client has sockets, its connections' coroutines, which never block, and its host
+ * name lookups, which do. A burst of short tasks would otherwise start a thread for each, as a
+ * view starts a worker per queued task up to its limit; each client gets a slice of its own, so
+ * no client's selector takes another's.
  */
-internal val cioDispatcher: CoroutineDispatcher by lazy {
-  httpThreads.limitedParallelism(CIO_THREADS)
-}
+internal fun cioDispatcher(): CoroutineDispatcher = httpThreads.limitedParallelism(CIO_THREADS)
 
 private const val OKHTTP_THREADS = 64
 private const val CIO_THREADS = 8

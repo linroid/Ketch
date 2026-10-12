@@ -6,10 +6,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.test.Test
@@ -52,16 +55,43 @@ class HttpDispatcherTest {
   @Test
   fun cio_runsFewTasksAtOnce(): Unit = runBlocking {
     // A burst of CIO's short tasks takes at most its slice, not a thread each up to OkHttp's 64.
+    val slice = cioDispatcher()
     val running = AtomicInteger()
     val most = AtomicInteger()
     List(40) {
-      async(cioDispatcher) {
+      async(slice) {
         most.accumulateAndGet(running.incrementAndGet(), ::maxOf)
         Thread.sleep(20)
         running.decrementAndGet()
       }
     }.awaitAll()
     assertEquals(8, most.get())
+  }
+
+  @Test
+  fun cio_clientsDoNotShareTheirSlices(): Unit = runBlocking {
+    // Each CIO client's selector keeps a thread of its slice while it has sockets: another
+    // client's slice must run even when every thread of the first one is taken.
+    val first = cioDispatcher()
+    val second = cioDispatcher()
+    val release = CountDownLatch(1)
+    val held = CountDownLatch(8)
+    val holders = List(8) {
+      async(first) {
+        held.countDown()
+        release.await()
+      }
+    }
+    try {
+      check(held.await(5, TimeUnit.SECONDS)) { "The first slice never filled" }
+      // Awaiting the probe needs no thread of either slice, so a shared one fails the test
+      // rather than hanging it.
+      val probe = async(second) { 1 }
+      assertEquals(1, withTimeoutOrNull(5.seconds) { probe.await() }, "The slices are shared")
+    } finally {
+      release.countDown()
+      holders.awaitAll()
+    }
   }
 
   /**
