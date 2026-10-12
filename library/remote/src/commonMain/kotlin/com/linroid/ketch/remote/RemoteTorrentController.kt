@@ -36,6 +36,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.LineEnding
 import io.ktor.utils.io.readLine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -187,7 +188,7 @@ internal class RemoteTorrentController(
       var name: String? = null
       val data = StringBuilder()
       while (!ended) {
-        val line = channel.readLine()
+        val line = channel.readLine(LineEnding.Lenient)
         // A blank line ends an event; so does the end of the stream, leniently.
         if (line.isNullOrEmpty()) {
           val event = name
