@@ -3,7 +3,7 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SystemInfo
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class RemoteProxyTest {
-  private val proxy = ProxyConfig.manual("socks5://127.0.0.1:1080")
+  private val proxy = Proxy.Manual("socks5://127.0.0.1:1080")
 
   @Test
   fun proxy_serverWithoutFeature_isRefusedBeforeSending() = runTest {

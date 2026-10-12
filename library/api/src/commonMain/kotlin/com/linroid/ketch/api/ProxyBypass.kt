@@ -1,7 +1,12 @@
 package com.linroid.ketch.api
 
-/** Matches hosts against [ProxyConfig.bypass] entries, unresolved. */
-internal object ProxyBypass {
+/** Matches hosts against [Proxy.Manual.bypass] entries, unresolved. */
+@InternalKetchApi
+object ProxyBypass {
+  /** Whether [host] is loopback or matches one of [entries], as [Proxy.Manual.bypasses] does. */
+  fun bypasses(entries: List<String>, host: String): Boolean =
+    isLoopback(host) || entries.any { matches(it, host) }
+
   /** Whether [entry] is a domain name, an IP address, a CIDR range, `<local>` or `*`. */
   fun isValid(entry: String): Boolean {
     val value = entry.trim().lowercase()

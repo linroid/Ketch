@@ -9,9 +9,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ProxyAddress
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.InstanceEntry
@@ -42,7 +41,8 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * How [device]'s HTTP downloads reach servers: the system's proxy, none, or one typed here, with
  * its credentials and the hosts reached directly. Changes apply as downloads start or resume,
- * and are saved with the download settings.
+ * and are saved with the download settings; a manual proxy left for another choice is kept only
+ * while the page is open.
  */
 @Composable
 internal fun ProxySettings(state: AppState, device: InstanceEntry) {
@@ -58,11 +58,19 @@ internal fun ProxySettings(state: AppState, device: InstanceEntry) {
     return
   }
   val proxy = config.proxy
-  val onChange = { updated: ProxyConfig -> controller.updateDownload(config.copy(proxy = updated)) }
-  // Manual mode needs an address, so it is only applied once one is typed.
+  val onChange = { updated: Proxy -> controller.updateDownload(config.copy(proxy = updated)) }
+  val manual = proxy as? Proxy.Manual
+  // Kept while the page is open, so choosing another proxy and Manual again brings it back.
+  var lastManual by remember(device.deviceId) { mutableStateOf(manual) }
+  // Manual needs an address, so choosing it shows the fields until one is typed.
   var choosingManual by rememberSaveable(device.deviceId) { mutableStateOf(false) }
-  LaunchedEffect(proxy.mode) { if (proxy.mode == ProxyMode.MANUAL) choosingManual = false }
-  val mode = if (choosingManual) ProxyMode.MANUAL else proxy.mode
+  LaunchedEffect(proxy) {
+    if (manual != null) {
+      lastManual = manual
+      choosingManual = false
+    }
+  }
+  val choice = if (choosingManual) ProxyChoice.Manual else ProxyChoice.of(proxy)
 
   SettingsGroup(
     title = stringResource(Res.string.settings_proxy),
@@ -70,33 +78,33 @@ internal fun ProxySettings(state: AppState, device: InstanceEntry) {
   ) {
     SettingsSelectRow(
       title = stringResource(Res.string.settings_proxy_mode),
-      value = mode,
-      options = ProxyMode.entries,
-      label = ::modeLabel,
+      value = choice,
+      options = ProxyChoice.entries,
+      label = ::choiceLabel,
       onSelect = { selected ->
-        when {
-          selected != ProxyMode.MANUAL -> {
-            choosingManual = false
-            if (selected != proxy.mode) onChange(proxy.copy(mode = selected))
-          }
-          proxy.url != null -> onChange(proxy.copy(mode = ProxyMode.MANUAL))
-          else -> choosingManual = true
+        val chosen = when (selected) {
+          ProxyChoice.System -> Proxy.System
+          ProxyChoice.Direct -> Proxy.Direct
+          ProxyChoice.Manual -> lastManual
         }
+        choosingManual = chosen == null
+        if (chosen != null && chosen != proxy) onChange(chosen)
       },
-      description = if (mode == ProxyMode.SYSTEM) {
+      description = if (choice == ProxyChoice.System) {
         stringResource(Res.string.settings_proxy_system_hint, device.label)
       } else {
         null
       },
     )
-    if (mode != ProxyMode.MANUAL) return@SettingsGroup
+    if (choice != ProxyChoice.Manual) return@SettingsGroup
+    val address = manual?.address
     SettingsRow(
       title = stringResource(Res.string.settings_proxy_address),
       description = stringResource(Res.string.settings_proxy_address_hint),
     ) {
       SettingsTextInput(
-        value = proxy.url.orEmpty(),
-        onCommit = { typed -> if (typed.isNotEmpty()) onChange(withAddress(proxy, typed)) },
+        value = address?.url.orEmpty(),
+        onCommit = { typed -> if (typed.isNotEmpty()) onChange(withAddress(manual, typed)) },
         placeholder = stringResource(Res.string.settings_proxy_address_placeholder),
         validate = { typed ->
           if (typed.isBlank() || ProxyAddress.parse(typed) != null) {
@@ -108,66 +116,93 @@ internal fun ProxySettings(state: AppState, device: InstanceEntry) {
         mono = true,
       )
     }
-    SettingsRow(title = stringResource(Res.string.settings_proxy_username)) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_proxy_username),
+      enabled = manual != null,
+    ) {
       SettingsTextInput(
-        value = proxy.username.orEmpty(),
+        value = address?.username.orEmpty(),
         onCommit = { name ->
           val username = name.ifEmpty { null }
           // A password belongs to its username.
-          val password = proxy.password.takeIf { username != null }
-          onChange(proxy.copy(username = username, password = password))
+          val password = address?.password.takeIf { username != null }
+          manual?.let { onChange(it.withCredentials(username, password)) }
         },
         placeholder = stringResource(Res.string.settings_proxy_optional),
+        enabled = manual != null,
       )
     }
     SettingsRow(
       title = stringResource(Res.string.settings_proxy_password),
-      enabled = proxy.username != null,
+      enabled = address?.username != null,
     ) {
       SettingsTextInput(
-        value = proxy.password.orEmpty(),
-        onCommit = { onChange(proxy.copy(password = it.ifEmpty { null })) },
+        value = address?.password.orEmpty(),
+        onCommit = { typed ->
+          manual?.let { onChange(it.withCredentials(it.address.username, typed.ifEmpty { null })) }
+        },
         placeholder = stringResource(Res.string.settings_proxy_optional),
         // Spaces can be part of a password.
         normalize = { it },
         secret = true,
-        enabled = proxy.username != null,
+        enabled = address?.username != null,
       )
     }
     SettingsRow(
       title = stringResource(Res.string.settings_proxy_bypass),
       description = stringResource(Res.string.settings_proxy_bypass_hint),
+      enabled = manual != null,
     ) {
       SettingsTextInput(
-        value = proxy.bypass.joinToString(", "),
-        onCommit = { typed -> onChange(proxy.copy(bypass = bypassEntries(typed))) },
+        value = manual?.bypass.orEmpty().joinToString(", "),
+        onCommit = { typed -> manual?.let { onChange(it.copy(bypass = bypassEntries(typed))) } },
         placeholder = stringResource(Res.string.settings_proxy_bypass_placeholder),
         normalize = { bypassEntries(it).joinToString(", ") },
         validate = { typed ->
-          bypassEntries(typed).firstOrNull { !ProxyConfig.isValidBypass(it) }
+          bypassEntries(typed).firstOrNull { !Proxy.Manual.isValidBypass(it) }
             ?.let { Res.string.settings_proxy_bypass_invalid.text(it) }
         },
         mono = true,
+        enabled = manual != null,
       )
     }
   }
 }
 
-private fun modeLabel(mode: ProxyMode): UiText = when (mode) {
-  ProxyMode.SYSTEM -> Res.string.settings_proxy_system.text()
-  ProxyMode.DIRECT -> Res.string.settings_proxy_direct.text()
-  ProxyMode.MANUAL -> Res.string.settings_proxy_manual.text()
+/** The choices of the proxy row. */
+private enum class ProxyChoice {
+  System,
+  Direct,
+  Manual;
+
+  companion object {
+    fun of(proxy: Proxy): ProxyChoice = when (proxy) {
+      Proxy.System -> System
+      Proxy.Direct -> Direct
+      is Proxy.Manual -> Manual
+    }
+  }
+}
+
+private fun choiceLabel(choice: ProxyChoice): UiText = when (choice) {
+  ProxyChoice.System -> Res.string.settings_proxy_system.text()
+  ProxyChoice.Direct -> Res.string.settings_proxy_direct.text()
+  ProxyChoice.Manual -> Res.string.settings_proxy_manual.text()
 }
 
 /**
- * [proxy] in manual mode at the proxy [typed], whose credentials, if it carries any, replace
- * the saved ones.
+ * The proxy at [typed], keeping [current]'s bypass list and, unless [typed] carries its own,
+ * its credentials.
  */
-internal fun withAddress(proxy: ProxyConfig, typed: String): ProxyConfig {
-  val parsed = ProxyConfig.manual(typed, proxy.bypass)
-  if (parsed.username != null) return parsed
-  return parsed.copy(username = proxy.username, password = proxy.password)
+internal fun withAddress(current: Proxy.Manual?, typed: String): Proxy.Manual {
+  val parsed = Proxy.Manual(typed, current?.bypass.orEmpty())
+  if (current == null || parsed.address.username != null) return parsed
+  return parsed.withCredentials(current.address.username, current.address.password)
 }
+
+/** This proxy with [username] and [password]. */
+internal fun Proxy.Manual.withCredentials(username: String?, password: String?): Proxy.Manual =
+  copy(address = address.copy(username = username, password = password))
 
 /** The entries of a comma-separated bypass list. */
 internal fun bypassEntries(text: String): List<String> =

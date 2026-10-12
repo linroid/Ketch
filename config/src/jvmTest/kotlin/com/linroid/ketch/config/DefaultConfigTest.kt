@@ -2,7 +2,7 @@ package com.linroid.ketch.config
 
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import java.io.File
 import kotlin.io.path.createTempDirectory
@@ -43,7 +43,7 @@ class DefaultConfigTest {
         ),
         DownloadCategory(folder = "Software/GitHub", hosts = listOf("github.com")),
       )
-      val proxy = ProxyConfig.manual(
+      val proxy = Proxy.Manual(
         "socks5://me:secret@127.0.0.1:1080",
         bypass = listOf("*.lan", "10.0.0.0/8"),
       )

@@ -329,7 +329,7 @@ DownloadConfig(
   speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
   maxConcurrentDownloads = 4,     // max simultaneous downloads (0 = unlimited)
   maxConnectionsPerHost = 16,     // max simultaneous downloads per host (0 = unlimited)
-  proxy = ProxyConfig.System,     // HTTP(S) proxy: System, Direct or ProxyConfig.manual(url)
+  proxy = Proxy.System,           // HTTP(S) proxy: System, Direct or Proxy.Manual(url)
   categories = emptyList(),       // folders inside defaultDirectory, by type or site
 )
 ```
@@ -436,11 +436,11 @@ task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
 ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // global
 
 // Proxies: one for every download, and one for a single download
-ketch.updateConfig(config.copy(proxy = ProxyConfig.manual("http://proxy.lan:3128")))
+ketch.updateConfig(config.copy(proxy = Proxy.Manual("http://proxy.lan:3128")))
 ketch.download(
   DownloadRequest(
     url = "https://example.com/file.zip",
-    proxy = ProxyConfig.manual("socks5://user:secret@127.0.0.1:1080", bypass = listOf("*.lan")),
+    proxy = Proxy.Manual("socks5://user:secret@127.0.0.1:1080", bypass = listOf("*.lan")),
   )
 )
 ```

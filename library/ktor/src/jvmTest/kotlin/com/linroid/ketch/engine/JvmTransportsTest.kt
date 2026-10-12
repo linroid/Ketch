@@ -1,12 +1,12 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import io.ktor.client.engine.cio.CIOEngineConfig
 import io.ktor.http.Url
 import java.io.IOException
 import java.net.InetSocketAddress
-import java.net.Proxy
+import java.net.Proxy as JavaProxy
 import java.net.ProxySelector
 import java.net.SocketAddress
 import java.net.URI
@@ -82,12 +82,12 @@ class JvmTransportsTest {
   @Test
   fun system_withoutEnvironment_usesSelectorProxy() {
     val transports = JvmTransports(null, emptyMap()) {
-      FixedSelector(Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("socks.test", 9050)))
+      FixedSelector(JavaProxy(JavaProxy.Type.SOCKS, InetSocketAddress.createUnresolved("socks.test", 9050)))
     }
     try {
       assertEquals(
         ProxyRoute.Socks5("socks.test", 9050),
-        transports.clientFor(https, ProxyConfig.System).route,
+        transports.clientFor(https, Proxy.System).route,
       )
     } finally {
       transports.close()
@@ -97,15 +97,15 @@ class JvmTransportsTest {
   @Test
   fun direct_usesCioOnlyWhenTheSelectorWouldToo() {
     val proxied = JvmTransports(null, emptyMap()) {
-      FixedSelector(Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved("jvm.test", 3128)))
+      FixedSelector(JavaProxy(JavaProxy.Type.HTTP, InetSocketAddress.createUnresolved("jvm.test", 3128)))
     }
-    val direct = JvmTransports(null, emptyMap()) { FixedSelector(Proxy.NO_PROXY) }
+    val direct = JvmTransports(null, emptyMap()) { FixedSelector(JavaProxy.NO_PROXY) }
     try {
-      val forced = proxied.clientFor(https, ProxyConfig.Direct)
+      val forced = proxied.clientFor(https, Proxy.Direct)
       assertEquals(ProxyRoute.Direct, forced.route)
       // CIO would ask the JVM's selector and take its proxy anyway.
       assertTrue(forced.client.engine.config !is CIOEngineConfig)
-      assertIs<CIOEngineConfig>(direct.clientFor(https, ProxyConfig.System).client.engine.config)
+      assertIs<CIOEngineConfig>(direct.clientFor(https, Proxy.System).client.engine.config)
     } finally {
       proxied.close()
       direct.close()
@@ -114,9 +114,9 @@ class JvmTransportsTest {
 
   @Test
   fun clientFor_sameRoute_reusesClient() {
-    val transports = JvmTransports(null, emptyMap()) { FixedSelector(Proxy.NO_PROXY) }
+    val transports = JvmTransports(null, emptyMap()) { FixedSelector(JavaProxy.NO_PROXY) }
     try {
-      val proxy = ProxyConfig.manual("http://proxy.test:3128")
+      val proxy = Proxy.Manual("http://proxy.test:3128")
       val first = transports.clientFor(https, proxy).client
       assertTrue(first === transports.clientFor(Url("https://other.test/a"), proxy).client)
     } finally {
@@ -124,8 +124,8 @@ class JvmTransportsTest {
     }
   }
 
-  private class FixedSelector(private val proxy: Proxy) : ProxySelector() {
-    override fun select(uri: URI): List<Proxy> = listOf(proxy)
+  private class FixedSelector(private val proxy: JavaProxy) : ProxySelector() {
+    override fun select(uri: URI): List<JavaProxy> = listOf(proxy)
 
     override fun connectFailed(uri: URI, address: SocketAddress, failure: IOException) {}
   }

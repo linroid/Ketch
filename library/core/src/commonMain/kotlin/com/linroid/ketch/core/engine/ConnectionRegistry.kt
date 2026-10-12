@@ -7,9 +7,8 @@ import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.PeerDetails
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ProxyAddress
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -328,17 +327,16 @@ internal class ConnectionRegistry(
  * The spec of an HTTP(S) request to [url] for [source], before the engine says more: the URL's
  * host and port, and the route [proxy] would take.
  */
-internal fun httpConnectionSpec(source: String, url: String, proxy: ProxyConfig): ConnectionSpec {
+internal fun httpConnectionSpec(source: String, url: String, proxy: Proxy): ConnectionSpec {
   val authority = UrlAuthority.parse(url)
   val host = authority?.host.orEmpty()
-  val route = when (proxy.mode) {
-    ProxyMode.SYSTEM -> ConnectionRoute.UNKNOWN
-    ProxyMode.DIRECT -> ConnectionRoute.DIRECT
-    ProxyMode.MANUAL -> when {
+  val route = when (proxy) {
+    Proxy.System -> ConnectionRoute.UNKNOWN
+    Proxy.Direct -> ConnectionRoute.DIRECT
+    is Proxy.Manual -> when {
       proxy.bypasses(host) -> ConnectionRoute.DIRECT
-      proxy.address?.type == ProxyAddress.Type.SOCKS5 -> ConnectionRoute.SOCKS5_PROXY
-      proxy.address?.type == ProxyAddress.Type.HTTP -> ConnectionRoute.HTTP_PROXY
-      else -> ConnectionRoute.UNKNOWN
+      proxy.address.type == ProxyAddress.Type.SOCKS5 -> ConnectionRoute.SOCKS5_PROXY
+      else -> ConnectionRoute.HTTP_PROXY
     }
   }
   return ConnectionSpec(

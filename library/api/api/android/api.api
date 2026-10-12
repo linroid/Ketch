@@ -283,15 +283,15 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public static final field Companion Lcom/linroid/ketch/api/DownloadConfig$Companion;
 	public static final field MIN_SPEED_WINDOW_MS J
 	public fun <init> ()V
-	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/ProxyConfig;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/ProxyConfig;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()I
 	public final fun component11-3Xq65sA ()J
 	public final fun component12 ()I
 	public final fun component13 ()I
 	public final fun component14 ()I
-	public final fun component15 ()Lcom/linroid/ketch/api/ProxyConfig;
+	public final fun component15 ()Lcom/linroid/ketch/api/Proxy;
 	public final fun component16 ()Ljava/util/List;
 	public final fun component2 ()I
 	public final fun component3 ()J
@@ -301,8 +301,8 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public final fun component7 ()J
 	public final fun component8 ()J
 	public final fun component9 ()J
-	public final fun copy-Xkg0QqQ (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/ProxyConfig;Ljava/util/List;)Lcom/linroid/ketch/api/DownloadConfig;
-	public static synthetic fun copy-Xkg0QqQ$default (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/ProxyConfig;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadConfig;
+	public final fun copy-Xkg0QqQ (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;)Lcom/linroid/ketch/api/DownloadConfig;
+	public static synthetic fun copy-Xkg0QqQ$default (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBufferSize ()I
 	public final fun getCategories ()Ljava/util/List;
@@ -314,7 +314,7 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public final fun getMaxRetryDelayMs ()J
 	public final fun getMinSpeed ()J
 	public final fun getProgressIntervalMs ()J
-	public final fun getProxy ()Lcom/linroid/ketch/api/ProxyConfig;
+	public final fun getProxy ()Lcom/linroid/ketch/api/Proxy;
 	public final fun getRetryCount ()I
 	public final fun getRetryDelayMs ()J
 	public final fun getSaveIntervalMs ()J
@@ -391,13 +391,13 @@ public final class com/linroid/ketch/api/DownloadProgress$Companion {
 
 public final class com/linroid/ketch/api/DownloadRequest {
 	public static final field Companion Lcom/linroid/ketch/api/DownloadRequest$Companion;
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/ProxyConfig;ZLcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/ProxyConfig;ZLcom/linroid/ketch/api/Checksum;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Lcom/linroid/ketch/api/ResolvedSource;
 	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Lcom/linroid/ketch/api/ProxyConfig;
+	public final fun component13 ()Lcom/linroid/ketch/api/Proxy;
 	public final fun component14 ()Z
 	public final fun component15 ()Lcom/linroid/ketch/api/Checksum;
 	public final fun component2-jWx8kFM ()Ljava/lang/String;
@@ -408,8 +408,8 @@ public final class com/linroid/ketch/api/DownloadRequest {
 	public final fun component7 ()Lcom/linroid/ketch/api/DownloadPriority;
 	public final fun component8 ()Lcom/linroid/ketch/api/DownloadSchedule;
 	public final fun component9 ()Ljava/util/Set;
-	public final fun copy-C1rT4yw (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/ProxyConfig;ZLcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/DownloadRequest;
-	public static synthetic fun copy-C1rT4yw$default (Lcom/linroid/ketch/api/DownloadRequest;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/ProxyConfig;ZLcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadRequest;
+	public final fun copy-C1rT4yw (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/DownloadRequest;
+	public static synthetic fun copy-C1rT4yw$default (Lcom/linroid/ketch/api/DownloadRequest;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAwaitFileSelection ()Z
 	public final fun getChecksum ()Lcom/linroid/ketch/api/Checksum;
@@ -419,7 +419,7 @@ public final class com/linroid/ketch/api/DownloadRequest {
 	public final fun getHeaders ()Ljava/util/Map;
 	public final fun getPriority ()Lcom/linroid/ketch/api/DownloadPriority;
 	public final fun getProperties ()Ljava/util/Map;
-	public final fun getProxy ()Lcom/linroid/ketch/api/ProxyConfig;
+	public final fun getProxy ()Lcom/linroid/ketch/api/Proxy;
 	public final fun getRequestId ()Ljava/lang/String;
 	public final fun getResolvedSource ()Lcom/linroid/ketch/api/ResolvedSource;
 	public final fun getSchedule ()Lcom/linroid/ketch/api/DownloadSchedule;
@@ -1511,6 +1511,50 @@ public final class com/linroid/ketch/api/PeerDetails$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public abstract interface class com/linroid/ketch/api/Proxy {
+	public static final field Companion Lcom/linroid/ketch/api/Proxy$Companion;
+}
+
+public final class com/linroid/ketch/api/Proxy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Proxy$Direct : com/linroid/ketch/api/Proxy {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Proxy$Direct;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Proxy$Manual : com/linroid/ketch/api/Proxy {
+	public static final field Companion Lcom/linroid/ketch/api/Proxy$Manual$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bypasses (Ljava/lang/String;)Z
+	public final fun component1 ()Lcom/linroid/ketch/api/ProxyAddress;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;)Lcom/linroid/ketch/api/Proxy$Manual;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Proxy$Manual;Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/Proxy$Manual;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddress ()Lcom/linroid/ketch/api/ProxyAddress;
+	public final fun getBypass ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Proxy$Manual$Companion {
+	public final fun isValidBypass (Ljava/lang/String;)Z
+}
+
+public final class com/linroid/ketch/api/Proxy$System : com/linroid/ketch/api/Proxy {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Proxy$System;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/linroid/ketch/api/ProxyAddress {
 	public static final field Companion Lcom/linroid/ketch/api/ProxyAddress$Companion;
 	public fun <init> (Lcom/linroid/ketch/api/ProxyAddress$Type;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V
@@ -1527,6 +1571,7 @@ public final class com/linroid/ketch/api/ProxyAddress {
 	public final fun getPassword ()Ljava/lang/String;
 	public final fun getPort ()I
 	public final fun getType ()Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public final fun getUrl ()Ljava/lang/String;
 	public final fun getUsername ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -1544,62 +1589,12 @@ public final class com/linroid/ketch/api/ProxyAddress$Type : java/lang/Enum {
 	public static fun values ()[Lcom/linroid/ketch/api/ProxyAddress$Type;
 }
 
-public final class com/linroid/ketch/api/ProxyConfig {
-	public static final field Companion Lcom/linroid/ketch/api/ProxyConfig$Companion;
-	public fun <init> ()V
-	public fun <init> (Lcom/linroid/ketch/api/ProxyMode;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
-	public synthetic fun <init> (Lcom/linroid/ketch/api/ProxyMode;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun bypasses (Ljava/lang/String;)Z
-	public final fun component1 ()Lcom/linroid/ketch/api/ProxyMode;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/util/List;
-	public final fun copy (Lcom/linroid/ketch/api/ProxyMode;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/linroid/ketch/api/ProxyConfig;
-	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ProxyConfig;Lcom/linroid/ketch/api/ProxyMode;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/ProxyConfig;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAddress ()Lcom/linroid/ketch/api/ProxyAddress;
-	public final fun getBypass ()Ljava/util/List;
-	public final fun getMode ()Lcom/linroid/ketch/api/ProxyMode;
-	public final fun getPassword ()Ljava/lang/String;
-	public final fun getUrl ()Ljava/lang/String;
-	public final fun getUsername ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/linroid/ketch/api/ProxyConfig$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/linroid/ketch/api/ProxyConfig$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/ProxyConfig;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/ProxyConfig;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/linroid/ketch/api/ProxyConfig$Companion {
-	public final fun getDirect ()Lcom/linroid/ketch/api/ProxyConfig;
-	public final fun getSystem ()Lcom/linroid/ketch/api/ProxyConfig;
-	public final fun isValidBypass (Ljava/lang/String;)Z
-	public final fun manual (Ljava/lang/String;Ljava/util/List;)Lcom/linroid/ketch/api/ProxyConfig;
-	public static synthetic fun manual$default (Lcom/linroid/ketch/api/ProxyConfig$Companion;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/ProxyConfig;
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/linroid/ketch/api/ProxyMode : java/lang/Enum {
-	public static final field Companion Lcom/linroid/ketch/api/ProxyMode$Companion;
-	public static final field DIRECT Lcom/linroid/ketch/api/ProxyMode;
-	public static final field MANUAL Lcom/linroid/ketch/api/ProxyMode;
-	public static final field SYSTEM Lcom/linroid/ketch/api/ProxyMode;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/ProxyMode;
-	public static fun values ()[Lcom/linroid/ketch/api/ProxyMode;
-}
-
-public final class com/linroid/ketch/api/ProxyMode$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+public final class com/linroid/ketch/api/ProxyBypass {
+	public static final field INSTANCE Lcom/linroid/ketch/api/ProxyBypass;
+	public final fun bypasses (Ljava/util/List;Ljava/lang/String;)Z
+	public final fun isLoopback (Ljava/lang/String;)Z
+	public final fun isValid (Ljava/lang/String;)Z
+	public final fun matches (Ljava/lang/String;Ljava/lang/String;)Z
 }
 
 public abstract interface class com/linroid/ketch/api/ResolveInput {

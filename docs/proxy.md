@@ -13,13 +13,14 @@ one download, and `KetchApi.resolve` uses the global one. A download reads the s
 starts or resumes, like the other `DownloadConfig` fields besides the speed and queue limits.
 
 ```kotlin
-ProxyConfig.System                                  // the default: the system's settings
-ProxyConfig.Direct                                  // no proxy
-ProxyConfig.manual("http://proxy.lan:3128")         // an HTTP proxy, which tunnels HTTPS
-ProxyConfig.manual(
-  "socks5://user:secret@127.0.0.1:1080",            // credentials move to username/password
+Proxy.System                                        // the default: the system's settings
+Proxy.Direct                                        // no proxy
+Proxy.Manual("http://proxy.lan:3128")               // an HTTP proxy, which tunnels HTTPS
+Proxy.Manual(
+  "socks5://user:secret@127.0.0.1:1080",            // credentials are kept in its address
   bypass = listOf("*.lan", "10.0.0.0/8", "<local>"),
 )
+Proxy.Manual(ProxyAddress(ProxyAddress.Type.SOCKS5, "127.0.0.1", 1080, "user", "secret"))
 ```
 
 In `config.toml`, the apps and `ketch server` read the same setting from `[download.proxy]`:
@@ -32,6 +33,10 @@ username = "me"
 password = "secret"
 bypass = ["*.lan", "10.0.0.0/8"]
 ```
+
+JSON (the REST API's `PUT /api/config`, `POST /api/tasks`) carries the same flat object. Only
+`manual` reads the other fields: a `system` or `direct` table that still holds them, as older
+versions kept the manual proxy's while another mode was chosen, loads without them.
 
 The apps edit it in Settings → Network, for the embedded device or, when it lists the
 `http.proxy` feature, a remote one. `Ketch` lists the feature when its `HttpEngine` reports
@@ -53,7 +58,7 @@ which would ignore the proxy.
 `username` and `password` go only to the proxy: with HTTP Basic authentication in `CONNECT`
 requests and with plain HTTP requests, which the proxy reads and removes, and with SOCKS5
 username/password authentication. They never reach the servers downloads come from. Logs print
-the proxy's address without them, and `ProxyConfig.toString()` masks the password.
+the proxy's address without them, and `Proxy.Manual.toString()` masks the password.
 
 The password is stored in plain text, like the server's `apiToken`: in `config.toml`, and with
 each task whose request names a proxy in the task database. The REST API returns it to callers
@@ -73,11 +78,11 @@ never resolved:
 | `<local>` | host names without a dot |
 | `*` | every host |
 
-A `:port` suffix is ignored. `ProxyConfig.isValidBypass(entry)` checks an entry.
+A `:port` suffix is ignored. `Proxy.Manual.isValidBypass(entry)` checks an entry.
 
 ## The system's settings
 
-`ProxyMode.SYSTEM` follows the platform:
+`Proxy.System` follows the platform:
 
 - **JVM**: the `https_proxy` (for HTTPS URLs) or `http_proxy` variable, else `all_proxy`, each
   read in lower case first, and `no_proxy` for hosts reached directly, as curl reads them. A

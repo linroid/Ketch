@@ -1,8 +1,9 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ProxyAddress
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.ProxyBypass
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -10,7 +11,7 @@ import io.ktor.http.Url
 import okhttp3.Dns
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.Proxy
+import java.net.Proxy as JavaProxy
 import java.net.ProxySelector
 import java.net.Socket
 import java.net.URI
@@ -21,7 +22,7 @@ internal actual fun defaultTransports(): HttpTransports = JvmTransports(localAdd
 /**
  * The JVM's transports, bound to [localAddress] when it is set.
  *
- * [com.linroid.ketch.api.ProxyMode.SYSTEM] takes the proxy from the environment, then from
+ * [com.linroid.ketch.api.Proxy.System] takes the proxy from the environment, then from
  * [selector]. Requests that go directly use CIO, unless [selector] would send them through a
  * proxy, which CIO cannot be told not to use, or the engine is bound to an address; OkHttp
  * carries the rest.
@@ -35,9 +36,9 @@ internal class JvmTransports(
   private val binding = localAddress?.let(::LocalAddressBinding) ?: SocketBinding.None
   private val clients = ClientCache<Any>()
 
-  override fun supports(proxy: ProxyConfig): Boolean = true
+  override fun supports(proxy: Proxy): Boolean = true
 
-  override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient {
+  override fun clientFor(url: Url, proxy: Proxy): RoutedClient {
     val route = proxy.routeFor(url) { environmentProxies.routeFor(it) ?: selectorRoute(it) }
     val client = when {
       route != ProxyRoute.Direct -> clients.get(route) {
@@ -62,17 +63,17 @@ internal class JvmTransports(
     val proxy = select(url)?.firstOrNull() ?: return ProxyRoute.Direct
     val address = proxy.address() as? InetSocketAddress ?: return ProxyRoute.Direct
     return when (proxy.type()) {
-      Proxy.Type.HTTP -> ProxyRoute.Http(address.hostString, address.port)
-      Proxy.Type.SOCKS -> ProxyRoute.Socks5(address.hostString, address.port)
+      JavaProxy.Type.HTTP -> ProxyRoute.Http(address.hostString, address.port)
+      JavaProxy.Type.SOCKS -> ProxyRoute.Socks5(address.hostString, address.port)
       else -> ProxyRoute.Direct
     }
   }
 
   /** Whether CIO, which asks [selector] itself, would connect to [url] directly. */
   private fun selectsDirect(url: Url): Boolean =
-    select(url)?.all { it.type() == Proxy.Type.DIRECT } != false
+    select(url)?.all { it.type() == JavaProxy.Type.DIRECT } != false
 
-  private fun select(url: Url): List<Proxy>? = try {
+  private fun select(url: Url): List<JavaProxy>? = try {
     val host = url.host.removePrefix("[").removeSuffix("]")
     selector()?.select(URI(url.protocol.name, null, host, url.port, "/", null, null))
   } catch (_: Exception) {
@@ -100,11 +101,9 @@ internal class JvmTransports(
  * `no_proxy` lists the hosts that go directly, separated by commas.
  */
 internal class EnvironmentProxies(private val environment: Map<String, String>) {
-  private val noProxy = ProxyConfig(
-    bypass = variable("no_proxy")?.second.orEmpty()
-      .split(',', ' ', '\t').map { it.trim() }
-      .filter { it.isNotEmpty() && ProxyConfig.isValidBypass(it) },
-  )
+  private val noProxy = variable("no_proxy")?.second.orEmpty()
+    .split(',', ' ', '\t').map { it.trim() }
+    .filter { it.isNotEmpty() && ProxyBypass.isValid(it) }
 
   /**
    * The route the environment gives [url], or `null` when it names no proxy for it.
@@ -116,14 +115,11 @@ internal class EnvironmentProxies(private val environment: Map<String, String>) 
     val (name, value) = variable("${url.protocol.name.lowercase()}_proxy")
       ?: variable("all_proxy")
       ?: return null
-    if (noProxy.bypasses(url.host)) return ProxyRoute.Direct
+    if (ProxyBypass.bypasses(noProxy, url.host)) return ProxyRoute.Direct
     val address = ProxyAddress.parse(value) ?: throw KetchError.Unsupported(
       cause = IllegalArgumentException("$name is not an HTTP or SOCKS5 proxy URL"),
     )
-    return ProxyRoute.of(
-      address.copy(username = null, password = null),
-      address.username?.let { ProxyCredentials(it, address.password.orEmpty()) },
-    )
+    return ProxyRoute.of(address)
   }
 
   private fun variable(name: String): Pair<String, String>? =

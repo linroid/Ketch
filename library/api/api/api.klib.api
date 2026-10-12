@@ -135,23 +135,6 @@ final enum class com.linroid.ketch.api/FileSelectionMode : kotlin/Enum<com.linro
     }
 }
 
-final enum class com.linroid.ketch.api/ProxyMode : kotlin/Enum<com.linroid.ketch.api/ProxyMode> { // com.linroid.ketch.api/ProxyMode|null[0]
-    enum entry DIRECT // com.linroid.ketch.api/ProxyMode.DIRECT|null[0]
-    enum entry MANUAL // com.linroid.ketch.api/ProxyMode.MANUAL|null[0]
-    enum entry SYSTEM // com.linroid.ketch.api/ProxyMode.SYSTEM|null[0]
-
-    final val entries // com.linroid.ketch.api/ProxyMode.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/ProxyMode> // com.linroid.ketch.api/ProxyMode.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.linroid.ketch.api/ProxyMode // com.linroid.ketch.api/ProxyMode.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.linroid.ketch.api/ProxyMode> // com.linroid.ketch.api/ProxyMode.values|values#static(){}[0]
-
-    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/ProxyMode.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/ProxyMode> // com.linroid.ketch.api/ProxyMode.Companion.serializer|serializer(){}[0]
-        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/ProxyMode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
-    }
-}
-
 abstract interface <#A: kotlin/Any> com.linroid.ketch.api/ControlKey { // com.linroid.ketch.api/ControlKey|null[0]
     abstract val name // com.linroid.ketch.api/ControlKey.name|{}name[0]
         abstract fun <get-name>(): kotlin/String // com.linroid.ketch.api/ControlKey.name.<get-name>|<get-name>(){}[0]
@@ -312,6 +295,47 @@ abstract interface com.linroid.ketch.api/KetchApi { // com.linroid.ketch.api/Ket
             final fun <get-REVISION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.REVISION.<get-REVISION>|<get-REVISION>(){}[0]
         final val VERSION // com.linroid.ketch.api/KetchApi.Companion.VERSION|{}VERSION[0]
             final fun <get-VERSION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
+    }
+}
+
+sealed interface com.linroid.ketch.api/Proxy { // com.linroid.ketch.api/Proxy|null[0]
+    final class Manual : com.linroid.ketch.api/Proxy { // com.linroid.ketch.api/Proxy.Manual|null[0]
+        constructor <init>(com.linroid.ketch.api/ProxyAddress, kotlin.collections/List<kotlin/String> = ...) // com.linroid.ketch.api/Proxy.Manual.<init>|<init>(com.linroid.ketch.api.ProxyAddress;kotlin.collections.List<kotlin.String>){}[0]
+        constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String> = ...) // com.linroid.ketch.api/Proxy.Manual.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+
+        final val address // com.linroid.ketch.api/Proxy.Manual.address|{}address[0]
+            final fun <get-address>(): com.linroid.ketch.api/ProxyAddress // com.linroid.ketch.api/Proxy.Manual.address.<get-address>|<get-address>(){}[0]
+        final val bypass // com.linroid.ketch.api/Proxy.Manual.bypass|{}bypass[0]
+            final fun <get-bypass>(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/Proxy.Manual.bypass.<get-bypass>|<get-bypass>(){}[0]
+
+        final fun bypasses(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/Proxy.Manual.bypasses|bypasses(kotlin.String){}[0]
+        final fun component1(): com.linroid.ketch.api/ProxyAddress // com.linroid.ketch.api/Proxy.Manual.component1|component1(){}[0]
+        final fun component2(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/Proxy.Manual.component2|component2(){}[0]
+        final fun copy(com.linroid.ketch.api/ProxyAddress = ..., kotlin.collections/List<kotlin/String> = ...): com.linroid.ketch.api/Proxy.Manual // com.linroid.ketch.api/Proxy.Manual.copy|copy(com.linroid.ketch.api.ProxyAddress;kotlin.collections.List<kotlin.String>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/Proxy.Manual.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/Proxy.Manual.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/Proxy.Manual.toString|toString(){}[0]
+
+        final object Companion { // com.linroid.ketch.api/Proxy.Manual.Companion|null[0]
+            final fun isValidBypass(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/Proxy.Manual.Companion.isValidBypass|isValidBypass(kotlin.String){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/Proxy.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/Proxy> // com.linroid.ketch.api/Proxy.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/Proxy.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object Direct : com.linroid.ketch.api/Proxy { // com.linroid.ketch.api/Proxy.Direct|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/Proxy.Direct.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/Proxy.Direct.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/Proxy.Direct.toString|toString(){}[0]
+    }
+
+    final object System : com.linroid.ketch.api/Proxy { // com.linroid.ketch.api/Proxy.System|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/Proxy.System.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/Proxy.System.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/Proxy.System.toString|toString(){}[0]
     }
 }
 
@@ -545,7 +569,7 @@ final class com.linroid.ketch.api/DownloadCategory { // com.linroid.ketch.api/Do
 }
 
 final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/DownloadConfig|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/ProxyConfig = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...) // com.linroid.ketch.api/DownloadConfig.<init>|<init>(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.ProxyConfig;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...) // com.linroid.ketch.api/DownloadConfig.<init>|<init>(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
 
     final val bufferSize // com.linroid.ketch.api/DownloadConfig.bufferSize|{}bufferSize[0]
         final fun <get-bufferSize>(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.bufferSize.<get-bufferSize>|<get-bufferSize>(){}[0]
@@ -568,7 +592,7 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
     final val progressIntervalMs // com.linroid.ketch.api/DownloadConfig.progressIntervalMs|{}progressIntervalMs[0]
         final fun <get-progressIntervalMs>(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.progressIntervalMs.<get-progressIntervalMs>|<get-progressIntervalMs>(){}[0]
     final val proxy // com.linroid.ketch.api/DownloadConfig.proxy|{}proxy[0]
-        final fun <get-proxy>(): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/DownloadConfig.proxy.<get-proxy>|<get-proxy>(){}[0]
+        final fun <get-proxy>(): com.linroid.ketch.api/Proxy // com.linroid.ketch.api/DownloadConfig.proxy.<get-proxy>|<get-proxy>(){}[0]
     final val retryCount // com.linroid.ketch.api/DownloadConfig.retryCount|{}retryCount[0]
         final fun <get-retryCount>(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.retryCount.<get-retryCount>|<get-retryCount>(){}[0]
     final val retryDelayMs // com.linroid.ketch.api/DownloadConfig.retryDelayMs|{}retryDelayMs[0]
@@ -586,7 +610,7 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
     final fun component12(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component12|component12(){}[0]
     final fun component13(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component13|component13(){}[0]
     final fun component14(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component14|component14(){}[0]
-    final fun component15(): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/DownloadConfig.component15|component15(){}[0]
+    final fun component15(): com.linroid.ketch.api/Proxy // com.linroid.ketch.api/DownloadConfig.component15|component15(){}[0]
     final fun component16(): kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> // com.linroid.ketch.api/DownloadConfig.component16|component16(){}[0]
     final fun component2(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component3|component3(){}[0]
@@ -596,7 +620,7 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
     final fun component7(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component7|component7(){}[0]
     final fun component8(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component9|component9(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/ProxyConfig = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/DownloadConfig.copy|copy(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.ProxyConfig;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/DownloadConfig.copy|copy(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/DownloadConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/DownloadConfig.toString|toString(){}[0]
@@ -659,7 +683,7 @@ final class com.linroid.ketch.api/DownloadProgress { // com.linroid.ketch.api/Do
 }
 
 final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/DownloadRequest|null[0]
-    constructor <init>(kotlin/String, com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/ProxyConfig? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...) // com.linroid.ketch.api/DownloadRequest.<init>|<init>(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.ProxyConfig?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
+    constructor <init>(kotlin/String, com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...) // com.linroid.ketch.api/DownloadRequest.<init>|<init>(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
 
     final val awaitFileSelection // com.linroid.ketch.api/DownloadRequest.awaitFileSelection|{}awaitFileSelection[0]
         final fun <get-awaitFileSelection>(): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.awaitFileSelection.<get-awaitFileSelection>|<get-awaitFileSelection>(){}[0]
@@ -678,7 +702,7 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
     final val properties // com.linroid.ketch.api/DownloadRequest.properties|{}properties[0]
         final fun <get-properties>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/DownloadRequest.properties.<get-properties>|<get-properties>(){}[0]
     final val proxy // com.linroid.ketch.api/DownloadRequest.proxy|{}proxy[0]
-        final fun <get-proxy>(): com.linroid.ketch.api/ProxyConfig? // com.linroid.ketch.api/DownloadRequest.proxy.<get-proxy>|<get-proxy>(){}[0]
+        final fun <get-proxy>(): com.linroid.ketch.api/Proxy? // com.linroid.ketch.api/DownloadRequest.proxy.<get-proxy>|<get-proxy>(){}[0]
     final val requestId // com.linroid.ketch.api/DownloadRequest.requestId|{}requestId[0]
         final fun <get-requestId>(): kotlin/String? // com.linroid.ketch.api/DownloadRequest.requestId.<get-requestId>|<get-requestId>(){}[0]
     final val resolvedSource // com.linroid.ketch.api/DownloadRequest.resolvedSource|{}resolvedSource[0]
@@ -696,7 +720,7 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
     final fun component10(): kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> // com.linroid.ketch.api/DownloadRequest.component10|component10(){}[0]
     final fun component11(): com.linroid.ketch.api/ResolvedSource? // com.linroid.ketch.api/DownloadRequest.component11|component11(){}[0]
     final fun component12(): kotlin/String? // com.linroid.ketch.api/DownloadRequest.component12|component12(){}[0]
-    final fun component13(): com.linroid.ketch.api/ProxyConfig? // com.linroid.ketch.api/DownloadRequest.component13|component13(){}[0]
+    final fun component13(): com.linroid.ketch.api/Proxy? // com.linroid.ketch.api/DownloadRequest.component13|component13(){}[0]
     final fun component14(): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.component14|component14(){}[0]
     final fun component15(): com.linroid.ketch.api/Checksum? // com.linroid.ketch.api/DownloadRequest.component15|component15(){}[0]
     final fun component2(): com.linroid.ketch.api/Destination? // com.linroid.ketch.api/DownloadRequest.component2|component2(){}[0]
@@ -707,7 +731,7 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
     final fun component7(): com.linroid.ketch.api/DownloadPriority // com.linroid.ketch.api/DownloadRequest.component7|component7(){}[0]
     final fun component8(): com.linroid.ketch.api/DownloadSchedule // com.linroid.ketch.api/DownloadRequest.component8|component8(){}[0]
     final fun component9(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/DownloadRequest.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/ProxyConfig? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...): com.linroid.ketch.api/DownloadRequest // com.linroid.ketch.api/DownloadRequest.copy|copy(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.ProxyConfig?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
+    final fun copy(kotlin/String = ..., com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...): com.linroid.ketch.api/DownloadRequest // com.linroid.ketch.api/DownloadRequest.copy|copy(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/DownloadRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/DownloadRequest.toString|toString(){}[0]
@@ -958,6 +982,8 @@ final class com.linroid.ketch.api/ProxyAddress { // com.linroid.ketch.api/ProxyA
         final fun <get-port>(): kotlin/Int // com.linroid.ketch.api/ProxyAddress.port.<get-port>|<get-port>(){}[0]
     final val type // com.linroid.ketch.api/ProxyAddress.type|{}type[0]
         final fun <get-type>(): com.linroid.ketch.api/ProxyAddress.Type // com.linroid.ketch.api/ProxyAddress.type.<get-type>|<get-type>(){}[0]
+    final val url // com.linroid.ketch.api/ProxyAddress.url|{}url[0]
+        final fun <get-url>(): kotlin/String // com.linroid.ketch.api/ProxyAddress.url.<get-url>|<get-url>(){}[0]
     final val username // com.linroid.ketch.api/ProxyAddress.username|{}username[0]
         final fun <get-username>(): kotlin/String? // com.linroid.ketch.api/ProxyAddress.username.<get-username>|<get-username>(){}[0]
 
@@ -984,55 +1010,6 @@ final class com.linroid.ketch.api/ProxyAddress { // com.linroid.ketch.api/ProxyA
 
     final object Companion { // com.linroid.ketch.api/ProxyAddress.Companion|null[0]
         final fun parse(kotlin/String): com.linroid.ketch.api/ProxyAddress? // com.linroid.ketch.api/ProxyAddress.Companion.parse|parse(kotlin.String){}[0]
-    }
-}
-
-final class com.linroid.ketch.api/ProxyConfig { // com.linroid.ketch.api/ProxyConfig|null[0]
-    constructor <init>(com.linroid.ketch.api/ProxyMode = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...) // com.linroid.ketch.api/ProxyConfig.<init>|<init>(com.linroid.ketch.api.ProxyMode;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
-
-    final val address // com.linroid.ketch.api/ProxyConfig.address|{}address[0]
-        final fun <get-address>(): com.linroid.ketch.api/ProxyAddress? // com.linroid.ketch.api/ProxyConfig.address.<get-address>|<get-address>(){}[0]
-    final val bypass // com.linroid.ketch.api/ProxyConfig.bypass|{}bypass[0]
-        final fun <get-bypass>(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/ProxyConfig.bypass.<get-bypass>|<get-bypass>(){}[0]
-    final val mode // com.linroid.ketch.api/ProxyConfig.mode|{}mode[0]
-        final fun <get-mode>(): com.linroid.ketch.api/ProxyMode // com.linroid.ketch.api/ProxyConfig.mode.<get-mode>|<get-mode>(){}[0]
-    final val password // com.linroid.ketch.api/ProxyConfig.password|{}password[0]
-        final fun <get-password>(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.password.<get-password>|<get-password>(){}[0]
-    final val url // com.linroid.ketch.api/ProxyConfig.url|{}url[0]
-        final fun <get-url>(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.url.<get-url>|<get-url>(){}[0]
-    final val username // com.linroid.ketch.api/ProxyConfig.username|{}username[0]
-        final fun <get-username>(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.username.<get-username>|<get-username>(){}[0]
-
-    final fun bypasses(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyConfig.bypasses|bypasses(kotlin.String){}[0]
-    final fun component1(): com.linroid.ketch.api/ProxyMode // com.linroid.ketch.api/ProxyConfig.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.component2|component2(){}[0]
-    final fun component3(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.component3|component3(){}[0]
-    final fun component4(): kotlin/String? // com.linroid.ketch.api/ProxyConfig.component4|component4(){}[0]
-    final fun component5(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/ProxyConfig.component5|component5(){}[0]
-    final fun copy(com.linroid.ketch.api/ProxyMode = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/ProxyConfig.copy|copy(com.linroid.ketch.api.ProxyMode;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/ProxyConfig.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/ProxyConfig.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.linroid.ketch.api/ProxyConfig.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/ProxyConfig> { // com.linroid.ketch.api/ProxyConfig.$serializer|null[0]
-        final val descriptor // com.linroid.ketch.api/ProxyConfig.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/ProxyConfig.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/ProxyConfig.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/ProxyConfig.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/ProxyConfig) // com.linroid.ketch.api/ProxyConfig.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.ProxyConfig){}[0]
-    }
-
-    final object Companion { // com.linroid.ketch.api/ProxyConfig.Companion|null[0]
-        final val $childSerializers // com.linroid.ketch.api/ProxyConfig.Companion.$childSerializers|{}$childSerializers[0]
-        final val Direct // com.linroid.ketch.api/ProxyConfig.Companion.Direct|{}Direct[0]
-            final fun <get-Direct>(): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/ProxyConfig.Companion.Direct.<get-Direct>|<get-Direct>(){}[0]
-        final val System // com.linroid.ketch.api/ProxyConfig.Companion.System|{}System[0]
-            final fun <get-System>(): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/ProxyConfig.Companion.System.<get-System>|<get-System>(){}[0]
-
-        final fun isValidBypass(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyConfig.Companion.isValidBypass|isValidBypass(kotlin.String){}[0]
-        final fun manual(kotlin/String, kotlin.collections/List<kotlin/String> = ...): com.linroid.ketch.api/ProxyConfig // com.linroid.ketch.api/ProxyConfig.Companion.manual|manual(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/ProxyConfig> // com.linroid.ketch.api/ProxyConfig.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -1990,6 +1967,13 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
 
 final object com.linroid.ketch.api/NaturalOrder : kotlin/Comparator<kotlin/String> { // com.linroid.ketch.api/NaturalOrder|null[0]
     final fun compare(kotlin/String, kotlin/String): kotlin/Int // com.linroid.ketch.api/NaturalOrder.compare|compare(kotlin.String;kotlin.String){}[0]
+}
+
+final object com.linroid.ketch.api/ProxyBypass { // com.linroid.ketch.api/ProxyBypass|null[0]
+    final fun bypasses(kotlin.collections/List<kotlin/String>, kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyBypass.bypasses|bypasses(kotlin.collections.List<kotlin.String>;kotlin.String){}[0]
+    final fun isLoopback(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyBypass.isLoopback|isLoopback(kotlin.String){}[0]
+    final fun isValid(kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyBypass.isValid|isValid(kotlin.String){}[0]
+    final fun matches(kotlin/String, kotlin/String): kotlin/Boolean // com.linroid.ketch.api/ProxyBypass.matches|matches(kotlin.String;kotlin.String){}[0]
 }
 
 final fun (com.linroid.ketch.api/Destination).com.linroid.ketch.api/isDirectory(): kotlin/Boolean // com.linroid.ketch.api/isDirectory|isDirectory@com.linroid.ketch.api.Destination(){}[0]

@@ -19,7 +19,7 @@ import android.net.Network
  * @param logRequests whether request and transport details may be logged
  * @param userAgent the `User-Agent` of requests whose headers name none, or `null` for none
  * @param connectivityManager reads the network's proxy for
- *   [com.linroid.ketch.api.ProxyMode.SYSTEM]; `null` to connect directly instead
+ *   [com.linroid.ketch.api.Proxy.System]; `null` to connect directly instead
  */
 fun KtorHttpEngine.Companion.forNetwork(
   network: Network,

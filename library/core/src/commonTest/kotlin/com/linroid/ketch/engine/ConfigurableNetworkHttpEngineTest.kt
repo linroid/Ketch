@@ -2,7 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.HttpEngine
@@ -151,7 +151,7 @@ class ConfigurableNetworkHttpEngineTest {
   fun withProxy_followsSelectionAndAppliesProxyOnEachNetwork() = runTest {
     val provider = Provider()
     val engine = ConfigurableNetworkHttpEngine(provider)
-    val proxied = engine.withProxy(ProxyConfig.manual("http://proxy.test:3128"))
+    val proxied = engine.withProxy(Proxy.Manual("http://proxy.test:3128"))
 
     proxied.head("url")
     engine.selectNetworkInterfaces(config("wifi", "ethernet"))
@@ -221,8 +221,8 @@ class ConfigurableNetworkHttpEngineTest {
       onData(byteArrayOf(1))
     }
 
-    override fun withProxy(proxy: ProxyConfig): HttpEngine =
-      RecordingEngine("$id via ${proxy.address?.host}", calls)
+    override fun withProxy(proxy: Proxy): HttpEngine =
+      RecordingEngine("$id via ${(proxy as? Proxy.Manual)?.address?.host}", calls)
 
     override fun close() {
       closed++

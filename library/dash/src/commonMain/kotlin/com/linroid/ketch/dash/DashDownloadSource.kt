@@ -2,7 +2,7 @@ package com.linroid.ketch.dash
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchFeatures
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
@@ -46,7 +46,7 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource {
   private suspend fun plan(
     original: String,
     headers: Map<String, String>,
-    proxy: ProxyConfig,
+    proxy: Proxy,
   ): MediaPlan {
     val manifest = helper.fetchManifest(original, headers, proxy)
     return parseDash(manifest.text, manifest.url)

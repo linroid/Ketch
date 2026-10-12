@@ -20,8 +20,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.PauseReason
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -1025,8 +1024,8 @@ class Ketch(
   }
 
   /** Refuses a [proxy] other than the system's when the HTTP engine cannot apply it. */
-  private fun requireProxySupport(proxy: ProxyConfig?) {
-    if (proxy == null || proxy.mode == ProxyMode.SYSTEM || KetchFeatures.PROXY in features) return
+  private fun requireProxySupport(proxy: Proxy?) {
+    if (proxy == null || proxy == Proxy.System || KetchFeatures.PROXY in features) return
     throw UnsupportedOperationException("The HTTP engine cannot use a proxy")
   }
 

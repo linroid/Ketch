@@ -8,7 +8,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
@@ -158,11 +158,11 @@ private fun runDownload(args: DownloadArgs.Download) {
   if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
   val fileConfig = readDefaultConfig()
   val proxy = args.proxy ?: fileConfig.download.proxy
-  when (proxy.mode) {
-    ProxyMode.SYSTEM -> Unit
-    ProxyMode.DIRECT -> println("Proxy: none")
-    // The URL holds no credentials; they are kept apart.
-    ProxyMode.MANUAL -> println("Proxy: ${proxy.url}")
+  when (proxy) {
+    Proxy.System -> Unit
+    Proxy.Direct -> println("Proxy: none")
+    // Without its credentials.
+    is Proxy.Manual -> println("Proxy: ${proxy.address.url}")
   }
   println()
 

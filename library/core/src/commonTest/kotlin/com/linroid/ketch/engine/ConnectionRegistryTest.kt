@@ -3,7 +3,7 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionRegistry
 import com.linroid.ketch.core.engine.ConnectionSample
@@ -182,25 +182,25 @@ class ConnectionRegistryTest {
 
   @Test
   fun httpConnectionSpec_usesUrlHostPortAndProxyRoute() {
-    val direct = httpConnectionSpec("http", "https://User:pw@CDN.Example.com/a", ProxyConfig.Direct)
+    val direct = httpConnectionSpec("http", "https://User:pw@CDN.Example.com/a", Proxy.Direct)
     assertEquals("cdn.example.com", direct.host)
     assertEquals(443, direct.port)
     assertEquals(true, direct.secure)
     assertEquals(ConnectionRoute.DIRECT, direct.route)
 
-    val ipv6 = httpConnectionSpec("http", "http://[::1]:8080/a", ProxyConfig.System)
+    val ipv6 = httpConnectionSpec("http", "http://[::1]:8080/a", Proxy.System)
     assertEquals("::1", ipv6.host)
     assertEquals(8080, ipv6.port)
     assertEquals(false, ipv6.secure)
     assertEquals(ConnectionRoute.UNKNOWN, ipv6.route)
 
-    val socks = ProxyConfig.manual("socks5://127.0.0.1:1080", bypass = listOf("example.org"))
+    val socks = Proxy.Manual("socks5://127.0.0.1:1080", bypass = listOf("example.org"))
     assertEquals(ConnectionRoute.SOCKS5_PROXY,
       httpConnectionSpec("http", "http://cdn.example.com/a", socks).route)
     assertEquals(ConnectionRoute.DIRECT,
       httpConnectionSpec("http", "http://dl.example.org/a", socks).route)
     assertEquals(ConnectionRoute.HTTP_PROXY, httpConnectionSpec("http", "http://cdn.example.com/a",
-      ProxyConfig.manual("http://127.0.0.1:3128")).route)
+      Proxy.Manual("http://127.0.0.1:3128")).route)
   }
 
   @Test

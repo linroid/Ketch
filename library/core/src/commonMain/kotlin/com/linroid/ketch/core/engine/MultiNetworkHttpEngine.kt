@@ -1,6 +1,6 @@
 package com.linroid.ketch.core.engine
 
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -55,7 +55,7 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
   /** Whether every network's engine supports proxies. */
   override val supportsProxies: Boolean = this.engines.all { it.supportsProxies }
 
-  override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
+  override fun withProxy(proxy: Proxy): HttpEngine = Proxied(proxy)
 
   private fun nextEngine(): HttpEngine {
     while (true) {
@@ -83,7 +83,7 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
   }
 
   /** These networks, each reaching servers as [proxy] says; closing it does nothing. */
-  private inner class Proxied(private val proxy: ProxyConfig) : HttpEngine {
+  private inner class Proxied(private val proxy: Proxy) : HttpEngine {
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
       nextEngine().withProxy(proxy).head(url, headers)
 
@@ -107,7 +107,7 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
 
     override val supportsProxies: Boolean get() = this@MultiNetworkHttpEngine.supportsProxies
 
-    override fun withProxy(proxy: ProxyConfig): HttpEngine =
+    override fun withProxy(proxy: Proxy): HttpEngine =
       this@MultiNetworkHttpEngine.withProxy(proxy)
 
     override fun close() {}

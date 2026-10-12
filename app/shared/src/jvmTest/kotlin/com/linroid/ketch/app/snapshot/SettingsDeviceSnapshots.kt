@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -99,7 +99,7 @@ class SettingsDeviceSnapshots {
       category = SettingsCategory.Network,
       sizes = listOf(Pane, PhonePage),
       setup = DeviceSetup(
-        proxy = ProxyConfig.manual(
+        proxy = Proxy.Manual(
           "socks5://alex:secret@10.0.0.2:1080",
           bypass = listOf("*.lan", "10.0.0.0/8"),
         ),
@@ -290,7 +290,7 @@ private data class DeviceSetup(
   val pendingPort: Int? = null,
   val remote: Boolean = false,
   val networksFail: Boolean = false,
-  val proxy: ProxyConfig = ProxyConfig.System,
+  val proxy: Proxy = Proxy.System,
 )
 
 /**

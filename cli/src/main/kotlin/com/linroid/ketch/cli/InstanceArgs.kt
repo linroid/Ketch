@@ -2,7 +2,7 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import java.util.UUID
 import kotlin.time.Duration
@@ -33,7 +33,7 @@ internal sealed interface InstanceCommand {
     val requestId: String? = null,
     val json: Boolean = false,
     /** `--proxy` or `--no-proxy`, in place of the instance's proxy; `null` for that one. */
-    val proxy: ProxyConfig? = null,
+    val proxy: Proxy? = null,
     /** `--checksum`: the digest the file must have; `null` checks only a published one. */
     val checksum: Checksum? = null,
   ) : InstanceCommand

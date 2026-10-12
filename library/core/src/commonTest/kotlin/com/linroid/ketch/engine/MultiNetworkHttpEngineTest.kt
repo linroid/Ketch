@@ -1,6 +1,6 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.MultiNetworkHttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -110,7 +110,7 @@ class MultiNetworkHttpEngineTest {
     val first = RecordingEngine()
     val second = RecordingEngine()
     val engine = MultiNetworkHttpEngine(listOf(first, second))
-    val proxy = ProxyConfig.manual("socks5://proxy.test:1080")
+    val proxy: Proxy = Proxy.Manual("socks5://proxy.test:1080")
 
     engine.withProxy(proxy).head("https://example.com/file")
     engine.download("https://example.com/file", null) {}
@@ -152,7 +152,7 @@ class MultiNetworkHttpEngineTest {
     val info = ServerInfo(100, true, "etag", null)
     val heads = mutableListOf<Request>()
     val gets = mutableListOf<Request>()
-    val proxies = mutableListOf<ProxyConfig>()
+    val proxies = mutableListOf<Proxy>()
     var closeCount = 0
 
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
@@ -172,7 +172,7 @@ class MultiNetworkHttpEngineTest {
       afterData()
     }
 
-    override fun withProxy(proxy: ProxyConfig): HttpEngine {
+    override fun withProxy(proxy: Proxy): HttpEngine {
       proxies.add(proxy)
       return this
     }

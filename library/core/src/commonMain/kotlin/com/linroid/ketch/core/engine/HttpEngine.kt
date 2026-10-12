@@ -1,8 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.Proxy
 
 /**
  * Abstraction over the HTTP layer used by Ketch.
@@ -72,7 +71,7 @@ interface HttpEngine {
   }
 
   /**
-   * Whether [withProxy] accepts modes other than [ProxyMode.SYSTEM]. Ketch lists
+   * Whether [withProxy] accepts proxies other than [Proxy.System]. Ketch lists
    * [com.linroid.ketch.api.KetchFeatures.PROXY], and accepts such proxies, only when it does.
    */
   val supportsProxies: Boolean get() = false
@@ -81,14 +80,14 @@ interface HttpEngine {
    * Returns an engine whose requests reach their servers as [proxy] says, sharing this engine's
    * resources. It stays usable until this engine is closed; closing it does nothing.
    *
-   * An engine follows the system's proxy settings ([ProxyMode.SYSTEM]) by itself, so Ketch only
-   * asks for other modes. Engines that wrap another must override this method to keep wrapping
+   * An engine follows the system's proxy settings ([Proxy.System]) by itself, so Ketch only
+   * asks for other proxies. Engines that wrap another must override this method to keep wrapping
    * the engine it returns. Engines that override it must also report [supportsProxies]. The
-   * default returns this engine for [ProxyMode.SYSTEM] and refuses any other mode with
+   * default returns this engine for [Proxy.System] and refuses any other proxy with
    * [KetchError.Unsupported], so a download never silently skips the proxy it was given.
    */
-  fun withProxy(proxy: ProxyConfig): HttpEngine {
-    if (proxy.mode == ProxyMode.SYSTEM) return this
+  fun withProxy(proxy: Proxy): HttpEngine {
+    if (proxy == Proxy.System) return this
     throw KetchError.Unsupported(
       cause = UnsupportedOperationException("This HTTP engine cannot choose a proxy"),
     )
@@ -98,6 +97,6 @@ interface HttpEngine {
   fun close()
 }
 
-/** This engine for [ProxyMode.SYSTEM], which it follows by itself, else [HttpEngine.withProxy]. */
-internal fun HttpEngine.through(proxy: ProxyConfig): HttpEngine =
-  if (proxy.mode == ProxyMode.SYSTEM) this else withProxy(proxy)
+/** This engine for [Proxy.System], which it follows by itself, else [HttpEngine.withProxy]. */
+internal fun HttpEngine.through(proxy: Proxy): HttpEngine =
+  if (proxy == Proxy.System) this else withProxy(proxy)

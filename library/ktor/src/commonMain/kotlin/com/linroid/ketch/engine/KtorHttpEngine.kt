@@ -3,7 +3,7 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
@@ -52,7 +52,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * Without a client of its own, the engine applies proxies ([withProxy]): each request, and each
  * hop of a redirect, goes directly, through an HTTP proxy (`CONNECT` for HTTPS) or through a
- * SOCKS5 proxy as its [ProxyConfig] says for that URL, on a client kept for that route. Proxy
+ * SOCKS5 proxy as its [Proxy] says for that URL, on a client kept for that route. Proxy
  * credentials only ever go to the proxy. On the JVM, requests use CIO when they go directly and
  * OkHttp, limited to HTTP/1.1 so that segments keep their own connections, through a proxy;
  * Android uses OkHttp and iOS Darwin (`NSURLSession`). A client given to it is used as it is,
@@ -60,7 +60,7 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class KtorHttpEngine private constructor(
   private val transports: HttpTransports,
-  private val proxy: ProxyConfig,
+  private val proxy: Proxy,
   private val redirects: RedirectCache,
   private val logRequests: Boolean,
   private val userAgent: String?,
@@ -84,7 +84,7 @@ class KtorHttpEngine private constructor(
     transports: HttpTransports,
     logRequests: Boolean,
     userAgent: String?,
-  ) : this(transports, ProxyConfig.System, RedirectCache(), logRequests, userAgent, true)
+  ) : this(transports, Proxy.System, RedirectCache(), logRequests, userAgent, true)
 
   private val log = KetchLogger("KtorHttpEngine")
 
@@ -232,7 +232,7 @@ class KtorHttpEngine private constructor(
   }
 
   /** `false` when this engine was given its own client, which only follows the system's. */
-  override val supportsProxies: Boolean get() = transports.supports(ProxyConfig.Direct)
+  override val supportsProxies: Boolean get() = transports.supports(Proxy.Direct)
 
   /**
    * An engine sharing this one's clients and remembered redirects, whose requests reach their
@@ -241,7 +241,7 @@ class KtorHttpEngine private constructor(
    * @throws KetchError.Unsupported when this engine was given its own client and [proxy] is not
    *   the system's
    */
-  override fun withProxy(proxy: ProxyConfig): HttpEngine {
+  override fun withProxy(proxy: Proxy): HttpEngine {
     if (proxy == this.proxy) return this
     if (!transports.supports(proxy)) {
       throw KetchError.Unsupported(

@@ -1,6 +1,6 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.engine.darwin.DarwinClientEngineConfig
@@ -22,16 +22,16 @@ import platform.Foundation.credentialWithUser
 internal actual fun defaultTransports(): HttpTransports = DarwinTransports()
 
 /**
- * iOS's transports: [com.linroid.ketch.api.ProxyMode.SYSTEM] leaves the proxy to
- * `NSURLSession`, which follows the system's settings; other modes set a session's proxy
- * dictionary, empty for direct requests.
+ * iOS's transports: [com.linroid.ketch.api.Proxy.System] leaves the proxy to `NSURLSession`,
+ * which follows the system's settings; other proxies set a session's proxy dictionary, empty for
+ * direct requests.
  */
 internal class DarwinTransports : HttpTransports {
   private val clients = ClientCache<ProxyRoute>()
 
-  override fun supports(proxy: ProxyConfig): Boolean = true
+  override fun supports(proxy: Proxy): Boolean = true
 
-  override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient {
+  override fun clientFor(url: Url, proxy: Proxy): RoutedClient {
     val route = proxy.routeFor(url) { ProxyRoute.Platform }
     return RoutedClient(clients.get(route) { client(route) }, route)
   }

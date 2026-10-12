@@ -6,7 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.resolve
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
@@ -28,8 +28,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class KetchProxyTest {
-  private val http = ProxyConfig.manual("http://proxy.test:3128")
-  private val socks = ProxyConfig.manual("socks5://socks.test:1080")
+  private val http = Proxy.Manual("http://proxy.test:3128")
+  private val socks = Proxy.Manual("socks5://socks.test:1080")
 
   @Test
   fun download_globalProxy_carriesEveryRequest() = withKetch(DownloadConfig(proxy = http)) {
@@ -52,12 +52,12 @@ class KetchProxyTest {
 
   @Test
   fun download_afterUpdateConfig_usesNewProxy() = withKetch(DownloadConfig()) {
-    ketch.updateConfig(DownloadConfig(retryCount = 0, proxy = ProxyConfig.Direct))
+    ketch.updateConfig(DownloadConfig(retryCount = 0, proxy = Proxy.Direct))
     val task = ketch.download(request())
     idle()
 
     assertIs<DownloadState.Completed>(task.state.value)
-    assertEquals(setOf(ProxyConfig.Direct), proxies.toSet())
+    assertEquals(setOf(Proxy.Direct), proxies.toSet())
   }
 
   @Test
@@ -82,11 +82,11 @@ class KetchProxyTest {
       ketch.updateConfig(DownloadConfig(proxy = http))
     }
     assertFailsWith<UnsupportedOperationException> {
-      ketch.download(request().copy(proxy = ProxyConfig.Direct))
+      ketch.download(request().copy(proxy = Proxy.Direct))
     }
     assertTrue(ketch.tasks.value.isEmpty())
     // The system's proxy needs nothing of the engine.
-    ketch.updateConfig(DownloadConfig(proxy = ProxyConfig(url = "http://kept.test:3128")))
+    ketch.updateConfig(DownloadConfig(proxy = Proxy.System))
   }
 
   @Test
@@ -133,7 +133,7 @@ class KetchProxyTest {
     private val folder: Path,
   ) {
     /** The proxies of the requests made so far. */
-    val proxies: List<ProxyConfig> get() = (engine as ProxyRecordingEngine).proxies
+    val proxies: List<Proxy> get() = (engine as ProxyRecordingEngine).proxies
 
     fun idle() = scope.advanceUntilIdle()
 
@@ -147,11 +147,11 @@ class KetchProxyTest {
   private class ProxyRecordingEngine(
     private val fake: FakeHttpEngine = FakeHttpEngine(),
   ) : HttpEngine by fake {
-    val proxies = mutableListOf<ProxyConfig>()
+    val proxies = mutableListOf<Proxy>()
 
     override val supportsProxies: Boolean = true
 
-    override fun withProxy(proxy: ProxyConfig): HttpEngine = object : HttpEngine by fake {
+    override fun withProxy(proxy: Proxy): HttpEngine = object : HttpEngine by fake {
       override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
         proxies += proxy
         return fake.head(url, headers)

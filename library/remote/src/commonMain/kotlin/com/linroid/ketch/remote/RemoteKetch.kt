@@ -13,8 +13,7 @@ import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -369,8 +368,8 @@ class RemoteKetch internal constructor(
    * Refuses [proxy] unless the server lists [KetchFeatures.PROXY]: an older server would ignore
    * it and connect without the proxy.
    */
-  private suspend fun requireProxySupport(proxy: ProxyConfig?) {
-    if (proxy == null || proxy.mode == ProxyMode.SYSTEM) return
+  private suspend fun requireProxySupport(proxy: Proxy?) {
+    if (proxy == null || proxy == Proxy.System) return
     if (KetchFeatures.PROXY !in status().features) {
       throw UnsupportedOperationException("This device cannot use a proxy")
     }

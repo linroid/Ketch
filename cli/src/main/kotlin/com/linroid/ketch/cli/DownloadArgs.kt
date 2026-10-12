@@ -7,7 +7,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileOrder
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
@@ -31,7 +31,7 @@ internal sealed interface DownloadArgs {
     val maxConcurrent: Int = DownloadConfig.Default.maxConcurrentDownloads,
     val headers: Map<String, String> = emptyMap(),
     /** `--proxy` or `--no-proxy`, in place of the configured proxy; `null` for that one. */
-    val proxy: ProxyConfig? = null,
+    val proxy: Proxy? = null,
     /**
      * `--files`: the IDs of the files to download of a download with several, such as a torrent,
      * one for a choice of variants; empty for the source's default (every file).
@@ -138,7 +138,7 @@ internal class ProxyOptions {
       "--proxy" -> url = value
       "--proxy-bypass" -> {
         val entries = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-        entries.firstOrNull { !ProxyConfig.isValidBypass(it) }?.let {
+        entries.firstOrNull { !Proxy.Manual.isValidBypass(it) }?.let {
           return "invalid host '$it' in --proxy-bypass"
         }
         bypass = entries
@@ -149,7 +149,7 @@ internal class ProxyOptions {
   }
 
   /** The proxy, `null` to keep the configured one, or why the options cannot be used together. */
-  fun build(): Result<ProxyConfig?> {
+  fun build(): Result<Proxy?> {
     val proxyUrl = url
     val problem = when {
       direct && proxyUrl != null -> "--proxy and --no-proxy cannot be used together"
@@ -157,10 +157,10 @@ internal class ProxyOptions {
       else -> null
     }
     if (problem != null) return Result.failure(IllegalArgumentException(problem))
-    if (direct) return Result.success(ProxyConfig.Direct)
+    if (direct) return Result.success(Proxy.Direct)
     if (proxyUrl == null) return Result.success(null)
     return try {
-      Result.success(ProxyConfig.manual(proxyUrl, bypass.orEmpty()))
+      Result.success(Proxy.Manual(proxyUrl, bypass.orEmpty()))
     } catch (_: IllegalArgumentException) {
       val message = "invalid proxy '$proxyUrl' (expected http://host:port or socks5://host:port)"
       Result.failure(IllegalArgumentException(message))

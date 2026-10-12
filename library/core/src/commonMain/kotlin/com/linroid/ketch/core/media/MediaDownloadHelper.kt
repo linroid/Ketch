@@ -1,7 +1,7 @@
 package com.linroid.ketch.core.media
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.DownloadContext
@@ -96,7 +96,7 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
   suspend fun fetchManifest(
     url: String,
     headers: Map<String, String>,
-    proxy: ProxyConfig = ProxyConfig.System,
+    proxy: Proxy = Proxy.System,
   ): MediaManifest {
     val checked = mediaUrl(type, url, url)
     val buffer = Buffer()

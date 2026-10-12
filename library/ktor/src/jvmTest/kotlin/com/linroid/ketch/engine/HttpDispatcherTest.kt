@@ -1,6 +1,6 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -32,7 +32,7 @@ class HttpDispatcherTest {
       // Through SOCKS5, whose relay passes bytes on as they arrive: OkHttp takes every proxy. A
       // name, as loopback addresses never go through one; the proxy resolves it to loopback.
       TestSocks5Proxy().use { proxy ->
-        val proxied = ProxyConfig.manual("socks5://127.0.0.1:${proxy.port}")
+        val proxied = Proxy.Manual("socks5://127.0.0.1:${proxy.port}")
         val waiting = download(proxied, "http://origin.test:${server.port}/file") {
           frames -> frames.any { "io.ktor.client.engine.okhttp" in it && "toChannel" in it }
         }
@@ -45,7 +45,7 @@ class HttpDispatcherTest {
   @Test
   fun cio_selectsOnKetchThreads() = runBlocking {
     StallingServer().use { server ->
-      val waiting = download(ProxyConfig.System, "http://127.0.0.1:${server.port}/file") { frames ->
+      val waiting = download(Proxy.System, "http://127.0.0.1:${server.port}/file") { frames ->
         frames.any { "ActorSelectorManager" in it && "select" in it }
       }
       assertTrue(waiting.any { it.startsWith("ketch-http-") }, "Selected on $waiting")
@@ -99,7 +99,7 @@ class HttpDispatcherTest {
    * whose stack frames match [waits] while the response stalls.
    */
   private suspend fun download(
-    proxy: ProxyConfig,
+    proxy: Proxy,
     url: String,
     waits: (List<String>) -> Boolean,
   ): List<String> {

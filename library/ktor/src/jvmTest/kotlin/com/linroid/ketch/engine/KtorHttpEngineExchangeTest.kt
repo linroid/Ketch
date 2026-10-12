@@ -1,7 +1,7 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.ConnectionRoute
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpExchange
 import com.linroid.ketch.core.engine.HttpExchangeObserver
@@ -65,7 +65,7 @@ class KtorHttpEngineExchangeTest {
   fun download_throughHttpProxy_reportsTargetHostAndProxyRoute() = realTime {
     OriginServer(content).use { origin ->
       TestHttpProxy().use { proxy ->
-        withEngine(ProxyConfig.manual("http://127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("http://127.0.0.1:${proxy.port}")) { engine ->
           val reported = engine.observe("http://origin.test:${origin.port}/file")
 
           val exchange = reported.single()
@@ -112,12 +112,12 @@ class KtorHttpEngineExchangeTest {
   }
 
   private suspend fun withEngine(
-    proxy: ProxyConfig = ProxyConfig.System,
+    proxy: Proxy = Proxy.System,
     block: suspend (HttpEngine) -> Unit,
   ) {
     val engine = KtorHttpEngine()
     try {
-      block(if (proxy == ProxyConfig.System) engine else engine.withProxy(proxy))
+      block(if (proxy == Proxy.System) engine else engine.withProxy(proxy))
     } finally {
       engine.close()
     }

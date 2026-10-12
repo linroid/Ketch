@@ -70,7 +70,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
-  `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `Proxy`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
   and `resolve(bytes, fileName)` extensions build them),
@@ -417,11 +417,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Proxies for HTTP(S), HLS and DASH downloads (not FTP or BitTorrent; Discover never proxies):
   `DownloadConfig.proxy` (`[download.proxy]`), replaced per task by `DownloadRequest.proxy`, which
   `DownloadCoordinator` folds into the run's `DownloadContext.config` (`forRequest`); `resolve`
-  uses the global one. `ProxyConfig` is `SYSTEM` (default), `DIRECT` or `MANUAL` with an
-  `http://` or `socks5://` URL (`ProxyAddress.parse`), username/password and a bypass list
-  (domains with subdomains, IPs, CIDR, `<local>`, `*`); loopback hosts always go directly and
-  `toString` masks the password. Sources call `HttpEngine.withProxy` (internal `through()`) only
-  for non-SYSTEM modes; its default refuses them with `KetchError.Unsupported`, so a proxy is
+  uses the global one. `Proxy` is sealed: `System` (default), `Direct` or `Manual` with a
+  `ProxyAddress` (`http://` or `socks5://`, its username and password) and a bypass list
+  (domains with subdomains, IPs, CIDR, `<local>`, `*`, matched by `@InternalKetchApi`
+  `ProxyBypass`, which the engines also use for system exclusion lists); loopback hosts always go
+  directly and `toString` masks the password. JSON and TOML keep the flat
+  `{mode, url, username, password, bypass}` object (`ProxySerializer`, which encodes the fields
+  itself, as ktoml nests delegated serializers). Sources call `HttpEngine.withProxy` (internal
+  `through()`) only for proxies other than `System`; its default refuses them with
+  `KetchError.Unsupported`, so a proxy is
   never skipped. `Ketch` lists `KetchFeatures.PROXY` only when `HttpEngine.supportsProxies`, and
   otherwise refuses such proxies in `updateConfig` and `download`. `Multi`/`ConfigurableNetworkHttpEngine` return views sharing their selection and
   round robin. `KtorHttpEngine` resolves a `ProxyRoute` per request and redirect hop, keeps one

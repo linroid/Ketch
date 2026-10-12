@@ -1,6 +1,6 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import io.ktor.http.Url
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,7 +27,7 @@ internal class RedirectCache(
   data class Key(
     val url: String,
     val headers: Map<String, String>,
-    val proxy: ProxyConfig = ProxyConfig.System,
+    val proxy: Proxy = Proxy.System,
   )
 
   /** The final hop of a request: its URL and the headers it was sent with. */

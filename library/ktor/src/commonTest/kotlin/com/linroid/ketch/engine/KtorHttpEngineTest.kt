@@ -2,7 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import io.ktor.client.HttpClient
@@ -328,8 +328,8 @@ class KtorHttpEngineTest {
   fun withProxy_ownClient_refusesProxiesOtherThanTheSystems() = runTest {
     withResponse(HttpStatusCode.OK, "", "Content-Length" to "0") { engine ->
       assertFalse(engine.supportsProxies)
-      assertTrue(engine.withProxy(ProxyConfig.System) === engine)
-      assertFailsWith<KetchError.Unsupported> { engine.withProxy(ProxyConfig.Direct) }
+      assertTrue(engine.withProxy(Proxy.System) === engine)
+      assertFailsWith<KetchError.Unsupported> { engine.withProxy(Proxy.Direct) }
     }
   }
 
@@ -339,11 +339,11 @@ class KtorHttpEngineTest {
     val transports = object : HttpTransports {
       private val clients = mutableMapOf<String, HttpClient>()
 
-      override fun supports(proxy: ProxyConfig): Boolean = true
+      override fun supports(proxy: Proxy): Boolean = true
 
-      override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient {
+      override fun clientFor(url: Url, proxy: Proxy): RoutedClient {
         // Each proxy is sent to a mirror of its own.
-        val name = proxy.address?.host ?: "direct"
+        val name = (proxy as? Proxy.Manual)?.address?.host ?: "direct"
         val client = clients.getOrPut(name) {
           HttpClient(MockEngine { request ->
             requests += "$name ${request.method.value} ${request.url.host}"
@@ -364,8 +364,8 @@ class KtorHttpEngineTest {
     }
     val engine = KtorHttpEngine(transports, logRequests = false, userAgent = null)
     try {
-      val first = engine.withProxy(ProxyConfig.manual("http://first:3128"))
-      val second = engine.withProxy(ProxyConfig.manual("http://second:3128"))
+      val first = engine.withProxy(Proxy.Manual("http://first:3128"))
+      val second = engine.withProxy(Proxy.Manual("http://second:3128"))
       first.head(URL)
       second.head(URL)
       first.download(URL, null) {}

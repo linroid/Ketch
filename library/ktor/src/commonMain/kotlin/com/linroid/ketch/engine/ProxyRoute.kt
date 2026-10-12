@@ -1,8 +1,8 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ProxyAddress
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.ProxyBypass
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlin.concurrent.atomics.AtomicReference
@@ -35,12 +35,14 @@ internal sealed interface ProxyRoute {
   }
 
   companion object {
-    /** The route to [address], with [credentials]. */
-    fun of(address: ProxyAddress, credentials: ProxyCredentials?): ProxyRoute =
-      when (address.type) {
+    /** The route to [address], with its credentials. */
+    fun of(address: ProxyAddress): ProxyRoute {
+      val credentials = address.username?.let { ProxyCredentials(it, address.password.orEmpty()) }
+      return when (address.type) {
         ProxyAddress.Type.HTTP -> Http(address.host, address.port, credentials)
         ProxyAddress.Type.SOCKS5 -> Socks5(address.host, address.port, credentials)
       }
+    }
 
     private fun printedHost(host: String): String = if (':' in host) "[$host]" else host
   }
@@ -56,24 +58,16 @@ internal class ProxyCredentials(val username: String, val password: String) {
   override fun toString(): String = "ProxyCredentials(username=$username)"
 }
 
-/** The credentials of this configuration, or `null` without a username. */
-internal val ProxyConfig.credentials: ProxyCredentials?
-  get() = username?.let { ProxyCredentials(it, password.orEmpty()) }
-
 /**
- * The route of a request to [url] under this configuration. [system] decides for
- * [ProxyMode.SYSTEM], after loopback hosts, which always go directly.
+ * The route of a request to [url] through this proxy. [system] decides for [Proxy.System], after
+ * loopback hosts, which always go directly.
  */
-internal fun ProxyConfig.routeFor(url: Url, system: (Url) -> ProxyRoute): ProxyRoute {
-  if (ProxyConfig.System.bypasses(url.host)) return ProxyRoute.Direct
-  return when (mode) {
-    ProxyMode.DIRECT -> ProxyRoute.Direct
-    ProxyMode.SYSTEM -> system(url)
-    ProxyMode.MANUAL -> if (bypasses(url.host)) {
-      ProxyRoute.Direct
-    } else {
-      ProxyRoute.of(checkNotNull(address), credentials)
-    }
+internal fun Proxy.routeFor(url: Url, system: (Url) -> ProxyRoute): ProxyRoute {
+  if (ProxyBypass.isLoopback(url.host)) return ProxyRoute.Direct
+  return when (this) {
+    Proxy.Direct -> ProxyRoute.Direct
+    Proxy.System -> system(url)
+    is Proxy.Manual -> if (bypasses(url.host)) ProxyRoute.Direct else ProxyRoute.of(address)
   }
 }
 
@@ -83,7 +77,7 @@ internal fun ProxyConfig.routeFor(url: Url, system: (Url) -> ProxyRoute): ProxyR
  */
 internal interface HttpTransports {
   /** Whether requests can go as [proxy] says. */
-  fun supports(proxy: ProxyConfig): Boolean
+  fun supports(proxy: Proxy): Boolean
 
   /**
    * The client for a request to [url] under [proxy], and the route it takes.
@@ -91,7 +85,7 @@ internal interface HttpTransports {
    * @throws com.linroid.ketch.api.KetchError when the route cannot be used, such as an
    *   unsupported proxy in the environment
    */
-  fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient
+  fun clientFor(url: Url, proxy: Proxy): RoutedClient
 
   /** Closes every client. */
   fun close()
@@ -104,9 +98,9 @@ internal class RoutedClient(val client: HttpClient, val route: ProxyRoute)
 internal class FixedTransports(private val client: HttpClient) : HttpTransports {
   private val requests = client.config { followRedirects = false }
 
-  override fun supports(proxy: ProxyConfig): Boolean = proxy.mode == ProxyMode.SYSTEM
+  override fun supports(proxy: Proxy): Boolean = proxy == Proxy.System
 
-  override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient =
+  override fun clientFor(url: Url, proxy: Proxy): RoutedClient =
     RoutedClient(requests, ProxyRoute.Platform)
 
   override fun close() {

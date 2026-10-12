@@ -1,8 +1,8 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.NetworkInterfaceConfig
-import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,7 +97,7 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   override val supportsProxies: Boolean
     get() = current.load()?.engine?.supportsProxies == true
 
-  override fun withProxy(proxy: ProxyConfig): HttpEngine = Proxied(proxy)
+  override fun withProxy(proxy: Proxy): HttpEngine = Proxied(proxy)
 
   private suspend fun <T> withEngine(block: suspend (HttpEngine) -> T): T {
     while (true) {
@@ -117,7 +117,7 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   }
 
   /** The selected networks, reaching servers as [proxy] says; closing it does nothing. */
-  private inner class Proxied(private val proxy: ProxyConfig) : HttpEngine {
+  private inner class Proxied(private val proxy: Proxy) : HttpEngine {
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
       withEngine { it.withProxy(proxy).head(url, headers) }
 
@@ -142,7 +142,7 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
     override val supportsProxies: Boolean
       get() = this@ConfigurableNetworkHttpEngine.supportsProxies
 
-    override fun withProxy(proxy: ProxyConfig): HttpEngine =
+    override fun withProxy(proxy: Proxy): HttpEngine =
       this@ConfigurableNetworkHttpEngine.withProxy(proxy)
 
     override fun close() {}

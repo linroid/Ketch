@@ -50,7 +50,7 @@ data class DownloadConfig(
   val maxConcurrentDownloads: Int = 4,
   val maxConnectionsPerDownload: Int = 4,
   val maxConnectionsPerHost: Int = 16,
-  val proxy: ProxyConfig = ProxyConfig.System,
+  val proxy: Proxy = Proxy.System,
   val categories: List<DownloadCategory> = emptyList(),
 ) {
   init {

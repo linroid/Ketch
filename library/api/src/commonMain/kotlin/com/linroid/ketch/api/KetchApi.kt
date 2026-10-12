@@ -29,8 +29,8 @@ interface KetchApi {
   /**
    * Adds a download.
    *
-   * @throws UnsupportedOperationException if [DownloadRequest.proxy] sets a proxy and this
-   *   backend does not list [KetchFeatures.PROXY]
+   * @throws UnsupportedOperationException if [DownloadRequest.proxy] is not [Proxy.System]
+   *   and this backend does not list [KetchFeatures.PROXY]
    */
   suspend fun download(request: DownloadRequest): DownloadTask
 
@@ -60,8 +60,8 @@ interface KetchApi {
    *
    * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
    *   changed to a folder that does not exist on this instance
-   * @throws UnsupportedOperationException if [DownloadConfig.proxy] sets a proxy and this
-   *   backend does not list [KetchFeatures.PROXY]
+   * @throws UnsupportedOperationException if [DownloadConfig.proxy] is not [Proxy.System]
+   *   and this backend does not list [KetchFeatures.PROXY]
    */
   suspend fun updateConfig(config: DownloadConfig)
 

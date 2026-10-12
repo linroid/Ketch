@@ -3,7 +3,8 @@ package com.linroid.ketch.engine
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.ProxyBypass
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -17,7 +18,7 @@ internal actual fun defaultTransports(): HttpTransports = AndroidTransports(netw
 /**
  * Android's transports, bound to [network] when it is set.
  *
- * Unbound, [com.linroid.ketch.api.ProxyMode.SYSTEM] leaves the proxy to OkHttp, which follows
+ * Unbound, [com.linroid.ketch.api.Proxy.System] leaves the proxy to OkHttp, which follows
  * the active network's. Bound to [network], it uses that network's own HTTP proxy from
  * [connectivity], or none when the network has a proxy auto-configuration script, whose local
  * proxy the network cannot reach.
@@ -29,9 +30,9 @@ internal class AndroidTransports(
   private val binding = network?.let(::NetworkBinding) ?: SocketBinding.None
   private val clients = ClientCache<ProxyRoute>()
 
-  override fun supports(proxy: ProxyConfig): Boolean = true
+  override fun supports(proxy: Proxy): Boolean = true
 
-  override fun clientFor(url: Url, proxy: ProxyConfig): RoutedClient {
+  override fun clientFor(url: Url, proxy: Proxy): RoutedClient {
     val route = proxy.routeFor(url) {
       if (network == null) ProxyRoute.Platform else networkRoute(network, it)
     }
@@ -56,8 +57,12 @@ internal class AndroidTransports(
     if (info.pacFileUrl != Uri.EMPTY || host.isNullOrEmpty() || info.port <= 0) {
       return ProxyRoute.Direct
     }
-    val bypass = ProxyConfig(bypass = info.exclusionList.filter(ProxyConfig::isValidBypass))
-    return if (bypass.bypasses(url.host)) ProxyRoute.Direct else ProxyRoute.Http(host, info.port)
+    val bypass = info.exclusionList.filter(ProxyBypass::isValid)
+    return if (ProxyBypass.bypasses(bypass, url.host)) {
+      ProxyRoute.Direct
+    } else {
+      ProxyRoute.Http(host, info.port)
+    }
   }
 
   private fun platformClient(): HttpClient = HttpClient(OkHttp) {

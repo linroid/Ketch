@@ -5,7 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import java.io.ByteArrayOutputStream
@@ -33,7 +33,7 @@ class ProxyDownloadTest {
   fun httpProxy_plainRequest_sendsCredentialsToProxyOnly() = runTest(timeout = 20.seconds) {
     OriginServer(content).use { origin ->
       TestHttpProxy("me", "secret").use { proxy ->
-        withEngine(ProxyConfig.manual("http://me:secret@127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("http://me:secret@127.0.0.1:${proxy.port}")) { engine ->
           val url = "http://origin.test:${origin.port}/file"
           assertContentEquals(content, engine.fetch(url))
 
@@ -52,7 +52,7 @@ class ProxyDownloadTest {
         while (!origin.isClosed) runCatching { origin.accept().close() }
       }
       TestHttpProxy("me", "secret").use { proxy ->
-        withEngine(ProxyConfig.manual("http://me:secret@127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("http://me:secret@127.0.0.1:${proxy.port}")) { engine ->
           assertFailsWith<KetchError.Network> {
             engine.fetch("https://origin.test:${origin.localPort}/file")
           }
@@ -69,7 +69,7 @@ class ProxyDownloadTest {
   fun httpProxy_wrongCredentials_failsWith407() = runTest(timeout = 20.seconds) {
     OriginServer(content).use { origin ->
       TestHttpProxy("me", "secret").use { proxy ->
-        withEngine(ProxyConfig.manual("http://me:wrong@127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("http://me:wrong@127.0.0.1:${proxy.port}")) { engine ->
           val error = assertFailsWith<KetchError.Http> {
             engine.fetch("http://origin.test:${origin.port}/file")
           }
@@ -90,7 +90,7 @@ class ProxyDownloadTest {
           config = DownloadConfig(
             defaultDirectory = folder.path,
             retryCount = 0,
-            proxy = ProxyConfig.manual("socks5://me:secret@127.0.0.1:${proxy.port}"),
+            proxy = Proxy.Manual("socks5://me:secret@127.0.0.1:${proxy.port}"),
           ),
         )
         try {
@@ -119,7 +119,7 @@ class ProxyDownloadTest {
   fun socks5Proxy_wrongPassword_failsWithoutReachingOrigin() = runTest(timeout = 20.seconds) {
     OriginServer(content).use { origin ->
       TestSocks5Proxy("me", "secret").use { proxy ->
-        withEngine(ProxyConfig.manual("socks5://me:wrong@127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("socks5://me:wrong@127.0.0.1:${proxy.port}")) { engine ->
           assertFailsWith<KetchError.Network> {
             engine.fetch("http://origin.test:${origin.port}/file")
           }
@@ -140,7 +140,7 @@ class ProxyDownloadTest {
             httpEngine = KtorHttpEngine(),
             config = DownloadConfig(
               retryCount = 0,
-              proxy = ProxyConfig.manual("http://127.0.0.1:${global.port}"),
+              proxy = Proxy.Manual("http://127.0.0.1:${global.port}"),
             ),
           )
           try {
@@ -148,7 +148,7 @@ class ProxyDownloadTest {
               DownloadRequest(
                 url = "http://origin.test:${origin.port}/file",
                 destination = Destination(File(folder, "file.bin").path),
-                proxy = ProxyConfig.manual("socks5://127.0.0.1:${socks.port}"),
+                proxy = Proxy.Manual("socks5://127.0.0.1:${socks.port}"),
               ),
             )
             assertIs<DownloadState.Completed>(task.state.first { it.isTerminal })
@@ -168,7 +168,7 @@ class ProxyDownloadTest {
   fun loopbackTarget_goesDirectlyPastProxy() = runTest(timeout = 20.seconds) {
     OriginServer(content).use { origin ->
       TestHttpProxy().use { proxy ->
-        withEngine(ProxyConfig.manual("http://127.0.0.1:${proxy.port}")) { engine ->
+        withEngine(Proxy.Manual("http://127.0.0.1:${proxy.port}")) { engine ->
           assertContentEquals(content, engine.fetch("http://127.0.0.1:${origin.port}/file"))
           assertTrue(proxy.requests.isEmpty())
         }
@@ -176,7 +176,7 @@ class ProxyDownloadTest {
     }
   }
 
-  private suspend fun withEngine(proxy: ProxyConfig, block: suspend (HttpEngine) -> Unit) {
+  private suspend fun withEngine(proxy: Proxy, block: suspend (HttpEngine) -> Unit) {
     val engine = KtorHttpEngine()
     try {
       block(engine.withProxy(proxy))

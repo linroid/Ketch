@@ -6,7 +6,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.FileOrder
-import com.linroid.ketch.api.ProxyConfig
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -191,7 +191,7 @@ class DownloadArgsTest {
         "https://example.com/a.zip"),
     )
     val download = assertIs<DownloadArgs.Download>(args)
-    val expected = ProxyConfig.manual(
+    val expected = Proxy.Manual(
       "socks5://me:secret@127.0.0.1:1080",
       bypass = listOf("*.lan", "10.0.0.0/8"),
     )
@@ -202,7 +202,7 @@ class DownloadArgsTest {
   @Test
   fun `no proxy option connects directly`() {
     val args = parseDownloadArgs(listOf("--no-proxy", "https://example.com/a.zip"))
-    assertEquals(ProxyConfig.Direct, assertIs<DownloadArgs.Download>(args).proxy)
+    assertEquals(Proxy.Direct, assertIs<DownloadArgs.Download>(args).proxy)
   }
 
   @Test

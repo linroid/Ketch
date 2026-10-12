@@ -51,7 +51,7 @@ data class DownloadRequest(
   val conditions: List<DownloadCondition> = emptyList(),
   val resolvedSource: ResolvedSource? = null,
   val requestId: String? = null,
-  val proxy: ProxyConfig? = null,
+  val proxy: Proxy? = null,
   val awaitFileSelection: Boolean = false,
   val checksum: Checksum? = null,
 ) {

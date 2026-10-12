@@ -1,34 +1,27 @@
 package com.linroid.ketch.app.ui.settings
 
-import com.linroid.ketch.api.ProxyConfig
-import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ProxySettingsTest {
-  private val saved = ProxyConfig(
-    url = "http://old.lan:3128",
-    username = "me",
-    password = "secret",
-    bypass = listOf("*.lan"),
-  )
+  private val saved = Proxy.Manual("http://me:secret@old.lan:3128", listOf("*.lan"))
 
   @Test
   fun withAddress_withoutCredentials_keepsSavedOnes() {
     val updated = withAddress(saved, "socks5://new.lan:1080")
-    assertEquals(
-      ProxyConfig(ProxyMode.MANUAL, "socks5://new.lan:1080", "me", "secret", listOf("*.lan")),
-      updated,
-    )
+    assertEquals(Proxy.Manual("socks5://me:secret@new.lan:1080", listOf("*.lan")), updated)
   }
 
   @Test
   fun withAddress_withCredentials_replacesSavedOnes() {
     val updated = withAddress(saved, "http://you:pass@new.lan:8080")
-    assertEquals("http://new.lan:8080", updated.url)
-    assertEquals("you", updated.username)
-    assertEquals("pass", updated.password)
-    assertEquals(listOf("*.lan"), updated.bypass)
+    assertEquals(Proxy.Manual("http://you:pass@new.lan:8080", listOf("*.lan")), updated)
+  }
+
+  @Test
+  fun withAddress_withoutSavedProxy_takesTheTypedOne() {
+    assertEquals(Proxy.Manual("http://new.lan:8080"), withAddress(null, "http://new.lan:8080"))
   }
 
   @Test

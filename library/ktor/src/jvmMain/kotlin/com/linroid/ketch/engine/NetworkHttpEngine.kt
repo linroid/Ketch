@@ -9,7 +9,7 @@ import java.net.NetworkInterface
  * Select an address assigned to the desired [NetworkInterface]. Each engine owns separate
  * connection pools. DNS uses the system resolver, filtered to the address family of
  * [localAddress]. Proxies ([KtorHttpEngine.withProxy]) are reached from the address too, and the
- * system's are those of the environment and the JVM ([com.linroid.ketch.api.ProxyMode.SYSTEM]).
+ * system's are those of the environment and the JVM ([com.linroid.ketch.api.Proxy.System]).
  * OS routing must support the selected source address; this is source-address binding, not a
  * platform-specific force-interface socket option. A removed address fails rather than falling
  * back to an unbound socket. Recreate the engine when the interface's address changes.
