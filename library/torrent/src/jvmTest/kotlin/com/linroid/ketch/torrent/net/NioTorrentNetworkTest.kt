@@ -34,7 +34,7 @@ class NioTorrentNetworkTest {
     withTimeout(30_000) {
       // Start the shared selector before taking the snapshot.
       NioSelector.shared
-      val before = Thread.getAllStackTraces().keys.map { it.threadId() }.toSet()
+      val before = Thread.getAllStackTraces().keys.toSet()
       val network = NioTorrentNetwork()
       try {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
@@ -63,7 +63,7 @@ class NioTorrentNetworkTest {
       } finally {
         network.close()
       }
-      val created = Thread.getAllStackTraces().keys.filter { it.threadId() !in before }
+      val created = Thread.getAllStackTraces().keys.filter { it !in before }
         .map { it.name }
         // The test's own pool starts its threads on demand.
         .filterNot { it.startsWith("kotlinx.coroutines.DefaultExecutor") || it.startsWith(WORKER) }
