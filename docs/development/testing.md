@@ -197,6 +197,14 @@ first read loads its file on another thread. Code that runs on another dispatche
 `TimeSource.Monotonic` or uses `withTimeout` in a composable (Compose times those out on the wall
 clock) still follows the wall clock.
 
+Pull requests that change the UI show it in their description: the affected scenarios rendered
+on the base commit and on the branch, side by side in a Before | After table (add a scenario
+when none covers the change). Keep the images out of the repository: put them in a secret gist
+(`gh gist create` refuses binaries, so create it with a text file, `git clone` it over HTTPS,
+commit the PNGs and push) and link them as
+`https://gist.githubusercontent.com/<user>/<gist id>/raw/<commit>/<file>.png`, pinned to the
+commit. GitHub has no API for the attachments its editor uploads.
+
 The README showcase (`art/showcase-light.png`, `art/showcase-dark.png`) is the
 `ShowcaseSnapshots` scenario: the desktop window, two phones and a terminal over brand-free
 `ShowcaseData`. `art/render-showcase.sh` renders it
