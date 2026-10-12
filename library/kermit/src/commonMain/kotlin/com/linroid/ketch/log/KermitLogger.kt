@@ -3,6 +3,7 @@ package com.linroid.ketch.log
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import co.touchlab.kermit.Logger as KermitLib
 
@@ -61,4 +62,16 @@ class KermitLogger(
   override fun e(message: String, throwable: Throwable?) {
     kermit.e(messageString = message, throwable = throwable)
   }
+
+  override fun isLoggable(level: LogLevel): Boolean =
+    kermit.config.minSeverity <= level.severity
+
+  private val LogLevel.severity: Severity
+    get() = when (this) {
+      LogLevel.VERBOSE -> Severity.Verbose
+      LogLevel.DEBUG -> Severity.Debug
+      LogLevel.INFO -> Severity.Info
+      LogLevel.WARN -> Severity.Warn
+      LogLevel.ERROR -> Severity.Error
+    }
 }

@@ -97,6 +97,13 @@ interface Logger {
    */
   fun e(message: String, throwable: Throwable? = null)
 
+  /**
+   * Whether this logger emits records at [level]. [KetchLogger] asks before it builds a
+   * message, so messages below a logger's level cost nothing. Defaults to `true`; loggers that
+   * filter by level should override it.
+   */
+  fun isLoggable(level: LogLevel): Boolean = true
+
   companion object {
     /**
      * No-op logger that discards all log messages.
@@ -108,6 +115,7 @@ interface Logger {
       override fun i(message: String) {}
       override fun w(message: String, throwable: Throwable?) {}
       override fun e(message: String, throwable: Throwable?) {}
+      override fun isLoggable(level: LogLevel): Boolean = false
     }
 
     /**
@@ -154,6 +162,8 @@ private class CombinedLogger(private val loggers: List<Logger>) : Logger {
 
   override fun e(message: String, throwable: Throwable?) =
     loggers.forEach { it.e(message, throwable) }
+
+  override fun isLoggable(level: LogLevel): Boolean = loggers.any { it.isLoggable(level) }
 }
 
 /**

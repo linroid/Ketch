@@ -1,8 +1,15 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Sealed hierarchy of all errors that Ketch can produce.
@@ -11,6 +18,10 @@ import kotlinx.serialization.Transient
  * retried automatically. Only transient failures ([Network],
  * server-side [Http] 5xx, and rate-limiting 429) are considered
  * retryable.
+ *
+ * Serialized as an object with a `type`, such as `{"type":"network","message":"..."}`. Read
+ * errors another version of Ketch sent with [tolerantSerializer], as [DownloadState.Failed]
+ * does, so an error type added later does not fail the whole message.
  *
  * @property message human-readable error description
  * @property cause underlying exception, if any
@@ -183,4 +194,41 @@ sealed class KetchError(
       is ChecksumMismatch -> false
       is Unknown -> false
     }
+
+  companion object {
+    /**
+     * Reads errors like `serializer()`, except that from JSON an error of a `type` this version
+     * does not know, such as one a newer server sends, or one whose fields do not decode, reads
+     * as [Unknown] with the `message` it was sent with. Writes errors as `serializer()` does.
+     */
+    fun tolerantSerializer(): KSerializer<KetchError> = KetchErrorSerializer
+  }
+}
+
+// The sealed serializer the plugin generates, which keeps the wire shape, plus a fallback: it
+// throws on a subtype it does not know, which would break older clients of newer servers. Not
+// the class's own serializer: the plugin only lets subclasses inherit the fields of a parent
+// whose serializer it generates.
+internal object KetchErrorSerializer : KSerializer<KetchError> {
+  private val generated: KSerializer<KetchError> get() = KetchError.serializer()
+
+  override val descriptor: SerialDescriptor get() = generated.descriptor
+
+  override fun serialize(encoder: Encoder, value: KetchError) {
+    encoder.encodeSerializableValue(generated, value)
+  }
+
+  override fun deserialize(decoder: Decoder): KetchError {
+    if (decoder !is JsonDecoder) return decoder.decodeSerializableValue(generated)
+    val element = decoder.decodeJsonElement()
+    return try {
+      decoder.json.decodeFromJsonElement(generated, element)
+    } catch (_: IllegalArgumentException) {
+      // SerializationException is an IllegalArgumentException.
+      KetchError.Unknown(errorMessage = (element as? JsonObject)?.string("message"))
+    }
+  }
+
+  private fun JsonObject.string(key: String): String? =
+    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 }

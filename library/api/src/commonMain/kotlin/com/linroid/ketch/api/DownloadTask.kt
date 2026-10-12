@@ -16,6 +16,7 @@ import kotlin.time.Instant
  * @property state Observable download state
  * @property segments Observable list of download segments with their progress
  */
+@SubclassOptInRequired(KetchImplementationApi::class)
 interface DownloadTask {
   val taskId: String
   val request: DownloadRequest

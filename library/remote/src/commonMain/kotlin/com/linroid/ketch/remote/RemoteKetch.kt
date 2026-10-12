@@ -58,6 +58,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -313,7 +314,8 @@ class RemoteKetch internal constructor(
     }
     when (response.status) {
       HttpStatusCode.UnsupportedMediaType -> throw KetchError.Unsupported()
-      HttpStatusCode.UnprocessableEntity -> throw response.body<KetchError>()
+      HttpStatusCode.UnprocessableEntity ->
+        throw json.decodeFromString(KetchError.tolerantSerializer(), response.bodyAsText())
       HttpStatusCode.PayloadTooLarge -> throw IllegalArgumentException("File is too large")
       HttpStatusCode.NotFound, HttpStatusCode.NotImplemented ->
         throw UnsupportedOperationException("Resolving file content is unavailable")

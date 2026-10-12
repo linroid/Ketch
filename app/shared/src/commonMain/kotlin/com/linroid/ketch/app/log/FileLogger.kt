@@ -74,8 +74,10 @@ class FileLogger(
     writer.join()
   }
 
+  override fun isLoggable(level: LogLevel): Boolean = level >= minLevel
+
   private fun log(level: LogLevel, message: String, throwable: Throwable?) {
-    if (level < minLevel) return
+    if (!isLoggable(level)) return
     val record = formatLogLine(level, message, throwable)
     jobs.trySend { it.append(record) }
   }

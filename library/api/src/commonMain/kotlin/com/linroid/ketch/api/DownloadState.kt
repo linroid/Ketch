@@ -84,10 +84,16 @@ sealed class DownloadState {
     val checksum: Checksum? = null,
   ) : DownloadState()
 
-  /** Download failed with [error]. May be retried if the error is retryable. */
+  /**
+   * Download failed with [error]. May be retried if the error is retryable. An error of a type
+   * this version does not know, such as one a newer server reports, reads as
+   * [KetchError.Unknown] ([KetchError.tolerantSerializer]).
+   */
   @Serializable
   @SerialName("failed")
-  data class Failed(val error: KetchError) : DownloadState()
+  data class Failed(
+    @Serializable(with = KetchErrorSerializer::class) val error: KetchError,
+  ) : DownloadState()
 
   /** Download was explicitly canceled. */
   @Serializable

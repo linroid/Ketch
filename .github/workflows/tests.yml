@@ -107,6 +107,11 @@ jobs:
       - name: Compile publication metadata
         run: ./gradlew compilePublishedMetadata
 
+      # Fails when library:api's public API differs from library/api/api; run
+      # `./gradlew :library:api:updateKotlinAbi` and commit the dump when the change is meant.
+      - name: Check public API dump
+        run: ./gradlew :library:api:checkKotlinAbi
+
   android-tests:
     name: Android Unit Tests
     runs-on: ubuntu-latest

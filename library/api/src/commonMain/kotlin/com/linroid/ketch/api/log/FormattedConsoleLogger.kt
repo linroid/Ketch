@@ -18,7 +18,9 @@ internal class FormattedConsoleLogger(
 
   override fun e(message: String, throwable: Throwable?) = log(LogLevel.ERROR, message, throwable)
 
+  override fun isLoggable(level: LogLevel): Boolean = level >= minLevel
+
   private fun log(level: LogLevel, message: String, throwable: Throwable?) {
-    if (level >= minLevel) write(level, formatLogLine(level, message, throwable))
+    if (isLoggable(level)) write(level, formatLogLine(level, message, throwable))
   }
 }

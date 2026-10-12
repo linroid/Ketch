@@ -1,5 +1,6 @@
 package com.linroid.ketch.api.log
 
+import com.linroid.ketch.api.InternalKetchApi
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
@@ -13,6 +14,7 @@ import kotlin.time.ExperimentalTime
  *
  * @suppress This is internal API and should not be used directly by library users.
  */
+@InternalKetchApi
 fun Throwable.describeCauses(): String {
   val seen = mutableListOf<Throwable>()
   var current: Throwable? = this
@@ -38,6 +40,7 @@ fun Throwable.describeCauses(): String {
  *
  * @suppress This is internal API and should not be used directly by library users.
  */
+@InternalKetchApi
 fun redactUrl(url: String): String {
   if (url.startsWith("magnet:", ignoreCase = true)) return redactMagnet(url)
   val schemeEnd = url.indexOf("://")
@@ -88,6 +91,7 @@ private fun redactMagnet(url: String): String {
  *
  * @suppress This is internal API and should not be used directly by library users.
  */
+@InternalKetchApi
 fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
 
 /**
@@ -97,6 +101,7 @@ fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(
  *
  * @suppress This is internal API and should not be used directly by library users.
  */
+@InternalKetchApi
 fun formatLogLine(level: LogLevel, message: String, throwable: Throwable? = null): String {
   val line = "${logTimestamp()} [${level.name}] $message"
   if (throwable == null) return line

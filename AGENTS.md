@@ -1426,13 +1426,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KETCH_TORRENT_SURVEY`, `KETCH_TORRENT_SURVEY_WIRE`) measures public swarms
 - See [logging](docs/logging.md) for the format, troubleshooting and sensitive-data rules
 - `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging
-- `Logger` interface accepts `String` messages; lazy evaluation handled by `KetchLogger`
+- `Logger` interface accepts `String` messages; lazy evaluation handled by `KetchLogger`, which
+  builds a message only when `Logger.isLoggable(level)` (loggers that filter by level override it)
 
 ### Error Handling (sealed `KetchError`)
 - `Network` (retryable), `Http(code)` (5xx/429 retryable), `Disk`, `Unsupported`,
   `FileChanged`, `CorruptResumeState`, `Canceled`, `SourceError`,
   `AuthenticationFailed`, `ChecksumMismatch(algorithm, expected, actual, published)`, `Unknown`
 - I/O exceptions from `FileAccessor` classified as `KetchError.Disk`
+- Errors another version sent are read with `KetchError.tolerantSerializer()` (as
+  `DownloadState.Failed` does): an unknown `type` decodes as `Unknown` with the sent `message`
 
 ### App Size
 - Release apps and the CLI leave out kotlin-reflect (`exclude` on the runtime classpath of
@@ -1516,6 +1519,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Favor simple correctness over micro-optimizations
 - Keep public APIs minimal with KDoc
 - Mark internal implementation with `internal` modifier
+- In `library:api`, declarations public only for Ketch's own modules carry `@InternalKetchApi`,
+  and `KetchApi`/`DownloadTask` require `KetchImplementationApi` to implement; the root build
+  opts every module in. Its public API is checked against `library/api/api/`: run
+  `./gradlew :library:api:updateKotlinAbi` and commit the dump with intended changes
 
 ### Architecture
 - All core logic in `commonMain` using expect/actual for platform differences

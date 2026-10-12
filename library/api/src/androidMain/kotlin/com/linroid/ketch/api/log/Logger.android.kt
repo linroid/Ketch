@@ -6,6 +6,8 @@ import com.linroid.ketch.api.log.Logger
 
 internal actual fun consoleLogger(minLevel: LogLevel): Logger =
   object : Logger {
+    override fun isLoggable(level: LogLevel): Boolean = level >= minLevel
+
     override fun v(message: String) {
       if (minLevel <= LogLevel.VERBOSE) Log.v("Ketch", message)
     }

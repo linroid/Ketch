@@ -433,7 +433,7 @@ class KtorHttpEngine private constructor(
 
   companion object {
     /** `User-Agent` of requests that name none: `Ketch/` and the library version. */
-    const val DEFAULT_USER_AGENT: String = "Ketch/${KetchApi.VERSION}"
+    val DEFAULT_USER_AGENT: String = "Ketch/${KetchApi.VERSION}"
 
     private const val DEFAULT_BUFFER_SIZE = 8192
     private const val MAX_REDIRECTS = 20

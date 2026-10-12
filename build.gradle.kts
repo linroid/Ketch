@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
   // this is necessary to avoid the plugins to be loaded multiple times
@@ -40,6 +41,17 @@ subprojects {
         }
       }
     }
+  }
+}
+
+// library:api marks what only Ketch's own modules may use or implement (InternalKetchApi,
+// KetchImplementationApi). Every module of this build is one of them and depends on library:api.
+subprojects {
+  tasks.withType<KotlinCompilationTask<*>>().configureEach {
+    compilerOptions.optIn.addAll(
+      "com.linroid.ketch.api.InternalKetchApi",
+      "com.linroid.ketch.api.KetchImplementationApi",
+    )
   }
 }
 

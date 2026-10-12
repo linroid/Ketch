@@ -9,6 +9,7 @@ import kotlin.time.Duration
  * and remote (HTTP+SSE) backends implement this interface, allowing
  * the UI to work identically regardless of backend mode.
  */
+@SubclassOptInRequired(KetchImplementationApi::class)
 interface KetchApi {
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
@@ -140,11 +141,13 @@ interface KetchApi {
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
 
+  // Not `const`: constants are copied into the code that reads them, which would then report
+  // the version it was compiled against rather than the one it runs with.
   companion object {
     /** Library version string (e.g., "0.0.1-dev"). */
-    const val VERSION: String = KETCH_BUILD_VERSION
+    val VERSION: String = KETCH_BUILD_VERSION
 
     /** Build revision (git short hash). */
-    const val REVISION: String = KETCH_BUILD_REVISION
+    val REVISION: String = KETCH_BUILD_REVISION
   }
 }

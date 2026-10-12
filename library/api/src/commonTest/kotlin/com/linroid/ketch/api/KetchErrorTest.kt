@@ -1,6 +1,9 @@
 package com.linroid.ketch.api
+
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -122,5 +125,54 @@ class KetchErrorTest {
   fun authenticationFailed_containsSourceType() {
     val error = KetchError.AuthenticationFailed("ftp")
     assertTrue(error.message!!.contains("ftp"))
+  }
+
+  @Test
+  fun serializedForm_isUnchanged() {
+    assertEquals(
+      """{"type":"network","message":"Network error occurred"}""",
+      Json.encodeToString(KetchError.tolerantSerializer(), KetchError.Network()),
+    )
+    assertEquals(
+      Json.encodeToString(KetchError.serializer(), KetchError.Http(404, "Not Found")),
+      Json.encodeToString(KetchError.tolerantSerializer(), KetchError.Http(404, "Not Found")),
+    )
+  }
+
+  @Test
+  fun tolerantSerializer_readsKnownErrors() {
+    val error =
+      KetchError.ChecksumMismatch(ChecksumAlgorithm.SHA_256, "a".repeat(64), "b".repeat(64))
+    val text = Json.encodeToString(KetchError.serializer(), error)
+    assertEquals(error, Json.decodeFromString(KetchError.tolerantSerializer(), text))
+  }
+
+  @Test
+  fun tolerantSerializer_readsUnknownTypeAsUnknown() {
+    val text = """{"type":"quota_exceeded","message":"Disk quota exceeded","limit":5}"""
+    val error = Json.decodeFromString(KetchError.tolerantSerializer(), text)
+    assertIs<KetchError.Unknown>(error)
+    assertEquals("Disk quota exceeded", error.message)
+  }
+
+  @Test
+  fun tolerantSerializer_readsUndecodableKnownTypeAsUnknown() {
+    val error = Json.decodeFromString(KetchError.tolerantSerializer(), """{"type":"http"}""")
+    assertIs<KetchError.Unknown>(error)
+  }
+
+  @Test
+  fun failedState_withUnknownError_decodes() {
+    val text = """{"type":"failed","error":{"type":"quota_exceeded","message":"Over quota"}}"""
+    val state = Json.decodeFromString(DownloadState.serializer(), text)
+    val error = assertIs<KetchError.Unknown>(assertIs<DownloadState.Failed>(state).error)
+    assertEquals("Over quota", error.message)
+  }
+
+  @Test
+  fun failedState_roundTrips() {
+    val state = DownloadState.Failed(KetchError.SourceError("ftp", detail = "Refused"))
+    val text = Json.encodeToString(DownloadState.serializer(), state)
+    assertEquals(state, Json.decodeFromString(DownloadState.serializer(), text))
   }
 }

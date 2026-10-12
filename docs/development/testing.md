@@ -66,6 +66,16 @@ runs on Windows; CI runs it in a Windows job of its own:
 ./gradlew :app:desktop:test --tests '*WindowsPortableScriptTest*'
 ```
 
+## Public API Dump
+
+`library:api`'s public API is recorded in `library/api/api/` (Kotlin's ABI validation), and CI
+fails when the code no longer matches it. After changing the public API on purpose, update the
+dump and commit it with the change, so reviewers see what changed:
+
+```shell
+./gradlew :library:api:updateKotlinAbi
+```
+
 ## Android distributions
 
 ```shell
