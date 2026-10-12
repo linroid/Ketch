@@ -19,9 +19,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * server-side [Http] 5xx, and rate-limiting 429) are considered
  * retryable.
  *
- * Serialized as an object with a `type`, such as `{"type":"network","message":"..."}`. Read
- * errors another version of Ketch sent with [tolerantSerializer], as [DownloadState.Failed]
- * does, so an error type added later does not fail the whole message.
+ * Serialized with a `type`, such as `{"type":"network","message":"..."}`. Read errors from
+ * other versions with [tolerantSerializer].
  *
  * @property message human-readable error description
  * @property cause underlying exception, if any
@@ -196,19 +195,13 @@ sealed class KetchError(
     }
 
   companion object {
-    /**
-     * Reads errors like `serializer()`, except that from JSON an error of a `type` this version
-     * does not know, such as one a newer server sends, or one whose fields do not decode, reads
-     * as [Unknown] with the `message` it was sent with. Writes errors as `serializer()` does.
-     */
+    /** Like `serializer()`, but reads an unknown or malformed JSON error as [Unknown]. */
     fun tolerantSerializer(): KSerializer<KetchError> = KetchErrorSerializer
   }
 }
 
-// The sealed serializer the plugin generates, which keeps the wire shape, plus a fallback: it
-// throws on a subtype it does not know, which would break older clients of newer servers. Not
-// the class's own serializer: the plugin only lets subclasses inherit the fields of a parent
-// whose serializer it generates.
+// The generated serializer plus an Unknown fallback. Not KetchError's own serializer: the plugin
+// only lets subclasses inherit fields from a parent whose serializer it generates.
 internal object KetchErrorSerializer : KSerializer<KetchError> {
   private val generated: KSerializer<KetchError> get() = KetchError.serializer()
 

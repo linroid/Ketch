@@ -9,10 +9,8 @@ import com.linroid.ketch.api.InternalKetchApi
  * The global [Logger] backend is set once by the [Ketch][com.linroid.ketch.core.Ketch]
  * instance and shared across all [KetchLogger] instances.
  *
- * All logging methods are `inline` with a fast-path check for [Logger.None], then
- * [Logger.isLoggable], so when logging is disabled (the default) or the level is filtered out
- * there is zero allocation overhead: the message lambda is never created and the string is
- * never constructed.
+ * All logging methods are `inline` and build the message only when [Logger.isLoggable], so
+ * disabled or filtered-out logging allocates nothing.
  *
  * ```kotlin
  * private val logger = KetchLogger("Coordinator")

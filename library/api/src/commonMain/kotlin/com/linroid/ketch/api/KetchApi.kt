@@ -141,8 +141,7 @@ interface KetchApi {
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
 
-  // Not `const`: constants are copied into the code that reads them, which would then report
-  // the version it was compiled against rather than the one it runs with.
+  // Not `const`, which callers would inline, reporting the version they were compiled against.
   companion object {
     /** Library version string (e.g., "0.0.1-dev"). */
     val VERSION: String = KETCH_BUILD_VERSION

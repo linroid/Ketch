@@ -68,9 +68,8 @@ runs on Windows; CI runs it in a Windows job of its own:
 
 ## Public API Dump
 
-`library:api`'s public API is recorded in `library/api/api/` (Kotlin's ABI validation), and CI
-fails when the code no longer matches it. After changing the public API on purpose, update the
-dump and commit it with the change, so reviewers see what changed:
+CI fails when `library:api`'s public API differs from the dump in `library/api/api/`. After an
+intended change, update the dump and commit it:
 
 ```shell
 ./gradlew :library:api:updateKotlinAbi

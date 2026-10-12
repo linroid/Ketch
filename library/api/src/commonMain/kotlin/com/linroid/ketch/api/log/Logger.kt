@@ -97,11 +97,7 @@ interface Logger {
    */
   fun e(message: String, throwable: Throwable? = null)
 
-  /**
-   * Whether this logger emits records at [level]. [KetchLogger] asks before it builds a
-   * message, so messages below a logger's level cost nothing. Defaults to `true`; loggers that
-   * filter by level should override it.
-   */
+  /** Whether records at [level] are emitted; override it to skip building filtered messages. */
   fun isLoggable(level: LogLevel): Boolean = true
 
   companion object {

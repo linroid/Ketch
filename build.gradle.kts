@@ -44,8 +44,7 @@ subprojects {
   }
 }
 
-// library:api marks what only Ketch's own modules may use or implement (InternalKetchApi,
-// KetchImplementationApi). Every module of this build is one of them and depends on library:api.
+// Every module here is Ketch's own, so it may use and implement what library:api reserves.
 subprojects {
   tasks.withType<KotlinCompilationTask<*>>().configureEach {
     compilerOptions.optIn.addAll(

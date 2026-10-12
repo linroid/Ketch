@@ -41,7 +41,7 @@ val generateVersion by tasks.registering {
 }
 
 kotlin {
-  // The public API is checked against the dump in api/, so changes to it show up in review.
+  // Checks the public API against the dump in api/.
   @OptIn(ExperimentalAbiValidation::class)
   abiValidation()
 
@@ -79,8 +79,7 @@ kotlin {
     commonMain {
       kotlin.srcDir(generateVersion)
       dependencies {
-        // The public API exposes Flow, StateFlow, KSerializer and serializable types, so
-        // consumers need these on their compile classpath.
+        // The public API exposes their types (Flow, StateFlow, KSerializer).
         api(libs.kotlinx.coroutines.core)
         api(libs.kotlinx.serialization.json)
         implementation(libs.kotlinx.datetime)

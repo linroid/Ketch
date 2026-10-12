@@ -85,9 +85,8 @@ sealed class DownloadState {
   ) : DownloadState()
 
   /**
-   * Download failed with [error]. May be retried if the error is retryable. An error of a type
-   * this version does not know, such as one a newer server reports, reads as
-   * [KetchError.Unknown] ([KetchError.tolerantSerializer]).
+   * Download failed with [error]. May be retried if the error is retryable. Error types this
+   * version does not know read as [KetchError.Unknown].
    */
   @Serializable
   @SerialName("failed")
