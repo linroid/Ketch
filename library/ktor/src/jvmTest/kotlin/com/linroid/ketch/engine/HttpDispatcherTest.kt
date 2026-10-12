@@ -106,14 +106,18 @@ class HttpDispatcherTest {
     val engine = KtorHttpEngine()
     try {
       val received = ByteArrayOutputStream()
+      val firstBytes = CountDownLatch(1)
       var waiting = emptyList<String>()
-      // Samples while the response stalls, a little after its first bytes went out.
+      // Samples while the response stalls, which starts once its first bytes arrive: a fixed delay
+      // missed the stall when a cold client took long to connect.
       val sampler = thread(isDaemon = true) {
-        Thread.sleep(500)
-        waiting = threadsWhere(waits)
+        if (firstBytes.await(30, TimeUnit.SECONDS)) waiting = threadsWhere(waits)
       }
       withTimeout(30.seconds) {
-        engine.withProxy(proxy).download(url, null) { received.write(it) }
+        engine.withProxy(proxy).download(url, null) {
+          received.write(it)
+          firstBytes.countDown()
+        }
       }
       sampler.join()
       assertEquals(StallingServer.SIZE, received.size())
