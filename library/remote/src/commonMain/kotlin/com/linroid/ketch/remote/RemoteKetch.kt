@@ -15,6 +15,7 @@ import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ProxyConfig
 import com.linroid.ketch.api.ProxyMode
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
@@ -292,25 +293,24 @@ class RemoteKetch internal constructor(
     }
   }
 
-  override suspend fun resolve(
-    url: String,
-    headers: Map<String, String>,
-  ): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput): ResolvedSource = when (input) {
+    is ResolveInput.Url -> resolveUrl(input)
+    is ResolveInput.Content -> resolveContent(input)
+  }
+
+  private suspend fun resolveUrl(input: ResolveInput.Url): ResolvedSource {
     val response = httpClient.post(Api.Resolve()) {
       contentType(ContentType.Application.Json)
-      setBody(ResolveUrlRequest(url, headers))
+      setBody(ResolveUrlRequest(input.url, input.headers))
     }
     checkSuccess(response)
     return response.body()
   }
 
-  override suspend fun resolveContent(
-    content: ByteArray,
-    fileName: String?,
-  ): ResolvedSource {
-    val response = httpClient.post(Api.Resolve.Content(fileName = fileName)) {
+  private suspend fun resolveContent(input: ResolveInput.Content): ResolvedSource {
+    val response = httpClient.post(Api.Resolve.Content(fileName = input.fileName)) {
       contentType(ContentType.Application.OctetStream)
-      setBody(content)
+      setBody(input.bytes)
     }
     when (response.status) {
       HttpStatusCode.UnsupportedMediaType -> throw KetchError.Unsupported()

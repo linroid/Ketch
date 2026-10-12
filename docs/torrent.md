@@ -35,9 +35,9 @@ files needs all its bytes for verification; skipped boundary bytes live in a hid
 not in skipped output files. Network speed includes received payload, including those boundary
 bytes/retries.
 
-For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
+For SDK-provided bytes, call `ketch.resolve(bytes, "name.torrent")` (or
 `torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. `resolveContent` also works
+`DownloadRequest.resolvedSource`, with its `url` as the request URL. Resolving content also works
 through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
 apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
@@ -102,7 +102,7 @@ The apps register for `.torrent` files, so the system file manager offers Ketch 
 Each opened file shows the add dialog with its name, size and file selection, as a dropped file
 does; nothing downloads until the user confirms. Several files open one after another, and a file
 stays pending until downloaded or dismissed, so it survives an Android activity recreation. Like a
-dropped file, it reaches the active backend through `resolveContent`, so remote daemons work too.
+dropped file, its content reaches the active backend through `resolve`, so remote daemons work too.
 Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the app's
 `Documents/Inbox` are deleted after reading.
 

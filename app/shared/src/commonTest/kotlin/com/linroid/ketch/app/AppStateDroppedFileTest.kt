@@ -2,6 +2,7 @@ package com.linroid.ketch.app
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
@@ -176,8 +177,7 @@ class AppStateDroppedFileTest {
   @Test
   fun resolveDroppedFile_malformedTorrent_keepsTheDevicesError() = runTest {
     val api = object : KetchApi by FakeKetchApi() {
-      override suspend fun resolveContent(content: ByteArray, fileName: String?) =
-        throw KetchError.SourceError("torrent")
+      override suspend fun resolve(input: ResolveInput) = throw KetchError.SourceError("torrent")
     }
     val manager = InstanceManager(InstanceFactory(embeddedFactory = { api }))
     val state = AppState(manager, backgroundScope)

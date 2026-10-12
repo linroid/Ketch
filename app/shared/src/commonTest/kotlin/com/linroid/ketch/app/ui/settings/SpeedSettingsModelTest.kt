@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
@@ -50,10 +51,7 @@ class SpeedSettingsModelTest {
     override suspend fun download(request: DownloadRequest): DownloadTask =
       throw UnsupportedOperationException()
 
-    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-      throw UnsupportedOperationException()
-
-    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+    override suspend fun resolve(input: ResolveInput): ResolvedSource =
       throw UnsupportedOperationException()
 
     override suspend fun status(): KetchStatus = testStatus(backendLabel, config)

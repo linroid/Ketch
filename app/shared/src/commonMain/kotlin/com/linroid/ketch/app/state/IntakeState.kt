@@ -28,6 +28,7 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.app.components.startTimeText
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -1812,7 +1813,7 @@ class IntakeSession internal constructor(
         }
       }
     }
-    return api.resolveContent(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
+    return api.resolve(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
   }
 
   private fun watch(target: InstanceEntry) {

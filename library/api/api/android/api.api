@@ -853,10 +853,7 @@ public abstract interface class com/linroid/ketch/api/KetchApi {
 	public abstract fun getBackendLabel ()Ljava/lang/String;
 	public abstract fun getTasks ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun networkInterfaces (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun resolve (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun resolveContent ([BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun resolveContent$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun resolve (Lcom/linroid/ketch/api/ResolveInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun selectNetworkInterfaces (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -873,9 +870,6 @@ public final class com/linroid/ketch/api/KetchApi$Companion {
 public final class com/linroid/ketch/api/KetchApi$DefaultImpls {
 	public static fun controller (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
 	public static fun networkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun resolveContent (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun resolveContent$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun selectNetworkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 }
@@ -1606,6 +1600,45 @@ public final class com/linroid/ketch/api/ProxyMode : java/lang/Enum {
 
 public final class com/linroid/ketch/api/ProxyMode$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/ResolveInput {
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Content : com/linroid/ketch/api/ResolveInput {
+	public static final field Companion Lcom/linroid/ketch/api/ResolveInput$Content$Companion;
+	public static final field MAX_CONTENT_BYTES J
+	public fun <init> ([BLjava/lang/String;)V
+	public synthetic fun <init> ([BLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBytes ()[B
+	public final fun getFileName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Content$Companion {
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Url : com/linroid/ketch/api/ResolveInput {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;)Lcom/linroid/ketch/api/ResolveInput$Url;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ResolveInput$Url;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/linroid/ketch/api/ResolveInput$Url;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ResolveInputKt {
+	public static final fun resolve (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun resolve (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/linroid/ketch/api/ResolvedSource {

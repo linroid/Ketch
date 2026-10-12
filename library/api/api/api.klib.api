@@ -299,13 +299,12 @@ abstract interface com.linroid.ketch.api/KetchApi { // com.linroid.ketch.api/Ket
     abstract fun <#A1: kotlin/Any?> subscribe(com.linroid.ketch.api/Interest<#A1>, kotlin.time/Duration = ...): kotlinx.coroutines.flow/Flow<#A1> // com.linroid.ketch.api/KetchApi.subscribe|subscribe(com.linroid.ketch.api.Interest<0:0>;kotlin.time.Duration){0§<kotlin.Any?>}[0]
     abstract fun close() // com.linroid.ketch.api/KetchApi.close|close(){}[0]
     abstract suspend fun download(com.linroid.ketch.api/DownloadRequest): com.linroid.ketch.api/DownloadTask // com.linroid.ketch.api/KetchApi.download|download(com.linroid.ketch.api.DownloadRequest){}[0]
-    abstract suspend fun resolve(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/KetchApi.resolve|resolve(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    abstract suspend fun resolve(com.linroid.ketch.api/ResolveInput): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/KetchApi.resolve|resolve(com.linroid.ketch.api.ResolveInput){}[0]
     abstract suspend fun start() // com.linroid.ketch.api/KetchApi.start|start(){}[0]
     abstract suspend fun status(): com.linroid.ketch.api/KetchStatus // com.linroid.ketch.api/KetchApi.status|status(){}[0]
     abstract suspend fun updateConfig(com.linroid.ketch.api/DownloadConfig) // com.linroid.ketch.api/KetchApi.updateConfig|updateConfig(com.linroid.ketch.api.DownloadConfig){}[0]
     open fun <#A1: kotlin/Any> controller(com.linroid.ketch.api/ControlKey<#A1>): #A1? // com.linroid.ketch.api/KetchApi.controller|controller(com.linroid.ketch.api.ControlKey<0:0>){0§<kotlin.Any>}[0]
     open suspend fun networkInterfaces(): com.linroid.ketch.api/NetworkInterfaces // com.linroid.ketch.api/KetchApi.networkInterfaces|networkInterfaces(){}[0]
-    open suspend fun resolveContent(kotlin/ByteArray, kotlin/String? = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/KetchApi.resolveContent|resolveContent(kotlin.ByteArray;kotlin.String?){}[0]
     open suspend fun selectNetworkInterfaces(com.linroid.ketch.api/NetworkInterfaceConfig): com.linroid.ketch.api/NetworkInterfaces // com.linroid.ketch.api/KetchApi.selectNetworkInterfaces|selectNetworkInterfaces(com.linroid.ketch.api.NetworkInterfaceConfig){}[0]
 
     final object Companion { // com.linroid.ketch.api/KetchApi.Companion|null[0]
@@ -313,6 +312,42 @@ abstract interface com.linroid.ketch.api/KetchApi { // com.linroid.ketch.api/Ket
             final fun <get-REVISION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.REVISION.<get-REVISION>|<get-REVISION>(){}[0]
         final val VERSION // com.linroid.ketch.api/KetchApi.Companion.VERSION|{}VERSION[0]
             final fun <get-VERSION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
+    }
+}
+
+sealed interface com.linroid.ketch.api/ResolveInput { // com.linroid.ketch.api/ResolveInput|null[0]
+    final class Content : com.linroid.ketch.api/ResolveInput { // com.linroid.ketch.api/ResolveInput.Content|null[0]
+        constructor <init>(kotlin/ByteArray, kotlin/String? = ...) // com.linroid.ketch.api/ResolveInput.Content.<init>|<init>(kotlin.ByteArray;kotlin.String?){}[0]
+
+        final val bytes // com.linroid.ketch.api/ResolveInput.Content.bytes|{}bytes[0]
+            final fun <get-bytes>(): kotlin/ByteArray // com.linroid.ketch.api/ResolveInput.Content.bytes.<get-bytes>|<get-bytes>(){}[0]
+        final val fileName // com.linroid.ketch.api/ResolveInput.Content.fileName|{}fileName[0]
+            final fun <get-fileName>(): kotlin/String? // com.linroid.ketch.api/ResolveInput.Content.fileName.<get-fileName>|<get-fileName>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/ResolveInput.Content.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/ResolveInput.Content.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/ResolveInput.Content.toString|toString(){}[0]
+
+        final object Companion { // com.linroid.ketch.api/ResolveInput.Content.Companion|null[0]
+            final const val MAX_CONTENT_BYTES // com.linroid.ketch.api/ResolveInput.Content.Companion.MAX_CONTENT_BYTES|{}MAX_CONTENT_BYTES[0]
+                final fun <get-MAX_CONTENT_BYTES>(): kotlin/Long // com.linroid.ketch.api/ResolveInput.Content.Companion.MAX_CONTENT_BYTES.<get-MAX_CONTENT_BYTES>|<get-MAX_CONTENT_BYTES>(){}[0]
+        }
+    }
+
+    final class Url : com.linroid.ketch.api/ResolveInput { // com.linroid.ketch.api/ResolveInput.Url|null[0]
+        constructor <init>(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...) // com.linroid.ketch.api/ResolveInput.Url.<init>|<init>(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+        final val headers // com.linroid.ketch.api/ResolveInput.Url.headers|{}headers[0]
+            final fun <get-headers>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/ResolveInput.Url.headers.<get-headers>|<get-headers>(){}[0]
+        final val url // com.linroid.ketch.api/ResolveInput.Url.url|{}url[0]
+            final fun <get-url>(): kotlin/String // com.linroid.ketch.api/ResolveInput.Url.url.<get-url>|<get-url>(){}[0]
+
+        final fun component1(): kotlin/String // com.linroid.ketch.api/ResolveInput.Url.component1|component1(){}[0]
+        final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/ResolveInput.Url.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.linroid.ketch.api/ResolveInput.Url // com.linroid.ketch.api/ResolveInput.Url.copy|copy(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/ResolveInput.Url.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/ResolveInput.Url.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/ResolveInput.Url.toString|toString(){}[0]
     }
 }
 
@@ -1969,3 +2004,5 @@ final fun com.linroid.ketch.api.log/formatLogLine(com.linroid.ketch.api.log/LogL
 final fun com.linroid.ketch.api.log/redactUrl(kotlin/String): kotlin/String // com.linroid.ketch.api.log/redactUrl|redactUrl(kotlin.String){}[0]
 final fun com.linroid.ketch.api.log/redactUrlsIn(kotlin/String): kotlin/String // com.linroid.ketch.api.log/redactUrlsIn|redactUrlsIn(kotlin.String){}[0]
 final fun com.linroid.ketch.api/fileExtension(kotlin/String): kotlin/String // com.linroid.ketch.api/fileExtension|fileExtension(kotlin.String){}[0]
+final suspend fun (com.linroid.ketch.api/KetchApi).com.linroid.ketch.api/resolve(kotlin/ByteArray, kotlin/String? = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/resolve|resolve@com.linroid.ketch.api.KetchApi(kotlin.ByteArray;kotlin.String?){}[0]
+final suspend fun (com.linroid.ketch.api/KetchApi).com.linroid.ketch.api/resolve(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/resolve|resolve@com.linroid.ketch.api.KetchApi(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]

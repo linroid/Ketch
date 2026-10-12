@@ -71,6 +71,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
   `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
+  `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
+  which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
+  and `resolve(bytes, fileName)` extensions build them),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
@@ -515,7 +518,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source defines: `type`, `canHandle()`, `resolve()`, `download()`, `resume()`,
   `buildResumeState()`; optional `canHandleContent()` / `resolveContent()` accept file content
-  such as `.torrent` bytes (`KetchApi.resolveContent`), and `resolveForDownload()` lets a task
+  such as `.torrent` bytes (`ResolveInput.Content`), and `resolveForDownload()` lets a task
   wait where a preview (`resolve()`) would fail, as magnets whose peers are offline do
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
@@ -679,7 +682,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
   `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
-  app) and resolve them through `KetchApi.resolveContent`, like dropped files
+  app) and resolve their content through `KetchApi.resolve`, like dropped files
 - Native torrent engine dependencies exist only in interoperability tests
 - uTP (BEP 29), `TorrentConfig.utpEnabled` (on by default): `UtpPacket` (codec, selective-ack
   and unknown extensions, `looksLikeUtp`) and `UtpSocket`, a deterministic state machine without
@@ -1404,7 +1407,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks
 - Forwards cookies, referrer and user agent as `DownloadRequest.headers`; `.torrent` downloads
-  whose URL Ketch would not recognize are fetched and resolved via `resolveContent`
+  whose URL Ketch would not recognize are fetched and resolved via `POST /api/resolve/content`
 - Tags every request with `DownloadRequest.properties["ketch.origin"] = "browser"`. The apps
   read this origin (`browser`, `discover`, `agent`, `app` or `cli`, set by whoever adds the
   download) for the Origin search facet; it never goes to `resolve()`, whose properties are headers

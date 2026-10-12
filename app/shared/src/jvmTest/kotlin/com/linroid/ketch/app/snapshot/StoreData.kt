@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
@@ -430,9 +431,10 @@ internal class StoreEnvironment(
 
 /** [base], resolving the links of [StoreData.LinkSizes] to their own sizes. */
 private class SizedLinks(private val base: KetchApi) : KetchApi by base {
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
-    val resolved = base.resolve(url, headers)
-    return resolved.copy(totalBytes = StoreData.LinkSizes[url] ?: resolved.totalBytes)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    val resolved = base.resolve(input)
+    val size = (input as? ResolveInput.Url)?.let { StoreData.LinkSizes[it.url] }
+    return resolved.copy(totalBytes = size ?: resolved.totalBytes)
   }
 }
 

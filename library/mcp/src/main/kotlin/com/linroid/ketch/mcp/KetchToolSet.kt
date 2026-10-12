@@ -14,6 +14,7 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.defaultSelection
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.api.withoutBulkMetadata
 import com.linroid.ketch.torrent.api.TorrentCommandError

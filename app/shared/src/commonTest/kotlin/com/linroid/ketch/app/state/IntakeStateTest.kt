@@ -14,6 +14,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -1097,8 +1098,8 @@ private class IntakeTestApi(
   private val features: Set<String> = emptySet(),
   private val config: DownloadConfig = DownloadConfig(maxConcurrentDownloads = 3),
 ) : KetchApi by base {
-  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
-    check(url, headers)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    check((input as ResolveInput.Url).url, input.headers)
 
   override suspend fun status(): KetchStatus = testStatus(
     name = "This Mac",
