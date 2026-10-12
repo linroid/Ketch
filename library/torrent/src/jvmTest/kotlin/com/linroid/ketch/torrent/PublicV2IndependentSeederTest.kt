@@ -82,8 +82,7 @@ class PublicV2IndependentSeederTest {
         merkle.toByteString() to hashes.fold(ByteArray(0)) { a, b -> a + b })))
       val expected = TorrentV2Document.parse(data)
       val manager = SessionManager()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
-        metadataTimeoutSeconds = 10))
+      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
       val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(source))
       try {
         val torrent = TorrentInfo(data)

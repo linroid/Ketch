@@ -20,6 +20,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
 
 class DhtListenPortTest {
   @Test
@@ -34,8 +35,9 @@ class DhtListenPortTest {
         }
         val port = freePort(real)
         val engine = KotlinTorrentEngine(
-          TorrentConfig(listenPort = port, dhtBootstrap = emptyList(), metadataTimeoutSeconds = 1),
+          TorrentConfig(listenPort = port, dhtBootstrap = emptyList()),
           rawNetwork = network,
+          magnetLookupTime = 1.seconds,
         )
         try {
           engine.start()

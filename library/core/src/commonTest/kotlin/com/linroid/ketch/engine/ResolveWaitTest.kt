@@ -4,7 +4,6 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.resolve
@@ -16,6 +15,7 @@ import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -23,27 +23,34 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
-/** A preview gives up after `resolveTimeout`, while a starting task waits as long as it takes. */
-class ResolveTimeoutTest {
-  private val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-resolve-timeout-test"
+/** A preview and a starting task both wait as long as finding the content takes. */
+class ResolveWaitTest {
+  private val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-resolve-wait-test"
 
   @Test
-  fun preview_givesUpAfterTheResolveTimeout() = runTest {
+  fun preview_waitsUntilFound() = runTest {
     val source = SlowSource()
     val ketch = ketch(source)
     try {
-      assertFailsWith<KetchError.Network> { ketch.resolve("slow:file") }
+      val preview = async { ketch.resolve("slow:file") }
+      advanceTimeBy(10.minutes)
+      assertTrue(preview.isActive)
+
+      source.found.complete(Unit)
+
+      assertEquals("empty.bin", preview.await().suggestedFileName)
     } finally {
       ketch.close()
     }
   }
 
   @Test
-  fun task_waitsPastTheResolveTimeout() = runTest {
+  fun task_waitsUntilFound() = runTest {
     platformFileSystem.createDirectories(folder)
     val source = SlowSource()
     val ketch = ketch(source)
@@ -72,7 +79,6 @@ class ResolveTimeoutTest {
       config = DownloadConfig(retryCount = 0),
       additionalSources = listOf(source),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
-      resolveTimeout = 1.minutes,
     )
   }
 

@@ -1,8 +1,6 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.torrent.tracker.TRACKER_SCRAPE_WORKSPACE_BYTES
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Configuration for the torrent engine.
@@ -11,8 +9,6 @@ import kotlin.time.Duration.Companion.seconds
  * @property maxActiveTorrents maximum number of torrents the engine runs at once, including
  *   seeding sessions. Further downloads wait for a slot (higher priority first, then arrival
  *   order) instead of failing, and a seeding session yields its slot to a waiting download.
- * @property metadataTimeoutSeconds timeout for magnet metadata
- *   resolution in seconds
  * @property connectionsPerTorrent peer cap for a task that sets no connections. A task's
  *   `DownloadRequest.connections` or `DownloadTask.setConnections` value replaces it, clamped to
  *   1..512 for v1 and 1..500 for v2. `DownloadConfig.maxConnectionsPerDownload` counts HTTP
@@ -46,7 +42,6 @@ data class TorrentConfig(
    */
   val localDiscovery: Boolean = true,
   val maxActiveTorrents: Int = 5,
-  val metadataTimeoutSeconds: Int = 120,
   val connectionsPerTorrent: Int = 100,
   val enableUpload: Boolean = false,
   val listenPort: Int = 0,
@@ -115,7 +110,6 @@ data class TorrentConfig(
     require(connectionsPerTorrent in 1..512)
     require(maxConnections in 1..4096)
     require(dhtBootstrap.size <= 64)
-    require(metadataTimeoutSeconds >= 0) { "metadata timeout must be non-negative" }
     require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
     require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
@@ -142,10 +136,6 @@ data class TorrentConfig(
     } else {
       TorrentUploadPolicy.DISABLED
     }
-
-  /** Metadata fetch timeout as a [Duration]. */
-  val metadataTimeout: Duration
-    get() = metadataTimeoutSeconds.seconds
 
   companion object {
     /** ngosang's list of the most reliable public trackers, refreshed daily. */

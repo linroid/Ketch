@@ -30,6 +30,7 @@ import com.linroid.ketch.torrent.control.TorrentControls
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.MAGNET_LOOKUP_TIME
 import com.linroid.ketch.torrent.engine.KotlinTorrentSession
 import com.linroid.ketch.torrent.engine.TorrentActiveSlots
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -90,6 +91,7 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration
 
 /**
  * Pure Kotlin BitTorrent v1, v2, and hybrid download source for JVM, Android, and iOS.
@@ -131,12 +133,16 @@ class TorrentDownloadSource(
   /** The upload policy of running and later torrents: the configured one or the last set. */
   internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
 
+  /** Test hook: how long one magnet metadata lookup runs before the next starts. */
+  internal var magnetLookupTime: Duration = MAGNET_LOOKUP_TIME
+
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
     // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
     // localDiscovery, which their setters change, decide if it does.
     KotlinTorrentEngine(it, http = http, portMapping = true,
-      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock)
+      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock,
+      magnetLookupTime = magnetLookupTime)
   }
   private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.disk)
   private val trackerListSubscription = TrackerLists(
@@ -832,9 +838,9 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Resolves [url] as [resolve] does, except that a magnet keeps looking for its metadata, in
-   * lookups of [TorrentConfig.metadataTimeoutSeconds] each, until one finds it or the caller
-   * stops: the peers of a small swarm may come online at any time.
+   * Resolves [url] as [resolve] does, except that a magnet keeps looking for its metadata, one
+   * lookup after another, until one finds it or the caller stops: the peers of a small swarm may
+   * come online at any time.
    */
   private suspend fun resolveUntilFound(
     url: String,

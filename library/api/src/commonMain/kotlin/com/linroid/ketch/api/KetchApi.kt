@@ -41,6 +41,9 @@ interface KetchApi {
    * holds. Pass the result in [DownloadRequest.resolvedSource] to skip probing again. The
    * `resolve(url)` and `resolve(content, fileName)` extensions build the input.
    *
+   * It runs until it has an answer, as a magnet link waits for peers to come online; cancel the
+   * call to stop it.
+   *
    * @throws KetchError.Unsupported if no source handles the URL or recognizes the content
    * @throws UnsupportedOperationException if this backend cannot resolve content
    */

@@ -14,6 +14,7 @@ import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.http.HttpRequestLifecycle
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
 import io.ktor.server.resources.put
@@ -72,7 +73,7 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
     log.i { "POST /api/resolve url=${redactUrl(body.url)}" }
     val resolved = ketch.resolve(body.url, body.properties)
     call.respond(resolved)
-  }
+  }.stopWhenClientLeaves()
 
   post<Api.Resolve.Content> { resource ->
     val content = readBounded(call, MAX_RESOLVE_CONTENT_BYTES)
@@ -100,8 +101,13 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
         ErrorResponse("unsupported", e.message ?: "Resolving file content is unavailable"),
       )
     }
-  }
+  }.stopWhenClientLeaves()
 }
 
 /** Upper bound for uploaded content ([ResolveInput.Content.MAX_CONTENT_BYTES]). */
 internal const val MAX_RESOLVE_CONTENT_BYTES = ResolveInput.Content.MAX_CONTENT_BYTES.toInt()
+
+// A resolve may wait for peers as long as it takes, so it stops when its client disconnects.
+private fun Route.stopWhenClientLeaves() {
+  install(HttpRequestLifecycle) { cancelCallOnClose = true }
+}

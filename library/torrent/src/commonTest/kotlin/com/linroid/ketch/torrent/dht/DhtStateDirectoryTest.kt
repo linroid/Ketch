@@ -21,6 +21,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalAtomicApi::class)
 class DhtStateDirectoryTest {
@@ -66,10 +67,10 @@ class DhtStateDirectoryTest {
   }
 
   private fun engine(state: okio.Path, bootstrap: List<String>) = KotlinTorrentEngine(
-    TorrentConfig(stateDirectory = state.toString(), dhtBootstrap = bootstrap,
-      metadataTimeoutSeconds = 1),
+    TorrentConfig(stateDirectory = state.toString(), dhtBootstrap = bootstrap),
     allowLocalPeers = true,
     discoveryIntervalMs = 100,
+    magnetLookupTime = 1.seconds,
   )
 
   /** Starts the engine's DHT through a public magnet lookup that finds no peers. */

@@ -116,6 +116,8 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
 
 /** A full-metainfo v2 or hybrid task for [KotlinTorrentEngine.addV2Task]. */
@@ -186,6 +188,8 @@ internal class KotlinTorrentEngine(
   localDiscovery: (suspend () -> LsdTransport?)? = null,
   /** Held while the local service discovery group is joined. */
   multicastLock: TorrentMulticastLock? = null,
+  /** Test hook: how long one magnet metadata lookup runs. */
+  private val magnetLookupTime: Duration = MAGNET_LOOKUP_TIME,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -507,12 +511,12 @@ internal class KotlinTorrentEngine(
     val metadata = cache.resolve(magnet.infoHash, privacy) {
       log.i {
         "Fetching metadata for magnet $hash: privacy=$privacy, trackers=${magnet.trackers.size}, " +
-          "peers=${magnet.explicitPeers.size}, timeout=${config.metadataTimeout}"
+          "peers=${magnet.explicitPeers.size}, timeout=$magnetLookupTime"
       }
       val started = TimeSource.Monotonic.markNow()
       var tried = 0
       try {
-        withTimeout(config.metadataTimeout) {
+        withTimeout(magnetLookupTime) {
           if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
             return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)
           }
@@ -530,8 +534,8 @@ internal class KotlinTorrentEngine(
           log.i { "Fetched metadata for magnet $hash in ${started.elapsedNow()}" }
         }
       } catch (e: TimeoutCancellationException) {
-        log.w {
-          "Metadata for magnet $hash not found within ${config.metadataTimeout} " +
+        log.d {
+          "Metadata for magnet $hash not found within $magnetLookupTime " +
             "after trying $tried peer(s)"
         }
         throw e
@@ -570,7 +574,7 @@ internal class KotlinTorrentEngine(
         log.i { "Fetched v2 metadata for magnet $hash in ${started.elapsedNow()}" }
       }
     } catch (e: TimeoutCancellationException) {
-      log.w { "V2 metadata for magnet $hash not found within ${config.metadataTimeout}" }
+      log.d { "V2 metadata for magnet $hash not found within $magnetLookupTime" }
       throw e
     }
   }
@@ -579,14 +583,14 @@ internal class KotlinTorrentEngine(
     magnetUri: String,
     privacy: TorrentDiscoveryPrivacy,
     onTopic: (String) -> Unit,
-  ): ByteArray = withTimeout(config.metadataTimeout) {
+  ): ByteArray = withTimeout(magnetLookupTime) {
     check(isRunning)
     val magnet = MagnetUri.parse(magnetUri)
     val topic = TrackerTopic.V2(requireNotNull(magnet.identity.v2))
     onTopic(topic.logHash())
     log.i {
       "Fetching v2 metadata for magnet ${topic.logHash()}: privacy=$privacy, " +
-        "trackers=${magnet.trackers.size}, timeout=${config.metadataTimeout}"
+        "trackers=${magnet.trackers.size}, timeout=$magnetLookupTime"
     }
     val tiers = TrackerConfiguration.prepare(magnet.trackers.map { listOf(it) }).tiers
     require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY || tiers.isNotEmpty()) {
@@ -1542,6 +1546,12 @@ private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128
 private const val DHT_REFRESH_MS = 15 * 60_000L
+
+/**
+ * How long one magnet metadata lookup runs. The source starts another until the metadata is
+ * found, so peers a lookup gave up on are asked again.
+ */
+internal val MAGNET_LOOKUP_TIME: Duration = 2.minutes
 
 private val attemptLog = KetchLogger("TorrentEngine")
 

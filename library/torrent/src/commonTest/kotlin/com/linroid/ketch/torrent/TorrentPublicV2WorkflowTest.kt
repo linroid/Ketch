@@ -58,6 +58,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class TorrentPublicV2WorkflowTest {
   @Test fun pureV2SelectionSurvivesKetchRecreationAndRechecksFiles() = runTest {
@@ -139,8 +140,7 @@ class TorrentPublicV2WorkflowTest {
     fixture(false) { peer ->
       peer.corruptProof = true
       val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
-        dhtEnabled = false,
-        metadataTimeoutSeconds = 1), peer.http)
+        dhtEnabled = false), peer.http).apply { magnetLookupTime = 1.seconds }
       try {
         val uri = MagnetUri(peer.document.identity,
           trackers = listOf("http://fixture/announce")).toUri()

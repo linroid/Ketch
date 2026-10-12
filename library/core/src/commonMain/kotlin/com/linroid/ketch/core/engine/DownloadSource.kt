@@ -50,8 +50,7 @@ interface DownloadSource {
   /**
    * Probes [input], which [canHandle] accepted, without downloading it, as an HTTP `HEAD` does.
    * It may take as long as finding the content does, as a magnet link waits for peers to come
-   * online, and stops when cancelled: callers bound it, as Ketch's preview does, while a starting
-   * task waits. [config] is Ketch's own for a preview, or the task's.
+   * online, and stops when cancelled. [config] is Ketch's own for a preview, or the task's.
    *
    * A result for [ResolveInput.Content] must carry everything [download] needs, as it gets it as
    * [DownloadContext.preResolved] rather than resolving [ResolvedSource.url] again.

@@ -521,8 +521,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   file content such as `.torrent` bytes, which only the torrent source accepts; the
   `canHandle(url)` and `resolve(url, headers, config)` extensions build the URL input. `resolve`
   may take as long as finding the content does (a magnet waits for peers) and stops when
-  cancelled: a starting task waits, while `Ketch.resolve`, the preview, gives up after its
-  `resolveTimeout` (2 minutes) with `KetchError.Network`
+  cancelled; `KetchApi.resolve`, the preview, waits the same way, so callers bound it if they
+  must (the server's resolve routes stop when the client disconnects)
 - `managesOwnFileIo` flag: when `true`, engine skips `FileAccessor` (used by torrent)
 
 ### Multi-File Download Support
@@ -621,9 +621,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
-- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; a task
-  keeps looking (`DownloadSource.resolve`) until found or stopped, while previews give up after
-  `Ketch`'s `resolveTimeout`. The apps show it as Starting, "Finding peers"
+- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; tasks
+  and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
+  peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
+  and a preview that takes 2 minutes offers Keep waiting and Add anyway
 - Verified selected-file storage, ownership journal, restart rehash, live limits, and opt-in
   upload and seeding (`[torrent] upload`)
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
