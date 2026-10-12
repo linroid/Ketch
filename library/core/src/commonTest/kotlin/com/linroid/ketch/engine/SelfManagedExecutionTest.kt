@@ -52,7 +52,7 @@ class SelfManagedExecutionTest {
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
         url = url, sourceType = type, totalBytes = 100, supportsResume = true,
         suggestedFileName = "fixture", maxSegments = 2,
         files = listOf(SourceFile("0", "empty", 0), SourceFile("1", "other", 100)),
@@ -107,7 +107,7 @@ class SelfManagedExecutionTest {
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
         url = url, sourceType = type, totalBytes = -1, supportsResume = false,
         suggestedFileName = "fixture", maxSegments = 1,
       )
@@ -150,7 +150,7 @@ class SelfManagedExecutionTest {
       override val type = "fixture"
       override val managesOwnFileIo = true
       override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+      override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture", maxSegments = 1,
       )

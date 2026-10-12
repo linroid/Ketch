@@ -420,7 +420,7 @@ class KetchToolSet(
     val task = ketch.tasks.value.find { it.taskId == taskId } ?: return notFound(taskId)
     if (!cursor.startsWith(LOCAL_CURSOR_PREFIX)) {
       val page = try {
-        ketch.control(TorrentController)?.files(
+        ketch.controller(TorrentController)?.files(
           taskId = taskId,
           page = TorrentPageRequest(limit, cursor.ifEmpty { null }),
           order = order,

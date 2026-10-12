@@ -7,7 +7,7 @@ package com.linroid.ketch.torrent.api
  */
 object TorrentFeatures {
   /**
-   * `KetchApi.control(TorrentController)` executes commands: REST `/api/torrents` and its event
+   * `KetchApi.controller(TorrentController)` executes commands: REST `/api/torrents` and its event
    * stream.
    */
   const val CONTROL: String = "torrent.control"

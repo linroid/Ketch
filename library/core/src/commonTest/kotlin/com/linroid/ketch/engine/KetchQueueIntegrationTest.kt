@@ -473,7 +473,7 @@ class KetchQueueIntegrationTest {
 
     fun complete(name: String) { gates.getValue(name).complete(Unit) }
     override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
       ResolvedSource(
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,

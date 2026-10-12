@@ -301,7 +301,7 @@ private class ResolvingApi(
   private val base: KetchApi,
   private val check: suspend (String) -> ResolvedSource,
 ) : KetchApi by base {
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     check(url)
 }
 

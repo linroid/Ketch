@@ -209,7 +209,7 @@ class DownloadTimeTest {
     override val type = FIXTURE
     override val managesOwnFileIo = selfManaged
     override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = type, totalBytes = totalBytes, supportsResume = true,
       suggestedFileName = "fixture", maxSegments = 1,
     )

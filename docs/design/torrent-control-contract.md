@@ -3,7 +3,7 @@
 This contract implements the API boundary decision in [roadmap #162][roadmap]. The types live in
 `library:torrent-api` (`com.linroid.ketch.torrent.api`), which has the targets of `library:api`, so
 WebAssembly and remote clients can use them without linking a torrent engine. `library:api` and
-`library:core` name no torrent type: `KetchApi.control(key)` looks controllers up by a
+`library:core` name no torrent type: `KetchApi.controller(key)` looks controllers up by a
 `ControlKey`, here `TorrentController.Key`, and a `DownloadSource` contributes one through
 `DownloadSource.attach`, which returns a `SourceExtension`.
 This PR defines inspection, capability negotiation, ordering, and command preconditions. Runtime
@@ -12,7 +12,7 @@ in roadmap step 27. A contract declaration is not an implemented runtime capabil
 
 ## Availability and negotiation
 
-`ketch.control(TorrentController)` is nullable and defaults to null for existing backend
+`ketch.controller(TorrentController)` is nullable and defaults to null for existing backend
 implementations. Null means
 no typed control protocol, not no torrent downloader. Local and remote adapters expose a controller
 only when they implement inspection. They advertise only executable features. The backend's
@@ -97,11 +97,11 @@ untrusted paths. Unsupported requests fail before any side effect or network acc
 
 ## Version 1 runtime
 
-`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.control(TorrentController)`
+`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.controller(TorrentController)`
 returns the controller of the first registered source whose `SourceExtension` offers one: the
 torrent source's `TorrentControls` (in `library:torrent`), which builds `KetchTorrentController`
 over the task records and ledgered commands of core's `SourceHost`;
-`RemoteKetch.control(TorrentController)` calls a server's `/api/torrents` routes and their
+`RemoteKetch.controller(TorrentController)` calls a server's `/api/torrents` routes and their
 `events` stream (`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
 serve them. What the runtime does, where it narrows the contract above:
 

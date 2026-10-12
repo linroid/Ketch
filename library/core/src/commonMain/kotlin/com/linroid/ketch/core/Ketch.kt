@@ -300,11 +300,11 @@ class Ketch(
 
   override suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
   ): ResolvedSource {
     log.i { "Resolving URL: ${redactUrl(url)}" }
     val source = sourceResolver.resolve(url)
-    return source.resolve(url, properties, currentConfig)
+    return source.resolve(url, headers, currentConfig)
   }
 
   override suspend fun resolveContent(
@@ -592,8 +592,8 @@ class Ketch(
     extensions.firstOrNull { it.first == sourceType }?.second
 
   /** The controller the first source extension offering one for [key] contributes. */
-  override fun <T : Any> control(key: ControlKey<T>): T? =
-    extensions.firstNotNullOfOrNull { (_, extension) -> extension.control(key) }
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
 
   /**
    * Validates, saves and applies a file selection; the caller holds the task's control lock.
@@ -1057,10 +1057,10 @@ class Ketch(
   override suspend fun networkInterfaces(): NetworkInterfaces =
     (httpEngine as? ConfigurableNetworkHttpEngine)?.networkInterfaces() ?: NetworkInterfaces()
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     val configurable = httpEngine as? ConfigurableNetworkHttpEngine
       ?: throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
-    return configurable.updateNetworkInterfaces(config)
+    return configurable.selectNetworkInterfaces(config)
   }
 
   /**

@@ -57,13 +57,13 @@ class ResolveForDownloadTest {
     val calls = mutableListOf<String>()
     override val type = "record"
     override fun canHandle(url: String): Boolean = url.startsWith("record:")
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
       calls += "preview"
       return resolved(url)
     }
     override suspend fun resolveForDownload(
       url: String,
-      properties: Map<String, String>,
+      headers: Map<String, String>,
       config: DownloadConfig,
     ): ResolvedSource {
       calls += "task"

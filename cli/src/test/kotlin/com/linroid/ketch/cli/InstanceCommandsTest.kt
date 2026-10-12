@@ -248,7 +248,7 @@ private class FakeKetch(
     return FakeTask("new", request, DownloadState.Queued)
   }
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     throw UnsupportedOperationException()
 
   override suspend fun start() = Unit

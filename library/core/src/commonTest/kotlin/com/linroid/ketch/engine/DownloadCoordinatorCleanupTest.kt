@@ -42,7 +42,7 @@ class DownloadCoordinatorCleanupTest {
     override fun canHandle(url: String): Boolean = true
     override suspend fun resolve(
       url: String,
-      properties: Map<String, String>,
+      headers: Map<String, String>,
     ): ResolvedSource = error("not used")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(

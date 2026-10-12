@@ -55,7 +55,7 @@ internal class FakeDevice : KetchApi {
     return add(DownloadState.Queued, request)
   }
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     error("Not used")
 
   override suspend fun start() {}

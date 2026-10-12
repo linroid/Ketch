@@ -223,7 +223,7 @@ class InstanceSettingsController(
           // A newer selection is queued behind this one; let it decide.
           if (pendingNetworkIds == null) networks = confirmedNetworks ?: current
         }) {
-          val updated = api.updateNetworkInterfaces(NetworkInterfaceConfig(requested))
+          val updated = api.selectNetworkInterfaces(NetworkInterfaceConfig(requested))
           confirmedNetworks = updated
           if (pendingNetworkIds == null) {
             networks = updated

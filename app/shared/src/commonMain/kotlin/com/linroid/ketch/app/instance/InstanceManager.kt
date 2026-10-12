@@ -566,7 +566,7 @@ private object DisconnectedApi : KetchApi {
 
   override suspend fun download(request: DownloadRequest): DownloadTask = notConnected()
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     notConnected()
 
   override suspend fun status(): KetchStatus = notConnected()

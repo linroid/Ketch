@@ -234,7 +234,7 @@ class TorrentDownloadSourceTest {
       assertTrue(KetchFeatures.FILE_SELECTION in features)
       assertTrue(KetchFeatures.AWAIT_FILE_SELECTION in features)
       assertTrue(TorrentFeatures.CONTROL in features)
-      assertNotNull(ketch.control(TorrentController))
+      assertNotNull(ketch.controller(TorrentController))
     } finally {
       ketch.close()
     }

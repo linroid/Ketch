@@ -121,7 +121,7 @@ class FakeRemote(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException("FakeRemote does not support downloads")
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     throw UnsupportedOperationException("FakeRemote does not support resolve")
 
   override suspend fun updateConfig(config: DownloadConfig) {}

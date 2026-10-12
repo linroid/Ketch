@@ -486,7 +486,7 @@ class TorrentSeedingControlTest {
   }
 
   private suspend fun Ketch.context(taskId: String, key: String): TorrentCommandContext {
-    val snapshot = assertNotNull(assertNotNull(control(TorrentController)).snapshot(taskId))
+    val snapshot = assertNotNull(assertNotNull(controller(TorrentController)).snapshot(taskId))
     return TorrentCommandContext(key, snapshot.revision)
   }
 
@@ -500,7 +500,7 @@ class TorrentSeedingControlTest {
     task.awaitCompleted()
     task.awaitSeeding(true)
     eventually("the seeding intent to be saved") { store.intent(task.taskId) == true }
-    val controller = assertNotNull(ketch.control(TorrentController))
+    val controller = assertNotNull(ketch.controller(TorrentController))
     eventually("the snapshot to show seeding") {
       controller.snapshot(task.taskId)?.activity == TorrentActivity.SEEDING
     }
@@ -526,7 +526,7 @@ class TorrentSeedingControlTest {
     val task = ketch.download(request(0, 2))
     task.awaitCompleted()
     task.awaitSeeding(true)
-    val controller = assertNotNull(ketch.control(TorrentController))
+    val controller = assertNotNull(ketch.controller(TorrentController))
     val stopped = controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
     task.awaitSeeding(false)
     val connects = networks.single().connects.load()
@@ -556,7 +556,7 @@ class TorrentSeedingControlTest {
     ketch.start()
     val task = ketch.download(request(1))
     assertFalse(task.awaitCompleted().sharing)
-    val controller = assertNotNull(ketch.control(TorrentController))
+    val controller = assertNotNull(ketch.controller(TorrentController))
     assertFalse(controller.capabilities().supports(TorrentCapability.SEEDING))
 
     val error = assertFailsWith<TorrentCommandException> {

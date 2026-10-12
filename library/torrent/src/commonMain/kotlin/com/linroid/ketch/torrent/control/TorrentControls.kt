@@ -20,7 +20,7 @@ import kotlin.time.Duration
 
 /**
  * What a torrent source adds to the Ketch that runs it ([SourceExtension]): the
- * [TorrentController] that `ketch.control(TorrentController)` returns, and seeding of completed
+ * [TorrentController] that `ketch.controller(TorrentController)` returns, and seeding of completed
  * tasks. It shows on every completed task of the source whether it seeds
  * ([DownloadState.Completed.sharing]) and saves the intent to seed it again after a restart once
  * it does; [start] seeds again the tasks that seeded when Ketch last stopped.
@@ -63,7 +63,7 @@ internal class TorrentControls(
   )
 
   @Suppress("UNCHECKED_CAST")
-  override fun <T : Any> control(key: ControlKey<T>): T? =
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
     if (key === TorrentController.Key) controller as T else null
 
   @Suppress("UNCHECKED_CAST")

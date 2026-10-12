@@ -72,7 +72,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
   `ProxyConfig`, `ProxyMode`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
-  `ControlKey` (`KetchApi.control(key)` looks up optional typed controllers that other modules
+  `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
   follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`) and
   `Interest.Connections(limit)`; other modules define their own, all serializable, each naming the
@@ -89,7 +89,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:torrent-api` (torrent control contract)
 - `com.linroid.ketch.torrent.api` -- `TorrentController` (its companion `Key` is the
-  `ControlKey`: `ketch.control(TorrentController)`; `Ketch` returns one when the torrent source is
+  `ControlKey`: `ketch.controller(TorrentController)`; `Ketch` returns one when the torrent source is
   registered, `RemoteKetch` one over REST and SSE that fails closed against older servers),
   `TorrentInterest(taskId)` (a task's snapshots through `KetchApi.subscribe`, `null` once gone),
   `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
@@ -107,7 +107,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
   `SourceResolver`, `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
-  (what `DownloadSource.attach` adds: controllers for `KetchApi.control`, `start`,
+  (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
   `selectFiles`/`setSharing`, `showSharing` and `saveSharingIntent`),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
@@ -409,7 +409,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Android deleting it), telling its `onUnreadable` callback
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
 - HTTP requests can be spread round-robin over selected network interfaces
-  (`KetchApi.updateNetworkInterfaces`, `MultiNetworkHttpEngine`); see
+  (`KetchApi.selectNetworkInterfaces`, `MultiNetworkHttpEngine`); see
   [multiple networks](docs/multiple-networks.md)
 - Proxies for HTTP(S), HLS and DASH downloads (not FTP or BitTorrent; Discover never proxies):
   `DownloadConfig.proxy` (`[download.proxy]`), replaced per task by `DownloadRequest.proxy`, which
@@ -902,7 +902,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   they are made; there are no Save buttons
 - The Device pages edit the device chosen in Settings, by default the one shown, through its
   `InstanceSettingsController` (`AppState.settingsFor`): pushed live via
-  `KetchApi.updateConfig` / `updateNetworkInterfaces`. Downloads settings are saved to
+  `KetchApi.updateConfig` / `selectNetworkInterfaces`. Downloads settings are saved to
   `config.toml` only for the embedded instance; the network selection is runtime-only and
   never saved. The Network page also edits the device's proxy (`ProxySettings`), shown for
   devices listing `KetchFeatures.PROXY`. On devices listing `KetchFeatures.TRANSFER_TIMEOUTS`,
@@ -1015,7 +1015,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   256 KB/s, 2 MB/s, and more); download solid, upload a ring, both split along the diagonal,
   idle a hairline outline
 - Files: the inspector's Files tab lists the files or variants of any task whose resolved source
-  names some (torrents also page names from `control(TorrentController)`) and, on devices listing
+  names some (torrents also page names from `controller(TorrentController)`) and, on devices listing
   `download.fileSelection`, checks and unchecks them with an Apply bar (`FileSelectionModel`, at
   least one file stays checked), or picks one with radio buttons (`KetchRadio`) for a
   `FileSelectionMode.SINGLE` source, and starts a waiting task. "Add anyway" in the add sheet
@@ -1118,8 +1118,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   waiting task whose position moved), `progress` carries none and leaves out a request that did
   not change
 - Torrents: `PUT /api/tasks/{id}/files` (`FileSelectionRequest`) chooses a task's files; with
-  `torrent.control` (the instance's `control(TorrentController)`; without one the routes are not
-  installed and answer `404`), `/api/torrents` serves `capabilities`, a task's snapshot, sorted
+  `torrent.control` (the instance's `controller(TorrentController)`; without one the routes are
+  not installed and answer `404`), `/api/torrents` serves `capabilities`, a task's snapshot, sorted
   file pages (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`),
   `selection` and `seeding` commands guarded by a revision and an idempotency key, and an SSE
   `events` stream of snapshots (deprecated: the event stream carries them). Command failures
@@ -1340,7 +1340,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 14 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl` (without the metainfo), `listDownloadFiles` (`cursor`, `limit` up to 1000, `sort`
-  and `descending`, from `control(TorrentController)`, else the request's resolved files),
+  and `descending`, from `controller(TorrentController)`, else the request's resolved files),
   `selectDownloadFiles` (comma-separated IDs), `getStatus`, `setSpeedLimit`, `setPriority`,
   `updateConfig` (also `retryCount`, -1 for unlimited, `idleTimeoutSeconds` and `minSpeed`,
   each kept when left out); `startDownload` takes `fileIds` and `checksum` (`sha256:<hex>` or the
@@ -1467,7 +1467,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `HttpEngine` interface for custom HTTP clients (default: Ktor)
 - `TaskStore` interface for persistence (InMemoryTaskStore, SqliteTaskStore)
 - `DownloadSource` interface for protocol-level extensibility; `DownloadSource.attach` returns a
-  `SourceExtension` for protocol controllers (`KetchApi.control(ControlKey)`) and task lifecycle
+  `SourceExtension` for protocol controllers (`KetchApi.controller(ControlKey)`) and task lifecycle
   hooks, so `library:api` and `library:core` stay protocol-neutral
 - `Logger` interface for logging backends
 

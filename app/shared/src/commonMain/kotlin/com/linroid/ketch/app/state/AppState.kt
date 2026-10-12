@@ -946,7 +946,7 @@ class AppState(
   fun torrentControllerOf(deviceId: String): TorrentController? {
     if (TorrentFeatures.CONTROL !in featuresOf(deviceId)) return null
     return instances.value.firstOrNull { it.deviceId == deviceId }?.instance
-      ?.control(TorrentController)
+      ?.controller(TorrentController)
   }
 
   /**

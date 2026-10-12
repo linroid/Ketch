@@ -261,7 +261,7 @@ class RemoteKetch internal constructor(
    * controls, which fail closed against servers without them. Other keys return `null`.
    */
   @Suppress("UNCHECKED_CAST")
-  override fun <T : Any> control(key: ControlKey<T>): T? =
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
     if (key === TorrentController.Key) torrents as T else null
 
   override suspend fun download(
@@ -294,11 +294,11 @@ class RemoteKetch internal constructor(
 
   override suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
   ): ResolvedSource {
     val response = httpClient.post(Api.Resolve()) {
       contentType(ContentType.Application.Json)
-      setBody(ResolveUrlRequest(url, properties))
+      setBody(ResolveUrlRequest(url, headers))
     }
     checkSuccess(response)
     return response.body()
@@ -385,7 +385,7 @@ class RemoteKetch internal constructor(
     return response.body()
   }
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     val response = httpClient.put(Api.NetworkInterfaces()) {
       contentType(ContentType.Application.Json)
       setBody(config)

@@ -71,7 +71,7 @@ class RemoteKetchTest {
     })
     try {
       val error = assertFailsWith<TorrentCommandException> {
-        assertNotNull(remote.control(TorrentController)).select(
+        assertNotNull(remote.controller(TorrentController)).select(
           "t1", setOf("0"), TorrentCommandContext("k", TorrentRevision("e", 0)),
         )
       }

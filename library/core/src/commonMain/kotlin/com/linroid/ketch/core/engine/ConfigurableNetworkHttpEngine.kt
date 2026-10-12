@@ -39,7 +39,7 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   }
 
   /** Replaces the selection for new requests atomically; failure preserves the old selection. */
-  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces =
+  suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces =
     updates.withLock {
       val previous = checkNotNull(current.load()) { "Network engine is closed" }
       // Copy and validate again so the caller cannot later mutate the selected IDs.

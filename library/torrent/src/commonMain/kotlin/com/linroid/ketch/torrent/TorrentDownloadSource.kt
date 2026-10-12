@@ -171,7 +171,7 @@ class TorrentDownloadSource(
 
   /**
    * The torrent controls of the Ketch that runs this source: the [TorrentController] that
-   * `ketch.control(TorrentController)` returns, and seeding of completed tasks.
+   * `ketch.controller(TorrentController)` returns, and seeding of completed tasks.
    *
    * [TorrentController]: com.linroid.ketch.torrent.api.TorrentController
    */
@@ -767,14 +767,14 @@ class TorrentDownloadSource(
   /** The task's registered session; for tests. */
   internal suspend fun sessionOf(taskId: String): TorrentSession? = tasks.session(taskId)
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    resolve(url, config.discoveryPrivacy, properties)
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+    resolve(url, config.discoveryPrivacy, headers)
 
   /** Resolve with an explicit privacy choice before any discovery or metadata request starts. */
   suspend fun resolve(
     url: String,
     privacy: TorrentDiscoveryPrivacy,
-    properties: Map<String, String> = emptyMap(),
+    headers: Map<String, String> = emptyMap(),
   ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
     log.d { "Resolving ${redactUrl(url)} (privacy=$privacy)" }
@@ -788,7 +788,7 @@ class TorrentDownloadSource(
       }
       val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
         try {
-          http.fetch(url, config.maxMetadataBytes, headers = properties)
+          http.fetch(url, config.maxMetadataBytes, headers = headers)
         } catch (e: IOException) {
           // Caller-supplied engines may surface raw socket failures; the metainfo host is remote.
           throw KetchError.Network(e)
@@ -826,9 +826,9 @@ class TorrentDownloadSource(
    */
   override suspend fun resolveForDownload(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
     config: DownloadConfig,
-  ): ResolvedSource = resolveForTask(url, this.config.discoveryPrivacy, properties)
+  ): ResolvedSource = resolveForTask(url, this.config.discoveryPrivacy, headers)
 
   private suspend fun resolveForTask(
     url: String,

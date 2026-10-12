@@ -80,7 +80,7 @@ when it is added before its file list arrives ("Add anyway"). A `requestId` resu
 the selection and this flag.
 
 `RemoteKetch` changes the files through `PUT /api/tasks/{id}/files`.
-`ketch.control(TorrentController)` (from `library:torrent-api`) lists a task's files a page at a
+`ketch.controller(TorrentController)` (from `library:torrent-api`) lists a task's files a page at a
 time (`TorrentController.files`), sorted by `TorrentFileOrder`: torrent order, case-insensitive
 natural name order ("Episode 2" before "Episode 10"), size, extension then name, or selected
 files first, each reversible. The apps sort the same way, except that their Kind order groups
@@ -344,7 +344,7 @@ New source resume records retain the chosen privacy independently of later defau
 when metadata must be fetched again. Legacy records without a privacy choice use the configured
 default and record it on their next save. Privacy is chosen at the source, for the local backend;
 remote privacy commands remain on the v2 roadmap. Capability negotiation, inspection, file pages
-and the selection and seeding commands are available through `ketch.control(TorrentController)`,
+and the selection and seeding commands are available through `ketch.controller(TorrentController)`,
 locally and,
 for servers listing `torrent.control`, over `/api/torrents`; see the
 [control contract](design/torrent-control-contract.md#version-1-runtime).

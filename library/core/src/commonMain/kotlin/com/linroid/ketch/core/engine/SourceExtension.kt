@@ -24,7 +24,7 @@ import kotlin.time.Duration
  */
 interface SourceExtension {
   /** This extension's controller for [key], or `null` when it offers none. */
-  fun <T : Any> control(key: ControlKey<T>): T? = null
+  fun <T : Any> controller(key: ControlKey<T>): T? = null
 
   /**
    * What this extension reports for [interest], about every [interval], or `null` when it does

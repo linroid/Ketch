@@ -130,7 +130,7 @@ class KetchTorrentControllerTest {
   private fun context(key: String, revision: TorrentRevision) =
     TorrentCommandContext(key, revision)
 
-  private val Ketch.controller: TorrentController get() = assertNotNull(control(TorrentController))
+  private val Ketch.torrents: TorrentController get() = assertNotNull(controller(TorrentController))
 
   /** A paused task that downloads file 0, with its file list known. */
   private suspend fun TestScope.pausedTask(ketch: Ketch): DownloadTask {
@@ -177,7 +177,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val initial = controller.revisionOf(task.taskId)
       val first = controller.select(task.taskId, setOf("0", "1"), context("a", initial))
       val second = controller.select(
@@ -202,7 +202,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val revision = controller.revisionOf(task.taskId)
       controller.select(task.taskId, setOf("0", "1"), context("a", revision))
 
@@ -222,7 +222,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source, store)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val stale = controller.revisionOf(task.taskId)
       val accepted = controller.select(task.taskId, setOf("0", "1"), context("a", stale))
       val writes = store.saves.size
@@ -251,7 +251,7 @@ class KetchTorrentControllerTest {
     try {
       val task = ketch.download(request("0", "1"))
       runCurrent()
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val before = controller.revisionOf(task.taskId)
       val run = source.inner.runs.value.single()
       run.context.segments.value = listOf(Segment(0, 0, 99, 40), Segment(1, 100, 299, 0))
@@ -276,7 +276,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source, store)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val revision = controller.revisionOf(task.taskId)
       val writes = store.saves.size
 
@@ -299,7 +299,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val selections = listOf(setOf("0", "1"), setOf("0"))
       repeat(TaskControl.MAX_COMMANDS) { i ->
         controller.select(
@@ -348,7 +348,7 @@ class KetchTorrentControllerTest {
       ketch.start()
       runCurrent()
       val task = ketch.tasks.value.single()
-      val controller = ketch.controller
+      val controller = ketch.torrents
 
       controller.select(
         task.taskId, setOf("1"), context("old0", controller.revisionOf(task.taskId)),
@@ -371,8 +371,8 @@ class KetchTorrentControllerTest {
     val result = try {
       val task = pausedTask(first)
       taskId = task.taskId
-      first.controller.select(
-        taskId, setOf("0", "2"), context("kept", first.controller.revisionOf(taskId)),
+      first.torrents.select(
+        taskId, setOf("0", "2"), context("kept", first.torrents.revisionOf(taskId)),
       )
     } finally {
       first.close()
@@ -381,10 +381,10 @@ class KetchTorrentControllerTest {
     try {
       next.start()
       runCurrent()
-      val nextRevision = next.controller.revisionOf(taskId)
+      val nextRevision = next.torrents.revisionOf(taskId)
       assertNotEquals(result.revision.epoch, nextRevision.epoch)
 
-      val replay = next.controller.select(taskId, setOf("2", "0"), context("kept", result.revision))
+      val replay = next.torrents.select(taskId, setOf("2", "0"), context("kept", result.revision))
 
       assertEquals(result, replay)
       assertEquals(1, next.tasks.value.single().saved.control?.selectionGeneration)
@@ -402,7 +402,7 @@ class KetchTorrentControllerTest {
       val task = ketch.download(request())
       runCurrent()
       assertEquals(DownloadState.Queued, task.state.value)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val snapshot = assertNotNull(controller.snapshot(task.taskId))
       assertEquals(TorrentActivity.RESOLVING, snapshot.activity)
       assertNull(snapshot.counters)
@@ -422,7 +422,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val revision = controller.revisionOf(task.taskId)
       failure(TorrentCommandError.INVALID_INPUT) {
         controller.select(task.taskId, emptySet(), context("a", revision))
@@ -450,7 +450,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val seen = mutableListOf<String>()
       var cursor: String? = null
       var pages = 0
@@ -481,7 +481,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val seen = mutableListOf<String>()
       var cursor: String? = null
       do {
@@ -511,7 +511,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val cursor = assertNotNull(
         controller.files(task.taskId, TorrentPageRequest(limit = 1), TorrentFileOrder.NAME)
           ?.nextCursor
@@ -537,7 +537,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val cursor = assertNotNull(
         controller.files(task.taskId, TorrentPageRequest(limit = 1))?.nextCursor
       )
@@ -561,7 +561,7 @@ class KetchTorrentControllerTest {
     try {
       val task = pausedTask(ketch)
       val other = pausedTask(ketch)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       failure(TorrentCommandError.INVALID_INPUT) {
         controller.files(task.taskId, TorrentPageRequest(cursor = "c1.bm90IGpzb24"))
       }
@@ -585,7 +585,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source)
     try {
       val task = pausedTask(ketch)
-      val snapshot = assertNotNull(ketch.controller.snapshot(task.taskId))
+      val snapshot = assertNotNull(ketch.torrents.snapshot(task.taskId))
 
       assertEquals(TorrentActivity.PAUSED, snapshot.activity)
       assertFalse(snapshot.selectionComplete)
@@ -600,7 +600,7 @@ class KetchTorrentControllerTest {
       assertNull(counters.uploadBytesPerSecond)
       assertNull(counters.seedSeconds)
       // An unchanged task keeps its revision.
-      assertEquals(snapshot, ketch.controller.snapshot(task.taskId))
+      assertEquals(snapshot, ketch.torrents.snapshot(task.taskId))
     } finally {
       ketch.close()
     }
@@ -614,7 +614,7 @@ class KetchTorrentControllerTest {
       val task = completedTask(ketch, source)
       source.live[task.taskId] = LiveTorrent(TorrentActivity.SEEDING, 100, 2048, 512)
 
-      val snapshot = assertNotNull(ketch.controller.snapshot(task.taskId))
+      val snapshot = assertNotNull(ketch.torrents.snapshot(task.taskId))
 
       assertEquals(TorrentActivity.SEEDING, snapshot.activity)
       assertTrue(snapshot.selectionComplete)
@@ -624,7 +624,7 @@ class KetchTorrentControllerTest {
       assertEquals(2048, counters.uploadedPayloadBytes)
       assertEquals(512, counters.uploadBytesPerSecond)
       source.live.remove(task.taskId)
-      assertEquals(TorrentActivity.STOPPED, ketch.controller.snapshot(task.taskId)?.activity)
+      assertEquals(TorrentActivity.STOPPED, ketch.torrents.snapshot(task.taskId)?.activity)
     } finally {
       ketch.close()
     }
@@ -710,7 +710,7 @@ class KetchTorrentControllerTest {
     try {
       val task = ketch.download(request("0"))
       runCurrent()
-      val controller = ketch.controller
+      val controller = ketch.torrents
 
       failure(TorrentCommandError.INVALID_STATE) {
         controller.setSeeding(task.taskId, true, context("a", controller.revisionOf(task.taskId)))
@@ -729,7 +729,7 @@ class KetchTorrentControllerTest {
     val ketch = ketch(source, store)
     try {
       val task = completedTask(ketch, source)
-      val controller = ketch.controller
+      val controller = ketch.torrents
       val writes = store.saves.size
 
       failure(TorrentCommandError.POLICY_DENIED) {
@@ -762,7 +762,7 @@ class KetchTorrentControllerTest {
     try {
       ketch.start()
       val task = completedTask(ketch, source)
-      val controller = ketch.controller
+      val controller = ketch.torrents
 
       val on = controller.setSeeding(
         task.taskId, true, context("on", controller.revisionOf(task.taskId)),
@@ -795,14 +795,14 @@ class KetchTorrentControllerTest {
     val source = ControlledSource()
     val ketch = ketch(source)
     try {
-      val capabilities = ketch.controller.capabilities()
+      val capabilities = ketch.torrents.capabilities()
       assertEquals(setOf("inspect", "file-selection"), capabilities.names)
       assertEquals(1000, capabilities.maxPageSize)
       assertEquals(16, capabilities.maxSubscriptions)
       assertFalse(capabilities.backgroundTransfers)
 
       source.capabilities += TorrentCapability.SEEDING.wireName
-      assertTrue(ketch.controller.capabilities().supports(TorrentCapability.SEEDING))
+      assertTrue(ketch.torrents.capabilities().supports(TorrentCapability.SEEDING))
     } finally {
       ketch.close()
     }
@@ -817,7 +817,7 @@ class KetchTorrentControllerTest {
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
     try {
-      assertNull(ketch.control(TorrentController))
+      assertNull(ketch.controller(TorrentController))
     } finally {
       ketch.close()
     }

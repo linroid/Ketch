@@ -643,7 +643,7 @@ class EventHubTest {
     fun task(taskId: String) = tasks.value.first { it.taskId == taskId }
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> control(key: ControlKey<T>): T? =
+    override fun <T : Any> controller(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T? else null
 
     @Suppress("UNCHECKED_CAST")
@@ -660,7 +660,7 @@ class EventHubTest {
     }
 
     override suspend fun download(request: DownloadRequest) = error("Unexpected call")
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
       error("Unexpected call")
     override suspend fun start() = error("Unexpected call")
     override suspend fun status(): KetchStatus = error("Unexpected call")

@@ -109,7 +109,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * ### Torrents
  *
- * Served from `KetchApi.control(TorrentController)`, and only when the instance has one: servers
+ * Served from `KetchApi.controller(TorrentController)`, and only when the instance has one: servers
  * listing `torrent.control` do, and others answer `404` without an error code. Failures answer
  * with the `TorrentCommandError` wire name: `400` `invalid_input`; `409` `invalid_state`,
  * `metadata_unavailable`, `revision_conflict` (with the current `revision`),
@@ -548,7 +548,7 @@ private fun Route.apiRoutes(
 ) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
-  ketch.control(TorrentController)?.let { torrentRoutes(ketch, it) }
+  ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
   connectionRoutes(ketch, connectionStreams)
   streamRoutes(events)
   eventRoutes(ketch)

@@ -45,16 +45,16 @@ internal class HttpDownloadSource(
 
   override suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
-  ): ResolvedSource = resolve(url, properties, DownloadConfig.Default)
+    headers: Map<String, String>,
+  ): ResolvedSource = resolve(url, headers, DownloadConfig.Default)
 
   override suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine.through(config.proxy))
-    val serverInfo = detector.detect(url, properties)
+    val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {
       DefaultFileNameResolver.fromContentDisposition(it)
     } ?: DefaultFileNameResolver.fromUrl(url)

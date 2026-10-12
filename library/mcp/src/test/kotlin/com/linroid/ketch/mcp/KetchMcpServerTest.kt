@@ -385,7 +385,7 @@ class KetchMcpServerTest {
     override suspend fun download(request: DownloadRequest): DownloadTask =
       throw UnsupportedOperationException()
 
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
       throw UnsupportedOperationException()
 
     override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =

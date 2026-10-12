@@ -53,7 +53,7 @@ class FileSelectionRoutesTest {
 
     override fun canHandle(url: String) = url.startsWith("files:")
 
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 30, supportsResume = true,
       suggestedFileName = "pack", maxSegments = 2,
       files = listOf(SourceFile("0", "a.bin", 10), SourceFile("1", "b.bin", 20)),
@@ -62,11 +62,11 @@ class FileSelectionRoutesTest {
 
     override suspend fun resolveForDownload(
       url: String,
-      properties: Map<String, String>,
+      headers: Map<String, String>,
       config: DownloadConfig,
     ): ResolvedSource {
       if (url == "files:unknown") awaitCancellation()
-      return resolve(url, properties)
+      return resolve(url, headers)
     }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =

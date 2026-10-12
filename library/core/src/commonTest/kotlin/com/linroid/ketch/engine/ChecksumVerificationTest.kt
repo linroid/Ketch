@@ -251,7 +251,7 @@ class ChecksumVerificationTest {
     override val type = "self"
     override val managesOwnFileIo = true
     override fun canHandle(url: String) = url.startsWith("self:")
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 1, supportsResume = false,
       suggestedFileName = "self", maxSegments = 1,
     )

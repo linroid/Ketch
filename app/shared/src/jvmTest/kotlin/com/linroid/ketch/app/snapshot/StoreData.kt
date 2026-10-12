@@ -430,8 +430,8 @@ internal class StoreEnvironment(
 
 /** [base], resolving the links of [StoreData.LinkSizes] to their own sizes. */
 private class SizedLinks(private val base: KetchApi) : KetchApi by base {
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
-    val resolved = base.resolve(url, properties)
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+    val resolved = base.resolve(url, headers)
     return resolved.copy(totalBytes = StoreData.LinkSizes[url] ?: resolved.totalBytes)
   }
 }

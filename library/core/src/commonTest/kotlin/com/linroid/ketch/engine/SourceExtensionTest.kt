@@ -62,7 +62,7 @@ class SourceExtensionTest {
       this.host = host
       return object : SourceExtension {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : Any> control(key: ControlKey<T>): T? =
+        override fun <T : Any> controller(key: ControlKey<T>): T? =
           if (key === Greeter.Key) greeter as T else null
 
         override suspend fun start() {
@@ -125,8 +125,8 @@ class SourceExtensionTest {
     val source = ExtendedSource()
     val ketch = ketch(source)
     try {
-      assertSame(source.greeter, ketch.control(Greeter))
-      assertNull(ketch.control(OtherKey))
+      assertSame(source.greeter, ketch.controller(Greeter))
+      assertNull(ketch.controller(OtherKey))
       assertEquals(1, source.attaches)
     } finally {
       ketch.close()
@@ -137,7 +137,7 @@ class SourceExtensionTest {
   fun control_sourceWithoutExtension_isNull() = runTest {
     val ketch = ketch(SelectableSource())
     try {
-      assertNull(ketch.control(Greeter))
+      assertNull(ketch.controller(Greeter))
     } finally {
       ketch.close()
     }

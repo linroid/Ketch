@@ -13,28 +13,18 @@ interface KetchApi {
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
-  /** Every task of this instance. */
-  val tasks: StateFlow<List<DownloadTask>>
-
-  /**
-   * Follows [interest] while collected. A remote instance asks its server for updates every
-   * [interval] (the shortest its callers ask for); an in-process one reports changes as they
-   * happen, and stats every [interval]. Unknown interests fail with
-   * [UnsupportedOperationException] when collected.
-   *
-   * @throws IllegalArgumentException if [interval] is not positive
-   */
-  fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
-
-  /**
-   * The controller this backend offers for [key], defined by another module, or `null`. Check the
-   * feature its module names in [KetchStatus.features] first: a remote controller fails against
-   * servers without it.
-   */
-  fun <T : Any> control(key: ControlKey<T>): T? = null
+  // Lifecycle
 
   /** Restores saved tasks (in-process) or connects and loads them (remote). */
   suspend fun start()
+
+  /** Releases the instance's resources. */
+  fun close()
+
+  // Tasks
+
+  /** Every task of this instance. */
+  val tasks: StateFlow<List<DownloadTask>>
 
   /**
    * Adds a download.
@@ -44,15 +34,17 @@ interface KetchApi {
    */
   suspend fun download(request: DownloadRequest): DownloadTask
 
+  // Probing
+
   /**
    * Probes [url] without downloading it. Pass the result in [DownloadRequest.resolvedSource] to
    * skip the probe when downloading.
    *
-   * @param properties request headers for HTTP sources; other sources may ignore them
+   * @param headers request headers for HTTP sources; other sources may ignore them
    */
   suspend fun resolve(
     url: String,
-    properties: Map<String, String> = emptyMap(),
+    headers: Map<String, String> = emptyMap(),
   ): ResolvedSource
 
   /**
@@ -70,6 +62,8 @@ interface KetchApi {
   ): ResolvedSource {
     throw UnsupportedOperationException("Resolving file content is unavailable")
   }
+
+  // Status and settings
 
   /** The instance's configuration, system, storage and [features][KetchStatus.features]. */
   suspend fun status(): KetchStatus
@@ -95,12 +89,28 @@ interface KetchApi {
    * @throws IllegalArgumentException if an ID is unknown or unavailable
    * @throws UnsupportedOperationException if this backend cannot configure interfaces
    */
-  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
   }
 
-  /** Releases the instance's resources. */
-  fun close()
+  // Extensions
+
+  /**
+   * Follows [interest] while collected. A remote instance asks its server for updates every
+   * [interval] (the shortest its callers ask for); an in-process one reports changes as they
+   * happen, and stats every [interval]. Unknown interests fail with
+   * [UnsupportedOperationException] when collected.
+   *
+   * @throws IllegalArgumentException if [interval] is not positive
+   */
+  fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
+
+  /**
+   * The controller this backend offers for [key], defined by another module, or `null`. Check the
+   * feature its module names in [KetchStatus.features] first: a remote controller fails against
+   * servers without it.
+   */
+  fun <T : Any> controller(key: ControlKey<T>): T? = null
 
   // Not `const`, which callers would inline, reporting the version they were compiled against.
   @Suppress("MayBeConstant")

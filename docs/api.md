@@ -50,7 +50,7 @@ kotlin {
 `sqlite`, `ftp` and `torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to
 control a daemon instead of running the engine in-process. `torrent-api`, the torrent controller
 contract that `torrent` and `remote` expose, has the targets of `api`, so any client can inspect
-and command torrents (`ketch.control(TorrentController)`).
+and command torrents (`ketch.controller(TorrentController)`).
 
 The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
 It does not support WASI because Kermit 2.1.0 does not publish a WASI variant. Projects with
@@ -83,7 +83,7 @@ interface KetchApi {
   suspend fun updateConfig(config: DownloadConfig)
   fun <T> subscribe(interest: Interest<T>, interval: Duration = 1.seconds): Flow<T>
   fun close()
-  // ... plus backendLabel, control(), networkInterfaces(), updateNetworkInterfaces()
+  // ... plus backendLabel, controller(), networkInterfaces(), selectNetworkInterfaces()
 }
 ```
 
@@ -207,7 +207,7 @@ stats end with the failure when the connection drops, so collect them again to r
 `RemoteKetch(progressInterval = 1.seconds)` sets how often every downloading task's progress
 comes; set `foreground = false` while nothing is shown, and the server sends only state changes.
 
-`KetchApi.control(key)` returns an optional typed controller a backend offers beyond the download
+`KetchApi.controller(key)` returns an optional typed controller a backend offers beyond the download
 API, or `null`; `library:api` defines only the `ControlKey` lookup, and the module that defines a
 controller defines its key. `library:api` also holds the file orders every client shares:
 `FileOrder`, `NaturalOrder`, `fileExtension()` and `sortedByFileOrder()`.
@@ -215,7 +215,7 @@ controller defines its key. `library:api` also holds the file orders every clien
 ### `library:torrent-api`
 
 The torrent control contract, with the targets of `library:api`, so browser and remote clients
-use it without linking the torrent engine. `ketch.control(TorrentController)` is a
+use it without linking the torrent engine. `ketch.controller(TorrentController)` is a
 `TorrentController`, or `null` without a torrent source: capabilities, a task's snapshot, its
 files a page at a time (`files`, sorted by `TorrentFileOrder`, which names a
 `FileOrder`, and optionally descending), and the `select` and `setSeeding` commands, each guarded
@@ -303,7 +303,7 @@ Android provides `KtorHttpEngine.forNetwork(Network)`. These are extension funct
 [multiple network interfaces](multiple-networks.md) for setup and platform limits.
 
 `KetchApi.networkInterfaces()` returns supported interfaces and their current selection on the
-download instance. `KetchApi.updateNetworkInterfaces(NetworkInterfaceConfig(interfaceIds))`
+download instance. `KetchApi.selectNetworkInterfaces(NetworkInterfaceConfig(interfaceIds))`
 changes the selection for subsequent HTTP requests; an empty list restores system-default
 routing. `RemoteKetch` forwards these methods through `GET`/`PUT /api/network-interfaces`.
 Selection is runtime-only. SDK instances enable these controls with

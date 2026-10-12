@@ -524,7 +524,7 @@ class KetchToolSetTest {
       flow { throw UnsupportedOperationException("Not followed in tests") }
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> control(key: ControlKey<T>): T? =
+    override fun <T : Any> controller(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T? else null
 
     val requests = mutableListOf<DownloadRequest>()
@@ -538,8 +538,8 @@ class KetchToolSetTest {
       return QueuedTask(request)
     }
 
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
-      resolveProperties += properties
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
+      resolveProperties += headers
       return resolved ?: ResolvedSource(
         url = url,
         sourceType = "http",

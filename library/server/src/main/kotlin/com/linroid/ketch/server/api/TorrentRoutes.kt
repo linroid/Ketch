@@ -34,7 +34,7 @@ private const val MAX_CURSOR_LENGTH = 4096
 
 /**
  * Installs the `/api/torrents` routes over [controller], the served instance's
- * `control(TorrentController)`; a server whose instance has none installs no routes, so clients
+ * `controller(TorrentController)`; a server whose instance has none installs no routes, so clients
  * read their absence as no torrent controls. Command failures throw [TorrentCommandException],
  * which the server's status pages answer with the error's wire name ([torrentErrorStatus]).
  * The deprecated per-torrent event stream follows [TorrentInterest] on [ketch]; clients of the

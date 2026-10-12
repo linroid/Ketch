@@ -73,7 +73,7 @@ class SeedingWatcherTest {
 
     override fun canHandle(url: String) = url.startsWith("seed:")
 
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = TYPE, totalBytes = 100, supportsResume = true,
       suggestedFileName = "seed", maxSegments = 1, files = listOf(SourceFile("0", "seed", 100)),
     )
@@ -200,7 +200,7 @@ class SeedingWatcherTest {
       ketch.start()
       runCurrent()
       val task = ketch.tasks.value.single()
-      val controller = assertNotNull(ketch.control(TorrentController))
+      val controller = assertNotNull(ketch.controller(TorrentController))
       val revision = assertNotNull(controller.snapshot("done")).revision
       val gate = CompletableDeferred<Unit>()
       source.stopGate = gate
@@ -240,7 +240,7 @@ class SeedingWatcherTest {
     try {
       ketch.start()
       runCurrent()
-      val controller = assertNotNull(ketch.control(TorrentController))
+      val controller = assertNotNull(ketch.controller(TorrentController))
       // A client sees the task seeding before the watcher saved the intent to seed it again.
       source.ids.value = setOf("done")
       val revision = assertNotNull(controller.snapshot("done")).revision
@@ -268,7 +268,7 @@ class SeedingWatcherTest {
       source.ids.value = setOf("done")
       runCurrent()
       val task = ketch.tasks.value.single()
-      val controller = assertNotNull(ketch.control(TorrentController))
+      val controller = assertNotNull(ketch.controller(TorrentController))
       val revision = assertNotNull(controller.snapshot("done")).revision
       store.failSaves = true
 

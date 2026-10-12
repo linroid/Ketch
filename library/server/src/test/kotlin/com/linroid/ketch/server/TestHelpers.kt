@@ -101,8 +101,8 @@ internal class RecordingKetchApi(
 
   override suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
-  ): ResolvedSource = delegate.resolve(url, properties)
+    headers: Map<String, String>,
+  ): ResolvedSource = delegate.resolve(url, headers)
 
   override suspend fun start() = delegate.start()
   override suspend fun status(): KetchStatus = delegate.status()

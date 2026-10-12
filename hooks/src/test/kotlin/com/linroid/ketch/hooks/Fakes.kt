@@ -40,7 +40,7 @@ internal class FakeKetch : KetchApi {
   override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
     flow { throw UnsupportedOperationException("unused") }
   override suspend fun download(request: DownloadRequest): DownloadTask = error("unused")
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     error("unused")
   override suspend fun start() {}
   override suspend fun status(): KetchStatus = error("no status")

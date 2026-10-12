@@ -412,7 +412,7 @@ internal class SampleKetchApi(
     return task
   }
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     ResolvedSource(
       url = url,
       sourceType = "http",
@@ -492,7 +492,7 @@ internal class SampleDeviceApi(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     download?.invoke(request) ?: throw UnsupportedOperationException("Not in snapshots")
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     resolve?.invoke(url) ?: throw UnsupportedOperationException("Not in snapshots")
 
   override suspend fun start() {}
@@ -728,7 +728,7 @@ internal class NetworkedApi(
     return networks
   }
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     networks = networks.copy(config = config)
     return networks
   }

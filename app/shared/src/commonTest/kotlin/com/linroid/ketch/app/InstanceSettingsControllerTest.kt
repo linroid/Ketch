@@ -44,7 +44,7 @@ private class SettingsKetchApi(
 
   override suspend fun networkInterfaces(): NetworkInterfaces = networks
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     gate?.await()
     networkRequests += config.interfaceIds
     if (failUpdates) throw IllegalArgumentException("Unknown interface")

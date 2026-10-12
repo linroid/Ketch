@@ -24,7 +24,7 @@ class FakeKetchApi(override val backendLabel: String = "Fake") : KetchApi {
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException("FakeKetchApi does not support downloads")
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
     throw UnsupportedOperationException("FakeKetchApi does not support resolve")
 
   /** Result of [resolveContent]; unsupported when null. */

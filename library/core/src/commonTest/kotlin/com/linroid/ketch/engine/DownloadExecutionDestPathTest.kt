@@ -435,7 +435,7 @@ class DownloadExecutionDestPathTest {
 
     override val type = "fixture"
     override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+    override suspend fun resolve(url: String, headers: Map<String, String>) = ResolvedSource(
       url = url, sourceType = type, totalBytes = 4, supportsResume = true,
       suggestedFileName = suggestedFileName, maxSegments = 1, contentType = contentType,
     )

@@ -108,7 +108,7 @@ class TorrentRemoteSelectionTest {
       started.await()
     }
 
-    val torrents: TorrentController get() = assertNotNull(remote.control(TorrentController))
+    val torrents: TorrentController get() = assertNotNull(remote.controller(TorrentController))
 
     fun capturedEvents(): String = synchronized(events) { events.toString() }
 

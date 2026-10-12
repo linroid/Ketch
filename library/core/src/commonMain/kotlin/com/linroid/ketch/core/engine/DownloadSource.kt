@@ -61,13 +61,11 @@ interface DownloadSource {
    * any source type.
    *
    * @param url the URL to resolve
-   * @param properties source-specific key-value pairs. For HTTP
-   *   sources this contains HTTP headers; other sources may
-   *   interpret them differently or ignore them.
+   * @param headers request headers for HTTP sources; other sources may ignore them
    */
   suspend fun resolve(
     url: String,
-    properties: Map<String, String> = emptyMap(),
+    headers: Map<String, String> = emptyMap(),
   ): ResolvedSource
 
   /**
@@ -82,9 +80,9 @@ interface DownloadSource {
    */
   suspend fun resolve(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
     config: DownloadConfig,
-  ): ResolvedSource = resolve(url, properties)
+  ): ResolvedSource = resolve(url, headers)
 
   /**
    * Resolves source metadata for a task that is starting, which can wait
@@ -96,9 +94,9 @@ interface DownloadSource {
    */
   suspend fun resolveForDownload(
     url: String,
-    properties: Map<String, String>,
+    headers: Map<String, String>,
     config: DownloadConfig,
-  ): ResolvedSource = resolve(url, properties, config)
+  ): ResolvedSource = resolve(url, headers, config)
 
   /**
    * Returns true if this source can resolve caller-supplied file

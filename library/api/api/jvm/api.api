@@ -848,7 +848,7 @@ public abstract interface annotation class com/linroid/ketch/api/InternalKetchAp
 public abstract interface class com/linroid/ketch/api/KetchApi {
 	public static final field Companion Lcom/linroid/ketch/api/KetchApi$Companion;
 	public abstract fun close ()V
-	public fun control (Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
+	public fun controller (Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
 	public abstract fun download (Lcom/linroid/ketch/api/DownloadRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getBackendLabel ()Ljava/lang/String;
 	public abstract fun getTasks ()Lkotlinx/coroutines/flow/StateFlow;
@@ -857,12 +857,12 @@ public abstract interface class com/linroid/ketch/api/KetchApi {
 	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun resolveContent ([BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun resolveContent$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun selectNetworkInterfaces (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun subscribe-HG0u8IE (Lcom/linroid/ketch/api/Interest;J)Lkotlinx/coroutines/flow/Flow;
 	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun updateConfig (Lcom/linroid/ketch/api/DownloadConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateNetworkInterfaces (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/linroid/ketch/api/KetchApi$Companion {
@@ -871,13 +871,13 @@ public final class com/linroid/ketch/api/KetchApi$Companion {
 }
 
 public final class com/linroid/ketch/api/KetchApi$DefaultImpls {
-	public static fun control (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
+	public static fun controller (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
 	public static fun networkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun resolveContent (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun resolveContent$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun selectNetworkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
-	public static fun updateNetworkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract class com/linroid/ketch/api/KetchError : java/lang/Exception {

@@ -42,7 +42,7 @@ class ResolveContentRoutesTest {
         maxSegments = 1,
       )
     }
-    override suspend fun resolve(url: String, properties: Map<String, String>) =
+    override suspend fun resolve(url: String, headers: Map<String, String>) =
       error("Unexpected URL resolution")
     override suspend fun download(context: DownloadContext) = Unit
     override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit

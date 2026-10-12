@@ -123,7 +123,7 @@ class TorrentRoutesTest {
     private val torrents: TorrentController,
   ) : KetchApi by delegate {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> control(key: ControlKey<T>): T? =
+    override fun <T : Any> controller(key: ControlKey<T>): T? =
       if (key === TorrentController.Key) torrents as T else null
 
     @Suppress("UNCHECKED_CAST")

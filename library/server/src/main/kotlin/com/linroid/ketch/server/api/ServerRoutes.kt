@@ -56,7 +56,7 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
   put<Api.NetworkInterfaces> {
     val body = call.receiveJson<NetworkInterfaceConfig>()
     try {
-      call.respond(ketch.updateNetworkInterfaces(body))
+      call.respond(ketch.selectNetworkInterfaces(body))
     } catch (e: UnsupportedOperationException) {
       call.respond(
         HttpStatusCode.NotImplemented,

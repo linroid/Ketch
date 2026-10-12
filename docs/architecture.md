@@ -78,7 +78,7 @@ KetchApi
   |-- resolveContent(content, fileName): ResolvedSource
   |-- status(): KetchStatus
   |-- updateConfig(config)
-  |-- networkInterfaces() / updateNetworkInterfaces(config)
+  |-- networkInterfaces() / selectNetworkInterfaces(config)
   |-- close()
 ```
 
@@ -275,11 +275,11 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   `config`, `network-interfaces`, `resolve` and `resolve/content` (resolve uploaded file bytes,
   such as a `.torrent` file)
 - **Torrents**: on servers listing `torrent.control`, `/api/torrents` (resources in
-  `endpoints.torrent`) serves the instance's `control(TorrentController)`: capabilities, a task's
+  `endpoints.torrent`) serves the instance's `controller(TorrentController)`: capabilities, a task's
   snapshot, sorted pages of its files, the `selection` and `seeding` commands, guarded by a
   revision and an idempotency key, and a deprecated `events` stream of snapshots. A server whose
   instance has no torrent controller installs none of these routes.
-  `RemoteKetch.control(TorrentController)` calls them and fails closed against servers without
+  `RemoteKetch.controller(TorrentController)` calls them and fails closed against servers without
   them
 - **Live connections**: `GET /api/connections` and the deprecated SSE stream
   `/api/connections/events` (`snapshot` events, an `error` event before it closes;

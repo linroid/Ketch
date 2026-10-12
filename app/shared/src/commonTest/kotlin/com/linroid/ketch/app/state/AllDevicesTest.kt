@@ -59,7 +59,7 @@ class AllDevicesTest {
   ) : KetchApi by recording {
     val resolved = mutableListOf<String>()
 
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
+    override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource {
       resolved += url
       return ResolvedSource(
         url = url,

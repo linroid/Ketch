@@ -25,11 +25,11 @@ suspend fun selectInterfaces(api: KetchApi, selectedIds: List<String>) {
   val networks = api.networkInterfaces()
   check(networks.supported) { "This instance does not support interface selection" }
   // Populate your interface picker from networks.available (id, name, addresses).
-  api.updateNetworkInterfaces(NetworkInterfaceConfig(selectedIds))
+  api.selectNetworkInterfaces(NetworkInterfaceConfig(selectedIds))
 }
 
 // Restore system-default routing:
-// api.updateNetworkInterfaces(NetworkInterfaceConfig())
+// api.selectNetworkInterfaces(NetworkInterfaceConfig())
 ```
 
 The selection is runtime-only; it resets when the instance restarts. IDs are opaque and local
@@ -156,7 +156,7 @@ for acquiring networks.
   propagate unchanged. The dispatcher does not replay partially delivered data. Ketch's existing
   retry/resume path issues subsequent requests, which participate in round-robin selection.
 - There is no health tracking or automatic removal of failed networks. Use
-  `updateNetworkInterfaces` with a configurable engine, or rebuild the owning Ketch instance
+  `selectNetworkInterfaces` with a configurable engine, or rebuild the owning Ketch instance
   when using a fixed engine list.
 - All selected networks must return the same file content. Source-IP-bound authentication,
   inconsistent CDN content, or networks with different access permissions may prevent downloads.

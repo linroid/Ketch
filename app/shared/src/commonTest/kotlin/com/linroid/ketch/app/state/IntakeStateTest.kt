@@ -1097,8 +1097,8 @@ private class IntakeTestApi(
   private val features: Set<String> = emptySet(),
   private val config: DownloadConfig = DownloadConfig(maxConcurrentDownloads = 3),
 ) : KetchApi by base {
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    check(url, properties)
+  override suspend fun resolve(url: String, headers: Map<String, String>): ResolvedSource =
+    check(url, headers)
 
   override suspend fun status(): KetchStatus = testStatus(
     name = "This Mac",
