@@ -104,12 +104,15 @@ internal enum class TableColumn(
  *
  * @property visible whether the user shows it; it may still hide when the table is narrow.
  * @property width its width, cell padding included.
+ * @property chosen whether the user set [width], which [TableLayout.withHeaderRoom] then keeps
+ *   even when it equals the default.
  */
 @Immutable
 internal data class ColumnSetting(
   val column: TableColumn,
   val visible: Boolean = !column.optional,
   val width: Dp = column.width,
+  val chosen: Boolean = false,
 )
 
 /**
@@ -138,7 +141,7 @@ internal data class TableLayout(
    */
   fun withWidth(column: TableColumn, width: Dp): TableLayout = update(column) {
     val whole = width.value.roundToInt().dp
-    it.copy(width = whole.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth))
+    it.copy(width = whole.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth), chosen = true)
   }
 
   /**
@@ -147,7 +150,7 @@ internal data class TableLayout(
    */
   fun withHeaderRoom(room: (TableColumn) -> Dp): TableLayout = copy(
     columns = columns.map { setting ->
-      if (setting.width != setting.column.width) return@map setting
+      if (setting.chosen) return@map setting
       val needed = room(setting.column).coerceAtMost(TableColumn.MaxWidth)
       if (needed > setting.width) setting.copy(width = needed) else setting
     },
@@ -221,7 +224,7 @@ internal data class TableLayout(
 
   /**
    * Encodes this layout as `name:width` when Name has one, then its column ids in order, each
-   * followed by `:width` when not the default and preceded by `-` when hidden:
+   * followed by `:width` when the user chose it and preceded by `-` when hidden:
    * `name:300,size,progress:160,speed,left,-added`.
    */
   fun encode(): String {
@@ -230,7 +233,7 @@ internal data class TableLayout(
       buildString {
         if (!setting.visible && !setting.column.fixed) append('-')
         append(setting.column.id)
-        if (setting.width != setting.column.width) append(':').append(setting.width.value.toInt())
+        if (setting.chosen) append(':').append(setting.width.value.toInt())
       }
     }
     return (name + rest).joinToString(",")
@@ -259,8 +262,13 @@ internal data class TableLayout(
         val id = entry.removePrefix("-").substringBefore(':')
         val column = TableColumn.fromId(id) ?: return@mapNotNull null
         val width = entry.substringAfter(':', "").toIntOrNull()?.dp
-          ?.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth) ?: column.width
-        ColumnSetting(column, visible = !hidden || column.fixed, width = width)
+          ?.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)
+        ColumnSetting(
+          column = column,
+          visible = !hidden || column.fixed,
+          width = width ?: column.width,
+          chosen = width != null,
+        )
       }.distinctBy { it.column }
       val missing = TableColumn.entries.filter { column -> read.none { it.column == column } }
       return TableLayout(read + missing.map(::ColumnSetting), nameWidth)
