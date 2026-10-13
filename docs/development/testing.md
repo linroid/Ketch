@@ -288,13 +288,16 @@ Debug signing cannot replace a release-signed installation. See [updates](../upd
 ## Desktop startup memory
 
 The desktop launcher uses `-Xms32m -Xmx512m`. The limit covers the Java heap, not native Skia or
-Metal allocations, thread stacks, class metadata or compiled code.
+Metal allocations, thread stacks, class metadata or compiled code. Skia's GPU resource cache is
+capped separately, with `-Dskiko.gpu.resourceCacheLimit=64M` (Skia's default is 256 MB).
 
 ### How to measure
 
 - Measure the app process itself, not Gradle or Kotlin daemons, and use a packaged release for
   release measurements.
 - Measure at launch and after a fixed idle interval, with the same window size and data.
+- Measure after using the window too: resize it and open the add sheet, the palette, Discover and
+  Settings. An idle window never fills Skia's caches, so it hides what use costs.
 - Include a configured Discover provider, saved history and a `--background` launch. Clients
   should initialize only on a search or connection check, history only when first needed, and a
   background launch with a tray should create its window only when shown. Closing an unused app
@@ -329,6 +332,19 @@ Measured on Apple Silicon (1280 × 800, empty list, idle):
 
 Disposing the window brought GPU memory down to about 25 MB instead of 60 MB, and the window's
 other graphics memory to about 1 MB instead of 18 MB.
+
+Using the window used to grow it past 1 GB. Compose's `Modifier.dropShadow` blurs each shadow into
+a bitmap the size of its shape on the CPU and builds a new one whenever the size changes, so a
+resize, or a sheet or the inspector animating open, left a bitmap of several megabytes and its GPU
+texture for each size until a collection freed them, and Skia kept up to 256 MB of textures
+cached. Surfaces now draw their shadows with `elevationShadow`, which Skia blurs on the GPU from a
+small cached profile whatever the size, and the launcher caps the cache. The same use (a resize
+sweep, then the add sheet, palette, shortcuts, Discover and Settings, then a minute idle) measured:
+
+| Build | After use | Peak |
+| --- | --- | --- |
+| Bitmap shadows, 256 MB cache | 1130 MB | 1360 MB |
+| GPU shadows, 64 MB cache | 690 to 720 MB | 810 to 840 MB |
 
 While a window draws, Skiko calls `System.gc()` every 30 seconds so that Skia objects are freed,
 so GC logs show `Pause Full (System.gc())` then. The serial collector used about 20 MB less when

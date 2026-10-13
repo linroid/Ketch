@@ -1059,7 +1059,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and uses the controls in `components/` and `KetchIcon`. `DesignTokenUsageTest` fails when
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,
   `MaterialTheme.` or Material icons; keep its allowlist (`design-token-allowlist.txt`) empty.
-  Composables read the time from `LocalClock`, never `Clock.System`
+  Composables read the time from `LocalClock`, never `Clock.System`. Surfaces take their shadows
+  from `ketchSurface`, which draws them with `elevationShadow`: on Skia (desktop, iOS, web,
+  `skikoMain`) a blurred shape Skia draws on the GPU, as `Modifier.dropShadow` builds a CPU bitmap
+  per size, which resizes and animations piled up (`ElevationShadowTest` keeps them alike);
+  Android keeps `dropShadow`. The desktop launcher caps Skia's GPU cache at 64 MB
+  (`skiko.gpu.resourceCacheLimit`); see [testing](docs/development/testing.md#desktop-startup-memory)
 - Localization: the apps follow the system language, or the one chosen in Settings → General
   (`AppLanguages`; Android 13+ and iOS keep it in their per-app setting), and fall back to
   English; the languages are listed in
@@ -1477,6 +1482,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Desktop app images carry no class data sharing archive: JDK 21 rejects one whose jars are not at
   their build-machine paths, and jpackage's packages reset the jars' modification times, which
   JDK 25 still checks; see [testing](docs/development/testing.md#desktop-startup-memory)
+- Desktop release builds are shrunk into one jar (`desktop.jar`, `joinOutputJars`) beside Skiko's
+  native library. ProGuard keeps only the first copy of a file several jars carry, so a step after
+  it lists every jar's providers in each `META-INF/services` file again, in the old classpath
+  order, so `ServiceLoader` finds the same providers first to last
 - Desktop release builds are obfuscated by ProGuard. A generated rules file (`proguardRules`) adds
   the rules libraries ship in `META-INF/proguard`, keeps the names of `META-INF/services`
   interfaces and writes `build/outputs/proguard/mapping.txt`, which the release workflow

@@ -77,6 +77,13 @@ kotlin {
     androidMain.get().dependsOn(jvmAndAndroidMain)
     jvmMain.get().dependsOn(jvmAndAndroidMain)
     iosMain.get().dependsOn(nonWebMain)
+    // The targets Compose draws with Skia: desktop, iOS and the web.
+    val skikoMain = create("skikoMain") {
+      dependsOn(commonMain.get())
+    }
+    jvmMain.get().dependsOn(skikoMain)
+    iosMain.get().dependsOn(skikoMain)
+    wasmJsMain.get().dependsOn(skikoMain)
 
     commonMain.dependencies {
       api(projects.config)
