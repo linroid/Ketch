@@ -44,15 +44,17 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_seeding_start
 import ketch.app.shared.generated.resources.inspector_seeding_status
 import ketch.app.shared.generated.resources.inspector_seeding_stop
+import ketch.app.shared.generated.resources.inspector_seeding_waiting
 import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("Seeding")
 
 /**
  * Seeding of a finished torrent on a device whose torrents [TorrentController] runs commands:
- * while it shares its files, "Seeding · ↑ 1.2 MB/s · 3.4 GB uploaded" with Stop seeding;
- * otherwise Seed, while the device can seed (its upload setting allows it, read again as the
- * torrent's activity changes). Nothing on other devices.
+ * while it shares its files, "Seeding · ↑ 1.2 MB/s · 3.4 GB uploaded"; Stop seeding while it is
+ * meant to seed, with "Waiting to seed" while it does not seed yet, such as while uploads wait for
+ * Wi-Fi; otherwise Seed, while the device can seed (its upload setting allows it, read again as
+ * the torrent's activity changes). Nothing on other devices. [seedingView] decides which.
  *
  * The task is followed through one `TorrentInterest` subscription while this shows; commands
  * carry a new idempotency key and the revision of the last snapshot.
@@ -83,8 +85,7 @@ internal fun SeedingControl(
       controller.capabilities().supports(TorrentCapability.SEEDING)
     }.getOrDefault(false)
   }
-  val seeding = activity?.let { it == TorrentActivity.SEEDING } ?: row.state.sharing
-  if (!seeding && !canSeed) return
+  val view = seedingView(snapshot, row.state.sharing, canSeed) ?: return
   val busy = pending.any { (key, label) ->
     key == row.key && (label == TaskCommand.Seed.key || label == TaskCommand.StopSeeding.key)
   }
@@ -94,9 +95,14 @@ internal fun SeedingControl(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier.fillMaxWidth(),
   ) {
-    if (seeding) {
+    val caption = when {
+      view.status -> seedingStatus(snapshot?.counters).resolve()
+      view.waiting -> stringResource(Res.string.inspector_seeding_waiting)
+      else -> null
+    }
+    if (caption != null) {
       Text(
-        text = seedingStatus(snapshot?.counters).resolve(),
+        text = caption,
         style = KetchTheme.typography.caption,
         color = KetchTheme.colors.textSecondary,
         maxLines = 1,
@@ -108,17 +114,49 @@ internal fun SeedingControl(
     }
     KetchButton(
       text = stringResource(
-        if (seeding) Res.string.inspector_seeding_stop else Res.string.inspector_seeding_start,
+        if (view.stop) Res.string.inspector_seeding_stop else Res.string.inspector_seeding_start,
       ),
       onClick = {
-        runner.commands.setSeeding(row, seeding = !seeding, revision = snapshot?.revision)
+        runner.commands.setSeeding(row, seeding = !view.stop, revision = snapshot?.revision)
       },
       variant = KetchButtonVariant.Secondary,
       size = KetchButtonSize.Small,
-      leadingIcon = if (seeding) KetchIcon.Stop else KetchIcon.Send,
+      leadingIcon = if (view.stop) KetchIcon.Stop else KetchIcon.Send,
       loading = busy,
     )
   }
+}
+
+/**
+ * What [SeedingControl] shows for a finished torrent.
+ *
+ * @property stop offers Stop seeding; otherwise Seed
+ * @property status shows "Seeding · ↑ 1.2 MB/s · 3.4 GB uploaded"
+ */
+internal data class SeedingView(val stop: Boolean, val status: Boolean) {
+  /**
+   * Shows "Waiting to seed": the task is meant to seed but does not yet, as while uploads wait for
+   * Wi-Fi or a free slot, or its files are checked first.
+   */
+  val waiting: Boolean get() = stop && !status
+}
+
+/**
+ * What [SeedingControl] shows for a finished torrent, from its latest [snapshot] (`null` until the
+ * first arrives), or `null` to show nothing. It offers Stop seeding while the task is meant to seed
+ * ([TorrentSnapshot.seeding], such as a task waiting for uploads to resume) or seeds now, and
+ * Seed otherwise while [canSeed]. The status shows only while it seeds now: the snapshot's
+ * activity is [TorrentActivity.SEEDING], or before the first snapshot the task's [sharing].
+ */
+internal fun seedingView(
+  snapshot: TorrentSnapshot?,
+  sharing: Boolean,
+  canSeed: Boolean,
+): SeedingView? {
+  val live = snapshot?.let { it.activity == TorrentActivity.SEEDING } ?: sharing
+  val stop = snapshot?.seeding == true || live
+  if (!stop && !canSeed) return null
+  return SeedingView(stop = stop, status = live)
 }
 
 /** "Seeding · ↑ 1.2 MB/s · 3.4 GB uploaded", with "–" for what the device does not count. */

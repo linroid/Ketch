@@ -535,6 +535,8 @@
   <string name="settings_torrent_upload_off_hint">ピアはこのデバイスから何もダウンロードできません。</string>
   <string name="settings_torrent_upload_while_downloading_hint">トレントのダウンロード中は、取得済みのピースをピアがダウンロードできます。</string>
   <string name="settings_torrent_upload_seed_hint">完了したトレントは、Ketchの再起動後も、停止するかこの設定をオフにするまでアップロードを続けます。</string>
+  <string name="settings_torrent_upload_wifi_only">Wi-Fi接続時のみ</string>
+  <string name="settings_torrent_upload_wifi_only_hint">モバイルデータ通信や従量制ネットワークではアップロードを一時停止します。</string>
   <string name="settings_torrent_upload_limit">アップロード速度制限</string>
   <string name="settings_torrent_upload_limit_hint">すべてのトレントで共有します。</string>
   <string name="settings_torrent_upload_footer">アップロード先のピアには、このデバイスのIPアドレスが見えます。非公開トレントは、そのトラッカーのピアとだけ共有します。</string>
@@ -732,6 +734,8 @@
   <string name="settings_search_trackers_keywords">アナウンス, udp, マグネット, トラッカーを追加</string>
   <string name="settings_search_upload">ピアとピースを共有し、完了したトレントをシードする</string>
   <string name="settings_search_upload_keywords">アップロード, シード, シーディング, 共有, 比率, ピア, seed</string>
+  <string name="settings_search_upload_wifi_only">Wi-Fi接続時のみピアにアップロード</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, モバイルデータ, モバイル通信, 従量制, テザリング, データセーバー, 省データモード, アップロード</string>
   <string name="settings_search_pair">スマートフォンやブラウザからこのデバイスを操作</string>
   <string name="settings_search_pair_keywords">QRコード, スマートフォン, ペアリング, リモート, Webアプリ, 接続</string>
   <string name="settings_search_reachable_keywords">LAN, ネットワーク, リモートアクセス</string>

@@ -2,6 +2,7 @@ package com.linroid.ketch.config
 
 import com.linroid.ketch.api.SpeedLimit
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -98,6 +99,58 @@ class TorrentSettingsTest {
       listOf("off", "while-downloading", "seed"),
       TorrentUploadMode.entries.map { it.id },
     )
+  }
+
+  @Test
+  fun `uploads while downloading and only on Wi-Fi by default`() {
+    assertEquals(TorrentUploadMode.WhileDownloading, TorrentSettings().upload)
+    assertEquals(true, TorrentSettings().uploadWifiOnly)
+  }
+
+  @Test
+  fun `a torrent section without upload loads while-downloading`() {
+    val settings = torrent("trackers = [\"udp://tracker.example:1337/announce\"]")
+    assertEquals(TorrentUploadMode.WhileDownloading, settings.upload)
+    assertEquals(true, settings.uploadWifiOnly)
+  }
+
+  @Test
+  fun `off saved before uploadWifiOnly existed stays off`() {
+    // What the apps of 0.7 wrote: every field, so their saved `off` outlives the new default.
+    val decoded = ConfigStore.decode(
+      """
+      |[torrent]
+      |trackers = []
+      |trackerList = true
+      |listenPort = 0
+      |upload = "off"
+      |uploadLimit = "unlimited"
+      |encryption = "preferred"
+      |utp = true
+      |portMapping = true
+      |localDiscovery = true
+      """.trimMargin(),
+    )
+    assertEquals(TorrentUploadMode.Off, decoded.torrent.upload)
+    assertEquals(true, decoded.torrent.uploadWifiOnly)
+  }
+
+  @Test
+  fun `new defaults are written out when the config is saved`() {
+    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), KetchConfig())
+    assertContains(encoded, "upload = \"while-downloading\"")
+    assertContains(encoded, "uploadWifiOnly = true")
+  }
+
+  @Test
+  fun `uploadWifiOnly switched off round trips through toml`() {
+    val settings = TorrentSettings(uploadWifiOnly = false)
+    val encoded = ConfigStore.toml
+      .encodeToString(KetchConfig.serializer(), KetchConfig(torrent = settings))
+    val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals(false, decoded.torrent.uploadWifiOnly, encoded)
+    assertEquals(settings, decoded.torrent, encoded)
+    assertEquals(false, torrent("uploadWifiOnly = false").uploadWifiOnly)
   }
 
   @Test

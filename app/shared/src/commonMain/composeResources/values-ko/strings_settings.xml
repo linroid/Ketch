@@ -535,6 +535,8 @@
   <string name="settings_torrent_upload_off_hint">피어가 이 기기에서 아무것도 다운로드할 수 없습니다.</string>
   <string name="settings_torrent_upload_while_downloading_hint">토렌트를 다운로드하는 동안 피어가 이미 받은 조각을 다운로드할 수 있습니다.</string>
   <string name="settings_torrent_upload_seed_hint">완료된 토렌트는 중지하거나 이 설정을 끌 때까지 계속 업로드하며, Ketch를 다시 시작한 후에도 마찬가지입니다.</string>
+  <string name="settings_torrent_upload_wifi_only">Wi-Fi에서만</string>
+  <string name="settings_torrent_upload_wifi_only_hint">모바일 데이터 및 기타 종량제 네트워크에서는 업로드를 일시정지합니다.</string>
   <string name="settings_torrent_upload_limit">업로드 속도 제한</string>
   <string name="settings_torrent_upload_limit_hint">모든 토렌트가 함께 사용합니다.</string>
   <string name="settings_torrent_upload_footer">업로드받는 피어는 이 기기의 IP 주소를 볼 수 있습니다. 비공개 토렌트는 해당 트래커의 피어와만 공유합니다.</string>
@@ -732,6 +734,8 @@
   <string name="settings_search_trackers_keywords">announce, udp, 마그넷, 트래커 추가</string>
   <string name="settings_search_upload">피어와 조각을 공유하고 완료된 토렌트를 시딩</string>
   <string name="settings_search_upload_keywords">업로드, 시드, 시딩, 공유, 비율, 피어, seed</string>
+  <string name="settings_search_upload_wifi_only">Wi-Fi에서만 피어에게 업로드</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, 와이파이, 모바일 데이터, 셀룰러, 종량제, 핫스팟, 데이터 절약, 업로드</string>
   <string name="settings_search_pair">휴대폰이나 브라우저에서 이 기기 제어</string>
   <string name="settings_search_pair_keywords">qr 코드, 휴대폰, 페어링, 원격, 웹 앱, 연결</string>
   <string name="settings_search_reachable_keywords">lan, 랜, 네트워크, 원격 액세스</string>

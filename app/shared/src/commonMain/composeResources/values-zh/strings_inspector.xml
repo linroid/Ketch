@@ -193,4 +193,5 @@
   <string name="inspector_seeding_status">做种中 · ↑ %1$s · 已上传 %2$s</string>
   <string name="inspector_seeding_stop">停止做种</string>
   <string name="inspector_seeding_start">做种</string>
+  <string name="inspector_seeding_waiting">等待做种</string>
 </resources>

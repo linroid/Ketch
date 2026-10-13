@@ -2,6 +2,7 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentUploadMode
 
 /**
  * Environment variables `ketch server` reads, as containers such as the Docker image configure
@@ -48,11 +49,17 @@ internal object ServerEnv {
   /** BitTorrent listen port, 0 for any (`--torrent-port`, `[torrent] listenPort`). */
   const val TORRENT_PORT = "KETCH_TORRENT_PORT"
 
+  /**
+   * What peers may download, `off`, `while-downloading` or `seed` (`--torrent-upload`,
+   * `[torrent] upload`).
+   */
+  const val TORRENT_UPLOAD = "KETCH_TORRENT_UPLOAD"
+
   /** Every variable [applyServerEnvironment] reads. */
   val names: List<String> = listOf(
     NAME, HOST, PORT, CORS, ALLOWED_HOSTS, ALLOWED_DIRS, MDNS, DOWNLOAD_DIR, SPEED_LIMIT,
     MAX_CONCURRENT_DOWNLOADS, MAX_CONNECTIONS_PER_DOWNLOAD, MAX_CONNECTIONS_PER_HOST,
-    TORRENT_PORT,
+    TORRENT_PORT, TORRENT_UPLOAD,
   )
 }
 
@@ -114,11 +121,37 @@ internal fun applyServerEnvironment(
     torrent = config.torrent.copy(
       listenPort = int(ServerEnv.TORRENT_PORT, 0..65535, "a port (0-65535)")
         ?: config.torrent.listenPort,
+      upload = value(ServerEnv.TORRENT_UPLOAD)?.let { text ->
+        parseTorrentUploadMode(text) ?: throw IllegalArgumentException(
+          "${ServerEnv.TORRENT_UPLOAD}: '$text' is not $TORRENT_UPLOAD_MODES"
+        )
+      } ?: config.torrent.upload,
     ),
   )
 }
 
 private const val NO_LIMIT = "a count (0 for no limit)"
+
+/** The [TorrentUploadMode] ids, for messages: `off, while-downloading or seed`. */
+internal val TORRENT_UPLOAD_MODES: String = TorrentUploadMode.entries.map { it.id }.let { ids ->
+  ids.dropLast(1).joinToString(", ") + " or " + ids.last()
+}
+
+/**
+ * The [TorrentUploadMode] whose id is [text], ignoring case and surrounding spaces, as
+ * `--torrent-upload` and [ServerEnv.TORRENT_UPLOAD] take it; `null` for anything else.
+ */
+internal fun parseTorrentUploadMode(text: String): TorrentUploadMode? {
+  val id = text.trim()
+  return TorrentUploadMode.entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+}
+
+/** [mode] in plain words, for the server to say how it uploads where it starts. */
+internal fun describeTorrentUpload(mode: TorrentUploadMode): String = when (mode) {
+  TorrentUploadMode.Off -> "off"
+  TorrentUploadMode.WhileDownloading -> "while downloading"
+  TorrentUploadMode.Seed -> "while downloading, then seeds finished torrents"
+}
 
 /** The [ServerEnv] variables set in [environment], for the server to list where it starts. */
 internal fun serverEnvironmentNames(environment: Map<String, String>): List<String> =

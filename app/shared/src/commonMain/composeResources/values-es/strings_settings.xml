@@ -547,6 +547,8 @@
   <string name="settings_torrent_upload_off_hint">Los pares no pueden descargar nada de este dispositivo.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Mientras se descargan tus torrents, los pares pueden descargar las piezas que ya tienes.</string>
   <string name="settings_torrent_upload_seed_hint">Los torrents completados siguen subiendo hasta que los detengas o desactives esto, también después de reiniciar Ketch.</string>
+  <string name="settings_torrent_upload_wifi_only">Solo con Wi-Fi</string>
+  <string name="settings_torrent_upload_wifi_only_hint">Pausa la subida con datos móviles y otras redes de uso medido.</string>
   <string name="settings_torrent_upload_limit">Límite de subida</string>
   <string name="settings_torrent_upload_limit_hint">Compartido por todos los torrents.</string>
   <string name="settings_torrent_upload_footer">Los pares a los que subes datos ven la dirección IP de este dispositivo. Los torrents privados solo comparten con los pares de su tracker.</string>
@@ -751,6 +753,8 @@
   <string name="settings_search_trackers_keywords">anuncio, announce, udp, magnet, añadir trackers, rastreadores</string>
   <string name="settings_search_upload">Compartir piezas con pares y sembrar torrents completados</string>
   <string name="settings_search_upload_keywords">subida, sembrar, seed, seeding, compartir, ratio, pares</string>
+  <string name="settings_search_upload_wifi_only">Subir a pares solo con Wi-Fi</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, datos móviles, red móvil, uso medido, hotspot, ahorro de datos, subida</string>
   <string name="settings_search_pair">Controla este dispositivo desde un teléfono o un navegador</string>
   <string name="settings_search_pair_keywords">código qr, teléfono, móvil, celular, vincular, emparejar, remoto, app web, conectar</string>
   <string name="settings_search_reachable_keywords">lan, red, acceso remoto</string>

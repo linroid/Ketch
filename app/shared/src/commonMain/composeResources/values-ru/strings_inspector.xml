@@ -238,4 +238,5 @@
   <string name="inspector_seeding_status">Раздача · ↑ %1$s · отдано %2$s</string>
   <string name="inspector_seeding_stop">Остановить раздачу</string>
   <string name="inspector_seeding_start">Раздавать</string>
+  <string name="inspector_seeding_waiting">Ожидает раздачи</string>
 </resources>

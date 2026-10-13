@@ -53,6 +53,7 @@ class TorrentRoutesTest {
     activity = TorrentActivity.DOWNLOADING,
     selectionGeneration = 1,
     selectionComplete = false,
+    seeding = true,
   )
 
   /** Answers like a controller with one torrent, `t1`; `gone` is removed after a snapshot. */

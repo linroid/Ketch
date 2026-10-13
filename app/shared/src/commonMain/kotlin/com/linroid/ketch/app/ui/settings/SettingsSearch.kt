@@ -59,6 +59,9 @@ internal enum class SettingsFeature {
 
   /** The app keeps the system awake while downloading: desktop and Android. */
   KeepAwake,
+
+  /** Uploads to peers can wait for Wi-Fi: the phone apps, whose uploads follow the network. */
+  UploadWifiOnly,
 }
 
 /**

@@ -423,6 +423,9 @@ ketch server --generate-config
 # A fixed BitTorrent port, to forward on the router
 ketch server --torrent-port 51413
 
+# Upload nothing to torrent peers
+ketch server --torrent-upload off
+
 # Configured through the environment, as in a container
 KETCH_PORT=9000 KETCH_DOWNLOAD_DIR=/srv/downloads ketch server
 ```
@@ -443,6 +446,7 @@ KETCH_PORT=9000 KETCH_DOWNLOAD_DIR=/srv/downloads ketch server
 | `--dir <path>` | Download folder (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit, such as `10m` or `500k` |
 | `--torrent-port <number>` | Port BitTorrent peers connect to (TCP), which DHT also uses (UDP), 0-65535. `0`, the default, picks a free one at every start; set one to forward it on a router |
+| `--torrent-upload <mode>` | What torrent peers may download: `off`, `while-downloading` (the default) or `seed`, as [`[torrent] upload`](#torrent) describes |
 
 Options take precedence over [environment variables](#environment-variables), which take
 precedence over the [config file](#configuration-file). When environment variables are set, the
@@ -836,6 +840,7 @@ naming the variable. The [Docker image](../docs/docker.md) is configured this wa
 | `KETCH_MAX_CONNECTIONS_PER_DOWNLOAD` | `maxConnectionsPerDownload`; at least 1 |
 | `KETCH_MAX_CONNECTIONS_PER_HOST` | `maxConnectionsPerHost`; `0` for no limit |
 | `KETCH_TORRENT_PORT` | `--torrent-port`, `[torrent] listenPort` |
+| `KETCH_TORRENT_UPLOAD` | `--torrent-upload`, `[torrent] upload`; `off`, `while-downloading` or `seed` |
 
 ## Configuration file
 
@@ -910,7 +915,7 @@ maxConnectionsPerHost = 16  # 0 means unlimited
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
 # listenPort = 6881
-# upload = "off"
+# upload = "while-downloading"
 
 # [[hooks]]
 # events = ["completed"]
@@ -1000,15 +1005,19 @@ on a server, changes made there, like the other download settings, last until it
 | `trackerList` | bool | `true` | Subscribe to the tracker lists at `trackerListUrls`, downloaded daily; their trackers are used after `trackers` |
 | `trackerListUrls` | string[] | ngosang's [`trackers_best.txt`](https://github.com/ngosang/trackerslist) and XIU2's [`best.txt`](https://github.com/XIU2/TrackersListCollection) | `http` or `https` URLs of plain-text lists, one announce URL per line |
 | `listenPort` | int | `0` | Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), 0-65535; `0` picks a free one at every start. The apps and the other commands always pick one, so they never compete for it |
-| `upload` | string | `"off"` | What torrents upload to peers: `off`, `while-downloading` (verified pieces, until each torrent finishes) or `seed` (finished torrents too, also after `ketch server` restarts). Peers you upload to see your IP address. Unknown values load as `off` |
+| `upload` | string | `"while-downloading"` | What torrents upload to peers: `while-downloading` (verified pieces, until each torrent finishes), `off` or `seed` (finished torrents too, also after `ketch server` restarts). Peers you upload to see your IP address. Unknown values load as `off`, so a typo never turns uploading on. `ketch server` also takes it from `--torrent-upload` and `KETCH_TORRENT_UPLOAD` |
 | `uploadLimit` | string | `"unlimited"` | Upload cap shared by all torrents, in the [speed limit format](#speed-limit-format); a value that cannot be read loads as unlimited |
+| `uploadWifiOnly` | bool | `true` | Read by the Android and iOS apps only, which pause uploads off Wi-Fi; the CLI and `ketch server` upload on any network |
 | `encryption` | string | `"preferred"` | Protocol encryption with peers: `preferred` (encrypted first, plaintext when a peer refuses), `required` (encrypted only) or `off`. Unknown values load as `preferred` |
 | `utp` | bool | `true` | Also reach peers over uTP (UDP) |
 | `portMapping` | bool | `true` | Ask the home router (NAT-PMP, then UPnP) to forward the BitTorrent port |
 | `localDiscovery` | bool | `true` | Find peers of public torrents on the local network (BEP 14) |
 
-`ketch server` and `ketch mcp --standalone` seed while they run; `ketch <url>` exits when its
-download finishes.
+Every command uploads while it downloads unless the mode is `off`, which earlier versions used by
+default: `upload = "off"` here, or for `ketch server` also `--torrent-upload off` or
+`KETCH_TORRENT_UPLOAD=off`, which need no config file. Under `seed`, `ketch server` and
+`ketch mcp --standalone` seed while they run; `ketch <url>` exits when its download finishes, so
+it never seeds.
 
 ### `[[hooks]]`
 

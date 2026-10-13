@@ -147,6 +147,17 @@ class InstanceManager(
   val serverState: StateFlow<ServerState> =
     _serverState.asStateFlow()
 
+  /**
+   * Whether the embedded device's uploads pause on metered networks under
+   * [TorrentSettings.uploadWifiOnly]: only where the factory reports the network
+   * ([InstanceFactory.uploadNetwork]), as the phone apps do.
+   */
+  val followsUploadNetwork: Boolean =
+    embeddedInstance != null && factory.uploadNetwork != null && factory.pauseUploads != null
+
+  // The embedded device's torrent settings as last saved, which its uploads follow.
+  private val torrentSettings = MutableStateFlow(TorrentSettings())
+
   private val inForeground = MutableStateFlow(true)
   private val backgroundExpired = MutableStateFlow(false)
   private val localSpeedMode = MutableStateFlow<Flow<SpeedMode>>(flowOf(SpeedMode.Full))
@@ -191,6 +202,8 @@ class InstanceManager(
     embeddedInstance?.instance?.let { ketch ->
       scope.launch { ketch.start() }
     }
+    saved?.torrent?.let { torrentSettings.value = it }
+    followNetworkForUploads()
     if (isLocalServerSupported && saved?.server?.autoStart == true) {
       startServer()
     }
@@ -297,9 +310,12 @@ class InstanceManager(
   /**
    * Applies saved torrent [settings] to the embedded instance: the upload mode and limit reach
    * running torrents at once, extra trackers and tracker lists reach torrents as they start or
-   * resume. Does nothing when the embedded instance has no torrent support, or there is none.
+   * resume, and where uploads follow the network ([followsUploadNetwork]), whether they pause
+   * on metered networks applies at once too. Does nothing when the embedded instance has no
+   * torrent support, or there is none.
    */
   suspend fun applyTorrentSettings(settings: TorrentSettings) {
+    torrentSettings.value = settings
     factory.applyTorrentSettings?.invoke(settings)
   }
 
@@ -401,6 +417,15 @@ class InstanceManager(
     factory.stopServer()
     _instances.value.filterIsInstance<RemoteInstance>().forEach { it.instance.close() }
     embeddedInstance?.instance?.close()
+  }
+
+  // Pauses the embedded device's uploads while it is on a metered network, if the factory says
+  // where it is.
+  private fun followNetworkForUploads() {
+    val network = factory.uploadNetwork ?: return
+    val pause = factory.pauseUploads ?: return
+    if (embeddedInstance == null) return
+    scope.launch { followUploadNetwork(torrentSettings, network, pause) }
   }
 
   private fun entryOf(deviceId: String): InstanceEntry? =

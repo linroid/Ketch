@@ -104,14 +104,24 @@ import kotlin.time.Duration
  *
  * Under [TorrentUploadPolicy.SEED_AFTER_COMPLETION] a completed task keeps seeding on a slot no
  * download needs, and [com.linroid.ketch.core.Ketch.start] seeds again the tasks that seeded
- * when it last stopped, each only once a recheck finds its files complete.
+ * when it last stopped, each only once a recheck finds its files complete. They seed again the
+ * same way, without a restart, whenever uploads resume ([setUploadsPaused]) or the policy
+ * switches to seeding ([setUploadPolicy]).
  *
- * @param restoreSeeding whether [com.linroid.ketch.core.Ketch.start] shares again the completed
- *   tasks that were sharing; false for processes that share a task store with the apps, such as
- *   `ketch mcp`
+ * Uploads can be paused apart from the policy ([setUploadsPaused]), such as while the device is
+ * on a metered network: the engine then runs as under [TorrentUploadPolicy.DISABLED], seeders
+ * stop and free their slots, and the tasks keep their intent to seed.
+ *
+ * @param restoreSeeding whether [com.linroid.ketch.core.Ketch.start], and every resume of
+ *   uploads or switch to seeding after it, shares again the completed tasks that were sharing,
+ *   and a task that completes while uploads are paused is meant to share once they resume;
+ *   false for processes that share a task store with the apps, such as `ketch mcp`
  * @param multicastLock held while the engine listens for peers on the LAN
  *   ([TorrentConfig.localDiscovery]), on hosts that filter multicast without one, such as Android
  *   on Wi-Fi
+ * @param uploadsPaused whether uploads start paused ([setUploadsPaused]), so a host that knows
+ *   uploads are not allowed yet starts that way before [com.linroid.ketch.core.Ketch.start]
+ *   restores seeding
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentDownloadSource(
@@ -119,12 +129,19 @@ class TorrentDownloadSource(
   httpEngine: HttpEngine? = null,
   private val restoreSeeding: Boolean = true,
   private val multicastLock: TorrentMulticastLock? = null,
+  uploadsPaused: Boolean = false,
 ) : DownloadSource<TorrentSourceState> {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
   private val listedTrackers = AtomicReference(emptyList<String>())
+  // The configured policy; the engine runs [engineUploadPolicy], which pausing overrides.
   private val uploadPolicy = AtomicReference(config.effectiveUploadPolicy)
+  private val pausedUploads = AtomicBoolean(uploadsPaused)
+  // Bumped under engineMutex each time the engine's policy turns to seeding; see sharingResumes.
+  private val resumes = MutableStateFlow(0L)
+  // Tasks that completed while uploads were paused under a seeding policy: takeDeferredSharing.
+  private val deferredSharing = MutableStateFlow<Set<String>>(emptySet())
   private val uploadRateLimit = AtomicLong(config.uploadRateLimit)
   private val encryption = AtomicReference(config.encryption)
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
@@ -133,6 +150,10 @@ class TorrentDownloadSource(
 
   /** The upload policy of running and later torrents: the configured one or the last set. */
   internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
+
+  /** The policy the engine runs: [TorrentUploadPolicy.DISABLED] while uploads are paused. */
+  private fun engineUploadPolicy(): TorrentUploadPolicy =
+    if (pausedUploads.load()) TorrentUploadPolicy.DISABLED else uploadPolicy.load()
 
   /** Test hook: how long one magnet metadata lookup runs before the next starts. */
   internal var magnetLookupTime: Duration = MAGNET_LOOKUP_TIME
@@ -197,6 +218,9 @@ class TorrentDownloadSource(
     override val torrentCapabilities: Set<String> get() = source.torrentCapabilities
     override val seedingTaskIds: StateFlow<Set<String>> get() = source.seedingTaskIds
     override val restoresSeeding: Boolean get() = source.restoresSeeding
+    override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
+
+    override suspend fun takeDeferredSharing(taskId: String) = source.takeDeferredSharing(taskId)
 
     override suspend fun torrentFiles(sourceState: SourceState?, resolved: ResolvedSource?) =
       source.torrentFiles(sourceState, resolved)
@@ -218,7 +242,9 @@ class TorrentDownloadSource(
    *
    * `utp` and `mse-pe` name what the engine can speak, whatever [TorrentConfig.utpEnabled] and
    * [TorrentConfig.encryption] currently say: capabilities describe the backend, and those
-   * settings change live without the backend gaining or losing the protocol.
+   * settings change live without the backend gaining or losing the protocol. `seeding` follows
+   * the live upload policy, also while uploads are paused: a task can still be meant to seed,
+   * and seeds once they resume.
    */
   internal val torrentCapabilities: Set<String>
     get() = buildSet {
@@ -228,7 +254,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.HYBRID.wireName)
       add(TorrentCapability.UTP.wireName)
       add(TorrentCapability.ENCRYPTION.wireName)
-      // Sharing follows the live upload setting.
+      // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)
       }
@@ -237,10 +263,46 @@ class TorrentDownloadSource(
   /** What [TorrentControlSource.seedingTaskIds] reports. */
   internal val seedingTaskIds: StateFlow<Set<String>> = seeding.asStateFlow()
 
-  /** Only while the live upload setting seeds, so switching it on needs no restart. */
+  /**
+   * Only while the live upload setting seeds and uploads are not paused; [sharingResumes] tells
+   * when that becomes true, so neither needs a restart.
+   */
   internal val restoresSeeding: Boolean
-    get() = restoreSeeding &&
+    get() = restoreSeeding && engineUploadPolicy() == TorrentUploadPolicy.SEED_AFTER_COMPLETION
+
+  /**
+   * What [TorrentControlSource.sharingResumes] reports: bumped each time the engine's policy
+   * turns to [TorrentUploadPolicy.SEED_AFTER_COMPLETION] from another, as uploads resume under it
+   * or the policy switches to it; never without [restoreSeeding].
+   */
+  internal val sharingResumes: StateFlow<Long> = resumes.asStateFlow()
+
+  /**
+   * What [TorrentControlSource.takeDeferredSharing] reports: whether [taskId] completed while
+   * uploads were paused under [TorrentUploadPolicy.SEED_AFTER_COMPLETION], which finished its
+   * session instead of seeding it, forgetting it.
+   */
+  internal fun takeDeferredSharing(taskId: String): Boolean {
+    var taken = false
+    deferredSharing.update { ids ->
+      taken = taskId in ids
+      ids - taskId
+    }
+    return taken
+  }
+
+  /**
+   * Remembers that [taskId] completed with its session finished, not seeding, when only paused
+   * uploads kept it from seeding, so the task is meant to seed once they resume.
+   */
+  private fun deferSharingIfPaused(taskId: String) {
+    if (restoreSeeding && pausedUploads.load() &&
       uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION
+    ) {
+      deferredSharing.update { it + taskId }
+      log.i { "Torrent taskId=$taskId completed while uploads are paused; seeds once resumed" }
+    }
+  }
 
   // The only writers of [seeding].
   private fun markSeeding(taskId: String) = seeding.update { it + taskId }
@@ -299,7 +361,7 @@ class TorrentDownloadSource(
 
   /** The configuration of the next engine: the config with what the setters changed since. */
   private fun engineConfig(): TorrentConfig = config.copy(additionalTrackers = extraTrackers(),
-    uploadPolicy = uploadPolicy.load(), uploadRateLimit = uploadRateLimit.load(),
+    uploadPolicy = engineUploadPolicy(), uploadRateLimit = uploadRateLimit.load(),
     encryption = encryption.load(), utpEnabled = utpEnabled.load(),
     portMapping = portMapping.load(), localDiscovery = localDiscovery.load())
 
@@ -350,15 +412,47 @@ class TorrentDownloadSource(
   /**
    * Replaces [TorrentConfig.uploadPolicy] at once: running torrents choke or unchoke their peers
    * within a rechoke, seeding ones finish unless [policy] is
-   * [TorrentUploadPolicy.SEED_AFTER_COMPLETION], and torrents started later use it. Never starts
-   * the engine.
+   * [TorrentUploadPolicy.SEED_AFTER_COMPLETION], and torrents started later use it. Switching to
+   * seeding seeds again, after a recheck, the completed tasks meant to seed. While uploads are
+   * paused ([setUploadsPaused]) the policy is kept for when they resume, and the engine stays as
+   * under [TorrentUploadPolicy.DISABLED]. Never starts the engine.
    */
   suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
-    engineMutex.withLock {
+    val paused = engineMutex.withLock {
+      val before = engineUploadPolicy()
       uploadPolicy.store(policy)
-      engine.load()?.setUploadPolicy(policy)
+      applyUploadPolicy(before)
+      pausedUploads.load()
     }
-    log.i { "Upload policy: $policy" }
+    log.i { "Upload policy: $policy" + if (paused) " (uploads paused)" else "" }
+  }
+
+  /**
+   * Pauses or resumes every upload, whatever the upload policy, such as while the device is on a
+   * metered network. Paused, the engine runs as under [TorrentUploadPolicy.DISABLED]: peers are
+   * choked, seeding torrents finish and free their slots, and the tasks keep their intent to
+   * seed. Resumed, the policy applies again, and under
+   * [TorrentUploadPolicy.SEED_AFTER_COMPLETION] the completed tasks meant to seed seed again
+   * after a recheck, without a restart. Never starts the engine.
+   */
+  suspend fun setUploadsPaused(paused: Boolean) {
+    val changed = engineMutex.withLock {
+      val before = engineUploadPolicy()
+      (pausedUploads.exchange(paused) != paused).also { applyUploadPolicy(before) }
+    }
+    if (changed) log.i { if (paused) "Uploads paused" else "Uploads resumed" }
+  }
+
+  /**
+   * Under [engineMutex]: hands a running engine the policy it runs now, and bumps [resumes] when
+   * that turned to seeding from [before], so the tasks meant to seed seed again.
+   */
+  private suspend fun applyUploadPolicy(before: TorrentUploadPolicy) {
+    val now = engineUploadPolicy()
+    engine.load()?.setUploadPolicy(now)
+    if (restoreSeeding && now == TorrentUploadPolicy.SEED_AFTER_COMPLETION && before != now) {
+      resumes.update { it + 1 }
+    }
   }
 
   /**
@@ -561,6 +655,7 @@ class TorrentDownloadSource(
 
   internal suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {
     uploadPolicy.load() != TorrentUploadPolicy.SEED_AFTER_COMPLETION -> SeedingOutcome.POLICY_OFF
+    pausedUploads.load() -> SeedingOutcome.UPLOADS_PAUSED
     tasks.isReserved(taskId) -> SeedingOutcome.ALREADY_ACTIVE
     !slots.hasFree() -> SeedingOutcome.NO_SLOT
     else -> null
@@ -629,8 +724,8 @@ class TorrentDownloadSource(
         TorrentSessionState.STOPPED -> if (failureOf(session) is IncompleteSeedException) {
           SeedingOutcome.CHANGED_ON_DISK
         } else SeedingOutcome.FAILED
-        // The upload setting stopped seeding while it checked.
-        else -> SeedingOutcome.FAILED
+        // The upload setting stopped seeding while it checked, or uploads paused meanwhile.
+        else -> if (pausedUploads.load()) SeedingOutcome.UPLOADS_PAUSED else SeedingOutcome.FAILED
       }
       if (outcome == SeedingOutcome.SEEDING) {
         markSeeding(taskId)
@@ -1074,6 +1169,8 @@ class TorrentDownloadSource(
     open: suspend () -> TorrentSession,
   ) {
     val taskId = context.taskId
+    // Only this run's completion counts: an earlier run's no longer stands for the task.
+    deferredSharing.update { it - taskId }
     val adopted = adoptLive(taskId, hash)
     val total = { table.totalOf(context.selection.value.fileIds.ifEmpty { state.selectedFileIds }) }
     withActiveSlot(context, total, hash, owned = adopted != null) {
@@ -1092,6 +1189,8 @@ class TorrentDownloadSource(
         // An adopted session applies the current selection first, whatever it ran with.
         keepSeeding = track(context, running, table, state.selectedFileIds,
           applied = if (adopted == null) initialRevision else -1, resume = adopted == null)
+        // Paused uploads finish a completed session that would have seeded.
+        if (!keepSeeding) deferSharingIfPaused(taskId)
         onTransferEnd(taskId)
       } catch (e: Throwable) {
         keepSeeding = false
@@ -1402,6 +1501,7 @@ class TorrentDownloadSource(
 
   /** Stops a session that outlived its download, such as one still seeding. */
   internal suspend fun release(taskId: String) {
+    deferredSharing.update { it - taskId }
     val owned = slots.reclaim(taskId)
     try {
       stopSession(taskId)

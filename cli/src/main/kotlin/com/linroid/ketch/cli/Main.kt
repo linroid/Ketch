@@ -323,6 +323,7 @@ private fun runServer(args: Array<String>): Int {
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
   var cliTorrentPort: Int? = null
+  var cliTorrentUpload: TorrentUploadMode? = null
   var configPath: String? = null
 
   var i = 0
@@ -440,6 +441,17 @@ private fun runServer(args: Array<String>): Int {
         }
         cliTorrentPort = value
       }
+      "--torrent-upload" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --torrent-upload requires a value")
+          printServerUsage()
+          return 2
+        }
+        cliTorrentUpload = parseTorrentUploadMode(args[++i]) ?: run {
+          System.err.println("Error: invalid upload mode '${args[i]}' ($TORRENT_UPLOAD_MODES)")
+          return 2
+        }
+      }
       else -> {
         System.err.println("Error: unknown option '${args[i]}'")
         printServerUsage()
@@ -509,6 +521,7 @@ private fun runServer(args: Array<String>): Int {
     ),
     torrent = envConfig.torrent.copy(
       listenPort = cliTorrentPort ?: envConfig.torrent.listenPort,
+      upload = cliTorrentUpload ?: envConfig.torrent.upload,
     ),
   )
 
@@ -592,6 +605,7 @@ private fun runServer(args: Array<String>): Int {
   }
   val torrentPort = mergedConfig.torrent.listenPort
   println("  Torrent port:  " + if (torrentPort == 0) "any free one" else "$torrentPort (TCP, UDP)")
+  println("  Uploading:     " + describeTorrentUpload(mergedConfig.torrent.upload))
   if (hooks != null) println("  Hooks:         ${hooks.size} from the config file")
   when (token) {
     is ServerToken.Given -> println("  Auth:          token from ${token.source}")
@@ -1571,6 +1585,10 @@ private fun printServerUsage() {
   println("                         Port for BitTorrent peers (TCP) and")
   println("                         DHT (UDP), to forward on a router;")
   println("                         0 picks a free one (default)")
+  println("  --torrent-upload <mode>")
+  println("                         What torrent peers may download:")
+  println("                         off, while-downloading (default)")
+  println("                         or seed (also finished torrents)")
   println("  --help, -h             Show this help message")
   println()
   println("Config file:")
@@ -1590,6 +1608,7 @@ private fun printServerUsage() {
   println("  ${ServerEnv.CORS}               --cors")
   println("  ${ServerEnv.SPEED_LIMIT}        --speed-limit")
   println("  ${ServerEnv.TORRENT_PORT}       --torrent-port")
+  println("  ${ServerEnv.TORRENT_UPLOAD}     --torrent-upload")
   println("  ${ServerEnv.NAME}               name")
   println("  ${ServerEnv.MDNS}               mdnsEnabled (true or false)")
   println("  ${ServerEnv.MAX_CONCURRENT_DOWNLOADS}")

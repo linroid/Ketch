@@ -49,8 +49,9 @@ ketch --files 0,2,5 'magnet:?xt=urn:btih:...'
 ```
 
 `--list-files` prints `ID  SIZE  PATH` rows. Sort them with `--sort name|size|type` (`type` is the
-file extension) and `--reverse`. `ketch <url>` exits once its downloads finish; it does not seed.
-To keep seeding, run [`ketch server`](#seeding-and-uploading).
+file extension) and `--reverse`. `ketch <url>` uploads to peers while it downloads, unless
+`[torrent] upload = "off"`, and exits once its downloads finish; it does not seed. To keep seeding,
+run [`ketch server`](#seeding-and-uploading).
 
 ### Where the files go
 
@@ -131,41 +132,76 @@ server and the CLI sort by the plain file extension.
 
 ## Seeding and uploading
 
-Ketch uploads nothing by default. Peers you upload to see this device's IP address. Choose a mode
-under Settings → BitTorrent → Uploading ("Share with peers"), or with `[torrent] upload`:
+By default Ketch uploads verified pieces to peers while a torrent downloads, and stops once it
+finishes. Peers you upload to see this device's IP address. Choose a mode under Settings →
+BitTorrent → Uploading ("Share with peers"), or with `[torrent] upload`:
 
 | Mode | `upload` | What it does |
 | --- | --- | --- |
-| Off | `off` (default) | Never uploads. Peers cannot fetch a magnet's metadata from this device either. |
-| While downloading | `while-downloading` | Uploads verified pieces while a torrent downloads, and stops when it finishes. |
+| Off | `off` | Never uploads. Peers cannot fetch a magnet's metadata from this device either. |
+| While downloading | `while-downloading` (default) | Uploads verified pieces while a torrent downloads, and stops when it finishes. |
 | Keep seeding | `seed` | Keeps uploading finished torrents until you stop them, and seeds them again after a restart. |
+
+The apps save every setting, so an app that saved its settings while Off was the default keeps
+Off until you change it. A `config.toml` without an `upload` key, as the CLI, `ketch server` and
+the [Docker image](docker.md) start with, uploads while downloading. To upload nothing, set:
+
+```toml
+[torrent]
+upload = "off"
+```
+
+`ketch server` takes the mode from `--torrent-upload`, then `KETCH_TORRENT_UPLOAD`, then
+`[torrent] upload`, so `ketch server --torrent-upload off`, or `KETCH_TORRENT_UPLOAD=off` in the
+Docker image, turns uploading off without a config file.
 
 `[torrent] uploadLimit` caps the upload speed of all torrents together (unlimited by default). It
 takes the same values as other speed limits, such as `"1m"` or `"500k"`; a bare number is bytes
-per second. Both settings apply immediately: peers are choked within about 10 seconds, and seeding
-stops once the mode leaves `seed`.
+per second. Both settings apply immediately: peers are choked or unchoked within a fraction of a
+second, and seeding stops once the mode leaves `seed`.
 
 A seeding task shows as completed and "Seeding". Use **Stop seeding** on its row or in the
 inspector to stop it, and **Seed** in the inspector to start a completed task seeding again. Ketch
 rechecks the files first, and only seeds while the mode is `seed` and an engine slot is free.
 
-Ketch remembers which tasks seed. On the next start it seeds them again, oldest completion first,
-into free engine slots only, each after a recheck finds its files complete. Seeding stops when:
+Ketch remembers which tasks seed. It seeds them again on the next start, when uploads resume after
+a pause (see [only on Wi-Fi](#only-on-wi-fi)) and as soon as you switch the mode to Keep seeding:
+oldest completion first, into free engine slots only, each after a recheck finds its files
+complete. Seeding stops when:
 
 - you stop it or remove the task;
 - the upload mode leaves `seed`;
+- uploads pause because the phone left Wi-Fi;
 - a download waits for one of the engine's slots (`maxActiveTorrents`, 5 by default) and takes the
   oldest seeder's; a torrent that finishes while a download waits does not seed at all;
 - the same torrent is added as another task;
 - Ketch quits.
 
-A seeder stopped by a waiting download or by quitting seeds again later; one you stop, or whose
-files changed on disk, does not.
+A seeder stopped by the mode, by paused uploads, by a waiting download or by quitting seeds again
+later; one you stop, or whose files changed on disk, does not.
 
-Which programs seed:
+### Only on Wi-Fi
+
+On Android and iOS, Ketch pauses uploading while the phone is on mobile data or another metered
+network, such as a personal hotspot, a network in Low Data Mode on iOS or a Wi-Fi network marked
+as metered on Android. It resumes by itself once the phone has been back on Wi-Fi, or another
+unmetered network, for a few seconds. Downloads carry on either way.
+
+While uploads are paused, torrents behave as if the mode were Off: peers are choked, nothing is
+served to them, and seeding torrents stop until uploads resume. Pressing **Seed** then is accepted:
+the task seeds once uploads resume. A torrent that finishes downloading while uploads are paused
+under Keep seeding also seeds then. Meanwhile the inspector shows "Waiting to seed" and offers
+**Stop seeding** for a task that waits to seed, so it does not seed when uploads resume.
+
+Turn this off under Settings → BitTorrent → Uploading → "Only on Wi-Fi", or with
+`[torrent] uploadWifiOnly = false`. The switch shows on phones only, and is greyed out while
+uploading is Off. The desktop app, the CLI and `ketch server` ignore it and upload on any network.
+
+### Which programs seed
 
 - The apps seed while they run. On Android, a seeding-only app is not kept in the foreground, so
-  Android may stop it in the background. On iOS seeding stops while the app is suspended.
+  Android may stop it in the background. On iOS seeding stops while the app is suspended. On both,
+  seeding waits for Wi-Fi unless "Only on Wi-Fi" is off.
 - `ketch server` seeds while it runs, and again after a restart.
 - `ketch mcp --standalone` seeds while it runs, but never restores seeding after a restart. MCP has
   no seeding tool.
@@ -183,8 +219,9 @@ The apps, the CLI and `ketch server` read the `[torrent]` table:
 
 ```toml
 [torrent]
-upload = "seed"               # "off" (default), "while-downloading" or "seed"
+upload = "seed"               # "while-downloading" (default), "off" or "seed"
 uploadLimit = "1m"            # all torrents together; "unlimited" by default
+uploadWifiOnly = true         # default; read by the Android and iOS apps only
 encryption = "preferred"      # "preferred" (default), "required" or "off"
 utp = true                    # default
 portMapping = true            # default
@@ -196,8 +233,9 @@ listenPort = 16881            # read by `ketch server` only; 0 (default) picks a
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `upload` | `off` | What this device uploads; see [seeding](#seeding-and-uploading). |
+| `upload` | `while-downloading` | What this device uploads; see [seeding](#seeding-and-uploading). An unknown value loads as `off`. |
 | `uploadLimit` | unlimited | Upload cap shared by all torrents. |
+| `uploadWifiOnly` | `true` | Pause uploads off Wi-Fi; read by the Android and iOS apps only. See [only on Wi-Fi](#only-on-wi-fi). |
 | `encryption` | `preferred` | Protocol encryption; see [encryption](#encryption). An unknown value loads as `preferred`. |
 | `utp` | `true` | Also reach peers over uTP; see [uTP](#utp). |
 | `portMapping` | `true` | Ask the router to forward the listen port; see [port forwarding](#port-forwarding). |
@@ -207,8 +245,14 @@ listenPort = 16881            # read by `ketch server` only; 0 (default) picks a
 | `trackerListUrls` | two public lists | Plain-text tracker lists, one announce URL per line. |
 | `listenPort` | `0` | Incoming peer port, read by `ketch server` only. |
 
-Values that cannot be read, such as `upload = false`, load as the default rather than failing the
-whole file.
+Only `upload`, `uploadLimit` and `encryption` are read leniently: a value they cannot read loads
+as `off`, unlimited and `preferred` respectively. `upload` deliberately loads as `off`, not its
+default, so a setting this version does not understand, such as `upload = false` or a misspelled
+mode, never turns uploading on. The other keys must have the right type: `true` or `false` for
+the switches (`uploadWifiOnly`, `utp`, `portMapping`, `localDiscovery`, `trackerList`), lists of
+strings for `trackers` and `trackerListUrls`, and a number from 0 to 65535 for `listenPort`.
+Otherwise the apps set the file aside and start with the default settings, and `ketch server`
+refuses to start.
 
 ### Ports and firewalls
 
@@ -316,6 +360,7 @@ that a download completed only once every file is selected and complete.
 - Torrents download on Android 8.0+ (API 26), JVM 11+ (desktop, CLI, server) and iOS (arm64 and
   the arm64 simulator). Browsers have no engine of their own; the web app controls another device.
 - Seeding only runs while the app or server runs. There is no background seeding.
+- Only the Android and iOS apps pause uploads off Wi-Fi; elsewhere `uploadWifiOnly` is ignored.
 - Local peer discovery does not run on iOS.
 - Downloads go to ordinary folders. When the default directory is an Android `content://` folder,
   torrents save to the platform's default directory instead. iOS saves inside the app sandbox.
@@ -361,7 +406,10 @@ hybrid torrent's IDs may have gaps where padding files are left out.
 - `config`: a `TorrentConfig` (below).
 - `httpEngine`: the engine for `.torrent` URLs, HTTP trackers and web seeds. It stays owned by the
   caller; without one the source creates its own `KtorHttpEngine`.
-- `restoreSeeding`: whether `Ketch.start()` seeds remembered tasks again (`true`).
+- `restoreSeeding`: whether remembered tasks seed again (`true`): when `Ketch.start()` runs, when
+  uploads resume after a pause and when the policy switches to `SEED_AFTER_COMPLETION`.
+- `uploadsPaused`: whether uploads start paused (`false`); see `setUploadsPaused` below. A host that
+  knows it is on a metered network passes `true`, so restoring seeding at start waits too.
 - `multicastLock`: a `TorrentMulticastLock` held while local discovery is joined. The Android app
   passes one backed by a Wi-Fi `MulticastLock`.
 
@@ -381,6 +429,10 @@ uploads the bytes to the server's `POST /api/resolve/content`, as the apps do fo
 Local `.torrent` paths and `file:` URLs also work as URLs.
 
 ### `TorrentConfig`
+
+The SDK uploads nothing unless asked: `TorrentConfig()` resolves to `DISABLED`. The apps, the CLI
+and `ketch server` pass `WHILE_DOWNLOADING` unless `[torrent] upload` (or, for `ketch server`,
+`--torrent-upload` or `KETCH_TORRENT_UPLOAD`) says otherwise.
 
 | Property | Default | Meaning |
 | --- | --- | --- |
@@ -417,6 +469,7 @@ next one:
 | Function | Effect |
 | --- | --- |
 | `setUploadPolicy`, `setUploadRateLimit` | Change uploading for running and later torrents. |
+| `setUploadsPaused(paused)` | Pause or resume uploads whatever the policy, as the phone apps do off Wi-Fi. |
 | `setTaskUploadRateLimit(taskId, bps)` | Cap an active task's upload, also while it seeds; 0 is unlimited. |
 | `setEncryption`, `setUtpEnabled` | Apply to connections opened afterwards. |
 | `setPortMapping` | Start port mapping, or stop it and remove the mapping. |
@@ -424,6 +477,14 @@ next one:
 | `setConnectionLimit` | Change `maxConnections` (1-4096), closing excess connections. |
 | `setAdditionalTrackers`, `setTrackerLists` | Apply to torrents started or resumed afterwards. |
 | `refreshTrackerLists()` | Download the tracker lists again; `trackerLists` reports each one's state. |
+
+While uploads are paused the engine runs as if the policy were `DISABLED`: peers are choked,
+seeders finish and free their slots, and remembered seeding intents are kept. Under
+`SEED_AFTER_COMPLETION`, a `setSeeding(true)` command is accepted and saves the intent. With
+`restoreSeeding` on (the default), a torrent that completes meanwhile is remembered too, and both
+seed once uploads resume, after a recheck. With `restoreSeeding = false` the command only saves
+the intent, and nothing seeds the task in that process. The policy itself does not change, so
+`capabilities()` still lists `seeding`.
 
 ### Choosing discovery privacy
 
@@ -464,8 +525,9 @@ val caps = controller.capabilities()
 val page = controller.files(taskId, order = TorrentFileOrder.NAME)
 ```
 
-It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp`, `mse-pe` and
-`seeding`, which describe the backend, not its current settings), `snapshot(taskId)`, sorted file
+It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`,
+which describe the backend, not its current settings, and `seeding` while the configured policy is
+`SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
 pages (`files`), and `select` and `setSeeding` commands guarded by a revision and an idempotency
 key. Follow a task's snapshots with `ketch.subscribe(TorrentInterest(taskId))`. `RemoteKetch`
 returns a controller that works over `/api/torrents` with servers listing `torrent.control`. See the
@@ -571,8 +633,9 @@ seconds. Peers get verified pieces only, through a bounded read cache; a verifie
 changed on disk stops the task. A hybrid's v1 peers get v1 blocks, with zeros for the padding.
 
 An upload limit holds a block back in its peer's queue while the connection keeps downloading, so
-a low upload limit never stalls downloads from the same peers. With uploading off, Ketch never
-unchokes a peer, does not offer `ut_metadata` and rejects BEP 52 hash requests.
+a low upload limit never stalls downloads from the same peers. With uploading off, or paused,
+Ketch never unchokes a peer, offers no allowed-fast pieces, does not offer `ut_metadata` and
+rejects BEP 52 hash requests.
 
 ### V2 and hybrid torrents
 

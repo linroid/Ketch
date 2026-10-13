@@ -208,4 +208,5 @@
   <string name="inspector_seeding_status">Seedet · ↑ %1$s · %2$s hochgeladen</string>
   <string name="inspector_seeding_stop">Seeden beenden</string>
   <string name="inspector_seeding_start">Seeden</string>
+  <string name="inspector_seeding_waiting">Wartet aufs Seeden</string>
 </resources>

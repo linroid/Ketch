@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -142,6 +143,26 @@ class InstanceSettingsControllerTest {
     assertEquals(capped, store.load().torrent)
     assertEquals(capped, controller.torrent)
     assertEquals(listOf(seeding, capped), applied)
+  }
+
+  @Test
+  fun updateTorrent_uploadWifiOnlyOff_isSavedAndApplied() = runTest {
+    val store = RecordingConfigStore()
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      applyTorrent = { applied += it },
+    )
+    val anyNetwork = TorrentSettings(uploadWifiOnly = false)
+
+    controller.updateTorrent(anyNetwork)
+    advanceUntilIdle()
+
+    assertFalse(store.load().torrent.uploadWifiOnly)
+    assertEquals(anyNetwork, controller.torrent)
+    assertEquals(listOf(anyNetwork), applied)
   }
 
   @Test

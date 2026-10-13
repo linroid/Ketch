@@ -535,6 +535,8 @@
   <string name="settings_torrent_upload_off_hint">节点无法从此设备下载任何内容。</string>
   <string name="settings_torrent_upload_while_downloading_hint">种子下载期间，节点可以下载已有的分块。</string>
   <string name="settings_torrent_upload_seed_hint">已完成的种子会持续上传，直到手动停止或关闭此选项，Ketch 重启后依然如此。</string>
+  <string name="settings_torrent_upload_wifi_only">仅限 Wi-Fi</string>
+  <string name="settings_torrent_upload_wifi_only_hint">使用移动数据或其他按流量计费的网络时暂停上传。</string>
   <string name="settings_torrent_upload_limit">上传限速</string>
   <string name="settings_torrent_upload_limit_hint">所有种子共用。</string>
   <string name="settings_torrent_upload_footer">接收上传的节点可以看到此设备的 IP 地址。私有种子只与其 Tracker 提供的节点共享。</string>
@@ -732,6 +734,8 @@
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, tracker, 添加 tracker</string>
   <string name="settings_search_upload">与节点共享分块，并为已完成的种子做种</string>
   <string name="settings_search_upload_keywords">上传, 做种, seed, 分享, 共享, 分享率, 节点</string>
+  <string name="settings_search_upload_wifi_only">仅在 Wi-Fi 下向节点上传</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, 无线, 移动数据, 蜂窝网络, 流量, 按流量计费, 热点, 省流量, 上传</string>
   <string name="settings_search_pair">从手机或浏览器控制这台设备</string>
   <string name="settings_search_pair_keywords">二维码, 手机, 配对, 远程, 网页版, 连接</string>
   <string name="settings_search_reachable_keywords">局域网, 网络, 远程访问</string>

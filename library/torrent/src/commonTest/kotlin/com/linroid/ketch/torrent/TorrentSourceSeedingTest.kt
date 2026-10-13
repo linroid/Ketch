@@ -7,6 +7,7 @@ import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -45,6 +46,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -94,9 +96,199 @@ class TorrentSourceSeedingTest {
       assertEquals(TorrentUploadPolicy.DISABLED, source.currentUploadPolicy)
       source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
       source.setUploadRateLimit(1_000)
+      source.setUploadsPaused(true)
+      source.setUploadsPaused(false)
       assertEquals(0, created)
       assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, source.currentUploadPolicy)
     } finally { source.close() }
+  }
+
+  /** Starts [source]'s engine, [engine], through a magnet lookup, the first thing that needs it. */
+  private suspend fun startEngine(source: TorrentDownloadSource, engine: FakeTorrentEngine) {
+    val metadata = TorrentMetadata.fromBencode(v1Metainfo("payload"))
+    engine.fetchMetadataResult = metadata
+    source.resolve(MagnetUri(metadata.infoHash).toUri(), emptyMap())
+  }
+
+  @Test
+  fun setUploadsPaused_runningEngine_runsDisabledUntilResumed() = runTest {
+    val engine = FakeTorrentEngine()
+    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING)).also { it.engineFactory = { engine } }
+    try {
+      startEngine(source, engine)
+      source.setUploadsPaused(true)
+      assertEquals(TorrentUploadPolicy.DISABLED, engine.uploadPolicy)
+      // The configured policy stays, for when uploads resume.
+      assertEquals(TorrentUploadPolicy.WHILE_DOWNLOADING, source.currentUploadPolicy)
+      source.setUploadsPaused(false)
+      assertEquals(TorrentUploadPolicy.WHILE_DOWNLOADING, engine.uploadPolicy)
+    } finally { source.close() }
+  }
+
+  @Test
+  fun setUploadPolicy_whilePaused_keepsTheEngineDisabled() = runTest {
+    val engine = FakeTorrentEngine()
+    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+      .also { it.engineFactory = { engine } }
+    try {
+      startEngine(source, engine)
+      source.setUploadsPaused(true)
+      source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+      assertEquals(TorrentUploadPolicy.DISABLED, engine.uploadPolicy)
+      assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, source.currentUploadPolicy)
+      // Seeding is still offered: tasks can be meant to seed, and seed once uploads resume.
+      assertTrue(TorrentCapability.SEEDING.wireName in source.torrentCapabilities)
+      assertFalse(source.restoresSeeding)
+      assertEquals(SeedingOutcome.UPLOADS_PAUSED, source.seedingAvailability("task"))
+      source.setUploadsPaused(false)
+      assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, engine.uploadPolicy)
+      assertTrue(source.restoresSeeding)
+      assertNull(source.seedingAvailability("task"))
+    } finally { source.close() }
+  }
+
+  @Test
+  fun constructedPaused_firstEngine_runsDisabled() = runTest {
+    val engine = FakeTorrentEngine()
+    var config: TorrentConfig? = null
+    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), uploadsPaused = true).also {
+      it.engineFactory = { created -> config = created; engine }
+    }
+    try {
+      assertFalse(source.restoresSeeding)
+      startEngine(source, engine)
+      assertEquals(TorrentUploadPolicy.DISABLED, assertNotNull(config).uploadPolicy)
+      source.setUploadsPaused(false)
+      assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, engine.uploadPolicy)
+    } finally { source.close() }
+  }
+
+  @Test
+  fun sharingResumes_sameValueSetters_bumpOnlyWhenSeedingComesBack() = runTest {
+    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+      .also { it.engineFactory = { FakeTorrentEngine() } }
+    try {
+      source.setUploadsPaused(false)
+      source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+      assertEquals(0L, source.sharingResumes.value)
+      source.setUploadsPaused(true)
+      source.setUploadsPaused(true)
+      source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+      assertEquals(0L, source.sharingResumes.value)
+      // Resuming under Seed brings seeding back once, however often it is repeated.
+      source.setUploadsPaused(false)
+      source.setUploadsPaused(false)
+      assertEquals(1L, source.sharingResumes.value)
+      // So does switching to Seed, but not to another policy.
+      source.setUploadPolicy(TorrentUploadPolicy.WHILE_DOWNLOADING)
+      source.setUploadsPaused(true)
+      source.setUploadsPaused(false)
+      assertEquals(1L, source.sharingResumes.value)
+      source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+      source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+      assertEquals(2L, source.sharingResumes.value)
+    } finally { source.close() }
+  }
+
+  /**
+   * Downloads a one-piece torrent as [taskId] on [source], whose fake engine finishes the
+   * session as soon as it runs.
+   */
+  private suspend fun CoroutineScope.downloadFinished(
+    source: TorrentDownloadSource,
+    engine: FakeTorrentEngine,
+    taskId: String,
+  ) {
+    val resolved = source.resolveMetainfo(v1Metainfo(taskId))
+    val session = FakeTorrentSession(resolved.metadata.getValue("infoHash"))
+    engine.addTorrentResult = session
+    val finishes = launch {
+      eventually { session.resumed }
+      session.finish()
+    }
+    source.download(context(taskId, resolved, "unused-$taskId"), null)
+    finishes.join()
+  }
+
+  @Test
+  fun download_completesWhilePausedUnderSeed_defersSharingOnce() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), uploadsPaused = true)
+          .also { it.engineFactory = { engine } }
+        try {
+          downloadFinished(source, engine, "paused")
+          assertTrue(source.takeDeferredSharing("paused"))
+          assertFalse(source.takeDeferredSharing("paused"))
+          // Under another policy a finished session is all the task asked for.
+          source.setUploadPolicy(TorrentUploadPolicy.WHILE_DOWNLOADING)
+          downloadFinished(source, engine, "other")
+          assertFalse(source.takeDeferredSharing("other"))
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun startSeeding_pausedDuringRecheck_returnsUploadsPaused() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        try {
+          val metainfo = v1Metainfo("data")
+          val hash = TorrentMetadata.fromBencode(metainfo).infoHash.hex
+          val ids = TorrentFileTable.parse(metainfo, TorrentConfig()).ids
+          val state = TorrentSourceState(hash, 4, "", ids, "unused-data", encodeBase64(metainfo),
+            version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val session = FakeTorrentSession(hash)
+          engine.addTorrentResult = session
+          // Uploads pause while the seed-only session checks its files, which finishes it.
+          val pauses = launch {
+            eventually { session.resumed }
+            source.setUploadsPaused(true)
+            session.finish()
+          }
+          val outcome = source.startSeeding(SeedingTask("seeder", "http://fixture/data.torrent",
+            state.saved(), null, "unused-data", ids))
+          pauses.join()
+          assertEquals(SeedingOutcome.UPLOADS_PAUSED, outcome)
+          assertEquals(listOf(hash to false), engine.removedTorrents)
+          assertEquals(emptySet(), source.seedingTaskIds.value)
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun restoreSeedingOff_neverResumesNorDefers() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), restoreSeeding = false,
+          uploadsPaused = true).also { it.engineFactory = { engine } }
+        try {
+          downloadFinished(source, engine, "paused")
+          assertFalse(source.takeDeferredSharing("paused"))
+          source.setUploadsPaused(false)
+          source.setUploadPolicy(TorrentUploadPolicy.DISABLED)
+          source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+          assertEquals(0L, source.sharingResumes.value)
+          assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, engine.uploadPolicy)
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
   }
 
   @Test

@@ -97,8 +97,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentInterest(taskId)` (a task's snapshots through `KetchApi.subscribe`, `null` once gone),
   `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
   `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, which the engine
-  speaks whatever its settings, and `seeding` while uploads seed),
-  `TorrentSnapshot`, `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
+  speaks whatever its settings, and `seeding` while the configured upload mode seeds, also while
+  uploads are paused),
+  `TorrentSnapshot` (`seeding`: meant to seed, the saved intent or a live seeding session; `null`
+  from older backends), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
   `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
   `TorrentFileOrder` (wire names, each naming a `FileOrder`)
@@ -648,8 +650,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
   peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway
-- Verified selected-file storage, ownership journal, restart rehash, live limits, and opt-in
-  upload and seeding (`[torrent] upload`)
+- Verified selected-file storage, ownership journal, restart rehash, live limits, and upload and
+  seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
+  the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so)
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
@@ -660,14 +663,37 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more. Trackers hear
   `completed` only once every file is selected and complete; admission charges every file
-- Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it, and
-  `TorrentController.setSeeding` (REST `PUT /api/torrents/{id}/seeding`, the inspector's Seed and
-  Stop seeding) starts or stops it. `TorrentControls` (the source's `SourceExtension`) saves the
-  intent in `TaskControl.sharing` once a task seeds, and after `Ketch.start()` seeds those tasks
-  again, oldest completion first, under `upload =
-  seed` and into free engine slots only, each after a recheck; a task whose files changed on disk
-  loses the intent, one a download or shutdown stopped keeps it. `TorrentDownloadSource(...,
-  restoreSeeding = false)`, as `ketch mcp --standalone` builds it, never restores
+- Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
+  `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
+  saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`
+  (REST `PUT /api/torrents/{id}/seeding`, the inspector's Seed and Stop seeding) starts or stops
+  it. `TorrentInterest` snapshots follow the intent too: every intent the controller or
+  `TorrentControls` saves calls `KetchTorrentController.controlChanged`, which wakes `observe`,
+  as a task that waits to seed changes nothing else it follows. `TorrentControls` (the source's
+  `SourceExtension`) saves the intent in `TaskControl.sharing` once a task seeds, and seeds those
+  tasks again, oldest completion first, under `upload = seed` and into free engine slots only,
+  each after a recheck, whenever the source's `sharingResumes` counter moves: its first value
+  once `Ketch.start()` attaches it, then each time the effective policy turns to seeding (uploads
+  resume under `seed`, or a live switch to `seed`, which re-seeds kept intents at once). A task
+  whose files changed on disk loses the intent, one a download, a pause of uploads or shutdown
+  stopped keeps it.
+  `TorrentDownloadSource(..., restoreSeeding = false)`, as `ketch mcp --standalone` builds it,
+  never restores, never bumps `sharingResumes` and never records deferred intents
+- Paused uploads, orthogonal to the upload policy (the phone apps' Wi-Fi gate):
+  `TorrentDownloadSource(uploadsPaused = ...)` (so hosts start paused before `Ketch.start()`
+  restores seeding) and `setUploadsPaused(paused)` (applied under `engineMutex` like
+  `setUploadPolicy`, never starting the engine) hand the engine `DISABLED` whatever the configured
+  policy, so pausing behaves exactly as `off` does: peers are choked, allowed-fast, `ut_metadata`
+  and BEP 52 hashes are not served, and seeders finish and free their slots, keeping
+  `TaskControl.sharing`. While paused `restoresSeeding` is false; under `seed`,
+  `seedingAvailability` and a `startSeeding` whose recheck a pause ends answer
+  `SeedingOutcome.UPLOADS_PAUSED` (the restore walk stops on it, intents kept), and
+  `setSeeding(true)` is accepted and saves the intent while the activity stays `STOPPED`. A
+  torrent that really completes then reaches `FINISHED`, so the source records its ID and
+  `TorrentControls` saves the intent of the IDs `takeDeferredSharing` hands over, seeding the task
+  at once if uploads resumed meanwhile;
+  `SourceExtension.taskCompleted` alone never saves one, as it fires for every restored completed
+  record and every `showSharing` copy
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
@@ -736,9 +762,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   PEX flags from one `pexFlags()`, and hybrid participation in v1 swarms (v1 peers, v1-topic
   trackers and DHT) are implemented. V2/hybrid owners live in the engine (`addV2Task`), so
   `removeTorrent`, slot lending and the upload setters work for either hash. Seeding lasts until
-  it is stopped or the task removed, until `upload` leaves `seed`, until a download waiting for
-  one of the `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its
-  intent), or until Ketch closes; a torrent that finishes while a download waits does not seed.
+  it is stopped or the task removed, until `upload` leaves `seed`, until uploads are paused (the
+  task keeps its intent), until a download waiting for one of the
+  `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its intent),
+  or until Ketch closes; a torrent that finishes while a download waits does not seed.
   Seeding runs only while the process runs
 - Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
   hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
@@ -895,15 +922,22 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   read), edited on the embedded instance's
   BitTorrent settings page and applied to torrents as they start or resume; a remote instance's
   trackers are only editable on that device. `upload` (`off`/`while-downloading`/`seed`,
-  `TorrentUploadMode`, mapped to `TorrentConfig.uploadPolicy` by an exhaustive `when` at each of
-  the four `TorrentConfig` sites) and `uploadLimit` (`TorrentConfig.uploadRateLimit`), both read
-  leniently (a value of any type that cannot be read loads as off or unlimited, and a bare
-  `uploadLimit` number is bytes per second), are applied live through
-  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. `encryption`
-  (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as `preferred`,
-  mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and `localDiscovery`
-  (all on), edited under Settings → BitTorrent → Connections (local discovery only on desktop
-  and Android, `localPeerDiscoverySupported`), apply live through
+  `TorrentUploadMode`, `while-downloading` by default, mapped to `TorrentConfig.uploadPolicy` by
+  an exhaustive `when` at each of the four `TorrentConfig` sites) and `uploadLimit`
+  (`TorrentConfig.uploadRateLimit`), both read leniently (a value of any type that cannot be read
+  loads as off, deliberately not the default, or unlimited, and a bare `uploadLimit` number is
+  bytes per second), are applied live through
+  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. The apps write every field, so an
+  install that saved `off` keeps it; files without the key (the CLI's, `ketch server`'s, Docker's,
+  hand-written ones) upload while downloading, unless `ketch server` gets `--torrent-upload` or
+  `KETCH_TORRENT_UPLOAD` (`ServerEnv.TORRENT_UPLOAD`, the mode ids in any case, read by
+  `parseTorrentUploadMode`; the server's banner prints the mode). `uploadWifiOnly` (on, a strict
+  Boolean) pauses uploads while the device is not on Wi-Fi or another unmetered network; only the
+  Android and iOS apps follow it (`UploadNetwork.kt`), the desktop app, the CLI and the server ignore it.
+  `encryption` (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as
+  `preferred`, mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and
+  `localDiscovery` (all on), edited under Settings → BitTorrent → Connections (local discovery
+  only on desktop and Android, `localPeerDiscoverySupported`), apply live through
   `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
   `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
   mapper started or stopped, and the LAN discovery group joined or left)
@@ -980,6 +1014,24 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KetchService.lanPeerSearchStarted`, set as the engine takes its multicast lock); switching
   Settings → BitTorrent → Local peer discovery on asks through `NearbyAccess`. The engine knows
   nothing of it: without the permission it fails to join the group and retries
+- Uploads on phones follow the network: Settings → BitTorrent → Uploading's Only on Wi-Fi switch
+  (`[torrent] uploadWifiOnly`, `SettingsFeature.UploadWifiOnly` in search) shows only while the
+  embedded device's `InstanceManager.followsUploadNetwork`, and is enabled while uploading is not
+  Off. `UploadNetwork.kt`'s `uploadsPaused(settings, unmetered)` pauses whenever the switch is on
+  and the network is metered, whatever the mode, so a mode change on mobile data never opens an
+  upload window; `followUploadNetwork` pauses at once and resumes only after the network has
+  allowed uploads for 3 s (`UNPAUSE_SETTLE`, as every resume rechecks seeded torrents). Hosts pass
+  `InstanceFactory.uploadNetwork` and `pauseUploads` (`TorrentDownloadSource.setUploadsPaused`):
+  Android's `unmeteredNetworkChanges(context)` follows the default network's
+  `NET_CAPABILITY_NOT_METERED` (or `TEMPORARILY_NOT_METERED` from API 30) and `KetchService`
+  starts the source paused while the switch is on and `isUnmeteredNow` is false (as without a
+  network); iOS's `unmeteredNetworkChanges()` follows `NWPathMonitor` (satisfied, not expensive,
+  not constrained) and `MainViewController` starts paused while the switch is on. Desktop and the
+  CLI pass neither. The inspector's seeding control (`seedingView`) offers Stop seeding while
+  `TorrentSnapshot.seeding` is true (else while the activity is `SEEDING`), so a task waiting
+  for Wi-Fi to seed shows Stop seeding with "Waiting to seed" (`SeedingView.waiting`) in place of
+  the "Seeding · ↑" status, which needs the `SEEDING` activity, and its intent can be cleared;
+  row menus follow live seeding only (`Completed.sharing`)
 - Every keyboard command lives in `KetchCommands`, each in a `CommandScope` (Global, List,
   Intake, Palette, Discover): `ShortcutHost` runs the global chords, and the list, the add
   sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`
@@ -1018,10 +1070,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
   waits ("next in line", "2 ahead") and when a finished one finished (Finished column and sort,
   Smart "Finished today" groups). A task waiting for its files says "Choose files to
-  download" (Choose files…, and Download all files unless its source offers a single choice) and a seeding one "Seeding" (Stop seeding; Seed
-  is in the inspector only). Auto connections and queue positions only show for devices whose
-  `KetchStatus.features` list them (`AppState.featuresOf`; the embedded engine has all,
-  `EmbeddedFeatures`)
+  download" (Choose files…, and Download all files unless its source offers a single choice)
+  and a seeding one "Seeding" (Stop seeding while it seeds now; Seed, and Stop seeding for a
+  task only meant to seed, are in the inspector only). Auto connections and queue positions only
+  show for devices whose `KetchStatus.features` list them (`AppState.featuresOf`; the embedded
+  engine has all, `EmbeddedFeatures`)
 - Remote devices send what is shown: every task's state at once and progress every second; the
   segments of the rows on screen every second on desktop and the web (`WatchShownTasks`; phones
   leave them out) and of the inspected tasks every 500 ms (`AppState.followSegments`); while the
@@ -1251,7 +1304,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   options, else where the config file and environment variables say (`healthCheckUrl`)
 - `ketch server` configuration layers: flags over `KETCH_*` environment variables
   (`ServerEnv`, `applyServerEnvironment`; blank counts as unset, an unusable value exits 2 naming
-  it) over `config.toml`. It exits 1 when it cannot start and 2 for invalid options
+  it) over `config.toml`, such as `--torrent-port`/`KETCH_TORRENT_PORT` and
+  `--torrent-upload`/`KETCH_TORRENT_UPLOAD` (`[torrent] upload`). It exits 1 when it cannot start
+  and 2 for invalid options
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -1304,7 +1359,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`docker/build/linux-<amd64|arm64>/`) on `debian:trixie-slim`; `ENV` sets `KETCH_DOCKER=1`
   (`ketch update` refuses and points to the image), `KETCH_CONFIG_DIR=/config`,
   `KETCH_DOWNLOAD_DIR=/downloads`, `KETCH_TORRENT_PORT=16881`, `PUID`/`PGID` 1000 and `UMASK`;
-  `HEALTHCHECK` runs `ketch health`
+  `HEALTHCHECK` runs `ketch health`. It leaves `KETCH_TORRENT_UPLOAD` unset, so the server
+  uploads while downloading; `KETCH_TORRENT_UPLOAD=off` turns that off without a `config.toml`
 - `docker/entrypoint.sh` (POSIX sh): options alone go to `ketch server`, other programs run as
   they are. As root it applies `UMASK`, adds passwd/group entries for `PUID`:`PGID` (home
   `/config`), gives every file in `/config` to them, takes over `/downloads` only when it is empty

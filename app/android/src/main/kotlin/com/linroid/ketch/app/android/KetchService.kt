@@ -33,6 +33,9 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.instance.isUnmeteredNow
+import com.linroid.ketch.app.instance.unmeteredNetworkChanges
+import com.linroid.ketch.app.instance.uploadsPaused
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
@@ -201,6 +204,7 @@ class KetchService : Service() {
         lock.acquire()
         AutoCloseable { lock.release() }
       },
+      uploadsPaused = uploadsPaused(config.torrent, isUnmeteredNow(this)),
     )
     instanceManager = InstanceManager(
       factory = InstanceFactory(
@@ -275,6 +279,8 @@ class KetchService : Service() {
           }
         },
         refreshTrackerList = torrentSource::refreshTrackerLists,
+        uploadNetwork = unmeteredNetworkChanges(this),
+        pauseUploads = torrentSource::setUploadsPaused,
       ),
       initialRemotes = config.remotes,
       configStore = configStore,

@@ -80,8 +80,10 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
   policy). The app is not designed for children.
 - **Content rating** (IARC, category utility or productivity): no violence, sexuality, language,
   drugs, gambling or purchases; no user-to-user communication or user-generated content; no
-  location sharing. BitTorrent exchanges file data with peers (uploading is off unless the user
-  turns it on) but not messages; answer the sharing questions by IARC's definitions.
+  location sharing. BitTorrent exchanges file data with peers but not messages: by default the
+  app uploads pieces of a torrent while it downloads, only over Wi-Fi or another unmetered
+  network, and the user can turn uploading off. Answer the sharing questions by IARC's
+  definitions.
 - **Data safety**: Ketch's developer receives nothing, and the app sends data only where the
   user points it, plus the daily tracker list downloads from GitHub or jsDelivr, which carry no
   user data (see [PRIVACY.md](../PRIVACY.md)). Downloads are like a browser's requests, and

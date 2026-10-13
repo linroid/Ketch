@@ -287,4 +287,7 @@
   <!-- Buttons that stop or start sharing a finished torrent's files with other peers. -->
   <string name="inspector_seeding_stop">Stop seeding</string>
   <string name="inspector_seeding_start">Seed</string>
+  <!-- A finished torrent meant to seed that does not share yet, such as while uploads wait for
+       Wi-Fi or a free slot. -->
+  <string name="inspector_seeding_waiting">Waiting to seed</string>
 </resources>

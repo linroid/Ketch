@@ -547,6 +547,8 @@
   <string name="settings_torrent_upload_off_hint">Peers können nichts von diesem Gerät herunterladen.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Während deine Torrents laden, können Peers die Teile herunterladen, die du schon hast.</string>
   <string name="settings_torrent_upload_seed_hint">Fertige Torrents laden weiter hoch, bis du sie stoppst oder dies ausschaltest, auch nach einem Neustart von Ketch.</string>
+  <string name="settings_torrent_upload_wifi_only">Nur im WLAN</string>
+  <string name="settings_torrent_upload_wifi_only_hint">Pausiert den Upload bei mobilen Daten und anderen getakteten Verbindungen.</string>
   <string name="settings_torrent_upload_limit">Upload-Limit</string>
   <string name="settings_torrent_upload_limit_hint">Gilt für alle Torrents zusammen.</string>
   <string name="settings_torrent_upload_footer">Peers, an die du hochlädst, sehen die IP-Adresse dieses Geräts. Private Torrents teilen nur mit den Peers ihres Trackers.</string>
@@ -751,6 +753,8 @@
   <string name="settings_search_trackers_keywords">Announce, UDP, Magnet, Tracker hinzufügen</string>
   <string name="settings_search_upload">Teile mit Peers teilen und fertige Torrents seeden</string>
   <string name="settings_search_upload_keywords">Upload, Seed, Seeding, teilen, Ratio, Peers</string>
+  <string name="settings_search_upload_wifi_only">Nur im WLAN an Peers hochladen</string>
+  <string name="settings_search_upload_wifi_only_keywords">WLAN, WiFi, Wi-Fi, mobile Daten, Mobilfunk, getaktet, Hotspot, Datensparmodus, Upload</string>
   <string name="settings_search_pair">Dieses Gerät von einem Telefon oder Browser aus steuern</string>
   <string name="settings_search_pair_keywords">QR-Code, Handy, Smartphone, koppeln, Kopplung, Fernzugriff, Fernsteuerung, Web-App, verbinden</string>
   <string name="settings_search_reachable_keywords">LAN, Netzwerk, Fernzugriff</string>

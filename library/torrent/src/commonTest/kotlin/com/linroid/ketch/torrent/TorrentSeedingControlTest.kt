@@ -86,10 +86,12 @@ class TorrentSeedingControlTest {
       policy: TorrentUploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION,
       maxActiveTorrents: Int = 5,
       restoreSeeding: Boolean = true,
+      uploadsPaused: Boolean = false,
     ): TorrentDownloadSource {
       val network = CountingTorrentNetwork().also { networks += it }
       return TorrentDownloadSource(TorrentConfig(dhtEnabled = false, uploadPolicy = policy,
-        maxActiveTorrents = maxActiveTorrents), http, restoreSeeding).also { source ->
+        maxActiveTorrents = maxActiveTorrents), http, restoreSeeding,
+        uploadsPaused = uploadsPaused).also { source ->
         source.engineFactory = { config ->
           created.incrementAndFetch()
           KotlinTorrentEngine(config, network, TorrentHttp(http), listenHost = "127.0.0.1")
@@ -159,12 +161,16 @@ class TorrentSeedingControlTest {
     checkNotNull(record.sourceState), record.resolvedSource, checkNotNull(record.outputPath),
     record.request.selectedFileIds)
 
-  /** A completed v1 task of [torrent], already on disk at [output], that seeded. */
+  /**
+   * A completed v1 task of [torrent], already on disk at [output], that seeded, or with
+   * [sharing] as its intent to seed.
+   */
   private fun v1Record(
     taskId: String,
     torrent: MultiFileTorrent,
     output: Path,
     completedAtMs: Long = 1_000,
+    sharing: Boolean? = true,
   ): TaskRecord {
     torrent.writeTo(output)
     val ids = torrent.sizes.indices.mapTo(LinkedHashSet()) { it.toString() }
@@ -173,7 +179,7 @@ class TorrentSeedingControlTest {
       output.toString(), encodeBase64(torrent.metainfo), version = 2,
       privacy = TorrentDiscoveryPrivacy.PUBLIC)
     return completedRecord(taskId, "http://fixture/$taskId.torrent", output, total, ids,
-      Json.encodeToString(state), completedAtMs)
+      Json.encodeToString(state), completedAtMs, sharing)
   }
 
   /** A completed v2 task of [fixture], already on disk at [output], that seeded. */
@@ -200,6 +206,7 @@ class TorrentSeedingControlTest {
     ids: Set<String>,
     state: String,
     completedAtMs: Long,
+    sharing: Boolean? = true,
   ): TaskRecord {
     val at = Instant.fromEpochMilliseconds(completedAtMs)
     return TaskRecord(taskId = taskId,
@@ -208,7 +215,8 @@ class TorrentSeedingControlTest {
       outputPath = output.toString(), state = TaskState.COMPLETED, totalBytes = total,
       sourceType = TorrentDownloadSource.TYPE,
       sourceState = SourceState(TorrentDownloadSource.TYPE, state),
-      createdAt = at, updatedAt = at, completedAt = at, control = TaskControl(sharing = true))
+      createdAt = at, updatedAt = at, completedAt = at,
+      control = sharing?.let { TaskControl(sharing = it) })
   }
 
   /** Flips one byte in the middle of [path]. */
@@ -458,6 +466,11 @@ class TorrentSeedingControlTest {
     val ketch = ketch(source, store)
     ketch.start()
     val task = ketch.tasks.value.single()
+    // Neither uploads resuming nor a switch to seeding walks the tasks again.
+    source.setUploadsPaused(true)
+    source.setUploadsPaused(false)
+    source.setUploadPolicy(TorrentUploadPolicy.DISABLED)
+    source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
     delay(500)
     assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
     assertEquals(0, created.load())
@@ -482,6 +495,179 @@ class TorrentSeedingControlTest {
     assertEquals(true, store.intent("seeder"))
     download.awaitSeeding(true)
     source.stopSeeding(download.taskId)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setUploadsPaused_seedingV1Task_stopsAndSeedsAgainOnResume() = harness {
+    val source = source()
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    eventually("the seeding intent to be saved") { store.intent(task.taskId) == true }
+
+    source.setUploadsPaused(true)
+
+    // The seeder finishes and frees its slot; the task stays meant to seed.
+    task.awaitSeeding(false)
+    source.assertNoLeaks()
+    assertNull(source.sessionOf(task.taskId))
+    assertEquals(true, store.intent(task.taskId))
+    assertEquals(SeedingOutcome.UPLOADS_PAUSED, source.seedingAvailability(task.taskId))
+
+    source.setUploadsPaused(false)
+
+    task.awaitSeeding(true)
+    assertEquals(TorrentSessionState.SEEDING, source.sessionOf(task.taskId)?.state?.value)
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setUploadsPaused_seedingV2Task_stopsAndSeedsAgainOnResume() = harness {
+    val store = MemoryTaskStore()
+    val record = v2Record("v2-seed", v2Fixture, root / "v2")
+    store.save(record)
+    val source = source()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.tasks.value.single()
+    task.awaitSeeding(true)
+
+    source.setUploadsPaused(true)
+
+    task.awaitSeeding(false)
+    source.assertNoLeaks()
+    assertNull(source.sessionOf(task.taskId))
+    assertEquals(true, store.intent(task.taskId))
+
+    source.setUploadsPaused(false)
+
+    task.awaitSeeding(true)
+    assertIs<TorrentV2DownloadSession>(source.sessionOf(task.taskId))
+    assertEquals(TorrentSessionState.SEEDING, source.sessionOf(task.taskId)?.state?.value)
+    source.stopSeeding(task.taskId)
+    task.awaitSeeding(false)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun restore_startedPaused_waitsForUploadsToResume() = harness {
+    val store = MemoryTaskStore()
+    store.save(v1Record("kept", MultiFileTorrent(listOf(40_000, 30_000)), root / "kept"))
+    val source = source(uploadsPaused = true)
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.tasks.value.single()
+    delay(500)
+    assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+    assertEquals(0, created.load())
+    assertEquals(true, store.intent("kept"))
+
+    source.setUploadsPaused(false)
+
+    task.awaitSeeding(true)
+    assertEquals(TorrentSessionState.SEEDING, source.sessionOf("kept")?.state?.value)
+    source.stopSeeding("kept")
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun completion_whilePausedUnderSeed_savesIntentAndSeedsOnResume() = harness {
+    val source = source(uploadsPaused = true)
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+
+    assertFalse(task.awaitCompleted().sharing)
+
+    // The session finished instead of seeding, and the task is meant to seed once uploads resume.
+    eventually("the seeding intent to be saved") { store.intent(task.taskId) == true }
+    assertNull(source.sessionOf(task.taskId))
+    source.assertNoLeaks()
+
+    source.setUploadsPaused(false)
+
+    task.awaitSeeding(true)
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun restore_startedPaused_completedTaskWithoutIntent_isNotMarked() = harness {
+    val store = MemoryTaskStore()
+    store.save(v1Record("plain", MultiFileTorrent(listOf(40_000, 30_000)), root / "plain",
+      sharing = null))
+    store.save(v1Record("stopped", MultiFileTorrent(listOf(50_000, 20_000)), root / "stopped",
+      sharing = false))
+    val source = source(uploadsPaused = true)
+    val ketch = ketch(source, store)
+    ketch.start()
+    delay(300)
+    source.setUploadsPaused(false)
+    delay(500)
+
+    // Restored completions are no completions: neither task gained an intent or a session.
+    assertNull(store.intent("plain"))
+    assertEquals(false, store.intent("stopped"))
+    for (task in ketch.tasks.value) {
+      assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+      assertNull(source.sessionOf(task.taskId))
+    }
+    assertEquals(0, created.load())
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setUploadPolicy_whileDownloadingThenSeed_seedsKeptIntentsLive() = harness {
+    val store = MemoryTaskStore()
+    store.save(v1Record("kept", MultiFileTorrent(listOf(40_000, 30_000)), root / "kept"))
+    val source = source(TorrentUploadPolicy.WHILE_DOWNLOADING)
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.tasks.value.single()
+    delay(300)
+    assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+
+    source.setUploadPolicy(TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+
+    task.awaitSeeding(true)
+    assertEquals(true, store.intent("kept"))
+    source.stopSeeding("kept")
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun setSeeding_trueWhilePaused_keepsIntentAndSeedsOnResume() = harness {
+    val source = source()
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    val controller = assertNotNull(ketch.controller(TorrentController))
+    val stopped = controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
+    task.awaitSeeding(false)
+    source.setUploadsPaused(true)
+
+    val started = controller.setSeeding(task.taskId, true,
+      TorrentCommandContext("seed", stopped.revision))
+
+    assertEquals(true, started.seeding)
+    assertEquals(true, store.intent(task.taskId))
+    assertNull(source.sessionOf(task.taskId))
+    assertEquals(TorrentActivity.STOPPED, controller.snapshot(task.taskId)?.activity)
+
+    source.setUploadsPaused(false)
+
+    task.awaitSeeding(true)
+    assertEquals(TorrentSessionState.SEEDING, source.sessionOf(task.taskId)?.state?.value)
+    source.stopSeeding(task.taskId)
     source.assertNoLeaks()
   }
 

@@ -33,6 +33,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class RemoteTorrentControllerTest {
@@ -242,6 +243,22 @@ class RemoteTorrentControllerTest {
     try {
       assertNull(fixture.controller.snapshot("t1"))
       assertNull(fixture.controller.files("t1"))
+    } finally {
+      fixture.client.close()
+    }
+  }
+
+  @Test
+  fun snapshot_seeding_isCarriedAndNullFromOlderServers() = runTest {
+    val meant = snapshot(1).copy(activity = TorrentActivity.STOPPED, seeding = true)
+    // As servers from before the field send it.
+    val older = """{"taskId":"t1","revision":{"epoch":"epoch","sequence":2},""" +
+      """"activity":"SEEDING","selectionGeneration":0,"selectionComplete":false}"""
+    val bodies = ArrayDeque(listOf(json.encodeToString(meant), older))
+    val fixture = fixture { request, _ -> capabilities(request) ?: json(bodies.removeFirst()) }
+    try {
+      assertEquals(meant, fixture.controller.snapshot("t1"))
+      assertNull(assertNotNull(fixture.controller.snapshot("t1")).seeding)
     } finally {
       fixture.client.close()
     }

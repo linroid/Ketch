@@ -5,6 +5,7 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.torrent.api.TorrentActivity
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -17,15 +18,34 @@ internal interface TorrentControlSource {
   /**
    * The [com.linroid.ketch.torrent.api.TorrentCapability] wire names this source carries out
    * now, besides `inspect`, which every implementation offers. It may change at runtime, such
-   * as when sharing is switched off.
+   * as when sharing is switched off. Paused uploads keep `seeding`: a task can still be meant to
+   * seed, and seeds once they resume.
    */
   val torrentCapabilities: Set<String>
 
   /** IDs of the tasks whose completed content is being shared right now. */
   val seedingTaskIds: StateFlow<Set<String>>
 
-  /** Whether [com.linroid.ketch.core.Ketch.start] shares again the tasks that were sharing. */
+  /**
+   * Whether the tasks that were sharing are shared again now: at
+   * [com.linroid.ketch.core.Ketch.start] and each time [sharingResumes] changes. False while
+   * uploads are paused.
+   */
   val restoresSeeding: Boolean
+
+  /**
+   * A count that grows each time sharing comes back on, such as when uploads resume or the
+   * upload setting switches to sharing, so the tasks meant to share are shared again without a
+   * restart. It never changes for a source that does not restore sharing.
+   */
+  val sharingResumes: StateFlow<Long> get() = NO_SHARING_RESUMES
+
+  /**
+   * Whether [taskId] completed while only paused uploads kept it from sharing, forgetting it: such
+   * a task is meant to share once they resume, though it never shared. Only real completions
+   * count, never a completed task Ketch restored.
+   */
+  suspend fun takeDeferredSharing(taskId: String): Boolean = false
 
   /**
    * Every content file of a task in metainfo order, from the resolution the task kept, else the
@@ -65,6 +85,9 @@ internal interface TorrentControlSource {
    */
   suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean = false
 }
+
+/** [TorrentControlSource.sharingResumes] of sources whose sharing never comes back on. */
+private val NO_SHARING_RESUMES: StateFlow<Long> = MutableStateFlow(0L)
 
 /**
  * A task's live torrent session.
@@ -114,6 +137,12 @@ internal enum class SeedingOutcome {
 
   /** The upload setting does not share completed torrents. */
   POLICY_OFF,
+
+  /**
+   * The upload setting shares completed torrents, but uploads are paused, such as on a metered
+   * network; the task is shared once they resume.
+   */
+  UPLOADS_PAUSED,
 
   /** The task already has a session in this process. */
   ALREADY_ACTIVE,

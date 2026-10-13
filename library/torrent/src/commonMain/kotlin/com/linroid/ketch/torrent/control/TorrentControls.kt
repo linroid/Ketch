@@ -23,7 +23,9 @@ import kotlin.time.Duration
  * [TorrentController] that `ketch.controller(TorrentController)` returns, and seeding of completed
  * tasks. It shows on every completed task of the source whether it seeds
  * ([DownloadState.Completed.sharing]) and saves the intent to seed it again after a restart once
- * it does; [start] seeds again the tasks that seeded when Ketch last stopped.
+ * it does, or once it completes while only paused uploads keep it from seeding
+ * ([TorrentControlSource.takeDeferredSharing]). From [start] on, it seeds again the tasks meant to
+ * seed: at once, and each time sharing comes back on ([TorrentControlSource.sharingResumes]).
  *
  * @param sourceType the [com.linroid.ketch.core.engine.DownloadSource.type] of [source]
  * @param handlesUrl whether [source] downloads a URL, for tasks that have not resolved yet
@@ -72,12 +74,17 @@ internal class TorrentControls(
 
   override suspend fun start() {
     host.scope.launch { followSeeding() }
-    host.scope.launch { restoreSeeding() }
+    host.scope.launch {
+      // The first value restores seeding as Ketch starts; each later one, sharing coming back on,
+      // walks the tasks meant to seed again.
+      source.sharingResumes.collect { restoreSeeding() }
+    }
   }
 
   override suspend fun taskCompleted(task: DownloadTask) {
     val seen = stops.value
     syncSeeding(task, source.seedingTaskIds.value, seen)
+    if (source.takeDeferredSharing(task.taskId)) deferSharing(task, seen[task.taskId])
   }
 
   override suspend fun selectionChanged(task: DownloadTask, fileIds: Set<String>) {
@@ -113,14 +120,38 @@ internal class TorrentControls(
       val stopped = seen[taskId]
       host.scope.launch {
         host.saveSharingIntent(task, true) { stops.value[taskId] == stopped }
+        controller.controlChanged()
       }
     }
   }
 
   /**
-   * Seeds the completed tasks that seeded before Ketch last stopped, oldest completion first,
-   * when the source restores seeding: each checks its files first and only takes a free slot.
-   * The walk stops at the first that finds no slot or seeding switched off.
+   * Saves the intent to seed [task], which completed while uploads were paused under a setting
+   * that seeds, so it seeds once they resume; not after a Stop command that [stopped], the count
+   * of [stops] read before the completion was taken, did not count, as in [syncSeeding]. Seeds it
+   * at once when uploads resumed before the intent was saved, as their walk may have passed it.
+   */
+  private fun deferSharing(task: DownloadTask, stopped: Long?) {
+    val taskId = task.taskId
+    host.scope.launch {
+      host.saveSharingIntent(task, true) { stops.value[taskId] == stopped }
+      controller.controlChanged()
+      if (task.state.value !is DownloadState.Completed ||
+        host.record(task)?.control?.sharing != true
+      ) return@launch
+      log.i { "Saved the intent to seed taskId=$taskId once uploads resume" }
+      if (source.seedingAvailability(taskId) == null) {
+        val outcome = seed(task)
+        if (outcome != SeedingOutcome.SEEDING) log.i { "Did not seed taskId=$taskId: $outcome" }
+      }
+    }
+  }
+
+  /**
+   * Seeds the completed tasks meant to seed, oldest completion first, when the source restores
+   * seeding: as Ketch starts, the tasks that seeded when it last stopped, and again each time
+   * sharing comes back on. Each checks its files first and only takes a free slot. The walk stops
+   * at the first that finds no slot, seeding switched off or uploads paused, keeping the intents.
    */
   private suspend fun restoreSeeding() {
     if (!source.restoresSeeding) return
@@ -135,13 +166,15 @@ internal class TorrentControls(
     for (task in candidates) {
       val taskId = task.taskId
       val record = host.record(task) ?: continue
-      // The task may have started again, or stopped seeding for good, since the walk began.
+      // The task may have started again, stopped seeding for good, or seeded on its own since
+      // the walk began.
       if (task.state.value !is DownloadState.Completed ||
-        record.state != TaskState.COMPLETED || record.control?.sharing != true
+        record.state != TaskState.COMPLETED || record.control?.sharing != true ||
+        taskId in source.seedingTaskIds.value
       ) continue
       when (val outcome = seed(task)) {
         SeedingOutcome.SEEDING -> log.i { "Restored seeding of taskId=$taskId" }
-        SeedingOutcome.NO_SLOT, SeedingOutcome.POLICY_OFF -> {
+        SeedingOutcome.NO_SLOT, SeedingOutcome.POLICY_OFF, SeedingOutcome.UPLOADS_PAUSED -> {
           log.i { "Stopped restoring seeding at taskId=$taskId: $outcome" }
           return
         }
@@ -179,6 +212,7 @@ internal class TorrentControls(
     }
     if (outcome == SeedingOutcome.CHANGED_ON_DISK) {
       host.saveSharingIntent(task, false)
+      controller.controlChanged()
       log.w { "Files of taskId=$taskId changed on disk since it completed; not seeding it" }
     }
     return outcome

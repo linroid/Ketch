@@ -547,6 +547,8 @@
   <string name="settings_torrent_upload_off_hint">Les pairs ne peuvent rien télécharger depuis cet appareil.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Pendant le téléchargement de vos torrents, les pairs peuvent télécharger les morceaux que vous avez déjà.</string>
   <string name="settings_torrent_upload_seed_hint">Les torrents terminés continuent l'envoi jusqu'à ce que vous les arrêtiez ou désactiviez cette option, même après un redémarrage de Ketch.</string>
+  <string name="settings_torrent_upload_wifi_only">Uniquement en Wi-Fi</string>
+  <string name="settings_torrent_upload_wifi_only_hint">Met l'envoi en pause sur les données mobiles et les autres réseaux facturés à l'usage.</string>
   <string name="settings_torrent_upload_limit">Limite d'envoi</string>
   <string name="settings_torrent_upload_limit_hint">Partagée par tous les torrents.</string>
   <string name="settings_torrent_upload_footer">Les pairs auxquels vous envoyez des données voient l'adresse IP de cet appareil. Les torrents privés ne partagent qu'avec les pairs de leur tracker.</string>
@@ -751,6 +753,8 @@
   <string name="settings_search_trackers_keywords">announce, annonce, udp, magnet, ajouter des trackers</string>
   <string name="settings_search_upload">Partager des morceaux avec les pairs et continuer le partage des torrents terminés</string>
   <string name="settings_search_upload_keywords">envoi, partage, seed, seeding, ratio, pairs</string>
+  <string name="settings_search_upload_wifi_only">Envoyer aux pairs uniquement en Wi-Fi</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, données mobiles, réseau mobile, facturé à l'usage, partage de connexion, économiseur de données, envoi</string>
   <string name="settings_search_pair">Contrôler cet appareil depuis un téléphone ou un navigateur</string>
   <string name="settings_search_pair_keywords">qr code, téléphone, appairage, jumelage, distant, app web, connecter</string>
   <string name="settings_search_reachable_keywords">lan, réseau local, réseau, accès à distance</string>

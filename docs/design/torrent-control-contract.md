@@ -106,9 +106,11 @@ over the task records and ledgered commands of core's `SourceHost`;
 serve them. What the runtime does, where it narrows the contract above:
 
 - **Capabilities.** `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, plus
-  `seeding` only while the live upload policy is `SEED_AFTER_COMPLETION`. `utp` and `mse-pe` say
-  the engine speaks uTP and protocol encryption, whether or not `utp` is on and `encryption` is off
-  in the settings at the moment. Every other name is never advertised.
+  `seeding` only while the configured upload policy is `SEED_AFTER_COMPLETION`, also while uploads
+  are paused (`TorrentDownloadSource.setUploadsPaused`, as the phone apps pause them off Wi-Fi):
+  the pause is a network condition, not a policy, so clients keep offering Seed. `utp` and
+  `mse-pe` say the engine speaks uTP and protocol encryption, whether or not `utp` is on and
+  `encryption` is off in the settings at the moment. Every other name is never advertised.
   `maxPageSize` is 1000, `maxSubscriptions` 16, and `backgroundTransfers` is false: seeding runs
   only while the process runs. The remote adapter fails closed: it checks the server's capabilities,
   read once per connection, before every command and refuses with `UNSUPPORTED` before sending
@@ -131,9 +133,17 @@ serve them. What the runtime does, where it narrows the contract above:
   choice instead.
 - **Seeding.** `setSeeding` starts (after a recheck, on a free engine slot only, else
   `RESOURCE_EXHAUSTED`) or stops sharing a completed task, and records the intent that restores
-  seeding after a restart; `POLICY_DENIED` while uploads do not seed, `INVALID_STATE` for a task
-  that is not completed. There are no ratio or duration goals and no separate seed queue: seeders
-  use free engine slots and yield them to waiting downloads, keeping their intent.
+  seeding, on hosts that restore it, after a restart, when uploads resume and on a live switch to
+  `SEED_AFTER_COMPLETION`; `POLICY_DENIED` while the configured policy does not seed,
+  `INVALID_STATE` for a task that is not completed. While uploads are paused under
+  `SEED_AFTER_COMPLETION`, `setSeeding(true)` is accepted: it saves the intent and reports
+  `seeding` true while the activity stays `STOPPED`, and on hosts that restore seeding the task
+  seeds, after a recheck, once uploads resume. `setSeeding(false)` clears the intent either way.
+  Snapshots carry the same answer as `TorrentSnapshot.seeding` (the saved intent or a live seeding
+  session; `null` from older servers), and subscriptions get a new snapshot whenever the intent
+  changes, so clients can offer Stop seeding for a task that waits to seed. There are no ratio or
+  duration goals and no separate seed queue: seeders use free engine slots and yield them to
+  waiting downloads, and to paused uploads, keeping their intent.
 - **Counters.** Received and uploaded payload and upload speed come from a live session; without
   one, as for a completed task that does not seed, they are `null`.
 - **File pages.** `files` sorts by `TorrentFileOrder` (torrent, natural name, size, extension,

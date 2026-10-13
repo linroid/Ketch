@@ -39,6 +39,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -110,6 +111,22 @@ class SettingsDeviceSnapshots {
   @Test
   fun bitTorrent_seedingWithTrackers_showsUploadAndTrackers() {
     pageSnapshots("settings-bittorrent", SettingsCategory.BitTorrent)
+  }
+
+  @Test
+  fun bitTorrent_phoneFollowingTheNetwork_showsOnlyOnWifi() {
+    pageSnapshots(
+      name = "settings-bittorrent-wifi",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(PhonePage),
+      setup = DeviceSetup(followsNetwork = true),
+    )
+    pageSnapshots(
+      name = "settings-bittorrent-wifi-upload-off",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(PhonePage),
+      setup = DeviceSetup(followsNetwork = true, upload = TorrentUploadMode.Off),
+    )
   }
 
   @Test
@@ -264,6 +281,9 @@ private fun PageFrame(
  * @property remote whether the pages show the NAS, a remote device, instead of this one.
  * @property networksFail whether asking the device for its networks fails.
  * @property proxy how the device's downloads reach servers.
+ * @property upload what the device shares with the peers of its torrents.
+ * @property followsNetwork whether its uploads follow the network, as on a phone, which shows
+ *   Only on Wi-Fi.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -291,6 +311,8 @@ private data class DeviceSetup(
   val remote: Boolean = false,
   val networksFail: Boolean = false,
   val proxy: Proxy = Proxy.System,
+  val upload: TorrentUploadMode = TorrentUploadMode.Seed,
+  val followsNetwork: Boolean = false,
 )
 
 /**
@@ -354,6 +376,9 @@ private class DeviceEnvironment(
           ),
         ),
       ),
+      // A phone on Wi-Fi.
+      uploadNetwork = flowOf(true).takeIf { setup.followsNetwork },
+      pauseUploads = {},
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(
@@ -414,7 +439,7 @@ private class DeviceEnvironment(
             "udp://open.demonii.com:1337/announce",
             "https://tracker.example.org:443/announce",
           ),
-          upload = TorrentUploadMode.Seed,
+          upload = setup.upload,
           uploadLimit = SpeedLimit.mbps(1),
         ),
         server = if (setup.sharing) {

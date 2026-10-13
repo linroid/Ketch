@@ -51,6 +51,11 @@ data class TorrentCounters(
  * Bounded task summary. Peer/file lists are paginated separately at the same revision.
  * Metadata may be absent while resolving; [counters] then remains null rather than implying zero.
  * A completed selection does not imply full-content availability or stopped seeding.
+ *
+ * @property seeding whether the task is meant to seed: its saved seeding intent or a live seeding
+ *   session. It can be `true` while [activity] is not [TorrentActivity.SEEDING], such as while
+ *   uploads are paused, and the task seeds once they resume; `null` from backends that do not
+ *   report it.
  */
 @Serializable
 data class TorrentSnapshot(
@@ -60,6 +65,7 @@ data class TorrentSnapshot(
   val selectionGeneration: Long,
   val selectionComplete: Boolean,
   val counters: TorrentCounters? = null,
+  val seeding: Boolean? = null,
 ) {
   init {
     require(taskId.isNotBlank() && taskId.length <= 128)

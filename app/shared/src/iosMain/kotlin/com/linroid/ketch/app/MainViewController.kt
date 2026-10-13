@@ -18,6 +18,7 @@ import com.linroid.ketch.app.feedback.reportActivity
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.instance.unmeteredNetworkChanges
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FolderBookmarks
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -217,6 +218,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
       portMapping = config.torrent.portMapping,
       localDiscovery = config.torrent.localDiscovery,
     ),
+    // Paused until the path monitor reports the network, moments after launch.
+    uploadsPaused = config.torrent.uploadWifiOnly,
   )
   return InstanceManager(
     factory = InstanceFactory(
@@ -251,6 +254,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
         }
       },
       refreshTrackerList = torrentSource::refreshTrackerLists,
+      uploadNetwork = unmeteredNetworkChanges(),
+      pauseUploads = torrentSource::setUploadsPaused,
     ),
     initialRemotes = config.remotes,
     configStore = configStore,

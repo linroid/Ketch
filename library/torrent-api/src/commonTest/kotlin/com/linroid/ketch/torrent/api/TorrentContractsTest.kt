@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TorrentContractsTest {
@@ -71,6 +72,21 @@ class TorrentContractsTest {
     assertFailsWith<IllegalArgumentException> { snapshot.copy(counters = null) }
     assertFailsWith<IllegalArgumentException> { counters.copy(wantedBytes = 101) }
     assertFailsWith<IllegalArgumentException> { counters.copy(selectedVerifiedBytes = -1) }
+  }
+
+  @Test
+  fun snapshot_seeding_roundTripsAndIsNullFromOlderBackends() {
+    val snapshot = TorrentSnapshot("task", TorrentRevision("a", 1), TorrentActivity.STOPPED,
+      0, false, seeding = true)
+    val encoded = Json.encodeToString(TorrentSnapshot.serializer(), snapshot)
+    assertEquals(snapshot, Json.decodeFromString(TorrentSnapshot.serializer(), encoded))
+
+    val older = Json.decodeFromString<TorrentSnapshot>(
+      """{"taskId":"task","revision":{"epoch":"a","sequence":1},"activity":"SEEDING",""" +
+        """"selectionGeneration":0,"selectionComplete":false}"""
+    )
+    assertNull(older.seeding)
+    assertEquals(TorrentActivity.SEEDING, older.activity)
   }
 
   @Test

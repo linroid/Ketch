@@ -167,6 +167,7 @@ class RemoteStreamTest {
       val snapshot = client.subscribe(TorrentInterest("t1")).first()
 
       assertEquals("t1", snapshot?.taskId)
+      assertEquals(true, snapshot?.seeding)
     }
   }
 
@@ -214,6 +215,7 @@ class RemoteStreamTest {
           activity = TorrentActivity.DOWNLOADING,
           selectionGeneration = 1,
           selectionComplete = false,
+          seeding = true,
         ),
       )
       awaitCancellation()

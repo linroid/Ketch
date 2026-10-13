@@ -571,6 +571,8 @@
   <string name="settings_torrent_upload_off_hint">Пиры не могут ничего скачать с этого устройства.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Пока торренты загружаются, пиры могут скачивать уже полученные вами части.</string>
   <string name="settings_torrent_upload_seed_hint">Готовые торренты продолжают отдачу, пока вы их не остановите или не отключите этот параметр, в том числе после перезапуска Ketch.</string>
+  <string name="settings_torrent_upload_wifi_only">Только по Wi-Fi</string>
+  <string name="settings_torrent_upload_wifi_only_hint">Приостанавливает отдачу в мобильной сети и других лимитных сетях.</string>
   <string name="settings_torrent_upload_limit">Ограничение отдачи</string>
   <string name="settings_torrent_upload_limit_hint">Общее для всех торрентов.</string>
   <string name="settings_torrent_upload_footer">Пиры, которым вы отдаёте данные, видят IP-адрес этого устройства. Приватные торренты делятся только с пирами своего трекера.</string>
@@ -789,6 +791,8 @@
   <string name="settings_search_trackers_keywords">анонс, announce, udp, magnet, добавить трекеры</string>
   <string name="settings_search_upload">Делиться частями с пирами и раздавать готовые торренты</string>
   <string name="settings_search_upload_keywords">отдача, раздача, сид, seed, ratio, рейтинг, пиры</string>
+  <string name="settings_search_upload_wifi_only">Отдавать пирам только по Wi-Fi</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, вайфай, мобильный интернет, сотовая сеть, лимитная сеть, точка доступа, экономия трафика, отдача</string>
   <string name="settings_search_pair">Управлять этим устройством с телефона или из браузера</string>
   <string name="settings_search_pair_keywords">qr-код, qr, телефон, сопряжение, удалённо, веб-приложение, подключить</string>
   <string name="settings_search_reachable_keywords">локальная сеть, lan, сеть, удалённый доступ</string>

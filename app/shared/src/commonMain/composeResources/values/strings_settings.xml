@@ -728,6 +728,9 @@
   <string name="settings_torrent_upload_off_hint">Peers can't download anything from this device.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Peers can download the pieces you have while your torrents download.</string>
   <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading until you stop them or turn this off, also after Ketch restarts.</string>
+  <string name="settings_torrent_upload_wifi_only">Only on Wi-Fi</string>
+  <!-- Under Only on Wi-Fi: uploading resumes by itself on Wi-Fi or another unmetered network. -->
+  <string name="settings_torrent_upload_wifi_only_hint">Pauses uploading on mobile data and other metered networks.</string>
   <string name="settings_torrent_upload_limit">Upload limit</string>
   <!-- Under Upload limit: one cap for all torrents together, not one per torrent. -->
   <string name="settings_torrent_upload_limit_hint">Shared by all torrents.</string>
@@ -980,6 +983,8 @@
   <string name="settings_search_trackers_keywords">announce, udp, magnet, add trackers</string>
   <string name="settings_search_upload">Share pieces with peers and seed finished torrents</string>
   <string name="settings_search_upload_keywords">upload, seed, seeding, share, ratio, peers</string>
+  <string name="settings_search_upload_wifi_only">Upload to peers only on Wi-Fi</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, mobile data, cellular, metered, hotspot, data saver, upload</string>
   <string name="settings_search_pair">Control this device from a phone or browser</string>
   <string name="settings_search_pair_keywords">qr code, phone, pairing, remote, web app, connect</string>
   <string name="settings_search_reachable_keywords">lan, network, remote access</string>

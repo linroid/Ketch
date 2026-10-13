@@ -38,11 +38,13 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -82,6 +84,8 @@ internal class KetchTorrentController(
   private val cacheMutex = Mutex()
   // Access order: the least recently used file list is dropped first.
   private val fileCache = LinkedHashMap<String, CachedFiles>()
+  /** Grows with each [controlChanged], which [observe] follows. */
+  private val controlChanges = MutableStateFlow(0L)
 
   private class CachedFiles(
     val sourceState: SourceState?,
@@ -113,6 +117,15 @@ internal class KetchTorrentController(
     return snapshotOf(task)
   }
 
+  /**
+   * Tells [observe] that a task's saved control changed, such as its intent to seed, which may
+   * change nothing else it follows: a task that waits for uploads to resume neither starts nor
+   * stops seeding when its intent changes.
+   */
+  fun controlChanged() {
+    controlChanges.update { it + 1 }
+  }
+
   /** What [TorrentInterest] reports in process; see there. */
   fun observe(taskId: String): Flow<TorrentSnapshot?> = channelFlow {
     if (!subscriptions.tryAcquire()) {
@@ -133,7 +146,7 @@ internal class KetchTorrentController(
         launch {
           merge(
             task.state.map {}, task.requestState.map {}, task.segments.map {},
-            source.seedingTaskIds.map {}, tasks.map {},
+            source.seedingTaskIds.map {}, tasks.map {}, controlChanges.map {},
           ).collect { changes.trySend(Unit) }
         }
         // Counters move without a state change while a session transfers.
@@ -249,6 +262,7 @@ internal class KetchTorrentController(
   ): TorrentCommandResult {
     val task = torrentTask(taskId) ?: throw notFound()
     var alreadyActive = false
+    var uploadsPaused = false
     val digest = sha256Hex("seeding\n$seeding")
     val outcome = mapErrors {
       host.setSharing(
@@ -281,13 +295,21 @@ internal class KetchTorrentController(
                 "Every torrent slot is taken",
               )
               SeedingOutcome.ALREADY_ACTIVE -> alreadyActive = true
+              // Accepted: the intent is saved, and the task seeds once uploads resume.
+              SeedingOutcome.UPLOADS_PAUSED -> uploadsPaused = true
               else -> {}
             }
           }
         },
       )
     }
-    if (!outcome.replayed && seeding && !alreadyActive) seed(task)
+    // Only the record holds the intent, as when the task waits for uploads to resume.
+    controlChanged()
+    // Uploads that resumed while the command ran may have walked past the task before its
+    // intent was saved.
+    if (!outcome.replayed && seeding && !alreadyActive &&
+      (!uploadsPaused || source.seedingAvailability(taskId) == null)
+    ) seed(task)
     return result(taskId, outcome, outcome.sharing)
   }
 
@@ -457,6 +479,8 @@ internal class KetchTorrentController(
       selectionGeneration = content.generation,
       selectionComplete = content.selectionComplete,
       counters = content.counters,
+      // A session the source has not reported seeding yet still seeds.
+      seeding = content.seeding || content.activity == TorrentActivity.SEEDING,
     )
   }
 

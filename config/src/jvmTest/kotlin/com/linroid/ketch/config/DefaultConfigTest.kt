@@ -64,7 +64,7 @@ class DefaultConfigTest {
       assertEquals(1, config.torrent.trackers.size)
       assertEquals(listOf("https://lists.example.org/trackers.txt"), config.torrent.trackerListUrls)
       assertEquals(6881, config.torrent.listenPort)
-      assertEquals(TorrentUploadMode.Off, config.torrent.upload)
+      assertEquals(TorrentUploadMode.WhileDownloading, config.torrent.upload)
       assertEquals(SpeedLimit.Unlimited, config.torrent.uploadLimit)
       val (command, webhook) = config.hooks
       assertEquals(listOf("/usr/local/bin/ketch-done"), command.command)

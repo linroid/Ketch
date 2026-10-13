@@ -14,7 +14,9 @@ import kotlinx.serialization.encoding.Encoder
  * What this device shares with the peers of its torrents.
  *
  * Saved as [id]. An id this version does not know, or a value that is not a string at all, loads
- * as [Off] rather than failing the whole config file.
+ * as [Off] rather than failing the whole config file. That is deliberately not the default
+ * ([WhileDownloading]): a value the user wrote but this version cannot read never turns uploading
+ * on.
  *
  * @property id value stored in `config.toml`.
  */
@@ -23,7 +25,10 @@ enum class TorrentUploadMode(val id: String) {
   /** Never uploads file data; peers cannot fetch a magnet's metadata from this device either. */
   Off(id = "off"),
 
-  /** Uploads verified pieces while torrents download, and stops when each one finishes. */
+  /**
+   * Uploads verified pieces while torrents download, and stops when each one finishes. The
+   * default.
+   */
   WhileDownloading(id = "while-downloading"),
 
   /**
@@ -127,9 +132,13 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  *   and runs DHT on, UDP; `0` lets the system pick a free one at every launch.
  *   The apps and the CLI's other commands always let the system pick, so they
  *   never contend for the server's port.
- * @property upload what this device uploads to peers: nothing by default. Peers it uploads to
- *   see its IP address.
+ * @property upload what this device uploads to peers: verified pieces while torrents download by
+ *   default ([TorrentUploadMode.WhileDownloading]). Peers it uploads to see its IP address. Config
+ *   files the apps saved before this default keep the `off` they wrote.
  * @property uploadLimit cap on the upload speed of all torrents together; unlimited by default.
+ * @property uploadWifiOnly whether uploads pause while the device is not on Wi-Fi or another
+ *   unmetered network, and resume by themselves once it is; on by default. Only the Android and
+ *   iOS apps follow it: the desktop app, the CLI and `ketch server` ignore it.
  * @property encryption protocol encryption for peer connections: encrypted first by default.
  * @property utp whether peers are also reached over uTP; on by default.
  * @property portMapping whether the home router is asked (NAT-PMP, then UPnP) to forward the
@@ -144,9 +153,10 @@ data class TorrentSettings(
   val trackerListUrls: List<String> = DEFAULT_TRACKER_LISTS,
   val trackerListUrl: String? = null,
   val listenPort: Int = 0,
-  val upload: TorrentUploadMode = TorrentUploadMode.Off,
+  val upload: TorrentUploadMode = TorrentUploadMode.WhileDownloading,
   @Serializable(with = LenientSpeedLimitSerializer::class)
   val uploadLimit: SpeedLimit = SpeedLimit.Unlimited,
+  val uploadWifiOnly: Boolean = true,
   val encryption: TorrentEncryptionMode = TorrentEncryptionMode.Preferred,
   val utp: Boolean = true,
   val portMapping: Boolean = true,

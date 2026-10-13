@@ -112,6 +112,29 @@ UDP 16881 转发到 NAS。Ketch 对外公布的是它监听的端口，所以映
 端口，比如 51413，就设置 `KETCH_TORRENT_PORT=51413`，并映射 `51413:51413` 和 `51413:51413/udp`。
 NAS 上的其他 BitTorrent 客户端需要使用不同的端口。
 
+## 上传给其他用户
+
+种子下载期间，Ketch 会把已有的分块上传给这个种子的其他用户，下载完成后停止上传。旧版本默认不上传。
+如果不想上传任何内容，把 `KETCH_TORRENT_UPLOAD` 设为 `off`，然后重新创建容器（`docker compose up -d`）：
+
+```yaml
+    environment:
+      KETCH_TORRENT_UPLOAD: "off"
+```
+
+请保留引号：有些 YAML 解析器会把不带引号的 `off` 读成 false，服务器会因此报错并停止。使用
+`docker run` 时，传入 `-e KETCH_TORRENT_UPLOAD=off`。
+
+也可以在 `/config/config.toml` 中关闭上传，然后重启容器。两者都设置时，以环境变量为准。
+
+```toml
+[torrent]
+upload = "off"
+```
+
+设为 `seed`（`KETCH_TORRENT_UPLOAD=seed` 或 `upload = "seed"`）会在服务器运行期间持续为已完成的种子
+做种，在配置文件中设置 `uploadLimit = "1m"` 可以限制上传速度。详见[做种和上传](torrent.md#seeding-and-uploading)。
+
 ## 环境变量
 
 环境变量优先于 `/config/config.toml`，而作为容器命令传入的 `ketch server` 选项又优先于两者。值为空
@@ -129,6 +152,7 @@ NAS 上的其他 BitTorrent 客户端需要使用不同的端口。
 | `KETCH_DOWNLOAD_DIR` | `/downloads` | 下载文件夹 |
 | `KETCH_ALLOWED_DIRS` | | 除下载文件夹外，客户端可以保存和删除文件的文件夹，用逗号分隔 |
 | `KETCH_TORRENT_PORT` | `16881` | BitTorrent 端口（TCP 和 UDP）；`0` 表示每次启动随机选择空闲端口 |
+| `KETCH_TORRENT_UPLOAD` | `while-downloading` | 其他 BitTorrent 用户可以从这里下载什么：`off`、`while-downloading` 或 `seed`；参见[上传给其他用户](#上传给其他用户) |
 | `KETCH_SPEED_LIMIT` | 不限速 | 全局限速，例如 `10m`（MB/s）或 `500k`（KB/s） |
 | `KETCH_MAX_CONCURRENT_DOWNLOADS` | `4` | 同时进行的下载数；`0` 表示不限 |
 | `KETCH_MAX_CONNECTIONS_PER_DOWNLOAD` | `4` | 每个 HTTP 或 FTP 下载的连接数 |

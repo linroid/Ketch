@@ -535,6 +535,8 @@
   <string name="settings_torrent_upload_off_hint">對等端無法從此裝置下載任何內容。</string>
   <string name="settings_torrent_upload_while_downloading_hint">種子下載期間，對等端可以下載已有的區塊。</string>
   <string name="settings_torrent_upload_seed_hint">已完成的種子會持續上傳，直到手動停止或關閉此選項，Ketch 重新啟動後依然如此。</string>
+  <string name="settings_torrent_upload_wifi_only">僅限 Wi-Fi</string>
+  <string name="settings_torrent_upload_wifi_only_hint">使用行動數據或其他計量付費網路時暫停上傳。</string>
   <string name="settings_torrent_upload_limit">上傳速度限制</string>
   <string name="settings_torrent_upload_limit_hint">所有種子共用。</string>
   <string name="settings_torrent_upload_footer">接收上傳的對等端可以看到此裝置的 IP 位址。私人種子只與其 Tracker 提供的對等端分享。</string>
@@ -732,6 +734,8 @@
   <string name="settings_search_trackers_keywords">announce, udp, 磁力, 新增 tracker, 追蹤器</string>
   <string name="settings_search_upload">與對等端分享區塊，並為已完成的種子做種</string>
   <string name="settings_search_upload_keywords">上傳, 做種, seed, 分享, 分享率, 對等端</string>
+  <string name="settings_search_upload_wifi_only">僅在 Wi-Fi 下向對等端上傳</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, 無線, 行動數據, 行動網路, 流量, 計量付費, 熱點, 數據節省, 上傳</string>
   <string name="settings_search_pair">從手機或瀏覽器控制此裝置</string>
   <string name="settings_search_pair_keywords">qr code, QR 碼, 手機, 配對, 遠端, 網頁版, 連線</string>
   <string name="settings_search_reachable_keywords">區域網路, lan, 網路, 遠端存取</string>

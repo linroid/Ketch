@@ -102,6 +102,8 @@ import ketch.app.shared.generated.resources.settings_torrent_upload_seed
 import ketch.app.shared.generated.resources.settings_torrent_upload_seed_hint
 import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading
 import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only_hint
 import ketch.app.shared.generated.resources.settings_torrent_utp
 import ketch.app.shared.generated.resources.settings_torrent_utp_hint
 import org.jetbrains.compose.resources.StringResource
@@ -134,7 +136,11 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   controller.torrentError?.let {
     SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
   }
-  UploadGroup(settings = torrent, onChange = controller::updateTorrent)
+  UploadGroup(
+    settings = torrent,
+    followsNetwork = state.instanceManager.followsUploadNetwork,
+    onChange = controller::updateTorrent,
+  )
   ConnectionsGroup(settings = torrent, onChange = controller::updateTorrent)
   if (removed.isNotEmpty()) {
     SettingsNotice(
@@ -228,11 +234,17 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
 }
 
 /**
- * Whether peers may download from this device, with a hint for the choice, and the upload cap
- * all torrents share, which only matters while something is uploaded.
+ * Whether peers may download from this device, with a hint for the choice; where the device's
+ * uploads follow its network ([followsNetwork], the phone apps), whether they wait for Wi-Fi;
+ * and the upload cap all torrents share. The last two only matter while something is uploaded.
  */
 @Composable
-private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+private fun UploadGroup(
+  settings: TorrentSettings,
+  followsNetwork: Boolean,
+  onChange: (TorrentSettings) -> Unit,
+) {
+  val uploads = settings.upload != TorrentUploadMode.Off
   SettingsGroup(
     title = stringResource(Res.string.settings_torrent_upload),
     footer = stringResource(Res.string.settings_torrent_upload_footer),
@@ -250,17 +262,26 @@ private fun UploadGroup(settings: TorrentSettings, onChange: (TorrentSettings) -
         revealInitialSelection = true,
       )
     }
+    if (followsNetwork) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_upload_wifi_only),
+        description = stringResource(Res.string.settings_torrent_upload_wifi_only_hint),
+        checked = settings.uploadWifiOnly,
+        onCheckedChange = { onChange(settings.copy(uploadWifiOnly = it)) },
+        enabled = uploads,
+      )
+    }
     val limit = settings.uploadLimit
     SettingsRow(
       title = stringResource(Res.string.settings_torrent_upload_limit),
       description = stringResource(Res.string.settings_torrent_upload_limit_hint),
-      enabled = settings.upload != TorrentUploadMode.Off,
+      enabled = uploads,
     ) {
       SpeedLimitPicker(
         value = limit,
         onCommit = { onChange(settings.copy(uploadLimit = it)) },
         presets = speedChoices(SpeedLimitPickerPresets, limit),
-        enabled = settings.upload != TorrentUploadMode.Off,
+        enabled = uploads,
       )
     }
   }

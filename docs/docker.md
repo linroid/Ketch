@@ -119,6 +119,32 @@ listens on, so map the same number on both sides. To use another port, say 51413
 `KETCH_TORRENT_PORT=51413` and map `51413:51413` and `51413:51413/udp`. Another BitTorrent client
 on the NAS needs a port of its own.
 
+## Uploading to peers
+
+While a torrent downloads, Ketch uploads the pieces it already has to the torrent's other peers,
+and stops once the download finishes. Earlier versions uploaded nothing unless told to. To upload
+nothing, set `KETCH_TORRENT_UPLOAD` to `off` and recreate the container (`docker compose up -d`):
+
+```yaml
+    environment:
+      KETCH_TORRENT_UPLOAD: "off"
+```
+
+Keep the quotes: some YAML readers take a bare `off` for false, and the server then stops with an
+error. With `docker run`, pass `-e KETCH_TORRENT_UPLOAD=off`.
+
+You can also turn it off in `/config/config.toml` and restart the container. The variable wins
+when both are set.
+
+```toml
+[torrent]
+upload = "off"
+```
+
+`seed` (`KETCH_TORRENT_UPLOAD=seed` or `upload = "seed"`) keeps sharing finished torrents while the
+server runs, and `uploadLimit = "1m"` in the config file caps the upload speed. See
+[seeding and uploading](torrent.md#seeding-and-uploading).
+
 ## Environment variables
 
 Environment variables take precedence over `/config/config.toml`, and `ketch server` options
@@ -136,6 +162,7 @@ given as the container's command over both. Blank values count as unset.
 | `KETCH_DOWNLOAD_DIR` | `/downloads` | Download folder |
 | `KETCH_ALLOWED_DIRS` | | Comma-separated folders, besides the download folder, clients may save to and delete from |
 | `KETCH_TORRENT_PORT` | `16881` | BitTorrent port (TCP and UDP); `0` picks a free one at every start |
+| `KETCH_TORRENT_UPLOAD` | `while-downloading` | What torrent peers may download: `off`, `while-downloading` or `seed`; see [uploading to peers](#uploading-to-peers) |
 | `KETCH_SPEED_LIMIT` | unlimited | Global speed limit, such as `10m` (MB/s) or `500k` (KB/s) |
 | `KETCH_MAX_CONCURRENT_DOWNLOADS` | `4` | Downloads at once; `0` for no limit |
 | `KETCH_MAX_CONNECTIONS_PER_DOWNLOAD` | `4` | Connections per HTTP or FTP download |

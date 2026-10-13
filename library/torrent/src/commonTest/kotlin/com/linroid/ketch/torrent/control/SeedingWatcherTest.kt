@@ -24,11 +24,14 @@ import com.linroid.ketch.torrent.api.TorrentCommandContext
 import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -64,6 +67,22 @@ class SeedingWatcherTest {
     var restores = true
     override val restoresSeeding: Boolean get() = restores
     override val torrentCapabilities: Set<String> = emptySet()
+    val resumes = MutableStateFlow(0L)
+    override val sharingResumes: StateFlow<Long> = resumes
+
+    /** Tasks whose completion the source deferred, as paused uploads do. */
+    val deferred = mutableSetOf<String>()
+
+    /** Holds [takeDeferredSharing] until it completes. */
+    var deferGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun takeDeferredSharing(taskId: String): Boolean {
+      deferGate?.await()
+      return deferred.remove(taskId)
+    }
+
+    /** What [seedingAvailability] answers for every task. */
+    var availability: SeedingOutcome? = null
 
     /** Outcomes of [startSeeding] by task; seeding by default. */
     val outcomes = mutableMapOf<String, SeedingOutcome>()
@@ -96,6 +115,8 @@ class SeedingWatcherTest {
       onFinish(context.taskId)
     }
 
+    // A state to seed from, as a torrent saves its own.
+    override suspend fun store(context: DownloadContext): Unit = Unit
 
     override suspend fun torrentFiles(
       sourceState: SourceState?,
@@ -104,7 +125,7 @@ class SeedingWatcherTest {
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = null
 
-    override suspend fun seedingAvailability(taskId: String): SeedingOutcome? = null
+    override suspend fun seedingAvailability(taskId: String): SeedingOutcome? = availability
 
     override suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
       started += task.taskId
@@ -455,6 +476,165 @@ class SeedingWatcherTest {
 
       assertEquals(listOf("first"), source.started)
       assertEquals(true, store.load("first")?.control?.sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun restore_uploadsPaused_stopsTheWalkAndKeepsIntents() = runTest {
+    val source = SeedingSource()
+    source.outcomes["first"] = SeedingOutcome.UPLOADS_PAUSED
+    val store = RecordingTaskStore()
+    store.save(completed("first", 1_000))
+    store.save(completed("second", 2_000))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+
+      assertEquals(listOf("first"), source.started)
+      assertEquals(true, store.load("first")?.control?.sharing)
+      assertEquals(true, store.load("second")?.control?.sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun sharingResumes_bump_walksAgain() = runTest {
+    // Uploads start paused: the start's walk restores nothing.
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("early", 1_000))
+    store.save(completed("late", 2_000))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      assertEquals(emptyList(), source.started)
+
+      source.restores = true
+      source.resumes.value = 1
+      runCurrent()
+
+      assertEquals(listOf("early", "late"), source.started)
+      assertTrue(ketch.tasks.value.all {
+        assertIs<DownloadState.Completed>(it.state.value).sharing
+      })
+      // Another resume skips the tasks seeding already.
+      source.resumes.value = 2
+      runCurrent()
+      assertEquals(listOf("early", "late"), source.started)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun taskCompleted_deferredSharing_savesIntentAndSeedsWhenAvailable() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    source.onFinish = { taskId -> source.deferred += taskId }
+    source.availability = SeedingOutcome.UPLOADS_PAUSED
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      val paused = ketch.download(request("seed:paused"))
+      runCurrent()
+
+      // Uploads are still paused: the intent is saved and the task waits for them.
+      assertIs<DownloadState.Completed>(paused.state.value)
+      assertEquals(true, store.load(paused.taskId)?.control?.sharing)
+      assertEquals(emptyList(), source.started)
+      assertTrue(source.deferred.isEmpty())
+
+      // Uploads resumed before the intent was saved: the task seeds at once.
+      source.availability = null
+      val resumed = ketch.download(request("seed:resumed"))
+      runCurrent()
+
+      assertEquals(true, store.load(resumed.taskId)?.control?.sharing)
+      assertEquals(listOf(resumed.taskId), source.started)
+      assertTrue(assertIs<DownloadState.Completed>(resumed.state.value).sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun taskCompleted_deferredSharing_reachesSubscribers() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    source.onFinish = { taskId -> source.deferred += taskId }
+    source.availability = SeedingOutcome.UPLOADS_PAUSED
+    // The intent is saved only after subscribers saw the completion.
+    val gate = CompletableDeferred<Unit>().also { source.deferGate = it }
+    val ketch = ketch(source)
+    try {
+      ketch.start()
+      val task = ketch.download(request("seed:paused"))
+      val received = mutableListOf<TorrentSnapshot?>()
+      val job = launch { ketch.subscribe(TorrentInterest(task.taskId)).collect { received += it } }
+      runCurrent()
+      assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals(false, assertNotNull(received.last()).seeding)
+
+      gate.complete(Unit)
+      runCurrent()
+
+      assertEquals(true, assertNotNull(received.last()).seeding)
+      assertEquals(emptyList(), source.started)
+      job.cancel()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun restore_changedOnDisk_clearedIntentReachesSubscribers() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    source.outcomes["changed"] = SeedingOutcome.CHANGED_ON_DISK
+    val store = RecordingTaskStore()
+    store.save(completed("changed", 1_000))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      val received = mutableListOf<TorrentSnapshot?>()
+      val job = launch { ketch.subscribe(TorrentInterest("changed")).collect { received += it } }
+      runCurrent()
+      assertEquals(true, assertNotNull(received.last()).seeding)
+
+      source.restores = true
+      source.resumes.value = 1
+      runCurrent()
+
+      assertEquals(listOf("changed"), source.started)
+      assertEquals(false, store.load("changed")?.control?.sharing)
+      assertEquals(false, assertNotNull(received.last()).seeding)
+      job.cancel()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun taskCompleted_restoredWithoutIntent_savesNoIntent() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("plain", 1_000, seeding = null))
+    store.save(completed("stopped", 2_000, seeding = false))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      source.restores = true
+      source.resumes.value = 1
+      runCurrent()
+
+      // Restored completions are no completions the source deferred.
+      assertEquals(emptyList(), source.started)
+      assertEquals(null, store.load("plain")?.control?.sharing)
+      assertEquals(false, store.load("stopped")?.control?.sharing)
     } finally {
       ketch.close()
     }

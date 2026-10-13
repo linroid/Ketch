@@ -193,4 +193,5 @@
   <string name="inspector_seeding_status">시딩 중 · ↑ %1$s · %2$s 업로드됨</string>
   <string name="inspector_seeding_stop">시딩 중지</string>
   <string name="inspector_seeding_start">시드</string>
+  <string name="inspector_seeding_waiting">시딩 대기 중</string>
 </resources>

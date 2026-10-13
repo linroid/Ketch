@@ -1,6 +1,6 @@
 # Privacy policy
 
-Effective 5 October 2026. This policy covers the Ketch apps for Android, iOS and iPadOS, macOS,
+Effective 13 October 2026. This policy covers the Ketch apps for Android, iOS and iPadOS, macOS,
 Windows, Linux and the web, the `ketch` command line and server, and the Ketch browser extension.
 
 Ketch is an open-source download manager. It has no accounts, no ads, no analytics and no crash
@@ -38,10 +38,14 @@ Ketch only connects to the places you point it at:
 - **BitTorrent peers and trackers.** For a torrent or magnet link, Ketch connects to the trackers
   it names and to other peers, and uses the distributed hash table (DHT) to find them. As with
   any BitTorrent client, the trackers and peers can see your IP address and which torrent you
-  are downloading. Uploading is off by default. If you turn it on (Settings → BitTorrent, or
-  `[torrent] upload`), peers also download the pieces you have from you; with *Keep seeding*,
-  Ketch keeps sharing finished torrents while it runs, until you stop sharing them, remove them
-  or turn it off, and shares them again after it restarts.
+  are downloading. By default, while a torrent downloads, peers also download from you the pieces
+  you already have, and uploading stops once it finishes. On Android and iOS this happens only
+  over Wi-Fi or another network that is not metered, unless you turn off *Only on Wi-Fi*. To
+  upload nothing, choose *Off* under Settings → BitTorrent → Uploading, or set
+  `[torrent] upload = "off"`. An app whose saved settings already say *Off*, as Ketch 0.5 to 0.7
+  saved them by default, keeps it; check Settings → BitTorrent → Uploading after updating. With
+  *Keep seeding*, Ketch keeps sharing finished torrents while it runs, until you stop sharing
+  them, remove them or turn it off, and shares them again after it restarts.
 - **Your router and local network, for torrents.** By default Ketch asks your router (UPnP or
   NAT-PMP) to forward a port so more peers can reach it, and, on the desktop, Android and the
   server, announces the public torrents it downloads to other devices on your local network

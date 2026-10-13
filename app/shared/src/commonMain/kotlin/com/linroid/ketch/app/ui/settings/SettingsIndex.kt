@@ -142,6 +142,8 @@ import ketch.app.shared.generated.resources.settings_search_trackers
 import ketch.app.shared.generated.resources.settings_search_trackers_keywords
 import ketch.app.shared.generated.resources.settings_search_upload
 import ketch.app.shared.generated.resources.settings_search_upload_keywords
+import ketch.app.shared.generated.resources.settings_search_upload_wifi_only
+import ketch.app.shared.generated.resources.settings_search_upload_wifi_only_keywords
 import ketch.app.shared.generated.resources.settings_search_version_keywords
 import ketch.app.shared.generated.resources.settings_search_web_search
 import ketch.app.shared.generated.resources.settings_search_web_search_keywords
@@ -162,6 +164,7 @@ import ketch.app.shared.generated.resources.settings_speed_rules
 import ketch.app.shared.generated.resources.settings_speed_slow_lane
 import ketch.app.shared.generated.resources.settings_torrent_trackers
 import ketch.app.shared.generated.resources.settings_torrent_upload_mode
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only
 
 /**
  * Every setting search finds, page by page. Titles and anchors are the resources of the rows and
@@ -499,6 +502,13 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     title = Res.string.settings_torrent_upload_mode,
     description = Res.string.settings_search_upload.text(),
     keywords = Res.string.settings_search_upload_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.BitTorrent,
+    title = Res.string.settings_torrent_upload_wifi_only,
+    description = Res.string.settings_search_upload_wifi_only.text(),
+    keywords = Res.string.settings_search_upload_wifi_only_keywords,
+    needs = SettingsFeature.UploadWifiOnly,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.BitTorrent,

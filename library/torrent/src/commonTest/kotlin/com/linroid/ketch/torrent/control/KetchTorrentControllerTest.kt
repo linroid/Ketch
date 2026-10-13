@@ -616,6 +616,7 @@ class KetchTorrentControllerTest {
       val snapshot = assertNotNull(ketch.torrents.snapshot(task.taskId))
 
       assertEquals(TorrentActivity.SEEDING, snapshot.activity)
+      assertEquals(true, snapshot.seeding)
       assertTrue(snapshot.selectionComplete)
       val counters = assertNotNull(snapshot.counters)
       assertEquals(100, counters.selectedVerifiedBytes)
@@ -623,7 +624,10 @@ class KetchTorrentControllerTest {
       assertEquals(2048, counters.uploadedPayloadBytes)
       assertEquals(512, counters.uploadBytesPerSecond)
       source.live.remove(task.taskId)
-      assertEquals(TorrentActivity.STOPPED, ketch.torrents.snapshot(task.taskId)?.activity)
+      val stopped = assertNotNull(ketch.torrents.snapshot(task.taskId))
+      assertEquals(TorrentActivity.STOPPED, stopped.activity)
+      // Neither seeding nor meant to.
+      assertEquals(false, stopped.seeding)
     } finally {
       ketch.close()
     }
@@ -784,6 +788,78 @@ class KetchTorrentControllerTest {
       assertEquals(on, controller.setSeeding(task.taskId, true, context("on", on.revision)))
       runCurrent()
       assertEquals(1, source.started.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun setSeeding_uploadsPaused_savesIntentWithoutSeeding() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.SEEDING.wireName
+    source.availability = SeedingOutcome.UPLOADS_PAUSED
+    val ketch = ketch(source)
+    try {
+      ketch.start()
+      val task = completedTask(ketch, source)
+      val controller = ketch.torrents
+
+      val on = controller.setSeeding(
+        task.taskId, true, context("on", controller.revisionOf(task.taskId)),
+      )
+      runCurrent()
+
+      // Accepted and remembered: the task seeds once uploads resume.
+      assertEquals(true, on.seeding)
+      assertEquals(true, task.saved.control?.sharing)
+      assertTrue(source.started.isEmpty())
+      val snapshot = assertNotNull(controller.snapshot(task.taskId))
+      assertEquals(TorrentActivity.STOPPED, snapshot.activity)
+      // Meant to seed without a live session, so clients can still offer Stop seeding.
+      assertEquals(true, snapshot.seeding)
+
+      val off = controller.setSeeding(task.taskId, false, context("off", snapshot.revision))
+      runCurrent()
+
+      assertEquals(false, off.seeding)
+      assertEquals(false, task.saved.control?.sharing)
+      val cleared = assertNotNull(controller.snapshot(task.taskId))
+      assertEquals(false, cleared.seeding)
+      assertEquals(TorrentActivity.STOPPED, cleared.activity)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun observe_seedingIntentWhileUploadsPaused_emitsIt() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.SEEDING.wireName
+    source.availability = SeedingOutcome.UPLOADS_PAUSED
+    val ketch = ketch(source)
+    try {
+      ketch.start()
+      val task = completedTask(ketch, source)
+      val received = mutableListOf<TorrentSnapshot?>()
+      val job = launch { ketch.subscribe(TorrentInterest(task.taskId)).collect { received += it } }
+      runCurrent()
+      val before = assertNotNull(received.last())
+      assertEquals(false, before.seeding)
+
+      ketch.torrents.setSeeding(task.taskId, true, context("on", before.revision))
+      runCurrent()
+
+      // Nothing starts seeding, yet subscribers see the intent, with a revision Stop can use.
+      val waiting = assertNotNull(received.last())
+      assertEquals(true, waiting.seeding)
+      assertEquals(TorrentActivity.STOPPED, waiting.activity)
+      assertTrue(source.started.isEmpty())
+
+      ketch.torrents.setSeeding(task.taskId, false, context("off", waiting.revision))
+      runCurrent()
+
+      assertEquals(false, assertNotNull(received.last()).seeding)
+      job.cancel()
     } finally {
       ketch.close()
     }
