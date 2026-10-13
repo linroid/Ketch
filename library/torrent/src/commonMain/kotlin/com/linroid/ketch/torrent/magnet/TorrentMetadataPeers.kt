@@ -26,9 +26,9 @@ internal const val MAX_METADATA_PEERS = 4096
 /**
  * Peers one metadata lookup asks at once. Each holds a connection; only one at a time reserves
  * the metadata buffer, after its handshake, so peers that never answer cannot keep a live one
- * waiting.
+ * waiting. Most peers a swarm lists cannot be reached, so few at once leave most unasked.
  */
-internal const val METADATA_PARALLEL_PEERS = 4
+internal const val METADATA_PARALLEL_PEERS = 16
 
 /**
  * Asks the peers [discovered] sends for metadata with [fetch], [parallelism] at a time, until
@@ -37,7 +37,9 @@ internal const val METADATA_PARALLEL_PEERS = 4
  * Each peer is asked as soon as it is found and a slot is free. One that fails is asked again
  * after each of [retryDelaysMs], behind any peers found meanwhile, so a swarm of one or two
  * peers that are briefly busy or unreachable still resolves; a peer found again while it waits
- * is not queued twice. [onPeer] gets the number of distinct peers found so far. A
+ * is not queued twice. [onPeer] gets the number of distinct peers found so far, [onAsked] the
+ * number asked so far. A peer [skip] matches when its turn comes is dropped, retries included,
+ * as what it rules out may be learned after the peer was found. A
  * [PrivateTorrentMagnetException] ends the lookup.
  *
  * @param label names the lookup in logs, such as "Metadata for 45b3e332a3b9".
@@ -46,6 +48,8 @@ internal suspend fun <T> fetchFromMetadataPeers(
   label: String,
   discovered: ReceiveChannel<PeerEndpoint>,
   onPeer: (Int) -> Unit = {},
+  onAsked: (Int) -> Unit = {},
+  skip: (PeerEndpoint) -> Boolean = { false },
   retryDelaysMs: List<Long> = METADATA_RETRY_DELAYS_MS,
   parallelism: Int = METADATA_PARALLEL_PEERS,
   fetch: suspend (PeerEndpoint) -> T,
@@ -92,8 +96,12 @@ internal suspend fun <T> fetchFromMetadataPeers(
     }
   }
   launch {
+    // Counted here, the one coroutine that hands out slots.
+    var askedPeers = 0
     for ((endpoint, previous) in ready) {
+      if (skip(endpoint)) continue
       slots.acquire()
+      if (previous == 0) onAsked(++askedPeers)
       launch {
         try {
           ask(endpoint, previous + 1)

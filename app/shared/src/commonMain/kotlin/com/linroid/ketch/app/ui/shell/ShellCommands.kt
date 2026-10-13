@@ -139,6 +139,7 @@ internal class ShellCommands(
         shell.discover.historyOpen = false
         shell.discover.focusComposer()
       }
+      KetchCommands.Connections -> return shell.show(AppDestination.Connections)
       KetchCommands.Devices -> return shell.show(AppDestination.Devices)
       KetchCommands.AllDevices -> return state.showAllDevices()
       KetchCommands.SwitchDevice -> state.showInstanceSelector = !state.showInstanceSelector
@@ -227,6 +228,7 @@ internal class ShellCommands(
       KetchCommands.Palette,
       KetchCommands.Search,
       KetchCommands.Discover,
+      KetchCommands.Connections,
       KetchCommands.Devices,
       KetchCommands.AllDevices,
       KetchCommands.SwitchDevice,

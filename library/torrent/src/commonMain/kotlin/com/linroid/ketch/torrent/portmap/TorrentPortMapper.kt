@@ -30,6 +30,8 @@ internal class TorrentPortMapper(
   /** The UDP port DHT and uTP listen on, when one is bound. */
   private val udpPort: suspend () -> Int?,
   private val onMapped: (Int?) -> Unit,
+  /** The router's public address while a mapping holds, as [numericHost] writes it, else null. */
+  private val onExternalAddress: (String?) -> Unit = {},
   private val natPmp: NatPmpClient,
   private val upnp: UpnpClient,
   private val networks: suspend () -> List<LocalIpv4Network> = ::localIpv4Networks,
@@ -43,7 +45,12 @@ internal class TorrentPortMapper(
     data class Upnp(val gateway: UpnpGateway, val client: String) : Gateway
   }
 
-  private class Mapped(val gateway: Gateway, val mappings: List<PortMapping>, val lifetime: Long)
+  private class Mapped(
+    val gateway: Gateway,
+    val mappings: List<PortMapping>,
+    val lifetime: Long,
+    val externalAddress: String? = null,
+  )
 
   private val log = KetchLogger("TorrentEngine")
   private val mutex = Mutex()
@@ -65,6 +72,7 @@ internal class TorrentPortMapper(
         }
         if (mapped == null) {
           onMapped(null)
+          onExternalAddress(null)
           delay(retryMs)
         } else {
           awaitRenewal(mapped)
@@ -131,6 +139,7 @@ internal class TorrentPortMapper(
     }
     current = mapped
     onMapped(external)
+    onExternalAddress(mapped.externalAddress)
     return mapped
   }
 
@@ -139,8 +148,10 @@ internal class TorrentPortMapper(
     networks: List<LocalIpv4Network>,
     udp: Int?,
   ): Mapped? {
-    val gateway = (renewing?.gateway as? Gateway.NatPmp)?.address
-      ?: natPmp.discover(networks.flatMap { it.gatewayGuesses() })?.first
+    val known = (renewing?.gateway as? Gateway.NatPmp)?.address
+    // Asked again on each renewal, as the router's public address may change.
+    val (gateway, address) = known?.let { it to natPmp.externalAddress(it) }
+      ?: natPmp.discover(networks.flatMap { it.gatewayGuesses() })
       ?: return null
     val previous = renewing?.mappings?.firstOrNull { it.protocol == MappedProtocol.TCP }
     val tcp = natPmp.map(gateway, MappedProtocol.TCP, tcpPort,
@@ -157,7 +168,8 @@ internal class TorrentPortMapper(
       }
     }
     val mappings = listOfNotNull(tcp, udpMapping)
-    return Mapped(Gateway.NatPmp(gateway), mappings, mappings.minOf { it.lifetimeSeconds })
+    return Mapped(Gateway.NatPmp(gateway), mappings, mappings.minOf { it.lifetimeSeconds },
+      address?.let(::numericHost))
   }
 
   private suspend fun mapUpnp(
@@ -191,7 +203,7 @@ internal class TorrentPortMapper(
           mappings += PortMapping(protocol, internal, external, lease)
         }
         return Mapped(Gateway.Upnp(gateway, client), mappings,
-          if (lease == 0L) LIFETIME_SECONDS else lease)
+          if (lease == 0L) LIFETIME_SECONDS else lease, upnpExternalAddress(gateway))
       } catch (e: UpnpException) {
         // What this port got mapped already is removed before trying another or giving up.
         for (added in mappings) {
@@ -209,6 +221,16 @@ internal class TorrentPortMapper(
       }
     }
     return null
+  }
+
+  /** The UPnP gateway's public address, or null when it does not say. */
+  private suspend fun upnpExternalAddress(gateway: UpnpGateway): String? = try {
+    upnp.externalAddress(gateway)?.let { numericAddress(it) }?.let(::numericHost)
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    log.d { "UPnP external address unavailable: ${e.describeWithoutUrls()}" }
+    null
   }
 
   private suspend fun unmap(mapped: Mapped) {

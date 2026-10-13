@@ -75,6 +75,12 @@ class TorrentTrackerTest {
     assertFailsWith<IllegalArgumentException> {
       TorrentTracker.compactPeers(byteArrayOf(1), false)
     }
+    // An IPv4-mapped peers6 entry is the IPv4 peer, listed once with it.
+    val mapped = ByteArray(10) + byteArrayOf(-1, -1, 27, 47, -85, 124, 0x1a, 0xe1.toByte())
+    val plain = byteArrayOf(27, 47, -85, 124, 0x1a, 0xe1.toByte())
+    assertEquals(listOf(PeerEndpoint("27.47.171.124", 6881)),
+      (TorrentTracker.compactPeers(mapped, true) + TorrentTracker.compactPeers(plain, false))
+        .distinct())
     val error = assertFailsWith<IllegalArgumentException> {
       TorrentTracker.parseHttp(Bencode.encode(mapOf("failure reason" to "secret passkey")))
     }

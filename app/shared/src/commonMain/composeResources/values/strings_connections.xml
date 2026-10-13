@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Connections page: every live network connection of the shown devices, as a table on wide
+  windows and as rows on narrow ones. See docs/development/localization.md.
+-->
+<resources>
+  <!-- The search field over the table. -->
+  <string name="connections_search">Search endpoints, tasks and protocols</string>
+  <!-- The filter chip that shows the connections of every protocol. -->
+  <string name="connections_filter_all">All</string>
+  <!-- Column headers. Where a connection goes, such as "example.org:443" or a peer's IP. -->
+  <string name="connections_column_endpoint">Endpoint</string>
+  <string name="connections_column_device">Device</string>
+  <!-- The download the connection is for. -->
+  <string name="connections_column_task">Task</string>
+  <string name="connections_column_protocol">Protocol</string>
+  <!-- How it reaches its endpoint: directly, through a proxy, or a peer that connected in. -->
+  <string name="connections_column_route">Route</string>
+  <!-- A BitTorrent peer's state. -->
+  <string name="connections_column_peer">Peer</string>
+  <!-- Speeds now: received ("Down") and sent ("Up"). -->
+  <string name="connections_column_down">Down</string>
+  <string name="connections_column_up">Up</string>
+  <!-- Bytes received and sent since it opened. -->
+  <string name="connections_column_received">Received</string>
+  <string name="connections_column_sent">Sent</string>
+  <!-- How long it has been open. -->
+  <string name="connections_column_open">Open</string>
+  <!-- Route column values. -->
+  <string name="connections_route_direct">Direct</string>
+  <string name="connections_route_http_proxy">HTTP proxy</string>
+  <string name="connections_route_socks_proxy">SOCKS5 proxy</string>
+  <!-- Peer column values: the peer sends no data to this device for now, or may. -->
+  <string name="connections_peer_choked">Choked</string>
+  <string name="connections_peer_unchoked">Unchoked</string>
+  <!-- After the peer's state: this device sends data to the peer. -->
+  <string name="connections_peer_uploading">Uploading</string>
+  <!-- Shown while nothing is connected. -->
+  <string name="connections_empty_body">Connections show here while downloads run or torrents seed.</string>
+  <string name="connections_no_match">No connections match</string>
+  <!-- Shown when the shown device runs a Ketch too old to report connections. -->
+  <string name="connections_unsupported_title">This device doesn't report its connections</string>
+  <string name="connections_unsupported_body">Update Ketch on it to see them here.</string>
+  <!-- Under the list: connections left out, as only the fastest are listed. -->
+  <plurals name="connections_more">
+    <item quantity="one">%1$d slower connection isn't listed</item>
+    <item quantity="other">%1$d slower connections aren't listed</item>
+  </plurals>
+</resources>

@@ -56,6 +56,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.ConnectHost
 import com.linroid.ketch.app.ui.connect.PairingApprovalHost
 import com.linroid.ketch.app.ui.connect.ConnectLanding
+import com.linroid.ketch.app.ui.connections.ConnectionsScreen
 import com.linroid.ketch.app.ui.devices.DevicesScreen
 import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
@@ -283,7 +284,6 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     PulseSheet(
       state = appState,
       onDismissRequest = { shell.pulseSheetOpen = false },
-      showConnections = shell.destination == AppDestination.Downloads,
     )
   }
 
@@ -392,11 +392,8 @@ private fun WideShell(
     },
     top = { BannerHost(appState) },
     bottom = {
-      PulseBar(
-        state = appState,
-        barState = shell.pulseBar,
-        showConnections = shell.destination == AppDestination.Downloads && !shell.settingsOpen,
-      )
+      // Live connections have their page; the bar's grid of them stays off.
+      PulseBar(state = appState, barState = shell.pulseBar)
     },
     overlay = {
       // Above the controls a page keeps at the bottom, such as Discover's composer.
@@ -568,6 +565,7 @@ private fun Destination(
   when (destination) {
     AppDestination.Downloads -> DownloadsScreen(appState, layout.info, Modifier.fillMaxSize())
     AppDestination.Discover -> DiscoverScreen(appState)
+    AppDestination.Connections -> ConnectionsScreen(appState)
     AppDestination.Devices -> DevicesScreen(appState)
   }
 }

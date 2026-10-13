@@ -385,7 +385,8 @@ private fun DetailLine(text: String) {
 }
 
 /** Sources whose downloads list their connections on the inspector's Connections tab. */
-private val SEGMENTED_SOURCES = setOf("http", "ftp")
+/** Sources whose connections the inspector shows as segment lanes. */
+internal val SEGMENTED_SOURCES = setOf("http", "ftp")
 
 private val PopoverWidth = 360.dp
 private val PopoverGridHeight = 300.dp

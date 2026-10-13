@@ -41,11 +41,19 @@ internal fun numericAddress(host: String): ByteArray? {
   return ByteArray(16) { index -> (words[index / 2] ushr (if (index % 2 == 0) 8 else 0)).toByte() }
 }
 
-/** Keeps address families intact; reverse DNS may turn ::1 into IPv4 localhost. */
+/**
+ * Keeps address families intact; reverse DNS may turn ::1 into IPv4 localhost. An IPv4-mapped
+ * address (`::ffff:a.b.c.d`, as some trackers list in `peers6`) is the IPv4 peer it maps, so the
+ * same peer never appears under two hosts.
+ */
 internal fun numericHost(bytes: ByteArray): String {
   require(bytes.size == 4 || bytes.size == 16)
-  return if (bytes.size == 4) {
-    bytes.joinToString(".") { (it.toInt() and 255).toString() }
+  val mapped = bytes.size == 16 && (0 until 10).all { bytes[it] == 0.toByte() } &&
+    bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
+  return if (bytes.size == 4 || mapped) {
+    bytes.copyOfRange(bytes.size - 4, bytes.size).joinToString(".") {
+      (it.toInt() and 255).toString()
+    }
   } else {
     (0 until 8).joinToString(":") { index ->
       (((bytes[index * 2].toInt() and 255) shl 8) or

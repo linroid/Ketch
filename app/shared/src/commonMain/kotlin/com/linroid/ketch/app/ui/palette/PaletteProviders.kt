@@ -619,6 +619,7 @@ private val NOT_COMMANDS: Set<KetchCommand> = setOf(
   KetchCommands.Palette,
   KetchCommands.PasteLinks,
   KetchCommands.Discover,
+  KetchCommands.Connections,
   KetchCommands.Devices,
   KetchCommands.AllDevices
 )

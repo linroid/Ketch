@@ -150,8 +150,8 @@ data class ConnectionGridState(
  *
  * Each device that is online and lists the feature is asked for its own stream; a failed or
  * finished stream leaves that device empty and is asked again after [retryDelay], while the
- * others carry on. Streams run only while [state] is collected, and stop
- * [SharingStarted.WhileSubscribed] five seconds after the grid leaves the screen.
+ * others carry on. Streams run only while [state] is collected, as the Connections page shows,
+ * and stop [SharingStarted.WhileSubscribed] five seconds after it leaves the screen.
  *
  * @param sources the shown devices.
  * @param rows tasks in the order the Downloads list shows them, then the ones it does not; they

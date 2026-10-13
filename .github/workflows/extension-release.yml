@@ -3,9 +3,7 @@ name: Extension Release
 # Releases the browser extension on its own, when it has changed, so a store review only follows
 # extension changes. Run it from the Actions tab. The extension takes the version of the latest
 # app release plus this workflow's run number (`0.3.1.7`), so every extension release is newer
-# than the last one, and Chromium shows the app version (`0.3.1`). With the CWS_* secrets set, it
-# uploads the store package to the Chrome Web Store and submits it for review before releasing;
-# app/browser-extension/README.md#chrome-web-store-upload says how to create them.
+# than the last one, and Chromium shows the app version (`0.3.1`).
 on:
   workflow_dispatch:
 
@@ -21,11 +19,6 @@ jobs:
   release:
     name: Browser extension
     runs-on: ubuntu-latest
-    env:
-      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-      CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -49,25 +42,6 @@ jobs:
       - name: Build browser extension packages
         run: node build.mjs --version "$APP_VERSION" --build "${{ github.run_number }}"
 
-      # Kept with the run, for a manual upload when the store step is skipped or fails.
-      - name: Keep the Chrome Web Store package
-        uses: actions/upload-artifact@v7
-        with:
-          name: chrome-store
-          path: app/browser-extension/build/ketch-extension-*-chrome-store.zip
-          if-no-files-found: error
-
-      # Before the GitHub release: a refused upload stops the run, and the next run's number
-      # gives the next attempt a newer version, as the store requires.
-      - name: Upload to the Chrome Web Store and submit for review
-        if: env.CWS_REFRESH_TOKEN != ''
-        run: node store-upload.mjs build/chrome-store
-
-      - name: Note the skipped store upload
-        if: env.CWS_REFRESH_TOKEN == ''
-        run: |
-          echo "::warning::The CWS_* secrets are not set; upload the chrome-store artifact to the Chrome Web Store by hand."
-
       - name: Write release notes
         run: |
           previous=$(git describe --tags --abbrev=0 --match 'extension-v*' 2>/dev/null || true)
@@ -75,7 +49,8 @@ jobs:
             echo "Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)."
             echo "To install it by hand in Chrome, Edge or Brave, for example while the store reviews it,"
             echo "unzip the \`chrome-unpacked\` package and load its folder with **Load unpacked**. It has"
-            echo "the store version's id, so remove the store version first. See the"
+            echo "the store version's id, so remove the store version first. The \`chrome-store\` package"
+            echo "is the store upload. See the"
             echo "[extension README](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/app/browser-extension/README.md#installing)."
             echo
             echo "## Changes"
@@ -92,8 +67,8 @@ jobs:
           name: Browser extension ${{ env.APP_VERSION }}.${{ github.run_number }}
           body_path: app/browser-extension/build/release-notes.md
           make_latest: false
-          # The store package goes to the store (or the run's artifacts), not here.
           files: |
+            app/browser-extension/build/ketch-extension-*-chrome-store.zip
             app/browser-extension/build/ketch-extension-*-chrome-unpacked.zip
             app/browser-extension/build/ketch-extension-*-firefox.zip
             app/browser-extension/build/ketch-extension-*-safari.zip

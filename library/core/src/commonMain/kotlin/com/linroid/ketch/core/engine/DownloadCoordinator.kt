@@ -199,7 +199,11 @@ internal class DownloadCoordinator(
     }
 
     val taskRecord = handle.record.value
-    val segments = taskRecord.segments ?: return false
+    // A source writing its own files may have created them before the first save, as when the
+    // process exits right after a start: it resumes into the path it chose, as starting over
+    // would pick a new `name (n)` beside the files it already owns.
+    val startedOwnFiles = taskRecord.outputPath != null && managesOwnFileIo(taskRecord)
+    val segments = taskRecord.segments ?: if (startedOwnFiles) emptyList() else return false
     if (segments.isEmpty() && taskRecord.totalBytes > 0 && !managesOwnFileIo(taskRecord)) {
       // Older versions saved [] when a download stopped before its first segments.
       log.i { "No saved progress for taskId=$taskId, starting it again" }

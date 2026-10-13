@@ -94,7 +94,9 @@ internal class UtpEndpoint(
             lastReport = now
             for (entry in entries.values) {
               if (entry.socket.inFlight > 0 || entry.socket.writable == 0) {
-                log.d { "uTP ${entry.remote}: ${entry.socket.describe()}" }
+                // The ID tells apart successive connections to one peer.
+                val socket = entry.socket
+                log.d { "uTP ${entry.remote} id=${socket.receiveId}: ${socket.describe()}" }
               }
             }
           }

@@ -224,6 +224,54 @@ class SelfManagedExecutionTest {
   }
 
   @Test
+  fun resume_withoutSavedSegments_keepsTheChosenOutputPath() = runTest {
+    val outputs = mutableListOf<String?>()
+    val source = object : DownloadSource<String> {
+      override val stateSerializer = String.serializer()
+      override val type = "fixture"
+      override val managesOwnFileIo = true
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
+      override suspend fun download(context: DownloadContext, state: String?) {
+        outputs += context.outputPath
+        context.segments.value = listOf(Segment(0, 0, 3, 4))
+      }
+    }
+    val now = Clock.System.now()
+    val request = DownloadRequest("fixture:input")
+    // As a process that exited right after the start left it: a path, but no segments yet.
+    val handle = object : TaskHandle {
+      override val taskId = "unsaved"
+      override val request = request
+      override val createdAt = now
+      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
+      override val record = AtomicSaver(TaskRecord(taskId, request,
+        outputPath = "/tmp/ketch-unsaved-output", state = TaskState.DOWNLOADING,
+        sourceType = "fixture", createdAt = now, updatedAt = now)) {}
+    }
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val coordinator = DownloadCoordinator(SourceResolver(listOf(source)),
+      { DownloadConfig(saveIntervalMs = 60_000) }, DefaultFileNameResolver(),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher))
+    try {
+      assertTrue(coordinator.resume(handle))
+      coordinator.awaitCompletion(handle.taskId)
+      assertEquals(listOf<String?>("/tmp/ketch-unsaved-output"), outputs)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
   fun retry_continuesFromTheLatestStoredState() = runTest {
     val received = mutableListOf<String?>()
     val source = object : DownloadSource<String> {

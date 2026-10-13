@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.cancellation.CancellationException
@@ -44,7 +45,7 @@ internal class DhtNode(
   private val voteMutex = Mutex()
   private val votes = linkedMapOf<ByteString, MutableSet<ByteString>>()
   private var voteWindow = nowMs()
-  private var externalAddress: ByteString? = null
+  @Volatile private var externalAddress: ByteString? = null
   private val tokens = DhtTokens(nowMs)
   private val stored = linkedMapOf<ByteString, LinkedHashMap<PeerEndpoint, Long>>()
   private val lookups = Semaphore(4)
@@ -53,6 +54,9 @@ internal class DhtNode(
   private val bootstrapCandidates = linkedSetOf<PeerEndpoint>()
 
   val local: PeerEndpoint get() = rpc.local
+
+  /** Our public address as three networks report it, as [numericHost] writes it; null until. */
+  val externalHost: String? get() = externalAddress?.let { numericHost(it.toByteArray()) }
 
   fun start() = rpc.start()
 

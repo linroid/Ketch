@@ -24,8 +24,8 @@ import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.PeerDetails
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.ConnectionCellKey
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.DeviceConnections
@@ -48,7 +48,6 @@ import com.linroid.ketch.app.ui.pulse.ConnectionsContent
 import com.linroid.ketch.app.ui.pulse.PulseBarContent
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
-import com.linroid.ketch.app.ui.pulse.gridDescription
 import com.linroid.ketch.config.DensityMode
 import kotlin.math.PI
 import kotlin.math.pow
@@ -203,18 +202,18 @@ class ConnectionGridSnapshots {
   }
 
   @Test
-  fun app_desktopAndPhone_showTheGridOnDownloads() {
+  fun app_everySize_showsTheConnectionsPage() {
     val data = {
       val sample = SampleData.downloads()
       SampleData(sample.tasks, connections = ConnectionSamples.mixed())
     }
     for (theme in SnapshotTheme.entries) {
-      appSnapshot("connections-app", SnapshotSize.Desktop, theme, data()) {
-        val strip = ConnectionSamples.grid(ConnectionSamples.mixed(), limit = 36)
-        scene.clickOn(strip.gridDescription().load())
-        scene.settle()
+      for (size in SnapshotSize.All) {
+        appSnapshot("connections-page", size, theme, data()) {
+          state.runInShell(KetchCommands.Connections)
+          scene.settle()
+        }
       }
-      appSnapshot("connections-app", SnapshotSize.Phone, theme, data())
     }
   }
 }

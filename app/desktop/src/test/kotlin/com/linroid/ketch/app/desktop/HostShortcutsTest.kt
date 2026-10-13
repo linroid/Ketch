@@ -25,6 +25,7 @@ class HostShortcutsTest {
       KetchCommands.ToggleSidebar,
       KetchCommands.Palette,
       KetchCommands.Discover,
+      KetchCommands.Connections,
       KetchCommands.Devices,
       KetchCommands.Activity,
       KetchCommands.Shortcuts,
