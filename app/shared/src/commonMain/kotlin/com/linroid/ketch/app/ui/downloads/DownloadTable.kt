@@ -167,12 +167,11 @@ internal fun DownloadTable(
   BoxWithConstraints(modifier) {
     val shown = autoColumns.fold(dragged) { shown, column -> shown.withVisible(column, true) }
       .withHeaderRoom(room)
-    val columns = shown.fit(maxWidth, TablePadding)
+    val content = maxWidth - TablePadding * 2 - TableColumn.StatusDotWidth
+    val geometry = shown.arrange(shown.fit(maxWidth, TablePadding, room), content)
+    val columns = geometry.columns
     val namePennant = TableColumn.Device in autoColumns &&
       columns.none { it.column == TableColumn.Device }
-    // Room a column can grow into before Name reaches its minimum and other columns hide.
-    val spare = maxWidth - TablePadding * 2 - TableColumn.StatusDotWidth -
-      TableColumn.NameMinWidth - columns.fold(0.dp) { sum, it -> sum + it.width }
     Column(Modifier.fillMaxSize()) {
       TableHeader(
         view = view,
@@ -180,11 +179,8 @@ internal fun DownloadTable(
         columns = columns,
         layout = dragged,
         autoColumns = autoColumns,
-        onResize = { column, width ->
-          val current = columns.firstOrNull { it.column == column }?.width ?: width
-          val widest = current + spare.coerceAtLeast(0.dp)
-          dragged = dragged.withWidth(column, width.coerceAtMost(widest))
-        },
+        nameWidth = geometry.name,
+        onResize = { index, width -> dragged = dragged.withDivider(geometry, index, width) },
         onResizeEnd = { onLayoutChange(dragged) },
         onLayoutChange = onLayoutChange,
         onSort = onSort,
@@ -231,7 +227,8 @@ private fun TableHeader(
   columns: List<ColumnSetting>,
   layout: TableLayout,
   autoColumns: Set<TableColumn>,
-  onResize: (TableColumn, Dp) -> Unit,
+  nameWidth: Dp,
+  onResize: (index: Int, width: Dp) -> Unit,
   onResizeEnd: () -> Unit,
   onLayoutChange: (TableLayout) -> Unit,
   onSort: (SortKey) -> Unit,
@@ -275,8 +272,8 @@ private fun TableHeader(
               modifier = Modifier.fillMaxSize().then(columnLead(columns, index)),
             )
             ResizeHandle(
-              width = setting.width,
-              onResize = { onResize(column, it) },
+              width = if (index == 0) nameWidth else columns[index - 1].width,
+              onResize = { onResize(index, it) },
               onResizeEnd = onResizeEnd,
               modifier = Modifier.align(Alignment.CenterStart),
             )
@@ -438,9 +435,8 @@ private fun SortChevron(descending: Boolean, tint: Color) {
 }
 
 /**
- * The 6 dp handle on the boundary before a column, drawn as a short separator. The columns after
- * Name keep to the table's end, so dragging the boundary toward Name widens the column and the
- * boundary follows the pointer.
+ * The 6 dp handle on the boundary before a column, drawn as a short separator. Dragging it
+ * resizes the column before the boundary, [width] wide, and the columns after it follow.
  */
 @Composable
 private fun ResizeHandle(
@@ -457,7 +453,7 @@ private fun ResizeHandle(
     modifier = modifier
       .width(ResizeHandleWidth)
       .fillMaxHeight()
-      .widthDragHandle(width, interactions, onResize, onResizeEnd)
+      .widthDragHandle(width, interactions, onResize, onResizeEnd, startWidens = false)
       .drawBehind {
         // On the boundary itself, as far from the labels on either side.
         val half = density / 2
@@ -470,8 +466,9 @@ private fun ResizeHandle(
 
 /**
  * Lets a pointer drag this handle sideways to resize a pane [width] wide, which dragging toward
- * the start widens: [onResize] gets each new width and [onResizeEnd] the end of the drag. The
- * handle reports its hover to [hover], and its drag to [dragInteractions] when given.
+ * the start widens, or toward the end unless [startWidens]: [onResize] gets each new width and
+ * [onResizeEnd] the end of the drag. The handle reports its hover to [hover], and its drag to
+ * [dragInteractions] when given.
  */
 @Composable
 internal fun Modifier.widthDragHandle(
@@ -480,6 +477,7 @@ internal fun Modifier.widthDragHandle(
   onResize: (Dp) -> Unit,
   onResizeEnd: () -> Unit,
   dragInteractions: MutableInteractionSource? = null,
+  startWidens: Boolean = true,
 ): Modifier {
   val pixels = LocalDensity.current
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -489,7 +487,8 @@ internal fun Modifier.widthDragHandle(
     .hoverable(hover)
     .draggable(
       state = rememberDraggableState { delta ->
-        moved += if (rtl) delta else -delta
+        val towardStart = if (rtl) delta else -delta
+        moved += if (startWidens) towardStart else -towardStart
         onResize(start + with(pixels) { moved.toDp() })
       },
       orientation = Orientation.Horizontal,

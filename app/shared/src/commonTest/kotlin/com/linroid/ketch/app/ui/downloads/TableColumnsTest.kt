@@ -9,6 +9,9 @@ import kotlin.test.assertTrue
 class TableColumnsTest {
   private val padding = 4.dp
 
+  /** What Name and the columns share in a table 1052 dp wide. */
+  private val content = 1052.dp - padding * 2 - TableColumn.StatusDotWidth
+
   @Test
   fun fit_wideTable_showsEveryDefaultColumn() {
     val columns = TableLayout().fit(1052.dp, padding).map { it.column }
@@ -61,6 +64,73 @@ class TableColumnsTest {
 
     assertFalse(TableColumn.Source in columns)
     assertTrue(TableColumn.Added in columns)
+  }
+
+  @Test
+  fun fit_widenedColumnNarrowed_givesBackItsWidthBeforeColumnsHide() {
+    val layout = TableLayout().withWidth(TableColumn.Progress, 300.dp)
+
+    val columns = layout.fit(984.dp, padding)
+
+    assertTrue(TableColumn.Added in columns.map { it.column })
+    assertEquals(220.dp, columns.first { it.column == TableColumn.Progress }.width)
+  }
+
+  @Test
+  fun fit_widenedColumnNarrowedPastDefaults_hidesAsDefaultsWould() {
+    val layout = TableLayout().withWidth(TableColumn.Progress, 300.dp)
+
+    val columns = layout.fit(903.dp, padding).map { it.column }
+
+    assertFalse(TableColumn.Added in columns)
+    assertTrue(TableColumn.Status in columns)
+  }
+
+  @Test
+  fun arrange_nameNarrowerThanItsRoom_stretchesTheLastColumn() {
+    val layout = TableLayout(nameWidth = 300.dp)
+
+    val geometry = layout.arrange(layout.fit(1052.dp, padding), content)
+
+    assertEquals(300.dp, geometry.name)
+    assertEquals(208.dp, geometry.columns.last().width)
+    assertEquals(96.dp, geometry.columns.first().width)
+  }
+
+  @Test
+  fun withDivider_dragged_resizesTheColumnBeforeItAndTheLastGivesTheRoom() {
+    val start = TableLayout()
+    val auto = start.arrange(start.fit(1052.dp, padding), content)
+    assertEquals(0.dp, auto.stretch)
+
+    val named = start.withDivider(auto, index = 0, width = 300.dp)
+    val narrowed = named.arrange(named.fit(1052.dp, padding), content)
+    assertEquals(300.dp, narrowed.name)
+    assertEquals(88.dp, narrowed.stretch)
+
+    val widened = named.withDivider(narrowed, index = 2, width = 180.dp)
+    val after = widened.arrange(widened.fit(1052.dp, padding), content)
+    assertEquals(300.dp, after.name)
+    assertEquals(180.dp, after.columns.first { it.column == TableColumn.Progress }.width)
+    assertEquals(48.dp, after.stretch)
+  }
+
+  @Test
+  fun withDivider_draggedPastTheRoomLeft_stopsWhereTheLastColumnIsAtItsWidth() {
+    val layout = TableLayout(nameWidth = 300.dp)
+    val geometry = layout.arrange(layout.fit(1052.dp, padding), content)
+
+    val widened = layout.withDivider(geometry, index = 2, width = 400.dp)
+
+    assertEquals(228.dp, widened.columns.first { it.column == TableColumn.Progress }.width)
+  }
+
+  @Test
+  fun encode_nameWidth_roundTripsThroughDecode() {
+    val layout = TableLayout(nameWidth = 300.dp).withWidth(TableColumn.Size, 120.dp)
+
+    assertEquals(layout, TableLayout.decode(layout.encode()))
+    assertEquals(null, TableLayout.decode("size,progress").nameWidth)
   }
 
   @Test
