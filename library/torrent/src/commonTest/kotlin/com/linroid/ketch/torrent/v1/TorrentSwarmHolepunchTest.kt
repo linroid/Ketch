@@ -14,6 +14,7 @@ import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
 import com.linroid.ketch.torrent.peer.HolepunchMessage
 import com.linroid.ketch.torrent.peer.HolepunchType
+import com.linroid.ketch.torrent.peer.PEX_FLAG_HOLEPUNCH
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -236,6 +237,32 @@ class TorrentSwarmHolepunchTest {
       relay.sendHolepunch(HolepunchMessage(HolepunchType.CONNECT, target))
       delay(500)
       assertTrue(target !in network.dialed(), "${network.dialed()}")
+    } finally {
+      swarm.cancelAndJoin()
+    }
+  }
+
+  /** A peer that punches speaks uTP, and over uTP it sees the port it must introduce us by. */
+  @Test
+  fun pexPeerThatPunches_isDialedOverUtpFirst() = swarmTest(complete = false) { store, network ->
+    val incoming = Channel<TorrentConnection>(1)
+    val budget = TorrentBufferBudget(2 * 1024 * 1024)
+    val utpFirst = AtomicReference(emptyList<PeerEndpoint>())
+    val swarm = launch {
+      TorrentSwarm(store, network, budget, allowLocalPeers = true, utpEnabled = { true },
+        onUtpPeers = { peers -> utpFirst.update { it + peers } },
+      ).run(Channel(), incoming)
+    }
+    try {
+      val introducer = joinedPeer(network, incoming, listenPort = 6001)
+      val punches = PeerEndpoint("127.0.0.2", 20_001)
+      val plain = PeerEndpoint("127.0.0.2", 20_002)
+      introducer.send(PeerMessage.Extended(PeerExtensions.PEX, Bencode.encode(mapOf(
+        "added" to DhtCodec.compactEndpoint(punches) + DhtCodec.compactEndpoint(plain),
+        "added.f" to byteArrayOf(PEX_FLAG_HOLEPUNCH.toByte(), 0),
+      ))))
+      withTimeout(5_000) { while (punches !in utpFirst.load()) delay(20) }
+      assertTrue(plain !in utpFirst.load(), "${utpFirst.load()}")
     } finally {
       swarm.cancelAndJoin()
     }

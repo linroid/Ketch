@@ -64,6 +64,19 @@ class SwarmHolepunchTest {
   }
 
   @Test
+  fun summary_countsErrorsByKind_thenStartsOver() = runTest {
+    connect()
+    holepunch.failed(HolepunchError.NOT_CONNECTED)
+    holepunch.failed(HolepunchError.NOT_CONNECTED)
+    holepunch.failed(HolepunchError.NO_SUPPORT)
+    assertEquals(
+      "holepunch peers=2 relayed=0 asked=0 connects=0 errors=notConnected:2,noSupport:1",
+      holepunch.summary(),
+    )
+    assertEquals("holepunch peers=2 relayed=0 asked=0 connects=0", holepunch.summary())
+  }
+
+  @Test
   fun rendezvous_asksTheLastIntroducerOnceInFiveMinutes() = runTest {
     connect()
     val target = PeerEndpoint("192.0.2.9", 6881)

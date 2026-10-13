@@ -23,6 +23,7 @@ import com.linroid.ketch.torrent.peer.FAST_REJECT_GRACE_MS
 import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
 import com.linroid.ketch.torrent.peer.HolepunchMessage
 import com.linroid.ketch.torrent.peer.HolepunchType
+import com.linroid.ketch.torrent.peer.PEX_FLAG_HOLEPUNCH
 import com.linroid.ketch.torrent.peer.PEX_FLAG_UTP
 import com.linroid.ketch.torrent.peer.PeerAttempt
 import com.linroid.ketch.torrent.peer.PeerDiagnostics
@@ -283,7 +284,10 @@ internal class TorrentSwarm(
     }
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       peerFlags.record(update.flags)
-      onUtpPeers(update.flags.filterValues { it and PEX_FLAG_UTP != 0 }.keys)
+      // A peer that punches holes speaks uTP (BEP 55), and a connection to it over uTP shows it
+      // our uTP mapping, the port it must hand out when it introduces us.
+      val utpPeers = PEX_FLAG_UTP or PEX_FLAG_HOLEPUNCH
+      onUtpPeers(update.flags.filterValues { it and utpPeers != 0 }.keys)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
       for (endpoint in pexDirectory.candidates()) {
@@ -997,9 +1001,12 @@ internal class TorrentSwarm(
             punches.trySend(target)
           }
         }
-        HolepunchType.ERROR -> log.v {
-          "Peer $endpoint of $logLabel could not punch through to ${message.endpoint}: " +
-            "error ${message.error}"
+        HolepunchType.ERROR -> {
+          holepunch.failed(message.error)
+          log.v {
+            "Peer $endpoint of $logLabel could not punch through to ${message.endpoint}: " +
+              "error ${message.error}"
+          }
         }
       }
     }

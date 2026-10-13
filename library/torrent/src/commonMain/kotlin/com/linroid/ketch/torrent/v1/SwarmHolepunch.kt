@@ -40,6 +40,8 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
   private var relayed = 0
   private var requested = 0
   private var connects = 0
+  /** Errors relays answered our rendezvous with, by BEP 55 code. */
+  private val errors = mutableMapOf<Int, Int>()
 
   suspend fun join(
     id: Int,
@@ -117,14 +119,34 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
     mutex.withLock { connects++ }
   }
 
-  /** "holepunch relayed=1 asked=2 connects=1", counting since the last summary. */
+  /** A relay could not introduce us, for BEP 55 error [code]. */
+  suspend fun failed(code: Int) = mutex.withLock {
+    errors[code] = (errors[code] ?: 0) + 1
+  }
+
+  /**
+   * "holepunch peers=3 relayed=1 asked=2 connects=1 errors=notConnected:1", counting since the
+   * last summary.
+   */
   suspend fun summary(): String = mutex.withLock {
     val peers = members.values.count { it.supports }
-    "holepunch peers=$peers relayed=$relayed asked=$requested connects=$connects".also {
+    val failures = if (errors.isEmpty()) "" else
+      " errors=" + errors.entries.sortedBy { it.key }
+        .joinToString(",") { (code, count) -> "${errorName(code)}:$count" }
+    ("holepunch peers=$peers relayed=$relayed asked=$requested connects=$connects$failures").also {
       relayed = 0
       requested = 0
       connects = 0
+      errors.clear()
     }
+  }
+
+  private fun errorName(code: Int): String = when (code) {
+    HolepunchError.NO_SUCH_PEER -> "noSuchPeer"
+    HolepunchError.NOT_CONNECTED -> "notConnected"
+    HolepunchError.NO_SUPPORT -> "noSupport"
+    HolepunchError.NO_SELF -> "noSelf"
+    else -> "code$code"
   }
 
   /**
