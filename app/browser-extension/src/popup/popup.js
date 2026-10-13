@@ -183,8 +183,11 @@ async function onAdd(event) {
   try {
     const current = await loadSettings();
     if (current.reviewDownloads) {
+      // A private window's link must never become a regular browser download.
+      const incognito = ext.extension?.inIncognitoContext ||
+        (await ext.windows?.getCurrent?.().catch(() => undefined))?.incognito || undefined;
       const response = await ext.runtime.sendMessage({ type: 'review-open',
-        instanceId: instance.id, download: { url } });
+        instanceId: instance.id, download: { url, incognito } });
       if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
       window.close();
       return;

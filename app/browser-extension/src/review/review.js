@@ -204,7 +204,8 @@ async function renderDevice() {
 function renderFolders() {
   const instanceId = selectedInstance().id;
   const folders = deviceFolders(probes.get(instanceId)?.status) ?? known.get(instanceId);
-  const directory = folders?.directory;
+  // An Android content:// tree is no path: only the device can find its category folders.
+  const directory = isFolderUri(folders?.directory) ? undefined : folders?.directory;
   const categories = folders?.categories ?? [];
   const auto = torrent ? undefined : categoryFor(categories, $('name').value ||
     $('name').placeholder, entry.download.mime, hostOf(entry.download.url));
@@ -266,6 +267,10 @@ function fillAutoFolder() {
 function folderValue() {
   const value = $('folder').value;
   return value === autoFilled ? '' : value;
+}
+
+function isFolderUri(folder) {
+  return /^[a-z][a-z\d+.-]*:\/\//i.test(folder ?? '');
 }
 
 function hostOf(url) {
