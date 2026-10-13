@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -132,8 +133,12 @@ fun ConnectionsScreen(state: AppState) {
   val deviceNames = grid.devices.associate { it.deviceId to it.name.resolve() }
   val all = remember(grid, deviceNames) { connectionRows(grid, deviceNames) }
   val filters = remember(all) { sourceFilters(all) }
-  // A protocol whose connections all closed shows every connection again.
+  // A protocol whose connections all closed shows every connection again, and stays unpicked
+  // when it comes back, rather than hiding the others without a click.
   val shownSource = source?.takeIf { picked -> filters.any { it.source == picked } }
+  if (source != null && shownSource == null && all.isNotEmpty()) {
+    LaunchedEffect(source) { source = null }
+  }
   val rows = remember(all, shownSource, query, arrangement) {
     all.matching(shownSource, query).arranged(arrangement)
   }

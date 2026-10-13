@@ -109,16 +109,17 @@ internal fun ConnectionArrangement.next(sort: ConnectionSort): ConnectionArrange
   else -> ConnectionArrangement()
 }
 
-/** [this] in [arrangement]'s order, ties the longest open first. */
+/**
+ * [this] in [arrangement]'s order, ties the longest open first. How long a connection has been
+ * open is its age when its own device sampled it, never its device's clock against another's.
+ */
 internal fun List<ConnectionRow>.arranged(arrangement: ConnectionArrangement): List<ConnectionRow> {
-  val opened = compareBy<ConnectionRow>(
-    { it.connection.openedAt },
-    { it.cell.key.deviceId },
-    { it.cell.key.id },
-  )
+  val longestOpen = compareByDescending<ConnectionRow> { it.cell.age }
+    .thenBy { it.cell.key.deviceId }
+    .thenBy { it.cell.key.id }
   val key: Comparator<ConnectionRow> = when (arrangement.sort) {
     // Ascending is the shortest open first, as for the other numbers.
-    ConnectionSort.Opened -> opened.reversed()
+    ConnectionSort.Opened -> compareBy { it.cell.age }
     ConnectionSort.Endpoint -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.endpoint }
     ConnectionSort.Device -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.deviceName }
     ConnectionSort.Task -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.taskName.orEmpty() }
@@ -135,7 +136,7 @@ internal fun List<ConnectionRow>.arranged(arrangement: ConnectionArrangement): L
     ConnectionSort.Sent -> compareBy { it.connection.uploadedBytes }
   }
   val ordered = if (arrangement.descending) key.reversed() else key
-  return sortedWith(ordered.then(opened))
+  return sortedWith(ordered.then(longestOpen))
 }
 
 /** Whether a peer connected to this device, rather than this device to it. */

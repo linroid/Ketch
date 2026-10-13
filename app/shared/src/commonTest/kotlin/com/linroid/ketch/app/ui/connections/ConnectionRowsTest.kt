@@ -70,6 +70,38 @@ class ConnectionRowsTest {
   }
 
   @Test
+  fun arranged_longestOpen_readsEachDevicesOwnClock() {
+    // The NAS's clock runs an hour behind: its connection opened 5 s before its sample, which
+    // reads as an hour earlier than the Mac's, open for a minute.
+    val mac = connection(1, "a", "HTTP/2", opened = 60)
+    val nasClock = NOW - 3600.seconds
+    val nas = connection(2, "b", "HTTP/2").copy(openedAt = nasClock - 5.seconds)
+    val grid = ConnectionGridState(
+      devices = listOf(
+        device("mac", mac, ActiveConnections(sampledAt = NOW, connections = listOf(mac))),
+        device("nas", nas, ActiveConnections(sampledAt = nasClock, connections = listOf(nas))),
+      ),
+      total = 2,
+      supported = true,
+    )
+    val rows = connectionRows(grid, mapOf("mac" to "Mac", "nas" to "NAS"))
+    assertEquals(listOf(1L, 2L), rows.arranged(ConnectionArrangement()).ids())
+  }
+
+  private fun device(deviceId: String, connection: ActiveConnection, snapshot: ActiveConnections) =
+    DeviceConnections(
+      deviceId = deviceId,
+      name = verbatim(deviceId),
+      tasks = listOf(
+        TaskConnections(
+          key = TaskKey(deviceId, connection.taskId),
+          name = connection.taskId,
+          cells = listOf(connectionCell(deviceId, connection, snapshot)),
+        ),
+      ),
+    )
+
+  @Test
   fun next_cyclesNaturalReversedThenTheDefault() {
     val first = ConnectionArrangement().next(ConnectionSort.Endpoint)
     assertEquals(ConnectionArrangement(ConnectionSort.Endpoint, descending = false), first)
