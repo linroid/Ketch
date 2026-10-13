@@ -8,10 +8,14 @@ const session = {
   set: async (values) => Object.assign(data, structuredClone(values)),
   remove: async (key) => { delete data[key]; },
 };
+const local = { settings: {
+  instances: [{ id: 'server', type: 'server', name: 'Server', url: 'http://localhost:8642' }],
+} };
 globalThis.chrome = {
-  storage: { session, local: { get: async () => ({ settings: {
-    instances: [{ id: 'server', type: 'server', name: 'Server', url: 'http://localhost:8642' }],
-  } }) } },
+  storage: { session, local: {
+    get: async (key) => ({ [key]: structuredClone(local[key]) }),
+    set: async (values) => Object.assign(local, structuredClone(values)),
+  } },
   runtime: { getURL: (path) => `chrome-extension://test/${path}` },
   tabs: { create: async () => ({ id: 7 }), get: async () => ({ id: 7 }) },
   downloads: {
@@ -19,13 +23,19 @@ globalThis.chrome = {
     resume: async (id) => browserActions.push(['resume', id]),
     cancel: async (id) => browserActions.push(['cancel', id]),
     erase: async ({ id }) => browserActions.push(['erase', id]),
+    download: async (options) => browserActions.push(['download', options]),
   },
 };
-const { openReview, sendReview, cancelReview, closeReviews, reviewDestination, resourceDestination } =
-  await import('../src/lib/review.js');
+const {
+  openReview, sendReview, cancelReview, closeReviews, reviewDestination, resourceDestination,
+  directReview, canDownloadDirectly, recentFolders, categoryFor, rememberDeviceFolders,
+  knownDeviceFolders,
+} = await import('../src/lib/review.js');
 
 function reset() {
   for (const key of Object.keys(data)) delete data[key];
+  delete local.recentFolders;
+  delete local.deviceFolders;
   browserActions.length = 0;
 }
 async function review(download = { url: 'https://example.com/file', browserDownloadId: 42 }) {
@@ -159,3 +169,104 @@ test('closing before tab association is saved resumes the original through the e
       globalThis.chrome.tabs.get = getTab;
     }
   });
+
+test('the review opens as a window centered over the browser window', async () => {
+  reset();
+  const created = [];
+  globalThis.chrome.windows = {
+    getLastFocused: async () => ({ left: 100, top: 50, width: 1460, height: 900 }),
+    create: async (options) => {
+      created.push(options);
+      return { id: 3, tabs: [{ id: 9 }] };
+    },
+  };
+  const get = globalThis.chrome.tabs.get;
+  globalThis.chrome.tabs.get = async (tabId) => ({ id: tabId });
+  try {
+    const id = await review();
+    assert.equal(created[0].type, 'popup');
+    assert.equal(created[0].left, 100 + (1460 - created[0].width) / 2);
+    assert.equal(data[`review:${id}`].tabId, 9);
+    await closeReviews(9);
+    assert.deepEqual(browserActions, [['resume', 42]]);
+  } finally {
+    delete globalThis.chrome.windows;
+    globalThis.chrome.tabs.get = get;
+  }
+});
+
+test('sent folders are remembered per device, most recent first and without repeats', async () => {
+  reset();
+  for (const folder of ['/data/a', '/data/b', '/data/a', '']) {
+    const id = await review({ url: 'https://example.com/file' });
+    await sendReview(id, 'server', '', folder, async () => ({ taskId: 'accepted' }));
+  }
+  assert.deepEqual(await recentFolders('server'), ['/data/a', '/data/b']);
+  assert.deepEqual(await recentFolders('other'), []);
+});
+
+test('downloading in the browser resumes a captured original', async () => {
+  reset();
+  const id = await review();
+  await directReview(id, 'ignored.bin');
+  assert.deepEqual(browserActions, [['resume', 42]]);
+  assert.deepEqual(data, {});
+  await assert.rejects(directReview(id));
+});
+
+test('downloading a reviewed link in the browser starts a download with a valid name', async () => {
+  reset();
+  const id = await review({ url: 'https://example.com/file', cookieStoreId: 'store' });
+  await directReview(id, 'report.pdf');
+  assert.deepEqual(browserActions, [['download', {
+    url: 'https://example.com/file', cookieStoreId: 'store', filename: 'report.pdf',
+  }]]);
+  reset();
+  const unnamed = await review({ url: 'https://example.com/file' });
+  await directReview(unnamed, '../escape');
+  assert.deepEqual(browserActions, [['download', { url: 'https://example.com/file' }]]);
+});
+
+test('only links the browser can fetch in their own context are offered to it', () => {
+  assert.equal(canDownloadDirectly({ url: 'magnet:?xt=urn:btih:abc', browserDownloadId: 1 }), true);
+  assert.equal(canDownloadDirectly({ url: 'magnet:?xt=urn:btih:abc' }), false);
+  assert.equal(canDownloadDirectly({ url: 'ftp://example.com/file' }), false);
+  assert.equal(canDownloadDirectly({ url: 'https://example.com/file' }), true);
+  globalThis.chrome.downloads.onDeterminingFilename = {};
+  try {
+    assert.equal(canDownloadDirectly({ url: 'https://example.com/file', incognito: true }), false);
+  } finally {
+    delete globalThis.chrome.downloads.onDeterminingFilename;
+  }
+});
+
+test('category folders match like the device does: type or MIME type, and site', () => {
+  const categories = [
+    { folder: 'Work', hosts: ['*.corp.example'] },
+    { folder: 'Videos', extensions: ['.mp4', 'mkv'], mimeTypes: ['video/*'] },
+    { folder: 'Archives', extensions: ['tar.gz'] },
+    { folder: 'Nothing' },
+  ];
+  const match = (...args) => categoryFor(categories, ...args)?.folder;
+  assert.equal(match('Clip.MP4', undefined, 'cdn.example.org'), 'Videos');
+  assert.equal(match('stream', 'video/webm; codecs=vp9', undefined), 'Videos');
+  assert.equal(match('report.pdf', 'application/pdf', 'files.corp.example'), 'Work');
+  assert.equal(match('src.tar.gz', undefined, 'example.org'), 'Archives');
+  assert.equal(match('.mp4', undefined, undefined), undefined);
+  assert.equal(match('notes.txt', 'text/plain', 'example.org'), undefined);
+});
+
+test('device folders are remembered from its status for when it cannot be asked', async () => {
+  reset();
+  assert.equal(await knownDeviceFolders('local'), undefined);
+  await rememberDeviceFolders('local', { system: {}, config: {} });
+  assert.equal(await knownDeviceFolders('local'), undefined);
+  await rememberDeviceFolders('local', {
+    system: { downloadDirectory: '/Users/me/Downloads', usableSpace: 1 },
+    config: { categories: [{ folder: 'Videos', extensions: ['mp4'] }, { folder: ' ' }] },
+  });
+  assert.deepEqual(await knownDeviceFolders('local'), {
+    directory: '/Users/me/Downloads', categories: [{ folder: 'Videos', extensions: ['mp4'] }],
+  });
+  assert.equal(await knownDeviceFolders('nas'), undefined);
+});

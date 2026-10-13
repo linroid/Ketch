@@ -1,11 +1,17 @@
 /** Pending reviews are session-only and never contain cookies or instance credentials. */
-import { ext } from './ext.js';
+import { ext, remoteOnly } from './ext.js';
 import { sendToKetch } from './handoff.js';
 import { t } from './i18n.js';
 import { fileNameFromPath, isTorrentFile, isTorrentUrl } from './request.js';
 import { loadSettings } from './settings.js';
 
 const PREFIX = 'review:';
+const RECENT_FOLDERS_KEY = 'recentFolders';
+const DEVICE_FOLDERS_KEY = 'deviceFolders';
+const MAX_RECENT_FOLDERS = 5;
+/** Size of the dialog window; the page fits its height to what it shows. */
+const DIALOG_WIDTH = 460;
+const DIALOG_HEIGHT = 560;
 const locks = new Map();
 
 // All mutations run in the background context, including sends from the review page.
@@ -22,15 +28,45 @@ export async function openReview(instanceId, download) {
     try {
       const entry = { instanceId, download, state: 'pending' };
       await ext.storage.session.set({ [PREFIX + id]: entry });
-      const tab = await ext.tabs.create({ url: ext.runtime.getURL(`review/review.html?id=${id}`) });
-      await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId: tab.id } });
+      const tabId = await openDialog(ext.runtime.getURL(`review/review.html?id=${id}`));
+      await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId } });
       // onRemoved may have run before the tab association reached storage.
-      await ext.tabs.get(tab.id);
+      await ext.tabs.get(tabId);
     } catch (error) {
       await cancelPendingReview(id);
       throw error;
     }
   });
+}
+
+/**
+ * Opens the review as a small window centered over the browser window, or as a tab where the
+ * browser has no popup windows (Safari). Closing either closes the review.
+ *
+ * @returns {Promise<number>} the id of the tab showing it
+ */
+async function openDialog(url) {
+  let created;
+  try {
+    if (ext.windows?.create) {
+      const options = { url, type: 'popup', width: DIALOG_WIDTH, height: DIALOG_HEIGHT };
+      const parent = await ext.windows.getLastFocused().catch(() => undefined);
+      if ([parent?.left, parent?.top, parent?.width, parent?.height].every(Number.isFinite)) {
+        options.left = Math.max(0, Math.round(parent.left + (parent.width - DIALOG_WIDTH) / 2));
+        options.top = Math.max(0, Math.round(parent.top +
+          Math.min(120, (parent.height - DIALOG_HEIGHT) / 2)));
+      }
+      created = await ext.windows.create(options);
+      const tabId = created.tabs?.[0]?.id ??
+        (await ext.tabs.query({ windowId: created.id }))[0]?.id;
+      if (Number.isInteger(tabId)) return tabId;
+      await ext.windows.remove(created.id);
+    }
+  } catch (error) {
+    console.debug('Ketch: could not open the review window', error);
+    if (created) return (await ext.tabs.query({ windowId: created.id }))[0].id;
+  }
+  return (await ext.tabs.create({ url })).id;
 }
 
 export async function readReview(id) {
@@ -96,8 +132,178 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
       await ext.downloads.erase({ id: browserId }).catch(() => {});
     }
     await ext.storage.session.remove(PREFIX + id);
+    await rememberFolder(instanceId, folder);
     return task;
   });
+}
+
+/**
+ * Whether the reviewed download can be saved by the browser instead: a paused original goes
+ * back, and an HTTP(S) link starts a new browser download. Chromium's background cannot start
+ * one in a private window's context.
+ */
+export function canDownloadDirectly(download) {
+  if (remoteOnly || !ext.downloads) return false;
+  if (Number.isInteger(download.browserDownloadId)) return true;
+  return /^https?:\/\//i.test(download.url) && !(download.incognito && !isFirefox());
+}
+
+/** Gives the review's download to the browser: the paused original, or a new download. */
+export function directReview(id, fileName) {
+  return locked(id, async () => {
+    const entry = await readReview(id);
+    if (!entry || entry.state !== 'pending') throw new Error(t('review_unavailable'));
+    const { download } = entry;
+    if (!canDownloadDirectly(download)) throw new Error(t('notify_direct_hint'));
+    if (Number.isInteger(download.browserDownloadId)) {
+      await ext.downloads.resume(download.browserDownloadId);
+    } else {
+      const name = String(fileName ?? '').trim();
+      let valid = false;
+      try {
+        valid = Boolean(name) && reviewDestination({ url: download.url }, name, '') === name;
+      } catch {
+        // The browser picks the name instead.
+      }
+      await startBrowserDownload(download.url, {
+        cookieStoreId: download.cookieStoreId,
+        incognito: download.incognito,
+        filename: valid ? name : undefined,
+      });
+    }
+    await ext.storage.session.remove(PREFIX + id);
+  });
+}
+
+/**
+ * Starts a browser download; its `byExtensionId` keeps it out of automatic capture. Without a
+ * `filename`, the browser chooses the name and whether to show its Save As dialog.
+ *
+ * @param {string} url
+ * @param {{ cookieStoreId?: string, incognito?: boolean, filename?: string }} [context] the
+ *   tab's cookie store and private state, which only Firefox can pass on
+ */
+export async function startBrowserDownload(url, { cookieStoreId, incognito, filename } = {}) {
+  const firefox = isFirefox();
+  if (!/^https?:\/\//i.test(url ?? '') || (incognito && !firefox)) {
+    throw new Error(t('notify_direct_hint'));
+  }
+  const options = { url };
+  if (firefox) {
+    if (cookieStoreId) options.cookieStoreId = cookieStoreId;
+    if (incognito) options.incognito = true;
+  }
+  if (filename) {
+    try {
+      return await ext.downloads.download({ ...options, filename });
+    } catch (error) {
+      console.debug('Ketch: the browser refused the file name', error);
+    }
+  }
+  return ext.downloads.download(options);
+}
+
+function isFirefox() {
+  return !ext.downloads?.onDeterminingFilename;
+}
+
+/**
+ * The first of a device's category folders (`DownloadConfig.categories`) a download matches, as
+ * `DownloadCategory.matches` decides: its name's extension or its MIME type, and its site.
+ *
+ * @param {{ folder: string, extensions?: string[], mimeTypes?: string[], hosts?: string[] }[]}
+ *   categories
+ * @param {string} fileName
+ * @param {string | undefined} contentType
+ * @param {string | undefined} host
+ */
+export function categoryFor(categories, fileName, contentType, host) {
+  const rules = (list, prefixed) => (Array.isArray(list) ? list : [])
+    .map((rule) => String(rule).trim().toLowerCase())
+    .map((rule) => prefixed ? rule.replace(/^\*?\./, '') : rule)
+    .filter(Boolean);
+  const name = String(fileName ?? '').trim().toLowerCase();
+  const type = String(contentType ?? '').split(';')[0].trim().toLowerCase();
+  const site = String(host ?? '').trim().replace(/\.$/, '').toLowerCase();
+  return categories.find((category) => {
+    const extensions = rules(category.extensions, true);
+    const types = rules(category.mimeTypes, false);
+    const hosts = rules(category.hosts, true).map((it) => it.replace(/\.$/, ''));
+    if (!extensions.length && !types.length && !hosts.length) return false;
+    const typeMatches = (!extensions.length && !types.length) ||
+      extensions.some((it) => name.length > it.length + 1 && name.endsWith(`.${it}`)) ||
+      (type !== '' && types.some((it) => it.endsWith('/*')
+        ? type.startsWith(it.slice(0, -1)) : type === it));
+    const siteMatches = !hosts.length ||
+      (site !== '' && hosts.some((it) => site === it || site.endsWith(`.${it}`)));
+    return typeMatches && siteMatches;
+  });
+}
+
+/**
+ * @typedef {{ directory: string, categories: { folder: string }[] }} DeviceFolders where a
+ *   device saves downloads and its category folders, as its `KetchStatus` last reported them
+ */
+
+/** Reads a device's folders from its `KetchStatus`; `undefined` when it names none. */
+export function deviceFolders(status) {
+  const directory = status?.system?.downloadDirectory;
+  if (typeof directory !== 'string' || !directory) return undefined;
+  const categories = (Array.isArray(status.config?.categories) ? status.config.categories : [])
+    .filter((category) => typeof category?.folder === 'string' && category.folder.trim());
+  return { directory, categories };
+}
+
+/**
+ * Keeps a device's folders from a status it reported, so the review can show them while it
+ * can't be asked, as when the Ketch app is closed.
+ */
+export async function rememberDeviceFolders(instanceId, status) {
+  const folders = deviceFolders(status);
+  if (!folders) return;
+  try {
+    const stored = (await ext.storage.local.get(DEVICE_FOLDERS_KEY))[DEVICE_FOLDERS_KEY] ?? {};
+    if (JSON.stringify(stored[instanceId]) === JSON.stringify(folders)) return;
+    await ext.storage.local.set({ [DEVICE_FOLDERS_KEY]: { ...stored, [instanceId]: folders } });
+  } catch (error) {
+    console.warn('Ketch: could not remember the device folders', error);
+  }
+}
+
+/** @returns {Promise<DeviceFolders | undefined>} the folders a device last reported */
+export async function knownDeviceFolders(instanceId) {
+  try {
+    const stored = (await ext.storage.local.get(DEVICE_FOLDERS_KEY))[DEVICE_FOLDERS_KEY];
+    return deviceFolders({ system: { downloadDirectory: stored?.[instanceId]?.directory },
+      config: { categories: stored?.[instanceId]?.categories } });
+  } catch {
+    return undefined;
+  }
+}
+
+/** Folders last used on `instanceId`, most recent first. */
+export async function recentFolders(instanceId) {
+  try {
+    const stored = (await ext.storage.local.get(RECENT_FOLDERS_KEY))[RECENT_FOLDERS_KEY];
+    const folders = stored?.[instanceId];
+    return Array.isArray(folders) ? folders.filter((it) => typeof it === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+async function rememberFolder(instanceId, folder) {
+  const directory = String(folder ?? '').trim();
+  if (!directory) return;
+  try {
+    const stored = (await ext.storage.local.get(RECENT_FOLDERS_KEY))[RECENT_FOLDERS_KEY] ?? {};
+    const folders = [directory, ...(await recentFolders(instanceId))
+      .filter((it) => it !== directory)].slice(0, MAX_RECENT_FOLDERS);
+    await ext.storage.local.set({ [RECENT_FOLDERS_KEY]: { ...stored, [instanceId]: folders } });
+  } catch (error) {
+    // The download was sent; only the suggestion is lost.
+    console.warn('Ketch: could not remember the folder', error);
+  }
 }
 
 export function cancelReview(id) {

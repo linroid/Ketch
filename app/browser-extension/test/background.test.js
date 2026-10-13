@@ -10,6 +10,7 @@ function event() {
 }
 
 const stored = {};
+const sessionData = {};
 const menus = new Map();
 const changed = event();
 const directDownloads = [];
@@ -38,6 +39,11 @@ globalThis.chrome = {
       },
     },
     onChanged: changed,
+    session: {
+      get: async (key) => key === null ? { ...sessionData } : { [key]: sessionData[key] },
+      set: async (values) => Object.assign(sessionData, values),
+      remove: async (key) => { delete sessionData[key]; },
+    },
   },
   contextMenus: {
     onClicked: event(),
@@ -64,7 +70,11 @@ globalThis.chrome = {
   },
   tabs: {
     onRemoved: event(),
-    create: async (options) => { openedTabs.push(options); },
+    create: async (options) => {
+      openedTabs.push(options);
+      return { id: openedTabs.length };
+    },
+    get: async (id) => ({ id }),
   },
   webRequest: { onBeforeRequest: event() },
   notifications: { create: async (message) => notifications.push(message) },
@@ -199,3 +209,25 @@ test('unsupported or failed direct downloads report a browser fallback without c
       downloadError = undefined;
     }
   });
+
+test('links and magnets always open the review instead of being sent', async () => {
+  for (const key of Object.keys(sessionData)) delete sessionData[key];
+  const start = openedTabs.length;
+  await ext.contextMenus.onClicked.emit(
+    { menuItemId: 'link:nas', linkUrl: 'https://example.com/file.zip', pageUrl: 'https://example.com/' },
+    { id: 5 },
+  );
+  const replies = [];
+  await ext.runtime.onMessage.emit({ type: 'magnet', url: 'magnet:?xt=urn:btih:abc' },
+    { id: 'ketch-extension' }, (reply) => replies.push(reply));
+  await settle();
+  assert.deepEqual(replies, [{ handled: true }]);
+  const opened = openedTabs.slice(start);
+  assert.equal(opened.length, 2);
+  for (const tab of opened) assert.match(tab.url, /review\/review\.html\?id=/);
+  const entries = Object.values(sessionData).map((entry) => [entry.instanceId, entry.download.url]);
+  assert.deepEqual(entries, [
+    ['nas', 'https://example.com/file.zip'],
+    ['nas', 'magnet:?xt=urn:btih:abc'],
+  ]);
+});

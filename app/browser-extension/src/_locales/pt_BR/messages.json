@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "Download adicionado"
   },
-  "notify_fallback_browser": {
-    "message": "Baixando no navegador"
-  },
-  "notify_fallback_magnet": {
-    "message": "Abrindo o link magnet em outro app"
-  },
-  "notify_send_failed": {
-    "message": "Não foi possível enviar para $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "O Ketch não pode baixar isto"
   },
@@ -402,14 +388,6 @@
   "popup_add_button": {
     "message": "Baixar"
   },
-  "popup_added": {
-    "message": "$NAME$ adicionado",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "Digite um link http, https, ftp ou magnet."
   },
@@ -616,20 +594,8 @@
   "error_media_unsupported": {
     "message": "Esta instância do Ketch não suporta listas de mídia. Atualize-a antes de enviar este link."
   },
-  "review_setting": {
-    "message": "Revisar downloads antes de enviar"
-  },
-  "review_title": {
-    "message": "Revisar download"
-  },
-  "review_name": {
-    "message": "Nome do arquivo (opcional)"
-  },
   "review_folder": {
     "message": "Pasta no dispositivo selecionado (opcional)"
-  },
-  "review_detail": {
-    "message": "Deixe a pasta vazia para usar o padrão do dispositivo. O servidor controla as pastas permitidas. Torrents mantêm sua estrutura de arquivos. Fechar esta página devolve ao navegador um download pausado."
   },
   "review_cancel": {
     "message": "Cancelar"
@@ -642,5 +608,82 @@
   },
   "safari_detail": {
     "message": "O Safari envia links revisados e recursos de páginas a um servidor Ketch configurado. Ative o compartilhamento no Ketch e insira o endereço e o token aqui. Captura automática de downloads e abertura do app não estão disponíveis."
+  },
+  "dialog_title": {
+    "message": "Novo download"
+  },
+  "dialog_name_label": {
+    "message": "Nome do arquivo"
+  },
+  "dialog_send_to": {
+    "message": "Enviar para"
+  },
+  "dialog_save_in": {
+    "message": "Salvar em"
+  },
+  "dialog_folder_default": {
+    "message": "Pasta padrão"
+  },
+  "dialog_device_checking": {
+    "message": "Verificando…"
+  },
+  "dialog_device_ready": {
+    "message": "Pronto"
+  },
+  "dialog_device_free": {
+    "message": "$SIZE$ livres",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "Abre ao baixar"
+  },
+  "dialog_device_offline": {
+    "message": "Inacessível"
+  },
+  "dialog_torrent_layout": {
+    "message": "Torrents mantêm a própria estrutura de pastas."
+  },
+  "dialog_space_warning": {
+    "message": "Apenas $SIZE$ livres em $DEVICE$.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "Baixar no navegador"
+  },
+  "dialog_sending": {
+    "message": "Enviando…"
+  },
+  "dialog_folder_auto": {
+    "message": "Automática"
+  },
+  "dialog_folder_auto_match": {
+    "message": "Automática · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "Deixe o dispositivo escolher: a pasta de downloads ou a pasta de categoria correspondente."
+  },
+  "dialog_folder_recent": {
+    "message": "Usada recentemente: $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
   }
 }

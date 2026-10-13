@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "已添加下载"
   },
-  "notify_fallback_browser": {
-    "message": "改用浏览器下载"
-  },
-  "notify_fallback_magnet": {
-    "message": "改用其他应用打开磁力链接"
-  },
-  "notify_send_failed": {
-    "message": "无法发送到 $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch 无法下载此内容"
   },
@@ -402,14 +388,6 @@
   "popup_add_button": {
     "message": "下载"
   },
-  "popup_added": {
-    "message": "已添加 $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "请输入 http、https、ftp 或磁力链接。"
   },
@@ -616,20 +594,8 @@
   "error_media_unsupported": {
     "message": "此 Ketch 实例不支持媒体播放列表。发送链接前请先更新。"
   },
-  "review_setting": {
-    "message": "发送前确认下载"
-  },
-  "review_title": {
-    "message": "确认下载"
-  },
-  "review_name": {
-    "message": "文件名（可选）"
-  },
   "review_folder": {
     "message": "所选设备上的文件夹（可选）"
-  },
-  "review_detail": {
-    "message": "文件夹留空时使用设备的默认文件夹。服务器控制允许使用的文件夹。种子保留其文件结构。关闭此页面会将暂停的下载交还浏览器。"
   },
   "review_cancel": {
     "message": "取消"
@@ -642,5 +608,82 @@
   },
   "safari_detail": {
     "message": "Safari 将确认过的链接和页面资源发送到已配置的 Ketch 服务器。在 Ketch 中开启共享，然后在此输入地址和访问令牌。不支持自动捕获下载或启动应用。"
+  },
+  "dialog_title": {
+    "message": "新建下载"
+  },
+  "dialog_name_label": {
+    "message": "文件名"
+  },
+  "dialog_send_to": {
+    "message": "发送到"
+  },
+  "dialog_save_in": {
+    "message": "保存到"
+  },
+  "dialog_folder_default": {
+    "message": "默认文件夹"
+  },
+  "dialog_device_checking": {
+    "message": "正在检查…"
+  },
+  "dialog_device_ready": {
+    "message": "就绪"
+  },
+  "dialog_device_free": {
+    "message": "可用 $SIZE$",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "下载时自动打开"
+  },
+  "dialog_device_offline": {
+    "message": "无法连接"
+  },
+  "dialog_torrent_layout": {
+    "message": "种子会保留自己的文件夹结构。"
+  },
+  "dialog_space_warning": {
+    "message": "$DEVICE$ 上仅剩 $SIZE$ 可用空间。",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "在浏览器中下载"
+  },
+  "dialog_sending": {
+    "message": "正在发送…"
+  },
+  "dialog_folder_auto": {
+    "message": "自动"
+  },
+  "dialog_folder_auto_match": {
+    "message": "自动 · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "由设备决定：下载文件夹，或与此文件匹配的分类文件夹。"
+  },
+  "dialog_folder_recent": {
+    "message": "最近使用：$FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
   }
 }

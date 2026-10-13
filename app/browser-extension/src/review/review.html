@@ -3,32 +3,73 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-i18n="review_title">Review download</title>
+  <title data-i18n="dialog_title">New download</title>
   <link rel="stylesheet" href="../ui/common.css">
   <link rel="stylesheet" href="review.css">
   <script type="module" src="review.js"></script>
 </head>
 <body>
-  <main>
-    <h1 data-i18n="review_title">Review download</h1>
-    <p id="url" class="muted"></p>
-    <form id="form">
-      <label><span data-i18n="popup_instance_picker">Ketch instance</span>
-        <select id="instance"></select></label>
-      <label><span data-i18n="review_name">File name (optional)</span>
-        <input id="name" type="text" autocomplete="off" maxlength="255"></label>
-      <label><span data-i18n="review_folder">Folder on the selected device (optional)</span>
-        <input id="folder" type="text" autocomplete="off" maxlength="4096"></label>
-      <p class="muted" data-i18n="review_detail">Leave the folder empty to use the device’s
-        default. The server controls which folders are allowed. Torrents keep their own file
-        layout. Closing this page returns a paused download to the browser.</p>
-      <div class="actions">
-        <button id="send" type="submit" class="primary" disabled
-          data-i18n="popup_add_button">Download</button>
-        <button id="cancel" type="button" data-i18n="review_cancel">Cancel</button>
+  <form id="form" class="dialog" aria-labelledby="dialog-title" autocomplete="off">
+    <h1 id="dialog-title" class="sr-only" data-i18n="dialog_title">New download</h1>
+    <header class="file">
+      <div id="badge" class="badge" aria-hidden="true"></div>
+      <div class="file-text">
+        <input id="name" class="name" type="text" spellcheck="false" maxlength="255"
+               aria-label="File name" data-i18n-aria-label="dialog_name_label">
+        <p id="title" class="name-static" hidden></p>
+        <p id="meta" class="meta"></p>
       </div>
-    </form>
-    <p id="status" role="status"></p>
-  </main>
+    </header>
+    <p id="name-error" class="field-error" hidden data-i18n="review_invalid_destination">Enter a
+      valid file name and folder.</p>
+
+    <fieldset class="section">
+      <legend class="section-title" data-i18n="dialog_send_to">Send to</legend>
+      <div id="devices" class="devices"></div>
+    </fieldset>
+
+    <section class="section">
+      <label class="section-title" for="folder" data-i18n="dialog_save_in">Save in</label>
+      <div class="folder-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4l2 2h8.6A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5
+                   1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>
+        </svg>
+        <input id="folder" type="text" spellcheck="false" maxlength="4096">
+      </div>
+      <div id="folders" class="chips"></div>
+      <p id="torrent-note" class="note" hidden data-i18n="dialog_torrent_layout">Torrents keep
+        their own folder layout.</p>
+      <p id="space-warning" class="warning" hidden></p>
+    </section>
+
+    <p id="status" class="status" role="status" hidden></p>
+
+    <footer class="actions">
+      <button id="direct" class="link" type="button" hidden
+              data-i18n="dialog_download_browser">Download in browser</button>
+      <span class="spacer"></span>
+      <button id="cancel" type="button" data-i18n="review_cancel">Cancel</button>
+      <button id="send" class="primary" type="submit" disabled
+              data-i18n="popup_add_button">Download</button>
+    </footer>
+  </form>
+
+  <template id="device-template">
+    <label class="device">
+      <input type="radio" name="device">
+      <span class="device-icon" aria-hidden="true"></span>
+      <span class="device-text">
+        <span class="device-name"></span>
+        <span class="device-line"><span class="status-dot"></span><span
+            class="device-status"></span></span>
+      </span>
+      <svg class="device-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m5 12.5 4.5 4.5L19 7.5"/>
+      </svg>
+    </label>
+  </template>
 </body>
 </html>

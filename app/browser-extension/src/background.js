@@ -4,19 +4,18 @@
  * the top level because the browser may stop this script whenever it is idle.
  */
 
-import { FailureKind } from './lib/ketch-client.js';
 import { ext, remoteOnly } from './lib/ext.js';
-import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
-import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
+import { taskName } from './lib/format.js';
+import { cookieStoreIdForTab } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
-import { openReview, sendReview, cancelReview, closeReviews } from './lib/review.js';
+import {
+  cancelReview, closeReviews, directReview, openReview, sendReview, startBrowserDownload,
+} from './lib/review.js';
 import { RequestContext } from './lib/request-context.js';
 import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
 import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './lib/settings.js';
 
-/** Captured downloads wait for Ketch this long before the browser takes them back. */
-const CAPTURE_TIMEOUT_MS = 6_000;
 const requestContext = new RequestContext();
 if (!remoteOnly) ext.webRequest?.onBeforeRequest.addListener((details) => requestContext.observe(details),
   { urls: ['http://*/*', 'https://*/*'] });
@@ -55,10 +54,13 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('review/')) &&
-    ['review-send', 'review-cancel'].includes(message?.type)) {
+    ['review-send', 'review-cancel', 'review-direct'].includes(message?.type)) {
     const action = message.type === 'review-send'
       ? sendReview(message.id, message.instanceId, message.fileName, message.folder)
-      : cancelReview(message.id);
+        .then((task) => notifyReviewSent(message.instanceId, task))
+      : message.type === 'review-direct'
+        ? directReview(message.id, message.fileName)
+        : cancelReview(message.id);
     action.then(() => sendResponse({ ok: true }), (error) =>
       sendResponse({ ok: false, message: error.message, kind: error.kind }));
     return true;
@@ -101,8 +103,8 @@ if (!remoteOnly && ext.downloads?.onDeterminingFilename) {
 }
 
 /**
- * Sends a download the browser started to the default instance. `gate.release()` gives the
- * download back to the browser; it runs for skipped downloads and when Ketch can't take it.
+ * Pauses a download the browser started and opens its review, aimed at the default instance.
+ * `gate.release()` lets the browser go on; it runs for skipped downloads too.
  */
 async function captureDownload(item, gate) {
   const release = () => gate.release().catch((error) => {
@@ -123,72 +125,31 @@ async function captureDownload(item, gate) {
   }
   await gate.hold();
   const instance = findInstance(settings);
-  const fileName = fileNameFromPath(item.filename);
-  if (settings.confirmDownloads) {
-    // Finish Chromium's filename hook before asking the browser to pause. If the download
-    // already completed or cannot pause, keep it in the browser without submitting a copy.
-    await release();
-    try {
-      await ext.downloads.pause(item.id);
-      await openReview(instance.id, {
-        url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
-        cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
-      });
-    } catch {
-      await ext.downloads.resume(item.id).catch(() => {});
-    }
-    return;
-  }
-  let task;
+  // Finish Chromium's filename hook before asking the browser to pause. If the download
+  // already completed or cannot pause, keep it in the browser without submitting a copy.
+  await release();
   try {
-    task = await sendToKetch(instance, {
-      url: item.finalUrl || item.url,
-      referrer: item.referrer,
-      fileName,
-      mime: item.mime,
-      cookieStoreId: item.cookieStoreId,
-      browserDownloadId: item.id,
-    }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
-  } catch (error) {
-    await release();
-    if (error.kind === FailureKind.UNCERTAIN) {
-      await ext.downloads.pause(item.id).catch(() => {});
-      notifyFailure(t('options_diagnostics'), instance, error);
-    } else {
-      notifyFailure(t('notify_fallback_browser'), instance, error);
-    }
-    return;
-  }
-  await removeBrowserDownload(item.id);
-  notifySent(settings, instance, taskName(task) || fileName);
-}
-
-async function removeBrowserDownload(downloadId) {
-  try {
-    await ext.downloads.cancel(downloadId);
-    await ext.downloads.erase({ id: downloadId });
-  } catch (error) {
-    // The browser may have finished a tiny file already; Ketch has its own copy either way.
-    console.warn('Ketch: could not remove the browser download', error);
+    await ext.downloads.pause(item.id);
+    await openReview(instance.id, {
+      url: item.finalUrl || item.url, referrer: item.referrer,
+      fileName: fileNameFromPath(item.filename), mime: item.mime,
+      cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
+      size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
+    });
+  } catch {
+    await ext.downloads.resume(item.id).catch(() => {});
   }
 }
 
 async function handleMagnet(url) {
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
-  const instance = findInstance(settings);
   try {
-    if (settings.confirmDownloads) {
-      await openReview(instance.id, { url });
-      return { handled: true };
-    }
-    const task = await sendToKetch(instance, { url }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
-    notifySent(settings, instance, taskName(task));
+    await openReview(findInstance(settings).id, { url });
     return { handled: true };
   } catch (error) {
-    notifyFailure(error.kind === FailureKind.UNCERTAIN
-      ? t('options_diagnostics') : t('notify_fallback_magnet'), instance, error);
-    return { handled: error.kind === FailureKind.UNCERTAIN };
+    console.error('Ketch: could not open the review for a magnet link', error);
+    return { handled: false };
   }
 }
 
@@ -216,41 +177,21 @@ async function handleMenuClick(info, tab) {
       : t('notify_unsupported_scheme'));
     return;
   }
-  try {
-    const download = {
-      url,
-      referrer: info.frameUrl || info.pageUrl,
-      cookieStoreId: await cookieStoreIdForTab(tab),
-    };
-    if (settings.confirmDownloads) {
-      await openReview(instance.id, download);
-      return;
-    }
-    const task = await sendToKetch(instance, download, settings);
-    notifySent(settings, instance, taskName(task) || nameFromUrl(url));
-  } catch (error) {
-    notifyFailure(t('notify_send_failed', instance.name), instance, error);
-  }
+  // The review can still hand a link back to the browser, in the tab's context.
+  await openReview(instance.id, {
+    url,
+    referrer: info.frameUrl || info.pageUrl,
+    cookieStoreId: await cookieStoreIdForTab(tab),
+    incognito: tab?.incognito || undefined,
+  });
 }
 
-/** Starts a browser download; its byExtensionId keeps it out of automatic capture. */
+/** Downloads the clicked item in the browser, leaving Ketch out of this one download. */
 async function downloadDirectly(info, tab) {
-  const url = info.linkUrl || info.srcUrl;
-  const firefox = !ext.downloads.onDeterminingFilename;
-  // Chromium's spanning background cannot select a private download context. Leave that
-  // case to the browser's native save command instead of using the regular cookie store.
-  if (!/^https?:\/\//i.test(url ?? '') || (tab?.incognito && !firefox)) {
-    notify(t('notify_direct_failed'), t('notify_direct_hint'));
-    return;
-  }
-  const options = { url };
-  if (firefox) {
-    if (tab?.cookieStoreId) options.cookieStoreId = tab.cookieStoreId;
-    if (tab?.incognito) options.incognito = true;
-  }
   try {
-    // Let the browser choose the name, cookies and whether to show its Save As dialog.
-    await ext.downloads.download(options);
+    await startBrowserDownload(info.linkUrl || info.srcUrl, {
+      cookieStoreId: tab?.cookieStoreId, incognito: tab?.incognito,
+    });
   } catch {
     console.warn('Ketch: could not start the browser download');
     notify(t('notify_direct_failed'), t('notify_direct_hint'));
@@ -326,17 +267,17 @@ function parseMenuId(menuId) {
   return { kind, instanceId: separator < 0 ? undefined : menuId.slice(separator + 1) };
 }
 
+async function notifyReviewSent(instanceId, task) {
+  const settings = await loadSettings().catch(() => undefined);
+  if (settings) notifySent(settings, findInstance(settings, instanceId), taskName(task));
+}
+
 function notifySent(settings, instance, name) {
   if (!settings.notifications) return;
   const where = settings.instances.length > 1
     ? t('notify_sent_to', instance.name)
     : t('notify_sent_to_ketch');
   notify(where, name || t('notify_download_added'));
-}
-
-function notifyFailure(title, instance, error) {
-  const message = String(error?.message ?? error).replace(/\.$/, '');
-  notify(title, withHint(message, failureHint(error, instance)));
 }
 
 function notify(title, message) {

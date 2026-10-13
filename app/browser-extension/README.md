@@ -5,7 +5,7 @@ opens when it needs it, or a Ketch server elsewhere, such as a NAS. This README 
 and using the extension, what it does with your data, and how to build, test and release it.
 
 Chromium browsers and Firefox get automatic capture and native app launching. The limited Safari
-target sends reviewed links and page resources to a configured server.
+target sends links and page resources to a configured server.
 
 ## Features
 
@@ -27,8 +27,8 @@ target sends reviewed links and page resources to a configured server.
   along, so downloads that need a session work in Ketch too. They stay with that site: when a
   download redirects to another host, Ketch sends it the user agent and only the origin of the
   referring page, not the cookies.
-- **Review before sending** (optional): choose the receiving device, a file name and a folder
-  before each download is sent.
+- **Download dialog**: before anything is sent, a small dialog lets you rename the file, pick the
+  receiving device and folder, or download it in the browser instead.
 
 ## Supported browsers
 
@@ -38,8 +38,8 @@ target sends reviewed links and page resources to a configured server.
 | Firefox (desktop) | 128 | `build/firefox` |
 | Safari (macOS, limited features) | 16.4 | `build/safari` |
 
-Safari supports manual links, magnets, page resources and task controls, with review before
-sending. Automatic browser-download capture, native app launching and extension notifications are
+Safari supports manual links, magnets, page resources and task controls, through the same
+download dialog. Automatic browser-download capture, native app launching and extension notifications are
 unavailable. See [Safari](#safari-limited-macos-target).
 
 ## Installing
@@ -92,12 +92,13 @@ links the latest one under *Add Ketch to your browser*. Each includes:
 
 The extension can send downloads to several Ketch instances. One of them is the default:
 
-- captured downloads and clicked magnet links go to the default instance;
+- the download dialog starts on the default instance for captured downloads and clicked magnet
+  links, and on the one you picked for context-menu and pasted links;
 - the context menu lists every instance, default first;
 - the popup has a picker to watch any instance, and adds pasted links to the one shown.
 
-Each instance card in the settings page shows whether it can be reached. Captured downloads fall
-back to the browser only when the default instance fails; they never switch to another instance.
+Each instance card in the settings page shows whether it can be reached; the download dialog shows
+it too, and lets you switch instance for that download.
 
 ### Capturing downloads
 
@@ -105,11 +106,11 @@ Turn off **Capture browser downloads** in the popup to leave downloads to the br
 capture has its own switch in settings.
 
 In Chromium browsers the extension holds each download while its file name is decided, before any
-"Save as" dialog. It asks Ketch to take the download, then cancels it in the browser. If Ketch
-refuses or doesn't answer within 6 seconds, the browser continues as if nothing happened.
+"Save as" dialog, then pauses it and opens the [download dialog](#download-dialog). Sending it
+to Ketch cancels it in the browser; canceling the dialog lets the browser continue.
 
-Firefox has no such hook, so the extension pauses the download once it has started, then cancels
-or resumes it. If Firefox is set to ask where to save each file, that dialog appears first.
+Firefox has no such hook, so the extension pauses the download once it has started. If Firefox is
+set to ask where to save each file, that dialog appears first.
 
 Downloads are left to the browser when:
 
@@ -158,20 +159,43 @@ unencrypted, single-stream HLS and static MP4 DASH work within the
 [media engine's limits](../../docs/media.md); live or encrypted streams and separate tracks that
 would need merging are rejected by the engine.
 
-### Review before sending
+### Download dialog
 
-Turn on **Review downloads before sending** to choose the receiving device, an optional file name
-and a folder before each captured download, context-menu link, pasted link or magnet is sent. The
-folder belongs to the receiving device and stays subject to its server directory policy. Torrents
-keep their file layout. The page resource picker already reviews a batch.
+Every captured download, context-menu link, pasted link and clicked magnet link opens a dialog
+before anything is sent. It opens as a small window over the browser (a tab in Safari) and shows:
 
-A captured browser download must pause successfully before the review opens:
+- the file's type, name, size when the browser knows it, and site. Edit the name to save it under
+  another one; torrents keep the names and layout inside them;
+- every Ketch instance with whether it can be reached and the free space in its download folder;
+  checking never opens the Ketch app, sending does;
+- the folder, on the selected device, with quick options under it:
+  - **Auto** (the default) leaves the folder empty, so the device chooses: its download folder,
+    or the category folder it sorts this file into by type or site (Settings → Downloads in the
+    app), named on the chip as in "Auto · Videos" and shown in the field. Clicking the field fills
+    in that path to edit; left unchanged, it stays Auto;
+  - the device's category folders, to pick one yourself;
+  - the last five folders you sent to on that device, kept in the extension's local storage.
 
-- canceling or closing an unsent review resumes it in the browser;
+  A device that can't be asked, such as the Ketch app while it is closed, shows the download and
+  category folders it reported last, in the dialog or the popup, which the extension keeps in its
+  local storage.
+
+  Folders stay subject to the server directory policy, and a warning shows when the file is
+  larger than the device's free space;
+- **Download in browser**, which gives a captured download back to the browser, or starts an
+  HTTP(S) link as a browser download (not from a Chromium private window);
+
+Enter sends, Esc cancels. With notifications on, a notification confirms where it was sent. The
+page resource picker sends a batch without it.
+
+A captured browser download must pause successfully before the dialog opens; one that can't pause
+stays in the browser:
+
+- canceling or closing the dialog, or **Download in browser**, resumes it in the browser;
 - acceptance removes the browser original;
 - an uncertain send keeps it paused until you check pending downloads in settings.
 
-Reviews and receipts last only for the browser session. After restarting the browser, check Ketch
+Dialogs and receipts last only for the browser session. After restarting the browser, check Ketch
 and the browser's downloads before resuming a paused original by hand.
 
 ### When a send is uncertain
@@ -269,17 +293,16 @@ The Ketch app on this computer is reached through
    like any Ketch server. When the app restarts, the extension asks the host again.
 
 Looking at the popup or the settings page never opens Ketch; sending a download, **Open Ketch** in
-the popup and **Test connection** do. A captured download waits up to 45 seconds for Ketch to start
-before the browser takes it back.
+the popup and **Test connection** do; sending waits up to 45 seconds for Ketch to start.
 
 ## Safari (limited macOS target)
 
 `npm run build` also writes `build/safari` and a Safari source zip. This target needs Safari 16.4
 or later, for module background workers and session storage.
 
-- **Supported**: configured Ketch servers, reviewed context-menu links and magnets, pasted links,
-  page resources, task controls and diagnostics. Every individual send opens the review page;
-  batch sends are reviewed in the resource picker.
+- **Supported**: configured Ketch servers, context-menu links and magnets, pasted links,
+  page resources, task controls and diagnostics. Every individual send opens the download
+  dialog; batch sends are chosen in the resource picker.
 - **Not supported**: intercepting browser downloads, launching the desktop app through a native
   host, and extension notifications.
 
@@ -375,7 +398,7 @@ icons are rendered from the repository's `art/icon-app.svg` by `art/render-icons
 | `src/popup/` | Toolbar popup |
 | `src/options/` | Settings page |
 | `src/resources/` | Page resource picker |
-| `src/review/` | Review page shown before sending |
+| `src/review/` | Download dialog shown before sending |
 | `src/ui/common.css` | Styles shared by the pages |
 | `src/lib/settings.js` | Settings, instances and their validation |
 | `src/lib/ketch-client.js` | Client for the Ketch REST API |
@@ -385,7 +408,7 @@ icons are rendered from the repository's `art/icon-app.svg` by `art/render-icons
 | `src/lib/request-context.js` | Remembers request methods and source pages for capture rules |
 | `src/lib/intercept.js` | Which browser downloads are captured |
 | `src/lib/page-resources.js` | Finds resources on a page |
-| `src/lib/review.js` | Review before sending |
+| `src/lib/review.js` | Download dialog state: open, send, cancel, hand back to the browser |
 | `src/lib/submissions.js` | Submission receipts, pending sends and diagnostics |
 | `src/lib/format.js` | Text for tasks, sizes and connection problems |
 | `src/lib/i18n.js` | Messages in the browser's language, for scripts and pages |
