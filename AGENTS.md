@@ -689,9 +689,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `seedingAvailability` and a `startSeeding` whose recheck a pause ends answer
   `SeedingOutcome.UPLOADS_PAUSED` (the restore walk stops on it, intents kept), and
   `setSeeding(true)` is accepted and saves the intent while the activity stays `STOPPED`. A
-  torrent that really completes then reaches `FINISHED`, so the source records its ID and
-  `TorrentControls` saves the intent of the IDs `takeDeferredSharing` hands over, seeding the task
-  at once if uploads resumed meanwhile;
+  torrent that really completes then reaches `FINISHED`, so the source records its ID, as it does
+  for one lent its slot to seed (a pause may stop that seeder before Ketch publishes the
+  completion), and `TorrentControls` saves the intent of the IDs `takeDeferredSharing` hands over,
+  seeding the task at once if uploads resumed meanwhile;
   `SourceExtension.taskCompleted` alone never saves one, as it fires for every restored completed
   record and every `showSharing` copy
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`

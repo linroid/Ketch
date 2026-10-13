@@ -126,10 +126,11 @@ internal class TorrentControls(
   }
 
   /**
-   * Saves the intent to seed [task], which completed while uploads were paused under a setting
-   * that seeds, so it seeds once they resume; not after a Stop command that [stopped], the count
-   * of [stops] read before the completion was taken, did not count, as in [syncSeeding]. Seeds it
-   * at once when uploads resumed before the intent was saved, as their walk may have passed it.
+   * Saves the intent to seed [task], which completed meant to seed under a setting that seeds,
+   * so it seeds once uploads resume even when a pause finished or stopped its session first; not
+   * after a Stop command that [stopped], the count of [stops] read before the completion was
+   * taken, did not count, as in [syncSeeding]. Seeds it at once when uploads resumed before the
+   * intent was saved, as their walk may have passed it; a task still seeding is left as it is.
    */
   private fun deferSharing(task: DownloadTask, stopped: Long?) {
     val taskId = task.taskId
@@ -139,7 +140,7 @@ internal class TorrentControls(
       if (task.state.value !is DownloadState.Completed ||
         host.record(task)?.control?.sharing != true
       ) return@launch
-      log.i { "Saved the intent to seed taskId=$taskId once uploads resume" }
+      log.d { "Saved the intent to seed taskId=$taskId" }
       if (source.seedingAvailability(taskId) == null) {
         val outcome = seed(task)
         if (outcome != SeedingOutcome.SEEDING) log.i { "Did not seed taskId=$taskId: $outcome" }

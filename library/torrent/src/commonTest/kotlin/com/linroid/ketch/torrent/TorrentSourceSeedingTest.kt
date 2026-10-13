@@ -236,6 +236,38 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
+  fun download_lentToSeed_defersSharingSoAPauseCannotDropIt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        try {
+          val resolved = source.resolveMetainfo(v1Metainfo("seeder"))
+          val session = FakeTorrentSession(resolved.metadata.getValue("infoHash"))
+          engine.addTorrentResult = session
+          val seeds = launch {
+            eventually { session.resumed }
+            session.seed()
+          }
+          source.download(context("seeder", resolved, "unused-seeder"), null)
+          seeds.join()
+          assertEquals(setOf("seeder"), source.seedingTaskIds.value)
+          // Uploads pause before Ketch publishes the completion: the seeder stops, and the
+          // completion still carries the intent to seed.
+          source.setUploadsPaused(true)
+          session.finish()
+          eventually { source.seedingTaskIds.value.isEmpty() }
+          assertTrue(source.takeDeferredSharing("seeder"))
+          assertFalse(source.takeDeferredSharing("seeder"))
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
   fun startSeeding_pausedDuringRecheck_returnsUploadsPaused() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {

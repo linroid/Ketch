@@ -278,9 +278,10 @@ class TorrentDownloadSource(
   internal val sharingResumes: StateFlow<Long> = resumes.asStateFlow()
 
   /**
-   * What [TorrentControlSource.takeDeferredSharing] reports: whether [taskId] completed while
-   * uploads were paused under [TorrentUploadPolicy.SEED_AFTER_COMPLETION], which finished its
-   * session instead of seeding it, forgetting it.
+   * What [TorrentControlSource.takeDeferredSharing] reports: whether [taskId] completed meant to
+   * seed under [TorrentUploadPolicy.SEED_AFTER_COMPLETION], forgetting it. That covers a session
+   * paused uploads finished instead of seeding, and one lent its slot to seed, which a pause may
+   * stop before Ketch publishes the completion and the seeding watcher could save the intent.
    */
   internal fun takeDeferredSharing(taskId: String): Boolean {
     var taken = false
@@ -292,14 +293,15 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Remembers that [taskId] completed with its session finished, not seeding, when only paused
-   * uploads kept it from seeding, so the task is meant to seed once they resume.
+   * Remembers that [taskId] completed meant to seed, so the intent is saved whatever its session
+   * does by the time Ketch publishes the completion: [seeded] when the session was lent its slot
+   * to seed, else when only paused uploads finished it instead of seeding.
    */
-  private fun deferSharingIfPaused(taskId: String) {
-    if (restoreSeeding && pausedUploads.load() &&
-      uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION
-    ) {
-      deferredSharing.update { it + taskId }
+  private fun deferSharing(taskId: String, seeded: Boolean) {
+    if (!restoreSeeding || uploadPolicy.load() != TorrentUploadPolicy.SEED_AFTER_COMPLETION) return
+    if (!seeded && !pausedUploads.load()) return
+    deferredSharing.update { it + taskId }
+    if (!seeded) {
       log.i { "Torrent taskId=$taskId completed while uploads are paused; seeds once resumed" }
     }
   }
@@ -1190,7 +1192,7 @@ class TorrentDownloadSource(
         keepSeeding = track(context, running, table, state.selectedFileIds,
           applied = if (adopted == null) initialRevision else -1, resume = adopted == null)
         // Paused uploads finish a completed session that would have seeded.
-        if (!keepSeeding) deferSharingIfPaused(taskId)
+        if (!keepSeeding) deferSharing(taskId, seeded = false)
         onTransferEnd(taskId)
       } catch (e: Throwable) {
         keepSeeding = false
@@ -1204,6 +1206,8 @@ class TorrentDownloadSource(
               store(context)
               // Seeding is optional: a download waiting for this slot takes precedence.
               if (keepSeeding && owned != null) lent = lendSlot(taskId, owned)
+              // A pause may stop this seeder before the completion can save its intent.
+              if (lent) deferSharing(taskId, seeded = true)
             } finally {
               // Removal closes the store before the task is released: cleanup cannot race it.
               if (!lent) engine.load()?.removeTorrent(hash)
