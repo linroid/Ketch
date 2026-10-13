@@ -754,6 +754,22 @@
   <string name="settings_torrent_no_trackers">No extra trackers</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->
   <string name="settings_torrent_remote">Change the BitTorrent settings on %1$s itself, or in its config.toml.</string>
+  <!-- Whether peers on the internet can connect to a device. %1$s is the device's name, %2$d the
+       port peers are told to use. -->
+  <string name="settings_torrent_reach_reachable">Peers can connect to %1$s on port %2$d.</string>
+  <!-- %3$d is how many routers (NAT layers) forward the port, the home router first. -->
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">Port %2$d is forwarded to %1$s through %3$d router, so peers can connect.</item>
+    <item quantity="other">Port %2$d is forwarded to %1$s through %3$d routers, so peers can connect.</item>
+  </plurals>
+  <!-- A router forwards the port, but a NAT outside it does not, such as a provider's
+       carrier-grade NAT, so peers cannot connect. -->
+  <string name="settings_torrent_reach_blocked">Peers can't connect to %1$s: its router forwards port %2$d, but a network outside it, often your provider's, doesn't.</string>
+  <string name="settings_torrent_reach_not_forwarded">No router forwards port %2$d to %1$s, so peers may not be able to connect. Turn on Port mapping, or forward the port on your router.</string>
+  <!-- After settings_torrent_reach_blocked or _not_forwarded. Hole punching lets two devices
+       behind routers connect with a third peer's help. -->
+  <string name="settings_torrent_reach_hole_punching">Downloads still work, and hole punching reaches peers behind routers.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Downloads still work. Turn on uTP so hole punching can reach peers behind routers.</string>
   <!-- After Remove all, with Undo. -->
   <plurals name="settings_torrent_removed">
     <item quantity="one">Removed %1$d tracker.</item>

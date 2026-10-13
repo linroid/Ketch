@@ -12,6 +12,19 @@ import kotlin.test.assertTrue
 
 class TorrentContractsTest {
   @Test
+  fun reachability_roundTripsByWireName_andReadsUnknownStatusesAsUnknown() {
+    val blocked = TorrentReachability(TorrentReachabilityStatus.BLOCKED, port = 6881,
+      forwardedLayers = 1, incomingPeers = 0, holePunching = true)
+    val text = Json.encodeToString(blocked)
+    assertTrue(text.contains("\"status\":\"blocked\""), text)
+    assertEquals(blocked, Json.decodeFromString<TorrentReachability>(text))
+    assertEquals(TorrentReachabilityStatus.NOT_FORWARDED,
+      Json.decodeFromString<TorrentReachability>("""{"status":"not-forwarded"}""").status)
+    assertEquals(TorrentReachabilityStatus.UNKNOWN,
+      Json.decodeFromString<TorrentReachability>("""{"status":"relayed"}""").status)
+  }
+
+  @Test
   fun capabilities_unknownNamesSurviveButUnknownMajorDoesNotEnableCommands() {
     val capabilities = Json.decodeFromString<TorrentCapabilities>(
       """{"names":["v2","future-feature"]}"""

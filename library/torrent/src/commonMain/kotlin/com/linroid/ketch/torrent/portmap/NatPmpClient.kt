@@ -11,8 +11,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.Buffer
 
-/** The transport protocol of a port mapping; NAT-PMP numbers them 1 and 2. */
-internal enum class MappedProtocol(val natPmpOpcode: Int) { UDP(1), TCP(2) }
+/** The transport protocol of a port mapping: NAT-PMP numbers them 1 and 2, PCP 17 and 6. */
+internal enum class MappedProtocol(val natPmpOpcode: Int, val ianaNumber: Int) {
+  UDP(1, 17),
+  TCP(2, 6),
+}
 
 /** A port a gateway forwards to us until [lifetimeSeconds] pass. */
 internal data class PortMapping(

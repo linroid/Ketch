@@ -18,6 +18,8 @@ import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentReachability
+import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.client.request.get
@@ -62,6 +64,9 @@ class TorrentRoutesTest {
 
     override suspend fun capabilities() =
       TorrentCapabilities(names = setOf("inspect", "file-selection"), maxPageSize = 1000)
+
+    override suspend fun reachability() = TorrentReachability(
+      TorrentReachabilityStatus.BLOCKED, port = 6881, forwardedLayers = 1, holePunching = true)
 
     override suspend fun snapshot(taskId: String): TorrentSnapshot? =
       if (taskId == "t1") this@TorrentRoutesTest.snapshot(taskId) else null
@@ -154,6 +159,22 @@ class TorrentRoutesTest {
     assertEquals(HttpStatusCode.NotFound, capabilities.status)
     assertEquals(HttpStatusCode.NotFound, snapshot.status)
     assertFalse(capabilities.bodyAsText().contains("\"error\""))
+  }
+
+  @Test
+  fun reachability_answersTheControllers() = testApplication {
+    application { with(controlledServer()) { configureServer() } }
+
+    val response = client.get("/api/torrents/reachability")
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    val body = response.bodyAsText()
+    assertTrue(body.contains("\"status\":\"blocked\""), body)
+    assertEquals(
+      TorrentReachability(TorrentReachabilityStatus.BLOCKED, port = 6881, forwardedLayers = 1,
+        holePunching = true),
+      json.decodeFromString<TorrentReachability>(body),
+    )
   }
 
   @Test

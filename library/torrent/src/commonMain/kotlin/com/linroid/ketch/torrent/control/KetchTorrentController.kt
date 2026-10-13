@@ -26,6 +26,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentCounters
+import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
@@ -111,6 +112,13 @@ internal class KetchTorrentController(
     maxSubscriptions = MAX_SUBSCRIPTIONS,
     backgroundTransfers = false,
   )
+
+  override suspend fun reachability(): TorrentReachability {
+    if (TorrentCapability.REACHABILITY.wireName !in source.torrentCapabilities) {
+      throw TorrentCommandException(TorrentCommandError.UNSUPPORTED, "Reachability is unavailable")
+    }
+    return source.torrentReachability()
+  }
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {
     val task = torrentTask(taskId) ?: return null

@@ -124,6 +124,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
+  TorrentReachabilityNotice(state, device)
   if (torrent == null) {
     SettingsNotice(
       text = stringResource(Res.string.settings_torrent_remote, device.label),

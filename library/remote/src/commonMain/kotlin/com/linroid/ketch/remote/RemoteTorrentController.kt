@@ -17,6 +17,7 @@ import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentRevisionDecision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -97,6 +98,13 @@ internal class RemoteTorrentController(
       cached = current to capabilities
     }
     return capabilities
+  }
+
+  override suspend fun reachability(): TorrentReachability {
+    requireCapability(TorrentCapability.REACHABILITY)
+    return checkNotNull(call<TorrentReachability>(notFoundIsNull = false) {
+      httpClient.get(Torrents.Reachability())
+    })
   }
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {

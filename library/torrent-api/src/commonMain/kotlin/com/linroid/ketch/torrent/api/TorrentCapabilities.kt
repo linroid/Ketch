@@ -23,6 +23,7 @@ enum class TorrentCapability(val wireName: String) {
   UTP("utp"),
   ENCRYPTION("mse-pe"),
   PROXY("proxy"),
+  REACHABILITY("reachability"),
 }
 
 /**

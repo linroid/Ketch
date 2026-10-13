@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
  * ([com.linroid.ketch.torrent.api.TorrentFeatures.CONTROL]) serve:
  *
  * - `GET /api/torrents/capabilities`   — what the torrent controller can do
+ * - `GET /api/torrents/reachability`   — whether peers can connect to its engine
  * - `GET /api/torrents/{id}`           — a torrent task's snapshot
  * - `GET /api/torrents/{id}/files`     — a page of its files (`?limit&cursor&sort&desc`)
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
@@ -22,6 +23,10 @@ data class Torrents(val parent: Api = Api()) {
   @Serializable
   @Resource("capabilities")
   data class Capabilities(val parent: Torrents = Torrents())
+
+  @Serializable
+  @Resource("reachability")
+  data class Reachability(val parent: Torrents = Torrents())
 
   @Serializable
   @Resource("{id}")

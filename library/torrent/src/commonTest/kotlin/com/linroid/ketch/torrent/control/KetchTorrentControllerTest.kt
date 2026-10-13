@@ -27,6 +27,7 @@ import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CompletableDeferred
@@ -878,6 +879,20 @@ class KetchTorrentControllerTest {
 
       source.capabilities += TorrentCapability.SEEDING.wireName
       assertTrue(ketch.torrents.capabilities().supports(TorrentCapability.SEEDING))
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun reachability_answersOnlyWithItsCapability() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    try {
+      val error = assertFailsWith<TorrentCommandException> { ketch.torrents.reachability() }
+      assertEquals(TorrentCommandError.UNSUPPORTED, error.error)
+      source.capabilities += TorrentCapability.REACHABILITY.wireName
+      assertEquals(TorrentReachability(), ketch.torrents.reachability())
     } finally {
       ketch.close()
     }

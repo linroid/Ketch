@@ -288,10 +288,17 @@ listen port over uTP. Private torrents use it too.
 ### Port forwarding
 
 With `portMapping` on, Ketch asks the home router to forward the listen port, so that peers behind
-other routers can connect to this device. It tries NAT-PMP first, then UPnP, and tells trackers,
-DHT and peers the external port it gets. Mappings last an hour, are renewed every half hour and are
-removed when the engine stops. Without a router that answers, Ketch logs that incoming peers need a
-forwarded port and tries again every 10 minutes.
+other routers can connect to this device. It tries NAT-PMP first, then PCP, then UPnP, and tells
+trackers, DHT and peers the external port it gets. When the router itself sits behind another NAT
+(a second router, or a provider's carrier-grade NAT), Ketch asks the gateway outside it to forward
+the same port too, through up to three layers, until it reaches a public address. Mappings last an
+hour, are renewed every half hour and are removed when the engine stops. Without a router that
+answers, Ketch logs that incoming peers need a forwarded port and tries again every 10 minutes.
+
+Settings → BitTorrent says whether peers can connect to the device, for this device and remote
+ones: reachable, forwarded through how many routers, blocked by a NAT outside them that will not
+forward the port, or not forwarded. A blocked device still downloads, reaching peers itself and,
+with uTP on, by hole punching.
 
 ### Local peer discovery
 
@@ -586,9 +593,12 @@ first.
 
 ### Port mapping details
 
-NAT-PMP goes to the first and last address of each private /24 network this device is on. UPnP
-runs an SSDP search, then SOAP on the router's WANIPConnection or WANPPPConnection service, only on
-a device on one of our private networks and never through a proxy. TCP and the UDP port map to one
+NAT-PMP and PCP go to the first and last address of each private /24 network this device is on.
+UPnP runs an SSDP search, then SOAP on the router's WANIPConnection or WANPPPConnection service,
+only on a device on one of our private networks and never through a proxy. A gateway outside a
+router is looked for at the first and last address of the /24 of the router's external address and
+the first address of its range (such as `10.0.0.1` or `100.64.0.1`), UPnP by a search sent to it
+directly; it is asked to forward the port the router got to the router's external address. TCP and the UDP port map to one
 external port; when another device holds that port, UPnP picks another. Only engines listening on
 every interface map ports.
 

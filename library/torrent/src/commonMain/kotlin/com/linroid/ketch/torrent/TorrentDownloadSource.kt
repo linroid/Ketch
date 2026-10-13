@@ -22,6 +22,7 @@ import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFeatures
 import com.linroid.ketch.torrent.control.LiveTorrent
 import com.linroid.ketch.torrent.control.SeedingOutcome
@@ -235,6 +236,8 @@ class TorrentDownloadSource(
 
     override suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>) =
       source.changeSeedingSelection(taskId, fileIds)
+
+    override suspend fun torrentReachability() = source.reachability()
   }
 
   /**
@@ -254,6 +257,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.HYBRID.wireName)
       add(TorrentCapability.UTP.wireName)
       add(TorrentCapability.ENCRYPTION.wireName)
+      add(TorrentCapability.REACHABILITY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)
@@ -637,6 +641,13 @@ class TorrentDownloadSource(
       SourceFile(it.id, it.path, it.size, metadata = mapOf("path" to it.path))
     }
   }
+
+  /**
+   * What [TorrentControlSource.torrentReachability] reports: the engine's, or unknown while no
+   * torrent has started it.
+   */
+  internal fun reachability(): TorrentReachability =
+    (engine.load() as? KotlinTorrentEngine)?.reachability() ?: TorrentReachability()
 
   internal suspend fun liveTorrent(taskId: String): LiveTorrent? {
     val session = tasks.session(taskId)

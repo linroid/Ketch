@@ -45,6 +45,10 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     call.respond(controller.capabilities())
   }
 
+  get<Torrents.Reachability> {
+    call.respond(controller.reachability())
+  }
+
   get<Torrents.ById> { resource ->
     log.d { "GET /api/torrents/${resource.id}" }
     val snapshot = controller.snapshot(resource.id) ?: throw notFound(resource.id)

@@ -207,7 +207,7 @@ class TorrentDownloadSourceTest {
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL), source.features)
-    assertEquals(setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe"),
+    assertEquals(setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability"),
       source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)

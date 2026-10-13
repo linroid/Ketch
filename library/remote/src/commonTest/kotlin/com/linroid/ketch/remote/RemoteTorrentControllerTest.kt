@@ -10,6 +10,8 @@ import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentReachability
+import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import io.ktor.client.HttpClient
@@ -129,6 +131,31 @@ class RemoteTorrentControllerTest {
       assertEquals(listOf("/api/torrents/capabilities"), fixture.paths)
     } finally {
       fixture.client.close()
+    }
+  }
+
+  @Test
+  fun reachability_readsTheServers_andFailsClosedWithoutTheCapability() = runTest {
+    val reachable = TorrentReachability(TorrentReachabilityStatus.FORWARDED, port = 6881,
+      forwardedLayers = 2, holePunching = true)
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "reachability")))
+        ?: if (request.url.encodedPath == "/api/torrents/reachability") {
+          json(json.encodeToString(reachable))
+        } else error("Unexpected request")
+    }
+    val older = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect")))
+        ?: error("Unexpected request")
+    }
+    try {
+      assertEquals(reachable, fixture.controller.reachability())
+      // A server without the capability is never asked.
+      failure(TorrentCommandError.UNSUPPORTED) { older.controller.reachability() }
+      assertEquals(listOf("/api/torrents/capabilities"), older.paths)
+    } finally {
+      fixture.client.close()
+      older.client.close()
     }
   }
 

@@ -5,6 +5,8 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentReachability
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -84,6 +86,9 @@ internal interface TorrentControlSource {
    * no longer read does not stop it. Returns whether a session took the change.
    */
   suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean = false
+
+  /** Whether peers can reach the engine; what [TorrentController.reachability] answers. */
+  suspend fun torrentReachability(): TorrentReachability = TorrentReachability()
 }
 
 /** [TorrentControlSource.sharingResumes] of sources whose sharing never comes back on. */

@@ -32,15 +32,30 @@ internal class UpnpClient(
   private val network: TorrentNetwork,
   /** Where SSDP searches go; tests point it at a local responder. */
   private val ssdp: PeerEndpoint = PeerEndpoint("239.255.255.250", 1900),
+  /** The port unicast searches of [discoverAt] go to; tests point it at a local responder. */
+  private val ssdpPort: Int = 1900,
   private val searchMs: Long = 2_000,
   private val requestMs: Long = 5_000,
 ) {
   /** The first gateway on [networks] whose description lists a WAN connection service. */
-  suspend fun discover(networks: List<LocalIpv4Network>): UpnpGateway? {
-    for (location in search()) {
+  suspend fun discover(networks: List<LocalIpv4Network>): UpnpGateway? =
+    describe(search(listOf(ssdp))) { url ->
+      val address = numericAddress(url.host)
+      address != null && networks.any { it.contains(address) }
+    }
+
+  /**
+   * A gateway at one of [hosts], such as an outer NAT's, which a multicast search would never
+   * reach: asked by unicast M-SEARCH (UPnP 1.1), and only a device at one of [hosts] is used.
+   */
+  suspend fun discoverAt(hosts: List<String>): UpnpGateway? =
+    describe(search(hosts.map { PeerEndpoint(it, ssdpPort) })) { url -> url.host in hosts }
+
+  /** The first of [locations] that [allowed] admits whose description lists a WAN service. */
+  private suspend fun describe(locations: List<String>, allowed: (Url) -> Boolean): UpnpGateway? {
+    for (location in locations) {
       val url = parseUrl(location) ?: continue
-      val address = numericAddress(url.host) ?: continue
-      if (networks.none { it.contains(address) }) continue
+      if (!allowed(url)) continue
       val description = try {
         request(url.host, url.port, "GET", url.path, emptyMap(), null).second
       } catch (e: CancellationException) {
@@ -53,8 +68,8 @@ internal class UpnpClient(
     return null
   }
 
-  /** Locations of the gateways answering an SSDP search within [searchMs]. */
-  private suspend fun search(): List<String> {
+  /** Locations of the gateways answering an SSDP search of [targets] within [searchMs]. */
+  private suspend fun search(targets: List<PeerEndpoint>): List<String> {
     val socket = try {
       network.bindUdp(PeerEndpoint("0.0.0.0", 0))
     } catch (e: CancellationException) {
@@ -64,15 +79,19 @@ internal class UpnpClient(
     }
     val locations = linkedSetOf<String>()
     try {
-      for (target in SEARCH_TARGETS) {
-        val message = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n" +
+      for (destination in targets) for (target in SEARCH_TARGETS) {
+        // A multicast search names the SSDP group, a unicast one its device (UPnP 1.1).
+        val host = if (destination == ssdp) "239.255.255.250:1900" else
+          "${destination.host}:${destination.port}"
+        val message = "M-SEARCH * HTTP/1.1\r\nHOST: $host\r\n" +
           "MAN: \"ssdp:discover\"\r\nMX: 2\r\nST: $target\r\n\r\n"
         try {
-          socket.send(ssdp, message.encodeToByteArray())
+          socket.send(destination, message.encodeToByteArray())
         } catch (e: CancellationException) {
           throw e
         } catch (_: Exception) {
-          return emptyList()
+          // An unreachable guess is skipped; the others may answer.
+          if (destination == ssdp) return emptyList()
         }
       }
       withTimeoutOrNull(searchMs) {

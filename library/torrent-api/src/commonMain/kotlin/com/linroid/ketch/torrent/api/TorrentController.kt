@@ -81,4 +81,14 @@ interface TorrentController {
     error = TorrentCommandError.UNSUPPORTED,
     message = "Seeding control is unavailable",
   )
+
+  /**
+   * Whether peers can connect to the backend's torrent engine, through how many NAT layers its
+   * port is forwarded, and whether it punches through NATs; advertised as
+   * [TorrentCapability.REACHABILITY].
+   */
+  suspend fun reachability(): TorrentReachability = throw TorrentCommandException(
+    error = TorrentCommandError.UNSUPPORTED,
+    message = "Reachability is unavailable",
+  )
 }

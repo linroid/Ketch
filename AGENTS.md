@@ -96,9 +96,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   registered, `RemoteKetch` one over REST and SSE that fails closed against older servers),
   `TorrentInterest(taskId)` (a task's snapshots through `KetchApi.subscribe`, `null` once gone),
   `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
-  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, which the engine
-  speaks whatever its settings, and `seeding` while the configured upload mode seeds, also while
-  uploads are paused),
+  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp`, `mse-pe` and `reachability`, which
+  the engine speaks whatever its settings, and `seeding` while the configured upload mode seeds,
+  also while uploads are paused), `TorrentReachability` (`TorrentController.reachability`, REST
+  `GET /api/torrents/reachability`: `TorrentReachabilityStatus` `reachable`, `forwarded`,
+  `blocked`, `not-forwarded` or `unknown`, which unknown wire values decode as; the port, the
+  NAT layers forwarding it, TCP peers that connected in and whether hole punching runs),
   `TorrentSnapshot` (`seeding`: meant to seed, the saved intent or a live seeding session; `null`
   from older backends), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
@@ -707,14 +710,28 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   IPv4 one (`numericHost`), so no peer is dialed under two hosts
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
-  built directly in tests never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the
-  `LocalIpv4Network.gatewayGuesses` of `localIpv4Networks()`, an expect/actual over
-  `NetworkInterface` and `getifaddrs`), then `UpnpClient` (SSDP, the device description and SOAP
-  over a minimal HTTP/1.1 client on direct TCP; only devices on one of our private networks). TCP
-  and the UDP port DHT and uTP share map to one external port, which
-  `TorrentAdvertisedPort.setMapped` announces; mappings last an hour, renew every half hour and are
-  removed by `stop` within 2 s; UPnP tries other ports on 718 and permanent leases on 725.
-  `PortMappingTest` runs both against scripted gateways on loopback
+  built directly in tests never reach the router): `TorrentPortMapper` maps through every NAT
+  layer that answers, at most `MAX_LAYERS` (3). Each layer tries `NatPmpClient` (RFC 6886), then
+  `PcpClient` (RFC 6887 MAP, naming the client address the gateway sees), then `UpnpClient` (SSDP,
+  the device description and SOAP over a minimal HTTP/1.1 client on direct TCP). The first layer
+  asks the `LocalIpv4Network.gatewayGuesses` of `localIpv4Networks()` (an expect/actual over
+  `NetworkInterface` and `getifaddrs`) and UPnP devices on one of our private networks; while a
+  layer's external address is still private, the next asks the gateways `outerGatewayGuesses`
+  derives from it (its /24's first and last host, its range's first), by unicast SSDP
+  (`UpnpClient.discoverAt`) for UPnP, to forward the port the layer got to that address. TCP and
+  the UDP port DHT and uTP share map to one external port per layer; the outermost one is what
+  `TorrentAdvertisedPort.setMapped` announces, and `PortMapLayers` (the layers, that port and
+  address, and whether the address is public) what `KotlinTorrentEngine.reachability` reads.
+  Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
+  2 s; UPnP tries other ports on 718 and permanent leases on 725. `PortMappingTest` and
+  `NatLayersTest` run them against scripted gateways on loopback
+- Reachability (`KotlinTorrentEngine.reachability`, through the controller): `reachable` once a
+  peer connected in over TCP (punched uTP connections prove nothing), `forwarded` when every layer
+  up to a public address forwards the port and the DHT sees us at that address, `blocked` when the
+  outermost mapped address is private or the DHT sees us elsewhere, `not-forwarded` without a
+  mapping, `unknown` while the engine is not running. Settings → BitTorrent shows it for every
+  device whose controller lists `reachability` (`TorrentReachabilityNotice`, asked every 10 s),
+  saying whether hole punching still reaches peers
 - Local Service Discovery (BEP 14), `TorrentConfig.localDiscovery` (on; only engines given a
   `KotlinTorrentEngine` `localDiscovery` transport factory, as `TorrentDownloadSource` passes
   `openLsdMulticast`, join the group, so engines built directly in tests never send multicast):
@@ -1245,7 +1262,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   not change
 - Torrents: `PUT /api/tasks/{id}/files` (`FileSelectionRequest`) chooses a task's files; with
   `torrent.control` (the instance's `controller(TorrentController)`; without one the routes are
-  not installed and answer `404`), `/api/torrents` serves `capabilities`, a task's snapshot, sorted
+  not installed and answer `404`), `/api/torrents` serves `capabilities`, `reachability`, a
+  task's snapshot, sorted
   file pages (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`),
   `selection` and `seeding` commands guarded by a revision and an idempotency key, and an SSE
   `events` stream of snapshots (deprecated: the event stream carries them). Command failures
