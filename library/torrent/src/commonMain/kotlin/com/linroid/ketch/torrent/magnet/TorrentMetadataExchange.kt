@@ -69,7 +69,8 @@ internal class TorrentMetadataExchange(
       log.v { "Metadata exchange with $endpoint: connecting" }
       val mode = if (identity.v2 != null) PeerIdentityHandshake.Mode.V2
         else PeerIdentityHandshake.Mode.V1
-      connection = network.connectPeer(endpoint, identity.wireTag(mode))
+      connection = network.connectPeer(endpoint, identity.wireTag(mode),
+        connectTimeoutMs = METADATA_CONNECT_TIMEOUT_MS)
       val workspace = TorrentBufferBudget(256 * 1024)
       val handshake = PeerIdentityHandshake(identity, extensions = true).initiate(connection,
         mode, torrentRandomBytes(20).toByteString(), workspace)

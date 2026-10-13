@@ -413,6 +413,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   journal, and starts an empty one (on Android also when corruption shows up later, instead of
   Android deleting it), telling its `onUnreadable` callback
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
+- A source that writes its own files (torrents) resumes into the output path its task chose even
+  when no segments were saved yet, as when the process exits right after a start: starting over
+  would pick a new `name (n)` beside the files it already owns
 - HTTP requests can be spread round-robin over selected network interfaces
   (`KetchApi.selectNetworkInterfaces`, `MultiNetworkHttpEngine`); see
   [multiple networks](docs/multiple-networks.md)
@@ -646,7 +649,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
-- Magnet metadata is asked of four peers at once, failed peers again after 5, 15 and 30 s; tasks
+- Magnet metadata is asked of sixteen peers at once (`METADATA_PARALLEL_PEERS`), each dial
+  allowed 8 s to connect, failed peers again after 5, 15 and 30 s; tasks
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
   peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway
@@ -695,6 +699,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeding the task at once if uploads resumed meanwhile;
   `SourceExtension.taskCompleted` alone never saves one, as it fires for every restored completed
   record and every `showSharing` copy
+- Peers at our own public address, any port, are left out of tracker and DHT answers and of
+  magnet lookups (`isOwnAddress`, checked again as each lookup peer's turn comes): our listener,
+  or stale announcements of earlier listen ports. The address is the router's while it maps our
+  port, else the one the DHT voted; an IPv4-mapped IPv6 peer (`::ffff:a.b.c.d`) is read as the
+  IPv4 one (`numericHost`), so no peer is dialed under two hosts
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` tries `NatPmpClient` (RFC 6886, to the

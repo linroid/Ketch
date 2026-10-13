@@ -77,6 +77,41 @@ class TorrentMetadataPeersTest {
   }
 
   @Test
+  fun manyPeersThatNeverAnswer_areAskedSixteenAtOnce() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED)
+    repeat(40) { peers.trySend(PeerEndpoint("192.0.2.${it + 1}", 6881)) }
+    val asked = mutableListOf<Int>()
+    withTimeoutOrNull(1_000) {
+      fetchFromMetadataPeers("Metadata", peers, onAsked = { asked += it }) {
+        awaitCancellation()
+      }
+    }
+    // Retries are not counted: asked counts peers, each once.
+    assertEquals((1..METADATA_PARALLEL_PEERS).toList(), asked)
+  }
+
+  @Test
+  fun peerRuledOutAfterItFailed_isNotAskedAgain() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED).apply { trySend(a) }
+    launch {
+      delay(1_000)
+      peers.send(b)
+    }
+    // a turns out to be our own address once b is found, before its retry is due.
+    var own = false
+    val asked = mutableListOf<PeerEndpoint>()
+    val result = withTimeoutOrNull(60_000) {
+      fetchFromMetadataPeers("Metadata", peers, skip = { own && it == a }) { endpoint ->
+        asked += endpoint
+        if (endpoint == b) own = true
+        throw IOException("unreachable")
+      }
+    }
+    assertNull(result)
+    assertEquals(listOf(a, b, b, b, b), asked)
+  }
+
+  @Test
   fun peerThatNeverAnswers_doesNotHoldUpTheNext() = runTest {
     val peers = Channel<PeerEndpoint>(Channel.UNLIMITED).apply { trySend(a); trySend(b) }
     val result = fetchFromMetadataPeers("Metadata", peers) { endpoint ->

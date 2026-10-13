@@ -481,6 +481,28 @@ class IntakeStateTest {
   }
 
   @Test
+  fun downloadAllNow_magnetOnSupportingDevice_downloadsEveryFile() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(
+      check = { _, _ -> metadata.await() },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+    val entry = session.entries.single()
+
+    // What "Download all files now" does while the magnet looks for its file list.
+    entry.addAnyway = true
+    entry.allFiles = true
+    session.submit {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertFalse(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
   fun addAnyway_uncheckedLinkOnSupportingDevice_awaitsFiles() = runTest {
     val api = IntakeTestApi(
       check = { _, _ -> throw KetchError.Http(404) },

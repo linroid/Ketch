@@ -279,6 +279,7 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
         text = stringResource(Res.string.intake_download_all_now),
         onClick = {
           entry.addAnyway = true
+          entry.allFiles = true
           actions.submit()
         },
         variant = KetchButtonVariant.Secondary,
@@ -546,7 +547,10 @@ private fun entryActions(
       )
     }
     if (session.entries.size > 1 && entry.waitsForFiles && !entry.addAnyway) {
-      return listOf(RowButton(Res.string.intake_add_all.text()) { entry.addAnyway = true })
+      return listOf(RowButton(Res.string.intake_add_all.text()) {
+        entry.addAnyway = true
+        entry.allFiles = true
+      })
     }
   }
   return emptyList()

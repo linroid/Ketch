@@ -268,8 +268,9 @@ class PortMappingTest {
     // NAT-PMP is silent: nobody listens where it asks.
     val silent = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
     val mapped = MutableStateFlow<Int?>(-1)
+    val address = MutableStateFlow<String?>(null)
     val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
-      onMapped = { mapped.value = it },
+      onMapped = { mapped.value = it }, onExternalAddress = { address.value = it },
       natPmp = NatPmpClient(network, silent.local.port, retryMs = listOf(50)),
       upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", ssdp), searchMs = 300),
       networks = { listOf(loopbackNetwork) })
@@ -277,11 +278,13 @@ class PortMappingTest {
       mapper.start()
       // 6881 is taken, so the next candidate, for TCP and UDP alike.
       assertEquals(6888, mapped.first { it != -1 })
+      // Peers at the router's public address are this engine; the engine leaves them out.
+      assertEquals("203.0.113.7", address.value)
       mapper.stop(timeoutMs = stopMs)
       val actions = igd.actions.value
       assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping TCP 6888",
-        "AddPortMapping UDP 6888", "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"),
-        actions)
+        "AddPortMapping UDP 6888", "GetExternalIPAddress null null",
+        "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"), actions)
     } finally {
       silent.close()
     }
@@ -293,8 +296,9 @@ class PortMappingTest {
       val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
       val port = natPmpGateway(network, scope, offset = 100, requests = requests)
       val mapped = MutableStateFlow<Int?>(-1)
+      val address = MutableStateFlow<String?>(null)
       val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
-        onMapped = { mapped.value = it },
+        onMapped = { mapped.value = it }, onExternalAddress = { address.value = it },
         natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
         upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
         // The gateway guesses for 127.0.0.2 include 127.0.0.1, where the gateway answers.
@@ -302,6 +306,7 @@ class PortMappingTest {
       mapper.start()
       // The gateway gave TCP another port; UDP asked for that same port.
       assertEquals(6981, mapped.first { it != -1 })
+      assertEquals("203.0.113.7", address.value)
       mapper.stop(timeoutMs = stopMs)
       assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests.value)
     }
@@ -324,7 +329,8 @@ class PortMappingTest {
         mapper.stop(timeoutMs = stopMs)
         assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping UDP 6881",
           "DeletePortMapping TCP 6881", "AddPortMapping TCP 6888", "AddPortMapping UDP 6888",
-          "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"), igd.actions.value)
+          "GetExternalIPAddress null null", "DeletePortMapping TCP 6888",
+          "DeletePortMapping UDP 6888"), igd.actions.value)
       } finally {
         silent.close()
       }

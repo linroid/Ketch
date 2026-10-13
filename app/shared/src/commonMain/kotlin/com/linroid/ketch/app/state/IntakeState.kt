@@ -237,6 +237,12 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Whether the row is added despite a problem, or a torrent without its file list. */
   var addAnyway: Boolean by mutableStateOf(false)
 
+  /**
+   * Whether a torrent added without its file list downloads every file once the list arrives,
+   * rather than waiting for a choice as [addAnyway] alone does.
+   */
+  var allFiles: Boolean by mutableStateOf(false)
+
   /** Name typed for the file; blank lets the source decide. */
   var fileName: String by mutableStateOf("")
 
@@ -1171,6 +1177,7 @@ class IntakeSession internal constructor(
   fun retry(entry: IntakeEntry) {
     entry.wanted = true
     entry.addAnyway = false
+    entry.allFiles = false
     launchResolve(entry)
   }
 
@@ -1435,8 +1442,8 @@ class IntakeSession internal constructor(
     }
     // A link added anyway before its files were known, such as a magnet still looking for its
     // file list, waits for a choice on devices that can, should it turn out to have several
-    // files or variants; with one it downloads at once.
-    val awaitsFiles = entry.addAnyway && resolved?.files.isNullOrEmpty() &&
+    // files or variants; with one, or when asked for all of them, it downloads at once.
+    val awaitsFiles = entry.addAnyway && !entry.allFiles && resolved?.files.isNullOrEmpty() &&
       KetchFeatures.AWAIT_FILE_SELECTION in targetFeatures()
     val name = entry.fileName.trim().ifEmpty { null }
       ?: (entry.source as? IntakeSource.Link)?.fileName

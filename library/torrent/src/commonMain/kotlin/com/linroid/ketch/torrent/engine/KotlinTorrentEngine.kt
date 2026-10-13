@@ -285,6 +285,8 @@ internal class KotlinTorrentEngine(
   private var nodes: List<DhtNode>? = null
   /** The DHT nodes, read by peers without [dhtMutex]; only running ones count. */
   private val dhtNodes = AtomicReference(emptyList<DhtNode>())
+  // The router's public address while it maps our port; see isOwnAddress.
+  private val mappedAddress = AtomicReference<String?>(null)
   /** DHT nodes peers named with `PORT`, waiting to be pinged; the oldest go when it is full. */
   private val dhtIntroductions = Channel<PeerEndpoint>(64, BufferOverflow.DROP_OLDEST)
   private val downloadRate = TorrentRateLimiter()
@@ -514,7 +516,8 @@ internal class KotlinTorrentEngine(
           "peers=${magnet.explicitPeers.size}, timeout=$magnetLookupTime"
       }
       val started = TimeSource.Monotonic.markNow()
-      var tried = 0
+      var found = 0
+      var asked = 0
       try {
         withTimeout(magnetLookupTime) {
           if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
@@ -524,7 +527,8 @@ internal class KotlinTorrentEngine(
             val peers = Channel<PeerEndpoint>(256)
             val discovery = launch { discoverMagnet(magnet, peers) }
             try {
-              fetchFromMetadataPeers("Metadata for $hash", peers, onPeer = { tried = it }) {
+              fetchFromMetadataPeers("Metadata for $hash", peers, onPeer = { found = it },
+                onAsked = { asked = it }, skip = ::isOwnAddress) {
                 TorrentMetadataExchange(network, config.maxMetadataBytes,
                   budget = exchangeBudgets.metadata).fetch(magnet.infoHash, it)
               }
@@ -535,8 +539,8 @@ internal class KotlinTorrentEngine(
         }
       } catch (e: TimeoutCancellationException) {
         log.d {
-          "Metadata for magnet $hash not found within $magnetLookupTime " +
-            "after trying $tried peer(s)"
+          "Metadata for magnet $hash not found within $magnetLookupTime: " +
+            "found $found peer(s), asked $asked"
         }
         throw e
       }
@@ -605,7 +609,7 @@ internal class KotlinTorrentEngine(
       while (isActive) {
         var interval = 30L
         for (url in tiers.flatten().distinct()) {
-          val trackerSet = TrackerTiers(listOf(listOf(url)), tracker::announce)
+          val trackerSet = TrackerTiers(listOf(listOf(url)), ::announceToTracker)
           var started = false
           try {
             val response = attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
@@ -633,7 +637,8 @@ internal class KotlinTorrentEngine(
       val peers = Channel<PeerEndpoint>(256)
       val discovery = launch { discoverMagnet(magnet, peers, topic) }
       try {
-        fetchFromMetadataPeers("V2 metadata for ${topic.logHash()}", peers) { fetch(it) }
+        fetchFromMetadataPeers("V2 metadata for ${topic.logHash()}", peers,
+          skip = ::isOwnAddress) { fetch(it) }
       } finally {
         withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
       }
@@ -651,7 +656,7 @@ internal class KotlinTorrentEngine(
       for (url in urls) {
         currentCoroutineContext().ensureActive()
         // Each connection closes before switching trackers, including unsuccessful peer sets.
-        val tiers = TrackerTiers(listOf(listOf(url)), tracker::announce)
+        val tiers = TrackerTiers(listOf(listOf(url)), ::announceToTracker)
         var contacted = false
         try {
           val result = attempt {
@@ -711,10 +716,10 @@ internal class KotlinTorrentEngine(
         }
       }
       if (magnet.trackers.isNotEmpty()) launch {
-        announce(TrackerTiers(magnet.trackers.map { listOf(it) }, tracker::announce))
+        announce(TrackerTiers(magnet.trackers.map { listOf(it) }, ::announceToTracker))
       }
       for (url in extraTrackers(magnet.trackers)) launch {
-        announce(TrackerTiers(listOf(listOf(url)), tracker::announce))
+        announce(TrackerTiers(listOf(listOf(url)), ::announceToTracker))
       }
       if (config.dhtEnabled) launch {
         while (isActive) {
@@ -997,7 +1002,7 @@ internal class KotlinTorrentEngine(
     // Tier state follows each topic's own answers, so every topic gets fresh tiers.
     fun discovery(topic: TrackerTopic, urls: List<List<String>>, onChanged: suspend () -> Unit) =
       TrackerDiscovery(document, layout, peerId, advertisedPort::current,
-        TrackerTiers(urls, tracker::announce), onChanged,
+        TrackerTiers(urls, ::announceToTracker), onChanged,
         announceCompletion = store::selectsAll, topic = topic)
     suspend fun poll(discovery: TrackerDiscovery, stopped: Boolean = false): TrackerResponse? =
       discovery.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes(),
@@ -1105,7 +1110,7 @@ internal class KotlinTorrentEngine(
     val trackerTiers = configuration.tiers
     if (trackerTiers.isNotEmpty()) launch {
       val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
-        TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
+        TrackerTiers(trackerTiers, ::announceToTracker, configuration.revision), session::resetPeers,
         nowMs = nowMs,
         announceCompletion = session::selectsAllFiles,
       )
@@ -1153,7 +1158,7 @@ internal class KotlinTorrentEngine(
     if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       for (url in extraTrackers(trackerTiers.flatten())) launch {
         val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
-          TrackerTiers(listOf(listOf(url)), tracker::announce), nowMs = nowMs,
+          TrackerTiers(listOf(listOf(url)), ::announceToTracker), nowMs = nowMs,
           announceCompletion = session::selectsAllFiles,
         )
         announceExtra(listOf(discovery), { topic, stopped ->
@@ -1188,8 +1193,26 @@ internal class KotlinTorrentEngine(
         attempt("DHT lookup for ${logHash(hash.hex)}") {
           node.peers(hash, if (announce) advertisedPort.current() else null)
         } ?: emptyList()
-      } }.awaitAll().flatten().distinct()
+      } }.awaitAll().flatten().distinct().filterNot(::isOwnAddress)
     }.also { peers -> log.d { "DHT lookup for ${logHash(hash.hex)} found ${peers.size} peer(s)" } }
+
+  /** Announces through [tracker], leaving out peers at our own public address. */
+  private suspend fun announceToTracker(
+    url: String,
+    request: TrackerAnnounce,
+    trackerId: ByteArray?,
+  ): TrackerResponse = tracker.announce(url, request, trackerId).let { response ->
+    response.copy(peers = response.peers.filterNot(::isOwnAddress))
+  }
+
+  /**
+   * Whether [peer] is at our public address, as the router mapping our port or the DHT reports
+   * it, on any port: our own listener, or a stale announcement of an earlier listen port, which
+   * trackers and the DHT keep handing back. Another device behind the same router answers there
+   * only through hairpin NAT; local discovery finds it on the LAN instead.
+   */
+  private fun isOwnAddress(peer: PeerEndpoint): Boolean =
+    peer.host == mappedAddress.load() || dhtNodes.load().any { it.externalHost == peer.host }
 
   /** DHT's view of the UDP port on [host], which it shares with uTP. */
   private suspend fun bindDhtSocket(host: String): TorrentDatagramSocket = udpPort(host).openDht()
@@ -1438,6 +1461,7 @@ internal class KotlinTorrentEngine(
         portMapper = null
       }
       advertisedPort.setMapped(null)
+      mappedAddress.store(null)
     }
     log.i { "Port mapping: ${if (enabled) "on" else "off"}" }
   }
@@ -1458,6 +1482,7 @@ internal class KotlinTorrentEngine(
         udpMutex.withLock { udpPorts[WILDCARD_IPV4]?.takeIf { it.isRunning }?.local?.port }
       },
       onMapped = advertisedPort::setMapped,
+      onExternalAddress = mappedAddress::store,
       natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
     ).also { it.start() }
   }
