@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -169,6 +170,9 @@ internal fun DownloadTable(
     val columns = shown.fit(maxWidth, TablePadding)
     val namePennant = TableColumn.Device in autoColumns &&
       columns.none { it.column == TableColumn.Device }
+    // Room a column can grow into before Name reaches its minimum and other columns hide.
+    val spare = maxWidth - TablePadding * 2 - TableColumn.StatusDotWidth -
+      TableColumn.NameMinWidth - columns.fold(0.dp) { sum, it -> sum + it.width }
     Column(Modifier.fillMaxSize()) {
       TableHeader(
         view = view,
@@ -176,7 +180,11 @@ internal fun DownloadTable(
         columns = columns,
         layout = dragged,
         autoColumns = autoColumns,
-        onResize = { column, width -> dragged = dragged.withWidth(column, width) },
+        onResize = { column, width ->
+          val current = columns.firstOrNull { it.column == column }?.width ?: width
+          val widest = current + spare.coerceAtLeast(0.dp)
+          dragged = dragged.withWidth(column, width.coerceAtMost(widest))
+        },
         onResizeEnd = { onLayoutChange(dragged) },
         onLayoutChange = onLayoutChange,
         onSort = onSort,
@@ -255,21 +263,24 @@ private fun TableHeader(
       )
       columns.forEachIndexed { index, setting ->
         val column = setting.column
-        Box(Modifier.width(setting.width).fillMaxHeight()) {
-          HeaderCell(
-            label = column.label.resolve(),
-            sort = column.sort,
-            arrangement = view.arrangement,
-            numeric = column.numeric,
-            onSort = onSort,
-            modifier = Modifier.fillMaxSize().then(columnLead(columns, index)),
-          )
-          ResizeHandle(
-            width = setting.width,
-            onResize = { onResize(column, it) },
-            onResizeEnd = onResizeEnd,
-            modifier = Modifier.align(Alignment.CenterStart),
-          )
+        // Keyed by column, so a drag stays with its column when another one shows or hides.
+        key(column) {
+          Box(Modifier.width(setting.width).fillMaxHeight()) {
+            HeaderCell(
+              label = column.label.resolve(),
+              sort = column.sort,
+              arrangement = view.arrangement,
+              numeric = column.numeric,
+              onSort = onSort,
+              modifier = Modifier.fillMaxSize().then(columnLead(columns, index)),
+            )
+            ResizeHandle(
+              width = setting.width,
+              onResize = { onResize(column, it) },
+              onResizeEnd = onResizeEnd,
+              modifier = Modifier.align(Alignment.CenterStart),
+            )
+          }
         }
       }
     }

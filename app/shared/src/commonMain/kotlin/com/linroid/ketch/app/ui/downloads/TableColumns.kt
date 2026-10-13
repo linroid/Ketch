@@ -23,6 +23,7 @@ import ketch.app.shared.generated.resources.sort_speed
 import ketch.app.shared.generated.resources.sort_status
 import ketch.app.shared.generated.resources.sort_time_left
 import org.jetbrains.compose.resources.StringResource
+import kotlin.math.roundToInt
 
 /**
  * A column of the Downloads table after its Name column, in the order the table shows them by
@@ -125,9 +126,14 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
   fun withVisible(column: TableColumn, visible: Boolean): TableLayout =
     update(column) { it.copy(visible = visible || column.fixed) }
 
-  /** This layout with [column] [width] wide, kept between [TableColumn.MinWidth] and MaxWidth. */
-  fun withWidth(column: TableColumn, width: Dp): TableLayout =
-    update(column) { it.copy(width = width.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)) }
+  /**
+   * This layout with [column] [width] wide, in whole dp as [encode] saves it, kept between
+   * [TableColumn.MinWidth] and MaxWidth.
+   */
+  fun withWidth(column: TableColumn, width: Dp): TableLayout = update(column) {
+    val whole = width.value.roundToInt().dp
+    it.copy(width = whole.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth))
+  }
 
   /**
    * This layout with each column still at its default width widened to [room], the width its

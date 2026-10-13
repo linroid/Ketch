@@ -121,6 +121,14 @@ class TableColumnsTest {
   }
 
   @Test
+  fun withWidth_fractionalWidth_keepsWhatDecodeReadsBack() {
+    val layout = TableLayout().withWidth(TableColumn.Progress, 180.6.dp)
+
+    assertEquals(181.dp, layout.columns.first { it.column == TableColumn.Progress }.width)
+    assertEquals(layout, TableLayout.decode(layout.encode()))
+  }
+
+  @Test
   fun fromId_unknownDensity_isDefault() {
     assertEquals(RowDensity.Compact, RowDensity.fromId("compact"))
     assertEquals(RowDensity.Default, RowDensity.fromId("tiny"))
