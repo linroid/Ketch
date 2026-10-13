@@ -107,7 +107,9 @@ class KetchDispatchersTest {
   fun threadPool_threadEndsOnceIdle() = runBlocking {
     val pool = ketchThreadPool("ketch-test", threads = 2, keepAlive = 50.milliseconds)
     val thread = withContext(pool) { Thread.currentThread() }
-    assertEquals("ketch-test-1", thread.name)
+    // Coroutine debug mode, on with assertions, names the running coroutine after the thread's
+    // name until the thread hands it back, which it may not have done yet.
+    assertEquals("ketch-test-1", thread.name.substringBefore(" @"))
     assertTrue(thread.isDaemon)
     withTimeout(5.seconds) {
       while (thread.isAlive) delay(10)
