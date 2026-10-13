@@ -34,7 +34,7 @@ target sends links and page resources to a configured server.
 
 | Browser | Minimum version | Build |
 | --- | --- | --- |
-| Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers | Chromium 116 | `build/chrome` |
+| Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers | Chromium 116 | `build/chrome-store`, `build/chrome-unpacked` |
 | Firefox (desktop) | 128 | `build/firefox` |
 | Safari (macOS, limited features) | 16.4 | `build/safari` |
 
@@ -49,7 +49,7 @@ unavailable. See [Safari](#safari-limited-macos-target).
   To install a release by hand, such as one the store is still reviewing, unzip its
   `chrome-unpacked` package, open `chrome://extensions`, turn on **Developer mode**, choose
   **Load unpacked** and select the folder. Remove the store version first: both would capture
-  downloads. Not the `chrome` package: loaded by hand, it gets an id the Ketch app refuses.
+  downloads. Not the `chrome-store` package: loaded by hand, it gets an id the Ketch app refuses.
 - **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the Firefox
   package is what gets submitted to addons.mozilla.org for signing. Until it is signed, load it
   for the current session from `about:debugging#/runtime/this-firefox` with **Load Temporary
@@ -63,7 +63,7 @@ The extension has its own releases on the
 `extension-v<app version>.<number>` and named like "Browser extension 0.4.0.1"; each app release
 links the latest one under *Add Ketch to your browser*. Each includes:
 
-- `ketch-extension-<version>-chrome.zip`, the Chrome Web Store package;
+- `ketch-extension-<version>-chrome-store.zip`, the Chrome Web Store package;
 - `ketch-extension-<version>-chrome-unpacked.zip`, the same with the manifest `key`, for **Load
   unpacked**: the key gives it the id the Ketch app accepts;
 - `ketch-extension-<version>-firefox.zip`;
@@ -361,8 +361,8 @@ The extension is plain JavaScript modules with no dependencies or bundler. `src/
 build, so it can be loaded as is while developing:
 
 - **Chromium**: open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**
-  and select `src/` (or `build/chrome-unpacked`). Not `build/chrome`: without the `key`, Chrome
-  gives it an id the Ketch app does not accept.
+  and select `src/` (or `build/chrome-unpacked`). Not `build/chrome-store`: without the `key`,
+  Chrome gives it an id the Ketch app does not accept.
 - **Firefox**: run `npm run build`, open `about:debugging#/runtime/this-firefox`, choose **Load
   Temporary Add-on** and select `build/firefox/manifest.json`.
 
@@ -376,7 +376,8 @@ runs the unit tests with Node's built-in test runner (Node 22.3+), and
 npm run build
 ```
 
-writes `build/chrome`, `build/firefox`, `build/safari` and their zips.
+writes `build/chrome-store`, `build/chrome-unpacked`, `build/firefox`, `build/safari` and their
+zips.
 
 ### Extension ids
 
@@ -385,7 +386,8 @@ The `key` in `src/manifest.json` pins the Chromium extension id to
 the ids it lists start its host (`NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in
 `app/desktop`). Extension stores assign their own id, so the packaged builds leave the `key` out.
 The Chrome Web Store id, `flnjeochbgpaipiofdjmoijaeooemhka`, is in that list too; add the Edge
-Add-ons id there once it is published. Firefox identifies the add-on by its gecko id,
+Add-ons id there once it is published. The `chrome-unpacked` package keeps the `key` so that a copy
+installed by hand gets an id the app accepts. Firefox identifies the add-on by its gecko id,
 `ketch@linroid.github.io`, instead.
 
 ### What the build does
@@ -441,7 +443,8 @@ changes to the extension:
    `node build.mjs --version <app version> --build <run number>` and publishes the zips in a
    GitHub release tagged `extension-v<app version>.<run number>`. That release is never marked
    latest, since the desktop and CLI updaters read the latest release.
-2. Upload `ketch-extension-<app version>-chrome.zip` to the Chrome Web Store (or Edge Add-ons).
+2. Upload `ketch-extension-<app version>-chrome-store.zip` to the Chrome Web Store (or Edge
+   Add-ons).
    You can also build it locally with `npm run build`.
 
 Browsers only accept versions made of numbers, so the run number becomes a fourth part (`0.3.1.7`)

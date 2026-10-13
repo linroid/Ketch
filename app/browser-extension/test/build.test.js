@@ -34,7 +34,7 @@ describe('build', () => {
 
   test('builds for Chromium, Firefox and Safari', () => {
     assert.deepEqual(outputs.map((it) => it.browser),
-      ['chrome', 'chrome-unpacked', 'firefox', 'safari']);
+      ['chrome-store', 'chrome-unpacked', 'firefox', 'safari']);
   });
 
   test('the Chromium package for unpacked installs keeps the key the Ketch app accepts', () => {
@@ -43,7 +43,7 @@ describe('build', () => {
     const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
     assert.equal(packaged.key, source.key);
     const { key: _key, ...rest } = packaged;
-    const store = JSON.parse(zipEntry(outputs.find((it) => it.browser === 'chrome').zip,
+    const store = JSON.parse(zipEntry(outputs.find((it) => it.browser === 'chrome-store').zip,
       'manifest.json'));
     assert.deepEqual(rest, store);
   });
@@ -51,7 +51,7 @@ describe('build', () => {
   test('Chromium zip omits the development key of src', () => {
     const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
     assert.ok(source.key);
-    const { dir, zip } = outputs.find((it) => it.browser === 'chrome');
+    const { dir, zip } = outputs.find((it) => it.browser === 'chrome-store');
     const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
     assert.deepEqual(packaged, JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
     const { key: _key, ...expected } = source;
@@ -82,8 +82,8 @@ test('Chromium release package carries the release version and no key', () => {
   const outDir = mkdtempSync(join(tmpdir(), 'ketch-store-build-'));
   try {
     const outputs = build({ outDir, release: '1.2.3-rc1', buildNumber: '57' });
-    const { zip } = outputs.find((it) => it.browser === 'chrome');
-    assert.equal(zip, join(outDir, 'ketch-extension-1.2.3-rc1-chrome.zip'));
+    const { zip } = outputs.find((it) => it.browser === 'chrome-store');
+    assert.equal(zip, join(outDir, 'ketch-extension-1.2.3-rc1-chrome-store.zip'));
     const manifest = JSON.parse(zipEntry(zip, 'manifest.json'));
     assert.equal(manifest.version, '1.2.3.57');
     assert.equal(manifest.version_name, '1.2.3-rc1');

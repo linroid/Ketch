@@ -1477,8 +1477,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers, Firefox and a limited Safari target; plain JavaScript modules with no
   dependencies. `src/` loads unpacked in Chromium, its `key` pinning the development id;
-  `node build.mjs` writes `build/chrome` (no `key`: the Chrome Web Store package, item
-  `flnjeochbgpaipiofdjmoijaeooemhka`), `build/firefox` (event page instead of service worker,
+  `node build.mjs` writes `build/chrome-store` (no `key`: the Chrome Web Store package, item
+  `flnjeochbgpaipiofdjmoijaeooemhka`), `build/chrome-unpacked` (with the `key`, for Load
+  unpacked, which the Ketch app's native host accepts), `build/firefox` (event page instead of service worker,
   gecko id) and zips. It is released apart from the apps, by running `extension-release.yml` by hand: the
   version is the latest app tag plus the run number (`0.3.1.7`, shown as `0.3.1`), tagged
   `extension-v0.3.1.7`, and the GitHub release is never marked latest (the updaters read the

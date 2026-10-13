@@ -2,8 +2,10 @@
 /**
  * Builds the extension for each browser family from `src/`:
  *
- *   build/chrome/    Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers
- *   build/firefox/   Firefox
+ *   build/chrome-store/      Chromium browsers: the Chrome Web Store upload, without `key`
+ *   build/chrome-unpacked/   Chromium browsers: for Load unpacked, with the `key`
+ *   build/firefox/           Firefox
+ *   build/safari/            Safari sources for the Xcode project
  *   build/ketch-extension-<version>-<browser>.zip   packages for releases and extension stores
  *
  * Usage: node build.mjs [--version <release version>] [--build <number>]
@@ -67,7 +69,7 @@ function targetManifests({ version: manifestVersion, versionName }) {
     ? base
     : { ...base, version_name: versionName };
   return {
-    chrome,
+    'chrome-store': chrome,
     // For Load unpacked: the key gives it the id the Ketch app accepts for native messaging,
     // where an unpacked copy without one gets an id from its folder that the app refuses.
     'chrome-unpacked': { ...chrome, key },
