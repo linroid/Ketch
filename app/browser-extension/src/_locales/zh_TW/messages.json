@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "下載時自動開啟"
+    "message": "已關閉 · 傳送時啟動"
   },
   "dialog_device_offline": {
     "message": "無法連線"
@@ -682,6 +682,31 @@
     "message": "最近使用：$FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "傳送前確認下載"
+  },
+  "notify_fallback_browser": {
+    "message": "改用瀏覽器下載"
+  },
+  "notify_fallback_magnet": {
+    "message": "改用其他應用程式開啟磁力連結"
+  },
+  "notify_send_failed": {
+    "message": "無法傳送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "已新增 $NAME$",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

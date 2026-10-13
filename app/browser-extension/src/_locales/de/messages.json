@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "Öffnet sich beim Download"
+    "message": "Geschlossen · startet beim Senden"
   },
   "dialog_device_offline": {
     "message": "Nicht erreichbar"
@@ -682,6 +682,31 @@
     "message": "Zuletzt verwendet: $FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Downloads vor dem Senden prüfen"
+  },
+  "notify_fallback_browser": {
+    "message": "Wird stattdessen im Browser heruntergeladen"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-Link wird in einer anderen App geöffnet"
+  },
+  "notify_send_failed": {
+    "message": "Senden an $NAME$ nicht möglich",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ hinzugefügt",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

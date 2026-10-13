@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "ダウンロード時に起動します"
+    "message": "終了中 · 送信時に起動"
   },
   "dialog_device_offline": {
     "message": "接続できません"
@@ -682,6 +682,31 @@
     "message": "最近使用：$FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "送信前にダウンロードを確認"
+  },
+  "notify_fallback_browser": {
+    "message": "代わりにブラウザでダウンロードします"
+  },
+  "notify_fallback_magnet": {
+    "message": "マグネットリンクを別のアプリで開きます"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$に送信できませんでした",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$を追加しました",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

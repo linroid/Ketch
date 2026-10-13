@@ -27,8 +27,8 @@ target sends links and page resources to a configured server.
   along, so downloads that need a session work in Ketch too. They stay with that site: when a
   download redirects to another host, Ketch sends it the user agent and only the origin of the
   referring page, not the cookies.
-- **Download dialog**: before anything is sent, a small dialog lets you rename the file, pick the
-  receiving device and folder, or download it in the browser instead.
+- **Download dialog** (on by default): before anything is sent, a small dialog lets you rename the
+  file, pick the receiving device and folder, or download it in the browser instead.
 
 ## Supported browsers
 
@@ -98,7 +98,8 @@ The extension can send downloads to several Ketch instances. One of them is the 
 - the popup has a picker to watch any instance, and adds pasted links to the one shown.
 
 Each instance card in the settings page shows whether it can be reached; the download dialog shows
-it too, and lets you switch instance for that download.
+it too, and lets you switch instance for that download. With the dialog off, captured downloads fall back to the
+browser only when the default instance fails; they never switch to another instance.
 
 ### Capturing downloads
 
@@ -107,7 +108,9 @@ capture has its own switch in settings.
 
 In Chromium browsers the extension holds each download while its file name is decided, before any
 "Save as" dialog, then pauses it and opens the [download dialog](#download-dialog). Sending it
-to Ketch cancels it in the browser; canceling the dialog lets the browser continue.
+to Ketch cancels it in the browser; canceling the dialog lets the browser continue. With the
+dialog turned off, it asks Ketch to take the download straight away; if Ketch refuses or doesn't
+answer within 6 seconds, the browser continues as if nothing happened.
 
 Firefox has no such hook, so the extension pauses the download once it has started. If Firefox is
 set to ask where to save each file, that dialog appears first.
@@ -161,8 +164,10 @@ would need merging are rejected by the engine.
 
 ### Download dialog
 
-Every captured download, context-menu link, pasted link and clicked magnet link opens a dialog
-before anything is sent. It opens as a small window over the browser (a tab in Safari) and shows:
+With **Review downloads before sending** on, as it is by default, every captured download,
+context-menu link, pasted link and clicked magnet link opens a dialog before anything is sent.
+Turn it off in settings to send them straight to the default instance, or the one picked in the
+menu or popup; Safari always shows the dialog. It opens as a small window over the browser (a tab in Safari) and shows:
 
 - the file's type, name, size when the browser knows it, and site. Edit the name to save it under
   another one; torrents keep the names and layout inside them;

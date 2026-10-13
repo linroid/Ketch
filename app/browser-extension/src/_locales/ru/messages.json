@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "Откроется при загрузке"
+    "message": "Закрыто · запустится при отправке"
   },
   "dialog_device_offline": {
     "message": "Недоступно"
@@ -682,6 +682,31 @@
     "message": "Недавно использовалась: $FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Проверять загрузки перед отправкой"
+  },
+  "notify_fallback_browser": {
+    "message": "Загрузка продолжится в браузере"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-ссылка откроется в другом приложении"
+  },
+  "notify_send_failed": {
+    "message": "Не удалось отправить на $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "Добавлено: $NAME$",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

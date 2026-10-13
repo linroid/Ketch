@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "下载时自动打开"
+    "message": "已关闭 · 发送时启动"
   },
   "dialog_device_offline": {
     "message": "无法连接"
@@ -682,6 +682,31 @@
     "message": "最近使用：$FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "发送前确认下载"
+  },
+  "notify_fallback_browser": {
+    "message": "改用浏览器下载"
+  },
+  "notify_fallback_magnet": {
+    "message": "改用其他应用打开磁力链接"
+  },
+  "notify_send_failed": {
+    "message": "无法发送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "已添加 $NAME$",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

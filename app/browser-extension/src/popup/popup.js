@@ -1,6 +1,7 @@
 import { withEndpoint } from '../lib/connection.js';
 import { ext, remoteOnly } from '../lib/ext.js';
 import { describeStatus, describeTaskState, failureHint, taskName } from '../lib/format.js';
+import { sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
@@ -180,10 +181,18 @@ async function onAdd(event) {
   }
   $('add-button').disabled = true;
   try {
-    const response = await ext.runtime.sendMessage({ type: 'review-open',
-      instanceId: instance.id, download: { url } });
-    if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
-    window.close();
+    const current = await loadSettings();
+    if (current.reviewDownloads) {
+      const response = await ext.runtime.sendMessage({ type: 'review-open',
+        instanceId: instance.id, download: { url } });
+      if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
+      window.close();
+      return;
+    }
+    const task = await sendToKetch(instance, { url }, current, { timeoutMs: REQUEST_TIMEOUT_MS });
+    input.value = '';
+    showAddMessage(t('popup_added', taskName(task)), 'success');
+    refresh();
   } catch (error) {
     showAddMessage(error.message, 'error');
   } finally {

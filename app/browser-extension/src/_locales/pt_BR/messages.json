@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "Abre ao baixar"
+    "message": "Fechado · abre ao enviar"
   },
   "dialog_device_offline": {
     "message": "Inacessível"
@@ -682,6 +682,31 @@
     "message": "Usada recentemente: $FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Revisar downloads antes de enviar"
+  },
+  "notify_fallback_browser": {
+    "message": "Baixando no navegador"
+  },
+  "notify_fallback_magnet": {
+    "message": "Abrindo o link magnet em outro app"
+  },
+  "notify_send_failed": {
+    "message": "Não foi possível enviar para $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ adicionado",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

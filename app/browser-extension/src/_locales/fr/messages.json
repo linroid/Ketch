@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "S’ouvre au téléchargement"
+    "message": "Fermé · démarre à l’envoi"
   },
   "dialog_device_offline": {
     "message": "Injoignable"
@@ -682,6 +682,31 @@
     "message": "Utilisé récemment : $FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Vérifier les téléchargements avant l’envoi"
+  },
+  "notify_fallback_browser": {
+    "message": "Téléchargement dans le navigateur à la place"
+  },
+  "notify_fallback_magnet": {
+    "message": "Ouverture du lien magnet dans une autre app"
+  },
+  "notify_send_failed": {
+    "message": "Impossible d'envoyer à $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ ajouté",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }

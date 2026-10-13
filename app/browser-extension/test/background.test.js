@@ -210,7 +210,7 @@ test('unsupported or failed direct downloads report a browser fallback without c
     }
   });
 
-test('links and magnets always open the review instead of being sent', async () => {
+test('links and magnets open the review by default instead of being sent', async () => {
   for (const key of Object.keys(sessionData)) delete sessionData[key];
   const start = openedTabs.length;
   await ext.contextMenus.onClicked.emit(

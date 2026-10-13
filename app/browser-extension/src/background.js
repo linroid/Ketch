@@ -5,8 +5,9 @@
  */
 
 import { ext, remoteOnly } from './lib/ext.js';
-import { taskName } from './lib/format.js';
-import { cookieStoreIdForTab } from './lib/handoff.js';
+import { FailureKind } from './lib/ketch-client.js';
+import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
+import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
 import {
   cancelReview, closeReviews, directReview, openReview, sendReview, startBrowserDownload,
@@ -16,6 +17,8 @@ import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
 import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './lib/settings.js';
 
+/** Captured downloads wait for Ketch this long before the browser takes them back. */
+const CAPTURE_TIMEOUT_MS = 6_000;
 const requestContext = new RequestContext();
 if (!remoteOnly) ext.webRequest?.onBeforeRequest.addListener((details) => requestContext.observe(details),
   { urls: ['http://*/*', 'https://*/*'] });
@@ -103,8 +106,9 @@ if (!remoteOnly && ext.downloads?.onDeterminingFilename) {
 }
 
 /**
- * Pauses a download the browser started and opens its review, aimed at the default instance.
- * `gate.release()` lets the browser go on; it runs for skipped downloads too.
+ * Hands a download the browser started to the default instance: through the review dialog, or
+ * straight to Ketch with reviews off. `gate.release()` gives the download back to the browser;
+ * it runs for skipped downloads and when Ketch can't take it.
  */
 async function captureDownload(item, gate) {
   const release = () => gate.release().catch((error) => {
@@ -125,31 +129,78 @@ async function captureDownload(item, gate) {
   }
   await gate.hold();
   const instance = findInstance(settings);
-  // Finish Chromium's filename hook before asking the browser to pause. If the download
-  // already completed or cannot pause, keep it in the browser without submitting a copy.
-  await release();
+  const fileName = fileNameFromPath(item.filename);
+  if (settings.reviewDownloads) {
+    // Finish Chromium's filename hook before asking the browser to pause. If the download
+    // already completed or cannot pause, keep it in the browser without submitting a copy.
+    await release();
+    try {
+      await ext.downloads.pause(item.id);
+      await openReview(instance.id, {
+        url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
+        cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
+        size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
+      });
+    } catch {
+      await ext.downloads.resume(item.id).catch(() => {});
+    }
+    return;
+  }
+  let task;
   try {
-    await ext.downloads.pause(item.id);
-    await openReview(instance.id, {
-      url: item.finalUrl || item.url, referrer: item.referrer,
-      fileName: fileNameFromPath(item.filename), mime: item.mime,
-      cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
-      size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
-    });
-  } catch {
-    await ext.downloads.resume(item.id).catch(() => {});
+    task = await sendToKetch(instance, {
+      url: item.finalUrl || item.url,
+      referrer: item.referrer,
+      fileName,
+      mime: item.mime,
+      cookieStoreId: item.cookieStoreId,
+      browserDownloadId: item.id,
+    }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
+  } catch (error) {
+    await release();
+    if (error.kind === FailureKind.UNCERTAIN) {
+      await ext.downloads.pause(item.id).catch(() => {});
+      notifyFailure(t('options_diagnostics'), instance, error);
+    } else {
+      notifyFailure(t('notify_fallback_browser'), instance, error);
+    }
+    return;
+  }
+  await removeBrowserDownload(item.id);
+  notifySent(settings, instance, taskName(task) || fileName);
+}
+
+async function removeBrowserDownload(downloadId) {
+  try {
+    await ext.downloads.cancel(downloadId);
+    await ext.downloads.erase({ id: downloadId });
+  } catch (error) {
+    // The browser may have finished a tiny file already; Ketch has its own copy either way.
+    console.warn('Ketch: could not remove the browser download', error);
   }
 }
 
 async function handleMagnet(url) {
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
+  const instance = findInstance(settings);
+  if (settings.reviewDownloads) {
+    try {
+      await openReview(instance.id, { url });
+      return { handled: true };
+    } catch (error) {
+      console.error('Ketch: could not open the review for a magnet link', error);
+      return { handled: false };
+    }
+  }
   try {
-    await openReview(findInstance(settings).id, { url });
+    const task = await sendToKetch(instance, { url }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
+    notifySent(settings, instance, taskName(task));
     return { handled: true };
   } catch (error) {
-    console.error('Ketch: could not open the review for a magnet link', error);
-    return { handled: false };
+    notifyFailure(error.kind === FailureKind.UNCERTAIN
+      ? t('options_diagnostics') : t('notify_fallback_magnet'), instance, error);
+    return { handled: error.kind === FailureKind.UNCERTAIN };
   }
 }
 
@@ -177,13 +228,22 @@ async function handleMenuClick(info, tab) {
       : t('notify_unsupported_scheme'));
     return;
   }
-  // The review can still hand a link back to the browser, in the tab's context.
-  await openReview(instance.id, {
-    url,
-    referrer: info.frameUrl || info.pageUrl,
-    cookieStoreId: await cookieStoreIdForTab(tab),
-    incognito: tab?.incognito || undefined,
-  });
+  try {
+    const download = {
+      url,
+      referrer: info.frameUrl || info.pageUrl,
+      cookieStoreId: await cookieStoreIdForTab(tab),
+    };
+    if (settings.reviewDownloads) {
+      // The review can still hand a link back to the browser, in the tab's context.
+      await openReview(instance.id, { ...download, incognito: tab?.incognito || undefined });
+      return;
+    }
+    const task = await sendToKetch(instance, download, settings);
+    notifySent(settings, instance, taskName(task) || nameFromUrl(url));
+  } catch (error) {
+    notifyFailure(t('notify_send_failed', instance.name), instance, error);
+  }
 }
 
 /** Downloads the clicked item in the browser, leaving Ketch out of this one download. */
@@ -278,6 +338,11 @@ function notifySent(settings, instance, name) {
     ? t('notify_sent_to', instance.name)
     : t('notify_sent_to_ketch');
   notify(where, name || t('notify_download_added'));
+}
+
+function notifyFailure(title, instance, error) {
+  const message = String(error?.message ?? error).replace(/\.$/, '');
+  notify(title, withHint(message, failureHint(error, instance)));
 }
 
 function notify(title, message) {

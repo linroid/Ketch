@@ -836,8 +836,8 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "Opens when you download",
-    "description": "Download review dialog: device line when the Ketch app on this computer is closed; sending opens it"
+    "message": "Closed · starts when you send",
+    "description": "Download review dialog: device line when the Ketch app on this computer is closed; sending to it starts the app"
   },
   "dialog_device_offline": {
     "message": "Not reachable",
@@ -894,6 +894,38 @@
       "folder": {
         "content": "$1",
         "example": "Videos"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Review downloads before sending",
+    "description": "Download review: setting"
+  },
+  "notify_fallback_browser": {
+    "message": "Downloading in the browser instead",
+    "description": "Notification title when Ketch couldn't take a download the browser started, so the browser downloads it. The text below says why."
+  },
+  "notify_fallback_magnet": {
+    "message": "Opening the magnet link in another app",
+    "description": "Notification title when Ketch couldn't take a clicked magnet link, so it opens as it would without the extension. The text below says why."
+  },
+  "notify_send_failed": {
+    "message": "Couldn't send to $NAME$",
+    "description": "Notification title when a link from the context menu couldn't be sent. $NAME$ is the instance's name. The text below says why.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "Added $NAME$",
+    "description": "Message after a link from the popup was added. $NAME$ is the download's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "ubuntu-24.04.iso"
       }
     }
   }

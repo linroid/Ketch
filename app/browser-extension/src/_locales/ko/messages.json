@@ -639,7 +639,7 @@
     }
   },
   "dialog_device_app_closed": {
-    "message": "다운로드할 때 열립니다"
+    "message": "닫힘 · 보낼 때 시작"
   },
   "dialog_device_offline": {
     "message": "연결할 수 없음"
@@ -682,6 +682,31 @@
     "message": "최근 사용: $FOLDER$",
     "placeholders": {
       "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "보내기 전에 다운로드 검토"
+  },
+  "notify_fallback_browser": {
+    "message": "대신 브라우저에서 다운로드합니다"
+  },
+  "notify_fallback_magnet": {
+    "message": "다른 앱에서 마그넷 링크를 엽니다"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$에 보낼 수 없음",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ 추가됨",
+    "placeholders": {
+      "name": {
         "content": "$1"
       }
     }
