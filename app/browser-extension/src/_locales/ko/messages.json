@@ -710,5 +710,11 @@
         "content": "$1"
       }
     }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch가 이 확장 프로그램 사본을 허용하지 않습니다"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch는 Chrome 웹 스토어, Firefox 부가 기능 또는 저장소의 src 폴더에서 가져온 확장 프로그램에만 연결합니다. 그중 하나를 로드한 다음 다시 시도하세요."
   }
 }

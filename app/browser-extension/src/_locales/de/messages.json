@@ -710,5 +710,11 @@
         "content": "$1"
       }
     }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch akzeptiert diese Kopie der Erweiterung nicht"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch verbindet sich nur mit der Erweiterung aus dem Chrome Web Store, von Firefox Add-ons oder aus dem src-Ordner des Repositorys. Lade eine davon und versuche es erneut."
   }
 }

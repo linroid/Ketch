@@ -1,6 +1,6 @@
 import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
-import { formatBytes, nameFromUrl } from '../lib/format.js';
+import { failureHint, formatBytes, nameFromUrl, withHint } from '../lib/format.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { fileNameFromPath, isTorrentFile, isTorrentUrl } from '../lib/request.js';
@@ -187,6 +187,14 @@ function renderProbe(instance) {
 async function renderDevice() {
   const instance = selectedInstance();
   const status = probes.get(instance.id)?.status;
+  // Why the selected device can't be reached, and what to do about it.
+  const probe = probes.get(instance.id);
+  const problem = $('device-problem');
+  problem.hidden = probe?.state !== 'offline';
+  if (!problem.hidden) {
+    problem.textContent = withHint(probe.error?.message ?? t('dialog_device_offline'),
+      failureHint(probe.error, instance));
+  }
   const folders = await recentFolders(instance.id);
   if (instance.id !== selectedInstance().id) return;
   recent = folders;
@@ -349,7 +357,8 @@ async function onSend(event) {
     const response = await ext.runtime.sendMessage({ type: 'review-send', id,
       instanceId: instance.id, fileName: $('name').value, folder: folderValue() });
     if (!response?.ok) {
-      showStatus(response?.message || t('review_unavailable'), 'error');
+      showStatus(withHint(response?.message || t('review_unavailable'),
+        failureHint({ kind: response?.kind }, instance)), 'error');
       if (response?.kind !== 'uncertain') setBusy(false);
       return;
     }

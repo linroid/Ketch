@@ -710,5 +710,11 @@
         "content": "$1"
       }
     }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch не принимает эту копию расширения"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch подключается только к расширению из Chrome Web Store, Firefox Add-ons или папки src репозитория. Загрузите одно из них и повторите попытку."
   }
 }

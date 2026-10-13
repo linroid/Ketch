@@ -166,3 +166,17 @@ describe('withEndpoint', () => {
     assert.equal(messages.length, 1);
   });
 });
+
+test('a copy of the extension the app does not accept says so', async () => {
+  const { withEndpoint } = await import('../src/lib/connection.js');
+  const { FailureKind } = await import('../src/lib/ketch-client.js');
+  await assert.rejects(withEndpoint({ id: 'local', type: 'app' }, async () => assert.fail(), {
+    deps: {
+      sendNativeMessage: async () => {
+        throw new Error('Access to the specified native messaging host is forbidden.');
+      },
+      loadEndpoint: async () => undefined,
+      saveEndpoint: async () => {},
+    },
+  }), { kind: FailureKind.APP_NOT_ALLOWED });
+});

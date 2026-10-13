@@ -93,6 +93,12 @@ async function connectToApp(deps, launch) {
         cause: error,
       });
     }
+    // Chromium: "Access to the specified native messaging host is forbidden."
+    if (/forbidden/i.test(String(error?.message))) {
+      throw new KetchRequestError(FailureKind.APP_NOT_ALLOWED, t('error_app_not_allowed'), {
+        cause: error,
+      });
+    }
     // Chromium: "Specified native messaging host not found."; Firefox: "No such native
     // application com.linroid.ketch".
     if (/not found|no such native application/i.test(String(error?.message))) {

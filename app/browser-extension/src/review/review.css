@@ -347,6 +347,14 @@ legend.section-title {
   font-size: 12px;
 }
 
+.device-problem {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--danger-container);
+  font-size: 12px;
+}
+
 .warning {
   margin: 0;
   padding: 8px 10px;
