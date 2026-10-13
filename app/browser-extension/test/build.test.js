@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,11 +38,13 @@ describe('build', () => {
       ['chrome-store', 'chrome-unpacked', 'firefox', 'safari']);
   });
 
-  test('the Chromium package for unpacked installs keeps the key the Ketch app accepts', () => {
-    const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+  test('the Chromium package for unpacked installs has the Chrome Web Store id', () => {
     const { zip } = outputs.find((it) => it.browser === 'chrome-unpacked');
     const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
-    assert.equal(packaged.key, source.key);
+    // Chromium's id: the first 16 bytes of the key's SHA-256, each hex digit as a to p.
+    const id = [...createHash('sha256').update(Buffer.from(packaged.key, 'base64')).digest('hex')
+      .slice(0, 32)].map((digit) => String.fromCharCode(97 + parseInt(digit, 16))).join('');
+    assert.equal(id, 'flnjeochbgpaipiofdjmoijaeooemhka');
     const { key: _key, ...rest } = packaged;
     const store = JSON.parse(zipEntry(outputs.find((it) => it.browser === 'chrome-store').zip,
       'manifest.json'));

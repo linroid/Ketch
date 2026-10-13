@@ -48,8 +48,10 @@ unavailable. See [Safari](#safari-limited-macos-target).
   [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka).
   To install a release by hand, such as one the store is still reviewing, unzip its
   `chrome-unpacked` package, open `chrome://extensions`, turn on **Developer mode**, choose
-  **Load unpacked** and select the folder. Remove the store version first: both would capture
-  downloads. Not the `chrome-store` package: loaded by hand, it gets an id the Ketch app refuses.
+  **Load unpacked** and select the folder. It has the store version's id, so it is the same
+  extension to Chrome and to the Ketch app: remove the store version first, and reinstall it from
+  the store once the review is done to get updates again. Not the `chrome-store` package: loaded
+  by hand, it gets an id from its folder that the Ketch app refuses.
 - **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the Firefox
   package is what gets submitted to addons.mozilla.org for signing. Until it is signed, load it
   for the current session from `about:debugging#/runtime/this-firefox` with **Load Temporary
@@ -64,8 +66,8 @@ The extension has its own releases on the
 links the latest one under *Add Ketch to your browser*. Each includes:
 
 - `ketch-extension-<version>-chrome-store.zip`, the Chrome Web Store package;
-- `ketch-extension-<version>-chrome-unpacked.zip`, the same with the manifest `key`, for **Load
-  unpacked**: the key gives it the id the Ketch app accepts;
+- `ketch-extension-<version>-chrome-unpacked.zip`, the same with the store item's public key as
+  the manifest `key`, for **Load unpacked**: it gets the store's id, which the Ketch app accepts;
 - `ketch-extension-<version>-firefox.zip`;
 - `ketch-extension-<version>-safari.zip`, which contains extension sources, not an installable
   app.
@@ -386,8 +388,8 @@ The `key` in `src/manifest.json` pins the Chromium extension id to
 the ids it lists start its host (`NativeHostRegistration.CHROMIUM_EXTENSION_IDS` in
 `app/desktop`). Extension stores assign their own id, so the packaged builds leave the `key` out.
 The Chrome Web Store id, `flnjeochbgpaipiofdjmoijaeooemhka`, is in that list too; add the Edge
-Add-ons id there once it is published. The `chrome-unpacked` package keeps the `key` so that a copy
-installed by hand gets an id the app accepts. Firefox identifies the add-on by its gecko id,
+Add-ons id there once it is published. The `chrome-unpacked` package has the store item's public key
+(`STORE_KEY` in `build.mjs`) as its `key`, so a copy installed by hand gets the store's id. Firefox identifies the add-on by its gecko id,
 `ketch@linroid.github.io`, instead.
 
 ### What the build does
