@@ -31,8 +31,8 @@ import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.theme.lightKetchColors
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.action_open
 import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.notify_action_full_speed
 import ketch.app.shared.generated.resources.notify_action_pause_all
 import ketch.app.shared.generated.resources.notify_action_share
@@ -59,8 +59,8 @@ import kotlin.time.Instant
  * - [CHANNEL_ACTIVE]: the download service's [ongoing] notification, with the total progress,
  *   the files in flight and Pause all and Slow lane buttons. On Android 16 a single download
  *   shows its connections as progress segments and asks to be promoted to a status bar chip.
- * - [CHANNEL_DONE]: finished downloads with Open and Share, grouped once more than
- *   [GROUP_AFTER] show.
+ * - [CHANNEL_DONE]: finished downloads with Show and Share, grouped once more than
+ *   [GROUP_AFTER] show. Tapping one saved on this device opens its file.
  * - [CHANNEL_FAILED]: failed downloads with Retry.
  * - [CHANNEL_PAIRING]: devices that want this one's access code, with Allow and Don't allow,
  *   which start [service] with [ACTION_PAIRING_ALLOW] and [ACTION_PAIRING_DENY].
@@ -68,7 +68,8 @@ import kotlin.time.Instant
  *   for the user's OK to open a website, as long as the message shows.
  *
  * Tapping a notification opens [activity] with a [NotificationLink], which [linkOf] reads back,
- * or, for a message, with the [MessageTap] that [messageTapOf] reads back.
+ * or, for a message, with the [MessageTap] that [messageTapOf] reads back; a finished download
+ * on this device opens its file instead, and its Show button leads to the task.
  * The ongoing notification's buttons start [service] with [ACTION_PAUSE_ALL] and
  * [ACTION_SLOW_LANE], and dismissing it starts it with [ACTION_REPOST_NOTIFICATION].
  *
@@ -186,11 +187,21 @@ class AndroidNotifier(
     when (event) {
       is ActivityEvent.Completed -> {
         val tag = tagOf(event.taskKey)
+        val show = showIntent(tag, task = event.taskKey)
+        // Only files on this device can be opened or shared from here.
+        val path = NotificationLink.filePathOf(event)
+        val open = path?.let { openIntent(it, tag) }
         val builder = builder(CHANNEL_DONE, copy)
           .setGroup(GROUP_DONE)
-          .setContentIntent(showIntent(tag, task = event.taskKey))
-        copy.actions.mapNotNull { fileAction(it, event.state.outputPath, tag) }
-          .forEach(builder::addAction)
+          .setContentIntent(open ?: show)
+        copy.actions.mapNotNull { action ->
+          when (action) {
+            // Only worth a button when tapping opens the file rather than the task.
+            NotificationAction.Show -> open?.let { button(labels().show, show) }
+            NotificationAction.Share -> path?.let { shareAction(it, tag) }
+            NotificationAction.Reveal, NotificationAction.Retry -> null
+          }
+        }.forEach(builder::addAction)
         post(tag, ID_TASK, builder.build())
         groupDone(tag)
       }
@@ -207,10 +218,11 @@ class AndroidNotifier(
       }
       is ActivityEvent.CompletedBatch, is ActivityEvent.QueueDrained -> {
         // A device's newer summary replaces its older one.
-        val tag = "device:${ActivityRouting.deviceIdOf(event)}"
+        val deviceId = ActivityRouting.deviceIdOf(event)
+        val tag = "device:$deviceId"
         val builder = builder(CHANNEL_DONE, copy)
           .setGroup(GROUP_DONE)
-          .setContentIntent(showIntent(tag, filter = StatusFilter.Done))
+          .setContentIntent(showIntent(tag, filter = StatusFilter.Done, deviceId = deviceId))
         post(tag, ID_SUMMARY, builder.build())
         groupDone(tag)
       }
@@ -331,26 +343,36 @@ class AndroidNotifier(
       .setStyle(NotificationCompat.BigTextStyle().bigText(copy.body))
       .setAutoCancel(true)
 
-  // Android has no file manager to reveal a download in, so only Open and Share become buttons.
-  private fun fileAction(
-    action: NotificationAction,
-    path: String,
-    tag: String,
-  ): NotificationCompat.Action? {
-    val labels = labels()
-    val (label, intent) = try {
-      when (action) {
-        NotificationAction.Open -> labels.open to openFileIntent(context, path)
-        NotificationAction.Share -> labels.share to shareFileIntent(context, path)
-        NotificationAction.Reveal, NotificationAction.Retry -> return null
-      }
+  // Opens the download at [path] in the app Android picks; `null` when it cannot be handed out,
+  // such as a folder or a file that is gone. Android has no file manager to reveal it in.
+  private fun openIntent(path: String, tag: String): PendingIntent? {
+    val intent = try {
+      openFileIntent(context, path)
     } catch (e: FileActionException) {
-      log.d { "No $action button: ${e.describeCauses()}" }
+      log.d { "Tapping opens the task, not the file: ${e.describeCauses()}" }
       return null
     }
-    val pending = PendingIntent.getActivity(context, requestCode(tag, action.name), intent, FLAGS)
-    return NotificationCompat.Action.Builder(0, label, pending).build()
+    return PendingIntent.getActivity(context, requestCode(tag, ACTION_OPEN_FILE), intent, FLAGS)
   }
+
+  private fun shareAction(path: String, tag: String): NotificationCompat.Action? {
+    val intent = try {
+      shareFileIntent(context, path)
+    } catch (e: FileActionException) {
+      log.d { "No Share button: ${e.describeCauses()}" }
+      return null
+    }
+    val pending = PendingIntent.getActivity(
+      context,
+      requestCode(tag, NotificationAction.Share.name),
+      intent,
+      FLAGS
+    )
+    return button(labels().share, pending)
+  }
+
+  private fun button(label: String, intent: PendingIntent): NotificationCompat.Action =
+    NotificationCompat.Action.Builder(0, label, intent).build()
 
   // Bundles the finished downloads under a summary once more than GROUP_AFTER of them show.
   private fun groupDone(posted: String) {
@@ -387,6 +409,7 @@ class AndroidNotifier(
     task: TaskKey? = null,
     filter: StatusFilter? = null,
     retry: Boolean = false,
+    deviceId: String? = null,
   ): PendingIntent {
     val action = if (retry) ACTION_RETRY else ACTION_SHOW
     val intent = Intent(context, activity)
@@ -394,6 +417,7 @@ class AndroidNotifier(
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     task?.let { intent.putExtra(EXTRA_TASK_KEY, it.encode()) }
     filter?.let { intent.putExtra(EXTRA_STATUS_FILTER, it.name) }
+    deviceId?.let { intent.putExtra(EXTRA_DEVICE_ID, it) }
     return PendingIntent.getActivity(context, requestCode(tag, action), intent, FLAGS)
   }
 
@@ -432,14 +456,14 @@ class AndroidNotifier(
 
   /** The buttons and titles of the notifications [notify] posts, in the app's language. */
   private class Labels(
-    val open: String,
+    val show: String,
     val share: String,
     val retry: String,
     val finished: String,
   ) {
     companion object {
       suspend fun load(): Labels = Labels(
-        open = Res.string.action_open.text().load(),
+        show = Res.string.action_show.text().load(),
         share = Res.string.notify_action_share.text().load(),
         retry = Res.string.action_retry.text().load(),
         finished = Res.string.notify_finished_group.text().load(),
@@ -488,8 +512,10 @@ class AndroidNotifier(
     private const val ACTION_SHOW = "com.linroid.ketch.app.action.SHOW"
     private const val ACTION_RETRY = "com.linroid.ketch.app.action.RETRY"
     private const val ACTION_MESSAGE = "com.linroid.ketch.app.action.MESSAGE"
+    private const val ACTION_OPEN_FILE = "openFile"
     private const val EXTRA_TASK_KEY = "taskKey"
     private const val EXTRA_STATUS_FILTER = "statusFilter"
+    private const val EXTRA_DEVICE_ID = "deviceId"
     private const val EXTRA_MESSAGE_ID = "messageId"
     private const val EXTRA_MESSAGE_AT = "messageAt"
     private const val MESSAGE_TAG_PREFIX = "message:"
@@ -519,7 +545,12 @@ class AndroidNotifier(
       val taskKey = intent.getStringExtra(EXTRA_TASK_KEY)?.let(TaskKey::decode)
       val filter = StatusFilter.entries.firstOrNull { it.name == name }
       if (taskKey == null && filter == null) return null
-      return NotificationLink(taskKey, filter, retry = action == ACTION_RETRY)
+      return NotificationLink(
+        taskKey = taskKey,
+        filter = filter,
+        retry = action == ACTION_RETRY,
+        deviceId = intent.getStringExtra(EXTRA_DEVICE_ID),
+      )
     }
 
     /** The pairing request whose Allow or Don't allow started the service with [intent]. */
@@ -549,19 +580,6 @@ class AndroidNotifier(
     private fun requestCode(tag: String, what: String): Int = "$tag/$what".hashCode()
   }
 }
-
-/**
- * What a tap on one of Ketch's notifications asks the app to show.
- *
- * @property taskKey task to show in the inspector; `null` for a status tab.
- * @property filter status tab to show, such as Downloading for the ongoing notification.
- * @property retry whether Retry was tapped, which retries [taskKey].
- */
-data class NotificationLink(
-  val taskKey: TaskKey?,
-  val filter: StatusFilter?,
-  val retry: Boolean,
-)
 
 /**
  * A tap on the notification of an app message, for [MessageNotifications.open].

@@ -1,32 +1,27 @@
 package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.state.deviceId
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.action_open
 import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.feedback_file_action_failed
 import ketch.app.shared.generated.resources.notify_action_share
 import ketch.app.shared.generated.resources.notify_paused
 import ketch.app.shared.generated.resources.notify_paused_body
 import ketch.app.shared.generated.resources.reveal_in_files
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import platform.Foundation.NSError
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationState
@@ -56,8 +51,9 @@ import platform.darwin.dispatch_get_main_queue
  * failed downloads on the app icon.
  *
  * Permission is asked for after the first download is added, never at launch. Tapping a
- * notification opens Ketch on its task; a finished download on this device offers Open and
- * Share, and a failure Retry. The Swift app calls [install] before it finishes launching, so a
+ * notification opens Ketch on its task, or on a summary's finished downloads; tapping a finished
+ * download on this device opens its file, and its Show and Share buttons show its task and share
+ * it. A failure offers Retry. The Swift app calls [install] before it finishes launching, so a
  * tap that launches Ketch is not lost.
  */
 object IosNotifier : SystemNotifier {
@@ -90,7 +86,7 @@ object IosNotifier : SystemNotifier {
   internal suspend fun registerCategories() {
     center.setNotificationCategories(
       setOf(
-        category(CATEGORY_COMPLETED, NotificationAction.Open, NotificationAction.Share),
+        category(CATEGORY_COMPLETED, NotificationAction.Show, NotificationAction.Share),
         category(CATEGORY_FAILED, NotificationAction.Retry),
       ),
     )
@@ -115,17 +111,19 @@ object IosNotifier : SystemNotifier {
     content.setBody(copy.body)
     ActivityRouting.deviceIdOf(event)?.let { content.setThreadIdentifier(it) }
     val key = ActivityRouting.taskKeyOf(event)
+    val link = NotificationLink.of(event)
     // Only files on this device can be opened from here.
-    val path = (event as? ActivityEvent.Completed)?.state?.outputPath
-      ?.takeIf { key?.deviceId == LOCAL_DEVICE_ID }
+    val path = NotificationLink.filePathOf(event)
     content.setUserInfo(
       listOfNotNull(
         key?.let { USER_INFO_TASK to it.encode() },
+        link.deviceId?.let { USER_INFO_DEVICE to it },
+        link.filter?.let { USER_INFO_FILTER to it.name },
         path?.let { USER_INFO_PATH to it },
       ).toMap<Any?, Any?>(),
     )
     when {
-      path != null && NotificationAction.Open in copy.actions ->
+      path != null && NotificationAction.Share in copy.actions ->
         content.setCategoryIdentifier(CATEGORY_COMPLETED)
       NotificationAction.Retry in copy.actions -> content.setCategoryIdentifier(CATEGORY_FAILED)
     }
@@ -188,7 +186,7 @@ object IosNotifier : SystemNotifier {
     identifier = id,
     actions = actions.map { action ->
       val title = when (action) {
-        NotificationAction.Open -> Res.string.action_open
+        NotificationAction.Show -> Res.string.action_show
         NotificationAction.Reveal -> Res.string.reveal_in_files
         NotificationAction.Share -> Res.string.notify_action_share
         NotificationAction.Retry -> Res.string.action_retry
@@ -214,9 +212,15 @@ object IosNotifier : SystemNotifier {
       val content = didReceiveNotificationResponse.notification.request.content
       val action = NotificationAction.entries
         .firstOrNull { it.name == didReceiveNotificationResponse.actionIdentifier }
+      val filter = content.userInfo[USER_INFO_FILTER] as? String
       taps.trySend(
         NotificationTap(
-          taskKey = (content.userInfo[USER_INFO_TASK] as? String)?.let { TaskKey.decode(it) },
+          link = NotificationLink(
+            taskKey = (content.userInfo[USER_INFO_TASK] as? String)?.let { TaskKey.decode(it) },
+            filter = StatusFilter.entries.firstOrNull { it.name == filter },
+            retry = action == NotificationAction.Retry,
+            deviceId = content.userInfo[USER_INFO_DEVICE] as? String,
+          ),
           action = action,
           path = content.userInfo[USER_INFO_PATH] as? String,
         ),
@@ -239,6 +243,8 @@ object IosNotifier : SystemNotifier {
   private const val CATEGORY_COMPLETED = "completed"
   private const val CATEGORY_FAILED = "failed"
   private const val USER_INFO_TASK = "taskKey"
+  private const val USER_INFO_DEVICE = "deviceId"
+  private const val USER_INFO_FILTER = "statusFilter"
   private const val USER_INFO_PATH = "path"
   private const val PAUSED_ID = "background-paused"
   private const val PAUSED_NOTICE_DELAY_SECONDS = 60.0
@@ -247,13 +253,13 @@ object IosNotifier : SystemNotifier {
 /**
  * A tap on one of Ketch's notifications.
  *
- * @property taskKey task the notification was about, or `null` for a summary.
+ * @property link what the notification shows in Ketch.
  * @property action button that was tapped, or `null` for the notification itself.
- * @property path the downloaded file on this device, for [NotificationAction.Open] and
- *   [NotificationAction.Share].
+ * @property path the downloaded file on this device, which tapping the notification opens and
+ *   [NotificationAction.Share] shares.
  */
 internal class NotificationTap(
-  val taskKey: TaskKey?,
+  val link: NotificationLink,
   val action: NotificationAction?,
   val path: String?,
 )
@@ -261,10 +267,10 @@ internal class NotificationTap(
 /**
  * Reports what happens on the devices [controller] watches, as the notification settings
  * allow: events go to the app while Ketch is in front and become notifications otherwise. The
- * app badge counts failed downloads, and a tapped notification opens its task or runs its
- * button. Runs until the controller closes.
+ * app badge counts failed downloads, and a tapped notification opens its file or its task, or
+ * runs its button. Runs until the controller closes.
  *
- * @param fileActions opens and shares downloaded files, for the buttons of finished downloads.
+ * @param fileActions opens and shares downloaded files, for taps on finished downloads.
  * @return the events for `App(activityEvents = …)`.
  */
 internal fun IosNotifier.reportActivity(
@@ -296,11 +302,13 @@ internal fun IosNotifier.reportActivity(
     tapped.collect { tap ->
       val actions = fileActions()
       when {
-        tap.path != null && actions != null && tap.action == NotificationAction.Open ->
-          launch { controller.messages.runFileAction { actions.open(tap.path) } }
+        tap.path != null && actions != null && tap.action == null -> launch {
+          // A file that is gone, or cannot be opened, leads to its task instead.
+          if (!openFile(actions, tap.path)) controller.state.open(tap.link)
+        }
         tap.path != null && actions != null && tap.action == NotificationAction.Share ->
           launch { controller.messages.runFileAction { actions.share(tap.path) } }
-        else -> launch { controller.state.open(tap) }
+        else -> launch { controller.state.open(tap.link) }
       }
     }
   }
@@ -316,18 +324,15 @@ private suspend fun MessageCenter.runFileAction(action: suspend () -> Unit) {
   }
 }
 
-// A tap can start the app, or switch devices, before the device has loaded the task.
-private val TASK_LOAD_TIMEOUT = 10.seconds
+private val tapLog = KetchLogger("IosNotifier")
 
-private suspend fun AppState.open(tap: NotificationTap) {
-  val key = tap.taskKey ?: return
-  val entry = instances.value.firstOrNull { it.deviceId == key.deviceId } ?: return
-  if (entry != activeInstance.value) switchInstance(entry)
-  inspect(key)
-  if (tap.action != NotificationAction.Retry) return
-  val task = withTimeoutOrNull(TASK_LOAD_TIMEOUT) {
-    entry.instance.tasks.mapNotNull { tasks -> tasks.firstOrNull { it.taskId == key.taskId } }
-      .first()
-  } ?: return
-  retry(task)
+// Whether the file at [path] opened.
+private suspend fun openFile(actions: FileActions, path: String): Boolean = try {
+  actions.exists(path) && run {
+    actions.open(path)
+    true
+  }
+} catch (e: FileActionException) {
+  tapLog.d { "Showing the task, as its file did not open: ${e.describeCauses()}" }
+  false
 }

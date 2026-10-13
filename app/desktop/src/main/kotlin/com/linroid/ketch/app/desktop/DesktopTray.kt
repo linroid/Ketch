@@ -249,6 +249,8 @@ private fun DevicePresence.toPulse(): DevicePulse = DevicePulse(
  * @param speedMode switches the active device's speed mode; `null` leaves out the Speed menu.
  *   This computer's own Speed menu, under Devices, follows the controller's speed mode.
  * @param state sends notifications from the icon, see [TrayNotifier].
+ * @param onMessageClick runs when one of the icon's notifications is clicked, see
+ *   [TrayNotifier.trayMessageClicked]; shows the window by default.
  */
 @Composable
 fun ApplicationScope.KetchTray(
@@ -257,6 +259,7 @@ fun ApplicationScope.KetchTray(
   actions: DesktopActions,
   speedMode: SpeedModeController? = null,
   state: TrayState = rememberTrayState(),
+  onMessageClick: () -> Unit = actions.showWindow,
 ) {
   if (!isTraySupported) return
   // Read once, when the first tray icon is created.
@@ -289,6 +292,7 @@ fun ApplicationScope.KetchTray(
     state = state,
     tooltip = trayTooltip(fleet, now).resolve(),
     onAction = actions.showWindow,
+    onMessageClick = onMessageClick,
   ) {
     key(language) { MenuEntries(entries, KeyboardPlatform.current, commands::perform) }
   }

@@ -208,5 +208,5 @@ object ActivityRouting {
   }
 
   private val COMPLETED_ACTIONS =
-    listOf(NotificationAction.Open, NotificationAction.Reveal, NotificationAction.Share)
+    listOf(NotificationAction.Show, NotificationAction.Reveal, NotificationAction.Share)
 }

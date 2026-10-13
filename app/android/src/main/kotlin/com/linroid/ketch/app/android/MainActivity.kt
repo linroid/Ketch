@@ -39,6 +39,7 @@ import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.MessageTap
 import com.linroid.ketch.app.feedback.NotificationLink
+import com.linroid.ketch.app.feedback.open
 import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -46,11 +47,7 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
-import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
 import kotlinx.coroutines.Job
@@ -59,12 +56,9 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
 
@@ -391,27 +385,4 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
     bound = false
     getApplication<Application>().unbindService(connection)
   }
-}
-
-// A tap can start the app before its device has loaded the task.
-private val TASK_LOAD_TIMEOUT = 10.seconds
-
-/**
- * Shows what a notification tap asks for: the device it is about, the status tab or the task,
- * which Retry also retries.
- */
-private suspend fun AppState.open(link: NotificationLink) {
-  val key = link.taskKey
-  val entry = instances.value.firstOrNull { it.deviceId == (key?.deviceId ?: LOCAL_DEVICE_ID) }
-    ?: return
-  if (entry != activeInstance.value) switchInstance(entry)
-  link.filter?.let { statusFilter = it }
-  if (key == null) return
-  val task = withTimeoutOrNull(TASK_LOAD_TIMEOUT) {
-    entry.instance.tasks.mapNotNull { tasks -> tasks.firstOrNull { it.taskId == key.taskId } }
-      .first()
-  } ?: return
-  if (!statusFilter.matches(task.state.value)) statusFilter = StatusFilter.All
-  inspect(key)
-  if (link.retry) retry(task)
 }

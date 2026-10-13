@@ -994,6 +994,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `AndroidNotifier`); download events are notified by the hosts' `ActivityMonitor` routing
   instead. On Android, `ForegroundPolicy` keeps the service in the foreground while Discover
   searches, so a search keeps running and can ask once the app is in the background
+- Notification clicks: clicking a finished download saved on this device opens its file
+  (`NotificationLink.filePathOf`; a file that is gone or will not open shows its task instead);
+  every other notification opens Ketch on its task, a summary on its device's Finished tab
+  (`NotificationLink.of`, `AppState.open`), a message on the message. Android and iOS add Show
+  (the task) and Share buttons to finished downloads. On desktop, `TrayNotifier` reports
+  `NotificationClick`s: macOS posts through `MacNotifications` (`NSUserNotificationCenter` with
+  a delegate of its own, only in an app bundle), Windows and Linux tray balloons are told apart
+  from icon clicks by their lack of mouse events (`TrayClicks`, taking the last balloon posted),
+  and `notify-send` waits for its `default` action
 - Success feedback (`SuccessFeedback`, `[notifications] successSound` / `successVibration`): a
   synthesized soft `Chime` and, on Android, a short vibration when a download finishes and is
   reported (`QueueDrained` included), or a Discover turn ends with results

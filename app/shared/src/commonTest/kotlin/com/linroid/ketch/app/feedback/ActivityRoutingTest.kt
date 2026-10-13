@@ -151,7 +151,7 @@ class ActivityRoutingTest {
         title = "Download complete",
         body = "ubuntu.iso · 5.70 GB · took 3m 12s · avg 30.4 MB/s",
         actions = listOf(
-          NotificationAction.Open,
+          NotificationAction.Show,
           NotificationAction.Reveal,
           NotificationAction.Share,
         ),

@@ -45,9 +45,12 @@ import com.linroid.ketch.app.i18n.speedText
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.theme.darkKetchColors
+import java.awt.EventQueue
 import java.awt.PopupMenu
 import java.awt.SystemTray
 import java.awt.TrayIcon
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 
 /**
  * What the tray icon shows of the downloads.
@@ -120,7 +123,8 @@ private fun rememberSpeedLabel(speed: Long?): TextLayoutResult? {
 
 /**
  * The system tray icon (the menu bar extra on macOS) showing [image], with [menu] as its menu;
- * clicking it on Windows and Linux calls [onAction], and [state] sends notifications from it.
+ * clicking it on Windows and Linux calls [onAction], and [state] sends notifications from it,
+ * a click on which calls [onMessageClick].
  *
  * Unlike Compose's `Tray`, which fits every image in a square, the macOS menu bar item takes the
  * width of [image], so text can follow the icon. Windows and Linux scale it to their tray's size.
@@ -131,6 +135,7 @@ internal fun ApplicationScope.SystemTrayIcon(
   state: TrayState,
   tooltip: String?,
   onAction: () -> Unit,
+  onMessageClick: () -> Unit,
   menu: @Composable @MenuComposable MenuScope.() -> Unit,
 ) {
   val mac = DesktopOs.current == DesktopOs.MAC
@@ -142,11 +147,19 @@ internal fun ApplicationScope.SystemTrayIcon(
     image.painter.toAwtImage(Density(scale), LayoutDirection.Ltr, image.size)
   }
   val currentOnAction by rememberUpdatedState(onAction)
+  val currentOnMessageClick by rememberUpdatedState(onMessageClick)
   val currentMenu by rememberUpdatedState(menu)
   val tray = remember {
+    val clicks = TrayClicks()
     TrayIcon(awtImage).apply {
       isImageAutoSize = !mac
-      addActionListener { currentOnAction() }
+      addMouseListener(clicks)
+      addActionListener {
+        // The mouse events of a click on the icon may still wait in the queue behind it.
+        EventQueue.invokeLater {
+          if (clicks.onIcon()) currentOnAction() else currentOnMessageClick()
+        }
+      }
     }
   }
   SideEffect {
@@ -168,6 +181,36 @@ internal fun ApplicationScope.SystemTrayIcon(
     state.notificationFlow.collect { tray.displayMessage(it) }
   }
 }
+
+/**
+ * Tells the clicks on a tray icon from those on its notifications, which AWT reports alike, as
+ * the icon's action: only a click on the icon comes with mouse events.
+ */
+internal class TrayClicks(
+  private val clock: () -> Long = System::nanoTime,
+) : MouseAdapter() {
+  private var lastMouse: Long? = null
+
+  override fun mousePressed(e: MouseEvent) = touched()
+
+  override fun mouseReleased(e: MouseEvent) = touched()
+
+  override fun mouseClicked(e: MouseEvent) = touched()
+
+  /** Marks a mouse event on the icon. */
+  fun touched() {
+    lastMouse = clock()
+  }
+
+  /** Whether the action just reported was a click on the icon, rather than on a notification. */
+  fun onIcon(): Boolean {
+    val last = lastMouse ?: return false
+    return clock() - last <= ICON_CLICK_WINDOW_NANOS
+  }
+}
+
+// A double click and the action it makes arrive well within this.
+private const val ICON_CLICK_WINDOW_NANOS = 1_000_000_000L
 
 private fun TrayIcon.displayMessage(notification: Notification) {
   val type = when (notification.type) {

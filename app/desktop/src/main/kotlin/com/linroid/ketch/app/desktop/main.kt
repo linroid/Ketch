@@ -19,8 +19,6 @@ import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
-import androidx.compose.ui.window.Notification
-import androidx.compose.ui.window.TrayState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
@@ -43,9 +41,11 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.NotificationCopy
+import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.feedback.SystemNotifier
 import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.UnreadableFiles
+import com.linroid.ketch.app.feedback.open
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.resolve
@@ -62,6 +62,8 @@ import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.FileActionException
+import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
@@ -426,7 +428,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       saveCloseAction = { action ->
         saveConfig(configStore) { it.copy(desktop = it.desktop.copy(closeAction = action)) }
       },
-      onFirstHide = { scope.launch { announceBackground(trayState) } },
+      onFirstHide = { scope.launch { announceBackground(notifier) } },
       quit = { response ->
         scope.launch {
           quit(controller, resources, launch.discoverHistory, response) { exitApplication() }
@@ -545,7 +547,10 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       controller.appSettings.config.notifications
     }
   }
-  KetchTray(controller, status, actions, speedMode, trayState)
+  LaunchedEffect(notifier, behavior, files) {
+    notifier.clicks.collect { openNotification(it, controller, behavior, files) }
+  }
+  KetchTray(controller, status, actions, speedMode, trayState, notifier::trayMessageClicked)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
   val language = controller.appSettings.language
@@ -881,10 +886,46 @@ private fun activeDownloads(manager: InstanceManager): Int =
   }
 
 // Windows users expect the close button to quit, so the first hide says where Ketch went.
-private suspend fun announceBackground(trayState: TrayState) {
+private suspend fun announceBackground(notifier: TrayNotifier) {
   if (DesktopOs.current != DesktopOs.WINDOWS || !isTraySupported) return
-  val notice = Notification(APP_NAME, Res.string.notify_still_running.text().load())
-  trayState.sendNotification(notice)
+  notifier.post(NotificationCopy(APP_NAME, Res.string.notify_still_running.text().load()))
+}
+
+/**
+ * Does what clicking a notification asks: opens a finished download's file when it is on this
+ * computer, otherwise shows the window on the task, the finished downloads or the message the
+ * notification is about.
+ */
+private suspend fun openNotification(
+  click: NotificationClick,
+  controller: AppController,
+  behavior: CloseBehavior,
+  files: FileActions?,
+) {
+  when (click) {
+    is NotificationClick.Activity -> {
+      val path = NotificationLink.filePathOf(click.event)
+      if (path != null && files != null && openFile(files, path)) return
+      behavior.showWindow()
+      controller.state.open(NotificationLink.of(click.event))
+    }
+    is NotificationClick.Message -> {
+      behavior.showWindow()
+      MessageNotifications.open(controller.messages, click.id, click.postedAt)
+    }
+    NotificationClick.App -> behavior.showWindow()
+  }
+}
+
+// Whether the file at [path] opened; a file that is gone or would not open shows its task.
+private suspend fun openFile(files: FileActions, path: String): Boolean = try {
+  files.exists(path) && run {
+    files.open(path)
+    true
+  }
+} catch (e: FileActionException) {
+  log.d { "Showing the task, as its file did not open: ${e.describeCauses()}" }
+  false
 }
 
 /** Opens Settings from the macOS Settings and About items; returns what removes the handlers. */
