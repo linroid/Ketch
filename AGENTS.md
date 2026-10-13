@@ -649,8 +649,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Extra trackers and daily-updated tracker lists, on by default (ngosang's `trackers_best.txt` and
   XIU2's `best.txt`, from jsDelivr when GitHub fails, with a copy of ngosang's shipped for before
   its first download) for public torrents
-- Magnet metadata is asked of sixteen peers at once (`METADATA_PARALLEL_PEERS`), each dial
-  allowed 8 s to connect, failed peers again after 5, 15 and 30 s; tasks
+- Magnet metadata is asked of sixteen peers at once (`METADATA_PARALLEL_PEERS`), failed peers
+  again after 5, 15 and 30 s; tasks
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
   peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway

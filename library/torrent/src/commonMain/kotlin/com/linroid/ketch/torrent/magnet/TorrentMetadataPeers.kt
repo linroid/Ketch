@@ -31,12 +31,6 @@ internal const val MAX_METADATA_PEERS = 4096
 internal const val METADATA_PARALLEL_PEERS = 16
 
 /**
- * How long a metadata dial may take to connect. A peer that answers usually does within a
- * second; an unreachable one holds a [METADATA_PARALLEL_PEERS] slot until this passes.
- */
-internal const val METADATA_CONNECT_TIMEOUT_MS = 8_000L
-
-/**
  * Asks the peers [discovered] sends for metadata with [fetch], [parallelism] at a time, until
  * one answers.
  *
