@@ -22,19 +22,23 @@ internal data class PexUpdate(
 /** BEP 11: the peer accepts incoming connections. */
 internal const val PEX_FLAG_REACHABLE = 0x10
 
+/** BEP 11: the peer takes part in hole punching (BEP 55). */
+internal const val PEX_FLAG_HOLEPUNCH = 0x08
+
 /**
  * The flags we advertise for a connected peer, the only place they are decided:
  * [PEX_FLAG_REACHABLE] only for peers we reached by dialing them, since only those are known to
- * accept connections. [link] and [extensions] carry what later transports and encryption add.
+ * accept connections. [link] and [extensions] carry what its transport, encryption and
+ * extensions add.
  */
-@Suppress("UNUSED_PARAMETER")
 internal fun pexFlags(
   reachedOutgoing: Boolean,
   link: TorrentConnection,
   extensions: PeerExtensions,
 ): Int = (if (reachedOutgoing) PEX_FLAG_REACHABLE else 0) or
   (if (link.encrypted) PEX_FLAG_ENCRYPTION else 0) or
-  (if (link.utp) PEX_FLAG_UTP else 0)
+  (if (link.utp) PEX_FLAG_UTP else 0) or
+  (if (extensions.id(HOLEPUNCH_EXTENSION) != 0) PEX_FLAG_HOLEPUNCH else 0)
 
 /**
  * Per-peer BEP 11 policy in both directions. Exchange data is a bounded, untrusted discovery hint.

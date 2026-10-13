@@ -53,12 +53,14 @@ internal class PeerExtensions {
   companion object {
     const val METADATA = 1
     const val PEX = 2
+    const val HOLEPUNCH = 3
     private const val MAX_REQUEST_QUEUE = 2048L
 
     /**
      * Our handshake for a peer of a torrent we hold: [utMetadata] offers the info dictionary of
      * [metadataSize] bytes, [pex] offers peer exchange, [listenPort] is where peers can reach us
-     * (0 leaves `p` out) and [requestQueue] how many requests we queue.
+     * (0 leaves `p` out) and [requestQueue] how many requests we queue. [holepunch] offers to
+     * relay and take part in hole punching (BEP 55).
      */
     fun handshake(
       utMetadata: Boolean,
@@ -66,11 +68,13 @@ internal class PeerExtensions {
       pex: Boolean,
       listenPort: Int,
       requestQueue: Int,
+      holepunch: Boolean = false,
     ): PeerMessage.Extended {
       require(listenPort in 0..65_535 && requestQueue in 1..MAX_REQUEST_QUEUE)
       val mapping = mutableMapOf<String, Long>()
       if (utMetadata) mapping["ut_metadata"] = METADATA.toLong()
       if (pex) mapping["ut_pex"] = PEX.toLong()
+      if (holepunch) mapping[HOLEPUNCH_EXTENSION] = HOLEPUNCH.toLong()
       val values = mutableMapOf<String, Any>("m" to mapping, "reqq" to requestQueue.toLong())
       if (utMetadata && metadataSize != null) values["metadata_size"] = metadataSize.toLong()
       if (listenPort != 0) values["p"] = listenPort.toLong()

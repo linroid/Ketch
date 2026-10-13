@@ -20,6 +20,9 @@ import com.linroid.ketch.torrent.net.connectPeer
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.publicTorrentAddress
 import com.linroid.ketch.torrent.peer.FAST_REJECT_GRACE_MS
+import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
+import com.linroid.ketch.torrent.peer.HolepunchMessage
+import com.linroid.ketch.torrent.peer.HolepunchType
 import com.linroid.ketch.torrent.peer.PEX_FLAG_UTP
 import com.linroid.ketch.torrent.peer.PeerAttempt
 import com.linroid.ketch.torrent.peer.PeerDiagnostics
@@ -208,6 +211,9 @@ internal class TorrentSwarm(
     val results = Channel<PeerResult>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
     val pexEvents = Channel<Pair<PeerEndpoint, PexUpdate>>(64)
+    // Peers a relay told us to dial now over uTP (BEP 55), as they dial us.
+    val punches = Channel<PeerEndpoint>(64)
+    val holepunch = SwarmHolepunch(nowMs)
     val pexDirectory = TorrentPeerDirectory(trackerRestricted)
     // Flags peers advertised for endpoints; handed to a worker when it dials one.
     val peerFlags = PeerFlagBook()
@@ -294,7 +300,8 @@ internal class TorrentSwarm(
           "known=${attempts.size}, discovered=$discovered, lsd=${localPeers()}, " +
           "failed=$connectFailures, " +
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
-          "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}" +
+          "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}; " +
+          holepunch.summary() +
           if (webSeeds.isEmpty()) "" else
             "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeeds.size)}"
       }
@@ -320,9 +327,8 @@ internal class TorrentSwarm(
         var failure: Throwable? = null
         var listen: PeerEndpoint? = if (incoming) null else endpoint
         try {
-          peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, connection) {
-            listen = it
-          }
+          peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, holepunch,
+            punches, connection) { listen = it }
         } catch (e: TimeoutCancellationException) {
           // A connect, handshake or idle deadline of this peer, not the swarm stopping it.
           failure = e
@@ -451,6 +457,11 @@ internal class TorrentSwarm(
               connectFailures++
               if (failure is CorruptPieceException) corruptPieces++
               log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
+              // Not reached at all: the peer that introduced it may punch a way through.
+              if (!result.incoming && result.attempt.stage == PeerStage.DIALING &&
+                !trackerRestricted && !complete && holepunch.rendezvous(endpoint)) {
+                log.v { "Peer $endpoint for $logLabel: asked its introducer to punch through" }
+              }
             }
             if (result.incoming) {
               // Never redial a source port: a public torrent dials where the peer listens.
@@ -467,6 +478,15 @@ internal class TorrentSwarm(
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
+          punches.onReceive { endpoint ->
+            // Dialed at once and over uTP first, while the peer dials us.
+            if (endpoint !in active && !complete) {
+              onUtpPeers(listOf(endpoint))
+              retryAt.remove(endpoint)
+              pending.remove(endpoint)
+              pending.addFirst(endpoint)
+            }
+          }
           webSeedFailures.onReceive { throw it }
           progressEvents.onReceive { onProgress(store.progress().sum()) }
           onTimeout(100) {}
@@ -502,6 +522,8 @@ internal class TorrentSwarm(
     scheduler: TorrentPieceScheduler,
     progressEvents: SendChannel<Unit>,
     pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
+    holepunch: SwarmHolepunch,
+    punches: SendChannel<PeerEndpoint>,
     accepted: TorrentConnection?,
     onListen: (PeerEndpoint?) -> Unit,
   ) {
@@ -511,7 +533,7 @@ internal class TorrentSwarm(
     attempt.utp = connection.utp
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
-        scheduler, progressEvents, pexEvents)
+        scheduler, progressEvents, pexEvents, holepunch, punches)
       try { worker.run() } finally { onListen(worker.listen) }
     } finally {
       connection.close()
@@ -541,6 +563,8 @@ internal class TorrentSwarm(
     private val scheduler: TorrentPieceScheduler,
     private val progressEvents: SendChannel<Unit>,
     private val pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
+    private val holepunch: SwarmHolepunch,
+    private val punches: SendChannel<PeerEndpoint>,
   ) {
     /** Where the peer accepts connections: the dialed endpoint, or `p` of an incoming peer. */
     var listen: PeerEndpoint? = if (incoming) null else endpoint
@@ -555,6 +579,8 @@ internal class TorrentSwarm(
     /** Hosts the peer introduced by peer exchange, bounded over this connection. */
     private val introductions = PexIntroductions()
     private val extensions = PeerExtensions()
+    /** Holepunch messages for this peer from the swarm (BEP 55), sent on the next pass. */
+    private val holepunchOut = Channel<HolepunchMessage>(16)
     /** Created once the handshake tells whether the Fast extension is negotiated. */
     private lateinit var state: PeerProtocolState
     private var extensionsNegotiated = false
@@ -638,6 +664,8 @@ internal class TorrentSwarm(
           }
         }
       } finally {
+        withContext(NonCancellable) { holepunch.leave(id) }
+        holepunchOut.cancel()
         traffic?.close()
         uploadCache.close()
       }
@@ -655,6 +683,7 @@ internal class TorrentSwarm(
       traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
       chokerMutex.withLock { choker.add(id) }
       publishContact()
+      holepunch.join(id, connection.remote, connection.utp, holepunchOut)
       extensionsNegotiated = handshake.extensions
       metadataWindow = TimeSource.Monotonic.markNow()
       if (extensionsNegotiated) {
@@ -662,6 +691,7 @@ internal class TorrentSwarm(
           utMetadata = servesMetadata(store.metadata.isPrivate, uploadPolicy()),
           metadataSize = store.metadata.infoBytes.size, pex = !trackerRestricted,
           listenPort = listenPortFor(connection.remote), requestQueue = REQUEST_QUEUE,
+          holepunch = !trackerRestricted,
         ))
       }
       advertised = store.verifiedPieces()
@@ -891,6 +921,11 @@ internal class TorrentSwarm(
           traffic?.listenPort(port)
         }
         publishContact()
+        holepunch.update(id, listen, extensions.id(HOLEPUNCH_EXTENSION) != 0)
+      } else if (message.id == PeerExtensions.HOLEPUNCH) {
+        // Never offered for tracker-restricted torrents; a malformed message is ignored.
+        if (trackerRestricted) return
+        receiveHolepunch(HolepunchMessage.decode(message.payload) ?: return)
       } else if (message.id == PeerExtensions.METADATA) {
         val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
         if (header["msg_type"]?.integer == 0L) {
@@ -924,8 +959,42 @@ internal class TorrentSwarm(
             introductions.admit(peer)
         }
         val kept = added.toSet()
+        holepunch.introduced(id, added)
         pexEvents.send(connection.remote to update.copy(added = added,
           flags = update.flags.filterKeys { it in kept }))
+      }
+    }
+
+    /**
+     * A rendezvous is relayed to the peer it names; a CONNECT dials that peer at once, unless it
+     * is not a public address (outside tests); an error is only logged.
+     */
+    private suspend fun receiveHolepunch(message: HolepunchMessage) {
+      when (message.type) {
+        HolepunchType.RENDEZVOUS -> holepunch.relay(id, message.endpoint)
+        HolepunchType.CONNECT -> {
+          val target = message.endpoint
+          val dialable = allowLocalPeers ||
+            numericAddress(target.host)?.let(::publicTorrentAddress) == true
+          if (dialable && extensions.id(HOLEPUNCH_EXTENSION) != 0) {
+            holepunch.connected()
+            log.v { "Peer $endpoint of $logLabel relays a connection to $target" }
+            punches.trySend(target)
+          }
+        }
+        HolepunchType.ERROR -> log.v {
+          "Peer $endpoint of $logLabel could not punch through to ${message.endpoint}: " +
+            "error ${message.error}"
+        }
+      }
+    }
+
+    /** Sends what the swarm queued for this peer: rendezvous, CONNECTs and errors (BEP 55). */
+    private suspend fun sendHolepunch() {
+      val remoteId = extensions.id(HOLEPUNCH_EXTENSION)
+      while (true) {
+        val message = holepunchOut.tryReceive().getOrNull() ?: break
+        if (remoteId != 0) wire.send(PeerMessage.Extended(remoteId, message.encode()))
       }
     }
 
@@ -965,6 +1034,7 @@ internal class TorrentSwarm(
         rejectUploads { !serving || it.index !in allowedFast }
       }
       serveUploads()
+      sendHolepunch()
       if (!trackerRestricted && extensions.id("ut_pex") != 0 && exchange.due()) {
         // Only listen endpoints, never another peer's source port.
         val contacts = connectedMutex.withLock {

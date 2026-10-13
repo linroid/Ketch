@@ -186,9 +186,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `openLsdMulticast()` opens)
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
-  (BEP 11), `PeerIdentityHandshake`, `PeerTraffic`, `PeerDiagnostics` and `TorrentChoker`
-- `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `TorrentPieceScheduler`,
-  `TorrentPeerDownloader`, `TorrentUploadCache`
+  (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`,
+  `PeerDiagnostics` and `TorrentChoker`
+- `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `SwarmHolepunch`,
+  `TorrentPieceScheduler`, `TorrentPeerDownloader`, `TorrentUploadCache`
 - `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
   `TorrentV2SessionLoop` (`TorrentV2Swarm`), `TorrentV2PieceScheduler`, `TorrentV2Candidates`,
   `TorrentV2Uploader`, `TorrentV2Extensions`, `TorrentV2ServeWorker` and their peers' views
@@ -755,6 +756,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   forgotten when it fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the
   swarm summary counts uTP connections. Private and tracker-only torrents use uTP too: tests
   count DHT and UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
+- Hole punching (BEP 55, `ut_holepunch`) in v1 swarms of public torrents, so peers behind NATs,
+  however many layers, reach each other: two peers a third is connected to dial each other over
+  uTP at the same moment, and each NAT lets the other's packets in. `SwarmHolepunch` knows the
+  connected peers that offered the extension and which peer introduced each endpoint by PEX.
+  As a relay it answers a rendezvous with a CONNECT to both peers, each naming the other (a
+  peer reached over uTP by its uTP source, else where it listens), and errors as BEP 55 lists;
+  peers that never offered the extension are ignored. A dial that fails before connecting asks
+  the endpoint's introducer for a rendezvous, once per endpoint in 5 minutes; a CONNECT puts the
+  endpoint at the front of the queue and dials it uTP first (`onUtpPeers`), while its own uTP
+  connection arrives as an incoming peer (a duplicate of a peer being dialed is closed). Peers
+  that take part carry the BEP 11 flag `0x08`, and the swarm summary counts relays, requests
+  and connects. V2 and hybrid sessions do not punch yet
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
   V2/hybrid incoming routing through one engine route table keyed by 20-byte wire tags
   (`TorrentRouteTable`, `launchIncoming`/`dispatchIncoming`), upload and seeding with 4-slot
