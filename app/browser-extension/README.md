@@ -107,13 +107,15 @@ Turn off **Capture browser downloads** in the popup to leave downloads to the br
 capture has its own switch in settings.
 
 In Chromium browsers the extension holds each download while its file name is decided, before any
-"Save as" dialog, then pauses it and opens the [download dialog](#download-dialog). Sending it
-to Ketch cancels it in the browser; canceling the dialog lets the browser continue. With the
-dialog turned off, it asks Ketch to take the download straight away; if Ketch refuses or doesn't
-answer within 6 seconds, the browser continues as if nothing happened.
+"Save as" dialog or download bubble. With the [download dialog](#download-dialog) on, it cancels
+the browser's download there and then, so the browser shows nothing, and opens the dialog;
+**Download in browser** starts it again. With the dialog off, it asks Ketch to take the download
+straight away; if Ketch refuses or doesn't answer within 6 seconds, the browser continues as if
+nothing happened.
 
-Firefox has no such hook, so the extension pauses the download once it has started. If Firefox is
-set to ask where to save each file, that dialog appears first.
+Firefox has no such hook, so the extension acts once the download has started: its downloads
+panel may show it for a moment, and if Firefox is set to ask where to save each file, that dialog
+appears first.
 
 Downloads are left to the browser when:
 
@@ -167,7 +169,12 @@ would need merging are rejected by the engine.
 With **Review downloads before sending** on, as it is by default, every captured download,
 context-menu link, pasted link and clicked magnet link opens a dialog before anything is sent.
 Turn it off in settings to send them straight to the default instance, or the one picked in the
-menu or popup; Safari always shows the dialog. It opens as a small window over the browser (a tab in Safari) and shows:
+menu or popup; Safari always shows the dialog.
+
+It opens over the page the download came from, in a frame of the extension's own page that the
+site can't read or style; clicking outside it cancels. On pages extensions can't script (browser
+pages, the extension stores, a frame that doesn't load within 5 seconds), it opens as a small
+window over the browser instead, or a tab in Safari. It shows:
 
 - the file's type, name, size when the browser knows it, and site. Edit the name to save it under
   another one; torrents keep the names and layout inside them;
@@ -187,21 +194,16 @@ menu or popup; Safari always shows the dialog. It opens as a small window over t
 
   Folders stay subject to the server directory policy, and a warning shows when the file is
   larger than the device's free space;
-- **Download in browser**, which gives a captured download back to the browser, or starts an
-  HTTP(S) link as a browser download (not from a Chromium private window);
+- **Download in browser**, which starts an HTTP(S) link, a captured one included, as a browser
+  download with the name in the dialog (not from a Chromium private window);
 
 Enter sends, Esc cancels. With notifications on, a notification confirms where it was sent. The
 page resource picker sends a batch without it.
 
-A captured browser download must pause successfully before the dialog opens; one that can't pause
-stays in the browser:
-
-- canceling or closing the dialog, or **Download in browser**, resumes it in the browser;
-- acceptance removes the browser original;
-- an uncertain send keeps it paused until you check pending downloads in settings.
-
-Dialogs and receipts last only for the browser session. After restarting the browser, check Ketch
-and the browser's downloads before resuming a paused original by hand.
+A captured download that finished before it could be canceled stays in the browser and opens no
+dialog. Canceling the dialog, closing it or leaving its page downloads nothing; an uncertain send
+can be checked in settings under pending downloads. Dialogs and receipts last only for the
+browser session.
 
 ### When a send is uncertain
 

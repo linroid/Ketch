@@ -10,7 +10,8 @@ import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
 import {
-  cancelReview, closeReviews, directReview, openReview, sendReview, startBrowserDownload,
+  cancelReview, closeReviews, directReview, openReview, reopenReview, sendReview,
+  startBrowserDownload,
 } from './lib/review.js';
 import { RequestContext } from './lib/request-context.js';
 import { captureDecision } from './lib/intercept.js';
@@ -45,6 +46,16 @@ ext.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((error) => console.error('Ketch: menu action failed', error));
 });
 
+// A review whose page goes away, closed or navigated from, is canceled.
+ext.runtime.onConnect?.addListener((port) => {
+  if (port.sender?.id !== ext.runtime.id || !port.name.startsWith('review:') ||
+    !port.sender.url?.startsWith(ext.runtime.getURL('review/'))) return;
+  port.onDisconnect.addListener(() => {
+    cancelReview(port.name.slice('review:'.length))
+      .catch((error) => console.warn('Ketch: could not close review', error));
+  });
+});
+
 ext.tabs?.onRemoved.addListener((id) => {
   closeReviews(id).catch((error) => console.warn('Ketch: could not close review', error));
 });
@@ -52,9 +63,16 @@ ext.tabs?.onRemoved.addListener((id) => {
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('popup/')) &&
     message?.type === 'review-open') {
-    openReview(message.instanceId, message.download).then(() => sendResponse({ ok: true }),
-      (error) => sendResponse({ ok: false, message: error.message }));
+    openReview(message.instanceId, message.download, { tabId: message.tabId })
+      .then(() => sendResponse({ ok: true }),
+        (error) => sendResponse({ ok: false, message: error.message }));
     return true;
+  }
+  if (sender.id === ext.runtime.id && message?.type === 'review-overlay-failed' &&
+    Number.isInteger(sender.tab?.id)) {
+    reopenReview(String(message.id), sender.tab.id)
+      .catch((error) => console.warn('Ketch: could not reopen the review', error));
+    return false;
   }
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('review/')) &&
     ['review-send', 'review-cancel', 'review-direct'].includes(message?.type)) {
@@ -69,7 +87,7 @@ ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (sender.id !== ext.runtime.id || message?.type !== 'magnet') return false;
-  handleMagnet(message.url).then(sendResponse, (error) => {
+  handleMagnet(message.url, sender.tab?.id).then(sendResponse, (error) => {
     console.error('Ketch: magnet hand-off failed', error);
     sendResponse({ handled: false });
   });
@@ -121,8 +139,8 @@ async function captureDownload(item, gate) {
     console.error('Ketch: could not load settings', error);
     return release();
   }
-  const decision = captureDecision(
-    requestContext.forDownload(item), settings, ext.runtime.id);
+  const context = requestContext.forDownload(item);
+  const decision = captureDecision(context, settings, ext.runtime.id);
   if (!decision.capture) {
     console.debug(`Ketch: leaving download ${item.id} to the browser: ${decision.reason}`);
     return release();
@@ -131,18 +149,25 @@ async function captureDownload(item, gate) {
   const instance = findInstance(settings);
   const fileName = fileNameFromPath(item.filename);
   if (settings.reviewDownloads) {
-    // Finish Chromium's filename hook before asking the browser to pause. If the download
-    // already completed or cannot pause, keep it in the browser without submitting a copy.
-    await release();
+    // Take the download from the browser before it shows its own download UI or Save As
+    // dialog; Download in browser starts it again. One that already finished stays there.
     try {
-      await ext.downloads.pause(item.id);
-      await openReview(instance.id, {
-        url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
-        cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
-        size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
-      });
+      await ext.downloads.cancel(item.id);
     } catch {
-      await ext.downloads.resume(item.id).catch(() => {});
+      return release();
+    }
+    await ext.downloads.erase({ id: item.id }).catch(() => {});
+    const download = {
+      url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
+      cookieStoreId: item.cookieStoreId,
+      size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
+    };
+    try {
+      await openReview(instance.id, download, { tabId: await pageTabFor(context) });
+    } catch (error) {
+      console.error('Ketch: could not open the review, downloading in the browser', error);
+      await startBrowserDownload(download.url, { cookieStoreId: download.cookieStoreId })
+        .catch(() => notify(t('notify_direct_failed'), t('notify_direct_hint')));
     }
     return;
   }
@@ -170,6 +195,20 @@ async function captureDownload(item, gate) {
   notifySent(settings, instance, taskName(task) || fileName);
 }
 
+/**
+ * The tab showing the page a download came from. A link that opened a tab of its own only to
+ * download closes it again, so its opener, or else the active tab, shows the review instead.
+ */
+async function pageTabFor(item) {
+  const urls = [item.url, item.finalUrl, 'about:blank', ''];
+  const shows = (tab) => tab && !urls.includes(tab.pendingUrl ?? tab.url ?? '');
+  const tab = item.tabId >= 0 ? await ext.tabs.get(item.tabId).catch(() => undefined) : undefined;
+  if (shows(tab)) return tab.id;
+  if (tab?.openerTabId !== undefined) return tab.openerTabId;
+  const [active] = await ext.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
+  return shows(active) ? active.id : undefined;
+}
+
 async function removeBrowserDownload(downloadId) {
   try {
     await ext.downloads.cancel(downloadId);
@@ -180,13 +219,13 @@ async function removeBrowserDownload(downloadId) {
   }
 }
 
-async function handleMagnet(url) {
+async function handleMagnet(url, tabId) {
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
   const instance = findInstance(settings);
   if (settings.reviewDownloads) {
     try {
-      await openReview(instance.id, { url });
+      await openReview(instance.id, { url }, { tabId });
       return { handled: true };
     } catch (error) {
       console.error('Ketch: could not open the review for a magnet link', error);
@@ -222,7 +261,7 @@ async function handleMenuClick(info, tab) {
   const instance = findInstance(settings, target.instanceId);
   const url = target.kind === 'link' ? info.linkUrl : info.srcUrl;
   if (!url || !isSupportedLinkUrl(url)) {
-    if (remoteOnly) { await openReview(instance.id, { url }); return; }
+    if (remoteOnly) { await openReview(instance.id, { url }, { tabId: tab?.id }); return; }
     notify(t('notify_unsupported'), url?.startsWith('blob:')
       ? t('notify_unsupported_stream')
       : t('notify_unsupported_scheme'));
@@ -236,7 +275,8 @@ async function handleMenuClick(info, tab) {
     };
     if (settings.reviewDownloads) {
       // The review can still hand a link back to the browser, in the tab's context.
-      await openReview(instance.id, { ...download, incognito: tab?.incognito || undefined });
+      await openReview(instance.id, { ...download, incognito: tab?.incognito || undefined },
+        { tabId: tab?.id });
       return;
     }
     const task = await sendToKetch(instance, download, settings);

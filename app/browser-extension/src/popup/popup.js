@@ -183,11 +183,12 @@ async function onAdd(event) {
   try {
     const current = await loadSettings();
     if (current.reviewDownloads) {
-      // A private window's link must never become a regular browser download.
-      const incognito = ext.extension?.inIncognitoContext ||
-        (await ext.windows?.getCurrent?.().catch(() => undefined))?.incognito || undefined;
+      // The review shows over the page the popup was opened on. A private window's link must
+      // never become a regular browser download.
+      const [tab] = await ext.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+      const incognito = tab?.incognito || ext.extension?.inIncognitoContext || undefined;
       const response = await ext.runtime.sendMessage({ type: 'review-open',
-        instanceId: instance.id, download: { url, incognito } });
+        instanceId: instance.id, download: { url, incognito }, tabId: tab?.id });
       if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
       window.close();
       return;

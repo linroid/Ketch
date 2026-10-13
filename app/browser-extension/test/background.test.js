@@ -11,6 +11,7 @@ function event() {
 
 const stored = {};
 const sessionData = {};
+const browserActions = [];
 const menus = new Map();
 const changed = event();
 const directDownloads = [];
@@ -56,6 +57,8 @@ globalThis.chrome = {
     },
   },
   downloads: {
+    cancel: async (id) => browserActions.push(['cancel', id]),
+    erase: async ({ id }) => browserActions.push(['erase', id]),
     onDeterminingFilename: event(),
     download: async (options) => {
       directDownloads.push(options);
@@ -75,6 +78,7 @@ globalThis.chrome = {
       return { id: openedTabs.length };
     },
     get: async (id) => ({ id }),
+    query: async () => [],
   },
   webRequest: { onBeforeRequest: event() },
   notifications: { create: async (message) => notifications.push(message) },
@@ -230,4 +234,22 @@ test('links and magnets open the review by default instead of being sent', async
     ['nas', 'https://example.com/file.zip'],
     ['nas', 'magnet:?xt=urn:btih:abc'],
   ]);
+});
+
+test('a captured download leaves the browser before it shows any download UI', async () => {
+  for (const key of Object.keys(sessionData)) delete sessionData[key];
+  browserActions.length = 0;
+  let suggested = false;
+  await ext.downloads.onDeterminingFilename.emit({
+    id: 99, url: 'https://example.com/report.pdf', filename: '/tmp/report.pdf',
+    mime: 'application/pdf', totalBytes: 2048, state: 'in_progress',
+  }, () => { suggested = true; });
+  await settle();
+  assert.deepEqual(browserActions, [['cancel', 99], ['erase', 99]]);
+  assert.equal(suggested, false);
+  const [entry] = Object.values(sessionData);
+  assert.equal(entry.download.url, 'https://example.com/report.pdf');
+  assert.equal(entry.download.fileName, 'report.pdf');
+  assert.equal(entry.download.size, 2048);
+  assert.equal(entry.download.browserDownloadId, undefined);
 });

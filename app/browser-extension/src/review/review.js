@@ -69,6 +69,11 @@ $('devices').addEventListener('change', () => renderDevice());
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !busy) onCancel();
 });
+// Over a page, the review lives in a frame the page's overlay sizes and removes.
+const embedded = window.parent !== window;
+// The review ends when this page does: closed, or its overlay removed with the page.
+ext.runtime.connect({ name: `review:${id}` });
+tellOverlay('ready');
 init().catch((error) => {
   setBusy(true);
   showStatus(error.message, 'error');
@@ -349,7 +354,7 @@ async function onSend(event) {
       return;
     }
     showStatus(t('notify_download_added'));
-    window.close();
+    closeDialog();
   } catch {
     // If the background disappeared, do not offer a second submission without its state.
     showStatus(t('error_handoff_uncertain'), 'error');
@@ -359,7 +364,7 @@ async function onSend(event) {
 async function onCancel() {
   setBusy(true);
   await ext.runtime.sendMessage({ type: 'review-cancel', id }).catch(() => {});
-  window.close();
+  closeDialog();
 }
 
 async function onDirect() {
@@ -367,7 +372,7 @@ async function onDirect() {
   const response = await ext.runtime.sendMessage({ type: 'review-direct', id,
     fileName: $('name').value }).catch(() => undefined);
   if (response?.ok) {
-    window.close();
+    closeDialog();
     return;
   }
   showStatus(response?.message || t('notify_direct_failed'), 'error');
@@ -393,6 +398,12 @@ let fitting;
 
 /** Sizes the review window to its content, within the screen. */
 function fitWindow() {
+  if (embedded) {
+    cancelAnimationFrame(fitting);
+    fitting = requestAnimationFrame(() =>
+      tellOverlay('resize', { height: $('form').getBoundingClientRect().height }));
+    return;
+  }
   if (!ext.windows?.getCurrent) return;
   cancelAnimationFrame(fitting);
   fitting = requestAnimationFrame(async () => {
@@ -409,6 +420,16 @@ function fitWindow() {
       // The window keeps its size and scrolls.
     }
   });
+}
+
+/** Messages the overlay holding this frame; nothing in a window. */
+function tellOverlay(action, details = {}) {
+  if (embedded) window.parent.postMessage({ ketchReview: true, action, ...details }, '*');
+}
+
+function closeDialog() {
+  if (embedded) tellOverlay('close');
+  else window.close();
 }
 
 function icon(name) {

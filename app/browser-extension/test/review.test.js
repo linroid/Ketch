@@ -28,7 +28,7 @@ globalThis.chrome = {
 };
 const {
   openReview, sendReview, cancelReview, closeReviews, reviewDestination, resourceDestination,
-  directReview, canDownloadDirectly, recentFolders, categoryFor, rememberDeviceFolders,
+  directReview, canDownloadDirectly, reopenReview, recentFolders, categoryFor, rememberDeviceFolders,
   knownDeviceFolders,
 } = await import('../src/lib/review.js');
 
@@ -269,4 +269,39 @@ test('device folders are remembered from its status for when it cannot be asked'
     directory: '/Users/me/Downloads', categories: [{ folder: 'Videos', extensions: ['mp4'] }],
   });
   assert.equal(await knownDeviceFolders('nas'), undefined);
+});
+
+test('the review shows over the page it came from, or in a window where it cannot', async () => {
+  reset();
+  const injected = [];
+  globalThis.chrome.scripting = { executeScript: async (options) => {
+    if (options.target.tabId === 13) throw new Error('Cannot access a chrome:// URL');
+    injected.push(options);
+  } };
+  const get = globalThis.chrome.tabs.get;
+  globalThis.chrome.tabs.get = async (tabId) => ({ id: tabId });
+  try {
+    await openReview('server', { url: 'https://example.com/file' }, { tabId: 11 });
+    const [id] = Object.keys(data).map((key) => key.slice('review:'.length));
+    assert.equal(data[`review:${id}`].tabId, 11);
+    assert.equal(injected[0].target.tabId, 11);
+    assert.equal(injected[0].args[0], `chrome-extension://test/review/review.html?id=${id}`);
+
+    reset();
+    await openReview('server', { url: 'https://example.com/file' }, { tabId: 13 });
+    const [other] = Object.keys(data).map((key) => key.slice('review:'.length));
+    assert.equal(data[`review:${other}`].tabId, 7);
+
+    // A frame that never loaded moves to a window, but only from the tab that showed it.
+    reset();
+    await openReview('server', { url: 'https://example.com/file' }, { tabId: 11 });
+    const [moved] = Object.keys(data).map((key) => key.slice('review:'.length));
+    await reopenReview(moved, 12);
+    assert.equal(data[`review:${moved}`].tabId, 11);
+    await reopenReview(moved, 11);
+    assert.equal(data[`review:${moved}`].tabId, 7);
+  } finally {
+    delete globalThis.chrome.scripting;
+    globalThis.chrome.tabs.get = get;
+  }
 });

@@ -22,13 +22,20 @@ function locked(id, action) {
   return next.finally(() => { if (locks.get(id) === next) locks.delete(id); });
 }
 
-export async function openReview(instanceId, download) {
+/**
+ * Opens the review: over the page in `options.tabId` when it can be shown there, otherwise in a
+ * window of its own.
+ *
+ * @param {{ tabId?: number }} [options] the tab the download came from
+ */
+export async function openReview(instanceId, download, { tabId: pageTabId } = {}) {
   const id = crypto.randomUUID();
   return locked(id, async () => {
     try {
       const entry = { instanceId, download, state: 'pending' };
       await ext.storage.session.set({ [PREFIX + id]: entry });
-      const tabId = await openDialog(ext.runtime.getURL(`review/review.html?id=${id}`));
+      const url = ext.runtime.getURL(`review/review.html?id=${id}`);
+      const tabId = await showOverlay(pageTabId, url) ? pageTabId : await openDialog(url);
       await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId } });
       // onRemoved may have run before the tab association reached storage.
       await ext.tabs.get(tabId);
@@ -37,6 +44,90 @@ export async function openReview(instanceId, download) {
       throw error;
     }
   });
+}
+
+/**
+ * Moves a review the page could not show (its frame never loaded) to a window of its own.
+ *
+ * @param {number} tabId the tab that should have shown it
+ */
+export function reopenReview(id, tabId) {
+  return locked(id, async () => {
+    const entry = await readReview(id);
+    if (!entry || entry.state !== 'pending' || entry.tabId !== tabId) return;
+    const dialogTabId = await openDialog(ext.runtime.getURL(`review/review.html?id=${id}`));
+    await ext.storage.session.set({ [PREFIX + id]: { ...entry, tabId: dialogTabId } });
+  });
+}
+
+/** Shows the review in a frame over the page in `tabId`; false where pages can't be scripted. */
+async function showOverlay(tabId, url) {
+  if (!Number.isInteger(tabId) || tabId < 0 || !ext.scripting?.executeScript) return false;
+  try {
+    await ext.scripting.executeScript({ target: { tabId }, func: mountReviewOverlay, args: [url] });
+    return true;
+  } catch (error) {
+    // Browser pages, the extension stores and other protected pages.
+    console.debug('Ketch: could not show the review over the page', error);
+    return false;
+  }
+}
+
+/**
+ * Runs in the page: puts the review page in a frame over it, in a closed shadow root so the
+ * page's styles can't reach it. The frame asks for its height and to be closed with
+ * `postMessage`; one that doesn't load in time is handed back to a window.
+ */
+function mountReviewOverlay(src) {
+  const api = globalThis.browser ?? globalThis.chrome;
+  const host = document.createElement('div');
+  host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483647;';
+  const shadow = host.attachShadow({ mode: 'closed' });
+  const style = document.createElement('style');
+  style.textContent = `
+    .backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+      background: rgb(15 18 30 / 0.38); backdrop-filter: blur(2px);
+      animation: fade 0.14s ease-out; }
+    iframe { width: min(460px, calc(100vw - 32px)); height: 520px;
+      max-height: calc(100vh - 32px); border: 0; border-radius: 14px; background: transparent;
+      box-shadow: 0 24px 64px rgb(0 0 0 / 0.32), 0 0 0 1px rgb(0 0 0 / 0.06);
+      color-scheme: normal; animation: rise 0.18s ease-out; }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+    @media (prefers-reduced-motion: reduce) { .backdrop, iframe { animation: none; } }`;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'backdrop';
+  const frame = document.createElement('iframe');
+  frame.title = 'Ketch';
+  frame.src = src;
+  backdrop.append(frame);
+  shadow.append(style, backdrop);
+  let ready = false;
+  const close = () => {
+    window.removeEventListener('message', onMessage);
+    host.remove();
+  };
+  const onMessage = (event) => {
+    if (event.source !== frame.contentWindow || event.data?.ketchReview !== true) return;
+    if (event.data.action === 'ready') {
+      ready = true;
+      frame.focus();
+    } else if (event.data.action === 'resize' && Number.isFinite(event.data.height)) {
+      frame.style.height = `${Math.ceil(event.data.height)}px`;
+    } else if (event.data.action === 'close') {
+      close();
+    }
+  };
+  window.addEventListener('message', onMessage);
+  // Clicking outside closes it, which cancels the review.
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
+  (document.body ?? document.documentElement).append(host);
+  setTimeout(() => {
+    if (ready) return;
+    close();
+    api.runtime.sendMessage({ type: 'review-overlay-failed',
+      id: new URL(src).searchParams.get('id') }).catch(() => {});
+  }, 5000);
 }
 
 /**
