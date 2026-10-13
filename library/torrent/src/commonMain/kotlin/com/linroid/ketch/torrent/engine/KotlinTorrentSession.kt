@@ -92,6 +92,8 @@ internal class KotlinTorrentSession(
   private val onDhtNode: (PeerEndpoint) -> Unit = {},
   /** Peers that peer exchange says speak uTP. */
   private val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
+  /** Whether the engine dials and accepts uTP now, which hole punching needs (BEP 55). */
+  private val utpEnabled: () -> Boolean = { false },
   /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
   private val webSeedHttp: TorrentHttp? = null,
 ) : TorrentSession {
@@ -431,7 +433,7 @@ internal class KotlinTorrentSession(
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
               listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
               dhtPortFor = dhtPortFor, onDhtNode = onDhtNode, onUtpPeers = onUtpPeers,
-              webSeedHttp = webSeedHttp,
+              utpEnabled = utpEnabled, webSeedHttp = webSeedHttp,
               localPeers = { localPeers.load() },
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes

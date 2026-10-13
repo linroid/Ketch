@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -118,6 +119,13 @@ class TorrentSwarmHolepunchTest {
     }
   }
 
+  private suspend fun PeerWire.readUntil(match: (PeerMessage) -> Boolean): PeerMessage {
+    while (true) {
+      val message = read()
+      if (match(message)) return message
+    }
+  }
+
   private suspend fun PeerWire.sendHolepunch(message: HolepunchMessage) =
     send(PeerMessage.Extended(PeerExtensions.HOLEPUNCH, message.encode()))
 
@@ -129,6 +137,7 @@ class TorrentSwarmHolepunchTest {
     val swarm = launch {
       TorrentSwarm(store, network, budget,
         uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION }, allowLocalPeers = true,
+        utpEnabled = { true },
       ).run(Channel(), incoming)
     }
     try {
@@ -149,13 +158,19 @@ class TorrentSwarmHolepunchTest {
   }
 
   @Test
-  fun connect_fromARelay_dialsThePeerOverUtpFirst() =
-    swarmTest(complete = false) { store, network ->
+  fun connect_fromARelay_dialsThePeerOverUtpFirst() = connectDials(complete = false)
+
+  /** A seed behind a NAT is how leechers behind theirs reach it, so it dials back too. */
+  @Test
+  fun connect_whileSeeding_dialsThePeerToo() = connectDials(complete = true)
+
+  private fun connectDials(complete: Boolean) = swarmTest(complete) { store, network ->
     val incoming = Channel<TorrentConnection>(1)
     val budget = TorrentBufferBudget(2 * 1024 * 1024)
     val utpFirst = AtomicReference(emptyList<PeerEndpoint>())
     val swarm = launch {
-      TorrentSwarm(store, network, budget, allowLocalPeers = true,
+      TorrentSwarm(store, network, budget, allowLocalPeers = true, utpEnabled = { true },
+        uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
         onUtpPeers = { peers -> utpFirst.update { it + peers } },
       ).run(Channel(), incoming)
     }
@@ -179,12 +194,61 @@ class TorrentSwarmHolepunchTest {
   }
 
   @Test
+  fun connects_fromOnePeer_areLimitedToEightAMinute() =
+    swarmTest(complete = false) { store, network ->
+    val incoming = Channel<TorrentConnection>(1)
+    val budget = TorrentBufferBudget(2 * 1024 * 1024)
+    val swarm = launch {
+      TorrentSwarm(store, network, budget, allowLocalPeers = true, utpEnabled = { true })
+        .run(Channel(), incoming)
+    }
+    try {
+      val relay = joinedPeer(network, incoming, listenPort = 6001)
+      // Hosts the network refuses at once: each CONNECT the swarm takes is one dial.
+      val targets = (1..12).map { PeerEndpoint("127.0.0.2", 20_000 + it) }
+      for (target in targets) relay.sendHolepunch(HolepunchMessage(HolepunchType.CONNECT, target))
+      withTimeout(5_000) {
+        while (network.dialed().count { it in targets } < 8) delay(20)
+      }
+      delay(500)
+      // Dialed in parallel, in any order: the first eight, and none after them.
+      assertEquals(targets.take(8).toSet(), network.dialed().filter { it in targets }.toSet())
+    } finally {
+      swarm.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun utpOff_neitherOffersNorActsOnHolepunch() = swarmTest(complete = false) { store, network ->
+    val incoming = Channel<TorrentConnection>(1)
+    val budget = TorrentBufferBudget(2 * 1024 * 1024)
+    val swarm = launch {
+      TorrentSwarm(store, network, budget, allowLocalPeers = true).run(Channel(), incoming)
+    }
+    try {
+      val relay = joinedPeer(network, incoming, listenPort = 6001)
+      val handshake = relay.readUntil { it is PeerMessage.Extended && it.id == 0 }
+      val offered = PeerExtensions().apply {
+        receive((handshake as PeerMessage.Extended).payload, 1024)
+      }
+      assertEquals(0, offered.id(HOLEPUNCH_EXTENSION))
+      val target = PeerEndpoint("127.0.0.2", 20_001)
+      relay.sendHolepunch(HolepunchMessage(HolepunchType.CONNECT, target))
+      delay(500)
+      assertTrue(target !in network.dialed(), "${network.dialed()}")
+    } finally {
+      swarm.cancelAndJoin()
+    }
+  }
+
+  @Test
   fun unreachableIntroducedPeer_asksItsIntroducerToPunch() =
     swarmTest(complete = false) { store, network ->
     val incoming = Channel<TorrentConnection>(1)
     val budget = TorrentBufferBudget(2 * 1024 * 1024)
     val swarm = launch {
-      TorrentSwarm(store, network, budget, allowLocalPeers = true).run(Channel(), incoming)
+      TorrentSwarm(store, network, budget, allowLocalPeers = true, utpEnabled = { true })
+        .run(Channel(), incoming)
     }
     try {
       val introducer = joinedPeer(network, incoming, listenPort = 6001)

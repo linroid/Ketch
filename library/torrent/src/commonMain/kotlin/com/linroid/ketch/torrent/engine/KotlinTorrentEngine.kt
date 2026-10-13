@@ -792,6 +792,7 @@ internal class KotlinTorrentEngine(
         dhtPortFor = ::dhtPortFor,
         onDhtNode = { dhtIntroductions.trySend(it) },
         onUtpPeers = utpFallback::preferUtp,
+        utpEnabled = { utpEnabled.load() },
         seedOnly = spec.seedOnly,
         reporter = spec.connections,
         peerOutcomes = peerOutcomes,

@@ -765,15 +765,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   forgotten when it fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the
   swarm summary counts uTP connections. Private and tracker-only torrents use uTP too: tests
   count DHT and UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
-- Hole punching (BEP 55, `ut_holepunch`) in v1 swarms of public torrents, so peers behind NATs,
+- Hole punching (BEP 55, `ut_holepunch`) in v1 swarms of public torrents while uTP is on
+  (`TorrentSwarm.utpEnabled`, the engine's live setting), so peers behind NATs,
   however many layers, reach each other: two peers a third is connected to dial each other over
   uTP at the same moment, and each NAT lets the other's packets in. `SwarmHolepunch` knows the
   connected peers that offered the extension and which peer introduced each endpoint by PEX.
   As a relay it answers a rendezvous with a CONNECT to both peers, each naming the other (a
   peer reached over uTP by its uTP source, else where it listens), and errors as BEP 55 lists;
   peers that never offered the extension are ignored. A dial that fails before connecting asks
-  the endpoint's introducer for a rendezvous, once per endpoint in 5 minutes; a CONNECT puts the
-  endpoint at the front of the queue and dials it uTP first (`onUtpPeers`), while its own uTP
+  the endpoint's introducer for a rendezvous, once per endpoint in 5 minutes; a CONNECT, taken
+  from each peer at most 8 times a minute and within the swarm's 4096 candidates, also while
+  seeding, puts the endpoint at the front of the queue and dials it uTP first (`onUtpPeers`),
+  while its own uTP
   connection arrives as an incoming peer (a duplicate of a peer being dialed is closed). Peers
   that take part carry the BEP 11 flag `0x08`, and the swarm summary counts relays, requests
   and connects. V2 and hybrid sessions do not punch yet

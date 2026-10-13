@@ -130,6 +130,11 @@ internal class TorrentSwarm(
   private val onDhtNode: (PeerEndpoint) -> Unit = {},
   /** Peers that peer exchange says speak uTP; must return at once. */
   private val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
+  /**
+   * Whether uTP is on, read live: hole punching (BEP 55) dials over uTP, so it is offered and
+   * acted on only while it is.
+   */
+  private val utpEnabled: () -> Boolean = { false },
   /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
   private val webSeedHttp: TorrentHttp? = null,
   /** The first backoff of a failed web seed; tests pass a short one. */
@@ -167,6 +172,9 @@ internal class TorrentSwarm(
   // Guarded by connectedMutex. Each worker publishes only its own contact.
   private val connected = mutableMapOf<Int, PexContact>()
   private val uploaded = AtomicLong(0)
+
+  /** Hole punching (BEP 55) runs for public torrents while uTP is on. */
+  private fun holepunchOn(): Boolean = !trackerRestricted && utpEnabled()
 
   private fun uploadAllowed(policy: TorrentUploadPolicy, complete: Boolean): Boolean =
     policy == TorrentUploadPolicy.SEED_AFTER_COMPLETION ||
@@ -280,7 +288,7 @@ internal class TorrentSwarm(
         update.dropped)
       for (endpoint in pexDirectory.candidates()) {
         if (endpoint !in attempts && endpoint !in pending &&
-          attempts.size + pending.size < 4096) pending.addLast(endpoint)
+          attempts.size + pending.size < MAX_CANDIDATES) pending.addLast(endpoint)
       }
     }
     suspend fun logSummary() {
@@ -441,7 +449,7 @@ internal class TorrentSwarm(
           if (!discoveryClosed) peers.onReceiveCatching { result ->
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
-            else if (endpoint !in attempts && attempts.size + pending.size < 4096 &&
+            else if (endpoint !in attempts && attempts.size + pending.size < MAX_CANDIDATES &&
               endpoint !in pending) {
               pending.addLast(endpoint)
               discovered++
@@ -459,7 +467,7 @@ internal class TorrentSwarm(
               log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
               // Not reached at all: the peer that introduced it may punch a way through.
               if (!result.incoming && result.attempt.stage == PeerStage.DIALING &&
-                !trackerRestricted && !complete && holepunch.rendezvous(endpoint)) {
+                holepunchOn() && !complete && holepunch.rendezvous(endpoint)) {
                 log.v { "Peer $endpoint for $logLabel: asked its introducer to punch through" }
               }
             }
@@ -468,7 +476,7 @@ internal class TorrentSwarm(
               val listen = result.listen
               if (listen != null && !trackerRestricted && listen !in active &&
                 listen !in attempts && listen !in pending &&
-                attempts.size + pending.size < 4096) {
+                attempts.size + pending.size < MAX_CANDIDATES) {
                 pending.addLast(listen)
               }
             } else if (failure !is IllegalArgumentException &&
@@ -479,8 +487,11 @@ internal class TorrentSwarm(
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
           punches.onReceive { endpoint ->
-            // Dialed at once and over uTP first, while the peer dials us.
-            if (endpoint !in active && !complete) {
+            // Dialed at once and over uTP first, while the peer dials us; a seed answers too, as
+            // that is how leechers behind NATs reach it. Bounded like every other candidate.
+            val queued = endpoint in pending
+            if (endpoint !in active &&
+              (queued || attempts.size + pending.size < MAX_CANDIDATES)) {
               onUtpPeers(listOf(endpoint))
               retryAt.remove(endpoint)
               pending.remove(endpoint)
@@ -581,6 +592,9 @@ internal class TorrentSwarm(
     private val extensions = PeerExtensions()
     /** Holepunch messages for this peer from the swarm (BEP 55), sent on the next pass. */
     private val holepunchOut = Channel<HolepunchMessage>(16)
+    /** When this peer's current minute of CONNECTs began, and how many came in it. */
+    private var connectWindow = nowMs()
+    private var connectsInWindow = 0
     /** Created once the handshake tells whether the Fast extension is negotiated. */
     private lateinit var state: PeerProtocolState
     private var extensionsNegotiated = false
@@ -691,7 +705,7 @@ internal class TorrentSwarm(
           utMetadata = servesMetadata(store.metadata.isPrivate, uploadPolicy()),
           metadataSize = store.metadata.infoBytes.size, pex = !trackerRestricted,
           listenPort = listenPortFor(connection.remote), requestQueue = REQUEST_QUEUE,
-          holepunch = !trackerRestricted,
+          holepunch = holepunchOn(),
         ))
       }
       advertised = store.verifiedPieces()
@@ -976,7 +990,8 @@ internal class TorrentSwarm(
           val target = message.endpoint
           val dialable = allowLocalPeers ||
             numericAddress(target.host)?.let(::publicTorrentAddress) == true
-          if (dialable && extensions.id(HOLEPUNCH_EXTENSION) != 0) {
+          if (dialable && extensions.id(HOLEPUNCH_EXTENSION) != 0 && holepunchOn() &&
+            admitConnect()) {
             holepunch.connected()
             log.v { "Peer $endpoint of $logLabel relays a connection to $target" }
             punches.trySend(target)
@@ -987,6 +1002,19 @@ internal class TorrentSwarm(
             "error ${message.error}"
         }
       }
+    }
+
+    /**
+     * Whether this peer may send another CONNECT now: at most [MAX_CONNECTS_PER_MINUTE] a minute,
+     * as each one is a host we dial.
+     */
+    private fun admitConnect(): Boolean {
+      val now = nowMs()
+      if (now - connectWindow >= 60_000) {
+        connectWindow = now
+        connectsInWindow = 0
+      }
+      return ++connectsInWindow <= MAX_CONNECTS_PER_MINUTE
     }
 
     /** Sends what the swarm queued for this peer: rendezvous, CONNECTs and errors (BEP 55). */
@@ -1124,6 +1152,12 @@ internal class TorrentSwarm(
 
 /** One maximal frame plus its decode copy; piece buffers are charged separately per claim. */
 private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
+
+/** Endpoints a swarm keeps to dial, known and queued together. */
+private const val MAX_CANDIDATES = 4096
+
+/** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
+private const val MAX_CONNECTS_PER_MINUTE = 8
 
 /** Requests a v1 peer may queue with us (BEP 10 `reqq`). */
 private const val REQUEST_QUEUE = 16
