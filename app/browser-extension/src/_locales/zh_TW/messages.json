@@ -715,6 +715,6 @@
     "message": "Ketch 不接受此擴充功能副本"
   },
   "hint_app_not_allowed": {
-    "message": "Ketch 只連線來自 Chrome 線上應用程式商店、Firefox 附加元件或儲存庫 src 資料夾的擴充功能。請載入其中之一後再試一次。"
+    "message": "Ketch 只連線來自 Chrome 線上應用程式商店的擴充功能，或透過「載入未封裝項目」載入的版本 chrome-unpacked 套件。請安裝其中之一後再試一次。"
   }
 }

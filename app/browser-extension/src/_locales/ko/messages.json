@@ -715,6 +715,6 @@
     "message": "Ketch가 이 확장 프로그램 사본을 허용하지 않습니다"
   },
   "hint_app_not_allowed": {
-    "message": "Ketch는 Chrome 웹 스토어, Firefox 부가 기능 또는 저장소의 src 폴더에서 가져온 확장 프로그램에만 연결합니다. 그중 하나를 로드한 다음 다시 시도하세요."
+    "message": "Ketch는 Chrome 웹 스토어의 확장 프로그램이나, 릴리스의 chrome-unpacked 패키지를 '압축해제된 확장 프로그램을 로드합니다'로 로드한 경우에만 연결합니다. 그중 하나를 설치한 다음 다시 시도하세요."
   }
 }

@@ -934,7 +934,7 @@
     "description": "Error when the browser refuses to let this extension reach the Ketch app, because the app did not register this copy's extension ID"
   },
   "hint_app_not_allowed": {
-    "message": "Ketch only connects to the extension from the Chrome Web Store, Firefox Add-ons or the repository's src folder. Load one of those, then try again.",
+    "message": "Ketch only connects to the extension from the Chrome Web Store, or a release's chrome-unpacked package loaded with Load unpacked. Install one of those, then try again.",
     "description": "Hint for error_app_not_allowed: which copies of the extension the Ketch app accepts"
   }
 }

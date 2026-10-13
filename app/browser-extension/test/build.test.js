@@ -33,7 +33,19 @@ describe('build', () => {
   const outputs = build({ outDir });
 
   test('builds for Chromium, Firefox and Safari', () => {
-    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox', 'safari']);
+    assert.deepEqual(outputs.map((it) => it.browser),
+      ['chrome', 'chrome-unpacked', 'firefox', 'safari']);
+  });
+
+  test('the Chromium package for unpacked installs keeps the key the Ketch app accepts', () => {
+    const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+    const { zip } = outputs.find((it) => it.browser === 'chrome-unpacked');
+    const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
+    assert.equal(packaged.key, source.key);
+    const { key: _key, ...rest } = packaged;
+    const store = JSON.parse(zipEntry(outputs.find((it) => it.browser === 'chrome').zip,
+      'manifest.json'));
+    assert.deepEqual(rest, store);
   });
 
   test('Chromium zip omits the development key of src', () => {

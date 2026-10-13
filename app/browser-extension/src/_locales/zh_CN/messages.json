@@ -715,6 +715,6 @@
     "message": "Ketch 不接受此扩展副本"
   },
   "hint_app_not_allowed": {
-    "message": "Ketch 只连接来自 Chrome 应用商店、Firefox 附加组件或仓库 src 文件夹的扩展。请加载其中之一后重试。"
+    "message": "Ketch 只连接来自 Chrome 应用商店的扩展，或通过“加载已解压的扩展程序”加载的版本 chrome-unpacked 包。请安装其中之一后重试。"
   }
 }

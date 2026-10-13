@@ -715,6 +715,6 @@
     "message": "O Ketch não aceita esta cópia da extensão"
   },
   "hint_app_not_allowed": {
-    "message": "O Ketch só se conecta à extensão da Chrome Web Store, do Firefox Add-ons ou da pasta src do repositório. Carregue uma delas e tente de novo."
+    "message": "O Ketch só se conecta à extensão da Chrome Web Store ou ao pacote chrome-unpacked de uma versão, carregado com \"Carregar sem compactação\". Instale uma delas e tente de novo."
   }
 }

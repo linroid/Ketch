@@ -62,12 +62,15 @@ export function releaseVersion(release, build) {
 /** @returns {Record<string, object>} the manifest for each browser build */
 function targetManifests({ version: manifestVersion, versionName }) {
   const base = { ...manifest, version: manifestVersion };
-  // Store uploads must omit the key, which only pins the id of unpacked `src/`.
-  const { key: _key, ...chrome } = versionName === manifestVersion
+  // Store uploads must omit the key, which only pins the id of unpacked installs.
+  const { key, ...chrome } = versionName === manifestVersion
     ? base
     : { ...base, version_name: versionName };
   return {
     chrome,
+    // For Load unpacked: the key gives it the id the Ketch app accepts for native messaging,
+    // where an unpacked copy without one gets an id from its folder that the app refuses.
+    'chrome-unpacked': { ...chrome, key },
     firefox: firefoxManifest(base),
     safari: safariManifest(base),
   };
