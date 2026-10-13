@@ -160,7 +160,7 @@ class AppDestinationTest {
   @Test
   fun `discover is hidden while discovery is not offered`() {
     assertEquals(
-      listOf(AppDestination.Downloads, AppDestination.Devices),
+      listOf(AppDestination.Downloads, AppDestination.Connections, AppDestination.Devices),
       AppDestination.visible(discoverOffered = false),
     )
   }

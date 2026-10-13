@@ -11,6 +11,7 @@
   <string name="command_palette">Command palette</string>
   <string name="command_search">Search downloads</string>
   <string name="command_discover">Discover</string>
+  <string name="command_connections">Connections</string>
   <string name="command_devices">Devices</string>
   <string name="command_device_all">All devices</string>
   <string name="command_device_switcher">Switch device…</string>

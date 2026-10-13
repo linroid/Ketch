@@ -407,6 +407,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         add(item(KetchCommands.ToggleSidebar))
         add(MenuEntry.Separator)
         add(item(KetchCommands.Discover))
+        add(item(KetchCommands.Connections))
         add(item(KetchCommands.Devices))
         add(item(KetchCommands.Activity))
       },
@@ -521,6 +522,7 @@ private val TEXT_EDITING_KEYS = setOf(Key.A, Key.C, Key.V, Key.X, Key.Z)
 private val SHELL_COMMANDS = setOf(
   KetchCommands.Palette,
   KetchCommands.Discover,
+  KetchCommands.Connections,
   KetchCommands.Devices,
   KetchCommands.ToggleSidebar,
   KetchCommands.Activity,

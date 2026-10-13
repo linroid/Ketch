@@ -13,6 +13,7 @@ import ketch.app.shared.generated.resources.command_add_to_device
 import ketch.app.shared.generated.resources.command_add_torrent
 import ketch.app.shared.generated.resources.command_device_all
 import ketch.app.shared.generated.resources.command_device_switcher
+import ketch.app.shared.generated.resources.command_connections
 import ketch.app.shared.generated.resources.command_devices
 import ketch.app.shared.generated.resources.command_discover
 import ketch.app.shared.generated.resources.command_discover_allow
@@ -163,6 +164,17 @@ object KetchCommands {
     label = Res.string.command_discover.text(),
     icon = KetchIcon.Discover,
     mac = KeyChord(Key.E, primary = true),
+    inMenus = true,
+  )
+
+  /** Shows the Connections page. */
+  val Connections: KetchCommand = KetchCommand(
+    id = "connections",
+    label = Res.string.command_connections.text(),
+    icon = KetchIcon.Lanes,
+    mac = KeyChord(Key.Seven, primary = true),
+    // Browsers keep ⌘7 for their seventh tab.
+    web = listOf(KeyChord(Key.Seven, alt = true)),
     inMenus = true,
   )
 
@@ -750,7 +762,7 @@ object KetchCommands {
   val all: List<KetchCommand> = buildList {
     addAll(listOf(Add, PasteLinks, AddClipboardLink, OpenTorrent, Palette, Search))
     addAll(tabs)
-    addAll(listOf(Discover, Devices))
+    addAll(listOf(Discover, Connections, Devices))
     addAll(devices)
     addAll(listOf(AllDevices, SwitchDevice, PauseAll, ResumeAll, RetryFailed, SlowLane))
     addAll(listOf(ShowDetails, ToggleSidebar, Activity, Undo, Settings, Shortcuts))

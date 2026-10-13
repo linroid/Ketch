@@ -7,6 +7,7 @@
   <!-- The pages of the navigation: the sidebar, the rail and the phone's bottom bar. -->
   <string name="shell_destination_downloads">Downloads</string>
   <string name="shell_destination_discover">Discover</string>
+  <string name="shell_destination_connections">Connections</string>
   <string name="shell_destination_devices">Devices</string>
   <!-- Settings at the bottom of the sidebar and the rail, and in the phone's menus. -->
   <string name="shell_settings">Settings</string>

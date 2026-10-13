@@ -252,8 +252,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `UnreadableFiles`) and `util`
 - `ui` -- `AppShell` and `shell` (layout, navigation and its badges, device switcher, drop
   berths), `sidebar`, `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake`
-  (add sheet), `palette`, `devices`, `connect`, `discover` (chat, history, approval cards),
-  `settings`, `pulse`, `feedback`, `onboarding`
+  (add sheet), `palette`, `devices`, `connections`, `connect`, `discover` (chat, history,
+  approval cards), `settings`, `pulse`, `feedback`, `onboarding`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`; `progressInterval` and
@@ -995,8 +995,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - One Compose Multiplatform UI (`app:shared`) for Android, desktop, iOS and the web, laid out
   by window width (`KetchLayout`): a 220 dp sidebar on wide windows (collapsible to the rail),
   a 72 dp rail on medium ones, and on phones a top bar, the Add button and, with three
-  destinations or more, a bottom bar. Destinations: Downloads, Discover (where supported) and
-  Devices; the downloads list shows as a table or as list rows, with a task inspector
+  destinations or more, a bottom bar. Destinations: Downloads, Discover (where supported),
+  Connections and Devices; the downloads list shows as a table or as list rows, with a task inspector
 - Devices are first class: the sidebar and rail list every device with its live line, health
   and failures, plus All devices (`⌘⌥0`, `AppState.showAllDevices`), which lists every
   device's tasks with a Device column. `⌘⌥1`-`9` switch, `⇧⌘D` opens the device switcher
@@ -1090,23 +1090,26 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   leave them out) and of the inspected tasks every 500 ms (`AppState.followSegments`); while the
   app is in the background (`InstanceManager.setInForeground`) only state changes
   (`RemoteKetch.foreground`)
-- Live connections grid: on the Downloads page the Pulse bar shows, left of the device's
-  connection from 540 dp, three rows of up to twelve squares, one per live connection of the
-  shown devices listing `net.activeConnections` (oldest top left, then "+N"); hovering one names
-  it, a click opens `ConnectionsPopover` (count and speeds, a legend, cells grouped by task in
-  list order and under All devices by device, the hovered, focused or picked cell's details with
-  Show task, which opens the inspector on its Connections tab for HTTP and FTP, and "N devices
-  don't report connections"). Phones show a 3×8 mini strip after the summary line and the
-  popover's content in the Pulse sheet. `ConnectionGridModel` asks each online device for its own
-  stream (`AppState.connectionGrid.state(36)` and `state(512)`, the limit split between
-  devices) only while one is on screen, stopping 5 s after, and asks again with backoff (1 s
-  doubling to 30 s) when one fails or ends; a device refusing it as unsupported is listed, not
-  asked again. Cells draw on one canvas (`components/KetchCellGrid`, hit-testing, arrow keys and
-  Enter, a live-region description of the picked cell) in `KetchColors.traffic`: download is the
-  accent, upload the seeding teal (Purple's fill for the Teal, Green and Blue accents,
-  `TrafficColorsTest` keeps them ΔE ≥ 20 apart), in four levels by fixed rates (under 16 KB/s,
-  256 KB/s, 2 MB/s, and more); download solid, upload a ring, both split along the diagonal,
-  idle a hairline outline
+- Live connections: the Connections page (`ui/connections`, `AppDestination.Connections`,
+  `⌘7`, web `Alt+7`) lists the live connections of the shown devices listing
+  `net.activeConnections`, the fastest `ActiveConnections.MAX_LIMIT` of them, with a footer
+  counting the slower ones and the devices that don't report connections. Wide windows show a
+  table (endpoint, device under All devices, task, protocol with a shield when encrypted, route
+  or Incoming, a torrent peer's wire and choke state, down, up, received, sent, open for) whose
+  headers sort it (`ConnectionArrangement`; by default the longest open first, so rows keep
+  their place), dropping the least telling columns as it narrows (`fitColumns`); narrow windows
+  and phones show two-line rows. Chips pick a source by its commonest protocol family
+  (`sourceFilters`) and the field searches endpoints, tasks, protocols and devices
+  (`matching`). Each row leads with ↓, ↑, both or a dot, and its speeds are drawn in the traffic
+  colors, so direction never rests on color alone; a row shows its task, on its Connections tab
+  for HTTP and FTP. `ConnectionGridModel` asks each online device for its own stream
+  (`AppState.connectionGrid.state(limit)`, the limit split between devices) only while the page
+  is on screen, stopping 5 s after, and asks again with backoff (1 s doubling to 30 s) when one
+  fails or ends; a device refusing it as unsupported is listed, not asked again. The Pulse bar's
+  grid of squares (`ConnectionStrip`, `ConnectionsPopover`, the phone's mini strip and Pulse
+  sheet section, drawn by `components/KetchCellGrid` in `KetchColors.traffic`: download the
+  accent, upload the seeding teal, `TrafficColorsTest` keeps them ΔE ≥ 20 apart) is kept but no
+  longer shown (`showConnections` off)
 - Files: the inspector's Files tab lists the files or variants of any task whose resolved source
   names some (torrents also page names from `controller(TorrentController)`) and, on devices listing
   `download.fileSelection`, checks and unchecks them with an Apply bar (`FileSelectionModel`, at

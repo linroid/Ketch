@@ -223,7 +223,6 @@ internal fun PhoneTopBar(
       PulseSubtitle(
         state = state,
         onClick = { shell.pulseSheetOpen = true },
-        showConnections = shell.destination == AppDestination.Downloads,
       )
     }
     if (actions != null) {
