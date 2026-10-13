@@ -139,7 +139,8 @@ class TableColumnsTest {
 
     val roomy = dragged.withHeaderRoom { 120.dp }
 
-    assertEquals(TableColumn.Size.width, roomy.columns.first { it.column == TableColumn.Size }.width)
+    val size = roomy.columns.first { it.column == TableColumn.Size }
+    assertEquals(TableColumn.Size.width, size.width)
     assertEquals(120.dp, roomy.columns.first { it.column == TableColumn.Speed }.width)
     assertEquals(dragged, TableLayout.decode(dragged.encode()))
   }
