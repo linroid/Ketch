@@ -87,6 +87,24 @@ class PairingRequestsTest {
   }
 
   @Test
+  fun answer_allowed_turnsAwayTheOtherWaitingRequests() = runTest {
+    val requests = PairingRequests(MutableClock())
+    requests.open()
+    val pixel = async { requests.ask("Pixel 9", "4821", null, "192.168.1.30") }
+    val ipad = async { requests.ask("iPad", "1907", null, "192.168.1.31") }
+    runCurrent()
+    val (first, second) = requests.pending.value
+
+    requests.answer(first.id, allow = true)
+    // A device asking after the first was let in gets no token, even if the owner allows it.
+    requests.answer(second.id, allow = true)
+
+    assertTrue(pixel.await())
+    assertFalse(ipad.await())
+    assertEquals(emptyList(), requests.pending.value)
+  }
+
+  @Test
   fun answer_denied_keepsTheWindowOpen() = runTest {
     val requests = PairingRequests(MutableClock())
     requests.open()

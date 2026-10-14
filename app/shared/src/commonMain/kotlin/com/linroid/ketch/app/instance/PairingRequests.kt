@@ -88,12 +88,17 @@ class PairingRequests(private val clock: Clock = Clock.System) {
   }
 
   /**
-   * Answers the request [id]: [allow] lets the device in, and closes the window, so each time
-   * pairing is turned on lets one device in at most. One no longer waiting is ignored.
+   * Answers the request [id]: [allow] lets the device in, closes the window and turns away every
+   * other request still waiting, so each time pairing is turned on lets one device in at most.
+   * One no longer waiting is ignored.
    */
   fun answer(id: Long, allow: Boolean) {
-    val ask = state.value.firstOrNull { it.id == id } ?: return
-    if (allow) close()
+    val asks = state.value
+    val ask = asks.firstOrNull { it.id == id } ?: return
+    if (allow) {
+      close()
+      asks.filter { it !== ask }.forEach { it.answer.complete(false) }
+    }
     ask.answer.complete(allow)
   }
 
