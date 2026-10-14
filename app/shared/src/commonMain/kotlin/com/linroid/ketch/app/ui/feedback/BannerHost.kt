@@ -55,7 +55,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.deviceId
@@ -202,7 +202,7 @@ fun BannerHost(state: AppState, modifier: Modifier = Modifier) {
         health = health,
         name = device.name,
         connectingLong = connectingLong,
-        localName = local?.let { localDeviceNoun() },
+        localName = local?.displayName,
         onRetry = { (state.activeInstance.value as? RemoteInstance)?.let(state::retryNow) },
         onSwitchToLocal = { local?.let(state::switchInstance) },
         onEnterToken = { (state.activeInstance.value as? RemoteInstance)?.let(state::askForToken) },

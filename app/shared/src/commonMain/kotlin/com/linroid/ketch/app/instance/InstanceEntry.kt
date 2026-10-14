@@ -59,17 +59,21 @@ data class RemoteInstance(
 }
 
 /**
- * Name the app shows for this device: [localDeviceNoun] ("This Mac") for the embedded one, else
- * [InstanceEntry.label].
+ * Name the app shows for this device: its [InstanceEntry.label], such as "Lin's MacBook Pro";
+ * [localDeviceNoun] ("This Mac") for an embedded device without a name of its own.
  */
 val InstanceEntry.displayName: UiText
-  get() = if (this is EmbeddedInstance) localDeviceNoun() else verbatim(label)
+  get() = when (this) {
+    is EmbeddedInstance -> label.trim().ifEmpty { null }?.let(::verbatim) ?: localDeviceNoun()
+    else -> verbatim(label)
+  }
 
 /**
- * Secondary text under [displayName]: the host name of the embedded device, else `host:port`.
+ * Secondary text under [displayName]: [localDeviceNoun] ("This Mac") for the embedded device,
+ * which tells it apart from the others, else `host:port`.
  */
-val InstanceEntry.detail: String
-  get() = if (this is RemoteInstance) "$host:$port" else label
+val InstanceEntry.detail: UiText
+  get() = if (this is RemoteInstance) verbatim("$host:$port") else localDeviceNoun()
 
 /**
  * [name] as a device name, or `null` when it names no device in particular: blank, or the

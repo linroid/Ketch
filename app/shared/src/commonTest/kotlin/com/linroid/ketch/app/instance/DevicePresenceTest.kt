@@ -11,6 +11,7 @@ import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.ListTestTask
@@ -106,12 +107,13 @@ class DevicePresenceTest {
   }
 
   @Test
-  fun presence_devices_namesEmbeddedByNounAndRemotesByName() = managerTest { _, manager ->
+  fun presence_devices_namesEveryDeviceByItsName() = managerTest { _, manager ->
     val (embedded, remote) = manager.presence.value
 
-    assertEquals("MacBook Pro", embedded.detail)
+    assertEquals("MacBook Pro", embedded.name.load())
+    assertEquals(localDeviceNoun().load(), embedded.detail.load())
     assertEquals("NAS-Basement", remote.name.load())
-    assertEquals("nas.local:8642", remote.detail)
+    assertEquals("nas.local:8642", remote.detail.load())
     assertEquals(DeviceHealth.Live, remote.health)
     assertTrue(remote.connected)
   }

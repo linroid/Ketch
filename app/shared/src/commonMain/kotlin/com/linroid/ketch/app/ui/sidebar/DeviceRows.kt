@@ -230,7 +230,7 @@ internal fun DeviceRowContent(
     selected = active,
     onClick = onClick,
     onSecondaryClick = onSecondaryClick,
-    tooltip = listOfNotNull(device.detail, device.systemName).map(::verbatim).joinText().resolve(),
+    tooltip = listOfNotNull(device.detail, device.systemName?.let(::verbatim)).joinText().resolve(),
     shortcut = shortcut,
     dropping = hint != null,
     accepting = hint?.accepts == true,

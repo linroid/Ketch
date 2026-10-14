@@ -24,7 +24,7 @@ class DeviceRowsTest {
   ) = presence(
     entry = EmbeddedInstance(FakeKetchApi(), "NAS-Basement"),
     name = "NAS-Basement",
-    detail = "nas.local:8642",
+    detail = verbatim("nas.local:8642"),
     health = health,
     connected = connected,
     speed = speed,

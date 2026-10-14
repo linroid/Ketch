@@ -302,7 +302,7 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
       )
       if (!unnamed) {
         Text(
-          text = device.detail,
+          text = device.detail.resolve(),
           style = type.caption,
           color = colors.textSecondary,
           maxLines = 1,

@@ -729,7 +729,7 @@ internal fun SettingsDeviceChip(
             DeviceHealth.Connecting -> Res.string.device_target_connecting.text()
             is DeviceHealth.Offline -> Res.string.device_target_offline.text()
             DeviceHealth.Unauthorized -> Res.string.settings_device_unauthorized.text()
-            is DeviceHealth.Local, DeviceHealth.Live -> verbatim(device.detail)
+            is DeviceHealth.Local, DeviceHealth.Live -> device.detail
           },
           enabled = state.isOnline,
           checked = device.deviceId == selected.deviceId,
