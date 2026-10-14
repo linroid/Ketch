@@ -33,7 +33,7 @@ class TorrentReachabilityNoticeTest {
     )
     assertEquals(
       "No router forwards port 6881 to NAS, so peers may not be able to connect. Turn on Port " +
-        "mapping, or forward the port on your router. Downloads still work. Turn on uTP so " +
+        "forwarding, or forward the port on your router. Downloads still work. Turn on uTP so " +
         "hole punching can reach peers behind routers." to NoticeTone.Info,
       notice(TorrentReachability(TorrentReachabilityStatus.NOT_FORWARDED, port = 6881)),
     )

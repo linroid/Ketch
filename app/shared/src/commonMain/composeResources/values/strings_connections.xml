@@ -40,7 +40,7 @@
   <string name="connections_no_match">No connections match</string>
   <!-- Shown when the shown device runs a Ketch too old to report connections. -->
   <string name="connections_unsupported_title">This device doesn't report its connections</string>
-  <string name="connections_unsupported_body">Update Ketch on it to see them here.</string>
+  <string name="connections_unsupported_body">Update Ketch on that device to see them here.</string>
   <!-- Under the list: connections left out, as only the fastest are listed. -->
   <plurals name="connections_more">
     <item quantity="one">%1$d slower connection isn't listed</item>

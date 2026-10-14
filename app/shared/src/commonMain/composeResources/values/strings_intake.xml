@@ -380,12 +380,12 @@
   </plurals>
   <!-- How many of the links start now and how many wait. -->
   <plurals name="intake_outcome_start_now">
-    <item quantity="one">%1$d start now</item>
+    <item quantity="one">%1$d starts now</item>
     <item quantity="other">%1$d start now</item>
   </plurals>
   <!-- %2$s is intake_outcome_slots_free. -->
   <plurals name="intake_outcome_start_now_slots">
-    <item quantity="one">%1$d start now (%2$s)</item>
+    <item quantity="one">%1$d starts now (%2$s)</item>
     <item quantity="other">%1$d start now (%2$s)</item>
   </plurals>
   <plurals name="intake_outcome_queued_count">

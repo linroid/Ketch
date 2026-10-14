@@ -237,7 +237,7 @@
   <!-- %1$s is a file name. -->
   <string name="downloads_speed_caps">Caps %1$s; the global limit still applies.</string>
   <plurals name="downloads_speed_caps_many">
-    <item quantity="one">Caps each of %1$d download; the global limit still applies.</item>
+    <item quantity="one">Caps %1$d download; the global limit still applies.</item>
     <item quantity="other">Caps each of %1$d downloads; the global limit still applies.</item>
   </plurals>
   <string name="downloads_speed_limit">Limit</string>
@@ -262,14 +262,14 @@
   <string name="downloads_remove_trash_file">Also move the file to the Trash</string>
   <string name="downloads_remove_trash_partial">Also move the partial file to the Trash</string>
   <plurals name="downloads_remove_trash_all">
-    <item quantity="one">Also move all %1$d files to the Trash</item>
+    <item quantity="one">Also move %1$d file to the Trash</item>
     <item quantity="other">Also move all %1$d files to the Trash</item>
   </plurals>
   <string name="downloads_remove_delete_files">Also delete the files permanently</string>
   <string name="downloads_remove_delete_file">Also delete the file permanently</string>
   <string name="downloads_remove_delete_partial">Also delete the partial file permanently</string>
   <plurals name="downloads_remove_delete_all">
-    <item quantity="one">Also delete all %1$d files permanently</item>
+    <item quantity="one">Also delete %1$d file permanently</item>
     <item quantity="other">Also delete all %1$d files permanently</item>
   </plurals>
   <!-- How much of a partial file exists. %1$s and %2$s are sizes: "812.0 MB of 2.00 GB". -->
@@ -305,8 +305,8 @@
   <string name="downloads_failed_priority">Couldn't set the priority of %1$s on %2$s</string>
   <string name="downloads_failed_connections">Couldn't set the connections of %1$s on %2$s</string>
   <string name="downloads_failed_reschedule">Couldn't reschedule %1$s on %2$s</string>
-  <string name="downloads_failed_files">Couldn't change the files of %1$s on %2$s</string>
-  <string name="downloads_failed_seeding">Couldn't change seeding of %1$s on %2$s</string>
+  <string name="downloads_failed_files">Couldn't change files for %1$s on %2$s</string>
+  <string name="downloads_failed_seeding">Couldn't change seeding for %1$s on %2$s</string>
 
   <!-- What a command did to several downloads, parts joined by " · ". %1$d is how many. -->
   <plurals name="downloads_batch_paused">

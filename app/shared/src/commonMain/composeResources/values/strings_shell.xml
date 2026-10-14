@@ -123,7 +123,7 @@
   <string name="banner_retrying">retrying</string>
   <string name="banner_retry_now">Retry now</string>
   <string name="banner_switch_to">Switch to %1$s</string>
-  <string name="banner_pairing_on">Pairing is on for %1$s · devices on your local network can ask to control Ketch on %2$s</string>
+  <string name="banner_pairing_on">Pairing is on for another %1$s · devices on your local network can ask to control Ketch on %2$s</string>
   <string name="banner_unauthorized">%1$s needs a new access token</string>
   <string name="banner_enter_token">Enter token</string>
   <!-- A failure's second line: what failed and why. %1$s is a file or device, %2$s the reason. -->

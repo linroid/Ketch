@@ -122,7 +122,7 @@
   <string name="feedback_switch_failed">Couldn't switch to %1$s</string>
   <string name="feedback_reconnect_failed">Couldn't reconnect to %1$s</string>
   <string name="feedback_remove_device_failed">Couldn't remove %1$s</string>
-  <string name="feedback_discovery_failed">Failed to discover LAN servers</string>
+  <string name="feedback_discovery_failed">Couldn't discover devices on the local network</string>
   <!-- Shown once when the settings file, config.toml, could not be read as Ketch started. It
        was moved aside, so Ketch runs with the default settings. -->
   <string name="feedback_settings_unreadable">Couldn't read your settings, so Ketch started with the defaults</string>
@@ -203,8 +203,8 @@
   <!-- %1$s is a file name, %2$s a device. -->
   <string name="feedback_redownload_failed_one">Couldn't download %1$s again on %2$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Couldn't download %1$d download again</item>
-    <item quantity="other">Couldn't download %1$d downloads again</item>
+    <item quantity="one">Couldn't download %1$d file again</item>
+    <item quantity="other">Couldn't download %1$d files again</item>
   </plurals>
   <string name="feedback_started_now_one">Started %1$s now</string>
   <plurals name="feedback_started_now">
@@ -265,10 +265,10 @@
     <item quantity="one">Couldn't discard progress of %1$d download on %2$s</item>
     <item quantity="other">Couldn't discard progress of %1$d downloads on %2$s</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">Couldn't undo start now of %1$s on %2$s</string>
+  <string name="feedback_undo_start_now_failed_one">Couldn't undo “Start now” for %1$s on %2$s</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="one">Couldn't undo start now of %1$d download on %2$s</item>
-    <item quantity="other">Couldn't undo start now of %1$d downloads on %2$s</item>
+    <item quantity="one">Couldn't undo “Start now” for %1$d download on %2$s</item>
+    <item quantity="other">Couldn't undo “Start now” for %1$d downloads on %2$s</item>
   </plurals>
   <string name="feedback_remove_failed_one">Couldn't remove %1$s on %2$s</string>
   <plurals name="feedback_remove_failed">

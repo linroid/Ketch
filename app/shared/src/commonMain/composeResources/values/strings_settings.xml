@@ -765,7 +765,7 @@
   <!-- A router forwards the port, but a NAT outside it does not, such as a provider's
        carrier-grade NAT, so peers cannot connect. -->
   <string name="settings_torrent_reach_blocked">Peers can't connect to %1$s: its router forwards port %2$d, but a network outside it, often your provider's, doesn't.</string>
-  <string name="settings_torrent_reach_not_forwarded">No router forwards port %2$d to %1$s, so peers may not be able to connect. Turn on Port mapping, or forward the port on your router.</string>
+  <string name="settings_torrent_reach_not_forwarded">No router forwards port %2$d to %1$s, so peers may not be able to connect. Turn on Port forwarding, or forward the port on your router.</string>
   <!-- After settings_torrent_reach_blocked or _not_forwarded. Hole punching lets two devices
        behind routers connect with a third peer's help. -->
   <string name="settings_torrent_reach_hole_punching">Downloads still work, and hole punching reaches peers behind routers.</string>
@@ -852,7 +852,7 @@
   <string name="settings_sharing_stop">Stop sharing</string>
   <string name="settings_sharing_pairing">Pairing requests</string>
   <string name="settings_sharing_pairing_off">Devices that find %1$s on your local network can ask to control Ketch there for 3 minutes after you turn this on.</string>
-  <string name="settings_sharing_pairing_on">On for %1$s · devices on your local network can ask to control Ketch on %2$s</string>
+  <string name="settings_sharing_pairing_on">On for another %1$s · devices on your local network can ask to control Ketch on %2$s</string>
   <string name="settings_sharing_pairing_turn_on">Turn on</string>
   <string name="settings_sharing_pairing_turn_off">Turn off</string>
   <!--
@@ -885,9 +885,9 @@
   <string name="settings_sharing_anyone">Anyone with it can control Ketch on %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>
   <string name="settings_sharing_new_code_hint">Disconnects the devices paired so far</string>
-  <string name="settings_sharing_new_code_title">Make a new code?</string>
+  <string name="settings_sharing_new_code_title">Generate a new code?</string>
   <string name="settings_sharing_new_code_body">Every device paired with %1$s is disconnected and has to pair again. The current pairing link and QR code stop working.</string>
-  <string name="settings_sharing_new_code_confirm">Make new code</string>
+  <string name="settings_sharing_new_code_confirm">Generate new code</string>
   <!-- The QR code, for screen readers. %1$s is the device's name or address. -->
   <string name="settings_sharing_qr">Pairing code for %1$s</string>
   <string name="settings_sharing_advanced">Advanced</string>

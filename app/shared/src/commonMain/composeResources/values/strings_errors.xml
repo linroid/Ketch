@@ -36,7 +36,7 @@
   <string name="error_disk_hint_free">%1$s free on %2$s. Check space and folder permissions.</string>
   <string name="error_disk_hint_free_short">%1$s free on %2$s</string>
 
-  <string name="error_unsupported">This server can't do this download</string>
+  <string name="error_unsupported">This server doesn't support this download</string>
   <string name="error_unsupported_hint">It doesn't report a size or support ranges.</string>
   <string name="error_unsupported_hint_short">it doesn't report a size or support ranges</string>
   <string name="error_file_changed">File changed on the server</string>

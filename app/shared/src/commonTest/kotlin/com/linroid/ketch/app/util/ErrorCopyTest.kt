@@ -31,7 +31,7 @@ class ErrorCopyTest {
       KetchError.Http(500) to ("Server error (500)" to RowAction.Retry),
       KetchError.Disk() to ("Couldn't write the file" to RowAction.ShowInFolder),
       KetchError.Unsupported() to
-        ("This server can't do this download" to RowAction.DownloadAgain),
+        ("This server doesn't support this download" to RowAction.DownloadAgain),
       KetchError.FileChanged("ETag changed") to
         ("File changed on the server" to RowAction.DownloadAgain),
       KetchError.CorruptResumeState() to

@@ -154,17 +154,17 @@
   <!-- When the system refuses to copy a detail. -->
   <string name="inspector_copy_failed_source">Couldn't copy the source</string>
   <string name="inspector_copy_failed_link">Couldn't copy the link</string>
-  <string name="inspector_copy_failed_path">Couldn't copy the saved to</string>
+  <string name="inspector_copy_failed_path">Couldn't copy the file path</string>
   <string name="inspector_copy_failed_size">Couldn't copy the size</string>
-  <string name="inspector_copy_failed_added">Couldn't copy the added</string>
+  <string name="inspector_copy_failed_added">Couldn't copy the date added</string>
   <string name="inspector_copy_failed_finished">Couldn't copy the finish time</string>
   <string name="inspector_copy_failed_time">Couldn't copy the time spent</string>
-  <string name="inspector_copy_failed_average">Couldn't copy the avg speed</string>
+  <string name="inspector_copy_failed_average">Couldn't copy the average speed</string>
   <string name="inspector_copy_failed_connections">Couldn't copy the connections</string>
   <string name="inspector_copy_failed_device">Couldn't copy the device</string>
-  <string name="inspector_copy_failed_captured">Couldn't copy the captured</string>
+  <string name="inspector_copy_failed_captured">Couldn't copy the origin</string>
   <string name="inspector_copy_failed_checksum">Couldn't copy the checksum</string>
-  <string name="inspector_copy_failed_task_id">Couldn't copy the task id</string>
+  <string name="inspector_copy_failed_task_id">Couldn't copy the task ID</string>
   <string name="inspector_copy_failed_headers">Couldn't copy the headers</string>
   <string name="inspector_copy_failed_property">Couldn't copy the property</string>
   <string name="inspector_show_full_link">Show full link</string>
