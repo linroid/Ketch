@@ -203,8 +203,8 @@
   <!-- %1$s is a file name, %2$s a device. -->
   <string name="feedback_redownload_failed_one">Couldn't download %1$s again on %2$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Couldn't download %1$d file again</item>
-    <item quantity="other">Couldn't download %1$d files again</item>
+    <item quantity="one">Couldn't restart %1$d download</item>
+    <item quantity="other">Couldn't restart %1$d downloads</item>
   </plurals>
   <string name="feedback_started_now_one">Started %1$s now</string>
   <plurals name="feedback_started_now">

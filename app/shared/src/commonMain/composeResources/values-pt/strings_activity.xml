@@ -149,8 +149,8 @@
   </plurals>
   <string name="feedback_redownload_failed_one">Não foi possível baixar %1$s novamente (%2$s)</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Não foi possível baixar %1$d arquivo novamente</item>
-    <item quantity="other">Não foi possível baixar %1$d arquivos novamente</item>
+    <item quantity="one">Não foi possível reiniciar %1$d download</item>
+    <item quantity="other">Não foi possível reiniciar %1$d downloads</item>
   </plurals>
   <string name="feedback_started_now_one">%1$s iniciado agora</string>
   <plurals name="feedback_started_now">

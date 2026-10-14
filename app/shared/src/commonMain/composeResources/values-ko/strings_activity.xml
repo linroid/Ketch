@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">%2$s에서 %1$s을(를) 다시 다운로드할 수 없음</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">파일 %1$d개를 다시 다운로드할 수 없음</item>
+    <item quantity="other">다운로드 %1$d개를 다시 시작할 수 없음</item>
   </plurals>
   <string name="feedback_started_now_one">%1$s 지금 시작됨</string>
   <plurals name="feedback_started_now">

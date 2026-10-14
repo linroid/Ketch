@@ -191,10 +191,10 @@
   </plurals>
   <string name="feedback_redownload_failed_one">Не удалось снова скачать %1$s на устройстве «%2$s»</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Не удалось снова скачать %1$d файл</item>
-    <item quantity="few">Не удалось снова скачать %1$d файла</item>
-    <item quantity="many">Не удалось снова скачать %1$d файлов</item>
-    <item quantity="other">Не удалось снова скачать %1$d файла</item>
+    <item quantity="one">Не удалось перезапустить %1$d загрузку</item>
+    <item quantity="few">Не удалось перезапустить %1$d загрузки</item>
+    <item quantity="many">Не удалось перезапустить %1$d загрузок</item>
+    <item quantity="other">Не удалось перезапустить %1$d загрузки</item>
   </plurals>
   <string name="feedback_started_now_one">Запущено сейчас: %1$s</string>
   <plurals name="feedback_started_now">

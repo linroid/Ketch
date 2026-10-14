@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">无法在 %2$s 上重新下载 %1$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">无法重新下载 %1$d 个文件</item>
+    <item quantity="other">无法重新开始 %1$d 个下载</item>
   </plurals>
   <string name="feedback_started_now_one">已立即开始 %1$s</string>
   <plurals name="feedback_started_now">
