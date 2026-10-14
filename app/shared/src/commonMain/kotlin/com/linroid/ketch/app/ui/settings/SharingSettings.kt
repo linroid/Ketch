@@ -179,6 +179,8 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     )
   }
   ReportSharingShown(state)
+  // At the top, where a request that brought the owner here shows first.
+  PairingRequestCards(state)
   PairCard(
     name = device.label,
     serverState = serverState,
@@ -214,8 +216,6 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
       onCheckedChange = { save(config.copy(autoStart = it)) },
     )
   }
-  // Below the pairing controls they answer to.
-  PairingRequestCards(state)
   val running = serverState as? ServerState.Running
   // Starting with Ketch only matters at launch, so it never calls for a restart.
   if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
