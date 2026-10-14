@@ -349,14 +349,14 @@
   <plurals name="intake_outcome_start_now">
     <item quantity="one">%1$d начнётся сейчас</item>
     <item quantity="few">%1$d начнутся сейчас</item>
-    <item quantity="many">%1$d начнётся сейчас</item>
-    <item quantity="other">%1$d начнётся сейчас</item>
+    <item quantity="many">%1$d начнутся сейчас</item>
+    <item quantity="other">%1$d начнутся сейчас</item>
   </plurals>
   <plurals name="intake_outcome_start_now_slots">
     <item quantity="one">%1$d начнётся сейчас (%2$s)</item>
     <item quantity="few">%1$d начнутся сейчас (%2$s)</item>
-    <item quantity="many">%1$d начнётся сейчас (%2$s)</item>
-    <item quantity="other">%1$d начнётся сейчас (%2$s)</item>
+    <item quantity="many">%1$d начнутся сейчас (%2$s)</item>
+    <item quantity="other">%1$d начнутся сейчас (%2$s)</item>
   </plurals>
   <plurals name="intake_outcome_queued_count">
     <item quantity="one">%1$d в очереди</item>

@@ -205,15 +205,15 @@
   <string name="downloads_remove_trash_file">Mover también el archivo a la papelera</string>
   <string name="downloads_remove_trash_partial">Mover también el archivo parcial a la papelera</string>
   <plurals name="downloads_remove_trash_all">
-    <item quantity="one">Mover también los %1$d archivos a la papelera</item>
-    <item quantity="other">Mover también los %1$d archivos a la papelera</item>
+    <item quantity="one">Mover también %1$d archivo a la papelera</item>
+    <item quantity="other">Mover también todos los %1$d archivos a la papelera</item>
   </plurals>
   <string name="downloads_remove_delete_files">Eliminar también los archivos de forma permanente</string>
   <string name="downloads_remove_delete_file">Eliminar también el archivo de forma permanente</string>
   <string name="downloads_remove_delete_partial">Eliminar también el archivo parcial de forma permanente</string>
   <plurals name="downloads_remove_delete_all">
-    <item quantity="one">Eliminar también los %1$d archivos de forma permanente</item>
-    <item quantity="other">Eliminar también los %1$d archivos de forma permanente</item>
+    <item quantity="one">Eliminar también %1$d archivo de forma permanente</item>
+    <item quantity="other">Eliminar también todos los %1$d archivos de forma permanente</item>
   </plurals>
   <string name="downloads_remove_size_of">%1$s de %2$s</string>
   <string name="downloads_remove_and_trash">Quitar y mover a la papelera</string>

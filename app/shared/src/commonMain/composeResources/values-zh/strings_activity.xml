@@ -73,7 +73,7 @@
   <string name="feedback_switch_failed">无法切换到 %1$s</string>
   <string name="feedback_reconnect_failed">无法重新连接到 %1$s</string>
   <string name="feedback_remove_device_failed">无法移除 %1$s</string>
-  <string name="feedback_discovery_failed">无法找到局域网中的 Ketch 服务器</string>
+  <string name="feedback_discovery_failed">无法发现局域网中的设备</string>
   <string name="feedback_settings_unreadable">无法读取设置，Ketch 已使用默认设置启动</string>
   <string name="feedback_downloads_unreadable">无法读取下载列表，Ketch 已使用空列表启动</string>
   <string name="feedback_unreadable_kept">旧文件已保留为 %1$s</string>
@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">无法在 %2$s 上重新下载 %1$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">无法重新下载 %1$d 个下载</item>
+    <item quantity="other">无法重新下载 %1$d 个文件</item>
   </plurals>
   <string name="feedback_started_now_one">已立即开始 %1$s</string>
   <plurals name="feedback_started_now">
@@ -170,9 +170,9 @@
   <plurals name="feedback_discard_failed">
     <item quantity="other">无法在 %2$s 上丢弃 %1$d 个下载的进度</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">无法在 %2$s 上撤销立即开始 %1$s</string>
+  <string name="feedback_undo_start_now_failed_one">无法在 %2$s 上撤销 %1$s 的“立即开始”</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="other">无法在 %2$s 上撤销立即开始 %1$d 个下载</item>
+    <item quantity="other">无法在 %2$s 上撤销 %1$d 个下载的“立即开始”</item>
   </plurals>
   <string name="feedback_remove_failed_one">无法在 %2$s 上移除 %1$s</string>
   <plurals name="feedback_remove_failed">

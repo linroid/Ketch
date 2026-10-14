@@ -26,7 +26,7 @@
   <string name="error_disk_hint_free">%1$s libres sur %2$s. Vérifiez l'espace et les autorisations du dossier.</string>
   <string name="error_disk_hint_free_short">%1$s libres sur %2$s</string>
 
-  <string name="error_unsupported">Ce serveur ne permet pas ce téléchargement</string>
+  <string name="error_unsupported">Ce serveur ne prend pas en charge ce téléchargement</string>
   <string name="error_unsupported_hint">Il n'indique pas de taille et ne prend pas en charge les plages.</string>
   <string name="error_unsupported_hint_short">il n'indique pas de taille et ne prend pas en charge les plages</string>
   <string name="error_file_changed">Fichier modifié sur le serveur</string>

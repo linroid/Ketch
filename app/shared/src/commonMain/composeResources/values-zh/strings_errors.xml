@@ -25,7 +25,7 @@
   <string name="error_disk_hint_free">%2$s 上可用 %1$s。请检查空间和文件夹权限。</string>
   <string name="error_disk_hint_free_short">%2$s 上可用 %1$s</string>
 
-  <string name="error_unsupported">此服务器无法完成这个下载</string>
+  <string name="error_unsupported">此服务器不支持此下载</string>
   <string name="error_unsupported_hint">它未提供文件大小，也不支持分段下载。</string>
   <string name="error_unsupported_hint_short">它未提供文件大小，也不支持分段下载</string>
   <string name="error_file_changed">服务器上的文件已更改</string>

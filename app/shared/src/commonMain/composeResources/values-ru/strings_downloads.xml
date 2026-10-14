@@ -202,7 +202,7 @@
   <string name="downloads_speed_set">Установить</string>
   <string name="downloads_speed_caps">Ограничивает %1$s; глобальное ограничение по-прежнему действует.</string>
   <plurals name="downloads_speed_caps_many">
-    <item quantity="one">Ограничивает каждую из %1$d загрузки; глобальное ограничение по-прежнему действует.</item>
+    <item quantity="one">Ограничивает %1$d загрузку; глобальное ограничение по-прежнему действует.</item>
     <item quantity="few">Ограничивает каждую из %1$d загрузок; глобальное ограничение по-прежнему действует.</item>
     <item quantity="many">Ограничивает каждую из %1$d загрузок; глобальное ограничение по-прежнему действует.</item>
     <item quantity="other">Ограничивает каждую из %1$d загрузки; глобальное ограничение по-прежнему действует.</item>
@@ -227,7 +227,7 @@
   <string name="downloads_remove_trash_file">Также переместить файл в корзину</string>
   <string name="downloads_remove_trash_partial">Также переместить неполный файл в корзину</string>
   <plurals name="downloads_remove_trash_all">
-    <item quantity="one">Также переместить все файлы (%1$d) в корзину</item>
+    <item quantity="one">Также переместить %1$d файл в корзину</item>
     <item quantity="few">Также переместить все файлы (%1$d) в корзину</item>
     <item quantity="many">Также переместить все файлы (%1$d) в корзину</item>
     <item quantity="other">Также переместить все файлы (%1$d) в корзину</item>
@@ -236,7 +236,7 @@
   <string name="downloads_remove_delete_file">Также удалить файл безвозвратно</string>
   <string name="downloads_remove_delete_partial">Также удалить неполный файл безвозвратно</string>
   <plurals name="downloads_remove_delete_all">
-    <item quantity="one">Также безвозвратно удалить все файлы (%1$d)</item>
+    <item quantity="one">Также безвозвратно удалить %1$d файл</item>
     <item quantity="few">Также безвозвратно удалить все файлы (%1$d)</item>
     <item quantity="many">Также безвозвратно удалить все файлы (%1$d)</item>
     <item quantity="other">Также безвозвратно удалить все файлы (%1$d)</item>

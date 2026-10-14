@@ -94,7 +94,7 @@
   <string name="feedback_switch_failed">Не удалось переключиться на %1$s</string>
   <string name="feedback_reconnect_failed">Не удалось переподключиться к %1$s</string>
   <string name="feedback_remove_device_failed">Не удалось удалить %1$s</string>
-  <string name="feedback_discovery_failed">Не удалось найти серверы в локальной сети</string>
+  <string name="feedback_discovery_failed">Не удалось найти устройства в локальной сети</string>
   <string name="feedback_settings_unreadable">Не удалось прочитать настройки, поэтому Ketch запущен с настройками по умолчанию</string>
   <string name="feedback_downloads_unreadable">Не удалось прочитать список загрузок, поэтому Ketch запущен с пустым списком</string>
   <string name="feedback_unreadable_kept">Старый файл сохранён как %1$s</string>
@@ -191,10 +191,10 @@
   </plurals>
   <string name="feedback_redownload_failed_one">Не удалось снова скачать %1$s на устройстве «%2$s»</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Не удалось снова скачать %1$d загрузку</item>
-    <item quantity="few">Не удалось снова скачать %1$d загрузки</item>
-    <item quantity="many">Не удалось снова скачать %1$d загрузок</item>
-    <item quantity="other">Не удалось снова скачать %1$d загрузки</item>
+    <item quantity="one">Не удалось снова скачать %1$d файл</item>
+    <item quantity="few">Не удалось снова скачать %1$d файла</item>
+    <item quantity="many">Не удалось снова скачать %1$d файлов</item>
+    <item quantity="other">Не удалось снова скачать %1$d файла</item>
   </plurals>
   <string name="feedback_started_now_one">Запущено сейчас: %1$s</string>
   <plurals name="feedback_started_now">
@@ -263,12 +263,12 @@
     <item quantity="many">Не удалось сбросить прогресс %1$d загрузок на устройстве «%2$s»</item>
     <item quantity="other">Не удалось сбросить прогресс %1$d загрузки на устройстве «%2$s»</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">Не удалось отменить немедленный запуск %1$s на устройстве «%2$s»</string>
+  <string name="feedback_undo_start_now_failed_one">Не удалось отменить действие «Запустить сейчас» для %1$s на устройстве «%2$s»</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="one">Не удалось отменить немедленный запуск %1$d загрузки на устройстве «%2$s»</item>
-    <item quantity="few">Не удалось отменить немедленный запуск %1$d загрузок на устройстве «%2$s»</item>
-    <item quantity="many">Не удалось отменить немедленный запуск %1$d загрузок на устройстве «%2$s»</item>
-    <item quantity="other">Не удалось отменить немедленный запуск %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="one">Не удалось отменить действие «Запустить сейчас» для %1$d загрузки на устройстве «%2$s»</item>
+    <item quantity="few">Не удалось отменить действие «Запустить сейчас» для %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="many">Не удалось отменить действие «Запустить сейчас» для %1$d загрузок на устройстве «%2$s»</item>
+    <item quantity="other">Не удалось отменить действие «Запустить сейчас» для %1$d загрузки на устройстве «%2$s»</item>
   </plurals>
   <string name="feedback_remove_failed_one">Не удалось удалить %1$s на устройстве «%2$s»</string>
   <plurals name="feedback_remove_failed">

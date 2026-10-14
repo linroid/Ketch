@@ -26,7 +26,7 @@
   <string name="error_disk_hint_free">%1$s livres em %2$s. Verifique o espaço e as permissões da pasta.</string>
   <string name="error_disk_hint_free_short">%1$s livres em %2$s</string>
 
-  <string name="error_unsupported">Este servidor não consegue fazer este download</string>
+  <string name="error_unsupported">Este servidor não suporta este download</string>
   <string name="error_unsupported_hint">Ele não informa o tamanho nem aceita downloads em partes.</string>
   <string name="error_unsupported_hint_short">ele não informa o tamanho nem aceita downloads em partes</string>
   <string name="error_file_changed">O arquivo mudou no servidor</string>

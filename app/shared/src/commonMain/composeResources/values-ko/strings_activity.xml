@@ -73,7 +73,7 @@
   <string name="feedback_switch_failed">%1$s(으)로 전환할 수 없음</string>
   <string name="feedback_reconnect_failed">%1$s에 다시 연결할 수 없음</string>
   <string name="feedback_remove_device_failed">%1$s을(를) 제거할 수 없음</string>
-  <string name="feedback_discovery_failed">LAN 서버를 찾지 못했습니다</string>
+  <string name="feedback_discovery_failed">로컬 네트워크의 기기를 찾지 못했습니다</string>
   <string name="feedback_settings_unreadable">설정을 읽을 수 없어 기본 설정으로 Ketch를 시작했습니다</string>
   <string name="feedback_downloads_unreadable">다운로드 목록을 읽을 수 없어 빈 목록으로 Ketch를 시작했습니다</string>
   <string name="feedback_unreadable_kept">이전 파일은 %1$s(으)로 보관했습니다</string>
@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">%2$s에서 %1$s을(를) 다시 다운로드할 수 없음</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">다운로드 %1$d개를 다시 다운로드할 수 없음</item>
+    <item quantity="other">파일 %1$d개를 다시 다운로드할 수 없음</item>
   </plurals>
   <string name="feedback_started_now_one">%1$s 지금 시작됨</string>
   <plurals name="feedback_started_now">
@@ -170,9 +170,9 @@
   <plurals name="feedback_discard_failed">
     <item quantity="other">%2$s에서 다운로드 %1$d개의 진행 상황을 삭제할 수 없음</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">%2$s에서 %1$s의 지금 시작을 실행 취소할 수 없음</string>
+  <string name="feedback_undo_start_now_failed_one">%2$s에서 %1$s의 '지금 시작'을 실행 취소할 수 없음</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="other">%2$s에서 다운로드 %1$d개의 지금 시작을 실행 취소할 수 없음</item>
+    <item quantity="other">%2$s에서 다운로드 %1$d개의 '지금 시작'을 실행 취소할 수 없음</item>
   </plurals>
   <string name="feedback_remove_failed_one">%2$s에서 %1$s을(를) 제거할 수 없음</string>
   <plurals name="feedback_remove_failed">

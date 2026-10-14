@@ -25,7 +25,7 @@
   <string name="error_disk_hint_free">%2$s 上可用 %1$s。請檢查空間和資料夾權限。</string>
   <string name="error_disk_hint_free_short">%2$s 上可用 %1$s</string>
 
-  <string name="error_unsupported">此伺服器無法完成這個下載</string>
+  <string name="error_unsupported">此伺服器不支援此下載</string>
   <string name="error_unsupported_hint">它未提供檔案大小，也不支援範圍請求。</string>
   <string name="error_unsupported_hint_short">它未提供檔案大小，也不支援範圍請求</string>
   <string name="error_file_changed">伺服器上的檔案已變更</string>

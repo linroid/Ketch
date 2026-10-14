@@ -22,7 +22,7 @@
   <string name="connections_empty_body">As conexões aparecem aqui enquanto há downloads em andamento ou torrents semeando.</string>
   <string name="connections_no_match">Nenhuma conexão corresponde</string>
   <string name="connections_unsupported_title">Este dispositivo não informa suas conexões</string>
-  <string name="connections_unsupported_body">Atualize o Ketch nele para vê-las aqui.</string>
+  <string name="connections_unsupported_body">Atualize o Ketch nesse dispositivo para vê-las aqui.</string>
   <plurals name="connections_more">
     <item quantity="one">%1$d conexão mais lenta não está listada</item>
     <item quantity="other">%1$d conexões mais lentas não estão listadas</item>

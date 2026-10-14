@@ -22,7 +22,7 @@
   <string name="connections_empty_body">다운로드가 진행되거나 토렌트를 시딩하는 동안 여기에 연결이 표시됩니다.</string>
   <string name="connections_no_match">일치하는 연결이 없습니다</string>
   <string name="connections_unsupported_title">이 기기는 연결 정보를 보고하지 않습니다</string>
-  <string name="connections_unsupported_body">여기에서 보려면 이 기기의 Ketch를 업데이트하세요.</string>
+  <string name="connections_unsupported_body">여기에서 보려면 해당 기기의 Ketch를 업데이트하세요.</string>
   <plurals name="connections_more">
     <item quantity="other">더 느린 연결 %1$d개는 표시되지 않습니다</item>
   </plurals>

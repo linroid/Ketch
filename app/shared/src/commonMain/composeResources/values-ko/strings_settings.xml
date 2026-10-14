@@ -623,7 +623,7 @@
   <string name="settings_sharing_stop">공유 중지</string>
   <string name="settings_sharing_pairing">페어링 요청</string>
   <string name="settings_sharing_pairing_off">켜면 3분 동안 로컬 네트워크에서 %1$s을(를) 찾은 기기가 Ketch 제어를 요청할 수 있습니다.</string>
-  <string name="settings_sharing_pairing_on">%1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
+  <string name="settings_sharing_pairing_on">앞으로 %1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
   <string name="settings_sharing_pairing_turn_on">켜기</string>
   <string name="settings_sharing_pairing_turn_off">끄기</string>
   <string name="settings_sharing_control_from_computer">컴퓨터나 다른 기기에서 %1$s의 Ketch를 제어하세요.</string>
@@ -644,9 +644,9 @@
   <string name="settings_sharing_anyone">이 링크가 있는 사람은 누구나 %1$s의 Ketch를 제어할 수 있습니다.</string>
   <string name="settings_sharing_new_code">새 코드</string>
   <string name="settings_sharing_new_code_hint">지금까지 페어링된 기기의 연결이 끊어집니다</string>
-  <string name="settings_sharing_new_code_title">새 코드를 만들까요?</string>
+  <string name="settings_sharing_new_code_title">새 코드를 생성할까요?</string>
   <string name="settings_sharing_new_code_body">%1$s와(과) 페어링된 모든 기기의 연결이 끊기며 다시 페어링해야 합니다. 현재 페어링 링크와 QR 코드는 더 이상 작동하지 않습니다.</string>
-  <string name="settings_sharing_new_code_confirm">새 코드 만들기</string>
+  <string name="settings_sharing_new_code_confirm">새 코드 생성</string>
   <string name="settings_sharing_qr">%1$s의 페어링 코드</string>
   <string name="settings_sharing_advanced">고급</string>
   <string name="settings_sharing_advanced_hint">포트, 액세스 코드, 검색, 웹사이트</string>

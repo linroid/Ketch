@@ -22,7 +22,7 @@
   <string name="connections_empty_body">ダウンロード中やトレントのシード中は、ここに接続が表示されます。</string>
   <string name="connections_no_match">一致する接続はありません</string>
   <string name="connections_unsupported_title">このデバイスは接続情報を報告しません</string>
-  <string name="connections_unsupported_body">表示するには、このデバイスのKetchをアップデートしてください。</string>
+  <string name="connections_unsupported_body">表示するには、そのデバイスのKetchをアップデートしてください。</string>
   <plurals name="connections_more">
     <item quantity="other">速度の遅い%1$d件の接続は表示されていません</item>
   </plurals>

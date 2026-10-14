@@ -80,7 +80,7 @@
   <string name="feedback_switch_failed">No se pudo cambiar a %1$s</string>
   <string name="feedback_reconnect_failed">No se pudo volver a conectar con %1$s</string>
   <string name="feedback_remove_device_failed">No se pudo quitar %1$s</string>
-  <string name="feedback_discovery_failed">No se pudieron buscar servidores en la red local</string>
+  <string name="feedback_discovery_failed">No se pudieron buscar dispositivos en la red local</string>
   <string name="feedback_settings_unreadable">No se pudieron leer tus ajustes, así que Ketch se inició con los valores predeterminados</string>
   <string name="feedback_downloads_unreadable">No se pudo leer la lista de descargas, así que Ketch se inició con una lista vacía</string>
   <string name="feedback_unreadable_kept">El archivo anterior se guardó como %1$s</string>
@@ -149,8 +149,8 @@
   </plurals>
   <string name="feedback_redownload_failed_one">No se pudo volver a descargar %1$s en %2$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">No se pudo volver a descargar %1$d descarga</item>
-    <item quantity="other">No se pudieron volver a descargar %1$d descargas</item>
+    <item quantity="one">No se pudo volver a descargar %1$d archivo</item>
+    <item quantity="other">No se pudieron volver a descargar %1$d archivos</item>
   </plurals>
   <string name="feedback_started_now_one">Se inició %1$s ahora</string>
   <plurals name="feedback_started_now">

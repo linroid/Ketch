@@ -22,7 +22,7 @@
   <string name="connections_empty_body">Подключения появляются здесь, пока идут загрузки или раздаются торренты.</string>
   <string name="connections_no_match">Нет подходящих подключений</string>
   <string name="connections_unsupported_title">Это устройство не сообщает о своих подключениях</string>
-  <string name="connections_unsupported_body">Обновите на нём Ketch, чтобы увидеть их здесь.</string>
+  <string name="connections_unsupported_body">Обновите Ketch на этом устройстве, чтобы увидеть их здесь.</string>
   <plurals name="connections_more">
     <item quantity="one">%1$d более медленное подключение не показано</item>
     <item quantity="few">%1$d более медленных подключения не показаны</item>

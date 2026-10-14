@@ -79,7 +79,7 @@
   <string name="banner_retrying">재시도 중</string>
   <string name="banner_retry_now">지금 재시도</string>
   <string name="banner_switch_to">%1$s(으)로 전환</string>
-  <string name="banner_pairing_on">페어링이 %1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
+  <string name="banner_pairing_on">페어링이 앞으로 %1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
   <string name="banner_unauthorized">%1$s에 새 액세스 토큰 필요</string>
   <string name="banner_enter_token">토큰 입력</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

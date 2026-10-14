@@ -80,7 +80,7 @@
   <string name="feedback_switch_failed">Impossible de passer à %1$s</string>
   <string name="feedback_reconnect_failed">Impossible de se reconnecter à %1$s</string>
   <string name="feedback_remove_device_failed">Impossible de retirer %1$s</string>
-  <string name="feedback_discovery_failed">Échec de la recherche de serveurs sur le réseau local</string>
+  <string name="feedback_discovery_failed">Échec de la recherche d'appareils sur le réseau local</string>
   <string name="feedback_settings_unreadable">Impossible de lire vos réglages, Ketch a démarré avec les réglages par défaut</string>
   <string name="feedback_downloads_unreadable">Impossible de lire la liste des téléchargements, Ketch a démarré avec une liste vide</string>
   <string name="feedback_unreadable_kept">L'ancien fichier a été conservé sous %1$s</string>
@@ -149,8 +149,8 @@
   </plurals>
   <string name="feedback_redownload_failed_one">Impossible de retélécharger %1$s sur %2$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Impossible de retélécharger %1$d téléchargement</item>
-    <item quantity="other">Impossible de retélécharger %1$d téléchargements</item>
+    <item quantity="one">Impossible de retélécharger %1$d fichier</item>
+    <item quantity="other">Impossible de retélécharger %1$d fichiers</item>
   </plurals>
   <string name="feedback_started_now_one">%1$s démarré immédiatement</string>
   <plurals name="feedback_started_now">

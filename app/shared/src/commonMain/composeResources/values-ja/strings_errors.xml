@@ -25,7 +25,7 @@
   <string name="error_disk_hint_free">%2$sの空き容量は%1$sです。容量とフォルダのアクセス権を確認してください。</string>
   <string name="error_disk_hint_free_short">%2$sの空き容量：%1$s</string>
 
-  <string name="error_unsupported">このサーバーではこのダウンロードを実行できません</string>
+  <string name="error_unsupported">このサーバーはこのダウンロードに対応していません</string>
   <string name="error_unsupported_hint">サーバーがサイズを返さず、範囲指定にも対応していません。</string>
   <string name="error_unsupported_hint_short">サーバーがサイズを返さず、範囲指定にも対応していません</string>
   <string name="error_file_changed">サーバー上のファイルが変更されました</string>

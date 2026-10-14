@@ -25,7 +25,7 @@
   <string name="error_disk_hint_free">%2$s에 %1$s 남음. 공간과 폴더 권한을 확인하세요.</string>
   <string name="error_disk_hint_free_short">%2$s에 %1$s 남음</string>
 
-  <string name="error_unsupported">이 서버에서는 이 다운로드를 할 수 없음</string>
+  <string name="error_unsupported">이 서버는 이 다운로드를 지원하지 않음</string>
   <string name="error_unsupported_hint">서버가 크기를 알려 주지 않고 범위 요청도 지원하지 않습니다.</string>
   <string name="error_unsupported_hint_short">크기 정보 없음, 범위 요청 미지원</string>
   <string name="error_file_changed">서버의 파일이 변경됨</string>
