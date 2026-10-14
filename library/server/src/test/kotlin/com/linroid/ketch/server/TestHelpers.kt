@@ -19,14 +19,10 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration
 
 internal class NoOpHttpEngine : HttpEngine {
@@ -83,18 +79,12 @@ internal class RecordingKetchApi(
   private val delegate: KetchApi,
 ) : KetchApi {
   val removeCalls = mutableListOf<Boolean>()
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   override val backendLabel: String get() = delegate.backendLabel
 
+  // Read through, not copied by a coroutine: a request right after `download` must find the task.
   override val tasks: StateFlow<List<DownloadTask>> =
-    delegate.tasks
-      .map { list -> list.map { RecordingTask(it, removeCalls) } }
-      .stateIn(
-        scope,
-        kotlinx.coroutines.flow.SharingStarted.Eagerly,
-        delegate.tasks.value.map { RecordingTask(it, removeCalls) },
-      )
+    MappedStateFlow(delegate.tasks) { list -> list.map { RecordingTask(it, removeCalls) } }
 
   override suspend fun download(request: DownloadRequest): DownloadTask =
     RecordingTask(delegate.download(request), removeCalls)
@@ -107,8 +97,20 @@ internal class RecordingKetchApi(
     delegate.updateConfig(config)
   override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = delegate.subscribe(interest, interval)
   override fun close() {
-    scope.cancel()
     delegate.close()
+  }
+}
+
+/** [source] seen through [transform], computed on every read. */
+@OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+private class MappedStateFlow<T, R>(
+  private val source: StateFlow<T>,
+  private val transform: (T) -> R,
+) : StateFlow<R> {
+  override val value: R get() = transform(source.value)
+  override val replayCache: List<R> get() = listOf(value)
+  override suspend fun collect(collector: FlowCollector<R>): Nothing {
+    source.collect { collector.emit(transform(it)) }
   }
 }
 
