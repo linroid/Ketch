@@ -107,10 +107,12 @@ internal class DestinationGuard(
   }
 
   /**
-   * Whether [value] is a URI, such as an Android `content://` folder, that may be used when not
-   * [confined]: the app can only write to folders the owner granted it, wherever they are.
+   * Whether [value] is an Android `content://` URI, which may be used when not [confined]: the app
+   * can only write to folders the owner granted it, wherever they are. Other URIs, such as
+   * `file://`, would reach any path, so the folder checks apply to them.
    */
-  private fun passesAsUri(value: String): Boolean = !confined && "://" in value
+  private fun passesAsUri(value: String): Boolean =
+    !confined && value.startsWith(CONTENT_URI_PREFIX, ignoreCase = true)
 
   private fun policy(downloadDirectory: String): DestinationPathPolicy {
     val folders = allowedDirectories + downloadDirectory
@@ -119,5 +121,9 @@ internal class DestinationGuard(
     } else {
       DestinationPathPolicy(folders + fileSystemRoots, protectedDirectories, refuseHidden = true)
     }
+  }
+
+  private companion object {
+    const val CONTENT_URI_PREFIX = "content://"
   }
 }

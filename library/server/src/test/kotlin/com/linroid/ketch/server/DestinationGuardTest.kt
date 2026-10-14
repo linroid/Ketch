@@ -223,6 +223,16 @@ class DestinationGuardTest {
   }
 
   @Test
+  fun `POST with a token to a file URI is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    assertRejected(client.createTask("file://${outside.path}/.zshrc"))
+    assertRejected(client.createTask("FILE://${outside.path}/file.zip"))
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
   fun `POST with a token and allowed folders keeps callers to them`() = testApplication {
     val client = serve(
       createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),

@@ -16,6 +16,8 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import kotlinx.serialization.json.Json
+import kotlin.math.ceil
+import kotlin.time.DurationUnit
 
 /**
  * Installs the pairing endpoints, which take no access token: a device asks for the token, the
@@ -51,7 +53,9 @@ internal fun Route.pairingRoutes(sessions: PairingSessions) {
         ErrorResponse("pairing_busy", "Another pairing request is waiting for an answer"),
       )
       is PairingSessions.Opened.Later -> {
-        val seconds = opened.retryAfter.inWholeSeconds.coerceAtLeast(1)
+        // Rounded up, so a device that waits as long as it is told is not turned away again.
+        val seconds = ceil(opened.retryAfter.toDouble(DurationUnit.SECONDS)).toLong()
+          .coerceAtLeast(1)
         call.response.header(HttpHeaders.RetryAfter, seconds)
         call.respond(
           HttpStatusCode.TooManyRequests,

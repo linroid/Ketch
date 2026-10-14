@@ -38,7 +38,6 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -122,7 +121,8 @@ class PairingRoutesTest {
 
     assertEquals(HttpStatusCode.TooManyRequests, again.status)
     assertEquals("pairing_paused", again.body<ErrorResponse>().error)
-    assertNotNull(again.headers[HttpHeaders.RetryAfter])
+    // The first wait is 30 seconds, part of which has passed: rounded up, not down to 29.
+    assertEquals("30", again.headers[HttpHeaders.RetryAfter])
   }
 
   @Test
