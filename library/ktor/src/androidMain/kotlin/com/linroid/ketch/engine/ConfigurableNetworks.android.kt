@@ -4,6 +4,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.NetworkInterfaceProvider
@@ -67,25 +68,32 @@ internal class AndroidNetworkInterfaceProvider(
 /** A network found by [AndroidNetworkInterfaceProvider], before it is named. */
 internal data class DiscoveredNetwork(
   val id: String,
-  /** What Android's settings call this kind of network, from [networkKind]. */
-  val kind: String?,
+  /** Its kind, from [networkKind]; [NetworkKind.OTHER] for an unfamiliar transport. */
+  val kind: NetworkKind,
   /** Kernel interface such as "wlan0" or "rmnet_data3". */
   val interfaceName: String?,
   val addresses: List<String>,
 )
 
-/**
- * What Android's settings call a network with these transports, such as "Wi-Fi" or
- * "Mobile data"; `null` for a transport without a familiar name.
- */
-internal fun networkKind(hasTransport: (Int) -> Boolean): String? = when {
+/** The kind of a network with these transports. */
+internal fun networkKind(hasTransport: (Int) -> Boolean): NetworkKind = when {
   // A VPN also reports the transports of the networks it runs over.
-  hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
-  hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-  hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile data"
-  hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-  hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "Bluetooth"
-  else -> null
+  hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> NetworkKind.VPN
+  hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkKind.WIFI
+  hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkKind.CELLULAR
+  hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkKind.ETHERNET
+  hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> NetworkKind.BLUETOOTH
+  else -> NetworkKind.OTHER
+}
+
+/** What Android's settings call a network of [kind]; `null` for [NetworkKind.OTHER]. */
+internal fun settingsName(kind: NetworkKind): String? = when (kind) {
+  NetworkKind.WIFI -> "Wi-Fi"
+  NetworkKind.CELLULAR -> "Mobile data"
+  NetworkKind.ETHERNET -> "Ethernet"
+  NetworkKind.VPN -> "VPN"
+  NetworkKind.BLUETOOTH -> "Bluetooth"
+  NetworkKind.OTHER -> null
 }
 
 /**
@@ -93,18 +101,22 @@ internal fun networkKind(hasTransport: (Int) -> Boolean): String? = when {
  * the same kind, such as two Wi-Fi connections, add their interface: "Wi-Fi (wlan1)".
  */
 internal fun nameNetworks(networks: List<DiscoveredNetwork>): List<NetworkInterfaceInfo> {
-  val names = networks.map { it.kind ?: it.interfaceName ?: "Network ${it.id}" }
+  val kinds = networks.map { settingsName(it.kind) }
+  val names = networks.mapIndexed { index, it ->
+    kinds[index] ?: it.interfaceName ?: "Network ${it.id}"
+  }
   val repeated = names.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
   return networks.mapIndexed { index, network ->
     val name = names[index]
     NetworkInterfaceInfo(
       id = network.id,
-      name = if (name in repeated && network.kind != null && network.interfaceName != null) {
+      name = if (name in repeated && kinds[index] != null && network.interfaceName != null) {
         "$name (${network.interfaceName})"
       } else {
         name
       },
       addresses = network.addresses,
+      kind = network.kind,
     )
   }
 }

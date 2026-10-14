@@ -1369,15 +1369,18 @@ public final class com/linroid/ketch/api/NetworkInterfaceConfig$Companion {
 
 public final class com/linroid/ketch/api/NetworkInterfaceInfo {
 	public static final field Companion Lcom/linroid/ketch/api/NetworkInterfaceInfo$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
-	public static synthetic fun copy$default (Lcom/linroid/ketch/api/NetworkInterfaceInfo;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
+	public final fun component4 ()Lcom/linroid/ketch/api/NetworkKind;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/NetworkInterfaceInfo;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;ILjava/lang/Object;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAddresses ()Ljava/util/List;
 	public final fun getId ()Ljava/lang/String;
+	public final fun getKind ()Lcom/linroid/ketch/api/NetworkKind;
 	public final fun getName ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -1428,6 +1431,23 @@ public final synthetic class com/linroid/ketch/api/NetworkInterfaces$$serializer
 }
 
 public final class com/linroid/ketch/api/NetworkInterfaces$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkKind : java/lang/Enum {
+	public static final field BLUETOOTH Lcom/linroid/ketch/api/NetworkKind;
+	public static final field CELLULAR Lcom/linroid/ketch/api/NetworkKind;
+	public static final field Companion Lcom/linroid/ketch/api/NetworkKind$Companion;
+	public static final field ETHERNET Lcom/linroid/ketch/api/NetworkKind;
+	public static final field OTHER Lcom/linroid/ketch/api/NetworkKind;
+	public static final field VPN Lcom/linroid/ketch/api/NetworkKind;
+	public static final field WIFI Lcom/linroid/ketch/api/NetworkKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/NetworkKind;
+	public static fun values ()[Lcom/linroid/ketch/api/NetworkKind;
+}
+
+public final class com/linroid/ketch/api/NetworkKind$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

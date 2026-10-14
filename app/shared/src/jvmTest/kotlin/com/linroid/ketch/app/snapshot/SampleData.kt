@@ -16,6 +16,7 @@ import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -717,9 +718,9 @@ internal class NetworkedApi(
   private var networks = NetworkInterfaces(
     supported = true,
     available = listOf(
-      NetworkInterfaceInfo("en0", "en0", en0),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
+      NetworkInterfaceInfo("en0", "en0", en0, NetworkKind.WIFI),
+      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4"), NetworkKind.ETHERNET),
+      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12"), NetworkKind.VPN),
     ),
     config = NetworkInterfaceConfig(listOf("en0", "en7")),
   )

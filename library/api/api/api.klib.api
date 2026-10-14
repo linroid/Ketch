@@ -135,6 +135,26 @@ final enum class com.linroid.ketch.api/FileSelectionMode : kotlin/Enum<com.linro
     }
 }
 
+final enum class com.linroid.ketch.api/NetworkKind : kotlin/Enum<com.linroid.ketch.api/NetworkKind> { // com.linroid.ketch.api/NetworkKind|null[0]
+    enum entry BLUETOOTH // com.linroid.ketch.api/NetworkKind.BLUETOOTH|null[0]
+    enum entry CELLULAR // com.linroid.ketch.api/NetworkKind.CELLULAR|null[0]
+    enum entry ETHERNET // com.linroid.ketch.api/NetworkKind.ETHERNET|null[0]
+    enum entry OTHER // com.linroid.ketch.api/NetworkKind.OTHER|null[0]
+    enum entry VPN // com.linroid.ketch.api/NetworkKind.VPN|null[0]
+    enum entry WIFI // com.linroid.ketch.api/NetworkKind.WIFI|null[0]
+
+    final val entries // com.linroid.ketch.api/NetworkKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/NetworkKind> // com.linroid.ketch.api/NetworkKind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.linroid.ketch.api/NetworkKind // com.linroid.ketch.api/NetworkKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.linroid.ketch.api/NetworkKind> // com.linroid.ketch.api/NetworkKind.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/NetworkKind.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/NetworkKind> // com.linroid.ketch.api/NetworkKind.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/NetworkKind.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 abstract interface <#A: kotlin/Any> com.linroid.ketch.api/ControlKey { // com.linroid.ketch.api/ControlKey|null[0]
     abstract val name // com.linroid.ketch.api/ControlKey.name|{}name[0]
         abstract fun <get-name>(): kotlin/String // com.linroid.ketch.api/ControlKey.name.<get-name>|<get-name>(){}[0]
@@ -869,19 +889,22 @@ final class com.linroid.ketch.api/NetworkInterfaceConfig { // com.linroid.ketch.
 }
 
 final class com.linroid.ketch.api/NetworkInterfaceInfo { // com.linroid.ketch.api/NetworkInterfaceInfo|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>) // com.linroid.ketch.api/NetworkInterfaceInfo.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, com.linroid.ketch.api/NetworkKind = ...) // com.linroid.ketch.api/NetworkInterfaceInfo.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;com.linroid.ketch.api.NetworkKind){}[0]
 
     final val addresses // com.linroid.ketch.api/NetworkInterfaceInfo.addresses|{}addresses[0]
         final fun <get-addresses>(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/NetworkInterfaceInfo.addresses.<get-addresses>|<get-addresses>(){}[0]
     final val id // com.linroid.ketch.api/NetworkInterfaceInfo.id|{}id[0]
         final fun <get-id>(): kotlin/String // com.linroid.ketch.api/NetworkInterfaceInfo.id.<get-id>|<get-id>(){}[0]
+    final val kind // com.linroid.ketch.api/NetworkInterfaceInfo.kind|{}kind[0]
+        final fun <get-kind>(): com.linroid.ketch.api/NetworkKind // com.linroid.ketch.api/NetworkInterfaceInfo.kind.<get-kind>|<get-kind>(){}[0]
     final val name // com.linroid.ketch.api/NetworkInterfaceInfo.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.linroid.ketch.api/NetworkInterfaceInfo.name.<get-name>|<get-name>(){}[0]
 
     final fun component1(): kotlin/String // com.linroid.ketch.api/NetworkInterfaceInfo.component1|component1(){}[0]
     final fun component2(): kotlin/String // com.linroid.ketch.api/NetworkInterfaceInfo.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<kotlin/String> // com.linroid.ketch.api/NetworkInterfaceInfo.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ...): com.linroid.ketch.api/NetworkInterfaceInfo // com.linroid.ketch.api/NetworkInterfaceInfo.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+    final fun component4(): com.linroid.ketch.api/NetworkKind // com.linroid.ketch.api/NetworkInterfaceInfo.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., com.linroid.ketch.api/NetworkKind = ...): com.linroid.ketch.api/NetworkInterfaceInfo // com.linroid.ketch.api/NetworkInterfaceInfo.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;com.linroid.ketch.api.NetworkKind){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/NetworkInterfaceInfo.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/NetworkInterfaceInfo.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/NetworkInterfaceInfo.toString|toString(){}[0]

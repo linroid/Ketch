@@ -37,6 +37,8 @@ import org.jetbrains.compose.resources.stringResource
  *
  * @param count number shown after the label, such as matching downloads.
  * @param leadingIcon glyph before the label; the check replaces it while selected.
+ * @param checkWhenSelected `false` keeps [leadingIcon] while selected, for a glyph that tells
+ *   chips apart, such as a network's kind; the soft accent alone then shows the selection.
  * @param trailingIcon glyph after the label, such as a chevron on a chip that opens a menu.
  * @param onRemove shows the ✕ and runs when it is clicked.
  */
@@ -49,6 +51,7 @@ fun KetchChip(
   enabled: Boolean = true,
   count: Int? = null,
   leadingIcon: KetchIcon? = null,
+  checkWhenSelected: Boolean = true,
   trailingIcon: KetchIcon? = null,
   onRemove: (() -> Unit)? = null,
 ) {
@@ -60,7 +63,8 @@ fun KetchChip(
   val overlay = rememberInteractionOverlay(interactions, enabled)
   val focus = rememberFocusVisibility()
   val ink = if (selected) colors.accentText else colors.textPrimary
-  val glyph = if (selected) KetchIcon.Check else leadingIcon
+  val checked = selected && (checkWhenSelected || leadingIcon == null)
+  val glyph = if (checked) KetchIcon.Check else leadingIcon
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -86,7 +90,7 @@ fun KetchChip(
     if (glyph != null) {
       KetchIconImage(
         icon = glyph,
-        size = if (selected) CheckSize else density.controlGlyph,
+        size = if (checked) CheckSize else density.controlGlyph,
         tint = if (selected) colors.accentText else colors.textSecondary,
       )
     }

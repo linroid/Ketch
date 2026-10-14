@@ -69,7 +69,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `DownloadCategory`,
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
-  `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`,
+  `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`, `NetworkKind`,
   `Proxy`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
