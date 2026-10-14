@@ -7,6 +7,7 @@
   <string name="command_palette">Палитра команд</string>
   <string name="command_search">Поиск по загрузкам</string>
   <string name="command_discover">Поиск</string>
+  <string name="command_connections">Подключения</string>
   <string name="command_devices">Устройства</string>
   <string name="command_device_all">Все устройства</string>
   <string name="command_device_switcher">Сменить устройство…</string>

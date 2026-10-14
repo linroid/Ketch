@@ -7,6 +7,7 @@
   <string name="command_palette">命令面板</string>
   <string name="command_search">搜索下载</string>
   <string name="command_discover">搜索</string>
+  <string name="command_connections">连接</string>
   <string name="command_devices">设备</string>
   <string name="command_device_all">所有设备</string>
   <string name="command_device_switcher">切换设备…</string>

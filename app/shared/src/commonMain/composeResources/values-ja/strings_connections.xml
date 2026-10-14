@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">接続先、ダウンロード、プロトコルを検索</string>
+  <string name="connections_filter_all">すべて</string>
+  <string name="connections_column_endpoint">接続先</string>
+  <string name="connections_column_device">デバイス</string>
+  <string name="connections_column_task">ダウンロード</string>
+  <string name="connections_column_protocol">プロトコル</string>
+  <string name="connections_column_route">経路</string>
+  <string name="connections_column_peer">ピア</string>
+  <string name="connections_column_down">受信速度</string>
+  <string name="connections_column_up">送信速度</string>
+  <string name="connections_column_received">受信量</string>
+  <string name="connections_column_sent">送信量</string>
+  <string name="connections_column_open">接続時間</string>
+  <string name="connections_route_direct">直接</string>
+  <string name="connections_route_http_proxy">HTTPプロキシ</string>
+  <string name="connections_route_socks_proxy">SOCKS5プロキシ</string>
+  <string name="connections_peer_choked">チョーク</string>
+  <string name="connections_peer_unchoked">アンチョーク</string>
+  <string name="connections_peer_uploading">アップロード中</string>
+  <string name="connections_empty_body">ダウンロード中やトレントのシード中は、ここに接続が表示されます。</string>
+  <string name="connections_no_match">一致する接続はありません</string>
+  <string name="connections_unsupported_title">このデバイスは接続情報を報告しません</string>
+  <string name="connections_unsupported_body">表示するには、このデバイスのKetchをアップデートしてください。</string>
+  <plurals name="connections_more">
+    <item quantity="other">速度の遅い%1$d件の接続は表示されていません</item>
+  </plurals>
+</resources>

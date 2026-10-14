@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">ダウンロード</string>
   <string name="shell_destination_discover">ディスカバー</string>
+  <string name="shell_destination_connections">接続</string>
   <string name="shell_destination_devices">デバイス</string>
   <string name="shell_settings">設定</string>
   <string name="shell_devices">デバイス</string>

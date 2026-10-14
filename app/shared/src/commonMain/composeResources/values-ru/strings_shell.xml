@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">Загрузки</string>
   <string name="shell_destination_discover">Поиск</string>
+  <string name="shell_destination_connections">Подключения</string>
   <string name="shell_destination_devices">Устройства</string>
   <string name="shell_settings">Настройки</string>
   <string name="shell_devices">Устройства</string>

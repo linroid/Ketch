@@ -383,13 +383,16 @@
   <string name="settings_categories_suggested">추천 사용</string>
   <string name="settings_categories_unsupported">다운로드를 폴더별로 나누려면 %1$s의 Ketch를 업데이트하세요.</string>
   <string name="settings_categories_no_rules">확장자, 미디어 유형 또는 사이트를 추가하세요</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">%1$s에서</string>
   <string name="settings_categories_folder">폴더</string>
   <string name="settings_categories_folder_hint">다운로드 폴더 안에 만들어집니다. /로 폴더 안에 폴더를 만들 수 있습니다.</string>
   <string name="settings_categories_folder_invalid">다운로드 폴더 안의 폴더를 지정하세요</string>
   <string name="settings_categories_extensions">확장자</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">미디어 유형</string>
   <string name="settings_categories_types_hint">서버가 알려 주는 값입니다. video/*는 모든 동영상에 해당합니다.</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">미디어 유형은 video/mp4처럼 유형/하위 유형으로 입력하세요</string>
   <string name="settings_categories_sites">사이트</string>
   <string name="settings_categories_sites_hint">example.com은 하위 도메인도 포함합니다.</string>
@@ -558,6 +561,14 @@
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
   <string name="settings_torrent_remote">BitTorrent 설정은 %1$s 기기에서 직접 또는 해당 기기의 config.toml에서 변경하세요.</string>
+  <string name="settings_torrent_reach_reachable">피어가 포트 %2$d로 %1$s에 연결할 수 있습니다.</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="other">포트 %2$d가 라우터 %3$d대를 거쳐 %1$s로 전달되므로 피어가 연결할 수 있습니다.</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">피어가 %1$s에 연결할 수 없습니다. 라우터는 포트 %2$d를 전달하지만, 그 바깥 네트워크(대개 인터넷 제공업체의 네트워크)는 전달하지 않습니다.</string>
+  <string name="settings_torrent_reach_not_forwarded">포트 %2$d를 %1$s로 전달하는 라우터가 없어 피어가 연결하지 못할 수 있습니다. 포트 포워딩을 켜거나 라우터에서 포트를 전달하세요.</string>
+  <string name="settings_torrent_reach_hole_punching">다운로드는 계속 작동하며, 홀 펀칭으로 라우터 뒤에 있는 피어에도 연결합니다.</string>
+  <string name="settings_torrent_reach_no_hole_punching">다운로드는 계속 작동합니다. 홀 펀칭으로 라우터 뒤에 있는 피어에 연결하려면 uTP를 켜세요.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">트래커 %1$d개를 제거했습니다.</item>
   </plurals>

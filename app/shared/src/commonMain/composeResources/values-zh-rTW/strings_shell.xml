@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">下載</string>
   <string name="shell_destination_discover">搜尋</string>
+  <string name="shell_destination_connections">連線</string>
   <string name="shell_destination_devices">裝置</string>
   <string name="shell_settings">設定</string>
   <string name="shell_devices">裝置</string>

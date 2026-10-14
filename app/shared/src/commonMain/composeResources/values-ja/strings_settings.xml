@@ -383,13 +383,16 @@
   <string name="settings_categories_suggested">おすすめを使用</string>
   <string name="settings_categories_unsupported">ダウンロードをフォルダに振り分けるには、%1$s の Ketch をアップデートしてください。</string>
   <string name="settings_categories_no_rules">拡張子、メディアタイプ、サイトのいずれかを追加してください</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">%1$s から</string>
   <string name="settings_categories_folder">フォルダ</string>
   <string name="settings_categories_folder_hint">ダウンロードフォルダ内に作成されます。/ で区切るとフォルダの中にフォルダを作れます。</string>
   <string name="settings_categories_folder_invalid">ダウンロードフォルダ内のフォルダを指定してください</string>
   <string name="settings_categories_extensions">拡張子</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">メディアタイプ</string>
   <string name="settings_categories_types_hint">サーバーが返す値です。video/* はすべての動画に一致します。</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">メディアタイプは type/subtype の形式で入力してください（例: video/mp4）</string>
   <string name="settings_categories_sites">サイト</string>
   <string name="settings_categories_sites_hint">example.com はサブドメインにも一致します。</string>
@@ -558,6 +561,14 @@
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>
   <string name="settings_torrent_remote">BitTorrentの設定は、%1$s本体またはそのconfig.tomlで変更してください。</string>
+  <string name="settings_torrent_reach_reachable">ピアはポート%2$dで%1$sに接続できます。</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="other">ポート%2$dは%3$d台のルーターを経由して%1$sに転送されているため、ピアは接続できます。</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">ピアは%1$sに接続できません。ルーターはポート%2$dを転送していますが、その外側のネットワーク（多くはプロバイダーのもの）が転送していません。</string>
+  <string name="settings_torrent_reach_not_forwarded">ポート%2$dを%1$sに転送しているルーターがないため、ピアが接続できない可能性があります。ポート転送をオンにするか、ルーターでポートを転送してください。</string>
+  <string name="settings_torrent_reach_hole_punching">ダウンロードは引き続き行えます。ホールパンチングでルーターの内側にいるピアにも接続できます。</string>
+  <string name="settings_torrent_reach_no_hole_punching">ダウンロードは引き続き行えます。ルーターの内側にいるピアにホールパンチングで接続するには、uTPをオンにしてください。</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">%1$d件のトラッカーを削除しました。</item>
   </plurals>

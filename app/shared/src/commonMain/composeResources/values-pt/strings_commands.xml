@@ -7,6 +7,7 @@
   <string name="command_palette">Paleta de comandos</string>
   <string name="command_search">Pesquisar downloads</string>
   <string name="command_discover">Descobrir</string>
+  <string name="command_connections">Conexões</string>
   <string name="command_devices">Dispositivos</string>
   <string name="command_device_all">Todos os dispositivos</string>
   <string name="command_device_switcher">Trocar de dispositivo…</string>

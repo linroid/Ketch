@@ -383,13 +383,16 @@
   <string name="settings_categories_suggested">使用建議分類</string>
   <string name="settings_categories_unsupported">請更新 %1$s 上的 Ketch，以便將其下載項目分類到資料夾。</string>
   <string name="settings_categories_no_rules">新增副檔名、媒體類型或網站</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">來自 %1$s</string>
   <string name="settings_categories_folder">資料夾</string>
   <string name="settings_categories_folder_hint">位於下載資料夾內。用 / 在資料夾中再建立資料夾。</string>
   <string name="settings_categories_folder_invalid">請使用下載資料夾內的資料夾</string>
   <string name="settings_categories_extensions">副檔名</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">媒體類型</string>
   <string name="settings_categories_types_hint">即伺服器回報的類型；video/* 涵蓋所有影片。</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">請以 類型/子類型 填寫媒體類型，例如 video/mp4</string>
   <string name="settings_categories_sites">網站</string>
   <string name="settings_categories_sites_hint">example.com 也涵蓋其子網域。</string>
@@ -558,6 +561,14 @@
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>
   <string name="settings_torrent_remote">請在 %1$s 上開啟 Ketch，或編輯該裝置的 config.toml，變更 BitTorrent 設定。</string>
+  <string name="settings_torrent_reach_reachable">對等端可以透過連接埠 %2$d 連線至 %1$s。</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="other">連接埠 %2$d 已經由 %3$d 台路由器轉送至 %1$s，對等端可以連線。</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">對等端無法連線至 %1$s：其路由器已轉送連接埠 %2$d，但外層網路（通常是電信業者的）沒有轉送。</string>
+  <string name="settings_torrent_reach_not_forwarded">沒有路由器將連接埠 %2$d 轉送至 %1$s，對等端可能無法連線。請開啟連接埠轉送，或在路由器上轉送該連接埠。</string>
+  <string name="settings_torrent_reach_hole_punching">下載仍可正常進行，打洞可連線至位於路由器後方的對等端。</string>
+  <string name="settings_torrent_reach_no_hole_punching">下載仍可正常進行。開啟 uTP 後，打洞即可連線至位於路由器後方的對等端。</string>
   <plurals name="settings_torrent_removed">
     <item quantity="other">已移除 %1$d 個 Tracker。</item>
   </plurals>

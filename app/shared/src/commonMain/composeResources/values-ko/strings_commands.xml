@@ -7,6 +7,7 @@
   <string name="command_palette">명령 팔레트</string>
   <string name="command_search">다운로드 검색</string>
   <string name="command_discover">찾기</string>
+  <string name="command_connections">연결</string>
   <string name="command_devices">기기</string>
   <string name="command_device_all">모든 기기</string>
   <string name="command_device_switcher">기기 전환…</string>

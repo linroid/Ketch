@@ -391,13 +391,16 @@
   <string name="settings_categories_suggested">Utiliser les suggestions</string>
   <string name="settings_categories_unsupported">Mettez à jour Ketch sur %1$s pour ranger ses téléchargements dans des dossiers.</string>
   <string name="settings_categories_no_rules">Ajoutez une extension, un type de média ou un site</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">De %1$s</string>
   <string name="settings_categories_folder">Dossier</string>
   <string name="settings_categories_folder_hint">Dans le dossier de téléchargement. Utilisez / pour un dossier dans un autre.</string>
   <string name="settings_categories_folder_invalid">Utilisez un dossier situé dans le dossier de téléchargement</string>
   <string name="settings_categories_extensions">Extensions</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">Types de média</string>
   <string name="settings_categories_types_hint">Tels que les serveurs les indiquent ; video/* couvre toutes les vidéos.</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">Écrivez les types de média sous la forme type/sous-type, par exemple video/mp4</string>
   <string name="settings_categories_sites">Sites</string>
   <string name="settings_categories_sites_hint">example.com couvre aussi ses sous-domaines.</string>
@@ -570,6 +573,15 @@
   <string name="settings_torrent_trackers">Trackers supplémentaires</string>
   <string name="settings_torrent_no_trackers">Aucun tracker supplémentaire</string>
   <string name="settings_torrent_remote">Modifiez les réglages BitTorrent sur %1$s lui-même, ou dans son config.toml.</string>
+  <string name="settings_torrent_reach_reachable">Les pairs peuvent se connecter à %1$s sur le port %2$d.</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">Le port %2$d est redirigé vers %1$s via %3$d routeur, les pairs peuvent donc se connecter.</item>
+    <item quantity="other">Le port %2$d est redirigé vers %1$s via %3$d routeurs, les pairs peuvent donc se connecter.</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">Les pairs ne peuvent pas se connecter à %1$s : son routeur redirige le port %2$d, mais un réseau extérieur, souvent celui de votre fournisseur, ne le fait pas.</string>
+  <string name="settings_torrent_reach_not_forwarded">Aucun routeur ne redirige le port %2$d vers %1$s, les pairs risquent donc de ne pas pouvoir se connecter. Activez Redirection de port ou redirigez le port sur votre routeur.</string>
+  <string name="settings_torrent_reach_hole_punching">Les téléchargements fonctionnent toujours, et la perforation NAT atteint les pairs derrière un routeur.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Les téléchargements fonctionnent toujours. Activez uTP pour que la perforation NAT atteigne les pairs derrière un routeur.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">%1$d tracker retiré.</item>
     <item quantity="other">%1$d trackers retirés.</item>

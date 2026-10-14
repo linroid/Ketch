@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">Téléchargements</string>
   <string name="shell_destination_discover">Découvrir</string>
+  <string name="shell_destination_connections">Connexions</string>
   <string name="shell_destination_devices">Appareils</string>
   <string name="shell_settings">Réglages</string>
   <string name="shell_devices">Appareils</string>

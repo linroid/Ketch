@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">Искать адреса, загрузки и протоколы</string>
+  <string name="connections_filter_all">Все</string>
+  <string name="connections_column_endpoint">Адрес</string>
+  <string name="connections_column_device">Устройство</string>
+  <string name="connections_column_task">Загрузка</string>
+  <string name="connections_column_protocol">Протокол</string>
+  <string name="connections_column_route">Маршрут</string>
+  <string name="connections_column_peer">Пир</string>
+  <string name="connections_column_down">Приём</string>
+  <string name="connections_column_up">Отдача</string>
+  <string name="connections_column_received">Получено</string>
+  <string name="connections_column_sent">Отправлено</string>
+  <string name="connections_column_open">Открыто</string>
+  <string name="connections_route_direct">Напрямую</string>
+  <string name="connections_route_http_proxy">HTTP-прокси</string>
+  <string name="connections_route_socks_proxy">SOCKS5-прокси</string>
+  <string name="connections_peer_choked">Заблокирован</string>
+  <string name="connections_peer_unchoked">Разблокирован</string>
+  <string name="connections_peer_uploading">Отдаём</string>
+  <string name="connections_empty_body">Подключения появляются здесь, пока идут загрузки или раздаются торренты.</string>
+  <string name="connections_no_match">Нет подходящих подключений</string>
+  <string name="connections_unsupported_title">Это устройство не сообщает о своих подключениях</string>
+  <string name="connections_unsupported_body">Обновите на нём Ketch, чтобы увидеть их здесь.</string>
+  <plurals name="connections_more">
+    <item quantity="one">%1$d более медленное подключение не показано</item>
+    <item quantity="few">%1$d более медленных подключения не показаны</item>
+    <item quantity="many">%1$d более медленных подключений не показаны</item>
+    <item quantity="other">%1$d более медленного подключения не показаны</item>
+  </plurals>
+</resources>

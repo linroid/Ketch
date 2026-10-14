@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">엔드포인트, 다운로드, 프로토콜 검색</string>
+  <string name="connections_filter_all">전체</string>
+  <string name="connections_column_endpoint">엔드포인트</string>
+  <string name="connections_column_device">기기</string>
+  <string name="connections_column_task">다운로드</string>
+  <string name="connections_column_protocol">프로토콜</string>
+  <string name="connections_column_route">경로</string>
+  <string name="connections_column_peer">피어</string>
+  <string name="connections_column_down">받기</string>
+  <string name="connections_column_up">보내기</string>
+  <string name="connections_column_received">받은 양</string>
+  <string name="connections_column_sent">보낸 양</string>
+  <string name="connections_column_open">연결 시간</string>
+  <string name="connections_route_direct">직접</string>
+  <string name="connections_route_http_proxy">HTTP 프록시</string>
+  <string name="connections_route_socks_proxy">SOCKS5 프록시</string>
+  <string name="connections_peer_choked">초크됨</string>
+  <string name="connections_peer_unchoked">초크 해제됨</string>
+  <string name="connections_peer_uploading">업로드 중</string>
+  <string name="connections_empty_body">다운로드가 진행되거나 토렌트를 시딩하는 동안 여기에 연결이 표시됩니다.</string>
+  <string name="connections_no_match">일치하는 연결이 없습니다</string>
+  <string name="connections_unsupported_title">이 기기는 연결 정보를 보고하지 않습니다</string>
+  <string name="connections_unsupported_body">여기에서 보려면 이 기기의 Ketch를 업데이트하세요.</string>
+  <plurals name="connections_more">
+    <item quantity="other">더 느린 연결 %1$d개는 표시되지 않습니다</item>
+  </plurals>
+</resources>

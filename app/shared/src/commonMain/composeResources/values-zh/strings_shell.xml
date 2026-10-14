@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">下载</string>
   <string name="shell_destination_discover">搜索</string>
+  <string name="shell_destination_connections">连接</string>
   <string name="shell_destination_devices">设备</string>
   <string name="shell_settings">设置</string>
   <string name="shell_devices">设备</string>

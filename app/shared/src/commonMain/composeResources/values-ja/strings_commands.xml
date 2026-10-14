@@ -7,6 +7,7 @@
   <string name="command_palette">コマンドパレット</string>
   <string name="command_search">ダウンロードを検索</string>
   <string name="command_discover">ディスカバー</string>
+  <string name="command_connections">接続</string>
   <string name="command_devices">デバイス</string>
   <string name="command_device_all">すべてのデバイス</string>
   <string name="command_device_switcher">デバイスを切り替え…</string>

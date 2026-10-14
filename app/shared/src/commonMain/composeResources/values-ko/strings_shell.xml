@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">다운로드</string>
   <string name="shell_destination_discover">찾기</string>
+  <string name="shell_destination_connections">연결</string>
   <string name="shell_destination_devices">기기</string>
   <string name="shell_settings">설정</string>
   <string name="shell_devices">기기</string>

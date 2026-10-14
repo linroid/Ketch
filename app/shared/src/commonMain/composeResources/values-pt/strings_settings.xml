@@ -391,13 +391,16 @@
   <string name="settings_categories_suggested">Usar sugestões</string>
   <string name="settings_categories_unsupported">Atualize o Ketch em %1$s para organizar os downloads dele em pastas.</string>
   <string name="settings_categories_no_rules">Adicione uma extensão, um tipo de mídia ou um site</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">De %1$s</string>
   <string name="settings_categories_folder">Pasta</string>
   <string name="settings_categories_folder_hint">Dentro da pasta de downloads. Use / para uma pasta dentro de outra.</string>
   <string name="settings_categories_folder_invalid">Use uma pasta dentro da pasta de downloads</string>
   <string name="settings_categories_extensions">Extensões</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">Tipos de mídia</string>
   <string name="settings_categories_types_hint">Como os servidores informam; video/* abrange todos os vídeos.</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">Escreva os tipos de mídia como tipo/subtipo, por exemplo video/mp4</string>
   <string name="settings_categories_sites">Sites</string>
   <string name="settings_categories_sites_hint">example.com também abrange seus subdomínios.</string>
@@ -570,6 +573,15 @@
   <string name="settings_torrent_trackers">Trackers extras</string>
   <string name="settings_torrent_no_trackers">Nenhum tracker extra</string>
   <string name="settings_torrent_remote">Altere as configurações de BitTorrent diretamente em %1$s ou no config.toml dele.</string>
+  <string name="settings_torrent_reach_reachable">Os peers podem se conectar a %1$s na porta %2$d.</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">A porta %2$d é redirecionada para %1$s por %3$d roteador, então os peers podem se conectar.</item>
+    <item quantity="other">A porta %2$d é redirecionada para %1$s por %3$d roteadores, então os peers podem se conectar.</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">Os peers não podem se conectar a %1$s: o roteador dele redireciona a porta %2$d, mas uma rede externa, muitas vezes a do seu provedor, não.</string>
+  <string name="settings_torrent_reach_not_forwarded">Nenhum roteador redireciona a porta %2$d para %1$s, então os peers talvez não consigam se conectar. Ative Redirecionamento de porta ou redirecione a porta no seu roteador.</string>
+  <string name="settings_torrent_reach_hole_punching">Os downloads continuam funcionando, e o hole punching alcança peers atrás de roteadores.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Os downloads continuam funcionando. Ative o uTP para que o hole punching alcance peers atrás de roteadores.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">%1$d tracker removido.</item>
     <item quantity="other">%1$d trackers removidos.</item>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">Pesquisar destinos, downloads e protocolos</string>
+  <string name="connections_filter_all">Todas</string>
+  <string name="connections_column_endpoint">Destino</string>
+  <string name="connections_column_device">Dispositivo</string>
+  <string name="connections_column_task">Download</string>
+  <string name="connections_column_protocol">Protocolo</string>
+  <string name="connections_column_route">Rota</string>
+  <string name="connections_column_peer">Peer</string>
+  <string name="connections_column_down">Recebendo</string>
+  <string name="connections_column_up">Enviando</string>
+  <string name="connections_column_received">Recebido</string>
+  <string name="connections_column_sent">Enviado</string>
+  <string name="connections_column_open">Aberta há</string>
+  <string name="connections_route_direct">Direta</string>
+  <string name="connections_route_http_proxy">Proxy HTTP</string>
+  <string name="connections_route_socks_proxy">Proxy SOCKS5</string>
+  <string name="connections_peer_choked">Bloqueado</string>
+  <string name="connections_peer_unchoked">Desbloqueado</string>
+  <string name="connections_peer_uploading">Enviando dados</string>
+  <string name="connections_empty_body">As conexões aparecem aqui enquanto há downloads em andamento ou torrents semeando.</string>
+  <string name="connections_no_match">Nenhuma conexão corresponde</string>
+  <string name="connections_unsupported_title">Este dispositivo não informa suas conexões</string>
+  <string name="connections_unsupported_body">Atualize o Ketch nele para vê-las aqui.</string>
+  <plurals name="connections_more">
+    <item quantity="one">%1$d conexão mais lenta não está listada</item>
+    <item quantity="other">%1$d conexões mais lentas não estão listadas</item>
+  </plurals>
+</resources>

@@ -407,13 +407,16 @@
   <string name="settings_categories_suggested">Использовать предложенные</string>
   <string name="settings_categories_unsupported">Обновите Ketch на устройстве %1$s, чтобы раскладывать его загрузки по папкам.</string>
   <string name="settings_categories_no_rules">Добавьте расширение, тип медиа или сайт</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">С %1$s</string>
   <string name="settings_categories_folder">Папка</string>
   <string name="settings_categories_folder_hint">Внутри папки для загрузок. Используйте /, чтобы создать папку в другой папке.</string>
   <string name="settings_categories_folder_invalid">Укажите папку внутри папки для загрузок</string>
   <string name="settings_categories_extensions">Расширения</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">Типы медиа</string>
   <string name="settings_categories_types_hint">Как их сообщают серверы; video/* охватывает любое видео.</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">Записывайте типы медиа как тип/подтип, например video/mp4</string>
   <string name="settings_categories_sites">Сайты</string>
   <string name="settings_categories_sites_hint">example.com охватывает и свои поддомены.</string>
@@ -594,6 +597,17 @@
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>
   <string name="settings_torrent_remote">Измените настройки BitTorrent на самом устройстве «%1$s» или в его config.toml.</string>
+  <string name="settings_torrent_reach_reachable">Пиры могут подключиться к %1$s через порт %2$d.</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">Порт %2$d проброшен на %1$s через %3$d роутер, поэтому пиры могут подключиться.</item>
+    <item quantity="few">Порт %2$d проброшен на %1$s через %3$d роутера, поэтому пиры могут подключиться.</item>
+    <item quantity="many">Порт %2$d проброшен на %1$s через %3$d роутеров, поэтому пиры могут подключиться.</item>
+    <item quantity="other">Порт %2$d проброшен на %1$s через %3$d роутера, поэтому пиры могут подключиться.</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">Пиры не могут подключиться к %1$s: его роутер пробрасывает порт %2$d, но внешняя сеть, часто сеть провайдера, — нет.</string>
+  <string name="settings_torrent_reach_not_forwarded">Ни один роутер не пробрасывает порт %2$d на %1$s, поэтому пиры, возможно, не смогут подключиться. Включите «Проброс порта» или пробросьте порт на роутере.</string>
+  <string name="settings_torrent_reach_hole_punching">Загрузки по-прежнему работают, а пробивка NAT находит пиров за роутерами.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Загрузки по-прежнему работают. Включите uTP, чтобы пробивка NAT находила пиров за роутерами.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">Удалён %1$d трекер.</item>
     <item quantity="few">Удалены %1$d трекера.</item>

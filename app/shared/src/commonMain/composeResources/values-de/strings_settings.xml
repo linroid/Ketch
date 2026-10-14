@@ -391,13 +391,16 @@
   <string name="settings_categories_suggested">Vorschläge verwenden</string>
   <string name="settings_categories_unsupported">Aktualisiere Ketch auf %1$s, um seine Downloads in Ordner zu sortieren.</string>
   <string name="settings_categories_no_rules">Füge eine Dateiendung, einen Medientyp oder eine Website hinzu</string>
+  <string name="settings_categories_more">+%1$d</string>
   <string name="settings_categories_from_sites">Von %1$s</string>
   <string name="settings_categories_folder">Ordner</string>
   <string name="settings_categories_folder_hint">Im Downloadordner. Mit / legst du einen Ordner in einem anderen an.</string>
   <string name="settings_categories_folder_invalid">Wähle einen Ordner im Downloadordner</string>
   <string name="settings_categories_extensions">Dateiendungen</string>
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
   <string name="settings_categories_types">Medientypen</string>
   <string name="settings_categories_types_hint">So, wie Server sie angeben; video/* umfasst alle Videos.</string>
+  <string name="settings_categories_types_placeholder">video/*</string>
   <string name="settings_categories_types_invalid">Schreibe Medientypen als Typ/Untertyp, etwa video/mp4</string>
   <string name="settings_categories_sites">Websites</string>
   <string name="settings_categories_sites_hint">example.com umfasst auch seine Subdomains.</string>
@@ -570,6 +573,15 @@
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>
   <string name="settings_torrent_remote">Ändere die BitTorrent-Einstellungen direkt auf %1$s oder in seiner config.toml.</string>
+  <string name="settings_torrent_reach_reachable">Peers können sich auf Port %2$d mit %1$s verbinden.</string>
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">Port %2$d wird über %3$d Router an %1$s weitergeleitet, Peers können sich also verbinden.</item>
+    <item quantity="other">Port %2$d wird über %3$d Router an %1$s weitergeleitet, Peers können sich also verbinden.</item>
+  </plurals>
+  <string name="settings_torrent_reach_blocked">Peers können sich nicht mit %1$s verbinden: Sein Router leitet Port %2$d weiter, ein Netz außerhalb davon, oft das deines Anbieters, aber nicht.</string>
+  <string name="settings_torrent_reach_not_forwarded">Kein Router leitet Port %2$d an %1$s weiter, daher können sich Peers womöglich nicht verbinden. Schalte Portweiterleitung ein oder richte die Weiterleitung an deinem Router ein.</string>
+  <string name="settings_torrent_reach_hole_punching">Downloads funktionieren weiterhin, und Hole Punching erreicht Peers hinter Routern.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Downloads funktionieren weiterhin. Schalte uTP ein, damit Hole Punching Peers hinter Routern erreicht.</string>
   <plurals name="settings_torrent_removed">
     <item quantity="one">%1$d Tracker entfernt.</item>
     <item quantity="other">%1$d Tracker entfernt.</item>
