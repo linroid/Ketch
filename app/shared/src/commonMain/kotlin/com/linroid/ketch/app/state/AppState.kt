@@ -177,6 +177,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -186,6 +187,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -280,10 +282,11 @@ class AppState(
     AiDiscoverController(aiSettings, scope, discoverHistory, clock, devices = ::discoverDevices)
 
   /**
-   * Whether Settings › Sharing of this device shows its pairing requests in a window in front,
-   * as the page reports it; elsewhere a toast leads there.
+   * Whether Settings › Sharing of this device shows in a window in front, as the page reports
+   * it: pairing requests and whether pairing is on show there, and elsewhere a toast and a
+   * banner tell about them.
    */
-  var pairingRequestsShown by mutableStateOf(false)
+  var sharingShown by mutableStateOf(false)
 
   /** How many requests to open a website wait for the user's answer, for Discover's badge. */
   val discoverWaitingCount: Int get() = aiDiscover.approvals.size
@@ -622,6 +625,7 @@ class AppState(
     }
     scope.launch { announceApprovals() }
     scope.launch { announcePairingRequests() }
+    scope.launch { endPairingWindows() }
     scope.launch {
       incoming.failures.collect {
         postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
@@ -923,7 +927,7 @@ class AppState(
   private suspend fun announcePairingRequests() {
     val requests = instanceManager.pairingRequests
     val toasts = mutableMapOf<Long, Long>()
-    combine(requests.pending, snapshotFlow { pairingRequestsShown }, ::Pair)
+    combine(requests.pending, snapshotFlow { sharingShown }, ::Pair)
       .collect { (asks, shown) ->
         val waiting = asks.mapTo(HashSet()) { it.id }
         toasts.keys.filter { it !in waiting || shown }.forEach { id ->
@@ -944,6 +948,15 @@ class AppState(
           ).id
         }
       }
+  }
+
+  /** Turns pairing off once its window ends, so the page and the banner stop showing it. */
+  private suspend fun endPairingWindows() {
+    val requests = instanceManager.pairingRequests
+    requests.openUntil.collectLatest {
+      while (true) delay(requests.timeLeft() ?: break)
+      requests.closeIfEnded()
+    }
   }
 
   /** Shows [key] in the inspector, or clears it with `null`. */

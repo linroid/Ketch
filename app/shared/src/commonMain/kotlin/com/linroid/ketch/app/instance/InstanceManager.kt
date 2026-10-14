@@ -304,6 +304,8 @@ class InstanceManager(
   /** Stop the local HTTP server if running. */
   fun stopServer() {
     factory.stopServer()
+    // Pairing ends with sharing, so starting it again never takes requests unasked.
+    pairingRequests.close()
     _serverState.value = ServerState.Stopped
   }
 

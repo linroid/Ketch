@@ -256,6 +256,7 @@ class KetchService : Service() {
             pairingApprover = { request, address ->
               pairingRequests.ask(request.name, request.code, request.os, address)
             },
+            pairingOpen = { pairingRequests.isOpen },
           )
           server.start(wait = false)
           log.i { "Local server started on port ${serverConfig.port}" }

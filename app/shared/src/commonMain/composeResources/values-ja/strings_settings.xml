@@ -621,6 +621,11 @@
   <string name="settings_sharing_restart">再起動</string>
   <string name="settings_sharing_pair">デバイスをペアリング</string>
   <string name="settings_sharing_stop">共有を停止</string>
+  <string name="settings_sharing_pairing">ペアリングリクエスト</string>
+  <string name="settings_sharing_pairing_off">オンにすると3分間、ローカルネットワーク上で%1$sを見つけたデバイスが操作を依頼できます。</string>
+  <string name="settings_sharing_pairing_on">あと%1$sオン · ローカルネットワーク上のデバイスが%2$sの操作を依頼できます</string>
+  <string name="settings_sharing_pairing_turn_on">オンにする</string>
+  <string name="settings_sharing_pairing_turn_off">オフにする</string>
   <string name="settings_sharing_control_from_computer">コンピュータや別のデバイスから%1$sを操作できます。</string>
   <string name="settings_sharing_control_from_phone">スマートフォン、タブレット、別のブラウザから%1$sを操作できます。</string>
   <string name="settings_sharing_failed">共有を開始できませんでした：%1$s</string>

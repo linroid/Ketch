@@ -50,6 +50,8 @@ import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.ui.connect.PairingRequestCards
+import com.linroid.ketch.app.ui.connect.PairingWindowGroup
+import com.linroid.ketch.app.ui.connect.ReportSharingShown
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.state.portError
 import com.linroid.ketch.app.theme.KetchTheme
@@ -153,6 +155,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     manager.stopServer()
     manager.startServer()
   }
+  ReportSharingShown(state)
   PairingRequestCards(state)
   PairCard(
     name = device.label,
@@ -177,6 +180,10 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     onRefresh = { networks.loadNetworks() },
   )
   val running = serverState as? ServerState.Running
+  // Devices find this one and ask to pair only while it is shared with them.
+  if (running != null && !running.config.isLoopbackOnly && running.config.apiToken != null) {
+    PairingWindowGroup(manager.pairingRequests)
+  }
   // Starting with Ketch only matters at launch, so it never calls for a restart.
   if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
     SettingsNotice(

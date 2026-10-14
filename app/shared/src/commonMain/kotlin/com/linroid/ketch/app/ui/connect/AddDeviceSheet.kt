@@ -87,22 +87,19 @@ import org.jetbrains.compose.resources.stringResource
  * added, so a typo or a missing access code shows in the sheet rather than as an offline
  * device; the access code field appears once a device asks for one.
  *
- * Desktop apps search the network as the sheet opens; phones search when "Find on network" is
- * tapped, which asks Android for its nearby devices permission first. The browser cannot
+ * The sheet searches the network as it opens, on phones too, where Android asks for its nearby
+ * devices permission first; "Find on network" searches again after a denial. The browser cannot
  * search, so the web hides it. A device found there that asks for a code but lets its owner
  * allow this device instead ([DiscoveredServer.pairable]) is asked to, while the sheet shows
  * the code the owner checks.
  *
  * @param device a device that rejected its access code; the sheet then asks for a new one.
- * @param searchNow searches the network as the sheet opens on phones too, for a "Find on
- *   network" tapped before it opened.
  */
 @Composable
 fun AddDeviceSheet(
   state: AppState,
   onDismiss: () -> Unit,
   device: RemoteInstance? = null,
-  searchNow: Boolean = false,
 ) {
   val form = remember(device) { device?.let(::codeForm) ?: ConnectForm() }
   val connector = rememberDeviceConnector(state)
@@ -112,10 +109,8 @@ fun AddDeviceSheet(
   val instances by state.instances.collectAsState()
   val serverState by state.serverState.collectAsState()
   LaunchedEffect(nearby) {
-    // Asking for a permission is up to the user, so phones wait for a tap.
-    if (nearby != null && (searchNow || !isMobilePlatform)) {
-      access.request(search = true) { nearby.search() }
-    }
+    // Phones search too, asking for the local network permission first where they need it.
+    if (nearby != null) access.request(search = true) { nearby.search() }
   }
   val submit = { check: Boolean ->
     // Android 17 blocks devices on the local network until the user allows it.

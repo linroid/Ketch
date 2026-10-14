@@ -148,8 +148,8 @@
   <string name="connect_code_no_longer_accepted">%1$s ya no acepta el código que tiene Ketch. Pega un enlace de vinculación nuevo desde Ajustes › Compartir en ese dispositivo o introduce su código de acceso.</string>
   <string name="connect_scan_hint">Escanea con la app de cámara el código de vinculación que aparece en Ajustes › Compartir en el otro dispositivo, o pega su enlace de vinculación.</string>
   <string name="connect_paste_hint">Pega el enlace de vinculación de Ajustes › Compartir del otro dispositivo o escribe su dirección.</string>
-  <string name="connect_find_on_network">Buscar en la red</string>
-  <string name="connect_on_your_network">En tu red</string>
+  <string name="connect_find_on_network">Buscar en la red local</string>
+  <string name="connect_on_your_network">En tu red local</string>
   <string name="connect_searching">Buscando…</string>
   <string name="connect_search_again">Buscar de nuevo</string>
   <string name="connect_looking">Buscando dispositivos con Ketch en esta red…</string>
@@ -165,6 +165,7 @@
   <string name="connect_approval_expired">Nadie respondió en %1$s. Vuelve a pedirlo o introduce su código de acceso.</string>
   <string name="connect_approval_busy">%1$s está respondiendo a otra solicitud de este dispositivo. Vuelve a intentarlo en un momento o introduce su código de acceso.</string>
   <string name="connect_approval_paused">%1$s no acepta solicitudes de vinculación de este dispositivo por ahora. Vuelve a intentarlo más tarde o introduce su código de acceso.</string>
+  <string name="connect_approval_closed">%1$s no acepta solicitudes de vinculación. Activa la vinculación en su Ajustes › Compartir y vuelve a pedirlo, o introduce su código de acceso.</string>
   <string name="connect_approval_ask_again">Volver a solicitar acceso</string>
   <string name="connect_added_badge">Añadido</string>
   <string name="connect_share_instead">¿Quieres controlar %1$s desde otro dispositivo?</string>

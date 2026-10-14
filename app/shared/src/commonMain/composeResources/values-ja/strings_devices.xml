@@ -142,8 +142,8 @@
   <string name="connect_code_no_longer_accepted">%1$sは、Ketchが保存しているコードを受け付けなくなりました。そのデバイスの「設定 › 共有」から新しいペアリングリンクを貼り付けるか、アクセスコードを入力してください。</string>
   <string name="connect_scan_hint">もう一方のデバイスの「設定 › 共有」にあるペアリングコードをカメラアプリでスキャンするか、ペアリングリンクを貼り付けてください。</string>
   <string name="connect_paste_hint">もう一方のデバイスの「設定 › 共有」にあるペアリングリンクを貼り付けるか、アドレスを入力してください。</string>
-  <string name="connect_find_on_network">ネットワーク上で探す</string>
-  <string name="connect_on_your_network">このネットワーク上</string>
+  <string name="connect_find_on_network">ローカルネットワークで探す</string>
+  <string name="connect_on_your_network">ローカルネットワーク上</string>
   <string name="connect_searching">検索中…</string>
   <string name="connect_search_again">再検索</string>
   <string name="connect_looking">このネットワーク上のKetchデバイスを探しています…</string>
@@ -159,6 +159,7 @@
   <string name="connect_approval_expired">%1$sで応答がありませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_busy">%1$sはこのデバイスからの別のリクエストに対応中です。しばらくしてからもう一度試すか、アクセスコードを入力してください。</string>
   <string name="connect_approval_paused">%1$sは現在このデバイスからのペアリングリクエストを受け付けていません。しばらくしてからもう一度お試しいただくか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_closed">%1$sはペアリングリクエストを受け付けていません。そのデバイスの「設定 › 共有」でペアリングをオンにしてからもう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_ask_again">もう一度依頼</string>
   <string name="connect_added_badge">追加済み</string>
   <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>

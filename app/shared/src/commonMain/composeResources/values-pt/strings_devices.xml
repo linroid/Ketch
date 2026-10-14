@@ -148,8 +148,8 @@
   <string name="connect_code_no_longer_accepted">%1$s não aceita mais o código que o Ketch tem. Cole um novo link de pareamento de Configurações › Compartilhamento nesse dispositivo ou digite o código de acesso dele.</string>
   <string name="connect_scan_hint">Escaneie com o app Câmera o código de pareamento que aparece em Configurações › Compartilhamento no outro dispositivo ou cole o link de pareamento dele.</string>
   <string name="connect_paste_hint">Cole o link de pareamento que aparece em Configurações › Compartilhamento no outro dispositivo ou digite o endereço dele.</string>
-  <string name="connect_find_on_network">Procurar na rede</string>
-  <string name="connect_on_your_network">Na sua rede</string>
+  <string name="connect_find_on_network">Procurar na rede local</string>
+  <string name="connect_on_your_network">Na sua rede local</string>
   <string name="connect_searching">Procurando…</string>
   <string name="connect_search_again">Procurar novamente</string>
   <string name="connect_looking">Procurando dispositivos Ketch nesta rede…</string>
@@ -165,6 +165,7 @@
   <string name="connect_approval_expired">Ninguém respondeu em %1$s. Peça de novo ou digite o código de acesso.</string>
   <string name="connect_approval_busy">%1$s está respondendo a outro pedido deste dispositivo. Tente novamente em instantes ou digite o código de acesso.</string>
   <string name="connect_approval_paused">%1$s não está aceitando pedidos de pareamento deste dispositivo no momento. Tente novamente mais tarde ou digite o código de acesso.</string>
+  <string name="connect_approval_closed">%1$s não está aceitando pedidos de pareamento. Ative o pareamento em Configurações › Compartilhamento nele e peça de novo, ou digite o código de acesso.</string>
   <string name="connect_approval_ask_again">Solicitar acesso novamente</string>
   <string name="connect_added_badge">Adicionado</string>
   <string name="connect_share_instead">Quer controlar %1$s de outro dispositivo?</string>

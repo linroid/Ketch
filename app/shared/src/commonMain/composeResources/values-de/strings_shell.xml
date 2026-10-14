@@ -56,7 +56,7 @@
 
   <string name="switcher_overview">Übersicht</string>
   <string name="switcher_add_device">Gerät hinzufügen…</string>
-  <string name="switcher_find_on_network">Im Netzwerk suchen</string>
+  <string name="switcher_find_on_network">Im lokalen Netzwerk suchen</string>
   <string name="switcher_share">Freigabe für %1$s…</string>
 
   <string name="shell_device_button">%1$s, Gerät wechseln</string>
@@ -85,6 +85,7 @@
   <string name="banner_retrying">neuer Versuch läuft</string>
   <string name="banner_retry_now">Jetzt erneut versuchen</string>
   <string name="banner_switch_to">Zu %1$s wechseln</string>
+  <string name="banner_pairing_on">Kopplung noch %1$s an · Geräte in deinem lokalen Netzwerk können anfragen, %2$s zu steuern</string>
   <string name="banner_unauthorized">%1$s braucht ein neues Zugriffstoken</string>
   <string name="banner_enter_token">Token eingeben</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

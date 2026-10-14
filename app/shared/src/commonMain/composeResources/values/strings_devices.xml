@@ -203,8 +203,8 @@
   <!-- On phones. -->
   <string name="connect_scan_hint">Scan the pairing code in Settings › Sharing on the other device with your camera app, or paste its pairing link.</string>
   <string name="connect_paste_hint">Paste the pairing link from Settings › Sharing on the other device, or type its address.</string>
-  <string name="connect_find_on_network">Find on network</string>
-  <string name="connect_on_your_network">On your network</string>
+  <string name="connect_find_on_network">Find on local network</string>
+  <string name="connect_on_your_network">On your local network</string>
   <string name="connect_searching">Searching…</string>
   <string name="connect_search_again">Search again</string>
   <string name="connect_looking">Looking for Ketch devices on this network…</string>
@@ -227,6 +227,7 @@
   <string name="connect_approval_expired">No one answered on %1$s. Ask again, or enter its access code.</string>
   <string name="connect_approval_busy">%1$s is answering another request from this device. Try again shortly, or enter its access code.</string>
   <string name="connect_approval_paused">%1$s isn't taking pairing requests from this device right now. Try again later, or enter its access code.</string>
+  <string name="connect_approval_closed">%1$s isn't taking pairing requests. Turn on pairing in its Settings › Sharing, then ask again, or enter its access code.</string>
   <string name="connect_approval_ask_again">Ask again</string>
   <!-- At the end of a device found on the network that is added already. -->
   <string name="connect_added_badge">Added</string>

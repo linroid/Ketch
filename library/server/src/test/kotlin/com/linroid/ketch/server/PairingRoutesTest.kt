@@ -48,6 +48,7 @@ class PairingRoutesTest {
   private fun ApplicationTestBuilder.pairingServer(
     apiToken: String? = TOKEN,
     approver: PairingApprover? = PairingApprover { _, _ -> true },
+    open: () -> Boolean = { true },
   ): HttpClient {
     application {
       val server = KetchServer(
@@ -55,6 +56,7 @@ class PairingRoutesTest {
         apiToken = apiToken,
         corsAllowedHosts = listOf("*"),
         pairingApprover = approver,
+        pairingOpen = open,
       )
       with(server) { configureServer() }
     }
@@ -109,6 +111,28 @@ class PairingRoutesTest {
     val ticket = client.ask().body<PairingTicket>()
 
     assertEquals(PairingStatus(PairingState.DENIED), client.answer(ticket.id))
+  }
+
+  @Test
+  fun `requests while pairing is off are refused unasked`() = testApplication {
+    var asked = false
+    var open = false
+    val client = pairingServer(
+      approver = { _, _ ->
+        asked = true
+        true
+      },
+      open = { open },
+    )
+
+    val refused = client.ask()
+
+    assertEquals(HttpStatusCode.Forbidden, refused.status)
+    assertEquals("pairing_closed", refused.body<ErrorResponse>().error)
+    assertEquals(false, asked)
+    // Refused requests are no strike against the address.
+    open = true
+    assertEquals(HttpStatusCode.Accepted, client.ask().status)
   }
 
   @Test

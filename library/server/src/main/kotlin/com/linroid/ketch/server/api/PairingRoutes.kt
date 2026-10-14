@@ -47,6 +47,13 @@ internal fun Route.pairingRoutes(sessions: PairingSessions) {
     )
     when (val opened = sessions.open(request, call.request.origin.remoteAddress)) {
       is PairingSessions.Opened.Asking -> call.respond(HttpStatusCode.Accepted, opened.ticket)
+      PairingSessions.Opened.Closed -> call.respond(
+        HttpStatusCode.Forbidden,
+        ErrorResponse(
+          "pairing_closed",
+          "Pairing is off; turn it on in Settings › Sharing on this device, then ask again",
+        ),
+      )
       PairingSessions.Opened.Busy -> call.respond(
         HttpStatusCode.TooManyRequests,
         ErrorResponse("pairing_busy", "Another pairing request is waiting for an answer"),

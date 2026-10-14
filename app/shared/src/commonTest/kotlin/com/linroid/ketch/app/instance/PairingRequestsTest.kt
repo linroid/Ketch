@@ -8,7 +8,11 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PairingRequestsTest {
@@ -40,5 +44,62 @@ class PairingRequestsTest {
     runCurrent()
 
     assertEquals(emptyList(), requests.pending.value)
+  }
+
+  @Test
+  fun open_takesRequestsForThreeMinutes() {
+    val clock = MutableClock()
+    val requests = PairingRequests(clock)
+    assertFalse(requests.isOpen)
+
+    requests.open()
+    assertTrue(requests.isOpen)
+    assertEquals(clock.now + 3.minutes, requests.openUntil.value)
+
+    clock.now += 3.minutes
+    assertFalse(requests.isOpen)
+    requests.closeIfEnded()
+    assertNull(requests.openUntil.value)
+  }
+
+  @Test
+  fun close_stopsTakingRequests() {
+    val requests = PairingRequests(MutableClock())
+    requests.open()
+
+    requests.close()
+
+    assertFalse(requests.isOpen)
+    assertNull(requests.openUntil.value)
+  }
+
+  @Test
+  fun answer_allowed_closesTheWindow() = runTest {
+    val requests = PairingRequests(MutableClock())
+    requests.open()
+    val asking = async { requests.ask("Pixel 9", "4821", null, "192.168.1.30") }
+    runCurrent()
+
+    requests.answer(requests.pending.value.single().id, allow = true)
+
+    assertTrue(asking.await())
+    assertFalse(requests.isOpen)
+  }
+
+  @Test
+  fun answer_denied_keepsTheWindowOpen() = runTest {
+    val requests = PairingRequests(MutableClock())
+    requests.open()
+    val asking = async { requests.ask("Pixel 9", "4821", null, "192.168.1.30") }
+    runCurrent()
+
+    requests.answer(requests.pending.value.single().id, allow = false)
+
+    assertFalse(asking.await())
+    assertTrue(requests.isOpen)
+  }
+
+  private class MutableClock(var now: Instant = Instant.fromEpochSeconds(1_800_000_000)) : Clock {
+    override fun now(): Instant = now
   }
 }

@@ -681,6 +681,11 @@
   <string name="settings_sharing_restart">Перезапустить</string>
   <string name="settings_sharing_pair">Сопряжение с устройством</string>
   <string name="settings_sharing_stop">Закрыть доступ</string>
+  <string name="settings_sharing_pairing">Запросы на сопряжение</string>
+  <string name="settings_sharing_pairing_off">После включения устройства, нашедшие %1$s в вашей локальной сети, смогут в течение 3 минут запросить управление им.</string>
+  <string name="settings_sharing_pairing_on">Включено ещё %1$s · устройства в вашей локальной сети могут запросить управление: %2$s</string>
+  <string name="settings_sharing_pairing_turn_on">Включить</string>
+  <string name="settings_sharing_pairing_turn_off">Выключить</string>
   <string name="settings_sharing_control_from_computer">Управляйте загрузками %1$s с компьютера или другого устройства.</string>
   <string name="settings_sharing_control_from_phone">Управляйте загрузками %1$s с телефона, планшета или из другого браузера.</string>
   <string name="settings_sharing_failed">Не удалось открыть общий доступ: %1$s</string>

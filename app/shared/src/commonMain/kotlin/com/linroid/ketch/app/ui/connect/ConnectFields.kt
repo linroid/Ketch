@@ -53,6 +53,7 @@ import ketch.app.shared.generated.resources.connect_added
 import ketch.app.shared.generated.resources.connect_added_detail
 import ketch.app.shared.generated.resources.connect_approval_ask_again
 import ketch.app.shared.generated.resources.connect_approval_busy
+import ketch.app.shared.generated.resources.connect_approval_closed
 import ketch.app.shared.generated.resources.connect_approval_denied
 import ketch.app.shared.generated.resources.connect_approval_expired
 import ketch.app.shared.generated.resources.connect_approval_paused
@@ -296,6 +297,7 @@ internal fun ConnectProblemNotice(
         when (problem.reason) {
           PairingResult.Busy -> Res.string.connect_approval_busy
           PairingResult.Paused -> Res.string.connect_approval_paused
+          PairingResult.Closed -> Res.string.connect_approval_closed
           PairingResult.Expired -> Res.string.connect_approval_expired
           else -> Res.string.connect_approval_denied
         },

@@ -148,8 +148,8 @@
   <string name="connect_code_no_longer_accepted">%1$s n'accepte plus le code dont dispose Ketch. Collez un nouveau lien d'appairage depuis Réglages › Partage sur cet appareil, ou saisissez son code d'accès.</string>
   <string name="connect_scan_hint">Scannez avec l'app Appareil photo le code d'appairage affiché dans Réglages › Partage sur l'autre appareil, ou collez son lien d'appairage.</string>
   <string name="connect_paste_hint">Collez le lien d'appairage affiché dans Réglages › Partage sur l'autre appareil, ou saisissez son adresse.</string>
-  <string name="connect_find_on_network">Rechercher sur le réseau</string>
-  <string name="connect_on_your_network">Sur votre réseau</string>
+  <string name="connect_find_on_network">Rechercher sur le réseau local</string>
+  <string name="connect_on_your_network">Sur votre réseau local</string>
   <string name="connect_searching">Recherche…</string>
   <string name="connect_search_again">Rechercher à nouveau</string>
   <string name="connect_looking">Recherche d'appareils Ketch sur ce réseau…</string>
@@ -165,6 +165,7 @@
   <string name="connect_approval_expired">Personne n'a répondu sur %1$s. Redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_busy">%1$s répond à une autre demande de cet appareil. Réessayez dans un instant, ou saisissez son code d'accès.</string>
   <string name="connect_approval_paused">%1$s n'accepte pas de demandes d'association de cet appareil pour le moment. Réessayez plus tard, ou saisissez son code d'accès.</string>
+  <string name="connect_approval_closed">%1$s n'accepte pas de demandes d'association. Activez l'association dans ses Réglages › Partage, puis redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_ask_again">Redemander</string>
   <string name="connect_added_badge">Ajouté</string>
   <string name="connect_share_instead">Vous voulez contrôler %1$s depuis un autre appareil ?</string>

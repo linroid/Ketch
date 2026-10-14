@@ -56,7 +56,7 @@
 
   <string name="switcher_overview">Visão geral</string>
   <string name="switcher_add_device">Adicionar dispositivo…</string>
-  <string name="switcher_find_on_network">Procurar na rede</string>
+  <string name="switcher_find_on_network">Procurar na rede local</string>
   <string name="switcher_share">Compartilhar %1$s…</string>
 
   <string name="shell_device_button">%1$s, trocar de dispositivo</string>
@@ -85,6 +85,7 @@
   <string name="banner_retrying">tentando novamente</string>
   <string name="banner_retry_now">Tentar agora</string>
   <string name="banner_switch_to">Mudar para %1$s</string>
+  <string name="banner_pairing_on">Pareamento ativado por mais %1$s · dispositivos da sua rede local podem pedir para controlar %2$s</string>
   <string name="banner_unauthorized">%1$s precisa de um novo token de acesso</string>
   <string name="banner_enter_token">Inserir token</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

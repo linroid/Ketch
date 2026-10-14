@@ -424,7 +424,9 @@ lists the routes.
   (`POST /api/pairing`, then poll `GET /api/pairing/{id}`). The approver decides within two
   minutes; one request per address and four in all may wait. An address whose request was
   denied or left unanswered waits 30 s before asking again, doubling each time, and five such
-  requests within 10 minutes pause pairing for 10 minutes (`PairingBackoff`). Web pages are
+  requests within 10 minutes pause pairing for 10 minutes (`PairingBackoff`). While
+  `pairingOpen` is false requests are refused with `403 pairing_closed`: the apps take them only
+  for 3 minutes after the owner turns pairing on in Settings › Sharing. Web pages are
   refused. The apps' servers pass an approver that asks their owner; `ketch server` takes no
   requests.
 - **Discovery**: advertised on the LAN over mDNS as `_ketch._tcp` unless disabled, with TXT

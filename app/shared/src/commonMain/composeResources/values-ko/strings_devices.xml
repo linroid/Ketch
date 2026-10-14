@@ -142,8 +142,8 @@
   <string name="connect_code_no_longer_accepted">%1$s에서 Ketch에 저장된 코드를 더 이상 받지 않습니다. 해당 기기의 설정 › 공유에서 새 페어링 링크를 붙여넣거나 액세스 코드를 입력하세요.</string>
   <string name="connect_scan_hint">다른 기기의 설정 › 공유에 있는 페어링 코드를 카메라 앱으로 스캔하거나 페어링 링크를 붙여넣으세요.</string>
   <string name="connect_paste_hint">다른 기기의 설정 › 공유에서 페어링 링크를 붙여넣거나 주소를 입력하세요.</string>
-  <string name="connect_find_on_network">네트워크에서 찾기</string>
-  <string name="connect_on_your_network">내 네트워크</string>
+  <string name="connect_find_on_network">로컬 네트워크에서 찾기</string>
+  <string name="connect_on_your_network">로컬 네트워크</string>
   <string name="connect_searching">검색 중…</string>
   <string name="connect_search_again">다시 검색</string>
   <string name="connect_looking">이 네트워크에서 Ketch 기기를 찾는 중…</string>
@@ -159,6 +159,7 @@
   <string name="connect_approval_expired">%1$s에서 응답이 없었습니다. 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_busy">%1$s에서 이 기기의 다른 요청에 응답하는 중입니다. 잠시 후 다시 시도하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_paused">%1$s에서 지금은 이 기기의 페어링 요청을 받지 않습니다. 나중에 다시 시도하거나 액세스 코드를 입력하세요.</string>
+  <string name="connect_approval_closed">%1$s에서 페어링 요청을 받지 않습니다. 해당 기기의 설정 › 공유에서 페어링을 켠 다음 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_ask_again">다시 요청</string>
   <string name="connect_added_badge">추가됨</string>
   <string name="connect_share_instead">다른 기기에서 %1$s을(를) 제어하고 싶나요?</string>

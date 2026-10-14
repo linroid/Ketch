@@ -850,6 +850,11 @@
   <string name="settings_sharing_restart">Restart</string>
   <string name="settings_sharing_pair">Pair a device</string>
   <string name="settings_sharing_stop">Stop sharing</string>
+  <string name="settings_sharing_pairing">Pairing requests</string>
+  <string name="settings_sharing_pairing_off">Devices that find %1$s on your local network can ask to control it for 3 minutes after you turn this on.</string>
+  <string name="settings_sharing_pairing_on">On for %1$s · devices on your local network can ask to control %2$s</string>
+  <string name="settings_sharing_pairing_turn_on">Turn on</string>
+  <string name="settings_sharing_pairing_turn_off">Turn off</string>
   <!--
     In the strings below, %1$s names this device inside a sentence, such as "this Mac" or
     "this phone".

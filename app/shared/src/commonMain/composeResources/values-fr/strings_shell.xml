@@ -56,7 +56,7 @@
 
   <string name="switcher_overview">Vue d'ensemble</string>
   <string name="switcher_add_device">Ajouter un appareil…</string>
-  <string name="switcher_find_on_network">Rechercher sur le réseau</string>
+  <string name="switcher_find_on_network">Rechercher sur le réseau local</string>
   <string name="switcher_share">Partager %1$s…</string>
 
   <string name="shell_device_button">%1$s, changer d'appareil</string>
@@ -85,6 +85,7 @@
   <string name="banner_retrying">nouvelle tentative</string>
   <string name="banner_retry_now">Réessayer maintenant</string>
   <string name="banner_switch_to">Passer à %1$s</string>
+  <string name="banner_pairing_on">Association activée encore %1$s · les appareils de votre réseau local peuvent demander à contrôler %2$s</string>
   <string name="banner_unauthorized">%1$s a besoin d'un nouveau jeton d'accès</string>
   <string name="banner_enter_token">Saisir le jeton</string>
   <string name="toast_subject_reason">%1$s : %2$s</string>

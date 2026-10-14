@@ -142,8 +142,8 @@
   <string name="connect_code_no_longer_accepted">%1$s 已不再接受 Ketch 目前的存取碼。請從該裝置的「設定 › 共享」貼上新的配對連結，或輸入它的存取碼。</string>
   <string name="connect_scan_hint">用相機掃描另一台裝置「設定 › 共享」中的配對碼，或貼上它的配對連結。</string>
   <string name="connect_paste_hint">貼上另一台裝置「設定 › 共享」中的配對連結，或輸入它的位址。</string>
-  <string name="connect_find_on_network">在網路上尋找</string>
-  <string name="connect_on_your_network">在你的網路上</string>
+  <string name="connect_find_on_network">在區域網路中尋找</string>
+  <string name="connect_on_your_network">區域網路中</string>
   <string name="connect_searching">正在搜尋…</string>
   <string name="connect_search_again">再次搜尋</string>
   <string name="connect_looking">正在此網路上尋找 Ketch 裝置…</string>
@@ -159,6 +159,7 @@
   <string name="connect_approval_expired">%1$s 未及時回應配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_busy">%1$s 正在回應此裝置的另一個要求。請稍後再試，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_paused">%1$s 暫時不接受此裝置的配對要求。請稍後再試，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_closed">%1$s 不接受配對要求。請在該裝置的「設定 › 共享」中開啟配對後重新要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_ask_again">重新傳送要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s嗎？</string>

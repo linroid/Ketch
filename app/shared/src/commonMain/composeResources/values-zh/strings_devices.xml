@@ -142,8 +142,8 @@
   <string name="connect_code_no_longer_accepted">%1$s 不再接受 Ketch 保存的访问码。请粘贴那台设备“设置 › 共享”中新的配对链接，或输入它的访问码。</string>
   <string name="connect_scan_hint">用相机应用扫描另一台设备“设置 › 共享”中的配对码，或粘贴它的配对链接。</string>
   <string name="connect_paste_hint">粘贴另一台设备“设置 › 共享”中的配对链接，或输入它的地址。</string>
-  <string name="connect_find_on_network">在网络中查找</string>
-  <string name="connect_on_your_network">同一网络中</string>
+  <string name="connect_find_on_network">在局域网中查找</string>
+  <string name="connect_on_your_network">局域网中</string>
   <string name="connect_searching">正在搜索…</string>
   <string name="connect_search_again">重新搜索</string>
   <string name="connect_looking">正在此网络中查找 Ketch 设备…</string>
@@ -159,6 +159,7 @@
   <string name="connect_approval_expired">%1$s 未及时响应配对请求。请重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_busy">%1$s 正在处理此设备的另一个请求。请稍后再试，或输入其访问码。</string>
   <string name="connect_approval_paused">%1$s 暂时不接受此设备的配对请求。请稍后再试，或输入该设备的访问码。</string>
+  <string name="connect_approval_closed">%1$s 不接受配对请求。请在该设备的“设置 › 共享”中开启配对后重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_ask_again">重新请求</string>
   <string name="connect_added_badge">已添加</string>
   <string name="connect_share_instead">想从其他设备控制%1$s？</string>

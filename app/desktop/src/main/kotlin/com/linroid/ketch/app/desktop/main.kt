@@ -731,6 +731,7 @@ private fun createInstanceManager(
           pairingApprover = { request, address ->
             pairingRequests.ask(request.name, request.code, request.os, address)
           },
+          pairingOpen = { pairingRequests.isOpen },
         )
         server.start(wait = false)
         object : LocalServerHandle {

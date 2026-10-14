@@ -56,22 +56,30 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.pairingTimeText
+import com.linroid.ketch.app.ui.connect.rememberPairingTimeLeft
 import com.linroid.ketch.app.ui.devices.askForToken
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_dismiss
+import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.banner_connecting
 import ketch.app.shared.generated.resources.banner_enter_token
 import ketch.app.shared.generated.resources.banner_offline
+import ketch.app.shared.generated.resources.banner_pairing_on
 import ketch.app.shared.generated.resources.banner_retry_now
 import ketch.app.shared.generated.resources.banner_retrying
 import ketch.app.shared.generated.resources.banner_switch_to
 import ketch.app.shared.generated.resources.banner_unauthorized
 import ketch.app.shared.generated.resources.feedback_reconnect_failed
+import ketch.app.shared.generated.resources.settings_sharing_pairing_turn_off
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
@@ -161,6 +169,27 @@ internal fun deviceBanner(
   else -> null
 }
 
+/**
+ * The banner while devices may ask to pair with this one ([left] is the time left), on every
+ * page but Settings › Sharing, which shows it itself: "Pairing is on for 2m 41s", with Show,
+ * which opens Sharing, and Turn off.
+ */
+internal fun pairingBanner(
+  left: Duration,
+  localName: UiText,
+  onShow: () -> Unit,
+  onTurnOff: () -> Unit,
+): Banner = Banner(
+  id = PAIRING_BANNER,
+  tone = BannerTone.Info,
+  text = Res.string.banner_pairing_on.text(pairingTimeText(left), localName),
+  icon = KetchIcon.Devices,
+  actions = listOf(
+    MessageAction(Res.string.action_show.text(), onShow),
+    MessageAction(Res.string.settings_sharing_pairing_turn_off.text(), onTurnOff),
+  ),
+)
+
 /** [message], posted as a banner, as it shows; closing it takes it off the screen. */
 internal fun messageBanner(message: AppMessage, onDismiss: () -> Unit): Banner = Banner(
   id = "message-${message.id}",
@@ -196,7 +225,21 @@ fun BannerHost(state: AppState, modifier: Modifier = Modifier) {
     }
   }
   val local = instances.firstOrNull { it is EmbeddedInstance }
+  val pairing = state.instanceManager.pairingRequests
+  val pairingLeft = rememberPairingTimeLeft(pairing)
   val banners = buildList {
+    if (pairingLeft != null && !state.sharingShown) {
+      add(
+        pairingBanner(
+          left = pairingLeft,
+          localName = localDeviceNounInSentence(),
+          onShow = {
+            state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+          },
+          onTurnOff = pairing::close,
+        ),
+      )
+    }
     if (device != null) {
       deviceBanner(
         health = health,
@@ -357,6 +400,7 @@ private fun BannerTone.colors(colors: KetchColors): Pair<Color, Color> = when (t
 internal val CONNECTING_GRACE: Duration = 3.seconds
 
 private const val DEVICE_BANNER = "device"
+private const val PAIRING_BANNER = "pairing"
 private const val STACKED_LINES = 3
 private val BannerHeight = 40.dp
 private val StackedBelowWidth = 480.dp

@@ -621,6 +621,11 @@
   <string name="settings_sharing_restart">重新啟動</string>
   <string name="settings_sharing_pair">配對裝置</string>
   <string name="settings_sharing_stop">停止共享</string>
+  <string name="settings_sharing_pairing">配對要求</string>
+  <string name="settings_sharing_pairing_off">開啟後 3 分鐘內，在區域網路中找到%1$s的裝置可以要求控制它。</string>
+  <string name="settings_sharing_pairing_on">還剩 %1$s · 區域網路中的裝置可以要求控制%2$s</string>
+  <string name="settings_sharing_pairing_turn_on">開啟</string>
+  <string name="settings_sharing_pairing_turn_off">關閉</string>
   <string name="settings_sharing_control_from_computer">從電腦或其他裝置控制%1$s。</string>
   <string name="settings_sharing_control_from_phone">從手機、平板電腦或其他瀏覽器控制%1$s。</string>
   <string name="settings_sharing_failed">無法開始共享：%1$s</string>

@@ -58,12 +58,12 @@ fun ConnectHost(state: AppState) {
   }
   if (asked) {
     // "Find on network" elsewhere starts the app's own search; the sheet's search takes over.
-    val searchNow = remember { state.discoveryState is DiscoveryState.Discovering }
-    LaunchedEffect(Unit) { if (searchNow) state.resetDiscovery() }
+    LaunchedEffect(Unit) {
+      if (state.discoveryState is DiscoveryState.Discovering) state.resetDiscovery()
+    }
     AddDeviceSheet(
       state = state,
       device = state.unauthorizedInstance,
-      searchNow = searchNow,
       onDismiss = {
         state.showAddRemoteDialog = false
         state.unauthorizedInstance = null

@@ -198,7 +198,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * device polls until it has the answer or the request expires after two minutes. One request
  * per address, and four in all, wait at a time. An address whose request was denied or left
  * unanswered must wait before asking again, longer each time, and many such requests from any
- * addresses pause pairing for a while (`429` `pairing_paused`). Web pages are refused, since with a token
+ * addresses pause pairing for a while (`429` `pairing_paused`). While [pairingOpen] is false
+ * requests are refused with `403` `pairing_closed`. Web pages are refused, since with a token
  * [corsAllowedHosts] may let them call the API. The server advertises `pairing=1` over mDNS
  * when it takes requests.
  *
@@ -266,6 +267,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *   an Android implementation, since the default registrar is compiled for the JVM
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
+ * @param pairingOpen whether pairing requests are taken now; others are refused with `403`
+ *   `pairing_closed` before [pairingApprover] hears of them. The apps take them only for a few
+ *   minutes after the owner turns pairing on.
  * @param ready whether [ketch] already serves its saved tasks, as `GET /api/health` reports.
  *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then;
  *   until then the other API endpoints answer `503`.
@@ -283,6 +287,7 @@ class KetchServer(
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
   pairingApprover: PairingApprover? = null,
+  pairingOpen: () -> Boolean = { true },
   ready: Boolean = true,
 ) {
   private val log = KetchLogger("KetchServer")
@@ -292,7 +297,7 @@ class KetchServer(
   private val pairing = if (apiToken.isNullOrBlank() || pairingApprover == null) {
     null
   } else {
-    PairingSessions(pairingApprover, apiToken, scope)
+    PairingSessions(pairingApprover, apiToken, scope, isOpen = pairingOpen)
   }
   private val destinations = DestinationGuard(
     ketch,

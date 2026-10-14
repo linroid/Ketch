@@ -641,6 +641,11 @@
   <string name="settings_sharing_restart">Reiniciar</string>
   <string name="settings_sharing_pair">Vincular un dispositivo</string>
   <string name="settings_sharing_stop">Dejar de compartir</string>
+  <string name="settings_sharing_pairing">Solicitudes de vinculación</string>
+  <string name="settings_sharing_pairing_off">Los dispositivos que encuentren %1$s en tu red local podrán pedir controlarlo durante 3 minutos después de activar esto.</string>
+  <string name="settings_sharing_pairing_on">Activado %1$s más · los dispositivos de tu red local pueden pedir controlar %2$s</string>
+  <string name="settings_sharing_pairing_turn_on">Activar</string>
+  <string name="settings_sharing_pairing_turn_off">Desactivar</string>
   <string name="settings_sharing_control_from_computer">Controla %1$s desde un equipo u otro dispositivo.</string>
   <string name="settings_sharing_control_from_phone">Controla %1$s desde tu teléfono, tu tableta u otro navegador.</string>
   <string name="settings_sharing_failed">No se pudo empezar a compartir: %1$s</string>

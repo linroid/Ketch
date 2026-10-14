@@ -641,6 +641,11 @@
   <string name="settings_sharing_restart">Neu starten</string>
   <string name="settings_sharing_pair">Gerät koppeln</string>
   <string name="settings_sharing_stop">Freigabe beenden</string>
+  <string name="settings_sharing_pairing">Kopplungsanfragen</string>
+  <string name="settings_sharing_pairing_off">Geräte, die %1$s in deinem lokalen Netzwerk finden, können nach dem Einschalten 3 Minuten lang anfragen, es zu steuern.</string>
+  <string name="settings_sharing_pairing_on">Noch %1$s an · Geräte in deinem lokalen Netzwerk können anfragen, %2$s zu steuern</string>
+  <string name="settings_sharing_pairing_turn_on">Einschalten</string>
+  <string name="settings_sharing_pairing_turn_off">Ausschalten</string>
   <string name="settings_sharing_control_from_computer">Steuere %1$s von einem Computer oder einem anderen Gerät aus.</string>
   <string name="settings_sharing_control_from_phone">Steuere %1$s von deinem Telefon, Tablet oder einem anderen Browser aus.</string>
   <string name="settings_sharing_failed">Die Freigabe konnte nicht gestartet werden: %1$s</string>

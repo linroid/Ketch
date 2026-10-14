@@ -621,6 +621,11 @@
   <string name="settings_sharing_restart">다시 시작</string>
   <string name="settings_sharing_pair">기기 페어링</string>
   <string name="settings_sharing_stop">공유 중지</string>
+  <string name="settings_sharing_pairing">페어링 요청</string>
+  <string name="settings_sharing_pairing_off">켜면 3분 동안 로컬 네트워크에서 %1$s을(를) 찾은 기기가 제어를 요청할 수 있습니다.</string>
+  <string name="settings_sharing_pairing_on">%1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s 제어를 요청할 수 있습니다</string>
+  <string name="settings_sharing_pairing_turn_on">켜기</string>
+  <string name="settings_sharing_pairing_turn_off">끄기</string>
   <string name="settings_sharing_control_from_computer">컴퓨터나 다른 기기에서 %1$s을(를) 제어하세요.</string>
   <string name="settings_sharing_control_from_phone">휴대폰, 태블릿 또는 다른 브라우저에서 %1$s을(를) 제어하세요.</string>
   <string name="settings_sharing_failed">공유를 시작할 수 없음: %1$s</string>

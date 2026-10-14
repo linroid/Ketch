@@ -621,6 +621,11 @@
   <string name="settings_sharing_restart">重新启动</string>
   <string name="settings_sharing_pair">配对设备</string>
   <string name="settings_sharing_stop">停止共享</string>
+  <string name="settings_sharing_pairing">配对请求</string>
+  <string name="settings_sharing_pairing_off">开启后 3 分钟内，在局域网中找到%1$s的设备可以请求控制它。</string>
+  <string name="settings_sharing_pairing_on">还剩 %1$s · 局域网中的设备可以请求控制%2$s</string>
+  <string name="settings_sharing_pairing_turn_on">开启</string>
+  <string name="settings_sharing_pairing_turn_off">关闭</string>
   <string name="settings_sharing_control_from_computer">从电脑或其他设备控制%1$s。</string>
   <string name="settings_sharing_control_from_phone">从手机、平板电脑或其他浏览器控制%1$s。</string>
   <string name="settings_sharing_failed">无法开始共享：%1$s</string>

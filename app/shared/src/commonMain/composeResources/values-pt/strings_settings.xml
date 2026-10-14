@@ -641,6 +641,11 @@
   <string name="settings_sharing_restart">Reiniciar</string>
   <string name="settings_sharing_pair">Parear um dispositivo</string>
   <string name="settings_sharing_stop">Parar de compartilhar</string>
+  <string name="settings_sharing_pairing">Pedidos de pareamento</string>
+  <string name="settings_sharing_pairing_off">Dispositivos que encontrarem %1$s na sua rede local poderão pedir para controlá-lo por 3 minutos depois que você ativar isto.</string>
+  <string name="settings_sharing_pairing_on">Ativado por mais %1$s · dispositivos da sua rede local podem pedir para controlar %2$s</string>
+  <string name="settings_sharing_pairing_turn_on">Ativar</string>
+  <string name="settings_sharing_pairing_turn_off">Desativar</string>
   <string name="settings_sharing_control_from_computer">Controle %1$s de um computador ou de outro dispositivo.</string>
   <string name="settings_sharing_control_from_phone">Controle %1$s pelo celular, pelo tablet ou por outro navegador.</string>
   <string name="settings_sharing_failed">Não foi possível começar a compartilhar: %1$s</string>

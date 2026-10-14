@@ -109,6 +109,15 @@ class RemotePairingTest {
   }
 
   @Test
+  fun pairingTurnedOff_isClosed() = runTest {
+    pairing { _, _ ->
+      json("""{"error":"pairing_closed","message":"Pairing is off"}""", HttpStatusCode.Forbidden)
+    }.use {
+      assertEquals(PairingResult.Closed, it.request(request))
+    }
+  }
+
+  @Test
   fun turnedDownTooOften_isPaused() = runTest {
     pairing { _, _ ->
       json("""{"error":"pairing_paused","message":"Try again in 30s"}""", HttpStatusCode.TooManyRequests)

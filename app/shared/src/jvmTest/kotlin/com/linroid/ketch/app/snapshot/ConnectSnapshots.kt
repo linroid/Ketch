@@ -1,6 +1,9 @@
 package com.linroid.ketch.app.snapshot
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.linroid.ketch.app.App
@@ -10,17 +13,21 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.MdnsDiscoverer
 import com.linroid.ketch.app.instance.PairingAsk
+import com.linroid.ketch.app.instance.PairingRequests
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LinkSource
+import com.linroid.ketch.app.state.LocalClock
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.AddDeviceDialog
 import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
 import com.linroid.ketch.app.ui.connect.DeviceConnector
 import com.linroid.ketch.app.ui.connect.NearbySearch
-import com.linroid.ketch.app.ui.connect.PairingRequestCard
 import com.linroid.ketch.app.ui.connect.PairingClient
 import com.linroid.ketch.app.ui.connect.PairingDialog
+import com.linroid.ketch.app.ui.connect.PairingRequestCard
+import com.linroid.ketch.app.ui.connect.PairingWindowGroup
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
 import com.linroid.ketch.app.util.PairingLink
@@ -35,7 +42,11 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Connecting another device: the web app's connect page, the Add device sheet and the pairing
@@ -151,6 +162,29 @@ class ConnectSnapshots {
     for (theme in SnapshotTheme.entries) {
       snapshot("add-device-approval-denied", SnapshotSize.Desktop, theme) {
         AddDeviceSample(remember { formAfterPairing(PairingResult.Denied) })
+      }
+    }
+  }
+
+  @Test
+  fun pairingWindow_offAndCountingDown() {
+    val now = Instant.fromEpochSeconds(1_800_000_000)
+    val clock = object : Clock {
+      override fun now(): Instant = now
+    }
+    val off = PairingRequests(clock)
+    val on = PairingRequests(clock).apply { open(2.minutes + 41.seconds) }
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )) {
+      snapshot("pairing-window", size, theme) {
+        CompositionLocalProvider(LocalClock provides clock) {
+          Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4)) {
+            PairingWindowGroup(off)
+            PairingWindowGroup(on)
+          }
+        }
       }
     }
   }

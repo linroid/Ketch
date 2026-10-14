@@ -52,7 +52,7 @@
 
   <string name="switcher_overview">概要</string>
   <string name="switcher_add_device">デバイスを追加…</string>
-  <string name="switcher_find_on_network">ネットワーク上で探す</string>
+  <string name="switcher_find_on_network">ローカルネットワークで探す</string>
   <string name="switcher_share">%1$sを共有…</string>
 
   <string name="shell_device_button">%1$s、デバイスを切り替え</string>
@@ -79,6 +79,7 @@
   <string name="banner_retrying">再試行中</string>
   <string name="banner_retry_now">今すぐ再試行</string>
   <string name="banner_switch_to">%1$sに切り替え</string>
+  <string name="banner_pairing_on">ペアリングはあと%1$sオン · ローカルネットワーク上のデバイスが%2$sの操作を依頼できます</string>
   <string name="banner_unauthorized">%1$sには新しいアクセストークンが必要です</string>
   <string name="banner_enter_token">トークンを入力</string>
   <string name="toast_subject_reason">%1$s：%2$s</string>

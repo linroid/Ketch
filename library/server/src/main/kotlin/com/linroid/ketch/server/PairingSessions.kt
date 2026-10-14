@@ -27,6 +27,8 @@ import kotlin.time.Duration.Companion.minutes
  *
  * @param token the access token an allowed request receives.
  * @param scope runs the requests; cancelling it withdraws them.
+ * @param isOpen whether the owner takes requests now; others are turned away unasked, and count
+ *   against nobody's [backoff].
  */
 internal class PairingSessions(
   private val approver: PairingApprover,
@@ -35,6 +37,7 @@ internal class PairingSessions(
   private val timeout: Duration = PAIRING_TIMEOUT,
   private val retention: Duration = ANSWER_RETENTION,
   private val backoff: PairingBackoff = PairingBackoff(),
+  private val isOpen: () -> Boolean = { true },
 ) {
   private val log = KetchLogger("Pairing")
   private val mutex = Mutex()
@@ -51,6 +54,9 @@ internal class PairingSessions(
     /** The owner is asked; the device polls with [ticket]. */
     class Asking(val ticket: PairingTicket) : Opened
 
+    /** Not asked: the owner has not turned pairing on. */
+    data object Closed : Opened
+
     /** Not asked: a request from the address, or [MAX_PENDING] in all, wait for an answer. */
     data object Busy : Opened
 
@@ -60,6 +66,10 @@ internal class PairingSessions(
 
   /** Asks the owner about [request] from [address], unless it has to wait. */
   suspend fun open(request: PairingRequest, address: String): Opened {
+    if (!isOpen()) {
+      log.i { "Pairing from $address refused: pairing is off" }
+      return Opened.Closed
+    }
     val id = newId()
     mutex.withLock {
       backoff.waitFor(address)?.let { wait ->

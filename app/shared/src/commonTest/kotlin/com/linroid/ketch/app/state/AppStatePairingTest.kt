@@ -67,7 +67,7 @@ class AppStatePairingTest {
   @Test
   fun requestWhileSharingIsShown_postsNoToast() = runTest {
     val state = appState()
-    state.pairingRequestsShown = true
+    state.sharingShown = true
     ask(state, "Pixel 9")
     settleSnapshots()
 
@@ -81,7 +81,7 @@ class AppStatePairingTest {
     settleSnapshots()
     assertNotNull(state.pairingToast("Pixel 9"))
 
-    state.pairingRequestsShown = true
+    state.sharingShown = true
     settleSnapshots()
 
     assertNull(state.pairingToast("Pixel 9"))
