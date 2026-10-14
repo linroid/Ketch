@@ -43,6 +43,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentUploadTest {
@@ -335,12 +336,17 @@ class TorrentUploadTest {
   }
 
   @Test
-  fun peerTakingWholePieces_isNeverRefused() = seeder { wire, pieces ->
-    for (index in 0 until pieces) {
-      for (begin in 0 until PIECE step 16_384) {
-        wire.send(PeerMessage.Request(index, begin, 16_384))
-        val answer = answer(wire)
-        assertTrue(answer is PeerMessage.Piece, "piece $index at $begin: $answer")
+  fun peerTakingWholePieces_isNeverRefused() = seeder { wire, _ ->
+    // Eight pieces, more than its share would read without what it earns, 16 requests at once.
+    for (index in 0 until 8) {
+      for (batch in 0 until PIECE step 16 * 16_384) {
+        for (begin in batch until batch + 16 * 16_384 step 16_384) {
+          wire.send(PeerMessage.Request(index, begin, 16_384))
+        }
+        repeat(16) {
+          val answer = answer(wire)
+          assertTrue(answer is PeerMessage.Piece, "piece $index: $answer")
+        }
       }
     }
   }
@@ -354,9 +360,10 @@ class TorrentUploadTest {
   }
 
   /** A Fast peer an engine seeding 16 pieces of [PIECE] bytes unchoked. */
-  private fun seeder(test: suspend (PeerWire, Int) -> Unit) = runTest {
+  private fun seeder(test: suspend (PeerWire, Int) -> Unit) = runTest(timeout = 120.seconds) {
     withContext(Dispatchers.Default) {
-      withTimeout(30_000) {
+      // Simulators hash and move 16 MiB slowly.
+      withTimeout(90_000) {
         val pieces = 16
         val bytes = ByteArray(pieces * PIECE) { (it * 31 + it / PIECE).toByte() }
         val hashes = (0 until pieces).fold(ByteArray(0)) { all, index ->
