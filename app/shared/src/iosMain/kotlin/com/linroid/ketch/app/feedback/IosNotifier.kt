@@ -84,12 +84,11 @@ object IosNotifier : SystemNotifier {
    * the first notification posts.
    */
   internal suspend fun registerCategories() {
-    center.setNotificationCategories(
-      setOf(
-        category(CATEGORY_COMPLETED, NotificationAction.Show, NotificationAction.Share),
-        category(CATEGORY_FAILED, NotificationAction.Retry),
-      ),
+    val categories = setOf(
+      category(CATEGORY_COMPLETED, NotificationAction.Show, NotificationAction.Share),
+      category(CATEGORY_FAILED, NotificationAction.Retry),
     )
+    center.setNotificationCategories(categories)
   }
 
   /** Asks to notify and badge once per launch; iOS only prompts the first time. */
@@ -144,9 +143,11 @@ object IosNotifier : SystemNotifier {
    * after a minute, so a quick trip to another app never posts it.
    */
   internal suspend fun notifyPaused(count: Int) {
+    val title = Res.plurals.notify_paused.text(count).load()
+    val body = Res.string.notify_paused_body.text().load()
     val content = UNMutableNotificationContent()
-    content.setTitle(Res.plurals.notify_paused.text(count).load())
-    content.setBody(Res.string.notify_paused_body.text().load())
+    content.setTitle(title)
+    content.setBody(body)
     val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(
       timeInterval = PAUSED_NOTICE_DELAY_SECONDS,
       repeats = false,
@@ -182,24 +183,32 @@ object IosNotifier : SystemNotifier {
   private suspend fun category(
     id: String,
     vararg actions: NotificationAction,
-  ): UNNotificationCategory = UNNotificationCategory.categoryWithIdentifier(
-    identifier = id,
-    actions = actions.map { action ->
+  ): UNNotificationCategory {
+    // Load every title before the first Objective-C call: a suspension inside the argument
+    // list of an Objective-C call loses the arguments evaluated before it on Kotlin/Native,
+    // which crashed `actionWithIdentifier` with null arguments.
+    val titles = actions.map { action ->
       val title = when (action) {
         NotificationAction.Show -> Res.string.action_show
         NotificationAction.Reveal -> Res.string.reveal_in_files
         NotificationAction.Share -> Res.string.notify_action_share
         NotificationAction.Retry -> Res.string.action_retry
       }
-      UNNotificationAction.actionWithIdentifier(
-        identifier = action.name,
-        title = title.text().load(),
-        options = UNNotificationActionOptionForeground,
-      )
-    },
-    intentIdentifiers = emptyList<String>(),
-    options = UNNotificationCategoryOptionNone,
-  )
+      action to title.text().load()
+    }
+    return UNNotificationCategory.categoryWithIdentifier(
+      identifier = id,
+      actions = titles.map { (action, title) ->
+        UNNotificationAction.actionWithIdentifier(
+          identifier = action.name,
+          title = title,
+          options = UNNotificationActionOptionForeground,
+        )
+      },
+      intentIdentifiers = emptyList<String>(),
+      options = UNNotificationCategoryOptionNone,
+    )
+  }
 
   private fun NSError.describe(): String = "$domain ${code}: $localizedDescription"
 
