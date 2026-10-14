@@ -19,14 +19,19 @@ class FileConfigStoreTest {
   }
 
   @Test
-  fun load_unreadableFile_movesItAsideAndReturnsDefaults() {
+  fun load_unreadableFile_movesItAsideAndReturnsDefaultsWithoutUploads() {
     // A TOML syntax error, and a port ServerConfig refuses.
     for (content in listOf("[server\nport = 8642\n", "[server]\nport = 70000\n")) {
       file.writeText(content)
       val reported = mutableListOf<UnreadableConfig>()
       val store = FileConfigStore(file.path) { reported += it }
 
-      assertEquals(KetchConfig(), store.load())
+      val loaded = store.load()
+      assertEquals(KetchConfig.Unreadable, loaded)
+      // The file may have turned uploading off; nothing says it did not.
+      assertEquals(TorrentUploadMode.Off, loaded.torrent.upload)
+      assertEquals(KetchConfig(),
+        loaded.copy(torrent = loaded.torrent.copy(upload = TorrentSettings().upload)))
 
       val unreadable = reported.single()
       assertEquals(file.path, unreadable.path)

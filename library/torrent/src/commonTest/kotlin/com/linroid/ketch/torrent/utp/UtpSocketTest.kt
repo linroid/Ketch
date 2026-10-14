@@ -4,6 +4,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -249,6 +250,35 @@ class UtpSocketTest {
     for (seq in 9..16) socket.receive(data(seq), 0)
     val window = sent.last().window
     assertEquals(0L, window)
+  }
+
+  @Test
+  fun accepted_takesNoDataUntilAPacketAcknowledgesOurAnswer() {
+    val sent = mutableListOf<UtpPacket>()
+    val syn = UtpPacket(UtpType.SYN, 7, 0, 0, 1_000_000, 1, 0)
+    val socket = UtpSocket.accept(syn, { sent += it }, 0, UtpOptions(), initialSeq = 100)
+    fun data(ack: Int) = UtpPacket(UtpType.DATA, 8, 0, 0, 1_000_000, 2, ack,
+      payload = ByteArray(10))
+    assertFalse(socket.confirmed)
+
+    // A forged source cannot know the sequence our answer carried.
+    socket.receive(data(ack = 1234), 0)
+    assertFalse(socket.confirmed)
+    assertEquals(0L, socket.available)
+    socket.receive(data(ack = 99), 0)
+
+    assertTrue(socket.confirmed)
+    assertEquals(10L, socket.available)
+  }
+
+  @Test
+  fun dialer_acknowledgesTheAnswerAtOnce_soTheResponderConfirms() {
+    val network = Network()
+    val a = network.connect()
+    network.run(1_000_000) { network.b?.confirmed == true }
+
+    assertEquals(UtpSocket.State.CONNECTED, a.currentState)
+    assertTrue(a.confirmed)
   }
 
   @Test

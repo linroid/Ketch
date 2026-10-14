@@ -87,6 +87,16 @@ internal class UtpSocket private constructor(
   private var ackNeeded = false
   /** The sequence our STATE answering the SYN carried, answering a repeated SYN the same way. */
   private var synAnswerSeq = -1
+  /** The first sequence of our stream, which the peer must acknowledge to confirm a SYN. */
+  private var firstSeq = -1
+
+  /**
+   * The peer has proved it receives our packets: dialed sockets always, accepted ones once a
+   * packet acknowledges the sequence our SYN answer carried. A SYN's source can be forged, but
+   * not a packet acknowledging a random sequence sent to it; until then the socket takes no data.
+   */
+  var confirmed: Boolean = true
+    private set
 
   /** Why the connection failed, once [state] is [State.FAILED]. */
   var failure: String? = null
@@ -173,7 +183,13 @@ internal class UtpSocket private constructor(
         return
       }
       // Anything else means the peer connected: a later SYN is a stale duplicate.
-      else -> synAnswerSeq = -1
+      else -> {
+        if (!confirmed) {
+          if (!acknowledgesOurStream(packet.ack)) return
+          confirmed = true
+        }
+        synAnswerSeq = -1
+      }
     }
     if (state == State.SYN_SENT) {
       // Only the STATE acknowledging our SYN connects: it carries the sequence the responder's
@@ -182,12 +198,18 @@ internal class UtpSocket private constructor(
       if (packet.type != UtpType.STATE || packet.ack != utpSeq(seqNr, -1)) return
       ackNr = utpSeq(packet.seq, -1)
       state = State.CONNECTED
+      // Acknowledged at once, so the responder sees the connection before we write.
+      ackNeeded = true
     }
     acknowledge(packet, now)
     if (packet.type == UtpType.DATA || packet.type == UtpType.FIN) accept(packet)
     if (ackNeeded) sendState(now)
     flush(now)
   }
+
+  /** [ack] names a packet of ours: from just before [firstSeq] to the last one sent. */
+  private fun acknowledgesOurStream(ack: Int): Boolean =
+    ((ack - utpSeq(firstSeq, -1)) and 0xffff) <= ((seqNr - firstSeq) and 0xffff)
 
   /** Retransmits on timeout, keeps the mapping alive and closes; call often (every 100 ms). */
   fun tick(now: Long) {
@@ -477,7 +499,10 @@ internal class UtpSocket private constructor(
       return socket
     }
 
-    /** Answers [syn], connecting at once; the STATE answering it goes out now. */
+    /**
+     * Answers [syn], connecting at once; the STATE answering it goes out now. The socket is
+     * [confirmed] once the peer's first packet acknowledges that STATE.
+     */
     fun accept(
       syn: UtpPacket,
       send: (UtpPacket) -> Unit,
@@ -494,6 +519,8 @@ internal class UtpSocket private constructor(
       socket.replyMicros = now.toInt() - syn.timestamp
       socket.peerWindow = syn.window
       socket.synAnswerSeq = initialSeq
+      socket.firstSeq = initialSeq
+      socket.confirmed = false
       socket.sendState(now)
       return socket
     }

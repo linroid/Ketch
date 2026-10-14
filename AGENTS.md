@@ -756,9 +756,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   target, slow start until half of it), the receive window with zero-window probes, FIN and
   RESET. `TorrentUdpPort` shares one UDP socket per address family between DHT (`openDht`) and
   uTP, bound at the TCP listen port (any port when taken) when the engine starts, and again
-  when it stops working; `UtpEndpoint` runs its sockets under one lock (dial, SYN answers through
-  `TorrentConnectionBudget.admit` into `dispatchIncoming`, RESETs for unknown connections at
-  most 64 a second, a 50 ms tick) and exposes each as a `TorrentConnection` (`utp`).
+  when it stops working; `UtpEndpoint` runs its sockets under one lock (dial, SYN answers, RESETs
+  for unknown connections at most 64 a second, a 50 ms tick) and exposes each as a
+  `TorrentConnection` (`utp`). An answered SYN stays half open, taking no data and outside
+  `TorrentConnectionBudget.admit` and `dispatchIncoming`, until a packet acknowledges the random
+  sequence our answer carried (`UtpSocket.confirmed`; dialers acknowledge it at once), so forged
+  SYN sources never hold the budget: at most 64 wait, each 10 s, forgotten without a RESET, and
+  further SYNs go unanswered.
   `TorrentUtpFallback`, below the budget, dials TCP first and uTP (two SYN retries, 7 s) when
   TCP fails, except for the last 4096 peers known to speak uTP (BEP 11 flags the v1 swarm
   passes from PEX, `preferUtp`, or a uTP fallback that worked), which get uTP first and are
@@ -780,6 +784,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection arrives as an incoming peer (a duplicate of a peer being dialed is closed). Peers
   that take part carry the BEP 11 flag `0x08`, and the swarm summary counts relays, requests
   and connects. V2 and hybrid sessions do not punch yet
+- Incoming connections still in their handshake (`dispatchIncoming`, 15 s) pass
+  `TorrentHandshakeGate`: a quarter of the connection budget (8 to 64) at once and 4 per host
+  (an IPv6 /64; loopback only counts against the total), so peers that connect and send nothing
+  never take the slots our dials need
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
   V2/hybrid incoming routing through one engine route table keyed by 20-byte wire tags
   (`TorrentRouteTable`, `launchIncoming`/`dispatchIncoming`), upload and seeding with 4-slot
@@ -1009,7 +1017,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   uses `WebConfigStore` (TOML in localStorage)
 - A `config.toml` that does not parse, or holds a value no setting takes, makes `load()` throw
   unless the store has an `onUnreadable` callback: the apps pass one, so the file moves aside to
-  `config.toml.broken-<UTC time>` and they start with the defaults. They report it, and a
+  `config.toml.broken-<UTC time>` and they start with `KetchConfig.Unreadable`, the defaults with
+  `[torrent] upload = off`, as the file may have turned uploading off (the CLI falls back to it
+  too). They report it, and a
   database moved aside, through `UnreadableFiles`, which the app shows once as a sticky warning.
   The CLI never moves the file it shares with the desktop app: `ketch server` refuses to start
   (defaults would serve on every interface without the token), `ketch mcp --standalone` and
@@ -1046,7 +1056,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Off. `UploadNetwork.kt`'s `uploadsPaused(settings, unmetered)` pauses whenever the switch is on
   and the network is metered, whatever the mode, so a mode change on mobile data never opens an
   upload window; `followUploadNetwork` pauses at once and resumes only after the network has
-  allowed uploads for 3 s (`UNPAUSE_SETTLE`, as every resume rechecks seeded torrents). Hosts pass
+  allowed uploads for 3 s (`UNPAUSE_SETTLE`, as every resume rechecks seeded torrents); a network
+  flow that fails counts as metered from then on, so uploads pause. Hosts pass
   `InstanceFactory.uploadNetwork` and `pauseUploads` (`TorrentDownloadSource.setUploadsPaused`):
   Android's `unmeteredNetworkChanges(context)` follows the default network's
   `NET_CAPABILITY_NOT_METERED` (or `TEMPORARILY_NOT_METERED` from API 30) and `KetchService`

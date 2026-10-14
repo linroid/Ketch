@@ -36,7 +36,8 @@ fun uploadsPaused(settings: TorrentSettings, unmetered: Boolean): Boolean =
  * cancelled: as soon as uploads must pause, and once they have been allowed for
  * [UNPAUSE_SETTLE] when they may resume. Nothing happens before both have a value, and each
  * change of what uploads may do calls [pause] once. A [pause] that fails is logged, and the next
- * change calls it again; a network that stops reporting leaves uploads as they are.
+ * change calls it again. A network that can no longer be followed counts as metered from then
+ * on, so uploads never go on over mobile data unseen; [settings] are still followed.
  *
  * @param unmetered whether the device is on Wi-Fi or another unmetered network.
  */
@@ -46,9 +47,12 @@ internal suspend fun followUploadNetwork(
   unmetered: Flow<Boolean>,
   pause: suspend (Boolean) -> Unit,
 ) {
-  combine(settings, unmetered) { current, free -> uploadsPaused(current, free) }
+  val network = unmetered.catch { e ->
+    log.w { "Stopped following the network for uploads: ${e.describeCauses()}" }
+    emit(false)
+  }
+  combine(settings, network) { current, free -> uploadsPaused(current, free) }
     .distinctUntilChanged()
-    .catch { e -> log.w { "Stopped following the network for uploads: ${e.describeCauses()}" } }
     .transformLatest { paused ->
       if (!paused) delay(UNPAUSE_SETTLE)
       emit(paused)

@@ -39,4 +39,15 @@ data class KetchConfig(
   val integration: IntegrationSettings = IntegrationSettings(),
   val power: PowerSettings = PowerSettings(),
   val hooks: List<HookConfig> = emptyList(),
-)
+) {
+  companion object {
+    /**
+     * What runs in place of a config file that cannot be read: the defaults, except that
+     * torrents upload nothing, as the file may have turned uploading off and the defaults turn
+     * it on. The user turns it on again in the settings, which saves a readable file.
+     */
+    val Unreadable: KetchConfig = KetchConfig(
+      torrent = TorrentSettings(upload = TorrentUploadMode.Off),
+    )
+  }
+}

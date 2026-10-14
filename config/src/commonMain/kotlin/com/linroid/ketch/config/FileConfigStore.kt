@@ -22,7 +22,8 @@ import kotlin.time.Instant
  *
  * A file that is not valid TOML, or holds a value no setting takes, makes [load] throw unless
  * [onUnreadable] is set. Then [load] moves it aside to `<path>.broken-<time>`, keeping it for
- * the user, reports it and returns the defaults, which the next [save] writes in its place.
+ * the user, reports it and returns [KetchConfig.Unreadable], the defaults without torrent
+ * uploads, which the next [save] writes in its place.
  * [load] still throws when the file cannot be read or moved.
  *
  * @param onUnreadable hears of a file [load] moved aside; `null` to have [load] throw instead,
@@ -61,7 +62,7 @@ class FileConfigStore(
       val movedTo = moveAside(file, e)
       log.w { "Moved unreadable $path aside to $movedTo, using defaults: ${e.describeCauses()}" }
       report(UnreadableConfig(path, movedTo, e))
-      KetchConfig()
+      KetchConfig.Unreadable
     }
   }
 

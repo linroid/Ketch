@@ -3,8 +3,10 @@ package com.linroid.ketch.app.instance
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -145,5 +147,26 @@ class UploadNetworkTest {
     follower.report(unmetered = false)
 
     assertEquals(listOf(false, true), follower.calls)
+  }
+
+  @Test
+  fun followUploadNetwork_networkFails_pausesAndKeepsFollowingTheSettings() = runTest {
+    val settings = MutableStateFlow(TorrentSettings(uploadWifiOnly = true))
+    val calls = mutableListOf<Boolean>()
+    val network = flow {
+      emit(true)
+      delay(UNPAUSE_SETTLE * 2)
+      throw IllegalStateException("Connectivity service gone")
+    }
+    backgroundScope.launch { followUploadNetwork(settings, network) { calls += it } }
+
+    advanceTimeBy(UNPAUSE_SETTLE * 3)
+    runCurrent()
+    assertEquals(listOf(false, true), calls)
+    settings.value = settings.value.copy(uploadWifiOnly = false)
+    advanceTimeBy(UNPAUSE_SETTLE * 2)
+    runCurrent()
+
+    assertEquals(listOf(false, true, false), calls)
   }
 }

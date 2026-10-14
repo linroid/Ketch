@@ -22,6 +22,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
 import kotlin.random.Random
 import kotlin.test.Test
@@ -29,6 +30,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** uTP endpoints over real loopback UDP ports. */
@@ -106,6 +108,42 @@ class UtpEndpointTest {
       silent.close()
     }
   }
+
+  @Test
+  fun forgedSyns_neverReachTheEngine_andStopBeingAnsweredPastTheHalfOpenLimit() =
+    endpoints { network, scope ->
+      val incoming = Channel<TorrentConnection>(Channel.UNLIMITED)
+      var endpoint: UtpEndpoint? = null
+      val port = TorrentUdpPort(network.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
+        utp = { endpoint?.receive(it) })
+      endpoint = UtpEndpoint(scope, port::send, onIncoming = { incoming.trySend(it).isSuccess },
+        maxHalfOpen = 2)
+      val target = PeerEndpoint("127.0.0.1", port.local.port)
+      val raw = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      try {
+        suspend fun syn(id: Int): UtpPacket? {
+          raw.send(target, UtpPacket(UtpType.SYN, id, 0, 0, 1_000_000, 1, 0).encode())
+          return withTimeoutOrNull(1_000) { UtpPacket.decode(raw.receive().bytes) }
+        }
+        val answer = assertNotNull(syn(10))
+        assertEquals(UtpType.STATE, answer.type)
+        assertNotNull(syn(20))
+        // Two wait unconfirmed: a third SYN gets no answer.
+        assertNull(syn(30))
+        // Data that does not acknowledge the answer is not a connection.
+        raw.send(target, UtpPacket(UtpType.DATA, 11, 0, 0, 1_000_000, 2,
+          utpSeq(answer.seq, 5), payload = ByteArray(4)).encode())
+        assertNull(withTimeoutOrNull(500) { incoming.receive() })
+        // Acknowledging it is: the connection reaches the engine with its data.
+        raw.send(target, UtpPacket(UtpType.DATA, 11, 0, 0, 1_000_000, 2,
+          utpSeq(answer.seq, -1), payload = byteArrayOf(1, 2, 3, 4)).encode())
+        val accepted = incoming.receive()
+        assertContentEquals(byteArrayOf(1, 2, 3, 4), accepted.readExactly(4))
+        accepted.close()
+      } finally {
+        raw.close()
+      }
+    }
 
   @Test
   fun refusedIncoming_resetsTheDialer() = endpoints { network, scope ->

@@ -1322,9 +1322,10 @@ internal fun torrentEncryption(mode: TorrentEncryptionMode): TorrentEncryption =
 }
 
 /**
- * The default config file's settings, or the defaults when there is none or it cannot be read,
- * which stderr reports. The file stays as it is: the CLI never saves it, and the apps that share
- * it move an unreadable one aside and tell the user.
+ * The default config file's settings, the defaults when there is none, or
+ * [KetchConfig.Unreadable] (no torrent uploads) when it cannot be read, which stderr reports.
+ * The file stays as it is: the CLI never saves it, and the apps that share it move an unreadable
+ * one aside and tell the user.
  */
 private fun readDefaultConfig(): KetchConfig {
   val path = defaultConfigPath()
@@ -1333,7 +1334,7 @@ private fun readDefaultConfig(): KetchConfig {
     FileConfigStore(path).load()
   } catch (e: Exception) {
     System.err.println("Ignoring $path, which can't be read: ${e.message}")
-    KetchConfig()
+    KetchConfig.Unreadable
   }
 }
 

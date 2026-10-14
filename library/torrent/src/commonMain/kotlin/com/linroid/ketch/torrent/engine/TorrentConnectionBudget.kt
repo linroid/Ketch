@@ -16,20 +16,23 @@ internal class TorrentConnectionBudget(
   private val delegate: TorrentNetwork,
   initialLimit: Int,
 ) : TorrentNetwork by delegate {
-  private val limit = AtomicInt(initialLimit)
+  private val limitValue = AtomicInt(initialLimit)
   private val count = AtomicInt(0)
   private val live = AtomicReference<List<TorrentConnection>>(emptyList())
 
+  /** The most live sockets allowed now. */
+  val limit: Int get() = limitValue.load()
+
   fun set(value: Int) {
     require(value in 1..4096)
-    limit.store(value)
+    limitValue.store(value)
     live.load().drop(value).forEach { it.close() }
   }
 
   private fun reserve(): Boolean {
     while (true) {
       val current = count.load()
-      if (current >= limit.load()) return false
+      if (current >= limitValue.load()) return false
       if (count.compareAndSet(current, current + 1)) return true
     }
   }
@@ -80,7 +83,7 @@ internal class TorrentConnectionBudget(
       val previous = live.load()
       if (live.compareAndSet(previous, previous + wrapped)) break
     }
-    if (count.load() > limit.load()) wrapped.close()
+    if (count.load() > limitValue.load()) wrapped.close()
     return wrapped
   }
 

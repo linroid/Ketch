@@ -26,10 +26,15 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
 
 /**
- * The uTP connections of one UDP port: dials ([dial]), answers SYNs ([onIncoming] takes each
- * new connection or refuses it), routes packets by peer and connection ID, ticks every socket
- * and RESETs packets of connections it does not know. One lock guards every socket; packets
- * they produce go out after each step.
+ * The uTP connections of one UDP port: dials ([dial]), answers SYNs, routes packets by peer and
+ * connection ID, ticks every socket and RESETs packets of connections it does not know. One lock
+ * guards every socket; packets they produce go out after each step.
+ *
+ * A SYN's source address can be forged, so an answered SYN stays half open, outside
+ * [onIncoming], until the peer's next packet acknowledges our answer ([UtpSocket.confirmed]).
+ * At most [maxHalfOpen] wait at once, each for [halfOpenTimeoutUs], and further SYNs are
+ * dropped unanswered, so forged SYNs never hold the engine's connection budget and are answered
+ * one packet each.
  */
 internal class UtpEndpoint(
   private val scope: CoroutineScope,
@@ -40,13 +45,24 @@ internal class UtpEndpoint(
   /** Options of dialed sockets: fewer SYN retries, as a dial already waited for TCP. */
   private val dialOptions: UtpOptions = UtpOptions(synRetries = 2),
   private val maxConnections: Int = 512,
+  private val maxHalfOpen: Int = 64,
+  private val halfOpenTimeoutUs: Long = 10_000_000,
 ) {
   private data class Key(val remote: PeerEndpoint, val receiveId: Int)
 
-  private class Entry(val remote: PeerEndpoint, val socket: UtpSocket) {
+  private class Entry(
+    val remote: PeerEndpoint,
+    val socket: UtpSocket,
+    /** When an accepted socket was created; it is offered to [onIncoming] once confirmed. */
+    val acceptedAt: Long = -1,
+  ) {
     /** Bumped whenever the socket may have changed; readers and writers wait on it. */
     val version = MutableStateFlow(0L)
     var released = false
+    /** Dialed, or accepted and handed to [onIncoming]. */
+    var offered = acceptedAt < 0
+
+    val halfOpen: Boolean get() = !offered && !released
 
     fun signature() = listOf(socket.available, socket.writable, socket.currentState,
       socket.isEndOfStream)
@@ -87,6 +103,8 @@ internal class UtpEndpoint(
             // Waiters wake only when what they wait for may have changed.
             if (entry.signature() != before) entry.version.update { it + 1 }
             if (entry.socket.isFinished && entry.released) finished += key
+            // Never confirmed: forgotten without a RESET, which could go to a forged source.
+            if (entry.halfOpen && now - entry.acceptedAt >= halfOpenTimeoutUs) finished += key
           }
           finished.forEach { entries.remove(it) }
           // Every 10 s, how each connection with data to send is doing.
@@ -141,10 +159,11 @@ internal class UtpEndpoint(
           reset(remote, packet, now)
           return@step null
         }
+        // Dropped unanswered: the peer's SYN retries come back once some have expired.
+        if (entries.values.count { it.halfOpen } >= maxHalfOpen) return@step null
         val socket = UtpSocket.accept(packet, sender(remote), now, options)
-        val entry = Entry(remote, socket)
-        entries[Key(remote, socket.receiveId)] = entry
-        return@step entry
+        entries[Key(remote, socket.receiveId)] = Entry(remote, socket, acceptedAt = now)
+        return@step null
       }
       val entry = entries[Key(remote, packet.connectionId)]
         ?: if (packet.type == UtpType.RESET) {
@@ -157,6 +176,10 @@ internal class UtpEndpoint(
       } else {
         entry.socket.receive(packet, now)
         entry.version.update { it + 1 }
+        if (entry.halfOpen && entry.socket.confirmed) {
+          entry.offered = true
+          return@step entry
+        }
       }
       null
     }
