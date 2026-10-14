@@ -271,22 +271,7 @@ private fun PairCard(
   } else {
     null
   }
-  SettingsGroup(
-    title = stringResource(Res.string.settings_sharing_pair),
-    action = if (running != null) {
-      {
-        KetchButton(
-          text = stringResource(Res.string.settings_sharing_stop),
-          onClick = onStop,
-          variant = KetchButtonVariant.Ghost,
-          size = KetchButtonSize.Small,
-          leadingIcon = KetchIcon.Stop,
-        )
-      }
-    } else {
-      null
-    },
-  ) {
+  SettingsGroup(title = stringResource(Res.string.settings_sharing_pair)) {
     BoxWithConstraints(
       Modifier.fillMaxWidth()
         .background(KetchTheme.colors.surface)
@@ -317,8 +302,30 @@ private fun PairCard(
         }
       }
     }
-    if (running != null) whileSharing(running)
+    if (running != null) {
+      whileSharing(running)
+      StopSharingRow(onStop)
+    }
   }
+}
+
+/**
+ * The last row of the Pair a device card while sharing runs: Stop sharing, in the danger color,
+ * below the settings it ends. The whole row is the button, laid out like the rows above, so its
+ * label starts where their titles do; a glyph would sit inset within its box and break the line.
+ */
+@Composable
+private fun StopSharingRow(onStop: () -> Unit) {
+  val spacing = KetchTheme.spacing
+  Text(
+    text = stringResource(Res.string.settings_sharing_stop),
+    style = KetchTheme.typography.body,
+    color = KetchTheme.colors.status.failed.color,
+    modifier = Modifier.fillMaxWidth()
+      .clickable(role = Role.Button, onClick = onStop)
+      .background(KetchTheme.colors.surface)
+      .padding(horizontal = spacing.s4, vertical = spacing.s3),
+  )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -448,6 +455,11 @@ private fun PairDetails(
           style = type.caption,
           color = colors.textSecondary,
         )
+        Text(
+          text = stringResource(Res.string.settings_sharing_anyone, noun),
+          style = type.caption,
+          color = colors.textSecondary,
+        )
         FlowRow(
           horizontalArrangement = Arrangement.spacedBy(spacing.s2),
           verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -474,22 +486,12 @@ private fun PairDetails(
             size = KetchButtonSize.Small,
             leadingIcon = if (copied) KetchIcon.Check else KetchIcon.Copy,
           )
-        }
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-        ) {
-          Text(
-            text = stringResource(Res.string.settings_sharing_anyone, noun),
-            style = type.caption,
-            color = colors.textSecondary,
-            modifier = Modifier.weight(1f, fill = false),
-          )
           KetchButton(
             text = stringResource(Res.string.settings_sharing_new_code),
             onClick = onNewCode,
-            variant = KetchButtonVariant.Ghost,
+            variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
+            leadingIcon = KetchIcon.Retry,
             tooltip = stringResource(Res.string.settings_sharing_new_code_hint),
           )
         }
