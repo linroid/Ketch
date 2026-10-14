@@ -1027,7 +1027,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the Downloads page's Retries stepper ends in Unlimited (`unlimitedRetries`) and a Stalled
   connections stepper sets `idleTimeoutMs` (Off, 15 s to 5 min); `minSpeed` has no control yet
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, `allowedDirectories`, mDNS,
-  `autoStart` (apps start the server on launch)
+  `autoStart` (apps start the server on launch; Settings › Sharing turns it on with sharing
+  and off with Stop sharing, and shows its switch outside Advanced)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
   reported, which picks its `DeviceType` glyph in the apps' pennants
 - `defaultConfigDir()` (JVM: desktop app and CLI) is `KETCH_CONFIG_DIR` when set (`/config` in

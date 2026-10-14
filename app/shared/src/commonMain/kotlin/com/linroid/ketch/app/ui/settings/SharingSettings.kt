@@ -122,7 +122,9 @@ private val log = KetchLogger("SharingSettings")
 
 /**
  * Sharing of the embedded [device]: the Pair a device card, which lets a phone, a tablet or a
- * browser control it, then the sharing server's advanced settings.
+ * browser control it, pairing requests while it is shared, whether sharing starts with Ketch
+ * (on once sharing is turned on, off once it is stopped), then the sharing server's advanced
+ * settings.
  *
  * Settings are saved at once but read when sharing starts, so while it runs a change offers a
  * restart. Other devices share from their own Ketch, so they get a note instead.
@@ -168,11 +170,16 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
           host = ServerConfig.ANY_HOST,
           apiToken = config.apiToken ?: newToken(),
           mdnsEnabled = true,
+          // Sharing turned on stays on across restarts until it is stopped.
+          autoStart = true,
         ),
       )
       manager.startServer()
     },
-    onStop = { manager.stopServer() },
+    onStop = {
+      save(config.copy(autoStart = false))
+      manager.stopServer()
+    },
     onNewCode = {
       save(config.copy(apiToken = newToken()))
       restart()
@@ -183,6 +190,13 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
   // Devices find this one and ask to pair only while it is shared with them.
   if (running != null && !running.config.isLoopbackOnly && running.config.apiToken != null) {
     PairingWindowGroup(manager.pairingRequests)
+  }
+  SettingsGroup {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_sharing_auto_start),
+      checked = config.autoStart,
+      onCheckedChange = { save(config.copy(autoStart = it)) },
+    )
   }
   // Starting with Ketch only matters at launch, so it never calls for a restart.
   if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
@@ -642,11 +656,6 @@ private fun AdvancedGroup(
         enabled = token.isNotEmpty(),
       )
     }
-    SettingsSwitchRow(
-      title = stringResource(Res.string.settings_sharing_auto_start),
-      checked = config.autoStart,
-      onCheckedChange = { onChange(config.copy(autoStart = it)) },
-    )
   }
 }
 
@@ -663,7 +672,6 @@ internal val AdvancedRows = listOf(
   Res.string.settings_sharing_access_code,
   Res.string.settings_sharing_discoverable,
   Res.string.settings_sharing_websites,
-  Res.string.settings_sharing_auto_start,
 )
 private val QrSize = 180.dp
 private val QrPlaceholderGlyph = 48.dp
