@@ -725,13 +725,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
   2 s; UPnP tries other ports on 718 and permanent leases on 725. `PortMappingTest` and
   `NatLayersTest` run them against scripted gateways on loopback
-- Reachability (`KotlinTorrentEngine.reachability`, through the controller): `reachable` once a
-  peer connected in over TCP (punched uTP connections prove nothing), `forwarded` when every layer
-  up to a public address forwards the port and the DHT sees us at that address, `blocked` when the
+- Reachability (`KotlinTorrentEngine.reachability`, `reachabilityStatus`, through the
+  controller): `reachable` once a peer connected in over TCP from a public address (punched uTP
+  connections and LAN peers prove nothing), `forwarded` when every layer up to a public address
+  forwards the port and the DHT sees us at that address (or no DHT runs), `blocked` when the
   outermost mapped address is private or the DHT sees us elsewhere, `not-forwarded` without a
-  mapping, `unknown` while the engine is not running. Settings → BitTorrent shows it for every
-  device whose controller lists `reachability` (`TorrentReachabilityNotice`, asked every 10 s),
-  saying whether hole punching still reaches peers
+  mapping, `unknown` while the engine is not running or a running DHT has not seen us yet.
+  Settings → BitTorrent shows it for every device whose controller lists `reachability`
+  (`TorrentReachabilityNotice`, asked every 10 s, following the device's current entry and
+  features), saying whether hole punching still reaches peers
 - Local Service Discovery (BEP 14), `TorrentConfig.localDiscovery` (on; only engines given a
   `KotlinTorrentEngine` `localDiscovery` transport factory, as `TorrentDownloadSource` passes
   `openLsdMulticast`, join the group, so engines built directly in tests never send multicast):

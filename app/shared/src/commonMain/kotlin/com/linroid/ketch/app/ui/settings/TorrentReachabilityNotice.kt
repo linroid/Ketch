@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -31,7 +32,13 @@ import kotlin.time.Duration.Companion.seconds
  */
 @Composable
 internal fun TorrentReachabilityNotice(state: AppState, device: InstanceEntry) {
-  val controller = remember(state, device.deviceId) { state.torrentControllerOf(device.deviceId) }
+  // A reconnect replaces a remote device's entry and client, and its features arrive later:
+  // follow both, so polling moves to the live client.
+  val entries by state.instances.collectAsState()
+  val presence by state.instanceManager.presence.collectAsState()
+  val entry = entries.firstOrNull { it.deviceId == device.deviceId }
+  val features = presence.firstOrNull { it.deviceId == device.deviceId }?.status?.features
+  val controller = remember(entry, features) { state.torrentControllerOf(device.deviceId) }
     ?: return
   val reachability by produceState<TorrentReachability?>(null, controller) {
     // Older devices do not list it; asking them anyway would only fail.

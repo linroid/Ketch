@@ -44,7 +44,9 @@ import com.linroid.ketch.torrent.net.TorrentListener
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.TorrentUdpPort
 import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.numericHost
+import com.linroid.ketch.torrent.net.publicTorrentAddress
 import com.linroid.ketch.torrent.net.resolveTorrentHost
 import com.linroid.ketch.torrent.peer.PeerAttempt
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
@@ -399,8 +401,11 @@ internal class KotlinTorrentEngine(
       PeerWire.decodeHandshake(header, InfoHash.fromBytes(tag))
       handedOff = route(tag.toByteString(), PrefixedConnection(stream, header))
       if (!handedOff) log.v { "Refused incoming peer ${connection.remote}: no accepting owner" }
-      // A punched uTP connection proves nothing about unsolicited ones; TCP does.
-      if (handedOff && !connection.utp) incomingPeers.incrementAndFetch()
+      // A punched uTP connection proves nothing about unsolicited ones, nor a peer on our own
+      // network about the internet; TCP from a public address does.
+      if (handedOff && !connection.utp && fromInternet(connection.remote)) {
+        incomingPeers.incrementAndFetch()
+      }
     } catch (e: TimeoutCancellationException) {
       log.v { "Refused incoming peer ${connection.remote}: no handshake within 15s" }
       reportUnrouted(connection.remote, attempt, e)
@@ -1225,10 +1230,8 @@ internal class KotlinTorrentEngine(
    * only through hairpin NAT; local discovery finds it on the LAN instead.
    */
   /**
-   * Whether peers can connect to us: reachable once one has over TCP; forwarded when every NAT
-   * layer up to a public address forwards our port and the DHT sees us at that address; blocked
-   * when a NAT outside the routers we mapped does not (their outermost address is private, or
-   * the DHT sees us elsewhere); not forwarded without a mapping.
+   * Whether peers can connect to us; see [reachabilityStatus]. Peers on our own network do not
+   * count as having connected, nor do punched uTP connections.
    */
   internal fun reachability(): TorrentReachability {
     if (!running.load()) return TorrentReachability()
@@ -1237,13 +1240,8 @@ internal class KotlinTorrentEngine(
     val observed = dhtNodes.load().firstNotNullOfOrNull { node ->
       node.externalHost?.takeIf { ':' !in it }
     }
-    val status = when {
-      incoming > 0 -> TorrentReachabilityStatus.REACHABLE
-      layers == null -> TorrentReachabilityStatus.NOT_FORWARDED
-      !layers.public -> TorrentReachabilityStatus.BLOCKED
-      observed != null && observed != layers.externalAddress -> TorrentReachabilityStatus.BLOCKED
-      else -> TorrentReachabilityStatus.FORWARDED
-    }
+    val status = reachabilityStatus(incoming, layers, observed,
+      dhtRunning = dhtNodes.load().isNotEmpty())
     return TorrentReachability(
       status = status,
       port = advertisedPort.current().takeIf { it != 0 },
@@ -1252,6 +1250,9 @@ internal class KotlinTorrentEngine(
       holePunching = utpEnabled.load(),
     )
   }
+
+  private fun fromInternet(peer: PeerEndpoint): Boolean =
+    numericAddress(peer.host)?.let(::publicTorrentAddress) == true
 
   private fun isOwnAddress(peer: PeerEndpoint): Boolean =
     peer.host == mappedAddress.load() || dhtNodes.load().any { it.externalHost == peer.host }
@@ -1646,4 +1647,29 @@ internal suspend fun resolveEndpoint(value: String): List<PeerEndpoint> {
   require(port != null && port in 1..65535) { "Invalid peer endpoint" }
   val host = value.substringBeforeLast(':').removeSurrounding("[", "]")
   return resolveTorrentHost(host).map { PeerEndpoint(numericHost(it), port) }
+}
+
+/**
+ * Whether peers can connect, from the TCP peers that connected in from the internet ([incoming]),
+ * the port mapped through the NAT [layers] and the IPv4 address the DHT [observed] us at:
+ * reachable once one has; forwarded when every layer up to a public address forwards our port
+ * and the DHT sees us at that address (or no DHT runs to say); unknown until a running DHT has
+ * seen us; blocked when a NAT outside the mapped routers does not forward (their outermost
+ * address is private, or the DHT sees us elsewhere); not forwarded without a mapping.
+ */
+internal fun reachabilityStatus(
+  incoming: Long,
+  layers: PortMapLayers?,
+  observed: String?,
+  dhtRunning: Boolean,
+): TorrentReachabilityStatus = when {
+  incoming > 0 -> TorrentReachabilityStatus.REACHABLE
+  layers == null -> TorrentReachabilityStatus.NOT_FORWARDED
+  !layers.public -> TorrentReachabilityStatus.BLOCKED
+  // DHT runs but has not seen our address yet: wait for it before saying peers connect.
+  // Without DHT nothing can confirm it; the mapping at a public address is all there is.
+  observed == null ->
+    if (dhtRunning) TorrentReachabilityStatus.UNKNOWN else TorrentReachabilityStatus.FORWARDED
+  observed != layers.externalAddress -> TorrentReachabilityStatus.BLOCKED
+  else -> TorrentReachabilityStatus.FORWARDED
 }
