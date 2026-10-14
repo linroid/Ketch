@@ -22,7 +22,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">アップロードと追加トラッカー</string>
   <string name="settings_category_sharing">共有</string>
-  <string name="settings_category_sharing_description">スマートフォンやブラウザとペアリングして、このデバイスを操作</string>
+  <string name="settings_category_sharing_description">スマートフォンやブラウザとペアリングして、このデバイスのKetchを操作</string>
 
   <string name="settings_title">設定</string>
   <string name="settings_close">設定を閉じる</string>
@@ -622,14 +622,14 @@
   <string name="settings_sharing_pair">デバイスをペアリング</string>
   <string name="settings_sharing_stop">共有を停止</string>
   <string name="settings_sharing_pairing">ペアリングリクエスト</string>
-  <string name="settings_sharing_pairing_off">オンにすると3分間、ローカルネットワーク上で%1$sを見つけたデバイスが操作を依頼できます。</string>
-  <string name="settings_sharing_pairing_on">あと%1$sオン · ローカルネットワーク上のデバイスが%2$sの操作を依頼できます</string>
+  <string name="settings_sharing_pairing_off">オンにすると3分間、ローカルネットワーク上で%1$sを見つけたデバイスがKetchの操作を依頼できます。</string>
+  <string name="settings_sharing_pairing_on">あと%1$sオン · ローカルネットワーク上のデバイスが%2$sのKetchの操作を依頼できます</string>
   <string name="settings_sharing_pairing_turn_on">オンにする</string>
   <string name="settings_sharing_pairing_turn_off">オフにする</string>
-  <string name="settings_sharing_control_from_computer">コンピュータや別のデバイスから%1$sを操作できます。</string>
-  <string name="settings_sharing_control_from_phone">スマートフォン、タブレット、別のブラウザから%1$sを操作できます。</string>
+  <string name="settings_sharing_control_from_computer">コンピュータや別のデバイスから%1$sのKetchを操作できます。</string>
+  <string name="settings_sharing_control_from_phone">スマートフォン、タブレット、別のブラウザから%1$sのKetchを操作できます。</string>
   <string name="settings_sharing_failed">共有を開始できませんでした：%1$s</string>
-  <string name="settings_sharing_open_no_code">ネットワーク上の誰でも%1$sを操作できます。デバイスを許可するとコードが設定されます。</string>
+  <string name="settings_sharing_open_no_code">ネットワーク上の誰でも%1$sのKetchを操作できます。デバイスを許可するとコードが設定されます。</string>
   <string name="settings_sharing_local_only">%1$s上のアプリだけが接続できます。デバイスを許可すると、コードで保護してネットワークに共有します。</string>
   <string name="settings_sharing_off_hint">Ketchは%1$sをコードで保護して、ネットワークに共有します。</string>
   <string name="settings_sharing_allow">別のデバイスを許可</string>
@@ -641,7 +641,7 @@
   <string name="settings_sharing_also">ほかに%1$s</string>
   <string name="settings_sharing_copy_link">ペアリングリンクをコピー</string>
   <string name="settings_sharing_copied">コピーしました</string>
-  <string name="settings_sharing_anyone">このリンクを持っている人は誰でも%1$sを操作できます。</string>
+  <string name="settings_sharing_anyone">このリンクを持っている人は誰でも%1$sのKetchを操作できます。</string>
   <string name="settings_sharing_new_code">新しいコード</string>
   <string name="settings_sharing_new_code_hint">これまでにペアリングしたデバイスは切断されます</string>
   <string name="settings_sharing_qr">%1$sのペアリングコード</string>
@@ -664,7 +664,7 @@
   <string name="settings_sharing_websites_needs_code">アクセスコードが必要です。</string>
   <string name="settings_sharing_websites_hint">app.example.comのように、カンマで区切って入力します。* ですべてを許可します。</string>
   <string name="settings_sharing_websites_none">なし</string>
-  <string name="settings_sharing_auto_start">Ketchを開いたときに共有を開始</string>
+  <string name="settings_sharing_auto_start">Ketchを開いたら共有</string>
 
   <string name="settings_search_device_name">他のデバイスに表示される名前</string>
   <string name="settings_search_device_name_keywords">ホスト名, コンピュータ名, 名前, 名前の変更</string>

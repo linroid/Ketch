@@ -22,7 +22,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Upload und zusätzliche Tracker</string>
   <string name="settings_category_sharing">Freigabe</string>
-  <string name="settings_category_sharing_description">Telefon oder Browser koppeln, um dieses Gerät zu steuern</string>
+  <string name="settings_category_sharing_description">Telefon oder Browser koppeln, um die Downloads dieses Geräts zu verwalten</string>
 
   <string name="settings_title">Einstellungen</string>
   <string name="settings_close">Einstellungen schließen</string>
@@ -642,14 +642,14 @@
   <string name="settings_sharing_pair">Gerät koppeln</string>
   <string name="settings_sharing_stop">Freigabe beenden</string>
   <string name="settings_sharing_pairing">Kopplungsanfragen</string>
-  <string name="settings_sharing_pairing_off">Geräte, die %1$s in deinem lokalen Netzwerk finden, können nach dem Einschalten 3 Minuten lang anfragen, es zu steuern.</string>
-  <string name="settings_sharing_pairing_on">Noch %1$s an · Geräte in deinem lokalen Netzwerk können anfragen, %2$s zu steuern</string>
+  <string name="settings_sharing_pairing_off">Geräte, die %1$s in deinem lokalen Netzwerk finden, können nach dem Einschalten 3 Minuten lang anfragen, seine Downloads zu verwalten.</string>
+  <string name="settings_sharing_pairing_on">Noch %1$s an · Geräte in deinem lokalen Netzwerk können anfragen, Downloads für %2$s zu verwalten</string>
   <string name="settings_sharing_pairing_turn_on">Einschalten</string>
   <string name="settings_sharing_pairing_turn_off">Ausschalten</string>
-  <string name="settings_sharing_control_from_computer">Steuere %1$s von einem Computer oder einem anderen Gerät aus.</string>
-  <string name="settings_sharing_control_from_phone">Steuere %1$s von deinem Telefon, Tablet oder einem anderen Browser aus.</string>
+  <string name="settings_sharing_control_from_computer">Verwalte Downloads für %1$s von einem Computer oder einem anderen Gerät aus.</string>
+  <string name="settings_sharing_control_from_phone">Verwalte Downloads für %1$s von deinem Telefon, Tablet oder einem anderen Browser aus.</string>
   <string name="settings_sharing_failed">Die Freigabe konnte nicht gestartet werden: %1$s</string>
-  <string name="settings_sharing_open_no_code">Jeder in deinem Netzwerk kann %1$s steuern. Wenn du ein Gerät zulässt, wird ein Code hinzugefügt.</string>
+  <string name="settings_sharing_open_no_code">Jeder in deinem Netzwerk kann Downloads für %1$s verwalten. Wenn du ein Gerät zulässt, wird ein Code hinzugefügt.</string>
   <string name="settings_sharing_local_only">Nur lokale Apps können %1$s erreichen. Wenn du ein Gerät zulässt, wird die Freigabe in deinem Netzwerk mit einem Code aktiviert.</string>
   <string name="settings_sharing_off_hint">Ketch gibt %1$s in deinem Netzwerk frei, geschützt durch einen Code.</string>
   <string name="settings_sharing_allow">Anderes Gerät zulassen</string>
@@ -661,7 +661,7 @@
   <string name="settings_sharing_also">außerdem %1$s</string>
   <string name="settings_sharing_copy_link">Kopplungslink kopieren</string>
   <string name="settings_sharing_copied">Kopiert</string>
-  <string name="settings_sharing_anyone">Jeder mit dem Link kann %1$s steuern.</string>
+  <string name="settings_sharing_anyone">Jeder mit dem Link kann Downloads für %1$s verwalten.</string>
   <string name="settings_sharing_new_code">Neuer Code</string>
   <string name="settings_sharing_new_code_hint">Trennt die bisher gekoppelten Geräte</string>
   <string name="settings_sharing_qr">Kopplungscode für %1$s</string>
@@ -684,7 +684,7 @@
   <string name="settings_sharing_websites_needs_code">Erfordert einen Zugriffscode.</string>
   <string name="settings_sharing_websites_hint">Etwa app.example.com, durch Kommas getrennt. * erlaubt alle.</string>
   <string name="settings_sharing_websites_none">Keine</string>
-  <string name="settings_sharing_auto_start">Freigabe beim Öffnen von Ketch starten</string>
+  <string name="settings_sharing_auto_start">Beim Öffnen von Ketch freigeben</string>
 
   <string name="settings_search_device_name">Der Name, den deine anderen Geräte sehen</string>
   <string name="settings_search_device_name_keywords">Hostname, Computername, Rechnername, umbenennen</string>

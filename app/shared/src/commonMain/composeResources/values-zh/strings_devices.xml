@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">可用空间未知</string>
   <string name="device_chip_networks">用于下载的网络</string>
   <string name="device_chip_sharing_settings">共享设置</string>
-  <string name="device_chip_share_tooltip">允许其他设备控制它</string>
+  <string name="device_chip_share_tooltip">允许其他设备控制它上面的 Ketch</string>
   <string name="device_chip_not_shared">未共享 · 共享…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">重试 %1$d 个失败的下载</item>
@@ -162,7 +162,7 @@
   <string name="connect_approval_closed">%1$s 不接受配对请求。请在该设备的“设置 › 共享”中开启配对后重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_ask_again">重新请求</string>
   <string name="connect_added_badge">已添加</string>
-  <string name="connect_share_instead">想从其他设备控制%1$s？</string>
+  <string name="connect_share_instead">想从其他设备控制%1$s上的 Ketch？</string>
   <string name="connect_show_pairing_code">显示配对码</string>
 
   <string name="connect_landing_title">连接到 Ketch 设备</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_known">已添加过 %1$s。连接后将切换到该设备。</string>
   <string name="connect_pairing_known_code">已添加过 %1$s。连接后将切换到该设备，并更新为此链接中的访问码。</string>
   <string name="connect_pairing_has_code">此链接包含访问码。</string>
-  <string name="pairing_request_title">允许 %1$s 控制%2$s？</string>
+  <string name="pairing_request_title">允许 %1$s 控制%2$s上的 Ketch？</string>
   <string name="pairing_request_check">请确认 %1$s 上显示的配对码与下方一致，再允许连接：</string>
   <string name="pairing_request_note">它可以添加、暂停和移除这里的下载。若要撤销访问权限，请在“设置 › 共享”中选择“新访问码”。</string>
   <string name="pairing_request_allow">允许</string>

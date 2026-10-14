@@ -15,7 +15,7 @@
   <string name="notify_channel_done">Abgeschlossene Downloads</string>
   <string name="notify_channel_failed">Fehlgeschlagene Downloads</string>
   <string name="notify_channel_pairing">Kopplungsanfragen</string>
-  <string name="notify_pairing_title">%1$s möchte %2$s steuern</string>
+  <string name="notify_pairing_title">%1$s möchte Downloads für %2$s verwalten</string>
   <string name="notify_pairing_body">Erlaube es nur, wenn %1$s angezeigt wird.</string>
   <string name="notify_channel_requests">Anfragen, die deine Erlaubnis brauchen</string>
   <string name="notify_finished_group">Abgeschlossene Downloads</string>

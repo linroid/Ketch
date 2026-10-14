@@ -84,7 +84,7 @@
   <string name="device_free_space_unknown">Espaço livre desconhecido</string>
   <string name="device_chip_networks">Redes usadas para baixar</string>
   <string name="device_chip_sharing_settings">Configurações de compartilhamento</string>
-  <string name="device_chip_share_tooltip">Permitir que outros dispositivos o controlem</string>
+  <string name="device_chip_share_tooltip">Permitir que outros dispositivos controlem o Ketch nele</string>
   <string name="device_chip_not_shared">Não compartilhado · Compartilhar…</string>
   <plurals name="device_retry_failed">
     <item quantity="one">Tentar novamente %1$d que falhou</item>
@@ -168,7 +168,7 @@
   <string name="connect_approval_closed">%1$s não está aceitando pedidos de pareamento. Ative o pareamento em Configurações › Compartilhamento nele e peça de novo, ou digite o código de acesso.</string>
   <string name="connect_approval_ask_again">Solicitar acesso novamente</string>
   <string name="connect_added_badge">Adicionado</string>
-  <string name="connect_share_instead">Quer controlar %1$s de outro dispositivo?</string>
+  <string name="connect_share_instead">Quer controlar o Ketch em %1$s de outro dispositivo?</string>
   <string name="connect_show_pairing_code">Mostrar o código de pareamento</string>
 
   <string name="connect_landing_title">Conectar a um dispositivo Ketch</string>
@@ -186,7 +186,7 @@
   <string name="connect_pairing_known">Você já adicionou %1$s. Ao conectar, ele aparece aqui.</string>
   <string name="connect_pairing_known_code">Você já adicionou %1$s. Ao conectar, ele aparece aqui e recebe o código deste link.</string>
   <string name="connect_pairing_has_code">O link inclui o código de acesso.</string>
-  <string name="pairing_request_title">Permitir que %1$s controle %2$s?</string>
+  <string name="pairing_request_title">Permitir que %1$s controle o Ketch em %2$s?</string>
   <string name="pairing_request_check">Permita só se %1$s mostrar este código:</string>
   <string name="pairing_request_note">Ele poderá adicionar, pausar e remover downloads aqui. Para revogar o acesso, escolha Novo código em Configurações › Compartilhamento.</string>
   <string name="pairing_request_allow">Permitir</string>

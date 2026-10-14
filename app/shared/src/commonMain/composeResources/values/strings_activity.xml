@@ -27,7 +27,7 @@
   <!-- A device found this one on the network and wants its access code, while Ketch is not in
        front. %1$s is that device's name, such as "Pixel 9"; %2$s names this device inside a
        sentence, such as "this Mac". -->
-  <string name="notify_pairing_title">%1$s wants to control %2$s</string>
+  <string name="notify_pairing_title">%1$s wants to control Ketch on %2$s</string>
   <!-- %1$s is four digits the other device shows too. -->
   <string name="notify_pairing_body">Allow it only if it shows %1$s.</string>
   <!-- The channel of messages that wait for the user, such as Discover asking before it opens a

@@ -1,7 +1,5 @@
 package com.linroid.ketch.app.snapshot
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -18,7 +16,6 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.LocalClock
-import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.AddDeviceDialog
 import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
@@ -27,9 +24,10 @@ import com.linroid.ketch.app.ui.connect.NearbySearch
 import com.linroid.ketch.app.ui.connect.PairingClient
 import com.linroid.ketch.app.ui.connect.PairingDialog
 import com.linroid.ketch.app.ui.connect.PairingRequestCard
-import com.linroid.ketch.app.ui.connect.PairingWindowGroup
+import com.linroid.ketch.app.ui.connect.PairingWindowRow
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
+import com.linroid.ketch.app.ui.settings.SettingsGroup
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -180,9 +178,9 @@ class ConnectSnapshots {
     )) {
       snapshot("pairing-window", size, theme) {
         CompositionLocalProvider(LocalClock provides clock) {
-          Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4)) {
-            PairingWindowGroup(off)
-            PairingWindowGroup(on)
+          SettingsGroup {
+            PairingWindowRow(off)
+            PairingWindowRow(on)
           }
         }
       }

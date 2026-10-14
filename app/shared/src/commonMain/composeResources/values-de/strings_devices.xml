@@ -84,7 +84,7 @@
   <string name="device_free_space_unknown">Freier Speicher unbekannt</string>
   <string name="device_chip_networks">Netzwerke, über die es herunterlädt</string>
   <string name="device_chip_sharing_settings">Freigabeeinstellungen</string>
-  <string name="device_chip_share_tooltip">Anderen Geräten die Steuerung erlauben</string>
+  <string name="device_chip_share_tooltip">Anderen Geräten erlauben, die Downloads hier zu verwalten</string>
   <string name="device_chip_not_shared">Nicht freigegeben · Freigeben…</string>
   <plurals name="device_retry_failed">
     <item quantity="one">%1$d fehlgeschlagenen erneut versuchen</item>
@@ -168,7 +168,7 @@
   <string name="connect_approval_closed">%1$s nimmt keine Kopplungsanfragen an. Schalte dort unter Einstellungen › Freigabe die Kopplung ein und frag erneut, oder gib den Zugriffscode ein.</string>
   <string name="connect_approval_ask_again">Erneut fragen</string>
   <string name="connect_added_badge">Hinzugefügt</string>
-  <string name="connect_share_instead">Möchtest du %1$s von einem anderen Gerät aus steuern?</string>
+  <string name="connect_share_instead">Möchtest du Downloads für %1$s von einem anderen Gerät aus verwalten?</string>
   <string name="connect_show_pairing_code">Kopplungscode anzeigen</string>
 
   <string name="connect_landing_title">Mit einem Ketch-Gerät verbinden</string>
@@ -186,7 +186,7 @@
   <string name="connect_pairing_known">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt.</string>
   <string name="connect_pairing_known_code">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt und erhält den Code dieses Links.</string>
   <string name="connect_pairing_has_code">Der Link enthält den Zugriffscode.</string>
-  <string name="pairing_request_title">%1$s erlauben, %2$s zu steuern?</string>
+  <string name="pairing_request_title">%1$s erlauben, Downloads für %2$s zu verwalten?</string>
   <string name="pairing_request_check">Erlaube es nur, wenn %1$s diesen Code anzeigt:</string>
   <string name="pairing_request_note">Es kann hier Downloads hinzufügen, pausieren und entfernen. Um den Zugriff zu widerrufen, wähle „Neuer Code“ unter Einstellungen › Freigabe.</string>
   <string name="pairing_request_allow">Erlauben</string>

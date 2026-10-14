@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -50,7 +51,7 @@ import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.ui.connect.PairingRequestCards
-import com.linroid.ketch.app.ui.connect.PairingWindowGroup
+import com.linroid.ketch.app.ui.connect.PairingWindowRow
 import com.linroid.ketch.app.ui.connect.ReportSharingShown
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.state.portError
@@ -122,9 +123,9 @@ private val log = KetchLogger("SharingSettings")
 
 /**
  * Sharing of the embedded [device]: the Pair a device card, which lets a phone, a tablet or a
- * browser control it, pairing requests while it is shared, whether sharing starts with Ketch
- * (on once sharing is turned on, off once it is stopped), then the sharing server's advanced
- * settings.
+ * browser control it, then while it is shared its pairing requests and whether sharing starts
+ * with Ketch (on once sharing is turned on, off once it is stopped), then the sharing server's
+ * advanced settings.
  *
  * Settings are saved at once but read when sharing starts, so while it runs a change offers a
  * restart. Other devices share from their own Ketch, so they get a note instead.
@@ -185,19 +186,19 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
       restart()
     },
     onRefresh = { networks.loadNetworks() },
-  )
-  val running = serverState as? ServerState.Running
-  // Devices find this one and ask to pair only while it is shared with them.
-  if (running != null && !running.config.isLoopbackOnly && running.config.apiToken != null) {
-    PairingWindowGroup(manager.pairingRequests)
-  }
-  SettingsGroup {
+  ) { running ->
+    // Devices find this one and ask to pair only while it is shared with them.
+    if (!running.config.isLoopbackOnly && running.config.apiToken != null) {
+      PairingWindowRow(manager.pairingRequests)
+    }
+    // Sharing turns it on and Stop sharing off, so it only shows while sharing.
     SettingsSwitchRow(
       title = stringResource(Res.string.settings_sharing_auto_start),
       checked = config.autoStart,
       onCheckedChange = { save(config.copy(autoStart = it)) },
     )
   }
+  val running = serverState as? ServerState.Running
   // Starting with Ketch only matters at launch, so it never calls for a restart.
   if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
     SettingsNotice(
@@ -226,7 +227,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
 
 /**
  * The QR code and pairing link while this device is shared with other devices, or the button
- * that shares it.
+ * that shares it; while sharing runs, [whileSharing]'s rows follow in the same card.
  *
  * @param addresses addresses other devices reach this one at, best first; `null` while loading.
  * @param addressesReadable whether the device can tell its addresses at all.
@@ -241,6 +242,7 @@ private fun PairCard(
   onStop: () -> Unit,
   onNewCode: () -> Unit,
   onRefresh: () -> Unit,
+  whileSharing: @Composable ColumnScope.(ServerState.Running) -> Unit,
 ) {
   val spacing = KetchTheme.spacing
   val running = serverState as? ServerState.Running
@@ -297,6 +299,7 @@ private fun PairCard(
         }
       }
     }
+    if (running != null) whileSharing(running)
   }
 }
 

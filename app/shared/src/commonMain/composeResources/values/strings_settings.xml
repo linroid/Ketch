@@ -28,7 +28,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Uploading and extra trackers</string>
   <string name="settings_category_sharing">Sharing</string>
-  <string name="settings_category_sharing_description">Pair a phone or browser to control this device</string>
+  <string name="settings_category_sharing_description">Pair a phone or browser to control Ketch on this device</string>
 
   <!-- Around the pages. -->
   <string name="settings_title">Settings</string>
@@ -851,8 +851,8 @@
   <string name="settings_sharing_pair">Pair a device</string>
   <string name="settings_sharing_stop">Stop sharing</string>
   <string name="settings_sharing_pairing">Pairing requests</string>
-  <string name="settings_sharing_pairing_off">Devices that find %1$s on your local network can ask to control it for 3 minutes after you turn this on.</string>
-  <string name="settings_sharing_pairing_on">On for %1$s · devices on your local network can ask to control %2$s</string>
+  <string name="settings_sharing_pairing_off">Devices that find %1$s on your local network can ask to control Ketch there for 3 minutes after you turn this on.</string>
+  <string name="settings_sharing_pairing_on">On for %1$s · devices on your local network can ask to control Ketch on %2$s</string>
   <string name="settings_sharing_pairing_turn_on">Turn on</string>
   <string name="settings_sharing_pairing_turn_off">Turn off</string>
   <!--
@@ -860,12 +860,12 @@
     "this phone".
   -->
   <!-- On phones and tablets. -->
-  <string name="settings_sharing_control_from_computer">Control %1$s from a computer or another device.</string>
+  <string name="settings_sharing_control_from_computer">Control Ketch on %1$s from a computer or another device.</string>
   <!-- On computers and in the browser. -->
-  <string name="settings_sharing_control_from_phone">Control %1$s from your phone, tablet or another browser.</string>
+  <string name="settings_sharing_control_from_phone">Control Ketch on %1$s from your phone, tablet or another browser.</string>
   <!-- %1$s is why sharing did not start, such as a port in use. -->
   <string name="settings_sharing_failed">Couldn't start sharing: %1$s</string>
-  <string name="settings_sharing_open_no_code">Anyone on your network can control %1$s. Allowing a device adds a code.</string>
+  <string name="settings_sharing_open_no_code">Anyone on your network can control Ketch on %1$s. Allowing a device adds a code.</string>
   <string name="settings_sharing_local_only">Only apps on %1$s can connect. Allowing a device shares it on your network, with a code.</string>
   <string name="settings_sharing_off_hint">Ketch shares %1$s on your network, protected by a code.</string>
   <string name="settings_sharing_allow">Allow another device</string>
@@ -882,7 +882,7 @@
   <string name="settings_sharing_copy_link">Copy pairing link</string>
   <string name="settings_sharing_copied">Copied</string>
   <!-- Under the pairing link: whoever has the link. -->
-  <string name="settings_sharing_anyone">Anyone with it can control %1$s.</string>
+  <string name="settings_sharing_anyone">Anyone with it can control Ketch on %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>
   <string name="settings_sharing_new_code_hint">Disconnects the devices paired so far</string>
   <!-- The QR code, for screen readers. %1$s is the device's name or address. -->
@@ -910,7 +910,7 @@
   <string name="settings_sharing_websites_hint">Such as app.example.com, separated by commas. * allows any.</string>
   <!-- In the empty websites field. -->
   <string name="settings_sharing_websites_none">None</string>
-  <string name="settings_sharing_auto_start">Start sharing when Ketch opens</string>
+  <string name="settings_sharing_auto_start">Share when Ketch opens</string>
 
   <!--
     Settings search. A setting is found by the title of its row on its page, by the description

@@ -84,7 +84,7 @@
   <string name="device_free_space_unknown">Espace libre inconnu</string>
   <string name="device_chip_networks">Réseaux utilisés pour télécharger</string>
   <string name="device_chip_sharing_settings">Réglages de partage</string>
-  <string name="device_chip_share_tooltip">Permettre à d'autres appareils de le contrôler</string>
+  <string name="device_chip_share_tooltip">Permettre à d'autres appareils de contrôler Ketch sur celui-ci</string>
   <string name="device_chip_not_shared">Non partagé · Partager…</string>
   <plurals name="device_retry_failed">
     <item quantity="one">Réessayer %1$d échec</item>
@@ -168,7 +168,7 @@
   <string name="connect_approval_closed">%1$s n'accepte pas de demandes d'association. Activez l'association dans ses Réglages › Partage, puis redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_ask_again">Redemander</string>
   <string name="connect_added_badge">Ajouté</string>
-  <string name="connect_share_instead">Vous voulez contrôler %1$s depuis un autre appareil ?</string>
+  <string name="connect_share_instead">Vous voulez contrôler Ketch sur %1$s depuis un autre appareil ?</string>
   <string name="connect_show_pairing_code">Afficher son code d'appairage</string>
 
   <string name="connect_landing_title">Se connecter à un appareil Ketch</string>
@@ -186,7 +186,7 @@
   <string name="connect_pairing_known">Vous avez déjà ajouté %1$s. La connexion l'affichera.</string>
   <string name="connect_pairing_known_code">Vous avez déjà ajouté %1$s. La connexion l'affichera et enregistrera le code de ce lien.</string>
   <string name="connect_pairing_has_code">Le lien inclut son code d'accès.</string>
-  <string name="pairing_request_title">Autoriser %1$s à contrôler %2$s ?</string>
+  <string name="pairing_request_title">Autoriser %1$s à contrôler Ketch sur %2$s ?</string>
   <string name="pairing_request_check">N'autorisez que si %1$s affiche ce code :</string>
   <string name="pairing_request_note">Il pourra ajouter, mettre en pause et supprimer des téléchargements ici. Pour révoquer l'accès, choisissez Nouveau code dans Réglages › Partage.</string>
   <string name="pairing_request_allow">Autoriser</string>

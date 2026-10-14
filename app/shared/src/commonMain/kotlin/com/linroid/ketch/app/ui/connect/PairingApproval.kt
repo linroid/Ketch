@@ -100,46 +100,44 @@ internal fun ReportSharingShown(state: AppState) {
 }
 
 /**
- * Whether devices that find this one may ask to pair: off until the owner turns it on, then on
- * for [PairingRequests.WINDOW] with the time left, until a device is let in or the owner turns
- * it off.
+ * Whether devices that find this one may ask to pair, a row of the Pair a device card: off
+ * until the owner turns it on, then on for [PairingRequests.WINDOW] with the time left, until a
+ * device is let in or the owner turns it off.
  */
 @Composable
-internal fun PairingWindowGroup(requests: PairingRequests) {
+internal fun PairingWindowRow(requests: PairingRequests) {
   val left = rememberPairingTimeLeft(requests)
   val noun = localDeviceNounInSentence().resolve()
-  SettingsGroup {
-    SettingsRow(
-      title = stringResource(Res.string.settings_sharing_pairing),
-      description = if (left == null) {
-        stringResource(Res.string.settings_sharing_pairing_off, noun)
+  SettingsRow(
+    title = stringResource(Res.string.settings_sharing_pairing),
+    description = if (left == null) {
+      stringResource(Res.string.settings_sharing_pairing_off, noun)
+    } else {
+      stringResource(Res.string.settings_sharing_pairing_on, pairingTimeText(left).resolve(), noun)
+    },
+    descriptionColor = if (left == null) {
+      KetchTheme.colors.textSecondary
+    } else {
+      KetchTheme.colors.accent
+    },
+    trailing = {
+      if (left == null) {
+        KetchButton(
+          text = stringResource(Res.string.settings_sharing_pairing_turn_on),
+          onClick = { requests.open() },
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+        )
       } else {
-        stringResource(Res.string.settings_sharing_pairing_on, pairingTimeText(left).resolve(), noun)
-      },
-      descriptionColor = if (left == null) {
-        KetchTheme.colors.textSecondary
-      } else {
-        KetchTheme.colors.accent
-      },
-      trailing = {
-        if (left == null) {
-          KetchButton(
-            text = stringResource(Res.string.settings_sharing_pairing_turn_on),
-            onClick = { requests.open() },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-          )
-        } else {
-          KetchButton(
-            text = stringResource(Res.string.settings_sharing_pairing_turn_off),
-            onClick = requests::close,
-            variant = KetchButtonVariant.Ghost,
-            size = KetchButtonSize.Small,
-          )
-        }
-      },
-    )
-  }
+        KetchButton(
+          text = stringResource(Res.string.settings_sharing_pairing_turn_off),
+          onClick = requests::close,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
+      }
+    },
+  )
 }
 
 /**

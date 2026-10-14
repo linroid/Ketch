@@ -15,7 +15,7 @@
   <string name="notify_channel_done">Descargas terminadas</string>
   <string name="notify_channel_failed">Descargas con error</string>
   <string name="notify_channel_pairing">Solicitudes de vinculación</string>
-  <string name="notify_pairing_title">%1$s quiere controlar %2$s</string>
+  <string name="notify_pairing_title">%1$s quiere controlar Ketch en %2$s</string>
   <string name="notify_pairing_body">Permítelo solo si muestra %1$s.</string>
   <string name="notify_channel_requests">Solicitudes de aprobación</string>
   <string name="notify_finished_group">Descargas terminadas</string>

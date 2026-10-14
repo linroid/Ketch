@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">여유 공간 알 수 없음</string>
   <string name="device_chip_networks">다운로드에 사용하는 네트워크</string>
   <string name="device_chip_sharing_settings">공유 설정</string>
-  <string name="device_chip_share_tooltip">다른 기기에서 제어할 수 있도록 허용</string>
+  <string name="device_chip_share_tooltip">다른 기기에서 이 기기의 Ketch를 제어할 수 있도록 허용</string>
   <string name="device_chip_not_shared">공유 안 함 · 공유…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">실패한 %1$d개 재시도</item>
@@ -162,7 +162,7 @@
   <string name="connect_approval_closed">%1$s에서 페어링 요청을 받지 않습니다. 해당 기기의 설정 › 공유에서 페어링을 켠 다음 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_ask_again">다시 요청</string>
   <string name="connect_added_badge">추가됨</string>
-  <string name="connect_share_instead">다른 기기에서 %1$s을(를) 제어하고 싶나요?</string>
+  <string name="connect_share_instead">다른 기기에서 %1$s의 Ketch를 제어하고 싶나요?</string>
   <string name="connect_show_pairing_code">페어링 코드 보기</string>
 
   <string name="connect_landing_title">Ketch 기기에 연결</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_known">%1$s 기기는 이미 추가되어 있습니다. 연결하면 이 기기가 표시됩니다.</string>
   <string name="connect_pairing_known_code">%1$s 기기는 이미 추가되어 있습니다. 연결하면 이 기기가 표시되고 이 링크의 코드가 적용됩니다.</string>
   <string name="connect_pairing_has_code">링크에 액세스 코드가 포함되어 있습니다.</string>
-  <string name="pairing_request_title">%1$s이(가) %2$s을(를) 제어하도록 허용할까요?</string>
+  <string name="pairing_request_title">%1$s이(가) %2$s의 Ketch를 제어하도록 허용할까요?</string>
   <string name="pairing_request_check">%1$s에 이 코드가 표시될 때만 허용하세요:</string>
   <string name="pairing_request_note">여기에서 다운로드를 추가, 일시정지, 제거할 수 있습니다. 접근 권한을 취소하려면 설정 › 공유에서 새 코드를 선택하세요.</string>
   <string name="pairing_request_allow">허용</string>

@@ -79,7 +79,7 @@
   <string name="banner_retrying">正在重試</string>
   <string name="banner_retry_now">立即重試</string>
   <string name="banner_switch_to">切換至 %1$s</string>
-  <string name="banner_pairing_on">配對已開啟，還剩 %1$s · 區域網路中的裝置可以要求控制%2$s</string>
+  <string name="banner_pairing_on">配對已開啟，還剩 %1$s · 區域網路中的裝置可以要求控制%2$s上的 Ketch</string>
   <string name="banner_unauthorized">%1$s 需要新的存取權杖</string>
   <string name="banner_enter_token">輸入權杖</string>
   <string name="toast_subject_reason">%1$s：%2$s</string>

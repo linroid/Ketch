@@ -22,7 +22,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">Subida y trackers adicionales</string>
   <string name="settings_category_sharing">Compartir</string>
-  <string name="settings_category_sharing_description">Vincula un teléfono o un navegador para controlar este dispositivo</string>
+  <string name="settings_category_sharing_description">Vincula un teléfono o un navegador para controlar Ketch en este dispositivo</string>
 
   <string name="settings_title">Ajustes</string>
   <string name="settings_close">Cerrar ajustes</string>
@@ -642,14 +642,14 @@
   <string name="settings_sharing_pair">Vincular un dispositivo</string>
   <string name="settings_sharing_stop">Dejar de compartir</string>
   <string name="settings_sharing_pairing">Solicitudes de vinculación</string>
-  <string name="settings_sharing_pairing_off">Los dispositivos que encuentren %1$s en tu red local podrán pedir controlarlo durante 3 minutos después de activar esto.</string>
-  <string name="settings_sharing_pairing_on">Activado %1$s más · los dispositivos de tu red local pueden pedir controlar %2$s</string>
+  <string name="settings_sharing_pairing_off">Los dispositivos que encuentren %1$s en tu red local podrán pedir controlar Ketch en él durante 3 minutos después de activar esto.</string>
+  <string name="settings_sharing_pairing_on">Activado %1$s más · los dispositivos de tu red local pueden pedir controlar Ketch en %2$s</string>
   <string name="settings_sharing_pairing_turn_on">Activar</string>
   <string name="settings_sharing_pairing_turn_off">Desactivar</string>
-  <string name="settings_sharing_control_from_computer">Controla %1$s desde un equipo u otro dispositivo.</string>
-  <string name="settings_sharing_control_from_phone">Controla %1$s desde tu teléfono, tu tableta u otro navegador.</string>
+  <string name="settings_sharing_control_from_computer">Controla Ketch en %1$s desde un equipo u otro dispositivo.</string>
+  <string name="settings_sharing_control_from_phone">Controla Ketch en %1$s desde tu teléfono, tu tableta u otro navegador.</string>
   <string name="settings_sharing_failed">No se pudo empezar a compartir: %1$s</string>
-  <string name="settings_sharing_open_no_code">Cualquiera en tu red puede controlar %1$s. Al permitir un dispositivo, se añade un código.</string>
+  <string name="settings_sharing_open_no_code">Cualquiera en tu red puede controlar Ketch en %1$s. Al permitir un dispositivo, se añade un código.</string>
   <string name="settings_sharing_local_only">Solo las apps de %1$s pueden conectarse. Al permitir un dispositivo, se comparte en tu red con un código.</string>
   <string name="settings_sharing_off_hint">Ketch comparte %1$s en tu red, protegido con un código.</string>
   <string name="settings_sharing_allow">Permitir otro dispositivo</string>
@@ -661,7 +661,7 @@
   <string name="settings_sharing_also">también %1$s</string>
   <string name="settings_sharing_copy_link">Copiar enlace de vinculación</string>
   <string name="settings_sharing_copied">Copiado</string>
-  <string name="settings_sharing_anyone">Cualquiera que lo tenga puede controlar %1$s.</string>
+  <string name="settings_sharing_anyone">Cualquiera que lo tenga puede controlar Ketch en %1$s.</string>
   <string name="settings_sharing_new_code">Código nuevo</string>
   <string name="settings_sharing_new_code_hint">Desconecta los dispositivos vinculados hasta ahora</string>
   <string name="settings_sharing_qr">Código de vinculación de %1$s</string>
@@ -684,7 +684,7 @@
   <string name="settings_sharing_websites_needs_code">Necesita un código de acceso.</string>
   <string name="settings_sharing_websites_hint">Como app.example.com, separados por comas. * permite cualquiera.</string>
   <string name="settings_sharing_websites_none">Ninguno</string>
-  <string name="settings_sharing_auto_start">Empezar a compartir al abrir Ketch</string>
+  <string name="settings_sharing_auto_start">Compartir al abrir Ketch</string>
 
   <string name="settings_search_device_name">El nombre que ven tus otros dispositivos</string>
   <string name="settings_search_device_name_keywords">nombre de host, hostname, equipo, ordenador, computadora, renombrar, cambiar nombre</string>

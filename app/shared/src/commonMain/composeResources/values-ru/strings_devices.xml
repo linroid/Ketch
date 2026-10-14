@@ -94,7 +94,7 @@
   <string name="device_free_space_unknown">Свободное место неизвестно</string>
   <string name="device_chip_networks">Сети, через которые идёт загрузка</string>
   <string name="device_chip_sharing_settings">Настройки общего доступа</string>
-  <string name="device_chip_share_tooltip">Разрешить другим устройствам управлять им</string>
+  <string name="device_chip_share_tooltip">Разрешить другим устройствам управлять загрузками на нём</string>
   <string name="device_chip_not_shared">Нет общего доступа · Открыть…</string>
   <plurals name="device_retry_failed">
     <item quantity="one">Повторить с ошибками (%1$d)</item>

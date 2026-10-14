@@ -14,7 +14,7 @@
   <string name="notify_channel_done">已完成的下載</string>
   <string name="notify_channel_failed">失敗的下載</string>
   <string name="notify_channel_pairing">配對要求</string>
-  <string name="notify_pairing_title">%1$s 想要控制%2$s</string>
+  <string name="notify_pairing_title">%1$s 想要控制%2$s上的 Ketch</string>
   <string name="notify_pairing_body">只有在它顯示 %1$s 時才允許。</string>
   <string name="notify_channel_requests">等待你確認的要求</string>
   <string name="notify_finished_group">已完成的下載</string>

@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">空き容量不明</string>
   <string name="device_chip_networks">ダウンロードに使うネットワーク</string>
   <string name="device_chip_sharing_settings">共有の設定</string>
-  <string name="device_chip_share_tooltip">他のデバイスからの操作を許可</string>
+  <string name="device_chip_share_tooltip">他のデバイスからこのKetchの操作を許可</string>
   <string name="device_chip_not_shared">未共有 · 共有…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">失敗した%1$d件を再試行</item>
@@ -162,7 +162,7 @@
   <string name="connect_approval_closed">%1$sはペアリングリクエストを受け付けていません。そのデバイスの「設定 › 共有」でペアリングをオンにしてからもう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_ask_again">もう一度依頼</string>
   <string name="connect_added_badge">追加済み</string>
-  <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>
+  <string name="connect_share_instead">別のデバイスから%1$sのKetchを操作しますか？</string>
   <string name="connect_show_pairing_code">ペアリングコードを表示</string>
 
   <string name="connect_landing_title">Ketchデバイスに接続</string>
@@ -180,7 +180,7 @@
   <string name="connect_pairing_known">%1$sはすでに追加されています。接続すると、そのデバイスを表示します。</string>
   <string name="connect_pairing_known_code">%1$sはすでに追加されています。接続すると、そのデバイスを表示し、このリンクのコードを設定します。</string>
   <string name="connect_pairing_has_code">このリンクにはアクセスコードが含まれています。</string>
-  <string name="pairing_request_title">%1$sに%2$sの操作を許可しますか？</string>
+  <string name="pairing_request_title">%1$sに%2$sのKetchの操作を許可しますか？</string>
   <string name="pairing_request_check">%1$sにこのコードが表示されている場合のみ許可してください：</string>
   <string name="pairing_request_note">ここでダウンロードの追加、一時停止、削除ができます。アクセスを取り消すには、「設定 › 共有」で「新しいコード」を選んでください。</string>
   <string name="pairing_request_allow">許可</string>

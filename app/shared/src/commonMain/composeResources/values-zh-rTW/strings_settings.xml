@@ -22,7 +22,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">上傳和額外的 Tracker</string>
   <string name="settings_category_sharing">共享</string>
-  <string name="settings_category_sharing_description">配對手機或瀏覽器來控制此裝置</string>
+  <string name="settings_category_sharing_description">配對手機或瀏覽器來控制此裝置上的 Ketch</string>
 
   <string name="settings_title">設定</string>
   <string name="settings_close">關閉設定</string>
@@ -622,14 +622,14 @@
   <string name="settings_sharing_pair">配對裝置</string>
   <string name="settings_sharing_stop">停止共享</string>
   <string name="settings_sharing_pairing">配對要求</string>
-  <string name="settings_sharing_pairing_off">開啟後 3 分鐘內，在區域網路中找到%1$s的裝置可以要求控制它。</string>
-  <string name="settings_sharing_pairing_on">還剩 %1$s · 區域網路中的裝置可以要求控制%2$s</string>
+  <string name="settings_sharing_pairing_off">開啟後 3 分鐘內，在區域網路中找到%1$s的裝置可以要求控制它上面的 Ketch。</string>
+  <string name="settings_sharing_pairing_on">還剩 %1$s · 區域網路中的裝置可以要求控制%2$s上的 Ketch</string>
   <string name="settings_sharing_pairing_turn_on">開啟</string>
   <string name="settings_sharing_pairing_turn_off">關閉</string>
-  <string name="settings_sharing_control_from_computer">從電腦或其他裝置控制%1$s。</string>
-  <string name="settings_sharing_control_from_phone">從手機、平板電腦或其他瀏覽器控制%1$s。</string>
+  <string name="settings_sharing_control_from_computer">從電腦或其他裝置控制%1$s上的 Ketch。</string>
+  <string name="settings_sharing_control_from_phone">從手機、平板電腦或其他瀏覽器控制%1$s上的 Ketch。</string>
   <string name="settings_sharing_failed">無法開始共享：%1$s</string>
-  <string name="settings_sharing_open_no_code">你網路上的任何人都能控制%1$s。允許裝置時會加上存取碼。</string>
+  <string name="settings_sharing_open_no_code">你網路上的任何人都能控制%1$s上的 Ketch。允許裝置時會加上存取碼。</string>
   <string name="settings_sharing_local_only">只有%1$s上的應用程式可以連線。允許裝置後，會在你的網路上以存取碼共享。</string>
   <string name="settings_sharing_off_hint">Ketch 會在你的網路上共享%1$s，並以存取碼保護。</string>
   <string name="settings_sharing_allow">允許其他裝置</string>
@@ -641,7 +641,7 @@
   <string name="settings_sharing_also">還有 %1$s</string>
   <string name="settings_sharing_copy_link">複製配對連結</string>
   <string name="settings_sharing_copied">已複製</string>
-  <string name="settings_sharing_anyone">任何擁有此連結的人都能控制%1$s。</string>
+  <string name="settings_sharing_anyone">任何擁有此連結的人都能控制%1$s上的 Ketch。</string>
   <string name="settings_sharing_new_code">新存取碼</string>
   <string name="settings_sharing_new_code_hint">會中斷所有已配對裝置的連線</string>
   <string name="settings_sharing_qr">%1$s 的配對碼</string>
@@ -664,7 +664,7 @@
   <string name="settings_sharing_websites_needs_code">需要存取碼。</string>
   <string name="settings_sharing_websites_hint">例如 app.example.com，以逗號分隔。* 表示允許任何網站。</string>
   <string name="settings_sharing_websites_none">無</string>
-  <string name="settings_sharing_auto_start">Ketch 開啟時開始共享</string>
+  <string name="settings_sharing_auto_start">Ketch 開啟時共享</string>
 
   <string name="settings_search_device_name">你的其他裝置看到的名稱</string>
   <string name="settings_search_device_name_keywords">主機名稱, 電腦名稱, 重新命名, 改名, hostname</string>

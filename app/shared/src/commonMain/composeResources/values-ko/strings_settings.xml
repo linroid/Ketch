@@ -22,7 +22,7 @@
   <string name="settings_category_bittorrent">BitTorrent</string>
   <string name="settings_category_bittorrent_description">업로드 및 추가 트래커</string>
   <string name="settings_category_sharing">공유</string>
-  <string name="settings_category_sharing_description">휴대폰이나 브라우저를 페어링해 이 기기 제어</string>
+  <string name="settings_category_sharing_description">휴대폰이나 브라우저를 페어링해 이 기기의 Ketch 제어</string>
 
   <string name="settings_title">설정</string>
   <string name="settings_close">설정 닫기</string>
@@ -622,14 +622,14 @@
   <string name="settings_sharing_pair">기기 페어링</string>
   <string name="settings_sharing_stop">공유 중지</string>
   <string name="settings_sharing_pairing">페어링 요청</string>
-  <string name="settings_sharing_pairing_off">켜면 3분 동안 로컬 네트워크에서 %1$s을(를) 찾은 기기가 제어를 요청할 수 있습니다.</string>
-  <string name="settings_sharing_pairing_on">%1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s 제어를 요청할 수 있습니다</string>
+  <string name="settings_sharing_pairing_off">켜면 3분 동안 로컬 네트워크에서 %1$s을(를) 찾은 기기가 Ketch 제어를 요청할 수 있습니다.</string>
+  <string name="settings_sharing_pairing_on">%1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
   <string name="settings_sharing_pairing_turn_on">켜기</string>
   <string name="settings_sharing_pairing_turn_off">끄기</string>
-  <string name="settings_sharing_control_from_computer">컴퓨터나 다른 기기에서 %1$s을(를) 제어하세요.</string>
-  <string name="settings_sharing_control_from_phone">휴대폰, 태블릿 또는 다른 브라우저에서 %1$s을(를) 제어하세요.</string>
+  <string name="settings_sharing_control_from_computer">컴퓨터나 다른 기기에서 %1$s의 Ketch를 제어하세요.</string>
+  <string name="settings_sharing_control_from_phone">휴대폰, 태블릿 또는 다른 브라우저에서 %1$s의 Ketch를 제어하세요.</string>
   <string name="settings_sharing_failed">공유를 시작할 수 없음: %1$s</string>
-  <string name="settings_sharing_open_no_code">네트워크의 누구나 %1$s을(를) 제어할 수 있습니다. 기기를 허용하면 코드가 추가됩니다.</string>
+  <string name="settings_sharing_open_no_code">네트워크의 누구나 %1$s의 Ketch를 제어할 수 있습니다. 기기를 허용하면 코드가 추가됩니다.</string>
   <string name="settings_sharing_local_only">%1$s의 앱만 연결할 수 있습니다. 기기를 허용하면 코드로 보호된 상태로 네트워크에 공유됩니다.</string>
   <string name="settings_sharing_off_hint">Ketch가 코드로 보호된 상태로 %1$s을(를) 네트워크에 공유합니다.</string>
   <string name="settings_sharing_allow">다른 기기 허용</string>
@@ -641,7 +641,7 @@
   <string name="settings_sharing_also">%1$s도 사용 가능</string>
   <string name="settings_sharing_copy_link">페어링 링크 복사</string>
   <string name="settings_sharing_copied">복사됨</string>
-  <string name="settings_sharing_anyone">이 링크가 있는 사람은 누구나 %1$s을(를) 제어할 수 있습니다.</string>
+  <string name="settings_sharing_anyone">이 링크가 있는 사람은 누구나 %1$s의 Ketch를 제어할 수 있습니다.</string>
   <string name="settings_sharing_new_code">새 코드</string>
   <string name="settings_sharing_new_code_hint">지금까지 페어링된 기기의 연결이 끊어집니다</string>
   <string name="settings_sharing_qr">%1$s의 페어링 코드</string>
@@ -664,7 +664,7 @@
   <string name="settings_sharing_websites_needs_code">액세스 코드가 필요합니다.</string>
   <string name="settings_sharing_websites_hint">app.example.com처럼 쉼표로 구분해 입력하세요. *는 모든 웹사이트를 허용합니다.</string>
   <string name="settings_sharing_websites_none">없음</string>
-  <string name="settings_sharing_auto_start">Ketch를 열 때 공유 시작</string>
+  <string name="settings_sharing_auto_start">Ketch를 열면 공유</string>
 
   <string name="settings_search_device_name">다른 기기에 표시되는 이름</string>
   <string name="settings_search_device_name_keywords">호스트 이름, 컴퓨터 이름, 기기 이름, 이름 변경, hostname</string>

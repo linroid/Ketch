@@ -114,7 +114,7 @@
   <!-- Tooltips of the chips on a device card. -->
   <string name="device_chip_networks">Networks it downloads over</string>
   <string name="device_chip_sharing_settings">Sharing settings</string>
-  <string name="device_chip_share_tooltip">Let other devices control it</string>
+  <string name="device_chip_share_tooltip">Let other devices control Ketch on it</string>
   <!-- The sharing chip of this device while other devices cannot reach it. -->
   <string name="device_chip_not_shared">Not shared · Share…</string>
   <!-- Buttons at the bottom of a device card. %1$d is how many downloads failed. -->
@@ -232,7 +232,7 @@
   <!-- At the end of a device found on the network that is added already. -->
   <string name="connect_added_badge">Added</string>
   <!-- %1$s names this device inside a sentence, such as "this Mac". -->
-  <string name="connect_share_instead">Want to control %1$s from another device?</string>
+  <string name="connect_share_instead">Want to control Ketch on %1$s from another device?</string>
   <string name="connect_show_pairing_code">Show its pairing code</string>
 
   <!-- The page shown while no device is connected, as in the web app. -->
@@ -260,7 +260,7 @@
   <!-- Asked on this device, while it is shared, when another device found it on the network and
        wants its access code. %1$s is that device's name, such as "Pixel 9"; %2$s names this
        device inside a sentence, such as "this Mac". -->
-  <string name="pairing_request_title">Allow %1$s to control %2$s?</string>
+  <string name="pairing_request_title">Allow %1$s to control Ketch on %2$s?</string>
   <!-- %1$s is the other device's name; four digits show under it. -->
   <string name="pairing_request_check">Allow it only if %1$s shows this code:</string>
   <string name="pairing_request_note">It can add, pause and remove downloads here. To revoke access, choose New code in Settings › Sharing.</string>

@@ -85,7 +85,7 @@
   <string name="banner_retrying">tentando novamente</string>
   <string name="banner_retry_now">Tentar agora</string>
   <string name="banner_switch_to">Mudar para %1$s</string>
-  <string name="banner_pairing_on">Pareamento ativado por mais %1$s · dispositivos da sua rede local podem pedir para controlar %2$s</string>
+  <string name="banner_pairing_on">Pareamento ativado por mais %1$s · dispositivos da sua rede local podem pedir para controlar o Ketch em %2$s</string>
   <string name="banner_unauthorized">%1$s precisa de um novo token de acesso</string>
   <string name="banner_enter_token">Inserir token</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

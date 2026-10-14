@@ -79,7 +79,7 @@
   <string name="banner_retrying">正在重试</string>
   <string name="banner_retry_now">立即重试</string>
   <string name="banner_switch_to">切换到 %1$s</string>
-  <string name="banner_pairing_on">配对已开启，还剩 %1$s · 局域网中的设备可以请求控制%2$s</string>
+  <string name="banner_pairing_on">配对已开启，还剩 %1$s · 局域网中的设备可以请求控制%2$s上的 Ketch</string>
   <string name="banner_unauthorized">%1$s 需要新的访问令牌</string>
   <string name="banner_enter_token">输入令牌</string>
   <string name="toast_subject_reason">%1$s：%2$s</string>

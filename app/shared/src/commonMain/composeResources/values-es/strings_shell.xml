@@ -85,7 +85,7 @@
   <string name="banner_retrying">reintentando</string>
   <string name="banner_retry_now">Reintentar ahora</string>
   <string name="banner_switch_to">Cambiar a %1$s</string>
-  <string name="banner_pairing_on">Vinculación activada %1$s más · los dispositivos de tu red local pueden pedir controlar %2$s</string>
+  <string name="banner_pairing_on">Vinculación activada %1$s más · los dispositivos de tu red local pueden pedir controlar Ketch en %2$s</string>
   <string name="banner_unauthorized">%1$s necesita un token de acceso nuevo</string>
   <string name="banner_enter_token">Introducir token</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>
