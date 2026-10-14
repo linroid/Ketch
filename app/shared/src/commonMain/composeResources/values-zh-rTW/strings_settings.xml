@@ -622,7 +622,7 @@
   <string name="settings_sharing_pair">配對裝置</string>
   <string name="settings_sharing_stop">停止共享</string>
   <string name="settings_sharing_pairing">配對要求</string>
-  <string name="settings_sharing_pairing_off">開啟後 3 分鐘內，在區域網路中找到%1$s的裝置可以要求控制它上面的 Ketch。</string>
+  <string name="settings_sharing_pairing_off">開啟後 3 分鐘內，在區域網路中找到%1$s的裝置可以要求控制這裡的 Ketch。</string>
   <string name="settings_sharing_pairing_on">還剩 %1$s · 區域網路中的裝置可以要求控制%2$s上的 Ketch</string>
   <string name="settings_sharing_pairing_turn_on">開啟</string>
   <string name="settings_sharing_pairing_turn_off">關閉</string>
@@ -644,6 +644,9 @@
   <string name="settings_sharing_anyone">任何擁有此連結的人都能控制%1$s上的 Ketch。</string>
   <string name="settings_sharing_new_code">新存取碼</string>
   <string name="settings_sharing_new_code_hint">會中斷所有已配對裝置的連線</string>
+  <string name="settings_sharing_new_code_title">要產生新的存取碼嗎？</string>
+  <string name="settings_sharing_new_code_body">與%1$s配對的所有裝置都會中斷連線，需要重新配對。目前的配對連結和 QR 碼將失效。</string>
+  <string name="settings_sharing_new_code_confirm">產生新存取碼</string>
   <string name="settings_sharing_qr">%1$s 的配對碼</string>
   <string name="settings_sharing_advanced">進階</string>
   <string name="settings_sharing_advanced_hint">連接埠、存取碼、網路上的可見性和網站</string>

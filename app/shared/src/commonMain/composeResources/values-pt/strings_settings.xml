@@ -664,6 +664,9 @@
   <string name="settings_sharing_anyone">Qualquer pessoa com o link pode controlar o Ketch em %1$s.</string>
   <string name="settings_sharing_new_code">Novo código</string>
   <string name="settings_sharing_new_code_hint">Desconecta os dispositivos pareados até agora</string>
+  <string name="settings_sharing_new_code_title">Criar um novo código?</string>
+  <string name="settings_sharing_new_code_body">Todos os dispositivos pareados com %1$s são desconectados e precisarão parear de novo. O link de pareamento e o código QR atuais deixam de funcionar.</string>
+  <string name="settings_sharing_new_code_confirm">Criar novo código</string>
   <string name="settings_sharing_qr">Código de pareamento de %1$s</string>
   <string name="settings_sharing_advanced">Avançado</string>
   <string name="settings_sharing_advanced_hint">Porta, código de acesso, descoberta e sites</string>

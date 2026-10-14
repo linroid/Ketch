@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">可用空间未知</string>
   <string name="device_chip_networks">用于下载的网络</string>
   <string name="device_chip_sharing_settings">共享设置</string>
-  <string name="device_chip_share_tooltip">允许其他设备控制它上面的 Ketch</string>
+  <string name="device_chip_share_tooltip">允许其他设备控制此设备上的 Ketch</string>
   <string name="device_chip_not_shared">未共享 · 共享…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">重试 %1$d 个失败的下载</item>

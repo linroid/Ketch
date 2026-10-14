@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">检测到 %1$s</string>
   <string name="launchpad_checklist_connected">已连接</string>
   <string name="launchpad_checklist_get_it">获取</string>
-  <string name="launchpad_checklist_phone">用手机控制%1$s</string>
+  <string name="launchpad_checklist_phone">用手机控制%1$s上的 Ketch</string>
   <string name="launchpad_checklist_show_qr">显示二维码</string>
 
   <string name="downloads_clip_download">下载 %1$s</string>

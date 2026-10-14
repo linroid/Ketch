@@ -644,6 +644,9 @@
   <string name="settings_sharing_anyone">このリンクを持っている人は誰でも%1$sのKetchを操作できます。</string>
   <string name="settings_sharing_new_code">新しいコード</string>
   <string name="settings_sharing_new_code_hint">これまでにペアリングしたデバイスは切断されます</string>
+  <string name="settings_sharing_new_code_title">新しいコードを作成しますか？</string>
+  <string name="settings_sharing_new_code_body">%1$sとペアリングしたすべてのデバイスの接続が切れ、もう一度ペアリングが必要になります。現在のペアリングリンクとQRコードは使えなくなります。</string>
+  <string name="settings_sharing_new_code_confirm">新しいコードを作成</string>
   <string name="settings_sharing_qr">%1$sのペアリングコード</string>
   <string name="settings_sharing_advanced">詳細</string>
   <string name="settings_sharing_advanced_hint">ポート、アクセスコード、検出、Webサイト</string>

@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">已偵測到 %1$s</string>
   <string name="launchpad_checklist_connected">已連線</string>
   <string name="launchpad_checklist_get_it">取得</string>
-  <string name="launchpad_checklist_phone">用手機控制%1$s</string>
+  <string name="launchpad_checklist_phone">用手機控制%1$s上的 Ketch</string>
   <string name="launchpad_checklist_show_qr">顯示 QR 碼</string>
 
   <string name="downloads_clip_download">下載 %1$s</string>

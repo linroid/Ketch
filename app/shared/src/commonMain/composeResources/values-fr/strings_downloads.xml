@@ -142,7 +142,7 @@
   <string name="launchpad_checklist_detected">%1$s détecté</string>
   <string name="launchpad_checklist_connected">Connectée</string>
   <string name="launchpad_checklist_get_it">Obtenir</string>
-  <string name="launchpad_checklist_phone">Contrôler %1$s depuis votre téléphone</string>
+  <string name="launchpad_checklist_phone">Contrôler Ketch sur %1$s depuis votre téléphone</string>
   <string name="launchpad_checklist_show_qr">Afficher le QR code</string>
 
   <string name="downloads_clip_download">Télécharger %1$s</string>

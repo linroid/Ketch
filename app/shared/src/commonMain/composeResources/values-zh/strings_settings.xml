@@ -622,7 +622,7 @@
   <string name="settings_sharing_pair">配对设备</string>
   <string name="settings_sharing_stop">停止共享</string>
   <string name="settings_sharing_pairing">配对请求</string>
-  <string name="settings_sharing_pairing_off">开启后 3 分钟内，在局域网中找到%1$s的设备可以请求控制它上面的 Ketch。</string>
+  <string name="settings_sharing_pairing_off">开启后 3 分钟内，在局域网中找到%1$s的设备可以请求控制这里的 Ketch。</string>
   <string name="settings_sharing_pairing_on">还剩 %1$s · 局域网中的设备可以请求控制%2$s上的 Ketch</string>
   <string name="settings_sharing_pairing_turn_on">开启</string>
   <string name="settings_sharing_pairing_turn_off">关闭</string>
@@ -644,6 +644,9 @@
   <string name="settings_sharing_anyone">任何拥有此链接的人都可以控制%1$s上的 Ketch。</string>
   <string name="settings_sharing_new_code">新访问码</string>
   <string name="settings_sharing_new_code_hint">会断开所有已配对设备的连接</string>
+  <string name="settings_sharing_new_code_title">生成新的访问码？</string>
+  <string name="settings_sharing_new_code_body">与%1$s配对的所有设备都会断开连接，需要重新配对。当前的配对链接和二维码将失效。</string>
+  <string name="settings_sharing_new_code_confirm">生成新访问码</string>
   <string name="settings_sharing_qr">%1$s 的配对码</string>
   <string name="settings_sharing_advanced">高级</string>
   <string name="settings_sharing_advanced_hint">端口、访问码、局域网发现和网站访问</string>

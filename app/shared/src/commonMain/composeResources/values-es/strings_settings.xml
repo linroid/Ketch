@@ -664,6 +664,9 @@
   <string name="settings_sharing_anyone">Cualquiera que lo tenga puede controlar Ketch en %1$s.</string>
   <string name="settings_sharing_new_code">Código nuevo</string>
   <string name="settings_sharing_new_code_hint">Desconecta los dispositivos vinculados hasta ahora</string>
+  <string name="settings_sharing_new_code_title">¿Crear un código nuevo?</string>
+  <string name="settings_sharing_new_code_body">Todos los dispositivos vinculados con %1$s se desconectan y tendrán que vincularse de nuevo. El enlace de vinculación y el código QR actuales dejan de funcionar.</string>
+  <string name="settings_sharing_new_code_confirm">Crear código nuevo</string>
   <string name="settings_sharing_qr">Código de vinculación de %1$s</string>
   <string name="settings_sharing_advanced">Avanzado</string>
   <string name="settings_sharing_advanced_hint">Puerto, código de acceso, detección y sitios web</string>

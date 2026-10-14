@@ -682,7 +682,7 @@
   <string name="settings_sharing_pair">Сопряжение с устройством</string>
   <string name="settings_sharing_stop">Закрыть доступ</string>
   <string name="settings_sharing_pairing">Запросы на сопряжение</string>
-  <string name="settings_sharing_pairing_off">После включения устройства, нашедшие %1$s в вашей локальной сети, смогут в течение 3 минут запросить управление загрузками на нём.</string>
+  <string name="settings_sharing_pairing_off">В течение 3 минут после включения устройства в вашей локальной сети смогут запросить управление загрузками %1$s.</string>
   <string name="settings_sharing_pairing_on">Включено ещё %1$s · устройства в вашей локальной сети могут запросить управление загрузками %2$s</string>
   <string name="settings_sharing_pairing_turn_on">Включить</string>
   <string name="settings_sharing_pairing_turn_off">Выключить</string>
@@ -704,6 +704,9 @@
   <string name="settings_sharing_anyone">Любой, у кого она есть, может управлять загрузками %1$s.</string>
   <string name="settings_sharing_new_code">Новый код</string>
   <string name="settings_sharing_new_code_hint">Отключает все уже сопряжённые устройства</string>
+  <string name="settings_sharing_new_code_title">Создать новый код?</string>
+  <string name="settings_sharing_new_code_body">Все устройства, сопряжённые %1$s, будут отключены, и их придётся сопрячь заново. Текущая ссылка для сопряжения и QR-код перестанут работать.</string>
+  <string name="settings_sharing_new_code_confirm">Создать новый код</string>
   <string name="settings_sharing_qr">Код сопряжения: %1$s</string>
   <string name="settings_sharing_advanced">Дополнительно</string>
   <string name="settings_sharing_advanced_hint">Порт, код доступа, обнаружение и сайты</string>

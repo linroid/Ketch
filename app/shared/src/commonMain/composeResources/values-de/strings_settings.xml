@@ -664,6 +664,9 @@
   <string name="settings_sharing_anyone">Jeder mit dem Link kann Downloads für %1$s verwalten.</string>
   <string name="settings_sharing_new_code">Neuer Code</string>
   <string name="settings_sharing_new_code_hint">Trennt die bisher gekoppelten Geräte</string>
+  <string name="settings_sharing_new_code_title">Neuen Code erstellen?</string>
+  <string name="settings_sharing_new_code_body">Alle für %1$s gekoppelten Geräte werden getrennt und müssen sich neu koppeln. Der bisherige Kopplungslink und QR-Code funktionieren nicht mehr.</string>
+  <string name="settings_sharing_new_code_confirm">Neuen Code erstellen</string>
   <string name="settings_sharing_qr">Kopplungscode für %1$s</string>
   <string name="settings_sharing_advanced">Erweitert</string>
   <string name="settings_sharing_advanced_hint">Port, Zugriffscode, Auffindbarkeit und Websites</string>

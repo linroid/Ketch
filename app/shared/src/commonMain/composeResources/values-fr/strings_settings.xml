@@ -641,7 +641,7 @@
   <string name="settings_sharing_restart">Redémarrer</string>
   <string name="settings_sharing_pair">Appairer un appareil</string>
   <string name="settings_sharing_stop">Arrêter le partage</string>
-  <string name="settings_sharing_pairing">Demandes d'association</string>
+  <string name="settings_sharing_pairing">Demandes d'appairage</string>
   <string name="settings_sharing_pairing_off">Les appareils qui trouvent %1$s sur votre réseau local peuvent demander à y contrôler Ketch pendant 3 minutes après l'activation.</string>
   <string name="settings_sharing_pairing_on">Activé encore %1$s · les appareils de votre réseau local peuvent demander à contrôler Ketch sur %2$s</string>
   <string name="settings_sharing_pairing_turn_on">Activer</string>
@@ -664,6 +664,9 @@
   <string name="settings_sharing_anyone">Toute personne qui possède ce lien peut contrôler Ketch sur %1$s.</string>
   <string name="settings_sharing_new_code">Nouveau code</string>
   <string name="settings_sharing_new_code_hint">Déconnecte les appareils appairés jusqu'ici</string>
+  <string name="settings_sharing_new_code_title">Créer un nouveau code ?</string>
+  <string name="settings_sharing_new_code_body">Tous les appareils appairés avec %1$s sont déconnectés et devront s'appairer à nouveau. Le lien d'appairage et le code QR actuels cessent de fonctionner.</string>
+  <string name="settings_sharing_new_code_confirm">Créer un nouveau code</string>
   <string name="settings_sharing_qr">Code d'appairage pour %1$s</string>
   <string name="settings_sharing_advanced">Avancé</string>
   <string name="settings_sharing_advanced_hint">Port, code d'accès, découverte et sites web</string>

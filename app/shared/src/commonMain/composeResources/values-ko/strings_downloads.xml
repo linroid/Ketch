@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">%1$s 감지됨</string>
   <string name="launchpad_checklist_connected">연결됨</string>
   <string name="launchpad_checklist_get_it">설치하기</string>
-  <string name="launchpad_checklist_phone">휴대폰에서 %1$s 제어</string>
+  <string name="launchpad_checklist_phone">휴대폰에서 %1$s의 Ketch 제어</string>
   <string name="launchpad_checklist_show_qr">QR 코드 보기</string>
 
   <string name="downloads_clip_download">%1$s 다운로드</string>

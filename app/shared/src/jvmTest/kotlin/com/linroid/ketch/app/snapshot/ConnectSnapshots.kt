@@ -27,6 +27,7 @@ import com.linroid.ketch.app.ui.connect.PairingRequestCard
 import com.linroid.ketch.app.ui.connect.PairingWindowRow
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
+import com.linroid.ketch.app.ui.settings.NewCodeDialog
 import com.linroid.ketch.app.ui.settings.SettingsGroup
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
@@ -161,6 +162,16 @@ class ConnectSnapshots {
       snapshot("add-device-approval-denied", SnapshotSize.Desktop, theme) {
         AddDeviceSample(remember { formAfterPairing(PairingResult.Denied) })
       }
+    }
+  }
+
+  @Test
+  fun newCode_asksBeforeDisconnectingPairedDevices() {
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )) {
+      snapshot("new-code-confirm", size, theme) { NewCodeDialog(onConfirm = {}, onDismiss = {}) }
     }
   }
 

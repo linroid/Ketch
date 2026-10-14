@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">可用空間不明</string>
   <string name="device_chip_networks">用來下載的網路</string>
   <string name="device_chip_sharing_settings">共享設定</string>
-  <string name="device_chip_share_tooltip">讓其他裝置控制它上面的 Ketch</string>
+  <string name="device_chip_share_tooltip">讓其他裝置控制此裝置上的 Ketch</string>
   <string name="device_chip_not_shared">未共享 · 共享…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">重試 %1$d 個失敗項目</item>
@@ -159,7 +159,7 @@
   <string name="connect_approval_expired">%1$s 未及時回應配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_busy">%1$s 正在回應此裝置的另一個要求。請稍後再試，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_paused">%1$s 暫時不接受此裝置的配對要求。請稍後再試，或輸入該裝置的存取碼。</string>
-  <string name="connect_approval_closed">%1$s 不接受配對要求。請在該裝置的「設定 › 共享」中開啟配對後重新要求，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_closed">%1$s 不接受配對要求。請在該裝置的「設定 › 共享」中開啟配對後重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_ask_again">重新傳送要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s上的 Ketch 嗎？</string>

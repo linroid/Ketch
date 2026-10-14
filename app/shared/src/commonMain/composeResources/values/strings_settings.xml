@@ -885,6 +885,9 @@
   <string name="settings_sharing_anyone">Anyone with it can control Ketch on %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>
   <string name="settings_sharing_new_code_hint">Disconnects the devices paired so far</string>
+  <string name="settings_sharing_new_code_title">Make a new code?</string>
+  <string name="settings_sharing_new_code_body">Every device paired with %1$s is disconnected and has to pair again. The current pairing link and QR code stop working.</string>
+  <string name="settings_sharing_new_code_confirm">Make new code</string>
   <!-- The QR code, for screen readers. %1$s is the device's name or address. -->
   <string name="settings_sharing_qr">Pairing code for %1$s</string>
   <string name="settings_sharing_advanced">Advanced</string>

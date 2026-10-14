@@ -142,7 +142,7 @@
   <string name="launchpad_checklist_detected">%1$s erkannt</string>
   <string name="launchpad_checklist_connected">Verbunden</string>
   <string name="launchpad_checklist_get_it">Installieren</string>
-  <string name="launchpad_checklist_phone">Steuere %1$s mit deinem Telefon</string>
+  <string name="launchpad_checklist_phone">Verwalte Downloads für %1$s mit deinem Telefon</string>
   <string name="launchpad_checklist_show_qr">QR-Code anzeigen</string>
 
   <string name="downloads_clip_download">%1$s herunterladen</string>

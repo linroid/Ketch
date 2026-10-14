@@ -184,7 +184,7 @@
   <string name="launchpad_checklist_connected">Connected</string>
   <string name="launchpad_checklist_get_it">Get it</string>
   <!-- %1$s is this device as a sentence names it, such as "this Mac". -->
-  <string name="launchpad_checklist_phone">Control %1$s from your phone</string>
+  <string name="launchpad_checklist_phone">Control Ketch on %1$s from your phone</string>
   <string name="launchpad_checklist_show_qr">Show QR</string>
 
   <!-- The Add button and the phone's clipboard chip. %1$s is a file name, %2$s a site. -->

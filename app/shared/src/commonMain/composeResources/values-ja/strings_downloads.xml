@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">%1$sを検出</string>
   <string name="launchpad_checklist_connected">接続済み</string>
   <string name="launchpad_checklist_get_it">入手</string>
-  <string name="launchpad_checklist_phone">スマートフォンから%1$sを操作</string>
+  <string name="launchpad_checklist_phone">スマートフォンから%1$sのKetchを操作</string>
   <string name="launchpad_checklist_show_qr">QRコードを表示</string>
 
   <string name="downloads_clip_download">%1$sをダウンロード</string>

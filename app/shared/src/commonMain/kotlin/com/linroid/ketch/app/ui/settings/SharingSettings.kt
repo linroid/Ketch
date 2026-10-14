@@ -50,12 +50,13 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.ui.connect.PairingRequestCards
-import com.linroid.ketch.app.ui.connect.PairingWindowRow
-import com.linroid.ketch.app.ui.connect.ReportSharingShown
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.state.portError
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.common.AdaptiveModal
+import com.linroid.ketch.app.ui.connect.PairingRequestCards
+import com.linroid.ketch.app.ui.connect.PairingWindowRow
+import com.linroid.ketch.app.ui.connect.ReportSharingShown
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.app.util.pairingAddresses
 import com.linroid.ketch.config.ServerConfig
@@ -63,6 +64,7 @@ import io.github.alexzhirkevich.qrose.options.QrBrush
 import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.settings_action_hide
@@ -89,7 +91,10 @@ import ketch.app.shared.generated.resources.settings_sharing_failed
 import ketch.app.shared.generated.resources.settings_sharing_local_only
 import ketch.app.shared.generated.resources.settings_sharing_looking
 import ketch.app.shared.generated.resources.settings_sharing_new_code
+import ketch.app.shared.generated.resources.settings_sharing_new_code_body
+import ketch.app.shared.generated.resources.settings_sharing_new_code_confirm
 import ketch.app.shared.generated.resources.settings_sharing_new_code_hint
+import ketch.app.shared.generated.resources.settings_sharing_new_code_title
 import ketch.app.shared.generated.resources.settings_sharing_no_address
 import ketch.app.shared.generated.resources.settings_sharing_no_code
 import ketch.app.shared.generated.resources.settings_sharing_off_hint
@@ -158,8 +163,22 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     manager.stopServer()
     manager.startServer()
   }
+  // A new code disconnects every paired device, so it is asked first.
+  var confirmingNewCode by remember { mutableStateOf(false) }
+  val makeNewCode = {
+    save(config.copy(apiToken = newToken()))
+    if (serverState is ServerState.Running) restart()
+  }
+  if (confirmingNewCode) {
+    NewCodeDialog(
+      onConfirm = {
+        confirmingNewCode = false
+        makeNewCode()
+      },
+      onDismiss = { confirmingNewCode = false },
+    )
+  }
   ReportSharingShown(state)
-  PairingRequestCards(state)
   PairCard(
     name = device.label,
     serverState = serverState,
@@ -181,10 +200,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
       save(config.copy(autoStart = false))
       manager.stopServer()
     },
-    onNewCode = {
-      save(config.copy(apiToken = newToken()))
-      restart()
-    },
+    onNewCode = { confirmingNewCode = true },
     onRefresh = { networks.loadNetworks() },
   ) { running ->
     // Devices find this one and ask to pair only while it is shared with them.
@@ -198,6 +214,8 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
       onCheckedChange = { save(config.copy(autoStart = it)) },
     )
   }
+  // Below the pairing controls they answer to.
+  PairingRequestCards(state)
   val running = serverState as? ServerState.Running
   // Starting with Ketch only matters at launch, so it never calls for a restart.
   if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
@@ -218,9 +236,9 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
   AdvancedGroup(
     config = config,
     onChange = save,
+    // Creating the first code disconnects nobody.
     onRotate = {
-      save(config.copy(apiToken = newToken()))
-      if (serverState is ServerState.Running) restart()
+      if (config.apiToken.isNullOrEmpty()) makeNewCode() else confirmingNewCode = true
     },
   )
 }
@@ -659,6 +677,41 @@ private fun AdvancedGroup(
         enabled = token.isNotEmpty(),
       )
     }
+  }
+}
+
+/**
+ * Asks before a new access code replaces the current one: every paired device is disconnected
+ * and has to pair again, and the pairing link and QR code shown so far stop working.
+ */
+@Composable
+internal fun NewCodeDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+  AdaptiveModal(
+    onDismissRequest = onDismiss,
+    title = { Text(stringResource(Res.string.settings_sharing_new_code_title)) },
+    confirmButton = {
+      KetchButton(
+        text = stringResource(Res.string.settings_sharing_new_code_confirm),
+        onClick = onConfirm,
+        variant = KetchButtonVariant.Danger,
+      )
+    },
+    dismissButton = {
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Secondary,
+      )
+    },
+  ) {
+    Text(
+      text = stringResource(
+        Res.string.settings_sharing_new_code_body,
+        localDeviceNounInSentence().resolve(),
+      ),
+      style = KetchTheme.typography.bodyS,
+      color = KetchTheme.colors.textSecondary,
+    )
   }
 }
 
