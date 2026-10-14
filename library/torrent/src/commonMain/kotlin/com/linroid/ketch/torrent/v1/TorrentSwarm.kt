@@ -36,6 +36,7 @@ import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerOrigin
 import com.linroid.ketch.torrent.peer.PeerOutcomeReport
 import com.linroid.ketch.torrent.peer.PeerProtocolState
+import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.peer.PeerStage
 import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PeerWire
@@ -585,6 +586,9 @@ internal class TorrentSwarm(
     var listen: PeerEndpoint? = if (incoming) null else endpoint
       private set
     private val uploadCache = TorrentUploadCache(store, uploadBudget)
+    /** Whole pieces read back for this peer, beyond what it takes of them. */
+    private val serveCredit =
+      PeerServeCredit(PeerServeCredit.capacityFor(store.metadata.pieceLength), nowMs)
     /** Requests of the peer we unchoked, oldest first; at most what we advertise (`reqq`). */
     private val uploads = ArrayDeque<PeerMessage.Request>()
     /** When the upload buckets admit the next block, if they held the last one back. */
@@ -883,12 +887,21 @@ internal class TorrentSwarm(
     /**
      * Sends queued blocks while the upload buckets admit them. A held block waits for a later
      * pass, so a low limit never keeps this worker from reading the peer or keeping its
-     * deadlines.
+     * deadlines. Blocks of the piece at hand go first, and reading another piece costs the
+     * peer's [serveCredit]: a peer that spent it has its requests for other pieces rejected,
+     * so asking a block of each piece in turn never makes us read and hash whole pieces for it.
      */
     private suspend fun serveUploads() {
       // Choked, only allowed-fast requests are left queued (BEP 6).
       while (uploads.isNotEmpty() && uploadRetryAt <= nowMs()) {
-        val request = uploads.first()
+        val request = uploads.firstOrNull { uploadCache.holds(it.index) } ?: uploads.first()
+        val readCost =
+          if (uploadCache.holds(request.index)) 0L else store.pieceSize(request.index).toLong()
+        if (!serveCredit.tryCharge(readCost)) {
+          log.v { "Peer $endpoint of $logLabel spent its reads; refusing piece ${request.index}" }
+          rejectUploads { it.index == request.index }
+          continue
+        }
         val bytes = try {
           storage { uploadCache.read(request.index) }
         } catch (revoked: PieceRevokedException) {
@@ -901,6 +914,7 @@ internal class TorrentSwarm(
           return
         }
         if (bytes == null) {
+          serveCredit.refund(readCost)
           // No buffer for the piece: the choker hands the slot on, and the peer is choked next.
           rejectUploads()
           chokerMutex.withLock { choker.refused(id) }
@@ -911,7 +925,8 @@ internal class TorrentSwarm(
           uploadRetryAt = nowMs() + delay
           return
         }
-        uploads.removeFirst()
+        uploads.remove(request)
+        serveCredit.earn(request.length.toLong())
         onUploaded(request.length)
         wire.send(PeerMessage.Piece(request.index, request.begin,
           bytes.copyOfRange(request.begin, request.begin + request.length)))

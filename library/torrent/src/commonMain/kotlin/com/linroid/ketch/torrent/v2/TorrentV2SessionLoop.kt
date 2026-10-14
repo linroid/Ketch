@@ -984,7 +984,7 @@ internal object TorrentV2SessionLoop {
                       v1 = it.mode == PeerIdentityHandshake.Mode.V1)
                   }
                   val view = TorrentV2PeerView(peerEvent.commands, info, viewLease, nowMs,
-                    traffic)
+                    traffic, layout.pieceLength)
                   peers[peerEvent.peer] = view
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.

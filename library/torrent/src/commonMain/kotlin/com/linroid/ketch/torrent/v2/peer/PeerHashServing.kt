@@ -8,6 +8,7 @@ import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import okio.Buffer
@@ -114,7 +115,10 @@ internal fun peerHashProof(
  * repeated requests never read a piece again. Reading one back is upload work: [canRead] is
  * asked first and, when it refuses, the request is rejected without reading; a piece that was
  * read pays its bytes to [chargeRead], and a read that fails or never happens pays nothing.
- * One caller at a time (the serve worker).
+ * Every answer pays its bytes to [chargeAnswer], so hashes count against the upload limits. Each [respond] also does at most the work its caller allows, in bytes
+ * read back and hashes folded ([PeerServeCredit.HASH_COST] each), and reports what it did in
+ * [lastWork], so a peer pays for the work its requests cause. One caller at a time (the serve
+ * worker).
  */
 internal class TorrentV2HashServer(
   private val document: TorrentV2Document,
@@ -125,6 +129,7 @@ internal class TorrentV2HashServer(
   private val maxSubtrees: Int = 4,
   private val canRead: suspend () -> Boolean = { true },
   private val chargeRead: suspend (bytes: Long) -> Unit = {},
+  private val chargeAnswer: suspend (bytes: Long) -> Unit = {},
 ) {
   private class Upper(
     /** Nodes from the cache's first level up to the root's, each level's hashes in a row. */
@@ -156,16 +161,42 @@ internal class TorrentV2HashServer(
   /** Bytes the upper-level caches hold; for tests. */
   internal val cacheBytes: Int get() = cachedBytes
 
+  /** The work the last [respond] did: bytes read back and hashes folded, in bytes. */
+  var lastWork = 0L
+    private set
+  private var workLimit = Long.MAX_VALUE
+
+  /** [respond] would do more work than it was allowed; nothing more is computed. */
+  private class WorkLimitException : Exception()
+
   /**
    * The hashes answering [selector], whose [bounds] came from [peerHashServeBounds], or null to
-   * reject it: the piece it needs is not readable, or its upper levels cannot be cached.
+   * reject it: the piece it needs is not readable, its upper levels cannot be cached, or it
+   * would take more than [maxWork] bytes of work.
    */
   suspend fun respond(
     selector: PeerHashSelector,
     bounds: HashServeBounds,
+    maxWork: Long = Long.MAX_VALUE,
     piece: suspend (Int) -> TorrentV2PieceStore.ReadOutcome,
   ): ByteString? {
     check(!closed) { "Hash server is closed" }
+    lastWork = 0
+    workLimit = maxWork
+    val answer = try {
+      prove(selector, bounds, piece)
+    } catch (_: WorkLimitException) {
+      null
+    } ?: return null
+    chargeAnswer(answer.size.toLong())
+    return answer
+  }
+
+  private suspend fun prove(
+    selector: PeerHashSelector,
+    bounds: HashServeBounds,
+    piece: suspend (Int) -> TorrentV2PieceStore.ReadOutcome,
+  ): ByteString? {
     val base = selector.baseLayer
     val group = selector.length.countTrailingZeroBits()
     val uncles = selector.hashCount - selector.length
@@ -187,9 +218,21 @@ internal class TorrentV2HashServer(
         layer == null -> error("Hash node above a piece without a layer")
         level == bounds.pieceLayer -> hash(layer, index)
         cached != null && level >= cacheLevel -> hash(cached.levels[level - cacheLevel], index)
-        else -> fold(layer, bounds.pieceLayer, level, index)
+        else -> {
+          val count = layer.size / 32L
+          val leaves = minOf((index + 1) shl (level - bounds.pieceLayer), count) -
+            (index shl (level - bounds.pieceLayer))
+          spend(leaves.coerceAtLeast(1) * PeerServeCredit.HASH_COST)
+          fold(layer, bounds.pieceLayer, level, index)
+        }
       }
     }
+  }
+
+  /** Counts [bytes] of work towards [lastWork], refusing work past the caller's limit. */
+  private fun spend(bytes: Long) {
+    if (lastWork + bytes > workLimit) throw WorkLimitException()
+    lastWork += bytes
   }
 
   /** Releases every cached hash. */
@@ -298,7 +341,7 @@ internal class TorrentV2HashServer(
       kept.lease.close()
     }
     // Refused, it leaves the kept pieces alone.
-    if (!canRead()) return null
+    if (!canRead() || lastWork + layout.pieceLength > workLimit) return null
     while (subtrees.size >= maxSubtrees) evictOldestSubtree()
     val hashBytes = (1 shl span) * 2 * 32 + 256
     var lease = state.reserve(hashBytes)
@@ -317,6 +360,7 @@ internal class TorrentV2HashServer(
       val rows = try {
         // Only a piece actually read is upload work the limits pay for.
         chargeRead(outcome.buffer.bytes.size.toLong())
+        lastWork += outcome.buffer.bytes.size
         val bytes = outcome.buffer.bytes
         val firstBlock = (piece - bounds.firstPiece) shl span
         var row = (0 until leaves).map { offset ->

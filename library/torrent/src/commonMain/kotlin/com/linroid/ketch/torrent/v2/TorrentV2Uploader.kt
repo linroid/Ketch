@@ -235,6 +235,7 @@ internal class TorrentV2Uploader private constructor(
     view.uploadsInFlight--
     val length = event.request.length
     if (event.sent) {
+      view.serveCredit.earn(length.toLong())
       store.recordUploaded(length)
       if (peer.info?.mode == PeerIdentityHandshake.Mode.V1) swarm.uploadedOverV1(length)
       choker.uploaded(peer, length.toLong())
@@ -347,9 +348,20 @@ internal class TorrentV2Uploader private constructor(
     val request = view.uploads.first()
     val piece = cache[request.index]
     if (piece == null) {
+      // Reading a piece back costs the peer that needs it, once, unless another peer's read of
+      // it is already out; one that spent its share is refused the pieces nobody holds for it.
+      if (request.index !in loading && view.paidRead != request.index) {
+        if (!view.serveCredit.tryCharge(pieceBytes(request.index))) {
+          dropUploads(view) { it.index == request.index }
+          return true
+        }
+        view.paidRead = request.index
+      }
       load(request.index, now, peers)
       return false
     }
+    // Read and at hand: a later read of it, once evicted, is paid again.
+    if (view.paidRead == request.index) view.paidRead = -1
     val lease = buffers.reserve(request.length + 256)
     if (lease == null) {
       view.uploadRetryAt = now + RETRY_MS

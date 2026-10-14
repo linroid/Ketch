@@ -821,6 +821,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentConfig.maxActiveTorrents` slots takes the oldest seeder's (the task keeps its intent),
   or until Ketch closes; a torrent that finishes while a download waits does not seed.
   Seeding runs only while the process runs
+- Serving work is paid per peer (`PeerServeCredit`, v1 `PeerWorker` and `TorrentV2PeerView`):
+  each holds two pieces and 4 MiB of work, refilled over 30 s and by twice the payload it is
+  sent. Reading a piece back (and hashing it) to send a block costs the piece, once while it is
+  at hand (v1 serves the cached piece's requests first; v2 charges the peer whose request starts
+  the read); a peer out of credit has its requests for other pieces rejected. A BEP 52 hash
+  request reserves at most `MAX_PROOF_WORK` (4096 folded hashes, `HASH_COST` 64 bytes each,
+  plus a piece below the piece layer), `TorrentV2HashServer.respond(maxWork)` stops before
+  folding past it and reports `lastWork`, and the rest is refunded. Every hash answer also pays
+  its bytes to the upload limits (`chargeAnswer`). The credit bounds this work even when the upload
+  limits, unlimited by default, do not
 - Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
   hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
   0x04 (`PeerHandshake.fast`), and with both bits set `PeerProtocolState(fast = true)` takes

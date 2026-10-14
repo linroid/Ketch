@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.v2
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
+import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.v2.peer.PeerHashSelector
 import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
@@ -17,9 +18,13 @@ import com.linroid.ketch.torrent.v2.peer.peerHashServeBounds
  * authenticated document, the peer has fewer than [MAX_PENDING_HASH_REQUESTS] being answered,
  * and the worker takes it. Hashes below the piece layer come from a piece read back from
  * storage, so those are proved only to peers we unchoke and only for verified pieces, and the
- * worker rejects them while the upload limits cannot pay for that read. Peers wait for an answer
- * to every request, so answers the actor has no room for yet wait in the peer's view, in order,
- * and go out on later passes.
+ * worker rejects them while the upload limits cannot pay for that read. Every answer is upload
+ * work the limits pay for, and the work it takes, folding hashes and reading pieces back, comes
+ * out of the peer's [TorrentV2PeerView.serveCredit]: each request reserves at most
+ * [MAX_PROOF_WORK] of it (and a piece more below the piece layer), gives back what the worker
+ * did not use, and is rejected once the peer has spent its share. Peers wait for an answer to
+ * every request, so answers the actor has no room for yet wait in the peer's view, in order, and
+ * go out on later passes.
  */
 internal class TorrentV2HashRequests(
   private val layout: TorrentContentLayout,
@@ -45,10 +50,17 @@ internal class TorrentV2HashRequests(
     val bounds = if (serve == null || disabled || view.hashPending >= MAX_PENDING_HASH_REQUESTS) {
       null
     } else peerHashServeBounds(swarm.document, layout, selector)
-    val admitted = bounds != null &&
-      (!bounds.blockPath || !view.amChoking && verified(bounds.piece(selector).toInt())) &&
-      checkNotNull(serve).trySubmit(TorrentV2ServeWorker.Job.Proof(peer, selector, bounds))
-    if (!admitted) return reject(view, selector)
+    if (bounds == null ||
+      bounds.blockPath && (view.amChoking || !verified(bounds.piece(selector).toInt()))) {
+      return reject(view, selector)
+    }
+    val wanted = MAX_PROOF_WORK + if (bounds.blockPath) layout.pieceLength else 0
+    val maxWork = minOf(view.serveCredit.available, wanted)
+    if (maxWork < PeerServeCredit.HASH_COST || !view.serveCredit.tryCharge(maxWork) ||
+      !checkNotNull(serve).trySubmit(
+        TorrentV2ServeWorker.Job.Proof(peer, selector, bounds, maxWork))) {
+      return reject(view, selector)
+    }
     view.hashPending++
     return TorrentV2Uploader.Verdict.KEEP
   }
@@ -63,6 +75,7 @@ internal class TorrentV2HashRequests(
       result.close()
       return TorrentV2Uploader.Verdict.KEEP
     }
+    view.serveCredit.refund(result.maxWork - result.work)
     return answer(view, result.command())
   }
 
@@ -72,6 +85,7 @@ internal class TorrentV2HashRequests(
     peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>,
   ): TorrentV2Uploader.Verdict {
     val view = peers[result.peer] ?: return TorrentV2Uploader.Verdict.KEEP
+    view.serveCredit.refund(result.maxWork - result.work)
     answered(view)
     return reject(view, result.selector)
   }
@@ -124,3 +138,6 @@ internal class TorrentV2HashRequests(
     return TorrentV2Uploader.Verdict.KEEP
   }
 }
+
+/** Work one hash request may cause, beyond a piece read back: 4096 hashes folded. */
+internal const val MAX_PROOF_WORK = 4096 * PeerServeCredit.HASH_COST

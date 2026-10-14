@@ -317,6 +317,89 @@ class TorrentUploadTest {
   }
 
   @Test
+  fun peerAskingABlockOfEachPiece_isRefusedOnceItSpentItsReads() = seeder { wire, pieces ->
+    var served = 0
+    var refused = 0
+    for (index in 0 until pieces) {
+      wire.send(PeerMessage.Request(index, 0, 16_384))
+      when (val answer = answer(wire)) {
+        is PeerMessage.Piece -> served++
+        is PeerMessage.Reject -> refused++
+        else -> error("Unexpected $answer")
+      }
+    }
+    // Its share holds two 1 MiB pieces and 4 MiB more: a few pieces, then refusals, never the
+    // 16 whole pieces it would have had us read and hash for 16 KiB each.
+    assertTrue(served in 5..7, "served $served")
+    assertEquals(pieces - served, refused)
+  }
+
+  @Test
+  fun peerTakingWholePieces_isNeverRefused() = seeder { wire, pieces ->
+    for (index in 0 until pieces) {
+      for (begin in 0 until PIECE step 16_384) {
+        wire.send(PeerMessage.Request(index, begin, 16_384))
+        val answer = answer(wire)
+        assertTrue(answer is PeerMessage.Piece, "piece $index at $begin: $answer")
+      }
+    }
+  }
+
+  /** The next block or reject the seeder sends. */
+  private suspend fun answer(wire: PeerWire): PeerMessage {
+    while (true) {
+      val message = wire.read()
+      if (message is PeerMessage.Piece || message is PeerMessage.Reject) return message
+    }
+  }
+
+  /** A Fast peer an engine seeding 16 pieces of [PIECE] bytes unchoked. */
+  private fun seeder(test: suspend (PeerWire, Int) -> Unit) = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        val pieces = 16
+        val bytes = ByteArray(pieces * PIECE) { (it * 31 + it / PIECE).toByte() }
+        val hashes = (0 until pieces).fold(ByteArray(0)) { all, index ->
+          all + sha1Digest(bytes.copyOfRange(index * PIECE, (index + 1) * PIECE))
+        }
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "data", "length" to bytes.size.toLong(), "piece length" to PIECE.toLong(),
+          "pieces" to hashes
+        ))))
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-upload-credit-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        torrentFileSystem.createDirectories(root)
+        torrentFileSystem.write(root / "data") { write(bytes) }
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
+        val network = createTorrentNetwork()
+        try {
+          engine.start()
+          val session = engine.addTask(TorrentTaskSpec("seed", metadata,
+            (root / "data").toString(), emptySet()))
+          session.resume()
+          assertEquals(TorrentSessionState.SEEDING, session.state.first {
+            it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+          }, session.failure.value?.stackTraceToString())
+          val connection = network.connect(PeerEndpoint("127.0.0.1", engine.listenPort))
+          try {
+            val wire = PeerWire(connection, metadata)
+            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), false, false,
+              fast = true))
+            wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+            while (wire.read() != unchoke) { }
+            test(wire, pieces)
+          } finally { connection.close() }
+        } finally {
+          engine.stop()
+          network.close()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
   fun cancelRemovesHeldV1Request() = heldUploads {
     // The engine's bucket holds one block: the first request takes it, the second waits.
     wire.send(PeerMessage.Request(0, 0, 16_384))
@@ -540,3 +623,5 @@ class TorrentUploadTest {
     }
   }
 }
+
+private const val PIECE = 1024 * 1024

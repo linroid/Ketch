@@ -50,7 +50,7 @@ class TorrentMerkleProofServingReferenceTest {
       val selector = PeerHashSelector(checkNotNull(document.info.files[file].piecesRoot), base,
         index, length, proof)
       val bounds = peerHashServeBounds(document, layout, selector) ?: continue
-      val hashes = checkNotNull(servers[served % 2].respond(selector, bounds, ::read)) {
+      val hashes = checkNotNull(servers[served % 2].respond(selector, bounds, piece = ::read)) {
         "Rejected $selector"
       }
       val expected = buildList {

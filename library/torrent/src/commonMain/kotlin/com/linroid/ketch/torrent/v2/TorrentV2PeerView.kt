@@ -6,11 +6,15 @@ import com.linroid.ketch.torrent.peer.PeerExchange
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerProtocolState
+import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PexIntroductions
 import com.linroid.ketch.torrent.v2.peer.PeerInfo
 import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import kotlinx.coroutines.channels.SendChannel
+
+/** The largest piece a torrent may have, which views without one size their credit for. */
+private const val MAX_PIECE_LENGTH = 16L * 1024 * 1024
 
 /** Session-state charge for one ready peer's loop view on a swarm session. */
 internal const val PEER_VIEW_BYTES = 16 * 1024
@@ -45,7 +49,12 @@ internal class TorrentV2PeerView(
   nowMs: () -> Long = monotonicClock(),
   /** This peer among the task's live connections; closed with the view. */
   val traffic: PeerTraffic? = null,
+  /** The swarm's piece length, which sizes [serveCredit]; the largest a piece may be. */
+  pieceLength: Long = MAX_PIECE_LENGTH,
 ) {
+  /** Pieces read back and hashes folded for this peer, beyond what it takes of them. */
+  val serveCredit = PeerServeCredit(PeerServeCredit.capacityFor(pieceLength), nowMs)
+
   // Download
   var choked = true
   var needed = 0
@@ -140,6 +149,9 @@ internal class TorrentV2PeerView(
 
   /** Hash requests accepted and not yet answered, at most [MAX_PENDING_HASH_REQUESTS]. */
   var hashPending = 0
+
+  /** The piece this peer last paid [serveCredit] to have read back, so it pays once for it. */
+  var paidRead = -1
 
   /**
    * Hashes and rejects for this peer that its actor's queue had no room for yet, oldest first;

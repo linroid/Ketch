@@ -22,6 +22,9 @@ internal class TorrentUploadCache(
   private var lease: TorrentBufferBudget.Lease? = null
   private var usedAt = TimeSource.Monotonic.markNow()
 
+  /** Whether [read] has [piece] at hand, without reading it again. */
+  fun holds(piece: Int): Boolean = piece == index && bytes != null
+
   suspend fun read(piece: Int): ByteArray? {
     if (piece != index) {
       close()

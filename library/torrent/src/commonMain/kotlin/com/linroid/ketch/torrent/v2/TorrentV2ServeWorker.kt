@@ -32,11 +32,15 @@ internal class TorrentV2ServeWorker private constructor(
     /** Reads committed piece [index] again from disk, authenticated. */
     data class ReadPiece(val index: Int) : Job
 
-    /** Answers [peer]'s hash request [selector], whose [bounds] the loop already checked. */
+    /**
+     * Answers [peer]'s hash request [selector], whose [bounds] the loop already checked, doing
+     * at most [maxWork] bytes of work (see [TorrentV2HashServer.respond]).
+     */
     class Proof(
       val peer: PeerV2Pool.Peer,
       val selector: PeerHashSelector,
       val bounds: HashServeBounds,
+      val maxWork: Long = Long.MAX_VALUE,
     ) : Job
   }
 
@@ -51,11 +55,16 @@ internal class TorrentV2ServeWorker private constructor(
       }
     }
 
-    /** The hashes answering one of [peer]'s requests; a lease of the uploads covers them. */
+    /**
+     * The hashes answering one of [peer]'s requests; a lease of the uploads covers them. Proving
+     * them took [work] bytes of the [maxWork] the job allowed.
+     */
     class Hashes(
       val peer: PeerV2Pool.Peer,
       val message: PeerHashMessage.Hashes,
       lease: TorrentBufferBudget.Lease,
+      val work: Long = 0,
+      val maxWork: Long = 0,
     ) : Result {
       private var lease: TorrentBufferBudget.Lease? = lease
 
@@ -72,8 +81,16 @@ internal class TorrentV2ServeWorker private constructor(
       }
     }
 
-    /** [peer]'s request [selector] cannot be answered now, so it is rejected. */
-    data class HashesRejected(val peer: PeerV2Pool.Peer, val selector: PeerHashSelector) : Result
+    /**
+     * [peer]'s request [selector] cannot be answered now, so it is rejected, after [work] bytes
+     * of the [maxWork] its job allowed.
+     */
+    data class HashesRejected(
+      val peer: PeerV2Pool.Peer,
+      val selector: PeerHashSelector,
+      val work: Long = 0,
+      val maxWork: Long = 0,
+    ) : Result
   }
 
   /** False when the queue is full; the loop tries again later or rejects. */
@@ -118,7 +135,7 @@ internal class TorrentV2ServeWorker private constructor(
               is Job.Proof -> {
                 // A verified piece found changed on disk fails the session like an upload read.
                 var revoked: Result.Piece? = null
-                val hashes = server?.respond(job.selector, job.bounds) { index ->
+                val hashes = server?.respond(job.selector, job.bounds, job.maxWork) { index ->
                   read(index).also {
                     if (it is TorrentV2PieceStore.ReadOutcome.Revoked) {
                       revoked = Result.Piece(index, it)
@@ -126,10 +143,12 @@ internal class TorrentV2ServeWorker private constructor(
                   }
                 }
                 revoked?.let { deliver(it) }
+                val work = server?.lastWork ?: 0
                 val lease = hashes?.let { checkNotNull(uploads).reserve(it.size + 256) }
                 deliver(if (hashes != null && lease != null) {
-                  Result.Hashes(job.peer, PeerHashMessage.Hashes(job.selector, hashes), lease)
-                } else Result.HashesRejected(job.peer, job.selector))
+                  Result.Hashes(job.peer, PeerHashMessage.Hashes(job.selector, hashes), lease,
+                    work, job.maxWork)
+                } else Result.HashesRejected(job.peer, job.selector, work, job.maxWork))
               }
             }
           }

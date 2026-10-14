@@ -5,6 +5,7 @@ import com.linroid.ketch.torrent.crypto.Sha256
 import com.linroid.ketch.torrent.crypto.merkleZeroHash
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
+import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import kotlinx.coroutines.test.runTest
@@ -69,7 +70,7 @@ class PeerHashServingTest {
     read: suspend (Int) -> TorrentV2PieceStore.ReadOutcome = reader(),
   ): ByteString? {
     val bounds = peerHashServeBounds(document, layout, selector) ?: return null
-    return server.respond(selector, bounds, read)
+    return server.respond(selector, bounds, piece = read)
   }
 
   private fun verifies(file: Int, selector: PeerHashSelector, hashes: ByteString): Boolean =
@@ -287,6 +288,31 @@ class PeerHashServingTest {
   }
 
   @Test
+  fun foldingPastTheWorkLimit_isRejected_andWorkIsReported() = runTest {
+    val answers = mutableListOf<Long>()
+    val server = TorrentV2HashServer(document, layout, TorrentBufferBudget(1_000_000),
+      chargeAnswer = { answers += it })
+    // Level 5 is three above the piece layer, below the cached levels: 8 nodes of 8 hashes.
+    val selector = selector(0, 5, 0, 8, 2)
+    val bounds = assertNotNull(peerHashServeBounds(document, layout, selector))
+
+    assertNull(server.respond(selector, bounds, maxWork = 1_000, piece = reader()))
+    assertTrue(server.lastWork <= 1_000)
+    val hashes = assertNotNull(server.respond(selector, bounds, piece = reader()))
+    assertEquals(expected(0, selector), hashes)
+    assertTrue(server.lastWork in PeerServeCredit.HASH_COST * 32..PeerServeCredit.HASH_COST * 64,
+      "work ${server.lastWork}")
+    // The piece layer itself costs nothing to fold.
+    val layerSelector = selector(0, 2, 0, 32, 5)
+    val layerHashes = assertNotNull(server.respond(layerSelector,
+      assertNotNull(peerHashServeBounds(document, layout, layerSelector)), piece = reader()))
+    assertTrue(server.lastWork < MAX_PROOF_WORK_FOR_TESTS, "work ${server.lastWork}")
+    // Each answer pays its bytes to the upload limits; the rejected one paid nothing.
+    assertEquals(listOf(hashes.size.toLong(), layerHashes.size.toLong()), answers)
+    server.close()
+  }
+
+  @Test
   fun rejectsCrossPieceBlockRange() {
     // Leaves 0 to 7 belong to pieces 0 and 1.
     assertNull(peerHashServeBounds(document, layout, selector(0, 0, 0, 8, 4)))
@@ -380,3 +406,6 @@ class PeerHashServingTest {
     assertEquals(0, buffers.allocated)
   }
 }
+
+/** What [com.linroid.ketch.torrent.v2.MAX_PROOF_WORK] allows one request. */
+private const val MAX_PROOF_WORK_FOR_TESTS = 4096 * 64L
